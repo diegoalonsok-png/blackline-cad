@@ -1,4 +1,4 @@
-# BLACKLINE CAD — 2D drafting web prototype
+# CAD2D — 2D drafting web prototype
 
 A self-contained, dependency-free, English-language CAD workspace. Dark ribbon interface inspired by conventional CAD UI patterns and scholarly dark UI design.
 
@@ -30,3 +30,7 @@ Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. There is n
 ## Intellectual property
 
 This prototype uses original HTML/CSS/JavaScript. It does not redistribute Autodesk or IntelliCAD UI artwork, program code or trademarks.
+
+## CAD2D movable palettes
+
+Drag any palette title to undock and move it across the drawing. Resize floating palettes from the lower-right corner. Each palette title provides Float, Dock left, Dock right, and Collapse buttons. The header includes **Reset layout**. Dock positions are stored locally in the browser. The public GitHub Pages URL stays `/blackline-cad/` for continuity.
