@@ -282,13 +282,30 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .layer-row{grid-template-columns:20px 18px 20px minmax(0,1fr) 20px}
 .layer-list{scrollbar-width:thin}
 
+
+/* CAD2D movable upper ribbon: docked by default, drag via its dedicated grip */
+.app{grid-template-rows:48px 36px var(--ribbon-row-height,var(--ribbon-height,88px)) minmax(0,1fr) 66px 27px}
+.ribbon-shell{display:flex;align-items:stretch;position:relative;min-width:0;min-height:0;background:#181b1e;border-bottom:1px solid #30353b}
+.ribbon-shell>.ribbon{flex:1;min-width:0;height:100%;border-bottom:0}
+.ribbon-grip{width:22px;flex:0 0 22px;display:flex;align-items:center;justify-content:center;cursor:grab;user-select:none;touch-action:none;color:#9ca6af;border-right:1px solid #343a40;background:#202429;font-size:15px;letter-spacing:-2px}
+.ribbon-grip:hover,.ribbon-grip:focus-visible{background:#384049;color:#f2f4f6;outline:1px solid #7e8d9b;outline-offset:-2px}
+.ribbon-grip:active{cursor:grabbing}
+.ribbon-dock{display:none;position:absolute;right:7px;top:5px;z-index:2;padding:5px 9px;border:1px solid #4b555f;background:#272d34;color:#e3e8ed;border-radius:5px;font-size:11px;cursor:pointer}
+.ribbon-dock:hover{background:#414b56}
+.ribbon-shell.floating{position:fixed!important;z-index:65!important;display:flex;width:min(850px,90vw);height:112px;max-width:96vw;max-height:50vh;min-width:320px;min-height:82px;resize:both;overflow:hidden;border:1px solid #59636e;border-radius:8px;box-shadow:0 15px 45px #000b}
+.ribbon-shell.floating .ribbon{padding-right:70px}
+.ribbon-shell.floating .ribbon-dock{display:block}
+.ribbon-shell.floating .ribbon-grip{background:#353d45}
+.app.ribbon-undocked #ribbonSizer{display:none}
+@media(max-width:620px){.app{grid-template-rows:48px 36px var(--ribbon-row-height,var(--ribbon-height,88px)) minmax(0,1fr) 66px 27px}.ribbon-shell.floating{min-width:240px;max-width:98vw}}
+
 </style>
 </head>
 <body>
 <div class="app">
  <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>PRECISION DRAFTING · 2D</small></div><div class="filename" id="filename">Untitled Drawing.dxf</div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn">Export DXF</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
- <div class="ribbon" id="ribbon"></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
+ <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
   <aside class="sidebar"><section class="panel"><div class="panel-title">Drawing properties</div><div class="panel-content"><div class="field"><label>Units</label><select id="units"><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="m" selected>Meters</option><option value="in">Inches</option><option value="ft">Feet</option></select></div><div class="field"><label>Grid spacing</label><input id="gridSpacing" type="number" min="0.00001" step="any" value="1"></div><div class="field"><label>Precision</label><select id="precision"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option></select></div><div class="field"><label>Line width</label><input id="lineWidth" type="number" step="0.05" min="0.05" max="5" value="0.25"></div><div class="help">Model space is unbounded. Use mouse wheel to zoom and middle mouse / Space + drag to pan. All geometry is stored in drawing units.</div></div></section><section class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column"><div class="panel-title">Layer manager <span id="layerCount">0</span></div><div class="panel-content" style="display:flex;flex-direction:column;flex:1;min-height:0"><div class="smallrow"><button class="btn" id="newLayer">+ Add layer</button><button class="btn" id="removeLayer">Remove</button></div><div class="layer-list" id="layers"></div><p class="help">Select a layer name to make it current. Toggle visibility and lock on each row.</p></div></section><section class="panel"><div class="panel-title">Blocks</div><div class="panel-content"><div class="smallrow"><button class="btn" id="createBlockBtn">Create from selection</button></div><div class="field"><label>Block</label><select id="blockLibrary"><option value="">No blocks</option></select></div><div class="smallrow"><button class="btn" id="insertBlockBtn">Insert at center</button><button class="btn" id="removeBlockBtn">Remove</button></div><p class="help">Reusable 2D block templates. Inserted entities retain their layer and their block name. Native DXF BLOCK/INSERT preservation is in development.</p></div></section></aside>
   <main class="canvas-wrap" id="canvasWrap"><canvas id="cadCanvas"></canvas><div class="canvas-overlay"><b>TOP</b> · 2D MODEL SPACE <span id="canvasUnits">· m</span><br><span id="toolPrompt">Select objects or choose a drawing tool</span></div><div class="view-tools"><button id="zoomIn" title="Zoom in">+</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomExtents" title="Zoom extents">⊞</button><button id="panBtn" title="Pan">✥</button></div><div id="modelScaleBadge">MODEL 1:1 · zoom is display only</div><div class="canvas-bottom"><span class="active">MODEL</span><span>LAYOUT / PDF →</span></div><div id="toast" class="toast"></div></main>
@@ -676,6 +693,67 @@ function initBlocks(){
 /* Keep the Layers palette at the top of the left dock, above Drawing properties. */
 (function(){const dock=document.querySelector('.workspace>.sidebar:not(.rightside)');const layers=dock&&[...dock.querySelectorAll(':scope > .panel')].find(p=>p.querySelector('#layers'));if(dock&&layers)dock.prepend(layers)})();
 
+
+/* Floating ribbon is independent of movable side palettes. Drag only the grip. */
+function initMovableRibbon(){
+ const app=document.querySelector('.app'),shell=$('ribbonShell'),grip=$('ribbonGrip'),dockButton=$('dockRibbonBtn');
+ const clamp=(v,min,max)=>Math.max(min,Math.min(v,max));
+ let drag=null;
+ function dock(){
+  shell.classList.remove('floating');
+  app.classList.remove('ribbon-undocked');
+  app.style.removeProperty('--ribbon-row-height');
+  for(const key of ['left','top','width','height'])shell.style.removeProperty(key);
+  resize();
+ }
+ function floatAt(x,y){
+  if(!shell.classList.contains('floating')){
+   const rect=shell.getBoundingClientRect();
+   shell.style.width=Math.min(Math.max(rect.width*.75,390),850,window.innerWidth-20)+'px';
+   shell.style.height=Math.max(100,rect.height)+'px';
+  }
+  shell.classList.add('floating');
+  app.classList.add('ribbon-undocked');
+  app.style.setProperty('--ribbon-row-height','0px');
+  shell.style.left=clamp(x,0,Math.max(0,innerWidth-120))+'px';
+  shell.style.top=clamp(y,0,Math.max(0,innerHeight-50))+'px';
+  resize();
+ }
+ dockButton.addEventListener('click',dock);
+ grip.addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();shell.classList.contains('floating')?dock():floatAt(20,120)}
+ });
+ grip.addEventListener('pointerdown',ev=>{
+  if(ev.button!==0)return;
+  ev.preventDefault();
+  const rect=shell.getBoundingClientRect();
+  drag={id:ev.pointerId,dx:ev.clientX-rect.left,dy:ev.clientY-rect.top,fromDock:!shell.classList.contains('floating')};
+  grip.setPointerCapture(ev.pointerId);
+ });
+ grip.addEventListener('pointermove',ev=>{
+  if(!drag||ev.pointerId!==drag.id)return;
+  if(drag.fromDock){floatAt(ev.clientX-drag.dx,ev.clientY-drag.dy);drag.fromDock=false}
+  else{
+   shell.style.left=clamp(ev.clientX-drag.dx,0,Math.max(0,innerWidth-120))+'px';
+   shell.style.top=clamp(ev.clientY-drag.dy,0,Math.max(0,innerHeight-50))+'px';
+  }
+ });
+ function stop(ev){
+  if(!drag||drag.id!==ev.pointerId)return;
+  drag=null;
+  if(shell.classList.contains('floating')&&ev.clientY<88)dock();
+ }
+ grip.addEventListener('pointerup',stop);
+ grip.addEventListener('pointercancel',stop);
+ window.addEventListener('resize',()=>{
+  if(!shell.classList.contains('floating'))return;
+  shell.style.left=clamp(parseFloat(shell.style.left)||0,0,Math.max(0,innerWidth-120))+'px';
+  shell.style.top=clamp(parseFloat(shell.style.top)||0,0,Math.max(0,innerHeight-50))+'px';
+ });
+ const reset=$('resetWorkspace'),existing=reset.onclick;
+ reset.onclick=()=>{if(existing)existing();dock()};
+}
+
 /* Movable CAD palettes: drag title to float, resize from lower-right, dock to either edge. */
 function initDockablePalettes(){
  const left=document.querySelector('.workspace>.sidebar:not(.rightside)');
@@ -766,7 +844,7 @@ function initDockablePalettes(){
 }
 
 initDockablePalettes();
-initAdjustableChrome();initBlocks();
+initAdjustableChrome();initMovableRibbon();initBlocks();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
