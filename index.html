@@ -270,6 +270,18 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadContextMenu .context-title{color:#8f9aa5;padding:5px 10px 6px;font-size:10px;text-transform:uppercase;letter-spacing:.7px}
 @media(max-width:620px){.app{grid-template-rows:48px 36px var(--ribbon-height,88px) minmax(0,1fr) 66px 27px}#ribbonSizer{top:calc(84px + var(--ribbon-height,88px) - 4px)}}
 
+
+/* CAD2D drafting and scale integrity refinements */
+.canvas-wrap{outline:0}
+.canvas-overlay{max-width:calc(100% - 96px);font-size:11px;line-height:1.4;padding:7px 10px}
+#modelScaleBadge{position:absolute;left:12px;bottom:49px;z-index:3;background:#1b2025e8;border:1px solid #3b434c;padding:4px 9px;color:#bfc6ce;border-radius:4px;font:10px -apple-system,"Helvetica Neue",Arial,sans-serif;pointer-events:none}
+#scaleAuditBtn{padding:3px 7px;background:#22262b;border:1px solid #4b535b;border-radius:4px;color:#d6dce2;font:10px -apple-system,"Helvetica Neue",Arial,sans-serif}
+#scaleAuditBtn:hover{background:#343b42}
+.ribbon{scrollbar-gutter:stable}
+.ribbon:focus-visible{outline:1px solid #8e98a2;outline-offset:-1px}
+.layer-row{grid-template-columns:20px 18px 20px minmax(0,1fr) 20px}
+.layer-list{scrollbar-width:thin}
+
 </style>
 </head>
 <body>
@@ -279,11 +291,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  <div class="ribbon" id="ribbon"></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
   <aside class="sidebar"><section class="panel"><div class="panel-title">Drawing properties</div><div class="panel-content"><div class="field"><label>Units</label><select id="units"><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="m" selected>Meters</option><option value="in">Inches</option><option value="ft">Feet</option></select></div><div class="field"><label>Grid spacing</label><input id="gridSpacing" type="number" min="0.00001" step="any" value="1"></div><div class="field"><label>Precision</label><select id="precision"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option></select></div><div class="field"><label>Line width</label><input id="lineWidth" type="number" step="0.05" min="0.05" max="5" value="0.25"></div><div class="help">Model space is unbounded. Use mouse wheel to zoom and middle mouse / Space + drag to pan. All geometry is stored in drawing units.</div></div></section><section class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column"><div class="panel-title">Layer manager <span id="layerCount">0</span></div><div class="panel-content" style="display:flex;flex-direction:column;flex:1;min-height:0"><div class="smallrow"><button class="btn" id="newLayer">+ Add layer</button><button class="btn" id="removeLayer">Remove</button></div><div class="layer-list" id="layers"></div><p class="help">Select a layer name to make it current. Toggle visibility and lock on each row.</p></div></section><section class="panel"><div class="panel-title">Blocks</div><div class="panel-content"><div class="smallrow"><button class="btn" id="createBlockBtn">Create from selection</button></div><div class="field"><label>Block</label><select id="blockLibrary"><option value="">No blocks</option></select></div><div class="smallrow"><button class="btn" id="insertBlockBtn">Insert at center</button><button class="btn" id="removeBlockBtn">Remove</button></div><p class="help">Reusable 2D block templates. Inserted entities retain their layer and their block name. Native DXF BLOCK/INSERT preservation is in development.</p></div></section></aside>
-  <main class="canvas-wrap" id="canvasWrap"><canvas id="cadCanvas"></canvas><div class="canvas-overlay"><b>TOP</b> · 2D MODEL SPACE <span id="canvasUnits">· m</span><br><span id="toolPrompt">Select objects or choose a drawing tool</span></div><div class="view-tools"><button id="zoomIn" title="Zoom in">+</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomExtents" title="Zoom extents">⊞</button><button id="panBtn" title="Pan">✥</button></div><div class="canvas-bottom"><span class="active">MODEL</span><span>LAYOUT / PDF →</span></div><div id="toast" class="toast"></div></main>
+  <main class="canvas-wrap" id="canvasWrap"><canvas id="cadCanvas"></canvas><div class="canvas-overlay"><b>TOP</b> · 2D MODEL SPACE <span id="canvasUnits">· m</span><br><span id="toolPrompt">Select objects or choose a drawing tool</span></div><div class="view-tools"><button id="zoomIn" title="Zoom in">+</button><button id="zoomOut" title="Zoom out">−</button><button id="zoomExtents" title="Zoom extents">⊞</button><button id="panBtn" title="Pan">✥</button></div><div id="modelScaleBadge">MODEL 1:1 · zoom is display only</div><div class="canvas-bottom"><span class="active">MODEL</span><span>LAYOUT / PDF →</span></div><div id="toast" class="toast"></div></main>
   <aside class="sidebar rightside"><section class="panel"><div class="panel-title">Selection / Properties</div><div class="panel-content"><div id="selectionSummary" class="help" style="margin-bottom:10px">No objects selected</div><div id="properties" class="prop-table"></div><div class="smallrow" style="margin-top:10px"><button class="btn" id="deleteBtn">Delete</button><button class="btn" id="duplicateBtn">Duplicate</button></div></div></section><section class="panel"><div class="panel-title">Quick tools</div><div class="panel-content"><div id="quickTools" style="display:grid;grid-template-columns:1fr 1fr;gap:5px"></div></div></section><section class="panel"><div class="panel-title">Drawing statistics</div><div class="panel-content" id="statistics"></div></section><section class="panel"><div class="panel-title">Keyboard / Coordinates</div><div class="panel-content help">L line · PL polyline · C circle · REC rectangle · A arc · T text · M move · CO copy · RO rotate · SC scale · O offset · E erase · DI distance · Z extents.<br><br>During drawing: type <b>10,5</b> for absolute point or <b>@3,0</b> for a relative point. <b>Esc</b> cancel · <b>Enter</b> end polyline · <b>Ctrl+Z</b> undo.</div></section></aside>
  </div>
  <div class="cmd"><div class="log" id="log"></div><div class="command-row"><b>COMMAND:</b><input id="command" type="text" placeholder="Enter a command or coordinate — e.g. LINE, OFFSET, 10,5" autocomplete="off" spellcheck="false"><button class="btn slim" id="runCommand">↵</button></div></div>
- <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on">GRID</button><button id="snapToggle">SNAP</button><button id="orthoToggle">ORTHO</button><button id="osnapToggle" class="on">OSNAP</button><button id="measureBtn">DIST</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
+ <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on">GRID</button><button id="snapToggle">SNAP</button><button id="orthoToggle">ORTHO</button><button id="osnapToggle" class="on">OSNAP</button><button id="measureBtn">DIST</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
 </div>
 <div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
 <div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="mono" selected>Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
@@ -354,7 +366,7 @@ function parseCoordinate(s){let rel=s.startsWith('@');if(rel)s=s.slice(1);let m=
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){setTool(aliases[cmd]);log(`_${cmd}`);return}if(cmd==='U'||cmd==='UNDO')return undo();if(cmd==='REDO')return redo();if(cmd==='Z'||cmd==='ZE'||cmd==='ZOOM')return zoomExtents();if(cmd==='DXF')return exportDXF();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT')return openPrint();if(cmd==='SAVE')return saveJSON();if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNITS')return $('units').focus();if(cmd==='CLOSE'&&state.tool==='polyline'&&state.stage.length>2){saveHistory();newEntity({type:'polyline',pts:clone(state.stage),closed:true});state.stage=[];return}log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{if(ev.key==='Enter')runCommand();if(ev.key==='Escape'){$('command').blur();state.stage=[];prompt();schedule()}});
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){state.stage=[];state.drag=null;setTool('select');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if(ev.key==='Delete'&&document.activeElement.tagName!=='INPUT'){eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','SELECT'].includes(document.activeElement.tagName)){finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
 function download(name,data,mime='application/octet-stream'){const b=data instanceof Blob?data:new Blob([data],{type:mime});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
-function saveJSON(){let data={format:'CAD2D-2',blocks:state.blocks,entities:state.entities,layers:state.layers,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId};download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json');toast('Project saved locally')}
+function saveJSON(){let data={format:'CAD2D-2',modelScale:'1:1',blocks:state.blocks,entities:state.entities,layers:state.layers,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId};download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json');toast('Project saved locally')}
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
 $('sampleHouseBtn').onclick=async()=>{try{
  const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
@@ -426,7 +438,7 @@ function importSVG(source,name){
 function importDXF(text,name){
  const raw=text.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i<raw.length-1;i+=2){const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
- let section='',table='',unitCode=6,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0;
+ let section='',table='',unitCode=0,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0;
  const aci=['#000000','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff'];
  const aciHex=n=>aci[Math.abs(n)]||'#c7cbd0';
  const toHex=v=>Number.isFinite(v)?'#'+(v&0xffffff).toString(16).padStart(6,'0'):'';
@@ -439,7 +451,7 @@ function importDXF(text,name){
   const [code,val]=pairs[i];
   if(code===0&&val==='SECTION'){section=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';table='';i+=2;continue}
   if(code===0&&val==='ENDSEC'){section='';table='';i++;continue}
-  if(section==='HEADER'&&code===9&&val==='$INSUNITS'){unitCode=Number(pairs[i+1]?.[1]||6);i+=2;continue}
+  if(section==='HEADER'&&code===9&&val==='$INSUNITS'){unitCode=Number(pairs[i+1]?.[1]||0);i+=2;continue}
   if(section==='TABLES'&&code===0&&val==='TABLE'){table=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';i+=2;continue}
   if(section==='TABLES'&&code===0&&val==='ENDTAB'){table='';i++;continue}
   if(code!==0){i++;continue}
@@ -476,13 +488,19 @@ function importDXF(text,name){
   }catch(error){unsupported.set(type,(unsupported.get(type)||0)+1);console.warn('Skipped DXF entity',type,error)}
  }
  if(!entities.length)throw Error('No supported 2D entities found. DXF blocks, spline curves and layout entities may require a more complete CAD import engine.');
- const from=({1:'in',2:'ft',4:'mm',5:'cm',6:'m'})[unitCode]||'m';
+ const unitMap={1:'in',2:'ft',4:'mm',5:'cm',6:'m'};
+ let from=unitMap[unitCode];if(!from){
+  const input=window.prompt('This DXF has no supported drawing units ($INSUNITS='+unitCode+'). Choose the ORIGINAL drawing units without rescaling coordinates: mm, cm, m, in or ft','mm');
+  if(input===null)throw Error('Import cancelled: drawing units must be confirmed to preserve model 1:1.');
+  from=String(input).trim().toLowerCase();
+  if(!U[from])throw Error('Unsupported unit '+from+'. Choose mm, cm, m, in or ft.');
+ }
  saveHistory();
  state.unit=from;state.grid=from==='m'?1:from==='mm'?100:10;
  state.layers=[...layers.values()];
  state.entities=entities;state.nextId=entities.length+1;state.layerId=state.layers[0].id;state.selected=[];
  state.file=name.replace(/\.dxf$/i,'');$('filename').textContent=state.file+'.dxf';
- $('units').value=from;$('gridSpacing').value=state.grid;
+ $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
  updateAll();zoomExtents();
  let warning=[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+': '+n);
  if(blockCount)warning.push('block definitions: '+blockCount);
@@ -554,6 +572,19 @@ function openCadContextMenu(x,y,worldPoint){
 }
 document.addEventListener('pointerdown',e=>{const menu=$('cadContextMenu');if(menu&&!menu.contains(e.target))menu.classList.remove('open')});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')$('cadContextMenu').classList.remove('open')});
+
+
+function auditModelScale(){
+ const selected=state.entities.filter(e=>state.selected.includes(e.id));
+ const line=selected.find(e=>e.type==='line');
+ const bounds=getBounds();
+ const W=bounds.maxX-bounds.minX,H=bounds.maxY-bounds.minY;
+ let msg='CAD2D MODEL SPACE — 1:1\nDrawing units: '+state.unit+'\nModel extents: '+W.toFixed(4)+' × '+H.toFixed(4)+' '+state.unit+'\nStored coordinates are not rescaled by screen zoom.';
+ if(line)msg+='\nSelected line: '+dist(line.a,line.b).toFixed(6)+' '+state.unit+' (measured directly from endpoints)';
+ msg+='\nPrinting at 1:N converts model units to physical paper millimeters; Fit to paper is NOT an exact architectural scale.';
+ window.alert(msg);
+}
+$('scaleAuditBtn').onclick=auditModelScale;
 
 /* CAD2D adjustable toolbar and dock widths */
 function initAdjustableChrome(){
