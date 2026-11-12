@@ -542,6 +542,9 @@ function initBlocks(){
  $('removeBlockBtn').onclick=()=>{const name=$('blockLibrary').value;if(!name)return;if(!window.confirm('Remove block definition '+name+'? Existing inserted geometry stays.'))return;delete state.blocks[name];renderBlockLibrary();toast('Block definition removed')};
 }
 
+/* Keep the Layers palette at the top of the left dock, above Drawing properties. */
+(function(){const dock=document.querySelector('.workspace>.sidebar:not(.rightside)');const layers=dock&&[...dock.querySelectorAll(':scope > .panel')].find(p=>p.querySelector('#layers'));if(dock&&layers)dock.prepend(layers)})();
+
 /* Movable CAD palettes: drag title to float, resize from lower-right, dock to either edge. */
 function initDockablePalettes(){
  const left=document.querySelector('.workspace>.sidebar:not(.rightside)');
