@@ -538,6 +538,26 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-export-popover .cad-export-option small{color:#a5bfc9;font-size:10px}
 .cad-export-popover .cad-export-note{font-size:10px;line-height:1.5;color:#a9bfca;padding:9px 4px 0}
 .cad-export-popover .cad-export-label{font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:#a8bdc8;margin:10px 4px 4px}
+
+/* Independent grayscale tint of the CAD interface: never changes model-space colors. */
+:root{--cad-ui-base:#172027;--cad-ui-raised:#25333c;--cad-ui-toolbar:#1d2931;--cad-ui-text:#edf3f5;--cad-ui-muted:#a8b7bf;--cad-ui-edge:#40545e;--cad-ui-input:#1b2932}
+.app .brandbar,.app .tabbar,.app .ribbon-shell,.app .ribbon{background:var(--cad-ui-toolbar)!important;color:var(--cad-ui-text)!important}
+.app .sidebar,.app .sidebar.rightside,.app .panel,.app .cad-palette,.app .floating-tools-handle,.app .cad-floating-tools,.app .cmd,.app .status{background:var(--cad-ui-base)!important;color:var(--cad-ui-text)!important;border-color:var(--cad-ui-edge)!important}
+.app .panel-title,.app .palette-title,.app .group,.app .floating-tools-handle,.app .cad-floating-tool-list{background:var(--cad-ui-raised)!important;border-color:var(--cad-ui-edge)!important;color:var(--cad-ui-text)!important}
+.app .tool,.app .btn,.app .status button,.app .cad-floating-tool-list button,.app .tabbar button,.app .sidebar button{background:var(--cad-ui-raised)!important;color:var(--cad-ui-text)!important;border-color:var(--cad-ui-edge)!important}
+.app .tool:hover,.app .btn:hover,.app .sidebar button:hover,.app .status button:hover{filter:brightness(1.08)}
+.app .tool.active,.app .tab.active,.app .status button.on{outline:1px solid var(--cad-ui-muted);outline-offset:-1px}
+.app input:not([type=color]),.app select,.app textarea,.app .filename{background:var(--cad-ui-input)!important;color:var(--cad-ui-text)!important;border-color:var(--cad-ui-edge)!important}
+.app .brand small,.app .panel .help,.app .tabbar,.app .group:after{color:var(--cad-ui-muted)!important}
+.cad-palette-tone{margin-top:13px;border-top:1px solid #50626c;padding-top:12px}
+.cad-palette-tone h3{font-size:12px;font-weight:650;letter-spacing:.1px;margin:0 0 5px}
+.cad-palette-tone p{font-size:10px;color:#b4c5cf;margin:0 0 12px;line-height:1.4}
+.cad-palette-tone input[type=range]{width:100%;accent-color:#a4c3d2;cursor:pointer;margin:6px 0}
+.cad-palette-tone .cad-tone-ends{display:flex;justify-content:space-between;color:#b4c5cf;font-size:10px}
+.cad-palette-tone .cad-tone-swatches{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:10px 0}
+.cad-palette-tone .cad-tone-swatches button{height:28px;border:1px solid #708490;border-radius:5px;cursor:pointer}
+.cad-palette-tone .cad-tone-swatches button[aria-pressed=true]{outline:2px solid #95d5e8;outline-offset:2px}
+.cad-palette-tone .cad-tone-value{font-size:11px;color:#bcd1dc;text-align:right}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -2688,6 +2708,39 @@ function initCadColorPopover(){
   input.addEventListener('input',()=>{const source=$(id);if(!source)return;source.value=input.value;source.dispatchEvent(new Event('input',{bubbles:true}))});
   row.append(input);panel.append(row);
  }
+
+ // Palette chrome shades, separate from drawing colors and object colors.
+ const toneBox=document.createElement('section');toneBox.className='cad-palette-tone';
+ toneBox.innerHTML='<h3>Color de las paletas</h3><p>De negro a blanco tiza, con tonos intermedios. No cambia el plano.</p><div class="cad-tone-ends"><span>Negro</span><span>Blanco tiza</span></div><input type="range" id="cadPaletteTone" min="0" max="100" step="1" value="19" aria-label="Tonalidad de las paletas"><div class="cad-tone-value" id="cadPaletteToneLabel">19% · Gris carbón</div><div class="cad-tone-swatches" id="cadPaletteToneSwatches"></div>';
+ panel.append(toneBox);
+ const paletteTone=$('cadPaletteTone'),paletteToneLabel=$('cadPaletteToneLabel'),swatches=$('cadPaletteToneSwatches');
+ const toneNames=['Negro','Antracita','Gris medio','Gris claro','Blanco tiza'];
+ const paletteHex=n=>{const v=Math.max(0,Math.min(255,Math.round(n)));return '#'+v.toString(16).padStart(2,'0').repeat(3)};
+ function setPaletteTone(value){
+  const t=Math.max(0,Math.min(100,Number(value)||0));
+  const base=Math.round(5+t*2.36),raised=Math.min(250,base+(t>65?-15:14));
+  const toolbar=Math.min(250,base+(t>65?-8:7));
+  const bright=t>53;
+  const root=document.documentElement.style;
+  const varSet=(name,v)=>root.setProperty('--cad-ui-'+name,v);
+  varSet('base',paletteHex(base));varSet('raised',paletteHex(raised));varSet('toolbar',paletteHex(toolbar));
+  varSet('input',paletteHex(Math.max(0,base+(bright?-10:8))));
+  varSet('text',bright?'#19232b':'#e9f0f4');
+  varSet('muted',bright?'#46545e':'#a8b7bf');
+  varSet('edge',bright?'#9ba5ac':'#50606b');
+  paletteTone.value=String(t);
+  paletteToneLabel.textContent=t+'% · '+toneNames[Math.min(4,Math.round(t/25))];
+  [...swatches.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(Math.abs(t-i*25)<8)));
+  try{localStorage.setItem('cad2d-palette-tone',String(t))}catch(e){}
+ }
+ for(const [i,value] of [0,25,50,75,100].entries()){
+  const sample=document.createElement('button');sample.type='button';sample.style.background=paletteHex(5+value*2.36);
+  sample.title=toneNames[i];sample.setAttribute('aria-label',toneNames[i]);
+  sample.onclick=()=>setPaletteTone(value);swatches.append(sample);
+ }
+ paletteTone.addEventListener('input',()=>setPaletteTone(paletteTone.value));
+ let savedTone=19;try{const raw=localStorage.getItem('cad2d-palette-tone');if(raw!==null&&Number.isFinite(Number(raw)))savedTone=Number(raw)}catch(e){}
+ setPaletteTone(savedTone);
  const note=document.createElement('div');note.className='cad-color-help';note.textContent='Elegí un esquema o personalizá cada color. Se guarda automáticamente en este navegador.';panel.append(note);
  const presets=document.createElement('div');presets.className='cad-color-presets';
  for(const [name,label] of [['dark','CAD oscuro'],['black','Negro'],['light','Claro'],['blueprint','Plano azul']]){
