@@ -515,6 +515,7 @@ function buildRibbon(tab){const def=ribbonTabs[tab]||ribbonTabs.home;$('ribbon')
 function ribbonAction(t){if(t==='print')return openPrint();if(t==='save')return saveJSON();if(t==='help')return $('helpBackdrop').classList.add('show');if(t==='zoom')return zoomExtents();if(t==='grid')return toggle('gridOn','gridToggle');setTool(t)}
 function setTool(t){
  if(t==='layout')return switchCadSpace('layout');
+ if(t==='area')return reportCadArea();
  if(t==='hatch')return hatchSelected();
  if(t==='join')return joinSelectedLines();
  if(t==='explode')return explodeSelected();
@@ -524,8 +525,8 @@ function setTool(t){
 
  const dimensionKinds={dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
- state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','chamfer','fillet'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Next point · Enter finish · U undo · C close':'Specify first point',polyline:state.stage.length?'Next vertex · Enter finish · U undo · C close':'Specify first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'Click offset side':'Select line or circle to offset',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`}
+ state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
+function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Next point · Enter finish · U undo · C close':'Specify first point',polyline:state.stage.length?'Next vertex · Enter finish · U undo · C close':'Specify first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'Click offset side':'Select line or circle to offset',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -670,7 +671,7 @@ function initTypographyPalette(){
  updateFontPreview();
 }
 
-function previewEntity(){const s=state.stage,t=state.tool,m=state.mouse,cl=curLayer();let e=null;if(t==='line'&&s.length){e={type:'line',a:s.at(-1),b:m,layer:cl.id}}else if(t==='polyline'){let pts=[...s,m];e={type:'polyline',pts,layer:cl.id};}else if(t==='polygon'&&s.length===1){const pts=regularPolygon(s[0],m,Number($('polygonSides').value));if(pts)e={type:'polyline',pts,closed:true,layer:cl.id}}else if(t==='rect'&&s.length===1)e={type:'rect',a:s[0],b:m,layer:cl.id};else if(t==='circle'&&s.length===1)e={type:'circle',c:s[0],r:dist(s[0],m),layer:cl.id};else if(t==='arc'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'arc',c:s[0],r:dist(s[0],s[1]),a0:ang(s[0],s[1]),a1:ang(s[0],m),layer:cl.id}}else if(t==='ellipse'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'ellipse',c:s[0],rx:Math.abs(s[1].x-s[0].x)||dist(s[0],s[1]),ry:Math.abs(m.y-s[0].y),layer:cl.id}}else if(t==='dimension'&&s.length===2)e={type:'dimension',a:s[0],b:s[1],p:m,mode:$('dimMode').value,style:readDimensionStyle(),layer:'dimensions'};else if(t==='dimension'&&s.length===1&&['ordinateX','ordinateY','leader'].includes($('dimMode').value))e={type:'dimension',a:s[0],b:m,p:m,mode:$('dimMode').value,label:$('dimLeaderText').value,style:readDimensionStyle(),layer:'dimensions'};else if(t==='distance'&&s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};else if(t==='insertBlock'&&selectedBlock()){const factor=Number($('blockScale').value)||1,angle=Number($('blockRotation').value)||0;ctx.save();ctx.setLineDash([4,4]);for(const part of blockInsertionEntities(selectedBlock(),m,factor,angle))drawEntity(part,'#c7d0e5');ctx.restore()}if(e){ctx.save();ctx.setLineDash([5,4]);drawEntity(e,'#edcc7c');ctx.restore()}for(const p of s){let q=screen(p);ctx.fillStyle='#f1cb85';ctx.fillRect(q.x-3,q.y-3,6,6)}}
+function previewEntity(){const s=state.stage,t=state.tool,m=state.mouse,cl=curLayer();let e=null;if(t==='line'&&s.length){e={type:'line',a:s.at(-1),b:m,layer:cl.id}}else if(t==='polyline'){let pts=[...s,m];e={type:'polyline',pts,layer:cl.id};}else if(t==='area'&&s.length){e={type:'polyline',pts:[...s,m],closed:s.length>=2,layer:cl.id}}else if(t==='polygon'&&s.length===1){const pts=regularPolygon(s[0],m,Number($('polygonSides').value));if(pts)e={type:'polyline',pts,closed:true,layer:cl.id}}else if(t==='rect'&&s.length===1)e={type:'rect',a:s[0],b:m,layer:cl.id};else if(t==='circle'&&s.length===1)e={type:'circle',c:s[0],r:dist(s[0],m),layer:cl.id};else if(t==='arc'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'arc',c:s[0],r:dist(s[0],s[1]),a0:ang(s[0],s[1]),a1:ang(s[0],m),layer:cl.id}}else if(t==='ellipse'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'ellipse',c:s[0],rx:Math.abs(s[1].x-s[0].x)||dist(s[0],s[1]),ry:Math.abs(m.y-s[0].y),layer:cl.id}}else if(t==='dimension'&&s.length===2)e={type:'dimension',a:s[0],b:s[1],p:m,mode:$('dimMode').value,style:readDimensionStyle(),layer:'dimensions'};else if(t==='dimension'&&s.length===1&&['ordinateX','ordinateY','leader'].includes($('dimMode').value))e={type:'dimension',a:s[0],b:m,p:m,mode:$('dimMode').value,label:$('dimLeaderText').value,style:readDimensionStyle(),layer:'dimensions'};else if(t==='distance'&&s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};else if(t==='insertBlock'&&selectedBlock()){const factor=Number($('blockScale').value)||1,angle=Number($('blockRotation').value)||0;ctx.save();ctx.setLineDash([4,4]);for(const part of blockInsertionEntities(selectedBlock(),m,factor,angle))drawEntity(part,'#c7d0e5');ctx.restore()}if(e){ctx.save();ctx.setLineDash([5,4]);drawEntity(e,'#edcc7c');ctx.restore()}for(const p of s){let q=screen(p);ctx.fillStyle='#f1cb85';ctx.fillRect(q.x-3,q.y-3,6,6)}}
 function drawTransformPreview(){const d=state.drag;if(!d.base||!d.lastWorld)return;const delta=sub(d.lastWorld,d.base);state.selected.forEach(id=>{const src=state.entities.find(e=>e.id===id);if(src){const cp=transformEntity(src,p=>add(p,delta));drawEntity(cp,'#eccb79')}})}
 function centerZoom(f,at){let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
 function getVertices(e){if(e.type==='line'||e.type==='rect'||e.type==='dimension')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
@@ -744,6 +745,8 @@ if(t==='polyline'){
 }if(t==='distance'){s.push(p);if(s.length===2){let d=dist(s[0],s[1]);log(`Distance: ${units(d)} ${state.unit}; Angle: ${(ang(s[0],s[1])*180/Math.PI).toFixed(2)}°`);toast(`Distance ${units(d)} ${state.unit}`);s.length=0}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
 function finishStage(close=false){
  const s=state.stage,t=state.tool;
+ if(t==='area')return finishCadArea();
+ if(t==='matchprop'){state.modifyCandidate=null;state.tool='select';prompt();schedule();return}
  if(t==='polyline'&&s.length>=2){
   if(close&&s.length<3){toast('PLINE close needs at least 3 vertices');return}
   saveHistory();newEntity({type:'polyline',pts:clone(s),closed:!!close});
@@ -1114,7 +1117,11 @@ function arraySelected(){
  saveHistory();state.nextId+=added.length;state.entities.push(...added);state.selected=[];updateAll();log('ARRAY');toast('Created '+added.length+' array copies');
 }
 
-function handlePoint(p,shift){const t=state.tool;if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(e)trimLine(e,p);return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&(e.type==='line'||e.type==='circle')){state.modifyCandidate={id:e.id};prompt();toast('Click the side for OFFSET')}else toast('Select a LINE or CIRCLE');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target)offsetAt(target,p);else state.modifyCandidate=null;return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+function handlePoint(p,shift){const t=state.tool;
+ if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
+ if(t==='matchprop'){matchCadPropertiesAt(p);return}
+ if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(e)trimLine(e,p);return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&(e.type==='line'||e.type==='circle')){state.modifyCandidate={id:e.id};prompt();toast('Click the side for OFFSET')}else toast('Select a LINE or CIRCLE');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target)offsetAt(target,p);else state.modifyCandidate=null;return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
@@ -1215,12 +1222,102 @@ function initCadCommandFinder(){
  document.addEventListener('pointerdown',event=>{if(!$('cadCommandFinder').contains(event.target))out.hidden=true});
 }
 
-function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
+
+function selectedCadEntities(){return state.entities.filter(e=>state.selected.includes(e.id))}
+function areaOfPolygon(vertices){
+ if(!Array.isArray(vertices)||vertices.length<3)return 0;
+ let sum=0;for(let i=0;i<vertices.length;i++){const a=vertices[i],b=vertices[(i+1)%vertices.length];sum+=a.x*b.y-b.x*a.y}
+ return Math.abs(sum)*.5;
+}
+function cadEntityArea(e){
+ if(e.type==='circle')return Math.PI*e.r*e.r;
+ if(e.type==='ellipse')return Math.PI*e.rx*e.ry;
+ if(e.type==='rect')return Math.abs((e.b.x-e.a.x)*(e.b.y-e.a.y));
+ if(e.type==='polyline'&&e.closed)return areaOfPolygon(e.pts);
+ return null;
+}
+function reportCadArea(){
+ const selected=selectedCadEntities(),figures=selected.map(cadEntityArea).filter(x=>x!==null);
+ if(figures.length){
+  const total=figures.reduce((a,b)=>a+b,0);
+  const value=Number(total.toFixed(Math.min(8,state.precision+2)));
+  log('AREA: '+value+' '+state.unit+'² · '+figures.length+' closed objects');
+  toast('Total area: '+value+' '+state.unit+'²');
+  return
+ }
+ state.tool='area';state.stage=[];state.selected=[];prompt();schedule();toast('AREA: click polygon vertices, Enter to calculate');
+}
+function finishCadArea(){
+ if(state.stage.length<3)return toast('AREA requires at least three points');
+ const value=Number(areaOfPolygon(state.stage).toFixed(Math.min(8,state.precision+2)));
+ state.stage=[];state.tool='select';prompt();schedule();
+ log('AREA: '+value+' '+state.unit+'²');toast('Enclosed area: '+value+' '+state.unit+'²');
+}
+function showCadEntityList(){
+ const selected=selectedCadEntities();
+ if(!selected.length)return toast('LIST: select one or more objects first');
+ const lines=selected.slice(0,40).map(e=>{
+  const fields=['#'+e.id,e.type.toUpperCase(),'layer: '+layerFor(e).name];
+  if(e.type==='line')fields.push('length '+dist(e.a,e.b).toFixed(6)+' '+state.unit);
+  if(e.type==='circle')fields.push('radius '+e.r.toFixed(6)+' '+state.unit);
+  if(e.type==='text')fields.push(JSON.stringify(e.text));
+  const area=cadEntityArea(e);if(area!==null)fields.push('area '+area.toFixed(6)+' '+state.unit+'²');
+  return fields.join(' · ')
+ });
+ const message=lines.join('\n')+(selected.length>40?'\n…and '+(selected.length-40)+' more.':'');
+ log('LIST: '+selected.length+' entities');window.alert(message);
+}
+function selectAllCad(){
+ state.selected=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);
+ updateProps();schedule();toast('Selected '+state.selected.length+' visible unlocked entities');
+}
+function openCadPaletteByTitle(text){
+ const matching=[...document.querySelectorAll('.sidebar>.panel')].find(panel=>panel.querySelector('.panel-title')?.textContent.toLowerCase().includes(text.toLowerCase()));
+ if(!matching)return toast('Palette unavailable: '+text);
+ matching.classList.remove('collapsed');matching.scrollIntoView({block:'nearest',behavior:'smooth'});
+ toast('Opened '+text+' palette');
+}
+function purgeUnusedCadLayers(){
+ const references=new Set(state.entities.map(e=>e.layer));
+ for(const block of Object.values(state.blocks))for(const e of block.entities)references.add(e.layer);
+ references.add(state.layerId);references.add('0');
+ const removable=state.layers.filter(layer=>!references.has(layer.id)&&!layer.locked);
+ if(!removable.length)return toast('PURGE: no unused unlocked layers');
+ if(!window.confirm('Remove '+removable.length+' unused layer(s)? This can be undone.'))return;
+ saveHistory();state.layers=state.layers.filter(layer=>!removable.includes(layer));
+ updateAll();log('PURGE '+removable.length+' unused layers');toast('Removed '+removable.length+' unused layers');
+}
+function copyCadProperties(from,to){
+ for(const field of ['color','width','linetype']){
+  if(from[field]===undefined)delete to[field];else to[field]=from[field];
+ }
+ if(state.layers.some(l=>l.id===from.layer))to.layer=from.layer;
+}
+function matchCadPropertiesAt(point){
+ const e=pick(point);if(!e)return toast('MATCHPROP: pick an existing CAD object');
+ if(layerFor(e).locked)return toast('Cannot modify locked layer objects');
+ if(!state.modifyCandidate){state.modifyCandidate={id:e.id};prompt();toast('MATCHPROP: select target object(s), Enter to finish');return}
+ const from=state.entities.find(x=>x.id===state.modifyCandidate.id);
+ if(!from)return toast('MATCHPROP source is missing');
+ if(from.id===e.id)return toast('Select a different target');
+ saveHistory();copyCadProperties(from,e);updateAll();toast('Object properties copied · select another target or press Enter');
+}
+
+function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
   const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
   if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
   else setTool(aliases[cmd]);
   log('_'+cmd);return
- }if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
+ }if(cmd==='LIST'||cmd==='LI')return showCadEntityList();
+ if(cmd==='SELECTALL'||cmd==='AI_SELALL')return selectAllCad();
+ if(cmd==='PURGE'||cmd==='PU')return purgeUnusedCadLayers();
+ if(cmd==='LAYER'||cmd==='LA')return openCadPaletteByTitle('Layer');
+ if(cmd==='PROPERTIES'||cmd==='PR'||cmd==='CHPROP')return openCadPaletteByTitle('Selection / Properties');
+ if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
+ if(cmd==='QSAVE'||cmd==='SAVEAS')return saveJSON();
+ if(cmd==='OPEN')return openFile();
+ if(cmd==='NEW'){if(window.confirm('Create a new drawing? Save your current work first.')){saveHistory();state.entities=[];state.blocks={};state.selected=[];state.file='Untitled Drawing';state.nextId=1;renderBlockLibrary();updateAll();zoomExtents()}return}
+ if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
  if(cmd==='INSERT'||cmd==='I')return $('insertBlockBtn').click();
  if(cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return $('exportBlockBtn').click();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
