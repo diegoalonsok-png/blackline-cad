@@ -468,6 +468,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:800px){.cad-command-finder{position:absolute;right:8px;top:72px;z-index:70;width:145px;height:25px;box-shadow:0 2px 6px #0008}.cad-command-finder:not(:focus-within){opacity:.87}}
 
 </style>
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
 <body>
 <div class="app">
@@ -1902,9 +1903,9 @@ function initAdjustableChrome(){
  function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,58,190)+'px');
  else ws.style.setProperty(key==='left'?'--left-width':'--right-width',clamp(val,160,440)+'px');
  resize()}
- apply('ribbon',saved('cad2d-ribbon-height',68));
- apply('left',saved('cad2d-left-width',window.innerWidth<1100?215:260));
- apply('right',saved('cad2d-right-width',window.innerWidth<1100?205:250));
+ apply('ribbon',saved('cad2d-ribbon-height',62));
+ apply('left',saved('cad2d-left-width',window.innerWidth<1100?176:192));
+ apply('right',saved('cad2d-right-width',window.innerWidth<1100?182:202));
  [['ribbonSizer','ribbon','y'],['leftDivider','left','x'],['rightDivider','right','x']].forEach(([id,key,axis])=>{
  const el=$(id);if(!el)return;
  el.addEventListener('pointerdown',ev=>{if(ev.button!==0)return;
@@ -1917,7 +1918,7 @@ function initAdjustableChrome(){
  });
  });
  const reset=$('resetWorkspace'),previous=reset&&reset.onclick;
- if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',68);apply('left',260);apply('right',250)};
+ if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',62);apply('left',192);apply('right',202)};
 }
 function renderBlockLibrary(){
  const sel=$('blockLibrary');if(!sel)return;const previous=sel.value;
@@ -2247,4 +2248,5 @@ initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();init
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
+<script src="workspace-upgrade.js?v=20261113"></script>
 </body></html>
