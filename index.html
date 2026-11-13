@@ -646,6 +646,25 @@ Object.assign(icons,{
  erase:'<path d="m4 15 9-10 7 7-8 8H8Z"/><path d="M9 20h11"/>',
  save:'<path d="M5 4h12l3 3v13H4V4Z"/><path d="M8 4v7h8V4M8 20v-6h8v6"/>'
 });
+/* Unified light outline command glyphs using the same 24px grid and thin strokes. */
+Object.assign(icons,{
+ select:'<path d="M5 3 19 12l-7 2-3 6z"/>',
+ line:'<path d="M5 19 19 5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="5" r="1.5"/>',
+ polyline:'<path d="M3 19 8 8 15 15 21 4"/><circle cx="3" cy="19" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="15" cy="15" r="1.3"/><circle cx="21" cy="4" r="1.3"/>',
+ rect:'<rect x="4" y="5" width="16" height="14" rx="1"/>',
+ circle:'<circle cx="12" cy="12" r="8.5"/>',
+ arc:'<path d="M4 19A14 14 0 0 1 20 5"/>',
+ text:'<path d="M4 6h16M12 6v13M8 19h8"/>',
+ move:'<path d="M12 3v18M3 12h18m-9-6 3-3 3 3m-6 12 3 3 3-3M6 9l-3 3 3 3m12-6 3 3-3 3"/>',
+ copy:'<rect x="7" y="7" width="13" height="13" rx="1"/><path d="M16 7V4H4v12h3"/>',
+ trim:'<path d="M5 5 19 19M19 5 5 19"/><circle cx="7" cy="7" r="1.6"/>',
+ offset:'<path d="M4 19 17 6M8 21 21 8"/>',
+ erase:'<path d="m4 14 9-10 7 7-9 10H8zM9 21h12"/>',
+ dimension:'<path d="M4 5v14M20 5v14M5 12h14m-11-3-3 3 3 3m8-6 3 3-3 3"/>',
+ save:'<path d="M4 4h13l3 3v13H4zM8 4v7h8V4M8 20v-6h8v6"/>',
+ print:'<path d="M6 9V4h12v5M6 18H4V9h16v9h-2M6 14h12v7H6z"/>',
+ layer:'<path d="m3 7 9-5 9 5-9 5zM3 12l9 5 9-5M3 17l9 5 9-5"/>'
+});
 function icon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]||icons.select}</svg>`}
 function buildRibbon(tab){const def=ribbonTabs[tab]||ribbonTabs.home;$('ribbon').innerHTML=def.map(group=>`<div class="group ${group.length>6?'stack':''}" data-label="${group[0]}">${group.slice(1).map(t=>`<button class="tool ${state.tool===t?'active':''}" data-tool="${t}" title="${toolDefs[t]?.[0]||t}">${icon(t==='print'?'print':t==='save'?'save':t==='help'?'help':t==='zoom'?'zoom':t==='grid'?'grid':t)}<span>${toolDefs[t]?.[0]||t[0].toUpperCase()+t.slice(1)}</span></button>`).join('')}</div>`).join('');$('ribbon').querySelectorAll('[data-tool]').forEach(x=>x.onclick=()=>ribbonAction(x.dataset.tool))}
 function ribbonAction(t){
@@ -2211,7 +2230,7 @@ function initAdjustableChrome(){
  function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,42,150)+'px');
  else ws.style.setProperty(key==='left'?'--left-width':'--right-width',clamp(val,160,440)+'px');
  resize()}
- apply('ribbon',saved('cad2d-ribbon-height',46));
+ apply('ribbon',Math.max(60,saved('cad2d-ribbon-height',60)));
  apply('left',saved('cad2d-left-width',window.innerWidth<1100?176:192));
  apply('right',saved('cad2d-right-width',window.innerWidth<1100?182:202));
  [['ribbonSizer','ribbon','y'],['leftDivider','left','x'],['rightDivider','right','x']].forEach(([id,key,axis])=>{
@@ -2226,16 +2245,16 @@ function initAdjustableChrome(){
  });
  });
  const reset=$('resetWorkspace'),previous=reset&&reset.onclick;
- if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',46);apply('left',192);apply('right',202)};
+ if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',60);apply('left',192);apply('right',202)};
 }
 /* Direct ribbon size buttons. Position drag remains available on the left grip. */
 (function(){
  const app=document.querySelector('.app'),shell=$('ribbonShell');
  function read(){return parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||46}
  function update(h){
-  const n=Math.max(42,Math.min(150,Math.round(h)));
+  const n=Math.max(55,Math.min(150,Math.round(h)));
   app.style.setProperty('--ribbon-height',n+'px');
-  app.classList.toggle('cad-ribbon-compact',n<=58);
+  app.classList.toggle('cad-ribbon-compact',n<=67);
   if(shell.classList.contains('floating'))shell.style.height=Math.max(44,n)+'px';
   try{localStorage.setItem('cad2d-ribbon-height',String(n))}catch(e){}
   resize();
@@ -2246,7 +2265,7 @@ function initAdjustableChrome(){
  const reset=$('resetWorkspace');if(reset){const old=reset.onclick;reset.onclick=()=>{if(old)old();update(46)}}
  const ribbonSizer=$('ribbonSizer');
  if(ribbonSizer)ribbonSizer.style.display='block';
- new MutationObserver(()=>app.classList.toggle('cad-ribbon-compact',read()<=58)).observe(app,{attributes:true,attributeFilter:['style']});
+ new MutationObserver(()=>app.classList.toggle('cad-ribbon-compact',read()<=67)).observe(app,{attributes:true,attributeFilter:['style']});
 })();
 function renderBlockLibrary(){
  const sel=$('blockLibrary');if(!sel)return;const previous=sel.value;
