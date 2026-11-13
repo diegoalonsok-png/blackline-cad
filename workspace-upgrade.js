@@ -177,7 +177,7 @@ function decorateRibbon(){
    const ai=saved.indexOf(groupName(a)),bi=saved.indexOf(groupName(b));
    return (ai<0?999:ai)-(bi<0?999:bi);
   });
-  ordered.forEach(g=>ribbon.appendChild(g));
+  if(ordered.some((g,i)=>g!==Array.from(ribbon.children).filter(ch=>ch.classList.contains('group'))[i])) ordered.forEach(g=>ribbon.appendChild(g));
  }
  syncing=false;
 }
