@@ -196,3 +196,22 @@ Official reference for desktop aliases and terminology: https://www.autodesk.com
 **BREAK / BR:** Choose this command from the Modify ribbon, Advanced Modify palette, Quick CAD floating toolbar or command prompt. Click an unlocked straight LINE near the intended first cut point; click a second point on the same LINE. The portion between those projected points is removed and the remaining portions retain the original line's color, layer and lineweight. Segment boundaries and degenerate cuts are checked; coincident points do not change the drawing. Supports straight LINE entities only—not PLINE, ARC, SPLINE or multiple-object break, and not AutoCAD's full BREAKATPOINT functionality.
 
 **Verification:** Complete JavaScript syntax checked. Isolated geometry tests: 10-unit LINE broken at 3 and 7 produced segments 0–3 and 7–10; endpoint break produced the expected remaining segment; coincident break points produced no geometry changes. Full browser mouse-interaction and external DXF/PDF roundtrip tests are still required.
+
+## November 13, 2026 — Larger, configurable drawing workspace
+
+The drafting application now loads `workspace-upgrade.css` and `workspace-upgrade.js` alongside the existing CAD engine. The initial desktop workspace allocates more horizontal space to model space, collapses the right-hand dock by default, and offers **Focus** (F11 while the CAD page has focus), **Workspace** configuration, and **Guest** status in the header.
+
+- Reversible controls show/hide left/right sidebars, top ribbon, floating quick tools, and each individual palette.
+- Palettes can be floated, moved, resized and docked on either side; floating geometry and collapsed state are saved in browser-local storage. Ribbon groups may be reordered with their small grip; group order is saved independently per ribbon tab.
+- Focus mode leaves the drawing canvas, compact command bar and status indicators visible. It does not alter model scale, coordinates or exported geometries.
+- The existing **Reset layout** button restores CAD dock locations; the newer **Workspace → Reset workspace** also clears palette visibility and returns to a compact default with a hidden right dock.
+
+### Guest access and future accounts
+
+The page records a local first-use timestamp and displays a **90-day guest countdown**. This is a usability indicator, **not a secure trial or proof of user identity**: browser storage can be cleared and cannot be shared across devices. There is currently **no actual account registration, authentication, remote project synchronization, payment processing, or hard account lock**. To avoid blocking drawing without a usable identity system, the site continues to operate as a public beta after day 90.
+
+The script accepts an optional deployment-time `window.CAD2D_AUTH_CONFIG` object (set *before* loading the workspace script) with HTTPS `loginUrl`, HTTPS `statusUrl`, and `enforce: true`. Only when all are present and a reachable server verifies a user is unauthenticated does the client show a post-trial registration gate. The backend must enforce sessions and subscriptions **on the server**; do not trust a browser-side timestamp, JavaScript visibility gate or editable local storage for billing. The exact three-month/90-day entitlement should be assigned to a server-verified account/device strategy at launch, in compliance with applicable privacy regulations.
+
+### Migration and monetization phase — after validation
+
+Keep GitHub Pages as the free development/QA environment. After confirming CAD editing, project recovery, DXF/JSON/PDF import/export, responsive workspace behavior and usage on several browsers, migrate the static frontend to **Cloudflare Pages**. Use Cloudflare Workers plus a secure identity/entitlement datastore if account registration and subscriptions are deployed; integrate Stripe Checkout, Customer Portal and verified webhooks in the backend only. Do not put Stripe secret keys in static JavaScript. Preserve the existing URL with a redirect only after the new deployment passes smoke tests. Cloudflare migration, paid subscriptions and mandatory post-trial registration are **planned, not yet active**.
