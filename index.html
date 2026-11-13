@@ -1176,20 +1176,21 @@ const CAD_COMMANDS=[
  ['FILLET','F','Radius fillet'],['CHAMFER','CHA','Equal-distance bevel'],
  ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
  ['EXPLODE','X','Separate polyline into lines'],['ERASE','E','Erase entity'],
- ['DIMALIGNED','DAL','Aligned dimension'],['DIMLINEAR','DLI','Linear dimension'],
+ ['DIMALIGNED','DAL','Aligned dimension'],
+ ['DIMSTYLE','D','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
  ['DIMDIAMETER','','Circle diameter'],['LEADER','','Leader with label'],
  ['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
  ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
  ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
- ['LAYER','LA','Layer manager'],['PROPERTIES','PR','Selected properties'],
+ ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
  ['BLOCK','B','Create reusable block'],['INSERT','I','Insert reusable block'],
  ['WBLOCK','','Export block library item'],['UNITS','','Change model units'],
  ['ZOOM','Z','Zoom model extents'],['PAN','P','Pan model space'],
  ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
  ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
- ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],
- ['PURGE','PU','Remove unused unlocked layers']
+ ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],['NEW','','Start a new drawing (confirmation)'],
+ ['PURGE','PU','Remove unused unlocked layers'],['EPDF','','Export printable PDF']
 ];
 function executeCADSearchCommand(name){
  $('cadCommandSearch').value='';$('cadCommandResults').hidden=true;
@@ -1303,7 +1304,7 @@ function matchCadPropertiesAt(point){
  saveHistory();copyCadProperties(from,e);updateAll();toast('Object properties copied · select another target or press Enter');
 }
 
-function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
+function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
   const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
   if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
   else setTool(aliases[cmd]);
@@ -1311,8 +1312,16 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  }if(cmd==='LIST'||cmd==='LI')return showCadEntityList();
  if(cmd==='SELECTALL'||cmd==='AI_SELALL')return selectAllCad();
  if(cmd==='PURGE'||cmd==='PU')return purgeUnusedCadLayers();
- if(cmd==='LAYER'||cmd==='LA')return openCadPaletteByTitle('Layer');
+ if(cmd==='LAYER'||cmd==='LA'||cmd==='LT'||cmd==='LTYPE')return openCadPaletteByTitle('Layer');
  if(cmd==='PROPERTIES'||cmd==='PR'||cmd==='CHPROP')return openCadPaletteByTitle('Selection / Properties');
+ if(cmd==='STYLE'||cmd==='ST'||cmd==='TEXTSTYLE')return openCadPaletteByTitle('Text / Typography');
+ if(cmd==='DIMSTYLE'||cmd==='D'||cmd==='DSTYLE')return openCadPaletteByTitle('Dimensions / Annotation');
+ if(cmd==='ED'||cmd==='TEDIT'||cmd==='DDEDIT'){
+  const target=selectedCadEntities().find(e=>e.type==='text');
+  if(target)syncTextPanel(target);
+  return openCadPaletteByTitle('Text / Typography');
+ }
+
  if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
  if(cmd==='QSAVE'||cmd==='SAVEAS')return saveJSON();
  if(cmd==='OPEN')return openFile();
@@ -1322,7 +1331,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return $('exportBlockBtn').click();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO')return undo();if(cmd==='REDO')return redo();if(cmd==='Z'||cmd==='ZE'||cmd==='ZOOM')return zoomExtents();if(cmd==='DXF')return exportDXF();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT')return openPrint();if(cmd==='SAVE')return saveJSON();if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNITS')return $('units').focus();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{if(ev.key==='Enter')runCommand();if(ev.key==='Escape'){$('command').blur();state.stage=[];prompt();schedule()}});
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO')return undo();if(cmd==='REDO')return redo();if(cmd==='Z'||cmd==='ZE'||cmd==='ZOOM')return zoomExtents();if(cmd==='DXF')return exportDXF();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='SAVE')return saveJSON();if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNITS'||cmd==='UN')return $('units').focus();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{if(ev.key==='Enter')runCommand();if(ev.key==='Escape'){$('command').blur();state.stage=[];prompt();schedule()}});
 document.addEventListener('keydown',ev=>{
  const focused=document.activeElement?.tagName||'',isEditing=['INPUT','TEXTAREA','SELECT'].includes(focused);
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='o'){ev.preventDefault();openFile();return}
