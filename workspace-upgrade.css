@@ -471,3 +471,15 @@
  .app:not(.cad-focus):not(.ribbon-undocked){grid-template-rows:48px 34px 90px minmax(0,1fr) 58px 35px!important}
  .app .workspace{grid-template-columns:minmax(0,1fr)!important}
 }
+
+
+/* Respect hidden/collapsed panels and focused canvas when using reference styling. */
+.app.cad-hide-right:not(.cad-focus) .workspace{grid-template-columns:var(--left-width,278px) minmax(0,1fr)!important}
+.app.cad-hide-left:not(.cad-focus) .workspace{grid-template-columns:minmax(0,1fr) var(--right-width,202px)!important}
+.app.cad-hide-left.cad-hide-right:not(.cad-focus) .workspace,
+.app.cad-focus .workspace{grid-template-columns:minmax(0,1fr)!important}
+.app.cad-hide-ribbon:not(.cad-focus){grid-template-rows:54px 38px 0 minmax(0,1fr) 70px 40px!important}
+.app.cad-focus{grid-template-rows:54px 0 0 minmax(0,1fr) 55px 40px!important}
+@media(max-width:1100px){
+ .app.cad-hide-right:not(.cad-focus) .workspace{grid-template-columns:var(--left-width,240px) minmax(0,1fr)!important}
+}
