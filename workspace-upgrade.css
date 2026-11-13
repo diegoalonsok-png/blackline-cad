@@ -157,3 +157,92 @@
 /* Home is the five-group reference toolbar; no tools are deleted. */
 .app.cad-classic-home-ribbon .ribbon .group[data-label="PROPERTIES"],
 .app.cad-classic-home-ribbon .ribbon .group[data-label="EXPORT"]{display:none!important}
+
+
+/* 2026-11-13 · Taupe architectural CAD workspace inspired by supplied visual reference.
+   Deliberately preserves rectangular command buttons and native drawing behavior. */
+:root{
+ --cad-taupe:#292724;
+ --cad-taupe-raised:#34312d;
+ --cad-chalk:#eceae4;
+ --cad-taupe-line:#494640;
+ --cad-matte:#0b0d0e;
+}
+.app .brandbar{
+ background:#111213!important;
+ border-bottom:1px solid var(--cad-ui-edge,#494640)!important;
+}
+.app .tabbar{
+ background:var(--cad-ui-base,var(--cad-taupe))!important;
+ border-bottom:1px solid var(--cad-ui-edge,#494640)!important;
+}
+.app .ribbon-shell,
+.app .ribbon,
+.app .ribbon .group{
+ background:var(--cad-ui-base,var(--cad-taupe))!important;
+ border-color:var(--cad-ui-edge,#494640)!important;
+}
+.app .ribbon-shell{
+ margin:3px 9px 6px!important;
+ border:1px solid var(--cad-ui-edge,#494640)!important;
+ border-radius:13px!important;
+ overflow:hidden!important;
+ box-shadow:0 3px 12px #0003!important;
+}
+.app .ribbon,
+.app.cad-ribbon-compact .ribbon{background:transparent!important}
+.app .sidebar,
+.app .sidebar.rightside{background:var(--cad-ui-base,var(--cad-taupe))!important;border-color:var(--cad-ui-edge,#494640)!important}
+.app .sidebar .panel,
+.app .cad-palette{
+ background:var(--cad-ui-base,var(--cad-taupe))!important;
+ border:1px solid var(--cad-ui-edge,#494640)!important;
+ border-radius:12px!important;
+ margin:4px!important;
+ box-shadow:none!important;
+}
+.app .panel-title,
+.app .palette-title{
+ background:var(--cad-ui-raised,var(--cad-taupe-raised))!important;
+ color:var(--cad-ui-text,var(--cad-chalk))!important;
+ border-bottom:1px solid var(--cad-ui-edge,#494640)!important;
+ font-weight:600!important;
+ letter-spacing:.3px!important;
+}
+.app .status,
+.app .cmd{
+ background:var(--cad-ui-base,var(--cad-taupe))!important;
+ border-color:var(--cad-ui-edge,#494640)!important;
+}
+.app .tool,
+.app .ribbon .tool,
+.app .cad-floating-tool-list button,
+.app .status button,
+.app .tabbar .tab,
+.app .sidebar button{
+ border-radius:0!important;
+ color:var(--cad-ui-text,var(--cad-chalk))!important;
+}
+.app .ribbon .tool{
+ background:transparent!important;
+ border:1px solid transparent!important;
+ box-shadow:none!important;
+}
+.app .ribbon .tool:hover{
+ background:var(--cad-ui-raised,var(--cad-taupe-raised))!important;
+ border-color:var(--cad-ui-edge,#494640)!important;
+}
+.app .ribbon .tool.active,
+.app .ribbon .tool:focus-visible{
+ background:var(--cad-ui-raised,var(--cad-taupe-raised))!important;
+ border-color:#858078!important;
+ outline:none!important;
+ box-shadow:inset 0 0 0 1px #77716a!important;
+}
+.app .tool svg{stroke:#e6e4de!important;stroke-width:1.35!important;fill:none!important}
+.app .tab.active{border-bottom:2px solid #c1bcb3!important;color:var(--cad-ui-text,var(--cad-chalk))!important}
+.app .canvas-wrap{background:var(--cad-matte)!important}
+.app .canvas-overlay{background:#1d201fe8!important;color:var(--cad-chalk)!important;border:1px solid #42413f!important;border-radius:10px!important}
+.app .cad-command-finder{border:1px solid #5a5650!important;background:#17191a!important;border-radius:10px!important}
+.app .cad-command-finder input{background:transparent!important;color:var(--cad-chalk)!important}
+.app .status button.on{background:var(--cad-ui-raised,var(--cad-taupe-raised))!important;border-color:#858078!important;color:var(--cad-chalk)!important}
