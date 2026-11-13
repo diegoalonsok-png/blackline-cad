@@ -765,6 +765,124 @@ function setupModifyPanel(){
  }
 }
 
+
+/* A small set of production-oriented 2D editing primitives. */
+function validEditSelection(){
+ return state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
+}
+function initAdvancedCad(){
+ $('applyObjectColor').onclick=()=>applyObjectAppearance(false);
+ $('resetObjectColor').onclick=()=>applyObjectAppearance(true);
+ for(const [button,tool] of [['cadExtendBtn','extend'],['cadJoinBtn','join'],['cadExplodeBtn','explode'],['cadReverseBtn','reverse'],['cadArrayBtn','array']]){
+  $(button).onclick=()=>setTool(tool);
+ }
+}
+function applyObjectAppearance(byLayer){
+ const items=validEditSelection();
+ if(!items.length)return toast('Select one or more unlocked objects to recolor');
+ const color=$('entityColor').value,weight=Number($('entityLineWidth').value);
+ if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<=0)return toast('Invalid color / lineweight');
+ saveHistory();
+ for(const e of items){
+  if(byLayer){delete e.color;delete e.width}
+  else{e.color=color;e.width=weight}
+ }
+ updateAll();toast(byLayer?'Selection set to ByLayer':'Object colors and lineweights applied');
+}
+function extendLine(e,mouse){
+ if(!e||e.type!=='line')return toast('EXTEND currently supports straight LINE entities');
+ const start=dist(mouse,e.a)<dist(mouse,e.b),origin=start?e.b:e.a,old=start?e.a:e.b;
+ const direction=sub(old,origin),magnitude=Math.hypot(direction.x,direction.y);
+ if(magnitude<1e-10)return toast('Zero-length line cannot be extended');
+ const u=mul(direction,1/magnitude);
+ let best=null,smallest=Infinity;
+ for(const edge of state.entities){
+  if(edge.id===e.id||edge.type!=='line'||!layerFor(edge).visible)continue;
+  const point=unrestrictedIntersection(origin,old,edge.a,edge.b);
+  if(!point)continue;
+  const advance=(point.x-old.x)*u.x+(point.y-old.y)*u.y;
+  const span=sub(edge.b,edge.a),den=span.x*span.x+span.y*span.y;
+  if(advance<=1e-8||den<=1e-12)continue;
+  const t=((point.x-edge.a.x)*span.x+(point.y-edge.a.y)*span.y)/den;
+  if(t<-1e-8||t>1+1e-8)continue;
+  if(advance<smallest){smallest=advance;best=point}
+ }
+ if(!best)return toast('No forward LINE boundary found; drawing unchanged');
+ saveHistory();e[start?'a':'b']=best;updateAll();log('EXTEND');toast('Line extended to real boundary');
+}
+function joinSelectedLines(){
+ const selected=validEditSelection();
+ if(selected.length<2||selected.some(e=>e.type!=='line'))return toast('Select two or more connected straight lines');
+ const pool=selected.map(e=>({id:e.id,a:clone(e.a),b:clone(e.b)}));
+ const tolerance=1e-7;
+ const points=[pool[0].a,pool[0].b],used=new Set([pool[0].id]);
+ let grew=true;
+ while(grew){
+  grew=false;
+  for(const edge of pool){
+   if(used.has(edge.id))continue;
+   let next=null;
+   if(dist(points.at(-1),edge.a)<=tolerance)next=['tail',edge.b];
+   else if(dist(points.at(-1),edge.b)<=tolerance)next=['tail',edge.a];
+   else if(dist(points[0],edge.b)<=tolerance)next=['head',edge.a];
+   else if(dist(points[0],edge.a)<=tolerance)next=['head',edge.b];
+   if(!next)continue;
+   if(next[0]==='tail')points.push(next[1]);else points.unshift(next[1]);
+   used.add(edge.id);grew=true;
+  }
+ }
+ if(used.size!==pool.length)return toast('Selected lines are not one connected chain');
+ const closed=points.length>=4&&dist(points[0],points.at(-1))<=tolerance;
+ if(closed)points.pop();
+ if(points.length<2)return toast('Not enough vertices to JOIN');
+ saveHistory();
+ const basis=selected[0];state.entities=state.entities.filter(e=>!used.has(e.id));
+ state.entities.push({type:'polyline',id:state.nextId++,pts:points,closed,layer:basis.layer,width:basis.width||.25,color:basis.color,linetype:basis.linetype});
+ state.selected=[];updateAll();log('JOIN');toast('Joined '+used.size+' LINE objects into a polyline');
+}
+function explodeSelected(){
+ const picked=validEditSelection(),supported=picked.filter(e=>e.type==='polyline'||e.type==='rect');
+ if(!supported.length)return toast('Select polylines or rectangles to EXPLODE');
+ const added=[];
+ for(const e of supported){
+  const corners=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;
+  if(!corners||corners.length<2)continue;
+  for(let i=1;i<corners.length;i++)if(dist(corners[i-1],corners[i])>1e-10)added.push({type:'line',a:clone(corners[i-1]),b:clone(corners[i]),layer:e.layer,width:e.width,color:e.color,linetype:e.linetype});
+  if((e.type==='rect'||e.closed)&&corners.length>=3&&dist(corners.at(-1),corners[0])>1e-10)
+   added.push({type:'line',a:clone(corners.at(-1)),b:clone(corners[0]),layer:e.layer,width:e.width,color:e.color,linetype:e.linetype});
+ }
+ if(!added.length)return toast('No geometry to EXPLODE');
+ saveHistory();
+ const ids=new Set(supported.map(e=>e.id));state.entities=state.entities.filter(e=>!ids.has(e.id));
+ for(const item of added){item.id=state.nextId++;state.entities.push(item)}
+ state.selected=[];updateAll();log('EXPLODE');toast('Exploded '+supported.length+' objects into '+added.length+' lines');
+}
+function reverseSelected(){
+ const picked=validEditSelection().filter(e=>e.type==='line'||e.type==='polyline');
+ if(!picked.length)return toast('Select LINE or PLINE entities to reverse');
+ saveHistory();
+ for(const e of picked)if(e.type==='line') [e.a,e.b]=[e.b,e.a];else e.pts.reverse();
+ updateAll();toast('Reversed '+picked.length+' entities');
+}
+function arraySelected(){
+ const picked=validEditSelection();
+ if(!picked.length)return toast('Select entities for rectangular ARRAY');
+ const rows=Math.round(Number($('arrayRows').value)),cols=Math.round(Number($('arrayCols').value));
+ const dx=Number($('arrayDx').value),dy=Number($('arrayDy').value);
+ if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<1||cols<1||rows>100||cols>100||!Number.isFinite(dx)||!Number.isFinite(dy))
+  return toast('ARRAY rows/columns must be 1–100 with finite spacing');
+ const total=(rows*cols-1)*picked.length;
+ if(total<=0)return toast('ARRAY needs more than one cell');
+ if(total>20000)return toast('ARRAY limited to 20,000 new entities');
+ const added=[];
+ for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+  if(row===0&&col===0)continue;
+  const shift=P(col*dx,row*dy);
+  for(const source of picked){const e=transformEntity(source,p=>add(p,shift));e.id=state.nextId+added.length;added.push(e)}
+ }
+ saveHistory();state.nextId+=added.length;state.entities.push(...added);state.selected=[];updateAll();log('ARRAY');toast('Created '+added.length+' array copies');
+}
+
 function handlePoint(p,shift){const t=state.tool;if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(e)trimLine(e,p);return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&(e.type==='line'||e.type==='circle')){state.modifyCandidate={id:e.id};prompt();toast('Click the side for OFFSET')}else toast('Select a LINE or CIRCLE');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target)offsetAt(target,p);else state.modifyCandidate=null;return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
@@ -1500,7 +1618,7 @@ function initDockablePalettes(){
 }
 
 initDockablePalettes();
-initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();
+initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
