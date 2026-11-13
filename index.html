@@ -483,6 +483,21 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .app.cad-ribbon-compact .ribbon .tool svg{width:14px;height:14px}
 .app.cad-ribbon-compact .ribbon .tool span{white-space:nowrap}
 .app.cad-ribbon-compact #ribbonGrip{font-size:14px}
+
+/* Precision status bar popovers, compact desktop CAD controls. */
+.status{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;gap:2px}
+.status button{white-space:nowrap;flex-shrink:0}
+.status .cad-status-arrow{padding:3px 3px;min-width:17px;border-left:0;border-radius:0 4px 4px 0;color:#b9d3dd;background:#26343c}
+.status .cad-status-arrow:hover,.status .cad-status-arrow[aria-expanded="true"]{color:#fff;background:#355569}
+.status .cad-snap-live{font:10px Consolas,monospace;white-space:nowrap;color:#d3dbb3;border:1px solid #374852;border-radius:4px;padding:4px 6px;min-width:76px;max-width:160px;overflow:hidden;text-overflow:ellipsis}
+.cad-status-menu[hidden]{display:none!important}
+.cad-status-menu{position:fixed;z-index:1001;width:245px;max-height:min(460px,75vh);overflow:auto;border:1px solid #69808e;border-radius:8px;background:#18232b;box-shadow:0 15px 42px #000b;padding:7px;color:#e8f0f3;font:12px Inter,Segoe UI,Arial,sans-serif}
+.cad-status-menu-title{padding:7px 9px 9px;border-bottom:1px solid #394e5a;color:#b6d3e0;font-size:11px;font-weight:700;letter-spacing:.4px}
+.cad-status-menu button{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;border:0;border-radius:5px;background:transparent;color:#dce8ee;padding:9px 10px;text-align:left;cursor:pointer}
+.cad-status-menu button:hover,.cad-status-menu button:focus-visible{background:#304b5a;outline:0}
+.cad-status-menu button.selected{color:#baf2d1}
+.cad-status-menu button span.check{font-weight:800;color:#72d5a1}
+.cad-status-menu .cad-menu-note{color:#9dafb9;font-size:10px;line-height:1.4;padding:8px}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -515,9 +530,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">PEDIT: select exactly one unlocked polyline first. Vertex numbers begin at 1. Move/insert: click the target model coordinate or enter exact X,Y in COMMAND. Insert adds a vertex after the selected vertex.</p><div class="smallrow"><button class="btn" id="cadExplodeBtn" type="button">EXPLODE</button><button class="btn" id="cadReverseBtn" type="button">REVERSE</button></div><div class="field"><label for="arrayRows">Array rows</label><input id="arrayRows" type="number" min="1" max="100" value="2"></div><div class="field"><label for="arrayCols">Array columns</label><input id="arrayCols" type="number" min="1" max="100" value="3"></div><div class="field"><label for="arrayDx">Spacing X</label><input id="arrayDx" type="number" step="any" value="2"></div><div class="field"><label for="arrayDy">Spacing Y</label><input id="arrayDy" type="number" step="any" value="2"></div><div class="smallrow"><button class="btn" id="cadArrayBtn" type="button">RECTANGULAR ARRAY</button></div><p class="help">EXTEND: pick a LINE near the end to extend toward a crossing boundary. JOIN: select connected lines. EXPLODE: selected polylines and rectangles. ARRAY: duplicates selected elements at exact model distances.</p></div></section><section class="panel" id="dimensionPalette"><div class="panel-title">Dimensions / Annotation</div><div class="panel-content"><div class="field"><label for="dimStyleLibrary">Dimension style</label><select id="dimStyleLibrary" aria-label="Saved dimension styles"><option value="">Current settings</option></select></div><div class="smallrow"><button class="btn" id="dimSaveStyle" type="button">Save style</button><button class="btn" id="dimDeleteStyle" type="button">Delete style</button></div><p class="help">Named DIMSTYLE presets stay inside this drawing and are included in CADJSON backups.</p><div class="field"><label for="dimMode">Dimension type</label><select id="dimMode"><option value="aligned">Aligned</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option><option value="angular">Angular · 3 points</option><option value="radius">Radius · circle</option><option value="diameter">Diameter · circle</option><option value="ordinateX">Ordinate X</option><option value="ordinateY">Ordinate Y</option><option value="leader">Leader / Callout</option></select></div><div class="field"><label for="dimPrecision">Precision</label><select id="dimPrecision"><option value="0">0</option><option value="1">0.0</option><option value="2" selected>0.00</option><option value="3">0.000</option><option value="4">0.0000</option></select></div><div class="field"><label for="dimDisplayUnits">Display units</label><select id="dimDisplayUnits"><option value="drawing">Drawing units</option><option value="mm">Millimeters (mm)</option><option value="cm">Centimeters (cm)</option><option value="m">Meters (m)</option><option value="in">Inches (in)</option><option value="ft">Feet (ft)</option></select></div><div class="field"><label for="dimTolerance">± Tolerance</label><input id="dimTolerance" type="number" min="0" step="0.01" value="0"></div><div class="field"><label for="dimTextHeight">Text height</label><input id="dimTextHeight" type="number" min="0.001" step="0.05" value="0.20"></div><div class="field"><label for="dimArrowSize">Arrow size</label><input id="dimArrowSize" type="number" min="0.001" step="0.03" value="0.12"></div><div class="field"><label for="dimSuffix">Suffix</label><input id="dimSuffix" type="text" value="" placeholder="Optional: mm, m"></div><div class="field"><label for="dimLeaderText">Leader text</label><input id="dimLeaderText" type="text" value="NOTE" placeholder="Annotation text"></div><div class="smallrow"><button class="btn" id="startDimension" type="button">Create dimension</button><button class="btn" id="applyDimensionStyle" type="button">Apply to selected</button></div><p class="help">Linear: specify two reference points and the dimension-line position. Radius/diameter: click a circle, then text placement. Angular: vertex, first ray, second ray. Model values remain 1:1; arrow sizes use model units.</p></div></section><section class="panel" id="modifyGeometryPanel"><div class="panel-title">Modify geometry</div><div class="panel-content"><div class="field"><label for="offsetDistance">Offset distance</label><input id="offsetDistance" type="number" step="any" min="0.000001" value="0.20"></div><div class="field"><label for="chamferLength">Chamfer distance</label><input id="chamferLength" type="number" step="any" min="0.000001" value="0.20"></div><div class="field"><label for="filletRadius">Fillet radius</label><input id="filletRadius" type="number" step="any" min="0.000001" value="0.20"></div><div class="smallrow"><button id="startOffset" type="button" class="btn">OFFSET</button><button id="startTrim" type="button" class="btn">TRIM</button></div><div class="smallrow"><button id="startChamfer" type="button" class="btn">CHAMFER</button><button id="startFillet" type="button" class="btn">FILLET</button></div><div class="smallrow"><button id="startPlot" type="button" class="btn">PRINT / PLOT · PDF</button></div><p class="help">OFFSET: choose a line, then click the target side. For circles choose inside/outside. CHAMFER and FILLET: select two straight line segments meeting at a corner, or whose ends can be extended to one. Enter distances in model units. TRIM operates on crossing straight segments.</p></div></section><section class="panel" id="textPalette"><div class="panel-title">Text / Typography</div><div class="panel-content"><div class="field"><label for="textValue">Content</label><input id="textValue" type="text" value="ROOM NAME" placeholder="Type annotation"></div><div class="field"><label for="textFont">Font</label><select id="textFont"><option value="Arial">Arial / Sans</option><option value="Helvetica">Helvetica</option><option value="Georgia">Georgia / Serif</option><option value="Times New Roman">Times New Roman</option><option value="Courier New">Courier New / CAD</option><option value="monospace">Monospace</option></select></div><div class="field"><label for="textHeight">Text height</label><input id="textHeight" type="number" value="0.25" min="0.001" step="0.05"></div><div class="field"><label for="textAngle">Rotation °</label><input id="textAngle" type="number" value="0" step="15"></div><div class="field"><label for="textWeight">Weight</label><select id="textWeight"><option value="normal">Regular</option><option value="bold">Bold</option></select></div><div class="field"><label for="textItalic">Style</label><select id="textItalic"><option value="normal">Upright</option><option value="italic">Italic</option></select></div><div class="smallrow"><button class="btn" id="placeTextBtn" type="button">Place text</button><button class="btn" id="applyTextBtn" type="button">Apply to selected</button></div><div class="smallrow"><button class="btn" id="copyTextContent" type="button">Copy text</button><button class="btn" id="pasteTextContent" type="button">Paste text</button></div><div id="fontPreview" class="font-preview">Aa Bb 123 · CAD2D</div><p class="help">Place: click in model space. Apply: select one or more text objects first. Fonts use installed system families. DXF stores a text style reference; PDF uses standard fallback fonts, so some appearances may differ.</p></div></section><section class="panel"><div class="panel-title">Drawing statistics</div><div class="panel-content" id="statistics"></div></section><section class="panel"><div class="panel-title">Keyboard / Coordinates</div><div class="panel-content help">F3 OSNAP · F7 GRID · F8 ORTHO · F9 SNAP · Ctrl+O open · Ctrl+S save · Ctrl+P print. Commands: AREA, ID, LIST, MATCHPROP (MA), LAYER (LA), PROPERTIES (PR), PURGE (PU), REGEN, QSAVE.<br><br>L line · PL polyline · B block · I insert · WBLOCK export · C circle · REC rectangle · A arc · T text · M move · CO copy · RO rotate · SC scale · O offset · E erase · DI distance · Z extents.<br><br>During drawing: type <b>10,5</b> for absolute point or <b>@3,0</b> for a relative point. <b>Esc</b> cancel · <b>Enter</b> end polyline · <b>Ctrl+Z</b> undo.</div></section></aside>
  </div>
  <div class="cmd"><div class="log" id="log"></div><div class="command-row"><b>COMMAND:</b><input id="command" type="text" placeholder="Comando / Command: LINEA · LINE · BORRAR · ERASE · 10,5 · @3,0" autocomplete="off" spellcheck="false"><button class="btn slim" id="runCommand">↵</button></div></div>
- <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on">GRID</button><button id="snapToggle">SNAP</button><button id="orthoToggle">ORTHO</button><button id="osnapToggle" class="on">OSNAP</button><button id="measureBtn">DIST</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
+ <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on" title="Activar o desactivar grilla">GRID</button><button class="cad-status-arrow" data-status-menu="grid" aria-label="Opciones de grilla">▾</button><button id="snapToggle" title="Ajustar a grilla">SNAP</button><button class="cad-status-arrow" data-status-menu="snap" aria-label="Opciones de snap de grilla">▾</button><button id="orthoToggle" title="Movimiento ortogonal">ORTHO</button><button class="cad-status-arrow" data-status-menu="ortho" aria-label="Opciones ortogonales">▾</button><button id="osnapToggle" class="on" title="Activar o desactivar referencias a objetos">OSNAP</button><button class="cad-status-arrow" data-status-menu="osnap" aria-label="Configurar referencias a objetos">▾</button><span class="cad-snap-live" id="cadSnapLive" title="Referencia a objetos detectada">OSNAP · —</span><button id="measureBtn">DIST</button><button class="cad-status-arrow" data-status-menu="measure" aria-label="Opciones de medición">▾</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><button class="cad-status-arrow" data-status-menu="scale" aria-label="Opciones de unidades y escala">▾</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
 </div>
-<div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
+<div id="cadStatusMenu" class="cad-status-menu" role="menu" hidden></div><div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
 <div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="mono" selected>Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
 <div class="modal-backdrop" id="helpBackdrop"><div class="modal"><div class="modal-head"><h2>CAD2D — Quick start</h2><button class="btn" id="closeHelp">✕ Close</button></div><div class="shortcuts"><div><h3>Drawing</h3><p>Click Line and click two points; repeat; Enter finishes.</p><p>Polyline connects points; Enter or double click finishes.</p><p>Circle: center then radius point.</p><p>Text: click the insertion point, type text in the prompt.</p><p>Coordinates can be entered in the command line.</p></div><div><h3>Editing and navigation</h3><p>Select with a click or drag left to right for a BLUE enclosed window; drag right to left for a GREEN crossing window. Use Shift to add objects. Borrar / Erase or Delete removes selected entities.</p><p>Hold Shift to select multiple entities.</p><p>Use Move, Copy, Rotate, Scale and Mirror on selected entities.</p><p>Mouse wheel zooms, middle mouse pans.</p><p>Space + left drag pans; Esc cancels.</p></div><div><h3>Output</h3><p>Export DXF R2000 (AC1015).</p><p>Import standard ASCII DXF entities (basic 2D types).</p><p>Save/Open native project JSON to preserve editing state.</p><p>Vector PDF at ISO, US or custom page size.</p></div><div><h3>Accuracy</h3><p>Coordinates are stored numerically, not in pixels.</p><p>Unit selection converts existing geometry to preserve physical size.</p><p>SNAP follows the selected grid spacing.</p><p>OSNAP recognizes endpoints, midpoints and centers.</p></div></div><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
@@ -582,7 +597,7 @@ function inViewport(e,w,h){
  const sc=state.view.scale,ox=state.view.ox,oy=state.view.oy,pad=30;
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
-function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);const visible=state.entities.filter(e=>layerFor(e).visible&&inViewport(e,w,h));for(const e of visible)drawEntity(e);if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.drag?.type==='transform')drawTransformPreview();drawCrosshair();drawSnapMarker();}
+function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const visible=state.entities.filter(e=>layerFor(e).visible&&inViewport(e,w,h));for(const e of visible)drawEntity(e);if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.drag?.type==='transform')drawTransformPreview();drawCrosshair();drawSnapMarker();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
@@ -792,6 +807,13 @@ function drawTransformPreview(){const d=state.drag;if(!d.base||!d.lastWorld)retu
 function centerZoom(f,at){let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
 function getVertices(e){if(e.type==='line'||e.type==='rect'||e.type==='dimension')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
+const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD'];
+let cadActiveOsnaps=new Set(CAD_OSNAP_TYPES);
+try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if(Array.isArray(saved))cadActiveOsnaps=new Set(saved.filter(x=>CAD_OSNAP_TYPES.includes(x)))}catch(e){}
+function cadOsnapEnabled(kind){return cadActiveOsnaps.has(kind)}
+function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
+function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
+
 function snapPoint(p){
  let q=P(p.x,p.y);snapIndicator=null;
  if(state.orthoOn&&state.stage.length){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
@@ -801,21 +823,21 @@ function snapPoint(p){
   for(const e of state.entities){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
-   const candidates=getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT']);
+   const candidates=getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT']).filter(item=>cadOsnapEnabled(item[1]));
    if(e.type==='line'){
-    candidates.push([mul(add(e.a,e.b),.5),'MID']);
+    if(cadOsnapEnabled('MID'))candidates.push([mul(add(e.a,e.b),.5),'MID']);
     if(nearbyLines.length<70)nearbyLines.push(e);
    }
-   if(e.type==='rect'){candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END'],[mul(add(e.a,e.b),.5),'CENTER'])}
-   if(e.type==='polyline'&&e.pts?.length>1)for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);
-   if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')candidates.push([e.c,'CENTER']);
-   if(e.type==='circle'){
+   if(e.type==='rect'){if(cadOsnapEnabled('END'))candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END']);if(cadOsnapEnabled('CENTER'))candidates.push([mul(add(e.a,e.b),.5),'CENTER'])}
+   if(cadOsnapEnabled('MID')&&e.type==='polyline'&&e.pts?.length>1)for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);
+   if(cadOsnapEnabled('CENTER')&&(e.type==='circle'||e.type==='arc'||e.type==='ellipse'))candidates.push([e.c,'CENTER']);
+   if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
    for(const [v,kind] of candidates){const d=dist(screen(v),screen(q));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
-  for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
+  if(cadOsnapEnabled('INT'))for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
    const a=nearbyLines[i],b=nearbyLines[j];
    const cross=unrestrictedIntersection(a.a,a.b,b.a,b.b);
    if(!cross)continue;
@@ -2445,6 +2467,72 @@ function initDockablePalettes(){
  });
 }
 
+
+/* Contextual settings for each lower CAD control. Native state controls remain operative. */
+function initCadStatusMenus(){
+ const menu=$('cadStatusMenu'), arrows=[...document.querySelectorAll('[data-status-menu]')];
+ const title={grid:'GRID · Grilla',snap:'SNAP · Ajuste de grilla',ortho:'ORTHO · Ortogonal',osnap:'OSNAP · Referencias a objetos',measure:'DIST · Medición',scale:'1:1 · Unidades y escala'};
+ const modes={END:'Extremo / Endpoint',POINT:'Vértice / Point',MID:'Punto medio / Midpoint',CENTER:'Centro / Center',INT:'Intersección / Intersection',QUAD:'Cuadrante / Quadrant'};
+ let active=null;
+ const entry=(label,action,checked=false)=>{
+  const b=document.createElement('button');b.type='button';b.className=checked?'selected':'';
+  const t=document.createElement('span');t.textContent=label;b.append(t);
+  if(checked){const c=document.createElement('span');c.className='check';c.textContent='✓';b.append(c)}
+  b.onclick=e=>{e.stopPropagation();action();render(active);updateCadSnapLive()};
+  menu.append(b);
+ };
+ const note=text=>{const el=document.createElement('div');el.className='cad-menu-note';el.textContent=text;menu.append(el)};
+ function render(kind){
+  if(!kind)return;menu.replaceChildren();
+  const h=document.createElement('div');h.className='cad-status-menu-title';h.textContent=title[kind];menu.append(h);
+  if(kind==='osnap'){
+   entry('Activar OSNAP / Enable',()=>toggle('osnapOn','osnapToggle'),state.osnapOn);
+   for(const mode of CAD_OSNAP_TYPES)entry(modes[mode],()=>{cadActiveOsnaps.has(mode)?cadActiveOsnaps.delete(mode):cadActiveOsnaps.add(mode);saveCadOsnapModes()},cadActiveOsnaps.has(mode));
+   entry('Activar todos / Enable all',()=>{cadActiveOsnaps=new Set(CAD_OSNAP_TYPES);saveCadOsnapModes()});
+   entry('Desactivar todos / Disable all',()=>{cadActiveOsnaps.clear();saveCadOsnapModes()});
+   note('El indicador OSNAP de la barra muestra la referencia detectada al mover el cursor.');
+  }
+  if(kind==='grid'){
+   entry('Mostrar grilla / Show grid',()=>toggle('gridOn','gridToggle'),state.gridOn);
+   entry('Espaciado / Grid spacing',()=>{const v=window.prompt('Espaciado de grilla / Grid spacing ('+state.unit+')',String(state.grid));if(v===null)return;const n=Number(v.replace(',','.'));if(!Number.isFinite(n)||n<=0)return toast('Espaciado inválido');state.grid=n;$('gridSpacing').value=n;schedule()},false);
+  }
+  if(kind==='snap'){
+   entry('Ajustar a grilla / Snap to grid',()=>toggle('snapOn','snapToggle'),state.snapOn);
+   entry('Ajustar espaciado / Snap spacing',()=>{const v=window.prompt('Distancia de grilla ('+state.unit+')',String(state.grid));if(v===null)return;const n=Number(v.replace(',','.'));if(n>0&&Number.isFinite(n)){state.grid=n;$('gridSpacing').value=n;schedule()}},false);
+   note('SNAP usa el espaciado de GRID. OSNAP reconoce puntos geométricos de los objetos.');
+  }
+  if(kind==='ortho'){
+   entry('Ortogonal 0° / 90°',()=>toggle('orthoOn','orthoToggle'),state.orthoOn);
+   note('Restringe el cursor a las direcciones horizontal y vertical durante el dibujo.');
+  }
+  if(kind==='measure'){
+   entry('Distancia / DIST',()=>setTool('distance'));
+   entry('Área / AREA',()=>setTool('area'));
+   entry('Coordenadas / ID',()=>setTool('id'));
+   entry('Listado / LIST',()=>showCadEntityList());
+  }
+  if(kind==='scale'){
+   entry('Cambiar unidades / UNITS',()=>openCadUnitsDialog());
+   entry('Verificar escala 1:1',()=>auditModelScale());
+   entry('Zoom a extensión / ZOOM',()=>zoomExtents());
+  }
+ }
+ function close(){menu.hidden=true;active=null;arrows.forEach(x=>x.setAttribute('aria-expanded','false'))}
+ arrows.forEach(arrow=>arrow.addEventListener('click',ev=>{
+  ev.preventDefault();ev.stopPropagation();const kind=arrow.dataset.statusMenu;
+  if(!menu.hidden&&active===kind)return close();
+  active=kind;render(kind);menu.hidden=false;
+  const b=arrow.getBoundingClientRect(),width=245;
+  menu.style.left=Math.max(8,Math.min(innerWidth-width-8,b.right-width))+'px';
+  menu.style.bottom=Math.max(8,innerHeight-b.top+5)+'px';
+  arrows.forEach(x=>x.setAttribute('aria-expanded',String(x===arrow)));
+ }));
+ document.addEventListener('pointerdown',ev=>{if(!menu.hidden&&!menu.contains(ev.target)&&!ev.target.closest('[data-status-menu]'))close()});
+ document.addEventListener('keydown',ev=>{if(ev.key==='Escape')close()});
+ updateCadSnapLive();
+}
+
+initCadStatusMenus();
 initDockablePalettes();
 initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
