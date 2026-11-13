@@ -499,9 +499,9 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
 canvas.addEventListener('pointerup',ev=>{const raw=P(ev.offsetX,ev.offsetY);const d=state.drag;state.drag=null;if(!d||d.type==='pan')return;if(d.type==='selection'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7){const l=Math.min(raw.x,d.start.x),r=Math.max(raw.x,d.start.x),t=Math.min(raw.y,d.start.y),b=Math.max(raw.y,d.start.y);const crossing=raw.x<d.start.x;
  const ids=state.entities.filter(e=>{
   if(!layerFor(e).visible||layerFor(e).locked)return false;
-  const b=boundsEntity(e);if(!b)return false;
-  const x1=screen(P(b.minX,0)).x,x2=screen(P(b.maxX,0)).x;
-  const y1=screen(P(0,b.maxY)).y,y2=screen(P(0,b.minY)).y;
+  const bb=boundsEntity(e);if(!bb)return false;
+  const x1=screen(P(bb.minX,0)).x,x2=screen(P(bb.maxX,0)).x;
+  const y1=screen(P(0,bb.maxY)).y,y2=screen(P(0,bb.minY)).y;
   return crossing?(x2>=l&&x1<=r&&y2>=t&&y1<=b):(x1>=l&&x2<=r&&y1>=t&&y2<=b);
  }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}handlePoint(snapPoint(world(raw)),d.shift)});
 canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='polyline'&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
