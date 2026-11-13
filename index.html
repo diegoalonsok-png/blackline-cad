@@ -1635,9 +1635,10 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(['line','polyline'].includes(state.tool)&&state.stage.length){
   const numeric=value.replace(',','.');
   if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(numeric)){
-   const length=Number(numeric),origin=state.stage.at(-1),delta=sub(state.mouse,origin),magnitude=Math.hypot(delta.x,delta.y);
+   const length=Number(numeric),origin=state.stage.at(-1);let delta=sub(state.mouse,origin);let magnitude=Math.hypot(delta.x,delta.y);
+   if(magnitude<1e-9){delta=P(1,0);magnitude=1;}
    if(!Number.isFinite(length)||length<=0)return toast('Longitud / Length must be positive');
-   if(magnitude<1e-9)return toast('Mové el cursor para indicar la dirección / Point in a direction');
+   // If the cursor has not moved, default to +X (AutoCAD-compatible predictable axis).
    const dest=add(origin,mul(delta,length/magnitude));
    handlePoint(dest,false);schedule();toast('Segmento / Segment: '+length+' '+state.unit);return;
   }
@@ -1680,7 +1681,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
  if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZE'||cmd==='ZOOM')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
  if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();runCommand();return}
- if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();$('command').value='';$('command').blur();state.stage=[];state.drag=null;state.modifyCandidate=null;setTool('select');toast('Comando cancelado / Command cancelled')}
+ if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();$('command').value='';$('command').blur();if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended')}
 });
 document.addEventListener('keydown',ev=>{
  const focused=document.activeElement?.tagName||'',isEditing=['INPUT','TEXTAREA','SELECT'].includes(focused);
@@ -1699,7 +1700,7 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='F8'){ev.preventDefault();toggle('orthoOn','orthoToggle')}
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;state.stage=[];state.drag=null;state.modifyCandidate=null;$('command').value='';setTool('select');toast('Comando cancelado / Command cancelled');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();$('command').value='';if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
 // Full CAD command typing directly from the drawing area, without clicking the bottom field.
 document.addEventListener('keydown',ev=>{
  if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1||!/[a-zA-Z]/.test(ev.key))return;
