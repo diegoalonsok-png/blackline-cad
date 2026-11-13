@@ -153,3 +153,7 @@
 .app .brandbar .btn,.app .status button,.app .tabbar .tab,.app .sidebar button,
 .app .cad-floating-tool-list button,.app .tool,.app .ribbon .tool,
 .app .cad-floating-tool-list button,.app [data-floating-cad],.app .cad-group-handle{border-radius:0!important}
+
+/* Home is the five-group reference toolbar; no tools are deleted. */
+.app.cad-classic-home-ribbon .ribbon .group[data-label="PROPERTIES"],
+.app.cad-classic-home-ribbon .ribbon .group[data-label="EXPORT"]{display:none!important}
