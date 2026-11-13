@@ -470,7 +470,9 @@ function drawSnapMarker(){
  if(!crosshairVisible||!state.osnapOn||!snapIndicator)return;
  const p=screen(snapIndicator.point);ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.fillStyle=displayColors.background;
  ctx.lineWidth=1.2;ctx.beginPath();const d=5;
- if(snapIndicator.type==='MID'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.lineTo(p.x-d,p.y+d);ctx.closePath()}
+ if(snapIndicator.type==='INT'){ctx.moveTo(p.x-d,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.moveTo(p.x+d,p.y-d);ctx.lineTo(p.x-d,p.y+d)}
+ else if(snapIndicator.type==='QUAD'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y);ctx.lineTo(p.x,p.y+d);ctx.lineTo(p.x-d,p.y);ctx.closePath()}
+ else if(snapIndicator.type==='MID'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.lineTo(p.x-d,p.y+d);ctx.closePath()}
  else if(snapIndicator.type==='CENTER'){ctx.arc(p.x,p.y,d,0,TAU)}
  else ctx.rect(p.x-d,p.y-d,d*2,d*2);
  ctx.fill();ctx.stroke();ctx.restore();
@@ -598,15 +600,32 @@ function snapPoint(p){
  if(state.orthoOn&&state.stage.length){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
  if(state.osnapOn){
   let nearest=null,minPixels=11,type='';
+  const nearbyLines=[];
   for(const e of state.entities){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
    const candidates=getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT']);
-   if(e.type==='line')candidates.push([mul(add(e.a,e.b),.5),'MID']);
+   if(e.type==='line'){
+    candidates.push([mul(add(e.a,e.b),.5),'MID']);
+    if(nearbyLines.length<70)nearbyLines.push(e);
+   }
    if(e.type==='rect'){candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END'],[mul(add(e.a,e.b),.5),'CENTER'])}
    if(e.type==='polyline'&&e.pts?.length>1)for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);
    if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')candidates.push([e.c,'CENTER']);
+   if(e.type==='circle'){
+    candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
+   }
    for(const [v,kind] of candidates){const d=dist(screen(v),screen(q));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
+  }
+  /* Finite LINE/LINE crossing points, with a hard local pair cap. */
+  for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
+   const a=nearbyLines[i],b=nearbyLines[j];
+   const cross=unrestrictedIntersection(a.a,a.b,b.a,b.b);
+   if(!cross)continue;
+   const along=(p,x,y)=>{const v=sub(y,x),length=v.x*v.x+v.y*v.y;if(length<1e-12)return false;const t=((p.x-x.x)*v.x+(p.y-x.y)*v.y)/length;return t>=-1e-8&&t<=1+1e-8};
+   if(!along(cross,a.a,a.b)||!along(cross,b.a,b.b))continue;
+   const distance=dist(screen(cross),screen(q));
+   if(distance<minPixels){minPixels=distance;nearest=cross;type='INT'}
   }
   if(nearest){snapIndicator={point:P(nearest.x,nearest.y),type};return snapIndicator.point}
  }
