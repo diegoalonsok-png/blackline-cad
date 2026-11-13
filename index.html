@@ -550,7 +550,25 @@ function inViewport(e,w,h){
 function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);const visible=state.entities.filter(e=>layerFor(e).visible&&inViewport(e,w,h));for(const e of visible)drawEntity(e);if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();ctx.strokeStyle='#b8cbd4';ctx.fillStyle='#8bcadd12';ctx.setLineDash([5,3]);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.drag?.type==='transform')drawTransformPreview();drawCrosshair();drawSnapMarker();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
-function drawCrosshair(){if(!crosshairVisible)return;const q=screen(state.mouse),w=canvas.width/dpr,h=canvas.height/dpr;const halfX=w*displayColors.size/200,halfY=h*displayColors.size/200;ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=displayColors.width;ctx.beginPath();ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();ctx.restore()}
+function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
+function drawCrosshair(){
+ if(!crosshairVisible)return;
+ const q=screen(state.mouse),w=canvas.width/dpr,h=canvas.height/dpr;
+ if(!Number.isFinite(q.x)||!Number.isFinite(q.y))return;
+ const halfX=w*displayColors.size/200,halfY=h*displayColors.size/200;
+ const active=hasActiveCadCommand(),size=active?8:6;
+ ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=displayColors.width;
+ ctx.beginPath();
+ ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
+ ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
+ /* CAD pickbox: yellow filled when a drawing/modification command is active,
+    hollow yellow when idle. Does not replace object snap indicators. */
+ ctx.fillStyle=active?'#ffe25a':displayColors.background;
+ ctx.strokeStyle='#ffe25a';ctx.lineWidth=1.4;
+ ctx.fillRect(q.x-size/2,q.y-size/2,size,size);
+ ctx.strokeRect(q.x-size/2,q.y-size/2,size,size);
+ ctx.restore();
+}
 function drawSnapMarker(){
  if(!crosshairVisible||!state.osnapOn||!snapIndicator)return;
  const p=screen(snapIndicator.point);ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.fillStyle=displayColors.background;
@@ -1311,9 +1329,29 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
   state.modifyCandidate=null;prompt();return
  }
  if(t==='insertBlock'){insertSelectedBlock(p);return}createAt(p)}
-canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',start:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;state.drag={type:'click',start:raw,last:raw,shift:ev.shiftKey};if(state.tool==='select'){const e=pick(world(raw));if(!e)state.drag.type='selection'} });
+let lastMiddleClick=null;
+function registerMiddleClick(time,point){
+ const last=lastMiddleClick;
+ const isDouble=!!last&&time-last.time>=0&&time-last.time<=380&&dist(last.point,point)<=14;
+ lastMiddleClick=isDouble?null:{time,point:P(point.x,point.y)};
+ return isDouble;
+}
+canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;state.drag={type:'click',start:raw,last:raw,shift:ev.shiftKey};if(state.tool==='select'){const e=pick(world(raw));if(!e)state.drag.type='selection'} });
 canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}else if(d.type==='click'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7&&state.tool==='select'){d.type='selection'}}schedule()});
-canvas.addEventListener('pointerup',ev=>{const raw=P(ev.offsetX,ev.offsetY);const d=state.drag;state.drag=null;if(!d||d.type==='pan')return;if(d.type==='selection'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7){const l=Math.min(raw.x,d.start.x),r=Math.max(raw.x,d.start.x),t=Math.min(raw.y,d.start.y),b=Math.max(raw.y,d.start.y);const crossing=raw.x<d.start.x;
+canvas.addEventListener('pointerup',ev=>{
+ const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
+ if(!d)return;
+ if(d.type==='pan'){
+  if(d.middle){
+   const movement=dist(raw,d.start);
+   if(movement<=5){
+    if(registerMiddleClick(performance.now(),raw)){
+     ev.preventDefault();zoomExtents();toast('Zoom Extents · middle-button double click');
+    }
+   }else lastMiddleClick=null;
+  }
+  return;
+ }if(d.type==='selection'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7){const l=Math.min(raw.x,d.start.x),r=Math.max(raw.x,d.start.x),t=Math.min(raw.y,d.start.y),b=Math.max(raw.y,d.start.y);const crossing=raw.x<d.start.x;
  const ids=state.entities.filter(e=>{
   if(!layerFor(e).visible||layerFor(e).locked)return false;
   const bb=boundsEntity(e);if(!bb)return false;
@@ -1321,7 +1359,7 @@ canvas.addEventListener('pointerup',ev=>{const raw=P(ev.offsetX,ev.offsetY);cons
   const y1=screen(P(0,bb.maxY)).y,y2=screen(P(0,bb.minY)).y;
   return crossing?(x2>=l&&x1<=r&&y2>=t&&y1<=b):(x1>=l&&x2<=r&&y1>=t&&y2<=b);
  }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}handlePoint(snapPoint(world(raw)),d.shift)});
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='dimension'){const all=dimensionPrimitives(e).map(boundsEntity).filter(Boolean);if(!all.length)return null;return {minX:Math.min(...all.map(x=>x.minX)),minY:Math.min(...all.map(x=>x.minY)),maxX:Math.max(...all.map(x=>x.maxX)),maxY:Math.max(...all.map(x=>x.maxY))}}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse')pts.push(P(e.c.x-e.rx,e.c.y-e.ry),P(e.c.x+e.rx,e.c.y+e.ry));if(e.type==='text')pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
 function getBounds(entities=state.entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
 function zoomExtents(){const b=getBounds(),w=wrap.clientWidth,h=wrap.clientHeight,dx=Math.max(1e-5,b.maxX-b.minX),dy=Math.max(1e-5,b.maxY-b.minY);state.view.scale=Math.min(w*.8/dx,h*.8/dy);state.view.ox=w/2-(b.minX+b.maxX)/2*state.view.scale;state.view.oy=h/2+(b.minY+b.maxY)/2*state.view.scale;schedule()}
