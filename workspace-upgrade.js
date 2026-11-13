@@ -241,5 +241,28 @@ function restoreHomeRibbon(){
 }
 restoreHomeRibbon();
 tabbar?.addEventListener('click',()=>queueMicrotask(restoreHomeRibbon));
+/* Reference-inspired dark taupe preset; respects users' previously chosen palette colors. */
+function initializeTaupeWorkspace(){
+ const picker=$('cadPaletteHue'),tone=$('cadPaletteTone'),background=$('modelBgColor');
+ try{
+  if(picker&&!localStorage.getItem('cad2d-palette-hue')){
+   picker.value='#39312c';
+   picker.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  const stored=localStorage.getItem('cad2d-palette-tone-v2');
+  if(tone&&(stored===null||stored==='8'||stored==='19')){
+   tone.value='11';
+   tone.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+  // Only change untouched default model backgrounds; retain drawings using custom backgrounds.
+  const saved=JSON.parse(localStorage.getItem('cad2d-display-colors')||'null');
+  const bg=saved?.background;
+  if(background&&(!bg||bg==='#10171c')){
+   background.value='#0b0d0e';
+   background.dispatchEvent(new Event('input',{bubbles:true}));
+  }
+ }catch(e){/* Appearance preferences are optional. */}
+}
+initializeTaupeWorkspace();
 checkAuthentication();
 })();
