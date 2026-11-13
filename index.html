@@ -558,6 +558,15 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-palette-tone .cad-tone-swatches button{height:28px;border:1px solid #708490;border-radius:5px;cursor:pointer}
 .cad-palette-tone .cad-tone-swatches button[aria-pressed=true]{outline:2px solid #95d5e8;outline-offset:2px}
 .cad-palette-tone .cad-tone-value{font-size:11px;color:#bcd1dc;text-align:right}
+
+/* Minimal graphite UI with smooth chamferless controls and user-selectable chrome hue. */
+.app .brandbar,.app .tabbar,.app .ribbon-shell,.app .ribbon,.app .status,.app .cmd{border-radius:8px!important}
+.app .panel,.app .cad-palette,.app .sidebar .panel,.app .cad-floating-tools{border-radius:10px!important;overflow:hidden}
+.app .tool,.app .btn,.app .tab,.app .status button,.app .cad-floating-tool-list button,.app .sidebar button{border-radius:7px!important;transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
+.app .tool svg,.app .cad-floating-tool-list svg{stroke-width:1.35!important;stroke-linecap:round!important;stroke-linejoin:round!important;fill:none!important}
+.app .tool:hover,.app .btn:hover,.app .status button:hover{box-shadow:inset 0 0 0 1px #b5bbc1!important}
+.cad-ui-hue-row{display:flex!important;justify-content:space-between;align-items:center;font-size:11px;color:#d9dde0;padding:10px 0}
+.cad-ui-hue-row input[type=color]{width:55px;height:30px;border:1px solid #81909a;border-radius:7px;background:transparent;cursor:pointer}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -624,6 +633,19 @@ ribbonTabs.home.push(['EXPORT','dxf','exportmenu']);
 ribbonTabs.output.push(['EXPORTAR','dxf','exportmenu']);
 let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#8cd2de',visible:true,locked:false},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'walls',unit:'m',grid:1,precision:2,lineWidth:.25,gridOn:true,snapOn:false,orthoOn:false,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
 const canvas=$('cadCanvas'),wrap=$('canvasWrap'),ctx=canvas.getContext('2d');canvas.tabIndex=0;canvas.setAttribute('aria-label','CAD model space: click to draw, type numbers for exact distance');let dpr=1,drawPending=false,spaceDown=false,pointer={x:0,y:0},lastClick=0;
+Object.assign(icons,{
+ line:'<path d="M5 18 19 6"/><circle cx="5" cy="18" r="1.7"/><circle cx="19" cy="6" r="1.7"/>',
+ polyline:'<path d="M3 19 9 8 15 14 21 4"/><circle cx="3" cy="19" r="1.3"/><circle cx="9" cy="8" r="1.3"/><circle cx="15" cy="14" r="1.3"/><circle cx="21" cy="4" r="1.3"/>',
+ rect:'<rect x="4" y="5" width="16" height="14" rx="2"/>',
+ circle:'<circle cx="12" cy="12" r="8"/>',
+ arc:'<path d="M4 19A15 15 0 0 1 20 5"/>',
+ select:'<path d="M5 3 19 12 12 13 9 20Z"/>',
+ move:'<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+ copy:'<rect x="7" y="7" width="13" height="13" rx="1.5"/><path d="M16 7V4H4v12h3"/>',
+ trim:'<path d="M5 5 19 19M19 5 5 19"/><circle cx="8" cy="8" r="1.5"/>',
+ erase:'<path d="m4 15 9-10 7 7-8 8H8Z"/><path d="M9 20h11"/>',
+ save:'<path d="M5 4h12l3 3v13H4V4Z"/><path d="M8 4v7h8V4M8 20v-6h8v6"/>'
+});
 function icon(name){return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name]||icons.select}</svg>`}
 function buildRibbon(tab){const def=ribbonTabs[tab]||ribbonTabs.home;$('ribbon').innerHTML=def.map(group=>`<div class="group ${group.length>6?'stack':''}" data-label="${group[0]}">${group.slice(1).map(t=>`<button class="tool ${state.tool===t?'active':''}" data-tool="${t}" title="${toolDefs[t]?.[0]||t}">${icon(t==='print'?'print':t==='save'?'save':t==='help'?'help':t==='zoom'?'zoom':t==='grid'?'grid':t)}<span>${toolDefs[t]?.[0]||t[0].toUpperCase()+t.slice(1)}</span></button>`).join('')}</div>`).join('');$('ribbon').querySelectorAll('[data-tool]').forEach(x=>x.onclick=()=>ribbonAction(x.dataset.tool))}
 function ribbonAction(t){
@@ -2711,11 +2733,17 @@ function initCadColorPopover(){
 
  // Palette chrome shades, separate from drawing colors and object colors.
  const toneBox=document.createElement('section');toneBox.className='cad-palette-tone';
- toneBox.innerHTML='<h3>Color de las paletas</h3><p>De negro a blanco tiza, con tonos intermedios. No cambia el plano.</p><div class="cad-tone-ends"><span>Negro</span><span>Blanco tiza</span></div><input type="range" id="cadPaletteTone" min="0" max="100" step="1" value="19" aria-label="Tonalidad de las paletas"><div class="cad-tone-value" id="cadPaletteToneLabel">19% · Gris carbón</div><div class="cad-tone-swatches" id="cadPaletteToneSwatches"></div>';
+ toneBox.innerHTML='<h3>Color de las paletas</h3><p>De negro a blanco tiza, con tonos intermedios. No cambia el plano.</p><div class="cad-tone-ends"><span>Negro</span><span>Blanco tiza</span></div><input type="range" id="cadPaletteTone" min="0" max="100" step="1" value="8" aria-label="Tonalidad de las paletas"><div class="cad-tone-value" id="cadPaletteToneLabel">8% · Grafito</div><div class="cad-tone-swatches" id="cadPaletteToneSwatches"></div>';
  panel.append(toneBox);
  const paletteTone=$('cadPaletteTone'),paletteToneLabel=$('cadPaletteToneLabel'),swatches=$('cadPaletteToneSwatches');
  const toneNames=['Negro','Antracita','Gris medio','Gris claro','Blanco tiza'];
  const paletteHex=n=>{const v=Math.max(0,Math.min(255,Math.round(n)));return '#'+v.toString(16).padStart(2,'0').repeat(3)};
+ let cadPaletteHue='#252525';
+ try{const oldHue=localStorage.getItem('cad2d-palette-hue');if(oldHue&&/^#[0-9a-f]{6}$/i.test(oldHue))cadPaletteHue=oldHue}catch(e){}
+ const hueRow=document.createElement('label');hueRow.className='cad-ui-hue-row';hueRow.textContent='Color de barras y botones';
+ const huePicker=document.createElement('input');huePicker.type='color';huePicker.value=cadPaletteHue;huePicker.id='cadPaletteHue';hueRow.append(huePicker);toneBox.insertBefore(hueRow,paletteTone);
+ const hueRGB=()=>[1,3,5].map(i=>parseInt(cadPaletteHue.slice(i,i+2),16));
+ const rgbHex=a=>'#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
  function setPaletteTone(value){
   const t=Math.max(0,Math.min(100,Number(value)||0));
   const base=Math.round(5+t*2.36),raised=Math.min(250,base+(t>65?-15:14));
@@ -2723,15 +2751,18 @@ function initCadColorPopover(){
   const bright=t>53;
   const root=document.documentElement.style;
   const varSet=(name,v)=>root.setProperty('--cad-ui-'+name,v);
-  varSet('base',paletteHex(base));varSet('raised',paletteHex(raised));varSet('toolbar',paletteHex(toolbar));
-  varSet('input',paletteHex(Math.max(0,base+(bright?-10:8))));
-  varSet('text',bright?'#19232b':'#e9f0f4');
-  varSet('muted',bright?'#46545e':'#a8b7bf');
+  const channels=hueRGB();
+  const chroma=channels.map(v=>v-(channels[0]+channels[1]+channels[2])/3);
+  const tint=(level)=>rgbHex(chroma.map(c=>level+c*.65));
+  varSet('base',tint(base));varSet('raised',tint(raised));varSet('toolbar',tint(toolbar));
+  varSet('input',tint(Math.max(0,base+(bright?-10:8))));
+  varSet('text',bright?'#19232b':'#edeae1');
+  varSet('muted',bright?'#46545e':'#bcbab2');
   varSet('edge',bright?'#9ba5ac':'#50606b');
   paletteTone.value=String(t);
   paletteToneLabel.textContent=t+'% · '+toneNames[Math.min(4,Math.round(t/25))];
   [...swatches.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(Math.abs(t-i*25)<8)));
-  try{localStorage.setItem('cad2d-palette-tone',String(t))}catch(e){}
+  try{localStorage.setItem('cad2d-palette-tone-v2',String(t))}catch(e){}
  }
  for(const [i,value] of [0,25,50,75,100].entries()){
   const sample=document.createElement('button');sample.type='button';sample.style.background=paletteHex(5+value*2.36);
@@ -2739,7 +2770,8 @@ function initCadColorPopover(){
   sample.onclick=()=>setPaletteTone(value);swatches.append(sample);
  }
  paletteTone.addEventListener('input',()=>setPaletteTone(paletteTone.value));
- let savedTone=19;try{const raw=localStorage.getItem('cad2d-palette-tone');if(raw!==null&&Number.isFinite(Number(raw)))savedTone=Number(raw)}catch(e){}
+ huePicker.addEventListener('input',()=>{cadPaletteHue=huePicker.value;try{localStorage.setItem('cad2d-palette-hue',cadPaletteHue)}catch(e){}setPaletteTone(paletteTone.value)});
+ let savedTone=8;try{const modern=localStorage.getItem('cad2d-palette-tone-v2');const legacy=localStorage.getItem('cad2d-palette-tone');if(modern!==null&&Number.isFinite(Number(modern)))savedTone=Number(modern);else if(legacy!==null&&Number.isFinite(Number(legacy))&&Number(legacy)!==19)savedTone=Number(legacy)}catch(e){}
  setPaletteTone(savedTone);
  const note=document.createElement('div');note.className='cad-color-help';note.textContent='Elegí un esquema o personalizá cada color. Se guarda automáticamente en este navegador.';panel.append(note);
  const presets=document.createElement('div');presets.className='cad-color-presets';
