@@ -625,7 +625,7 @@ function snapPoint(p){
    const along=(p,x,y)=>{const v=sub(y,x),length=v.x*v.x+v.y*v.y;if(length<1e-12)return false;const t=((p.x-x.x)*v.x+(p.y-x.y)*v.y)/length;return t>=-1e-8&&t<=1+1e-8};
    if(!along(cross,a.a,a.b)||!along(cross,b.a,b.b))continue;
    const distance=dist(screen(cross),screen(q));
-   if(distance<minPixels){minPixels=distance;nearest=cross;type='INT'}
+   if(distance<=minPixels+1e-8){minPixels=distance;nearest=cross;type='INT'}
   }
   if(nearest){snapIndicator={point:P(nearest.x,nearest.y),type};return snapIndicator.point}
  }
