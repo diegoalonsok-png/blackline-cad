@@ -1265,7 +1265,6 @@ function cutSelectedCadObjects(){
  if(!ids.length)return toast('CUTCLIP: select objects first');
  copySelectedCadObjects();
  if(!cadClipboard.length)return;
- const copyIds=new Set(cadClipboard.map(x=>x.id));
  /* Only the visible/unlocked selected objects are eligible for cut. */
  const selected=new Set(ids.filter(id=>state.entities.some(e=>e.id===id&&layerFor(e).visible&&!layerFor(e).locked)));
  if(!selected.size)return;
