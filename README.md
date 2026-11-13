@@ -73,3 +73,11 @@ The November 2026 rendering pass adds viewport culling, geometric bounding-box p
 - Save projects locally by default and explain whether any future conversion or synchronization involves uploading files. If accounts/sync/payment are added later, use a separate authenticated backend with suitable privacy, data retention, backups and cost monitoring.
 
 A static site is cheap to distribute, but bandwidth, server-side file conversion, optional storage and support can still incur costs as usage increases. No concurrency/performance guarantee is currently claimed.
+
+## Nov 12, 2026 — Local recovery and DWG header diagnostics
+
+- CAD2D keeps one **browser-local IndexedDB** recovery snapshot, scheduled 1.8 s after completed model changes. The new Recovery palette can restore the latest snapshot (explicit confirmation) or delete it. This is best-effort only: browser storage may be disabled, cleared or unavailable. It is **not** cloud synchronization or a replacement for downloading .cadjson project files.
+- JSON projects preserve the active `layerId` and restore it when reopening. Blocks also trigger a new recovery snapshot when definitions are added/removed.
+- Picking a DWG reads only its first 32 bytes locally and displays a known `AC10xx` format header and file size. **No DWG geometry, layers, blocks, xrefs or dimensions are imported** by this diagnostic. The `DWG_CONVERTER_ENDPOINT` remains empty. Automatic DWG opening still requires a real, tested decoder.
+- No drawings are sent to a server by local recovery or DWG header inspection. Browser storage is origin-scoped, may have quotas, and may be wiped by private browsing or cleanup.
+- Before production use, add robust import tests, file-identity checks, worker-based decoding, stress benchmarks and licensing verification for any free DWG library.
