@@ -426,11 +426,52 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadFloatingTools[hidden]{display:none!important}
 #cadLayoutPage svg{background:#fff}
 
+
+/* CAD2D drafting design system · restrained, high-contrast desktop CAD */
+:root{--bg:#090e12;--panel:#12191e;--panel2:#1a242b;--panel3:#243039;--border:#34444f;--muted:#9eafb9;--text:#e9f0f4;--gold:#d3b47a;--cyan:#8dcce0;--accent:#9cc4d2}
+.brandbar{background:linear-gradient(180deg,#152029 0%,#0e171c 100%);border-bottom:1px solid #40505b}
+.mark{border-radius:5px;background:#243139;box-shadow:inset 0 0 0 1px #2c3e46}
+.brand{font-size:16px;letter-spacing:1.5px}
+.filename{background:#10181e;border-color:#344651;min-width:130px;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.btn{border-radius:5px;transition:background .12s ease,border-color .12s ease}
+.btn:hover:not(:disabled){border-color:#718895;background:#2a3944}
+.btn.primary{background:linear-gradient(180deg,#396677,#294b59);border-color:#538192;color:#fff}
+.tabbar{background:#151f26;border-bottom:1px solid #3c4c56}
+.tabbar .tab{border-bottom:2px solid transparent;color:#aab9c5}
+.tabbar .tab.active{border-bottom-color:#8cc9df;color:#f0f6f8;background:#26343d}
+.ribbon-shell{background:linear-gradient(180deg,#202b33,#172129);border-bottom-color:#465662}
+.ribbon .tool{border-radius:4px}
+.ribbon .tool:hover{background:#3a4e5b}
+.ribbon .tool.active{background:#344f5b;box-shadow:inset 0 0 0 1px #648a9c}
+.ribbon .group:after{color:#9eb1bd;letter-spacing:1px}
+.panel{border:1px solid #34434b;border-radius:6px;background:#151e24;box-shadow:0 2px 8px #050b103b}
+.panel-title{background:#243139;border-bottom:1px solid #455760;color:#e5eef2;font-size:10px;letter-spacing:.7px}
+.panel-content{color:#d7e0e7}
+.sidebar{background:#10181e}
+.status{border-top:1px solid #485762;background:#131d24}
+.cmd{background:#0c151a;border-top:1px solid #344752}
+#command{border-color:#52616b;background:#0c1217;color:#e8eff2}
+#command:focus{border-color:#84b6cc;box-shadow:0 0 0 1px #37566a}
+.cad-command-finder{position:relative;display:flex;align-items:center;gap:5px;flex:0 1 280px;min-width:135px;height:27px;border:1px solid #52616e;border-radius:5px;background:#0c151b;padding:0 7px}
+.cad-command-finder:focus-within{border-color:#9ac8d7}
+.finder-symbol{font-size:17px;color:#9bb4c1}
+#cadCommandSearch{border:0;outline:0;box-shadow:none;background:transparent;color:#e4edf2;width:100%;min-width:0;font-size:11px}
+#cadCommandSearch::placeholder{color:#8fa4af}
+.cad-command-results[hidden]{display:none!important}
+.cad-command-results{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:200;background:#18242d;border:1px solid #587080;border-radius:6px;box-shadow:0 12px 36px #000c;max-height:330px;overflow:auto;padding:5px}
+.cad-command-result{width:100%;display:flex;justify-content:space-between;align-items:baseline;gap:10px;text-align:left;border:0;border-radius:4px;background:transparent;color:#e3edf2;padding:8px;cursor:pointer}
+.cad-command-result:hover,.cad-command-result:focus{background:#304552;outline:0}
+.cad-command-result strong{font-size:11px;letter-spacing:.4px}
+.cad-command-result small{color:#a7bac6;font-size:10px;text-align:right}
+.cad-command-empty{padding:10px;color:#b8c4ca;font-size:11px}
+@media(max-width:1050px){.cad-command-finder{flex-basis:170px}.filename{max-width:145px}}
+@media(max-width:800px){.cad-command-finder{position:absolute;right:8px;top:72px;z-index:70;width:145px;height:25px;box-shadow:0 2px 6px #0008}.cad-command-finder:not(:focus-within){opacity:.87}}
+
 </style>
 </head>
 <body>
 <div class="app">
- <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>PRECISION DRAFTING · 2D</small></div><div class="filename" id="filename">Untitled Drawing.dxf</div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn">Export DXF</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
+ <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>PRECISION DRAFTING · 2D</small></div><div class="filename" id="filename">Untitled Drawing.dxf</div><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn">Export DXF</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -1114,6 +1155,66 @@ function parseCoordinate(s){
  const m=s.match(/^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*[,;]\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*$/);
  if(!m)return null;const pt=P(Number(m[1]),Number(m[2]));return rel?add(state.stage.at(-1)||P(0,0),pt):pt;
 }
+
+/* Searchable registry: only commands whose action is implemented in this build. */
+const CAD_COMMANDS=[
+ ['LINE','L','Draw sequential line segments'],['PLINE','PL','Connected editable polyline'],
+ ['POLYGON','POL','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
+ ['ARC','A','Center and arc endpoints'],['ELLIPSE','EL','Ellipse'],['HATCH','H','Hatch selected closed boundaries'],
+ ['TABLE','','Insert editable table'],['TEXT','T','Insert single-line annotation'],
+ ['MOVE','M','Move selected entities'],['COPY','CO','Duplicate selected entities'],
+ ['ROTATE','RO','Rotate selected objects'],['SCALE','SC','Scale selected objects'],
+ ['MIRROR','MI','Mirror entities'],['OFFSET','O','Parallel line or circle'],
+ ['TRIM','TR','Cut to line crossing'],['EXTEND','EX','Extend to line boundary'],
+ ['FILLET','F','Radius fillet'],['CHAMFER','CHA','Equal-distance bevel'],
+ ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
+ ['EXPLODE','X','Separate polyline into lines'],['ERASE','E','Erase entity'],
+ ['DIMALIGNED','DAL','Aligned dimension'],['DIMLINEAR','DLI','Linear dimension'],
+ ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
+ ['DIMDIAMETER','','Circle diameter'],['LEADER','','Leader with label'],
+ ['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
+ ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
+ ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
+ ['LAYER','LA','Layer manager'],['PROPERTIES','PR','Selected properties'],
+ ['BLOCK','B','Create reusable block'],['INSERT','I','Insert reusable block'],
+ ['WBLOCK','','Export block library item'],['UNITS','','Change model units'],
+ ['ZOOM','Z','Zoom model extents'],['PAN','P','Pan model space'],
+ ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
+ ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
+ ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],
+ ['PURGE','PU','Remove unused unlocked layers']
+];
+function executeCADSearchCommand(name){
+ $('cadCommandSearch').value='';$('cadCommandResults').hidden=true;
+ $('command').value=name;runCommand();
+}
+function initCadCommandFinder(){
+ const input=$('cadCommandSearch'),out=$('cadCommandResults');
+ function render(){
+  const q=input.value.trim().toUpperCase(),all=q?CAD_COMMANDS.filter(x=>(x[0]+' '+x[1]+' '+x[2]).toUpperCase().includes(q)):CAD_COMMANDS.slice(0,10);
+  const matches=all.slice(0,12);out.replaceChildren();
+  if(!matches.length){const hint=document.createElement('div');hint.className='cad-command-empty';hint.textContent='No matching CAD2D command.';out.append(hint)}
+  for(const item of matches){
+   const button=document.createElement('button');button.type='button';button.className='cad-command-result';
+   const code=document.createElement('strong');code.textContent=item[0]+(item[1]?' · '+item[1]:'');
+   const desc=document.createElement('small');desc.textContent=item[2];
+   button.append(code,desc);button.onmousedown=e=>e.preventDefault();button.onclick=()=>executeCADSearchCommand(item[0]);out.append(button);
+  }
+  out.hidden=false;input.setAttribute('aria-expanded','true');
+ }
+ input.addEventListener('input',render);
+ input.addEventListener('focus',render);
+ input.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){out.hidden=true;input.blur();event.stopPropagation()}
+  if(event.key==='Enter'){
+   event.preventDefault();
+   const match=CAD_COMMANDS.find(x=>x[0]===input.value.trim().toUpperCase())||CAD_COMMANDS.find(x=>(x[0]+' '+x[1]).toUpperCase().includes(input.value.trim().toUpperCase()));
+   if(match)executeCADSearchCommand(match[0]);
+  }
+ });
+ document.addEventListener('pointerdown',event=>{if(!$('cadCommandFinder').contains(event.target))out.hidden=true});
+}
+
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}let aliases={L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
   const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
   if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
@@ -1886,7 +1987,7 @@ function initDockablePalettes(){
 }
 
 initDockablePalettes();
-initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();
+initAdjustableChrome();initMovableRibbon();initBlocks();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
