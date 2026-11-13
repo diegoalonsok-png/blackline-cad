@@ -1604,7 +1604,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  // AutoCAD-style direct distance entry: point + mouse direction + length + Enter.
  if(['line','polyline'].includes(state.tool)&&state.stage.length){
   const numeric=value.replace(',','.');
-  if(/^[+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(numeric)){
+  if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(numeric)){
    const length=Number(numeric),origin=state.stage.at(-1),delta=sub(state.mouse,origin),magnitude=Math.hypot(delta.x,delta.y);
    if(!Number.isFinite(length)||length<=0)return toast('Longitud / Length must be positive');
    if(magnitude<1e-9)return toast('Mové el cursor para indicar la dirección / Point in a direction');
