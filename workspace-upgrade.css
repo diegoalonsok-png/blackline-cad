@@ -246,3 +246,61 @@
 .app .cad-command-finder{border:1px solid #5a5650!important;background:#17191a!important;border-radius:10px!important}
 .app .cad-command-finder input{background:transparent!important;color:var(--cad-chalk)!important}
 .app .status button.on{background:var(--cad-ui-raised,var(--cad-taupe-raised))!important;border-color:#858078!important;color:var(--cad-chalk)!important}
+
+
+/* White stroke command iconography and slightly taller professional ribbon. */
+.app .ribbon-shell{margin:4px 9px 6px!important;border-radius:12px!important}
+.app .ribbon,.app.cad-ribbon-compact .ribbon{
+  padding:5px 9px!important;
+  gap:9px!important;
+  align-items:center!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  scrollbar-width:thin;
+}
+.app .ribbon .group,.app .ribbon .group.stack,
+.app.cad-ribbon-compact .ribbon .group,.app.cad-ribbon-compact .ribbon .group.stack{
+  gap:3px!important;
+  padding-right:13px!important;
+  border-right:1px solid #474440!important;
+}
+.app .ribbon .tool,.app .ribbon .group.stack .tool,
+.app.cad-ribbon-compact .ribbon .tool,.app.cad-ribbon-compact .ribbon .group.stack .tool{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  flex-direction:column!important;
+  gap:3px!important;
+  min-width:48px!important;
+  min-height:46px!important;
+  height:46px!important;
+  max-width:84px!important;
+  padding:3px 5px!important;
+  border-radius:0!important;
+}
+.app .ribbon .tool svg,
+.app.cad-ribbon-compact .ribbon .tool svg{
+  width:20px!important;
+  height:20px!important;
+  min-width:20px!important;
+  stroke:#f3f2ef!important;
+  stroke-width:1.55!important;
+  stroke-linecap:round!important;
+  stroke-linejoin:round!important;
+  fill:none!important;
+  opacity:.97!important;
+}
+.app .ribbon .tool span,
+.app.cad-ribbon-compact .ribbon .tool span{
+  color:#e5e4df!important;
+  font-size:9.5px!important;
+  font-weight:450!important;
+  line-height:1.1!important;
+  white-space:nowrap!important;
+}
+.app .ribbon .tool.active{
+  background:#383d40!important;
+  border-color:#737a7d!important;
+}
+.app .ribbon .tool:hover{background:#3b3936!important}
+.app .ribbon-grip{color:#c8c6c0!important}
