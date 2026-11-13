@@ -467,6 +467,18 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:1050px){.cad-command-finder{flex-basis:170px}.filename{max-width:145px}}
 @media(max-width:800px){.cad-command-finder{position:absolute;right:8px;top:72px;z-index:70;width:145px;height:25px;box-shadow:0 2px 6px #0008}.cad-command-finder:not(:focus-within){opacity:.87}}
 
+
+/* Ribbon height: compact default, clear +/- sizing, reliable one-row tools. */
+.cad-ribbon-size{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:3px;border-left:1px solid #41535f;flex:0 0 30px}
+.cad-ribbon-size button{height:21px;min-width:23px;padding:0;border:1px solid #526571;border-radius:4px;background:#23343e;color:#f1f5f7;font:bold 17px Arial;cursor:pointer}
+.cad-ribbon-size button:hover{background:#385769}
+.app.cad-ribbon-compact .ribbon{align-items:center;padding:2px 6px 3px;gap:3px}
+.app.cad-ribbon-compact .ribbon .group,.app.cad-ribbon-compact .ribbon .group.stack{display:flex;flex-direction:row;align-items:center;grid-template-columns:none;grid-template-rows:none;gap:1px;padding:0 5px 0 0;min-height:0}
+.app.cad-ribbon-compact .ribbon .group:after{display:none}
+.app.cad-ribbon-compact .ribbon .tool,.app.cad-ribbon-compact .ribbon .group.stack .tool{min-width:36px;max-width:90px;min-height:32px;height:35px;padding:2px 4px;font-size:9px}
+.app.cad-ribbon-compact .ribbon .tool svg{width:14px;height:14px}
+.app.cad-ribbon-compact .ribbon .tool span{white-space:nowrap}
+.app.cad-ribbon-compact #ribbonGrip{font-size:14px}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -474,7 +486,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <div class="app">
  <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="filename" id="filename">Untitled Drawing.dxf</div><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn">Export DXF</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
- <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
+ <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
   <aside class="sidebar"><section class="panel"><div class="panel-title">Drawing properties</div><div class="panel-content"><div class="field"><label>Units</label><select id="units"><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="m" selected>Meters</option><option value="in">Inches</option><option value="ft">Feet</option></select></div><div class="field"><label>Grid spacing</label><input id="gridSpacing" type="number" min="0.00001" step="any" value="1"></div><div class="field"><label>Precision</label><select id="precision"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option></select></div><div class="field"><label>Line width</label><input id="lineWidth" type="number" step="0.05" min="0.05" max="5" value="0.25"></div><div class="help">Model space is unbounded. Use mouse wheel to zoom and middle mouse / Space + drag to pan. All geometry is stored in drawing units.</div></div></section><section class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column"><div class="panel-title">Layer manager <span id="layerCount">0</span></div><div class="panel-content" style="display:flex;flex-direction:column;flex:1;min-height:0"><div class="smallrow"><button class="btn" id="newLayer">+ Add layer</button><button class="btn" id="removeLayer">Remove</button></div><div class="layer-list" id="layers"></div><p class="help">Select a layer name to make it current. Toggle visibility and lock on each row.</p></div></section><section class="panel"><div class="panel-title">Display / Cursor colors</div><div class="panel-content" id="displaySettings"><div class="field"><label for="cursorColor">Crosshair</label><input type="color" id="cursorColor" value="#ffff00" aria-label="Crosshair color"></div><div class="field"><label for="crosshairSize">Crosshair length</label><select id="crosshairSize"><option value="100">Full viewport (100%)</option><option value="75" selected>Large (75%)</option><option value="50">Medium (50%)</option><option value="25">Short (25%)</option><option value="5">Compact (5%)</option></select></div><div class="field"><label for="cursorWidth">Crosshair weight</label><select id="cursorWidth"><option value="0.75">Fine</option><option value="1" selected>Standard</option><option value="1.5">Bold</option></select></div><div class="field"><label for="modelBgColor">Background</label><input type="color" id="modelBgColor" value="#10171c" aria-label="Model background color"></div><div class="field"><label for="modelGridColor">Grid</label><input type="color" id="modelGridColor" value="#27343b" aria-label="Grid color"></div><div class="field"><label for="modelAxesColor">Axes</label><input type="color" id="modelAxesColor" value="#59636e" aria-label="Axes color"></div><div class="field"><label for="selectionColor">Selection</label><input type="color" id="selectionColor" value="#e9edf2" aria-label="Selection highlight color"></div><div class="field"><label for="cadThemePreset">Color scheme</label><select id="cadThemePreset"><option value="custom">Custom</option><option value="dark">Classic dark CAD</option><option value="black">Black model space</option><option value="light">Light drafting</option><option value="blueprint">Blueprint blue</option></select></div><div class="smallrow"><button class="btn" id="resetDisplayColors" type="button">Reset colors</button></div><p class="help">Changes affect the viewport only. Layer and exported drawing colors stay unchanged.</p></div></section><section class="panel"><div class="panel-title">Blocks / Symbols</div><div class="panel-content"><div class="smallrow"><button class="btn" id="createBlockBtn" type="button">Create selection</button></div><div class="field"><label for="blockLibrary">Block definition</label><select id="blockLibrary"><option value="">Choose block...</option></select></div><div class="field"><label for="blockScale">Insert scale</label><input type="number" id="blockScale" value="1" min="0.001" step="0.25"></div><div class="field"><label for="blockRotation">Angle (°)</label><input type="number" id="blockRotation" value="0" step="15"></div><div class="smallrow"><button class="btn" id="insertBlockBtn" type="button">Insert by point</button><button class="btn" id="removeBlockBtn" type="button">Remove</button></div><div class="smallrow"><button class="btn" id="exportBlockBtn" type="button">Export block</button><button class="btn" id="exportBlockDxfBtn" type="button">Export DXF</button></div><div class="smallrow"><button class="btn" id="importBlockBtn" type="button">Import block</button><input id="blockFileInput" type="file" accept=".cadblock,.json" hidden></div><p class="help">Click insertion point, or enter exact X,Y. CADBLOCK preserves the editable definition. DXF export contains expanded geometry, not a native BLOCK/INSERT reference.</p></div></section></aside>
   <main class="canvas-wrap" id="canvasWrap"><canvas id="cadCanvas"></canvas><div class="cad-floating-tools" id="cadFloatingTools" aria-label="Floating CAD tools"><div class="floating-tools-handle" id="cadFloatingGrip" title="Drag the CAD toolbar">⠿ <span>QUICK CAD</span><button type="button" id="cadFloatingMinimize" title="Collapse floating toolbar">−</button></div><div class="cad-floating-tool-list" id="cadFloatingList"><button data-floating-cad="erase" title="BORRAR / ERASE · E">⌫ BORRAR</button><button data-floating-cad="line" title="LINE">LINE</button><button data-floating-cad="polyline" title="PLINE">PL</button><button data-floating-cad="rect" title="RECTANGLE">▭</button><button data-floating-cad="circle" title="CIRCLE">◯</button><button data-floating-cad="arc" title="ARC">ARC</button><button data-floating-cad="move" title="MOVE">MOVE</button><button data-floating-cad="copy" title="COPY">COPY</button><button data-floating-cad="trim" title="TRIM">TRIM</button><button data-floating-cad="extend" title="EXTEND">EXT</button><button data-floating-cad="breakLine" title="BREAK LINE">BRK</button><button data-floating-cad="lengthen" title="LENGTHEN">LEN</button><button data-floating-cad="offset" title="OFFSET">OFF</button><button data-floating-cad="fillet" title="FILLET">FILLET</button><button data-floating-cad="chamfer" title="CHAMFER">CHA</button><button data-floating-cad="dimension" title="DIMENSION">DIM</button><button data-floating-cad="join" title="JOIN">JOIN</button><button data-floating-cad="explode" title="EXPLODE">EXP</button><button data-floating-cad="array" title="ARRAY">ARRAY</button><button data-floating-cad="color" title="COLOR">COLOR</button><button data-floating-cad="matchprop" title="MATCH PROPERTIES">MATCH</button><button data-floating-cad="area" title="AREA">AREA</button><button data-floating-cad="print" title="PRINT / PDF">PLOT</button></div></div><section id="cadLayoutWorkspace" class="cad-layout-workspace" hidden aria-label="Layout paper space">
@@ -2017,10 +2029,10 @@ function initAdjustableChrome(){
  const app=document.querySelector('.app'),ws=document.querySelector('.workspace');
  const clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
  const saved=(key,defaultValue)=>{try{return Number(localStorage.getItem(key))||defaultValue}catch(e){return defaultValue}};
- function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,58,190)+'px');
+ function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,42,150)+'px');
  else ws.style.setProperty(key==='left'?'--left-width':'--right-width',clamp(val,160,440)+'px');
  resize()}
- apply('ribbon',saved('cad2d-ribbon-height',62));
+ apply('ribbon',saved('cad2d-ribbon-height',46));
  apply('left',saved('cad2d-left-width',window.innerWidth<1100?176:192));
  apply('right',saved('cad2d-right-width',window.innerWidth<1100?182:202));
  [['ribbonSizer','ribbon','y'],['leftDivider','left','x'],['rightDivider','right','x']].forEach(([id,key,axis])=>{
@@ -2035,8 +2047,28 @@ function initAdjustableChrome(){
  });
  });
  const reset=$('resetWorkspace'),previous=reset&&reset.onclick;
- if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',62);apply('left',192);apply('right',202)};
+ if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',46);apply('left',192);apply('right',202)};
 }
+/* Direct ribbon size buttons. Position drag remains available on the left grip. */
+(function(){
+ const app=document.querySelector('.app'),shell=$('ribbonShell');
+ function read(){return parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||46}
+ function update(h){
+  const n=Math.max(42,Math.min(150,Math.round(h)));
+  app.style.setProperty('--ribbon-height',n+'px');
+  app.classList.toggle('cad-ribbon-compact',n<=58);
+  if(shell.classList.contains('floating'))shell.style.height=Math.max(44,n)+'px';
+  try{localStorage.setItem('cad2d-ribbon-height',String(n))}catch(e){}
+  resize();
+ }
+ $('cadRibbonLess').onclick=()=>update(read()-18);
+ $('cadRibbonMore').onclick=()=>update(read()+18);
+ update(read());
+ const reset=$('resetWorkspace');if(reset){const old=reset.onclick;reset.onclick=()=>{if(old)old();update(46)}}
+ const ribbonSizer=$('ribbonSizer');
+ if(ribbonSizer)ribbonSizer.style.display='block';
+ new MutationObserver(()=>app.classList.toggle('cad-ribbon-compact',read()<=58)).observe(app,{attributes:true,attributeFilter:['style']});
+})();
 function renderBlockLibrary(){
  const sel=$('blockLibrary');if(!sel)return;const previous=sel.value;
  sel.replaceChildren();
