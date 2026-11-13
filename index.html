@@ -614,7 +614,7 @@ function initializeDimensionPalette(){
  renderDimStyles();
  $('dimSaveStyle').onclick=saveNamedDimensionStyle;
  $('dimDeleteStyle').onclick=deleteNamedDimensionStyle;
- $('dimStyleLibrary').onchange=()=>{const key=$('dimStyleLibrary').value;if(!key)return;const st=state.dimStyles[key];if(st){state.activeDimStyle=key;applyDimStyleToForm(st);queueLocalBackup();toast('Active DIMSTYLE: '+key)}};
+ $('dimStyleLibrary').onchange=()=>{const key=$('dimStyleLibrary').value;if(!key){state.activeDimStyle='';queueLocalBackup();return}const st=state.dimStyles[key];if(st){state.activeDimStyle=key;applyDimStyleToForm(st);queueLocalBackup();toast('Active DIMSTYLE: '+key)}};
  $('startDimension').onclick=()=>setTool('dimension');
  $('applyDimensionStyle').onclick=()=>{
   const targets=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='dimension');
