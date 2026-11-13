@@ -1,0 +1,84 @@
+/* CAD2D Workspace 2026.11 — compact, reversible professional CAD chrome */
+:root{--cad2d-ink:#0b1116;--cad2d-surface:#141c22;--cad2d-edge:#34444d;--cad2d-accent:#a5c9d8}
+.app{grid-template-rows:39px 28px var(--ribbon-row-height,var(--ribbon-height,62px)) minmax(0,1fr) 54px 27px}
+.workspace{grid-template-columns:var(--left-width,192px) minmax(0,1fr) var(--right-width,202px)}
+.brandbar{background:linear-gradient(180deg,#172229,#10181d);border-bottom:1px solid #35454d}
+.brandbar .right{gap:5px;scrollbar-width:none}
+.brandbar .right::-webkit-scrollbar{display:none}
+.brandbar .btn{border-radius:5px}
+.brandbar .filename{min-width:100px;max-width:165px;font-size:11px}
+.cad-workspace-controls{display:flex;align-items:center;gap:5px;flex-shrink:0;position:relative}
+.cad-workspace-controls .btn{font-size:10px;letter-spacing:.1px}
+.cad-workspace-controls .cad-full-canvas{border-color:#688999;color:#deeff5;background:#253b47}
+.cad-workspace-controls .cad-full-canvas:hover{background:#315262}
+.cad-workspace-controls .cad-full-canvas[aria-pressed="true"]{background:#aeccd9;color:#0b171d}
+.cad-workspace-controls .cad-account-btn{max-width:155px;overflow:hidden;text-overflow:ellipsis}
+.cad-workspace-menu[hidden],.cad-auth-backdrop[hidden]{display:none!important}
+.cad-workspace-menu{position:fixed;right:15px;top:44px;z-index:4000;width:min(355px,calc(100vw - 22px));padding:12px;border:1px solid #576b76;border-radius:10px;background:#151f27;box-shadow:0 22px 65px #000c;color:#dce6eb;max-height:min(80vh,680px);overflow:auto}
+.cad-workspace-menu h2{font-size:12px;font-weight:650;letter-spacing:.5px;margin:2px 2px 8px;color:#dbe8ee}
+.cad-workspace-menu p{font-size:10px;color:#a7bac4;margin:2px 2px 12px;line-height:1.45}
+.cad-workspace-menu .cad-workspace-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.cad-workspace-menu .cad-workspace-actions button{padding:8px 9px;border-radius:5px;border:1px solid #465865;background:#20303a;color:#e0eaf0;font:11px/1.2 inherit;text-align:center}
+.cad-workspace-menu .cad-workspace-actions button:hover{background:#304858}
+.cad-workspace-menu .cad-workspace-section{font:650 10px/1.5 inherit;text-transform:uppercase;letter-spacing:1px;color:#92b5c6;margin:12px 2px 7px;border-top:1px solid #33434e;padding-top:11px}
+.cad-workspace-menu .cad-toggle-row{display:flex;align-items:center;gap:10px;padding:6px 7px;border-radius:5px;cursor:pointer;color:#d4e0e5;font-size:11px}
+.cad-workspace-menu .cad-toggle-row:hover{background:#263843}
+.cad-workspace-menu .cad-toggle-row input{width:15px;height:15px;accent-color:#a0c6d6;flex-shrink:0}
+.cad-workspace-menu .cad-panel-options{display:grid;grid-template-columns:1fr 1fr;column-gap:6px}
+.cad-workspace-menu .cad-panel-options .cad-toggle-row{min-width:0}
+.cad-workspace-menu .cad-panel-options .cad-toggle-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace>.sidebar{background:#10191e;gap:5px;padding:5px 4px}
+.workspace>.sidebar .panel.cad-palette{margin:0;border-radius:5px;box-shadow:none}
+.workspace .panel-title{background:#1e2a31;color:#c7d7df;font-size:9.5px;letter-spacing:.3px;min-height:31px;padding:6px}
+.workspace .palette-actions button{min-width:19px;width:19px;height:20px}
+.workspace>.sidebar .panel-content{padding:8px}
+.workspace .panel-content .field{margin-bottom:6px}
+.workspace .panel-content .help{font-size:10px}
+.canvas-wrap{background:#0c1318;box-shadow:inset 0 0 0 1px #2a3941}
+.canvas-overlay{background:#17212aca;border:1px solid #3b4b55;backdrop-filter:blur(3px)}
+.canvas-bottom{bottom:6px;left:8px}
+.view-tools{right:8px;top:8px}
+.view-tools button{border-radius:5px}
+.cad-floating-tools{border-color:#526976;background:#1a2933eb}
+.cad-floating-tools.minimized{opacity:.82}
+.cad-floating-tools.minimized:hover{opacity:1}
+.cmd{padding:3px 10px;gap:2px}
+.cmd .log{height:15px;font-size:10px;line-height:15px;white-space:nowrap}
+.command-row input{height:26px}
+.status{font-size:10px}
+.workspace .panel.cad-palette[hidden]{display:none!important}
+.app.cad-hide-left .workspace{grid-template-columns:minmax(0,1fr) var(--right-width,202px)}
+.app.cad-hide-left .workspace>.sidebar:not(.rightside),.app.cad-hide-left #leftDivider{display:none!important}
+.app.cad-hide-right .workspace{grid-template-columns:var(--left-width,192px) minmax(0,1fr)}
+.app.cad-hide-right .workspace>.sidebar.rightside,.app.cad-hide-right #rightDivider{display:none!important}
+.app.cad-hide-left.cad-hide-right .workspace{grid-template-columns:minmax(0,1fr)}
+.app.cad-hide-ribbon{grid-template-rows:39px 28px 0 minmax(0,1fr) 54px 27px}
+.app.cad-hide-ribbon .ribbon-shell,.app.cad-hide-ribbon #ribbonSizer{display:none!important}
+.app.cad-hide-quick #cadFloatingTools{display:none!important}
+.app.cad-focus{grid-template-rows:39px 0 0 minmax(0,1fr) 41px 27px!important}
+.app.cad-focus .workspace{grid-template-columns:minmax(0,1fr)!important}
+.app.cad-focus .workspace>.sidebar,.app.cad-focus #leftDivider,.app.cad-focus #rightDivider,.app.cad-focus .tabbar,.app.cad-focus .ribbon-shell,.app.cad-focus #ribbonSizer,.app.cad-focus #cadFloatingTools{display:none!important}
+.app.cad-focus .cmd{padding:4px 10px}
+.app.cad-focus .cmd .log{display:none}
+.app.cad-focus .cad-command-finder{display:flex}
+.ribbon .group{transition:background .12s}
+.ribbon .group.cad-group-drop{background:#2d4856;outline:1px dashed #99c8d8}
+.ribbon .cad-group-handle{position:absolute;right:2px;top:1px;z-index:1;padding:0 3px;height:14px;line-height:12px;border:0;background:transparent;color:#97aeb9;font-size:11px;cursor:grab;opacity:.55;touch-action:none}
+.ribbon .group:hover .cad-group-handle,.ribbon .cad-group-handle:focus-visible{opacity:1}
+.cad-auth-backdrop{position:fixed;inset:0;z-index:5000;background:#050b0fd9;display:flex;align-items:center;justify-content:center;padding:15px;backdrop-filter:blur(5px)}
+.cad-auth-card{width:min(430px,100%);border:1px solid #5b7480;border-radius:12px;padding:24px;background:linear-gradient(145deg,#202f38,#111b21);color:#e7f0f4;box-shadow:0 22px 90px #000d}
+.cad-auth-card .cad-auth-overline{font:700 10px Arial,sans-serif;letter-spacing:2.5px;color:#9dbfcd}
+.cad-auth-card h2{font:600 22px/1.2 Inter,Segoe UI,sans-serif;margin:9px 0 10px}
+.cad-auth-card p{font-size:12px;line-height:1.6;color:#b9cbd4;margin:7px 0 12px}
+.cad-auth-card label{display:block;color:#cedee5;font-size:11px;font-weight:600;margin:14px 0 5px}
+.cad-auth-card input{display:block;width:100%;height:39px;border:1px solid #59727f;border-radius:6px;background:#0b151b;color:#f3f8fa;padding:8px 10px;font:13px Arial,sans-serif}
+.cad-auth-card button{border:1px solid #5a7581;border-radius:6px;padding:9px 13px;color:#e5eff3;background:#253945;cursor:pointer}
+.cad-auth-card button:hover{background:#375364}
+.cad-auth-card button.primary{background:#a8c9d6;border-color:#a8c9d6;color:#0a1a22;font-weight:650}
+.cad-auth-card button:disabled{opacity:.5;cursor:not-allowed}
+.cad-auth-card .cad-auth-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
+.cad-auth-card .cad-auth-note{font-size:10px;color:#a3b7c0;border-top:1px solid #354853;padding-top:10px;margin-top:16px}
+.cad-auth-card .cad-auth-status{min-height:18px;color:#cae3ef;font-size:11px}
+@media(max-width:1100px){.brandbar .filename{max-width:110px}.cad-workspace-controls .btn{padding:4px 6px}}
+@media(max-width:850px){.app:not(.cad-focus):not(.cad-hide-left):not(.cad-hide-right) .workspace{grid-template-columns:var(--left-width,176px) minmax(0,1fr)}.app:not(.cad-focus):not(.cad-hide-left):not(.cad-hide-right) .workspace>.sidebar.rightside{display:none}}
+@media(max-width:620px){.app{grid-template-rows:40px 28px var(--ribbon-row-height,var(--ribbon-height,62px)) minmax(0,1fr) 54px 27px}.brandbar .right{overflow:visible}.brandbar .right>.smallhide{display:none}.brandbar .filename,.cad-workspace-controls .cad-workspace-toggle{display:none}.cad-workspace-controls .btn{font-size:10px}.app:not(.cad-focus) .workspace{grid-template-columns:minmax(0,1fr)!important}.app:not(.cad-focus) .workspace>.sidebar{display:none!important}.cad-workspace-menu{top:42px;right:8px}.app.cad-focus{grid-template-rows:40px 0 0 minmax(0,1fr) 41px 27px!important}}
