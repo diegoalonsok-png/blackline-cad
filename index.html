@@ -1046,21 +1046,56 @@ function lineIntersection(a,b,c,d){
  if(t<=1e-9||t>=1-1e-9||u<-1e-9||u>1+1e-9)return null;
  return {point:P(a.x+t*vx,a.y+t*vy),t,u};
 }
-function trimLine(e,p){
- if(e.type!=='line')return toast('TRIM currently supports straight lines only');
- const removeStart=dist(p,e.a)<dist(p,e.b),candidates=[];
- for(const other of state.entities){
-  if(other.id===e.id||other.type!=='line'||!layerFor(other).visible)continue;
-  const intersection=lineIntersection(e.a,e.b,other.a,other.b);
-  if(intersection)candidates.push(intersection);
+function cadTrimBoundaries(entity){
+ if(entity.type==='line')return [[entity.a,entity.b]];
+ if(entity.type==='rect'){
+  const a=entity.a,b=entity.b;
+  const pts=[P(a.x,a.y),P(b.x,a.y),P(b.x,b.y),P(a.x,b.y)];
+  return pts.map((p,i)=>[p,pts[(i+1)%4]]);
  }
- if(!candidates.length)return toast('No crossing LINE boundary found. Drawing unchanged.');
- candidates.sort((a,b)=>removeStart?a.t-b.t:b.t-a.t);
- const cut=candidates[0].point;saveHistory();
- if(removeStart)e.a=cut;else e.b=cut;
- updateAll();log('TRIM to line intersection');toast('Line trimmed at real intersection');
+ if(entity.type==='polyline'){
+  const pts=entity.pts||[];
+  const segments=[];
+  for(let i=1;i<pts.length;i++)segments.push([pts[i-1],pts[i]]);
+  if(entity.closed&&pts.length>2)segments.push([pts.at(-1),pts[0]]);
+  return segments;
+ }
+ return [];
 }
-
+function trimLine(e,p){
+ if(!e||e.type!=='line')return toast('TRIM: seleccioná un segmento LINE; admite límites LINE, PLINE y RECT');
+ if(layerFor(e).locked)return toast('TRIM: la capa del objeto está bloqueada');
+ const v=sub(e.b,e.a),length2=v.x*v.x+v.y*v.y;
+ if(length2<1e-16)return toast('TRIM: línea de longitud cero');
+ const intersections=[];
+ for(const other of state.entities){
+  if(other.id===e.id||!layerFor(other).visible)continue;
+  for(const [a,b] of cadTrimBoundaries(other)){
+   const cross=lineIntersection(e.a,e.b,a,b);
+   if(cross&&cross.t>1e-8&&cross.t<1-1e-8&&!intersections.some(x=>Math.abs(x-cross.t)<1e-7))intersections.push(cross.t);
+  }
+ }
+ if(!intersections.length)return toast('TRIM: no hay límites que crucen esta línea');
+ intersections.sort((a,b)=>a-b);
+ const raw=((p.x-e.a.x)*v.x+(p.y-e.a.y)*v.y)/length2;
+ const t=Math.max(0,Math.min(1,raw));
+ const bounds=[0,...intersections,1];
+ let slot=bounds.findIndex((x,i)=>i<bounds.length-1&&t>=x-1e-9&&t<=bounds[i+1]+1e-9);
+ if(slot<0)slot=bounds.length-2;
+ const start=bounds[slot],end=bounds[slot+1];
+ const pos=k=>P(e.a.x+v.x*k,e.a.y+v.y*k);
+ const pieces=[];
+ if(start>1e-8)pieces.push([pos(0),pos(start)]);
+ if(end<1-1e-8)pieces.push([pos(end),pos(1)]);
+ saveHistory();
+ const at=state.entities.findIndex(item=>item.id===e.id);
+ if(at<0)return toast('TRIM: objeto no encontrado');
+ state.entities.splice(at,1);
+ for(const [a,b] of pieces)state.entities.push({...clone(e),id:state.nextId++,a,b});
+ state.selected=[];updateAll();
+ log('TRIM '+(pieces.length===2?'split into two segments':'removed selected segment'));
+ toast(pieces.length===2?'TRIM: vano abierto entre límites':'TRIM: tramo recortado');
+}
 function positiveModifyValue(id){
  const n=Number($(id).value);
  if(!Number.isFinite(n)||n<=0)return null;
@@ -1583,7 +1618,7 @@ canvas.addEventListener('pointerup',ev=>{
   const x1=screen(P(bb.minX,0)).x,x2=screen(P(bb.maxX,0)).x;
   const y1=screen(P(0,bb.maxY)).y,y2=screen(P(0,bb.minY)).y;
   return crossing?(x2>=l&&x1<=r&&y2>=t&&y1<=b):(x1>=l&&x2<=r&&y1>=t&&y2<=b);
- }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}handlePoint(snapPoint(world(raw)),d.shift)});
+ }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}const w=world(raw);handlePoint(['offset','trim','extend','erase','select','breakLine','lengthen'].includes(state.tool)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='dimension'){const all=dimensionPrimitives(e).map(boundsEntity).filter(Boolean);if(!all.length)return null;return {minX:Math.min(...all.map(x=>x.minX)),minY:Math.min(...all.map(x=>x.minY)),maxX:Math.max(...all.map(x=>x.maxX)),maxY:Math.max(...all.map(x=>x.maxY))}}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse')pts.push(P(e.c.x-e.rx,e.c.y-e.ry),P(e.c.x+e.rx,e.c.y+e.ry));if(e.type==='text')pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
 function getBounds(entities=state.entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
