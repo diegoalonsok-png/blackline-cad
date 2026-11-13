@@ -135,3 +135,17 @@ The Modify ribbon / Advanced Modify palette contains new commands:
 - **COLOR**: scroll to the object color editor for selected entities.
 
 This is a growing experimental 2D CAD, **not a clone containing every AutoCAD feature**. Native DWG editing, associative dimensions, parametric constraints, dynamic blocks, 3D modeling, advanced splines and full external CAD compatibility remain pending. Syntax checking and isolated math/function tests passed; full browser and external CAD roundtrip verification remain necessary.
+
+## CAD 2D command-reference cross-check (November 2026)
+
+Reference used for feature prioritization (not source code): *Herramientas Básicas de Dibujo en AutoCAD*,
+https://es.scribd.com/document/134121555/Herramientas-de-Autocad-2d .
+The material discusses LINE, PLINE, POLYGON, HATCH, drawing/modification commands, object snaps, layers and view controls. CAD2D implements its tools independently.
+
+New additions:
+- **POL / POLYGON:** choose a regular polygon's center and first vertex. The configurable 3–128-sided polygon is stored as one editable closed polyline, keeping coordinates 1:1 and exporting through existing DXF/SVG/PDF geometry.
+- **H / HATCH:** select a closed polygon/polyline, rectangle, or circle first, then choose hatch spacing, angle and parallel or crosshatched direction in the *Polygon / Hatch / Table* palette. The program clips lines to each boundary and generates independent editable LINE entities. It does not yet create associative or native CAD HATCH entities, nor does it recognize holes/islands; hatching is capped at 12,000 segments for browser safety.
+- **TABLE:** set grid dimensions (up to 40 × 15) and cell sizes in model units, then click an insertion point. The resulting table is a grid of editable lines with individually editable text objects, not a native CAD TABLE object.
+- **OSNAP:** finite straight LINE/LINE intersection snapping and circle quadrants supplement endpoint, midpoint, center and existing vertex candidates. Intersection markers are prioritized when coincident with midpoints. Pair checking is limited to 70 eligible nearby lines to control pointer latency. Other advanced snap modes (tangent/perpendicular/nearest/parallel) are not implemented yet.
+
+Checks completed: JavaScript syntax; regular hexagon geometry with radius 5; square clipped horizontal and 45-degree hatch geometry; 12k safety rejection for dense patterns; line intersection and circle quadrant OSNAP. Full browser tests, export roundtrips and compatibility with complex CAD files are still pending.
