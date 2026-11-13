@@ -263,6 +263,53 @@ function initializeTaupeWorkspace(){
   }
  }catch(e){/* Appearance preferences are optional. */}
 }
+/* Visual reference arrangement: layers and object properties at left, Spanish CAD navigation.
+   This leaves CAD commands and original panel handlers untouched. */
+function useReferenceCadLayout(){
+ const navLabels={home:'Inicio',draw:'Dibujo',modify:'Modificar',annotate:'Anotar',view:'Vista',output:'Salida'};
+ doc.querySelectorAll('#tabs [data-tab]').forEach(button=>{
+  if(navLabels[button.dataset.tab])button.textContent=navLabels[button.dataset.tab];
+ });
+ const brand=doc.querySelector('.brand small');
+ if(brand)brand.textContent='DISEÑO Y DIBUJO ARQUITECTÓNICO · 2D';
+ const left=side.left;
+ if(left){
+  const layerPanel=left.querySelector('#layers')?.closest('.panel')||doc.querySelector('#layers')?.closest('.panel');
+  const propsPanel=doc.querySelector('#cadPropertiesPanel');
+  const settingsPanel=doc.querySelector('#units')?.closest('.panel');
+  if(layerPanel&&!layerPanel.classList.contains('floating'))left.prepend(layerPanel);
+  if(propsPanel&&!propsPanel.classList.contains('floating')){
+   if(layerPanel?.parentElement===left)layerPanel.after(propsPanel);
+   else left.prepend(propsPanel);
+  }
+  if(settingsPanel&&!settingsPanel.classList.contains('floating')&&propsPanel?.parentElement===left){
+   propsPanel.after(settingsPanel);
+  }
+  const nameMap={'Layer manager':'Capas','Object color / CAD properties':'Propiedades','Drawing properties':'Configuración de dibujo',
+                 'Display / Cursor colors':'Apariencia y cursor','Blocks / Symbols':'Bloques y símbolos'};
+  left.querySelectorAll('.panel-title').forEach(title=>{
+   const child=title.querySelector('#layerCount');
+   const heading=title.firstChild;
+   if(heading?.nodeType===Node.TEXT_NODE){
+    const original=heading.textContent.trim();
+    if(nameMap[original])heading.textContent=nameMap[original]+' ';
+   }
+   if(child)child.style.marginLeft='4px';
+  });
+  const a=doc.getElementById('newLayer'),b=doc.getElementById('removeLayer');
+  if(a)a.textContent='+ Añadir capa';if(b)b.textContent='Eliminar';
+ }
+ // Wider palette for architectural layer names, unless the user already resized it.
+ const ws=doc.querySelector('.workspace');
+ try{
+  if(ws&&!localStorage.getItem('cad2d-left-width'))ws.style.setProperty('--left-width','278px');
+ }catch(e){}
+ const finder=$('cadCommandSearch');if(finder)finder.placeholder='Comandos (LÍNEA, RECORTAR, ACOTAR...)';
+ const command=$('command');if(command)command.placeholder='Escribí un comando o una medida · LINE / LÍNEA · OFFSET 0.20';
+ const commandLabel=doc.querySelector('.cmd .command-row b');if(commandLabel)commandLabel.textContent='COMANDO:';
+ doc.querySelector('.brandbar')?.setAttribute('aria-label','Blackline CAD · Dibujo Arquitectónico 2D');
+}
+useReferenceCadLayout();
 initializeTaupeWorkspace();
 checkAuthentication();
 })();
