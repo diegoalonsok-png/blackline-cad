@@ -155,3 +155,36 @@ Checks completed: JavaScript syntax; regular hexagon geometry with radius 5; squ
 CAD2D now has **MODEL**, **LAYOUT 1**, and **PLOT / PDF** tabs at the base of model space. MODEL preserves 1:1 world-unit geometry and normal CAD tools. LAYOUT 1 is a separate printable paper-space view with A0/A1/A2/A3/A4, Letter and ARCH D pages; portrait/landscape; Fit or fixed 1:1–1:1000 scale; configurable millimeter margins; monochrome/color; optional basic title block; live SVG sheet preview and direct **vector PDF** export. A warning identifies drawings whose extents could be clipped at the chosen scale. **PLOT / PDF** opens the pre-existing advanced dialog, which also handles custom sheet dimensions, SVG and PNG output.
 
 LAYOUT controls share the existing `plotOptions`, `makeSVG` and `makePDF` machinery so model entities are not copied or scaled in the source model. The physical PDF page size is in millimeters; fixed print scale is computed from model units. Layout settings are saved in `.cadjson` project files and IndexedDB recovery snapshots, and in browser-local preferences. Command aliases: `LAYOUT`, `PSPACE`, `PAPERSPACE`, `MSPACE`. This is the first **single-sheet paper-space workspace**, not yet AutoCAD-style multiple named layouts with movable viewport boundaries, multiple model viewports or full paper-space annotation entities. Preview and PDF are not yet externally verified in an interactive browser or CAD desktop application.
+
+## Professional UI and AutoCAD-style commands (November 2026)
+
+The desktop CAD2D UI has refreshed ribbon, tab, palettes, sidebar, input and status styling with subdued drafting-blue accents, consistent borders, clearer active controls and a searchable command launcher in the top brand bar. The command finder searches by CAD command name, alias and description; clicking a result submits that command. It only advertises a subset with implemented behavior.
+
+Additional command aliases and working command actions:
+
+| CAD2D command | CAD workflow |
+| --- | --- |
+| `AREA`, `AA` | Calculate area of selected rectangles, circles, ellipses or closed polylines; otherwise point-by-point polygon area, Enter to finish |
+| `ID` | Click the model to report precise X/Y coordinates |
+| `LIST`, `LI` | Show selected object details, length and applicable area |
+| `MATCHPROP`, `MA` | Pick source then target(s) to copy layer, color, linetype and lineweight; Enter stops |
+| `SELECTALL` | Select visible, unlocked entities |
+| `PURGE`, `PU` | Confirm removal of unused, unlocked layers only; selected layer and layer 0 are preserved |
+| `LAYER`, `LA`; `LTYPE`, `LT` | Open layer property controls |
+| `PROPERTIES`, `PR`, `CHPROP` | Show selection properties |
+| `STYLE`, `ST` | Show font/typography controls (not a full AutoCAD text-style manager) |
+| `DIMSTYLE`, `D` | Show dimension styling controls (not native DIMSTYLE objects) |
+| `ED`, `TEDIT` | Load selected text into typography palette and allow edits |
+| `REGEN`, `RE`, `REDRAW` | Redraw model viewport |
+| `QSAVE`, `SAVEAS`, `OPEN`, `NEW` | Save or open project, new drawing with confirmation |
+| `EPDF`, `PLOT` | Open vector plotting and PDF layout |
+| `COPYCLIP`, `PASTECLIP`, `CUTCLIP` | In-browser geometry clipboard, pasted at model cursor |
+| `Ctrl/Cmd+C`, `Ctrl/Cmd+V`, `Ctrl/Cmd+X` | CAD clipboard shortcuts when not editing text/form inputs |
+
+Typography palette adds explicit **Copy text** and **Paste text** buttons using the browser Clipboard API on supported HTTPS browsers. Native text-input Ctrl/Cmd+C and Ctrl/Cmd+V are preserved. If system clipboard permissions are denied, users can focus the field and use ordinary keyboard clipboard operations.
+
+Supported geometry commands remain intentionally **limited** compared with desktop AutoCAD and IntelliCAD. Area measurements use idealized model geometry and do not account for holes/islands. MATCHPROP applies basic visual properties, not complete CAD object styles. The in-app CAD clipboard is not a DWG-aware system clipboard and does not exchange objects across third-party CAD desktop applications. No 3D/parametric CAD tools or full DWG import are claimed.
+
+Implementation was checked with JavaScript syntax parsing and isolated tests for rectangular/polygon/circle AREA, the clipboard copying a 2-unit red line from (1,2) to (10,20) preserving color and length. Full interactive browser, accessibility, PDF and third-party CAD round-trip tests remain outstanding.
+
+Official reference for desktop aliases and terminology: https://www.autodesk.com/es/shortcuts/autocad (aliases may differ by application language and custom settings).
