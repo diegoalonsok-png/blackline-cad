@@ -21,7 +21,7 @@ Open `index.html` in a modern Chromium, Firefox, or Safari browser. Or serve wit
 
 ## Known limitations / next engineering milestones
 
-This is a functional **prototype**, not a replacement for a production CAD kernel. Test export geometry in LibreCAD, QCAD or AutoCAD before professional use. DXF import is restricted to several common 2D ASCII entity types; polyline bulges, blocks, xrefs, splines, external images, advanced hatches, annotations and layouts require a more complete CAD library. Trim currently shortens a line to its midpoint (placeholder, not exact intersection trim). Rotated ellipse rendering needs refinement. No object drag-grips, advanced measurement calibration, orthogonal dimension styles, model/paper viewports, cloud storage, accounts or payments yet. PDF output uses basic vector shapes and standard Helvetica, with a simplified encoding for non-ASCII labels. Fixed-scale output can clip drawings if they exceed the paper.
+This is a functional **prototype**, not a replacement for a production CAD kernel. Test export geometry in LibreCAD, QCAD or AutoCAD before professional use. DXF import is restricted to several common 2D ASCII entity types; polyline bulges, blocks, xrefs, splines, external images, advanced hatches, annotations and layouts require a more complete CAD library. TRIM now shortens straight LINE entities to an actual crossing with another finite LINE; it does not yet support arcs, splines, polylines, extended boundaries, or full AutoCAD-style cutting edges. Rotated ellipse rendering needs refinement. No object drag-grips, advanced measurement calibration, orthogonal dimension styles, model/paper viewports, cloud storage, accounts or payments yet. PDF output uses basic vector shapes and standard Helvetica, with a simplified encoding for non-ASCII labels. Fixed-scale output can clip drawings if they exceed the paper.
 
 ## Deployment
 
@@ -81,3 +81,9 @@ A static site is cheap to distribute, but bandwidth, server-side file conversion
 - Picking a DWG reads only its first 32 bytes locally and displays a known `AC10xx` format header and file size. **No DWG geometry, layers, blocks, xrefs or dimensions are imported** by this diagnostic. The `DWG_CONVERTER_ENDPOINT` remains empty. Automatic DWG opening still requires a real, tested decoder.
 - No drawings are sent to a server by local recovery or DWG header inspection. Browser storage is origin-scoped, may have quotas, and may be wiped by private browsing or cleanup.
 - Before production use, add robust import tests, file-identity checks, worker-based decoding, stress benchmarks and licensing verification for any free DWG library.
+
+## CAD drawing improvements — November 12, 2026
+
+- **TRIM (basic line intersection):** click a straight LINE near the end you want removed. CAD2D finds the nearest actual crossing between the selected LINE and other visible LINE segments, and moves that endpoint to the crossing. If no finite-segment intersection exists, it refuses to change the drawing. TRIM does not yet cover arcs, polylines, circles or virtual extensions. It does not cut an interior segment into two separate lines.
+- **CAD selection rectangles:** drag left-to-right to select objects whose bounding boxes lie fully inside the window; drag right-to-left for crossing selection (overlapping bounding boxes). Hold Shift to add to the selection. This is a bounding-box approximation, not yet precise segment/polygon clipping.
+- Syntax and isolated geometric smoke tests verified an intersection at x=4 on a 10-unit line, no unintended changes when no crossing was found, and parallel-line rejection. Full browser interaction/regression tests still required.
