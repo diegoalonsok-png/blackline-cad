@@ -128,3 +128,28 @@
 .app .status button.on{
   outline-color:#9d9d99!important;
 }
+
+
+/* Compact horizontal ribbon restored from the user's reference capture.
+   No rounded command buttons; keep all tools available on their respective tabs. */
+.app .ribbon-shell{border-radius:0!important}
+.app .ribbon,.app.cad-ribbon-compact .ribbon{border-radius:0!important;display:flex;align-items:center;flex-wrap:nowrap;padding:2px 7px!important;gap:5px!important}
+.app .ribbon .group,.app .ribbon .group.stack,
+.app.cad-ribbon-compact .ribbon .group,.app.cad-ribbon-compact .ribbon .group.stack{
+ display:flex!important;flex-direction:row!important;align-items:center!important;
+ grid-template-columns:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;
+ gap:2px!important;padding:0 8px 0 0!important;min-height:0!important;margin:0!important;
+ border-radius:0!important;background:transparent!important
+}
+.app .ribbon .group:after,.app.cad-ribbon-compact .ribbon .group:after{display:none!important}
+.app .ribbon .tool,.app .ribbon .group.stack .tool,
+.app.cad-ribbon-compact .ribbon .tool,.app.cad-ribbon-compact .ribbon .group.stack .tool{
+ border-radius:0!important;min-width:34px!important;min-height:35px!important;height:35px!important;
+ padding:3px 5px!important;gap:3px!important;max-width:95px!important;box-shadow:none!important
+}
+.app .ribbon .tool svg{height:15px!important;width:15px!important}
+.app .ribbon .tool span{font-size:10px!important;white-space:nowrap!important}
+.app .ribbon .tool:hover{transform:none!important}
+.app .brandbar .btn,.app .status button,.app .tabbar .tab,.app .sidebar button,
+.app .cad-floating-tool-list button,.app .tool,.app .ribbon .tool,
+.app .cad-floating-tool-list button,.app [data-floating-cad],.app .cad-group-handle{border-radius:0!important}
