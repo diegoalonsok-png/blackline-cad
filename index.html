@@ -2758,7 +2758,7 @@ function initCadColorPopover(){
   varSet('input',tint(Math.max(0,base+(bright?-10:8))));
   varSet('text',bright?'#19232b':'#edeae1');
   varSet('muted',bright?'#46545e':'#bcbab2');
-  varSet('edge',bright?'#9ba5ac':'#50606b');
+  varSet('edge',bright?'#aaa9a4':'#424242');
   paletteTone.value=String(t);
   paletteToneLabel.textContent=t+'% · '+toneNames[Math.min(4,Math.round(t/25))];
   [...swatches.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(Math.abs(t-i*25)<8)));
