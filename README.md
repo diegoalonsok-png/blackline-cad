@@ -119,3 +119,19 @@ For linear dimensions, enter two points and then the dimension-line location. Fo
 These are custom editable CAD2D `dimension` entities, currently **not associative** with source geometry. DXF and SVG/PDF export expand the dimensions into vector lines, arcs/polyline samples and text rather than real native AutoCAD DIMENSION entities. A third-party CAD application may display the resulting geometry but cannot necessarily edit it as a true dimension. The PDF writer uses standard fonts, substituting text such as diameter/degree/tolerance symbols when exact glyph support is missing. No production claim of standards-compliant dimension styles (ISO 129 / ASME Y14.5), annotative scaling, chained/baseline series, geometrical tolerances, per-layout dimension styles, or DWG interoperability is made yet.
 
 Standalone math smoke tests checked nine geometry/label cases (including 3–4–5 model-unit aligned linear dimensions, 90° angular dimension, 5-unit circle radius and 10-unit diameter, ordinate coordinates, mm conversion from meters and ± tolerance). JavaScript source syntax was validated. Browser-interaction/plot/DXF external roundtrips remain open test tasks.
+
+## CAD command toolbar, themes and advanced Modify (November 2026)
+
+The CAD2D interface now includes a compact Home/Draw/Modify/Annotate ribbon and a separate draggable **QUICK CAD** toolbar on the drawing canvas. Grab the dotted title bar to reposition the toolbar; use the **− / +** control to collapse or expand it. Its position is stored locally per browser. Side palettes and the main ribbon remain draggable/dockable using their existing controls. The compact ribbon now defaults to ~68 px height, retaining vertical resizing.
+
+The **Display / Cursor colors** palette offers presets: Classic Dark, Black, Light Drafting and Blueprint Blue. Individual cursor/background/grid/axes/selection colors remain configurable and are saved to localStorage. The **Object color / CAD properties** palette edits the explicitly selected unlocked entities' color and lineweight; ByLayer removes explicit overrides. Layer colors remain independently configurable in the Layer Manager. Exporters retain explicit object colors where supported.
+
+The Modify ribbon / Advanced Modify palette contains new commands:
+- **EXTEND / EX**: click near a straight LINE endpoint to extend to the nearest crossing finite LINE boundary ahead of that endpoint. No change if a boundary is not found.
+- **JOIN / J**: select two or more connected LINE segments in one nonbranching chain, converting them to an editable PLINE. This does not handle branching topology, arcs or splines.
+- **EXPLODE / X**: split selected PLINE and RECT entities into separate LINE segments. Block references remain unlinked/expanded as previously documented.
+- **REVERSE**: reverse the orientation of selected LINE and PLINE entities.
+- **ARRAY / AR**: rectangular duplicate array of selected entities, with configurable rows, columns and X/Y spacing in model units. Capped at 20,000 new entities.
+- **COLOR**: scroll to the object color editor for selected entities.
+
+This is a growing experimental 2D CAD, **not a clone containing every AutoCAD feature**. Native DWG editing, associative dimensions, parametric constraints, dynamic blocks, 3D modeling, advanced splines and full external CAD compatibility remain pending. Syntax checking and isolated math/function tests passed; full browser and external CAD roundtrip verification remain necessary.
