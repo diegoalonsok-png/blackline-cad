@@ -234,5 +234,12 @@ async function checkAuthentication(){
   $('cadAccountButton').textContent='Account service offline';
  }
 }
+/* Match original five-group Home ribbon; extra properties/export commands remain under Modify/Output and the status/header buttons. */
+function restoreHomeRibbon(){
+ const active=tabbar?.querySelector('.tab.active')?.dataset.tab||'home';
+ app.classList.toggle('cad-classic-home-ribbon',active==='home');
+}
+restoreHomeRibbon();
+tabbar?.addEventListener('click',()=>queueMicrotask(restoreHomeRibbon));
 checkAuthentication();
 })();
