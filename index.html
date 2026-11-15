@@ -783,7 +783,7 @@ function setTool(t){
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
+function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'TRIM: click segment to remove · line, polyline, rectangle, circle and arc boundaries',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -809,17 +809,18 @@ function drawCrosshair(){
  const q=screen(state.mouse),w=canvas.width/dpr,h=canvas.height/dpr;
  if(!Number.isFinite(q.x)||!Number.isFinite(q.y))return;
  const halfX=w*displayColors.size/200,halfY=h*displayColors.size/200;
- const active=hasActiveCadCommand(),size=active?8:6;
+ const active=hasActiveCadCommand(),size=active?9:7;
  ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=displayColors.width;
  ctx.beginPath();
  ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
  ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
- /* CAD pickbox: yellow filled when a drawing/modification command is active,
-    hollow yellow when idle. Does not replace object snap indicators. */
- ctx.fillStyle=active?'#ffe25a':displayColors.background;
- ctx.strokeStyle='#ffe25a';ctx.lineWidth=1.4;
- ctx.fillRect(q.x-size/2,q.y-size/2,size,size);
- ctx.strokeRect(q.x-size/2,q.y-size/2,size,size);
+ /* Keep the centre pickbox hollow and visible at all times. Active tools
+    use a thicker cyan outline, never a solid fill hiding geometry. */
+ ctx.fillStyle=displayColors.background;
+ ctx.strokeStyle=active?'#a0e8ff':'#ffe25a';ctx.lineWidth=active?2:1.5;
+ ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+ ctx.strokeRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+ if(active){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
  ctx.restore();
 }
 function drawSnapMarker(){
@@ -1148,6 +1149,18 @@ function cadTrimBoundaries(entity){
   for(let i=1;i<pts.length;i++)segments.push([pts[i-1],pts[i]]);
   if(entity.closed&&pts.length>2)segments.push([pts.at(-1),pts[0]]);
   return segments;
+ }
+ // Approximate curved cutting edges with bounded chord tessellation.
+ // Only used to detect trim crossings; native circle/arc geometry stays unchanged.
+ if((entity.type==='circle'||entity.type==='arc')&&entity.r>0){
+  const start=entity.type==='arc'?entity.a0:0;
+  const span=entity.type==='arc'?arcSweep(entity.a0,entity.a1):TAU;
+  const n=Math.max(24,Math.min(360,Math.ceil(span*entity.r*state.view.scale/7)));
+  const points=Array.from({length:n+1},(_,i)=>{
+   const angle=start+span*i/n;
+   return P(entity.c.x+entity.r*Math.cos(angle),entity.c.y+entity.r*Math.sin(angle));
+  });
+  return points.slice(1).map((p,i)=>[points[i],p]);
  }
  return [];
 }
