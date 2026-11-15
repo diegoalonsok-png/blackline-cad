@@ -599,6 +599,47 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:850px){.tabbar #blToolStatus{max-width:26%;min-width:95px;padding:0 7px}.tabbar #blToolStatus .bl-tool-step{display:none}}
 @media(prefers-reduced-motion:reduce){.ribbon .tool,.ribbon .tool svg,#blacklineBlockGallery #blCards .btn{transition:none!important;animation:none!important}.ribbon .tool.active::after{animation:none!important}.ribbon .tool.bl-activated svg{animation:none!important}}
 
+
+/* Blackline compact drafting layout v2: viewport first, 42px command ribbon. */
+.app{grid-template-rows:34px 27px var(--ribbon-row-height,var(--ribbon-height,42px)) minmax(0,1fr) 52px 24px!important}
+.brandbar{min-height:0;padding:0 8px;gap:6px;overflow:hidden}
+.brandbar .brand{font-size:13px;line-height:1}
+.brandbar .brand small{font-size:7px;margin-top:2px}
+.brandbar .mark{width:21px;height:21px;font-size:13px}
+.brandbar .btn,.brandbar button{padding:3px 7px;min-height:25px;white-space:nowrap}
+.brandbar .filename{padding:4px 7px;min-width:105px;max-width:165px}
+.brandbar .right{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.brandbar .right::-webkit-scrollbar{display:none}
+.tabbar{min-height:0;align-items:center;overflow-x:auto;scrollbar-width:none}
+.tabbar .tab{padding:4px 12px!important;font-size:10px!important;line-height:18px;flex-shrink:0}
+.tabbar #blToolStatus{min-height:25px;font-size:10px}
+.ribbon-shell{min-height:0;overflow:hidden;border-radius:0!important}
+.ribbon-shell>.ribbon{height:100%;display:flex;align-items:center!important;gap:5px!important;padding:2px 6px!important;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#4a5e6c transparent}
+.ribbon-shell .ribbon .group,.ribbon-shell .ribbon .group.stack{display:flex!important;align-items:center!important;flex-direction:row!important;grid-template-columns:none!important;grid-auto-rows:auto!important;gap:2px!important;min-height:0!important;padding:0 6px 0 0!important;border-right:1px solid #3e5561!important}
+.ribbon-shell .ribbon .group:after{display:none!important}
+.ribbon-shell .ribbon .tool,.ribbon-shell .ribbon .group.stack .tool{
+ height:32px!important;min-height:30px!important;max-height:34px!important;
+ min-width:37px!important;max-width:65px!important;padding:2px 5px!important;
+ display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+ gap:0!important;font-size:8px!important;line-height:11px!important;border-radius:5px!important;
+}
+.ribbon-shell .ribbon .tool svg{width:16px!important;height:16px!important;flex-shrink:0}
+.ribbon-shell .ribbon .tool span{display:block;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ribbon-grip{flex-basis:16px!important;width:16px!important;font-size:11px!important}
+.cad-ribbon-size{flex-shrink:0}
+.cad-ribbon-size button{height:17px!important;min-height:0!important;padding:0 3px!important}
+#ribbonSizer{top:calc(34px + 27px + var(--ribbon-row-height,var(--ribbon-height,42px)) - 3px)!important;height:6px}
+.cmd{padding:3px 9px;gap:1px}
+.cmd .log{height:17px;line-height:12px}
+.command-row input{height:23px}
+.status{padding:1px 6px;gap:3px}
+.status button{padding:2px 6px;font-size:9px}
+@media(max-width:850px){
+ .app{grid-template-rows:33px 26px var(--ribbon-row-height,var(--ribbon-height,42px)) minmax(0,1fr) 50px 23px!important}
+ #ribbonSizer{top:calc(59px + var(--ribbon-row-height,var(--ribbon-height,42px)) - 3px)!important}
+ .brandbar .right{min-width:0}
+}
+@media(prefers-reduced-motion:reduce){.ribbon-shell .ribbon .tool{transition:none!important}}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -2680,10 +2721,10 @@ function initAdjustableChrome(){
  const app=document.querySelector('.app'),ws=document.querySelector('.workspace');
  const clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
  const saved=(key,defaultValue)=>{try{return Number(localStorage.getItem(key))||defaultValue}catch(e){return defaultValue}};
- function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,42,150)+'px');
+ function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,38,120)+'px');
  else ws.style.setProperty(key==='left'?'--left-width':'--right-width',clamp(val,160,440)+'px');
  resize()}
- apply('ribbon',Math.max(60,saved('cad2d-ribbon-height',60)));
+ apply('ribbon',saved('cad2d-ribbon-height',42));
  apply('left',saved('cad2d-left-width',window.innerWidth<1100?176:192));
  apply('right',saved('cad2d-right-width',window.innerWidth<1100?182:202));
  [['ribbonSizer','ribbon','y'],['leftDivider','left','x'],['rightDivider','right','x']].forEach(([id,key,axis])=>{
@@ -2698,14 +2739,14 @@ function initAdjustableChrome(){
  });
  });
  const reset=$('resetWorkspace'),previous=reset&&reset.onclick;
- if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',60);apply('left',192);apply('right',202)};
+ if(reset)reset.onclick=()=>{if(previous)previous();try{['cad2d-ribbon-height','cad2d-left-width','cad2d-right-width'].forEach(k=>localStorage.removeItem(k))}catch(e){}apply('ribbon',42);apply('left',192);apply('right',202)};
 }
 /* Direct ribbon size buttons. Position drag remains available on the left grip. */
 (function(){
  const app=document.querySelector('.app'),shell=$('ribbonShell');
- function read(){return parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||46}
+ function read(){return parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42}
  function update(h){
-  const n=Math.max(55,Math.min(150,Math.round(h)));
+  const n=Math.max(38,Math.min(120,Math.round(h)));
   app.style.setProperty('--ribbon-height',n+'px');
   app.classList.toggle('cad-ribbon-compact',n<=67);
   if(shell.classList.contains('floating'))shell.style.height=Math.max(44,n)+'px';
@@ -2714,8 +2755,9 @@ function initAdjustableChrome(){
  }
  $('cadRibbonLess').onclick=()=>update(read()-18);
  $('cadRibbonMore').onclick=()=>update(read()+18);
- update(read());
- const reset=$('resetWorkspace');if(reset){const old=reset.onclick;reset.onclick=()=>{if(old)old();update(46)}}
+ // One-time upgrade from the earlier oversized default to the drafting-first ribbon.
+ try{if(localStorage.getItem('cad2d-compact-layout-v2')!=='1'){update(42);localStorage.setItem('cad2d-compact-layout-v2','1')}else update(read())}catch(e){update(42)}
+ const reset=$('resetWorkspace');if(reset){const old=reset.onclick;reset.onclick=()=>{if(old)old();update(42)}}
  const ribbonSizer=$('ribbonSizer');
  if(ribbonSizer)ribbonSizer.style.display='block';
  new MutationObserver(()=>app.classList.toggle('cad-ribbon-compact',read()<=67)).observe(app,{attributes:true,attributeFilter:['style']});
