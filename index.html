@@ -2456,14 +2456,12 @@ async function importCADBlock(file){
    Original parametric geometry; third-party collection pending source verification. */
 function initPermanentBlockGallery(){
  const select=$('blockLibrary');if(!select)return;
- const container=select.closest('.panel')||select.parentElement;
- const opener=document.createElement('button');opener.type='button';opener.className='btn';opener.textContent='Block Gallery · Search and insert';
- opener.style.cssText='display:block;width:100%;margin:8px 0;';
- select.parentElement.append(opener);
- const overlay=document.createElement('div');overlay.id='blacklineBlockGallery';
- overlay.style.cssText='display:none;position:fixed;inset:0;z-index:9999;background:#070b0de8;padding:3vh 3vw;overflow:auto';
- overlay.innerHTML='<section role="dialog" aria-modal="true" aria-label="Architectural block gallery" style="max-width:1120px;margin:auto;background:#19242c;border:1px solid #587082;border-radius:10px;padding:20px;min-height:60vh"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><h2 style="margin:0;font-size:19px">Blackline CAD · Block Gallery</h2><button id="blClose" class="btn" type="button">Close</button></div><p style="color:#afbfca">Built-in original 2D symbols. Inserted to model space at 1:1; select a preview, then click an insertion point.</p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"><input id="blSearch" type="search" placeholder="Search doors, windows, furniture..." aria-label="Search blocks" style="flex:1;min-width:180px;background:#0d171c;color:white;border:1px solid #6a7d88;padding:9px"><select id="blCategory" aria-label="Category" style="background:#0d171c;color:white;border:1px solid #6a7d88;padding:9px"><option value="">All categories</option></select></div><div id="blCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:10px"></div><p style="font-size:11px;color:#94aab7">These starter symbols are not the previously shared external block collection. Imported or custom blocks remain supported by the existing block tools.</p></section>';
- document.body.append(overlay);
+ const dock=document.querySelector('.workspace>.sidebar.rightside')||select.closest('.sidebar');
+ if(!dock)return;
+ const panel=document.createElement('section');panel.className='panel';panel.id='blacklineBlockGallery';
+ panel.innerHTML='<div class="panel-title"><span>BLOCKS · SYMBOL PALETTE</span><button type="button" id="blCollapse" class="btn slim" title="Collapse / expand" aria-label="Collapse block palette">−</button></div><div id="blBody" class="panel-content" style="padding:8px"><div id="blCategories" role="group" aria-label="Block categories" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div><div id="blCards" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;max-height:290px;overflow-y:auto"></div><p id="blHelp" style="font-size:10px;color:#9cb1bc;margin:7px 0 0">Choose a symbol, then click the drawing to place it at 1:1.</p></div>';
+ dock.prepend(panel);
+ $('blCollapse').onclick=()=>{const body=$('blBody'),collapsed=body.hidden;body.hidden=!collapsed;$('blCollapse').textContent=collapsed?'−':'+';$('blCollapse').setAttribute('aria-expanded',String(collapsed))};
  const entries=[
  {id:'Door single 090',cat:'Openings',w:.9,h:.9,draw:[['line',0,0,0,.9],['line',0,0,.9,0],['arc',0,0,.9,0,90]]},
  {id:'Door double 160',cat:'Openings',w:1.6,h:.8,draw:[['line',0,0,0,.8],['line',1.6,0,1.6,.8],['line',0,0,.8,0],['line',1.6,0,.8,0],['arc',0,0,.8,0,90],['arc',1.6,0,.8,90,180]]},
@@ -2478,8 +2476,16 @@ function initPermanentBlockGallery(){
  {id:'Car compact',cat:'Vehicles',w:1.8,h:4,draw:[['rect',.15,0,1.5,4],['rect',.3,1,1.2,2],['line',.3,1.6,1.5,1.6],['line',.3,2.5,1.5,2.5]]},
  {id:'Tree plan 200',cat:'Landscape',w:2,h:2,draw:[['circle',1,1,.95],['circle',1,1,.27],['line',.35,.65,1,1],['line',1,1,1.55,1.55]]}
  ];
- const cats=[...new Set(entries.map(x=>x.cat))];const chooser=$('blCategory');
- for(const cat of cats){const o=document.createElement('option');o.value=cat;o.textContent=cat;chooser.append(o)}
+ const cats=[...new Set(entries.map(x=>x.cat))];
+ let activeCategory=cats[0];
+ const catIcons={Openings:'▯',Furniture:'▤',Sanitary:'◉',Vehicles:'▰',Landscape:'♧'};
+ const chooser=$('blCategories');
+ for(const cat of cats){
+  const b=document.createElement('button');b.type='button';b.className='btn slim';
+  b.dataset.category=cat;b.textContent=cat;b.title=cat;b.style.cssText='padding:5px 6px;font-size:10px;';
+  b.onclick=()=>{activeCategory=cat;showCards()};
+  chooser.append(b);
+ }
  const svgFor=x=>{
  const transform='translate(14 116) scale(85 -85)';const scale=95/Math.max(x.w,x.h);
  const shapes=x.draw.map(d=>{const n=d[0],v=d.slice(1);if(n==='line')return '<line x1="'+v[0]+'" y1="'+v[1]+'" x2="'+v[2]+'" y2="'+v[3]+'"/>';if(n==='rect')return '<rect x="'+v[0]+'" y="'+v[1]+'" width="'+v[2]+'" height="'+v[3]+'"/>';if(n==='circle')return '<circle cx="'+v[0]+'" cy="'+v[1]+'" r="'+v[2]+'"/>';if(n==='ellipse')return '<ellipse cx="'+v[0]+'" cy="'+v[1]+'" rx="'+v[2]+'" ry="'+v[3]+'"/>';if(n==='arc'){let [cx,cy,r,a,b]=v;let p=a*Math.PI/180,q=b*Math.PI/180;return '<path d="M '+(cx+r*Math.cos(p))+' '+(cy+r*Math.sin(p))+' A '+r+' '+r+' 0 0 1 '+(cx+r*Math.cos(q))+' '+(cy+r*Math.sin(q))+'"/>'}return ''}).join('');
@@ -2499,22 +2505,24 @@ function initPermanentBlockGallery(){
   const key='BL '+x.id;
   if(!state.blocks[key]){saveHistory();state.blocks[key]={name:key,entities:normalizeBlockEntities(entities)};renderBlockLibrary();queueLocalBackup()}
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
-  overlay.style.display='none';setTool('insertBlock');toast('Ready to insert '+x.id+' at 1:1 · Click the drawing');
+  setTool('insertBlock');$('blHelp').textContent='Selected: '+x.id+' · Click a point in the drawing to insert.';toast('Click drawing to place symbol at 1:1');
  }
  function showCards(){
- const q=$('blSearch').value.trim().toLowerCase(),cat=chooser.value,cards=$('blCards');cards.replaceChildren();
- for(const x of entries.filter(x=>(!cat||cat===x.cat)&&(!q||(x.id+' '+x.cat).toLowerCase().includes(q)))){
-  const b=document.createElement('button');b.type='button';b.className='btn';b.style.cssText='text-align:left;padding:10px;white-space:normal;';
-  b.innerHTML=svgFor(x)+'<strong style="display:block;margin-top:5px">'+x.id+'</strong><small style="color:#9bb0be">'+x.cat+' · '+x.w+' × '+x.h+' m</small>';
-  b.onclick=()=>install(x);cards.append(b);
+  for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
+  const cards=$('blCards');cards.replaceChildren();
+  for(const x of entries.filter(x=>x.cat===activeCategory)){
+   const button=document.createElement('button');button.type='button';button.className='btn';
+   button.style.cssText='padding:4px;min-width:0;aspect-ratio:1;white-space:normal;';
+   button.setAttribute('aria-label','Insert '+x.id+' at 1:1');
+   button.title=x.id+' · '+x.w+' × '+x.h+' m';
+   button.innerHTML=svgFor(x);
+   const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
+   button.onclick=()=>{install(x);for(const other of cards.children)other.style.borderColor='';button.style.borderColor='#9bd5ed'};
+   cards.append(button);
+  }
  }
- if(!cards.children.length)cards.textContent='No matching blocks.';
- }
- opener.onclick=()=>{overlay.style.display='block';$('blSearch').focus();showCards()};
- $('blClose').onclick=()=>overlay.style.display='none';
- overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.style.display='none'});
- $('blSearch').oninput=showCards;chooser.onchange=showCards;
- window.addEventListener('keydown',e=>{if(e.key==='Escape'&&overlay.style.display==='block'){overlay.style.display='none';e.stopPropagation()}},true);
+ showCards();
+
 }
 
 function initBlocks(){
