@@ -2162,17 +2162,31 @@ function initLayoutWorkspace(){
  $('paperSpaceTab').onclick=()=>switchCadSpace('layout');
  $('cadPlotShortcut').onclick=()=>openPrint();
  $('layoutOpenPlot').onclick=()=>{syncLayoutToPlot();openPrint()};
- $('layoutDownloadPdf').onclick=()=>{
-  try{
-   const o=layoutPlotOptions();
-   if(o.w<10||o.h<10||o.w>5080||o.h>5080)throw Error('Invalid paper dimensions');
-   download(state.file+'-Layout1.pdf',makePDF(o),'application/pdf');
-   toast('Layout vector PDF exported');
-  }catch(error){alert('Layout PDF failed: '+error.message)}
- };
+ $('layoutDownloadPdf').onclick=()=>downloadCadPdf(layoutPlotOptions(),state.file+'-Layout1.pdf');
  window.addEventListener('resize',()=>{if(cadActiveSpace==='layout')renderLayoutWorkspace()});
 }
 
+function validateCadPdfExport(options){
+ if(!options||![options.w,options.h,options.margin,options.factor].every(Number.isFinite)||options.w<10||options.h<10||options.w>5080||options.h>5080||options.margin<0||options.w<=2*options.margin||options.h<=2*options.margin||options.factor<=0)
+  throw Error('Invalid paper, scale or margins. Check PDF plot settings.');
+ const count=state.entities.filter(e=>layerFor(e).visible).length;
+ if(!count&&!window.confirm('This drawing has no visible geometry. Export an empty PDF sheet?'))return false;
+ const drawW=(options.b.maxX-options.b.minX)*options.factor,drawH=(options.b.maxY-options.b.minY)*options.factor;
+ const paperW=options.w-2*options.margin,paperH=options.h-2*options.margin;
+ if((drawW>paperW+.01||drawH>paperH+.01)&&
+    !window.confirm('The drawing exceeds the printable area at this scale. Parts will be clipped. Export the PDF anyway?'))return false;
+ return true;
+}
+function downloadCadPdf(options,filename){
+ try{
+  if(!validateCadPdfExport(options))return false;
+  const pdf=makePDF(options);
+  if(pdf.type!=='application/pdf'||pdf.size<300)throw Error('PDF output failed validation');
+  download(filename.replace(/[\\/:*?"<>|]+/g,'_'),pdf,'application/pdf');
+  toast('Vector PDF exported · '+options.w.toFixed(0)+' × '+options.h.toFixed(0)+' mm');
+  return true;
+ }catch(error){alert('PDF export failed: '+error.message);return false}
+}
 function openPrint(){$('printBackdrop').classList.add('show');updatePreview()}function updatePreview(){let o=plotOptions(),svg=makeSVG(o),scaleValue=$('plotScale').value,fixed=scaleValue!=='fit',actual=(o.b.maxX-o.b.minX)*o.factor,actualH=(o.b.maxY-o.b.minY)*o.factor,availableW=o.w-2*o.margin,availableH=o.h-2*o.margin,clipped=actual>availableW+.01||actualH>availableH+.01;
 $('printPreview').innerHTML=svg;
 $('plotInfo').textContent='Sheet: '+o.w.toFixed(0)+' × '+o.h.toFixed(0)+' mm · '+$('orientation').value+' · '+(fixed?'1:'+ (scaleValue==='custom'?$('customScale').value:scaleValue):'Fit to paper')+' · '+state.entities.length+' entities';
@@ -2186,7 +2200,7 @@ function bezierEllipse(c,rx,ry,start=0,end=TAU){const n=Math.max(1,Math.ceil((en
 for(const e of flattenCADEntities(state.entities)){if(!layerFor(e).visible)continue;const hex=colorOutput(e,o),rgb=o.style==='mono'?[0,0,0]:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);contents.push(`${rgb.map(fmt).join(' ')} RG`,`${rgb.map(fmt).join(' ')} rg`,`${fmt(Math.max(.1,e.width||.25))} w`);if(e.type==='line')contents.push(`${move(e.a)} ${line(e.b)} S`);else if(e.type==='polyline')contents.push(`${move(e.pts[0])} ${e.pts.slice(1).map(line).join(' ')} ${e.closed?'h ':''}S`);else if(e.type==='rect'){let p1=e.a,p2=P(e.b.x,e.a.y),p3=e.b,p4=P(e.a.x,e.b.y);contents.push(`${move(p1)} ${line(p2)} ${line(p3)} ${line(p4)} h S`)}else if(e.type==='circle'||e.type==='ellipse'||e.type==='arc'){let c=pos(e.c),rx=(e.type==='ellipse'?e.rx:e.r)*o.factor,ry=(e.type==='ellipse'?e.ry:e.r)*o.factor;if(e.type==='arc'){let start=-e.a0,end=-(e.a0+arcSweep(e.a0,e.a1)),sweep=end-start;let steps=Math.max(1,Math.ceil(Math.abs(sweep)/(Math.PI/2))),seg=sweep/steps;let result=[];for(let i=0;i<steps;i++){let a=start+i*seg,b=a+seg,k=4/3*Math.tan(seg/4);let p0=P(c.x+rx*Math.cos(a),c.y+ry*Math.sin(a)),p1=P(c.x+rx*(Math.cos(a)-k*Math.sin(a)),c.y+ry*(Math.sin(a)+k*Math.cos(a))),p2=P(c.x+rx*(Math.cos(b)+k*Math.sin(b)),c.y+ry*(Math.sin(b)-k*Math.cos(b))),p3=P(c.x+rx*Math.cos(b),c.y+ry*Math.sin(b));if(i===0)result.push(`${fmt(p0.x)} ${fmt(p0.y)} m`);result.push(`${fmt(p1.x)} ${fmt(p1.y)} ${fmt(p2.x)} ${fmt(p2.y)} ${fmt(p3.x)} ${fmt(p3.y)} c`)}contents.push(result.join('\n')+' S')}else contents.push(bezierEllipse(c,rx,ry)+' S')}else if(e.type==='text'){let p=pos(e.p),face=safeCADFont(e.fontFamily||'Arial'),serif=face==='Georgia'||face==='Times New Roman',mono=face==='Courier New'||face==='monospace',index=serif?3:mono?5:1,fi=index+(e.bold?1:0);let a=-(e.rotation||0)*Math.PI/180,c=Math.cos(a),sin=Math.sin(a);contents.push(`BT /F${fi} ${fmt(Math.max(1,e.h*o.factor))} Tf ${fmt(c)} ${fmt(-sin)} ${fmt(sin)} ${fmt(-c)} ${fmt(p.x)} ${fmt(p.y)} Tm (${esc(e.text)}) Tj ET`)}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),m=pos(mul(add(p1,p2),.5));contents.push(`${move(e.a)} ${line(p1)} ${move(e.b)} ${line(p2)} ${move(p1)} ${line(p2)} S`,`BT /F1 3 Tf 1 0 0 -1 ${fmt(m.x)} ${fmt(m.y-2)} Tm (${esc(units(L)+' '+state.unit)}) Tj ET`)}}
 contents.push('Q');if(o.title==='simple'){const x=o.w-85,y=o.h-o.margin-29;contents.push('q',`${fmt(toPt)} 0 0 ${fmt(-toPt)} 0 ${fmt(o.h*toPt)} cm`,'0 0 0 RG 0 0 0 rg .25 w',`${fmt(x)} ${fmt(y)} 85 29 re S`,`${fmt(x)} ${fmt(y+11)} m ${fmt(x+85)} ${fmt(y+11)} l S`,`BT /F1 4 Tf 1 0 0 -1 ${fmt(x+3)} ${fmt(y+7)} Tm (${esc(state.file)}) Tj ET`,`BT /F1 3 Tf 1 0 0 -1 ${fmt(x+3)} ${fmt(y+19)} Tm (CAD2D) Tj ET`,'Q')}
 const content=contents.join('\n')+'\n',encoder=new TextEncoder(),bytes=[],offsets=[0];const push=s=>{const a=encoder.encode(s);for(let i=0;i<a.length;i++)bytes.push(a[i])};push('%PDF-1.4\n%CAD2D\n');function obj(n,body){offsets[n]=bytes.length;push(`${n} 0 obj\n${body}\nendobj\n`)}obj(1,'<< /Type /Catalog /Pages 2 0 R >>');obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');obj(3,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${fmt(o.w*toPt)} ${fmt(o.h*toPt)}] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R /F5 9 0 R /F6 10 0 R >> >> /Contents 4 0 R >>`);obj(4,`<< /Length ${encoder.encode(content).length} >>\nstream\n${content}endstream`);obj(5,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');obj(6,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');obj(7,'<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman >>');obj(8,'<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold >>');obj(9,'<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>');obj(10,'<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold >>');let start=bytes.length;push('xref\n0 11\n0000000000 65535 f \n');for(let i=1;i<=10;i++)push(`${String(offsets[i]).padStart(10,'0')} 00000 n \n`);push(`trailer\n<< /Size 11 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`);return new Blob([new Uint8Array(bytes)],{type:'application/pdf'})}
-$('downloadPdf').onclick=()=>{const o=plotOptions();if(o.w<10||o.h<10||o.w>5080||o.h>5080){alert('Paper dimensions must be between 10 and 5080 mm per side.');return}download(`${state.file}.pdf`,makePDF(o),'application/pdf');toast('Vector PDF downloaded')};
+$('downloadPdf').onclick=()=>downloadCadPdf(plotOptions(),state.file+'.pdf');
 $('quickTools').innerHTML=['line','polyline','rect','circle','move','copy','rotate','scale','mirror','offset','trim','extend','chamfer','fillet','erase','matchprop','dimension','distance','area','id'].map(t=>`<button class="btn slim" data-quick="${t}" style="text-align:left">${escapeHTML(toolDefs[t][0])}</button>`).join('');$('quickTools').querySelectorAll('button').forEach(b=>b.onclick=()=>setTool(b.dataset.quick));
 $('printBackdrop').addEventListener('click',e=>{if(e.target===$('printBackdrop'))$('printBackdrop').classList.remove('show')});$('helpBackdrop').addEventListener('click',e=>{if(e.target===$('helpBackdrop'))$('helpBackdrop').classList.remove('show')});
 
