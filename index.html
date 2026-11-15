@@ -2861,19 +2861,32 @@ function initPermanentBlockGallery(){
  };
  function install(x){
   const factor=U.m/U[state.unit];
+  const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e']}[x.cat];
+  if(!info)return toast('Unknown block category');
+  const key='BL '+x.id,already=Boolean(state.blocks[key]);
+  let layer=state.layers.find(l=>l.name===info[0]);
+  if(!layer||!already)saveHistory();
+  if(!layer){
+   const id=info[0];
+   layer={id,name:id,color:info[1],visible:true,locked:false,width:.25};
+   state.layers.push(layer);
+   renderLayers();
+  }
   const entities=x.draw.map(d=>{
-   let v=d.slice(1).map(n=>n*factor),type=d[0];
-   if(type==='line')return {type,a:P(v[0],v[1]),b:P(v[2],v[3]),layer:state.layerId};
-   if(type==='rect')return {type,a:P(v[0],v[1]),b:P(v[0]+v[2],v[1]+v[3]),layer:state.layerId};
-   if(type==='circle')return {type,c:P(v[0],v[1]),r:v[2],layer:state.layerId};
-   if(type==='ellipse')return {type,c:P(v[0],v[1]),rx:v[2],ry:v[3],rotation:0,layer:state.layerId};
-   if(type==='arc')return {type,c:P(v[0],v[1]),r:v[2],a0:d[4]*Math.PI/180,a1:d[5]*Math.PI/180,layer:state.layerId};
+   const v=d.slice(1).map(n=>n*factor),type=d[0];
+   if(type==='line')return {type,a:P(v[0],v[1]),b:P(v[2],v[3]),layer:layer.id};
+   if(type==='rect')return {type,a:P(v[0],v[1]),b:P(v[0]+v[2],v[1]+v[3]),layer:layer.id};
+   if(type==='circle')return {type,c:P(v[0],v[1]),r:v[2],layer:layer.id};
+   if(type==='ellipse')return {type,c:P(v[0],v[1]),rx:v[2],ry:v[3],rotation:0,layer:layer.id};
+   if(type==='arc')return {type,c:P(v[0],v[1]),r:v[2],a0:d[4]*Math.PI/180,a1:d[5]*Math.PI/180,layer:layer.id};
   });
-  if(entities.some(e=>!e))return toast('Block contains an unsupported element');
-  const key='BL '+x.id;
-  if(!state.blocks[key]){saveHistory();state.blocks[key]={name:key,entities:normalizeBlockEntities(entities)};renderBlockLibrary();queueLocalBackup()}
+  if(entities.some(e=>!e))return toast('Unsupported block geometry');
+  // Reuse the definition when available; built-ins never overwrite user imports.
+  if(!already){state.blocks[key]={name:key,entities:normalizeBlockEntities(entities)};renderBlockLibrary();queueLocalBackup()}
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
-  state.galleryRepeatedInsert=true;setTool('insertBlock');$('blHelp').textContent='Selected: '+x.id+' · Click in the drawing to insert repeatedly; Esc to finish.';toast('Click drawing to place symbol at 1:1');
+  state.galleryRepeatedInsert=true;setTool('insertBlock');
+  $('blHelp').textContent='Selected: '+x.id+' · click to place more copies; Esc to finish';
+  toast('Ready to insert at 1:1 · '+layer.name);
  }
  function showCards(){
   for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
