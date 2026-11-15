@@ -567,6 +567,38 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .app .tool:hover,.app .btn:hover,.app .status button:hover{box-shadow:inset 0 0 0 1px #b5bbc1!important}
 .cad-ui-hue-row{display:flex!important;justify-content:space-between;align-items:center;font-size:11px;color:#d9dde0;padding:10px 0}
 .cad-ui-hue-row input[type=color]{width:55px;height:30px;border:1px solid #81909a;border-radius:7px;background:transparent;cursor:pointer}
+
+/* BLACKLINE interaction clarity: unmistakable active tools, accessible focus, minimal movement. */
+:root{--bl-active:#85d6ed;--bl-active-bg:#214a5c;--bl-hover:#2b4350}
+.ribbon .tool{position:relative;isolation:isolate;transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .14s ease!important}
+.ribbon .tool svg{transition:stroke .16s ease,transform .18s ease}
+.ribbon .tool:hover:not(:disabled){background:var(--bl-hover)!important;transform:translateY(-1px)}
+.ribbon .tool:active:not(:disabled){transform:translateY(1px) scale(.97)!important}
+.ribbon .tool.active,.ribbon .tool[aria-pressed="true"]{
+ color:#f3fbff!important;background:var(--bl-active-bg)!important;
+ border-color:var(--bl-active)!important;
+ box-shadow:inset 0 0 0 1px #68c4dd,0 0 0 1px #083242,0 0 13px #6abdd43d!important;
+}
+.ribbon .tool.active svg,.ribbon .tool[aria-pressed="true"] svg{stroke:#b5eeff!important}
+.ribbon .tool.active::after{content:"";position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:#8cf2c3;box-shadow:0 0 7px #8cf2c3;animation:bl-active-beat 2.4s ease-in-out infinite;pointer-events:none}
+.ribbon .tool.bl-activated svg{animation:bl-tool-pop .32s ease-out both}
+.tabbar .tab.active{box-shadow:inset 0 -2px 0 #8bd7e8;color:#f4fcff!important}
+.tabbar #blToolStatus{margin-left:auto;display:flex;align-items:center;gap:7px;padding:0 13px;background:#10212b;border-left:1px solid #375368;min-width:145px;max-width:38%;font-size:10px;letter-spacing:.02em;color:#dcebf2}
+#blToolStatus .bl-led{width:7px;height:7px;background:#8bf0c2;border-radius:50%;box-shadow:0 0 7px #54d9ad;flex-shrink:0}
+#blToolStatus[data-idle="true"] .bl-led{background:#8196a3;box-shadow:none}
+#blToolStatus .bl-tool-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+#blToolStatus .bl-tool-step{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#a8c0cb;font-weight:400}
+.app .btn:focus-visible,.app .tool:focus-visible,.app .tab:focus-visible,.app .status button:focus-visible{outline:2px solid #a2e6f7!important;outline-offset:2px}
+#blacklineBlockGallery .panel-title{background:#193543!important;border-bottom:1px solid #488197!important}
+#blacklineBlockGallery #blCards .btn{border-radius:7px;min-width:0;box-shadow:none;transition:border-color .12s ease,background .12s ease}
+#blacklineBlockGallery #blCards .btn:hover{background:#2e4857;transform:translateY(-1px)}
+#blacklineBlockGallery #blCards .btn:active{transform:scale(.97)}
+#blacklineBlockGallery #blCards .btn[aria-pressed="true"]{border:2px solid #9adff3!important;background:#213d4b!important;box-shadow:inset 0 0 0 1px #9adff34c!important}
+@keyframes bl-tool-pop{0%{transform:scale(.72);opacity:.65}65%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+@keyframes bl-active-beat{0%,82%,100%{opacity:.65;box-shadow:0 0 5px #6dddae}88%{opacity:1;box-shadow:0 0 12px #96f6cd}}
+@media(max-width:850px){.tabbar #blToolStatus{max-width:26%;min-width:95px;padding:0 7px}.tabbar #blToolStatus .bl-tool-step{display:none}}
+@media(prefers-reduced-motion:reduce){.ribbon .tool,.ribbon .tool svg,#blacklineBlockGallery #blCards .btn{transition:none!important;animation:none!important}.ribbon .tool.active::after{animation:none!important}.ribbon .tool.bl-activated svg{animation:none!important}}
+
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -699,7 +731,36 @@ Object.assign(icons,{
 toolDefs.blockgallery=['Bloques','blockgallery'];
 ribbonTabs.home.splice(1,0,['BIBLIOTECA','blockgallery']);
 ribbonTabs.draw.push(['BIBLIOTECA','blockgallery']);
-function buildRibbon(tab){const def=ribbonTabs[tab]||ribbonTabs.home;$('ribbon').innerHTML=def.map(group=>`<div class="group ${group.length>6?'stack':''}" data-label="${group[0]}">${group.slice(1).map(t=>`<button class="tool ${state.tool===t?'active':''}" data-tool="${t}" title="${toolDefs[t]?.[0]||t}">${icon(t==='print'?'print':t==='save'?'save':t==='help'?'help':t==='zoom'?'zoom':t==='grid'?'grid':t)}<span>${toolDefs[t]?.[0]||t[0].toUpperCase()+t.slice(1)}</span></button>`).join('')}</div>`).join('');$('ribbon').querySelectorAll('[data-tool]').forEach(x=>x.onclick=()=>ribbonAction(x.dataset.tool))}
+function buildRibbon(tab){
+ const def=ribbonTabs[tab]||ribbonTabs.home;
+ const active=state.activeRibbonTool||state.tool;
+ $('ribbon').innerHTML=def.map(group=>`<div class="group ${group.length>6?'stack':''}" data-label="${group[0]}">${group.slice(1).map(t=>{
+  const selected=active===t||(!state.activeRibbonTool&&state.tool===t);
+  return `<button class="tool ${selected?'active':''} ${selected&&state.blNewTool?'bl-activated':''}" aria-pressed="${selected?'true':'false'}" data-tool="${t}" title="${toolDefs[t]?.[0]||t}">${icon(t)}<span>${toolDefs[t]?.[0]||t[0].toUpperCase()+t.slice(1)}</span></button>`
+ }).join('')}</div>`).join('');
+ state.blNewTool=false;
+ $('ribbon').querySelectorAll('[data-tool]').forEach(x=>x.onclick=()=>ribbonAction(x.dataset.tool));
+ updateBlacklineToolStatus();
+}
+function updateBlacklineToolStatus(){
+ let node=$('blToolStatus');
+ if(!node){
+  const tabbar=document.querySelector('.tabbar');if(!tabbar)return;
+  node=document.createElement('div');node.id='blToolStatus';node.setAttribute('role','status');node.setAttribute('aria-live','polite');
+  node.innerHTML='<span class="bl-led" aria-hidden="true"></span><span class="bl-tool-name"></span><span class="bl-tool-step"></span>';
+  tabbar.append(node);
+ }
+ const cmd=state.tool||'select';
+ const key=state.activeRibbonTool||cmd;
+ const name=(toolDefs[key]&&toolDefs[key][0])||key;
+ const idle=cmd==='select'||cmd==='pan';
+ node.dataset.idle=String(idle);
+ node.querySelector('.bl-tool-name').textContent=idle?'Ready · '+name:'● '+name;
+ const steps=state.stage?.length||0;
+ node.querySelector('.bl-tool-step').textContent=idle?'':(steps?'· Point '+(steps+1):'· Click canvas');
+ node.title=idle?'No drawing command is active':'Active: '+name+' · Press Esc to cancel';
+}
+
 function ribbonAction(t){
  if(t==='blockgallery')return openBlacklineBlockPalette();
  if(t==='exportmenu')return openCadExportPopover();
@@ -716,12 +777,13 @@ function setTool(t){
  if(t==='reverse')return reverseSelected();
  if(t==='color'){const panel=$('cadPropertiesPanel');panel?.scrollIntoView({block:'nearest'});toast('Choose a color and apply to selected objects');return}
 
+ state.blNewTool=state.activeRibbonTool!==t;state.activeRibbonTool=t;
  const dimensionKinds={dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`}
+function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -2580,7 +2642,7 @@ function initPermanentBlockGallery(){
    button.title=x.id+' · '+x.w+' × '+x.h+' m';
    button.innerHTML=svgFor(x);
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
-   button.onclick=()=>{install(x);for(const other of cards.children)other.style.borderColor='';button.style.borderColor='#9bd5ed'};
+   button.setAttribute('aria-pressed',String(state.blocks?.['BL '+x.id]&&select.value==='BL '+x.id));button.onclick=()=>{install(x);for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
   }
  }
