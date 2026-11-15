@@ -2803,7 +2803,24 @@ function initAdjustableChrome(){
  try{if(localStorage.getItem('cad2d-compact-layout-v2')!=='1'){update(42);localStorage.setItem('cad2d-compact-layout-v2','1')}else update(read())}catch(e){update(42)}
  const reset=$('resetWorkspace');if(reset){const old=reset.onclick;reset.onclick=()=>{if(old)old();update(42)}}
  const ribbonSizer=$('ribbonSizer');
- if(ribbonSizer)ribbonSizer.style.display='block';
+ if(ribbonSizer){
+  ribbonSizer.style.display='block';
+  ribbonSizer.setAttribute('role','slider');
+  ribbonSizer.setAttribute('tabindex','0');
+  ribbonSizer.setAttribute('aria-label','Altura de la barra de herramientas');
+  ribbonSizer.setAttribute('aria-valuemin','38');
+  ribbonSizer.setAttribute('aria-valuemax','120');
+  ribbonSizer.title='Arrastrá hacia arriba o abajo para cambiar la altura · doble clic: compacto';
+  const syncValue=()=>ribbonSizer.setAttribute('aria-valuenow',String(Math.round(read())));
+  ribbonSizer.addEventListener('dblclick',()=>{update(42);syncValue()});
+  ribbonSizer.addEventListener('keydown',e=>{
+   if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();update(read()+(e.key==='ArrowDown'?4:-4));syncValue()}
+   if(e.key==='Home'){e.preventDefault();update(38);syncValue()}
+   if(e.key==='End'){e.preventDefault();update(120);syncValue()}
+  });
+  new MutationObserver(syncValue).observe(app,{attributes:true,attributeFilter:['style']});
+  syncValue();
+ }
  new MutationObserver(()=>app.classList.toggle('cad-ribbon-compact',read()<=67)).observe(app,{attributes:true,attributeFilter:['style']});
 })();
 function renderBlockLibrary(){
