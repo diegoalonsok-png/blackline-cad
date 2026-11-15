@@ -783,7 +783,7 @@ function setTool(t){
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'TRIM: click segment to remove · line, polyline, rectangle, circle and arc boundaries',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
+function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'TRIM: click one line to cut · click inside a door rectangle to cut all crossing lines · Shift+click for opening',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -1163,6 +1163,70 @@ function cadTrimBoundaries(entity){
   return points.slice(1).map((p,i)=>[points[i],p]);
  }
  return [];
+}
+/* Door/window opening: trim every editable straight segment crossing the
+   interior of a closed RECT. No cutting of boundary lines coincident with edge.
+   Returns null if geometry is unchanged, else the outside portions. */
+function trimSegmentOutsideRect(a,b,rect){
+ const x0=Math.min(rect.a.x,rect.b.x),x1=Math.max(rect.a.x,rect.b.x);
+ const y0=Math.min(rect.a.y,rect.b.y),y1=Math.max(rect.a.y,rect.b.y);
+ const dx=b.x-a.x,dy=b.y-a.y,eps=1e-9;
+ if(x1-x0<=eps||y1-y0<=eps||dx*dx+dy*dy<=eps*eps)return null;
+ // Retain lines coincident with the perimeter, as they define the opening.
+ if((Math.abs(a.x-x0)<eps&&Math.abs(b.x-x0)<eps)||
+    (Math.abs(a.x-x1)<eps&&Math.abs(b.x-x1)<eps)||
+    (Math.abs(a.y-y0)<eps&&Math.abs(b.y-y0)<eps)||
+    (Math.abs(a.y-y1)<eps&&Math.abs(b.y-y1)<eps))return null;
+ let enter=0,leave=1;
+ for(const [p,q] of [[-dx,a.x-x0],[dx,x1-a.x],[-dy,a.y-y0],[dy,y1-a.y]]){
+  if(Math.abs(p)<eps){if(q<0)return null;continue}
+  const t=q/p;
+  if(p<0)enter=Math.max(enter,t);else leave=Math.min(leave,t);
+  if(enter>leave+eps)return null;
+ }
+ // Tangency / touching at one vertex does not remove geometry.
+ if(leave-enter<=eps)return null;
+ const at=t=>P(a.x+t*dx,a.y+t*dy);
+ const parts=[];
+ if(enter>eps)parts.push([a,at(enter)]);
+ if(leave<1-eps)parts.push([at(leave),b]);
+ return parts;
+}
+function trimOpeningAtPoint(p,all=false){
+ const rects=state.entities.filter(e=>e.type==='rect'&&layerFor(e).visible&&!layerFor(e).locked);
+ // Prefer the smallest rectangle under the cursor; this keeps nearby openings independent.
+ const inside=rects.filter(r=>{
+  const x0=Math.min(r.a.x,r.b.x),x1=Math.max(r.a.x,r.b.x),y0=Math.min(r.a.y,r.b.y),y1=Math.max(r.a.y,r.b.y);
+  return p.x>x0+1e-8&&p.x<x1-1e-8&&p.y>y0+1e-8&&p.y<y1-1e-8;
+ }).sort((a,b)=>Math.abs((a.b.x-a.a.x)*(a.b.y-a.a.y))-Math.abs((b.b.x-b.a.x)*(b.b.y-b.a.y)));
+ if(!inside.length)return false;
+ const rect=inside[0], edits=[],newItems=[];
+ for(const e of state.entities){
+  if(e.id===rect.id||!layerFor(e).visible||layerFor(e).locked)continue;
+  if(e.type==='line'){
+   const parts=trimSegmentOutsideRect(e.a,e.b,rect);
+   if(parts!==null){edits.push(e.id);for(const [a,b] of parts)newItems.push({...clone(e),id:state.nextId+newItems.length,a,b})}
+  }else if(e.type==='polyline'&&Array.isArray(e.pts)&&e.pts.length>1){
+   const edges=e.pts.slice(1).map((pt,i)=>[e.pts[i],pt]);
+   if(e.closed&&e.pts.length>2)edges.push([e.pts.at(-1),e.pts[0]]);
+   const results=edges.map(([a,b])=>trimSegmentOutsideRect(a,b,rect));
+   if(results.some(parts=>parts!==null)){
+    edits.push(e.id);
+    // Flatten only the polyline being cut, maintaining its layer and visual geometry.
+    for(let i=0;i<edges.length;i++)for(const [a,b] of results[i]===null?[edges[i]]:results[i])
+     newItems.push({...clone(e),type:'line',id:state.nextId+newItems.length,a,b,closed:undefined,pts:undefined});
+   }
+  }
+ }
+ if(!edits.length){toast('TRIM: no editable wall segments inside the opening');return true}
+ saveHistory();
+ const removed=new Set(edits);
+ state.entities=state.entities.filter(e=>!removed.has(e.id));
+ state.nextId+=newItems.length;state.entities.push(...newItems);
+ state.selected=[];updateAll();
+ log('TRIM opening: '+edits.length+' source objects cut');
+ toast('TRIM: '+edits.length+' wall segment(s) cut · opening preserved');
+ return true;
 }
 function trimLine(e,p){
  if(!e||e.type!=='line')return toast('TRIM: seleccioná un segmento LINE; admite límites LINE, PLINE y RECT');
@@ -1680,7 +1744,7 @@ function handlePoint(p,shift){const t=state.tool;
  if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
  if(t==='matchprop'){matchCadPropertiesAt(p);return}
  if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
-if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(e)trimLine(e,p);return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Elegí el lado / Click side')}else toast('Seleccioná línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if((shift||!e)&&trimOpeningAtPoint(p,shift))return;if(e)trimLine(e,p);else toast('TRIM: click a segment, or click inside a door rectangle to cut all crossing lines');return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Elegí el lado / Click side')}else toast('Seleccioná línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
