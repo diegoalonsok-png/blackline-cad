@@ -741,6 +741,8 @@ Object.assign(icons,{
  copytolayer:'<path d="m3 6 9-4 9 4-9 4zM3 11l9 4 9-4M3 16l9 4 9-4"/><path d="M12 14v8m-3-3 3 3 3-3"/>',
  changelayer:'<path d="m3 7 9-5 9 5-9 5zM3 12l9 5 9-5M3 17l9 5 9-5"/>'
 });
+toolDefs.stretch=['Stretch','stretch'];icons.stretch='<path d="M4 20 20 4M4 4v16h16"/><circle cx="20" cy="4" r="2"/><path d="m11 4 9 0 0 9"/>';
+ribbonTabs.modify[0].push('stretch');
 ribbonTabs.modify.push(['CLEANUP','overkill','selectsimilar','copytolayer','changelayer']);
 function buildRibbon(tab){
  const def=ribbonTabs[tab]||ribbonTabs.home;
@@ -795,8 +797,8 @@ function setTool(t){
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
- if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'TRIM: click inside a door rectangle to open both wall lines · elsewhere click the segment to remove',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
+ if(!['stretch','move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
+function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'TRIM: click inside a door rectangle to open both wall lines · elsewhere click the segment to remove',stretch:'STRETCH: select entities then choose vertex and new position',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -1657,25 +1659,29 @@ function deletePeditVertex(){
 }
 
 function extendLine(e,mouse){
- if(!e||e.type!=='line')return toast('EXTEND currently supports straight LINE entities');
+ if(!e||e.type!=='line')return toast('EXTEND: select a straight LINE');
+ if(layerFor(e).locked)return toast('EXTEND: object layer locked');
  const start=dist(mouse,e.a)<dist(mouse,e.b),origin=start?e.b:e.a,old=start?e.a:e.b;
  const direction=sub(old,origin),magnitude=Math.hypot(direction.x,direction.y);
- if(magnitude<1e-10)return toast('Zero-length line cannot be extended');
+ if(magnitude<1e-10)return toast('EXTEND: zero-length line');
  const u=mul(direction,1/magnitude);
  let best=null,smallest=Infinity;
  for(const edge of state.entities){
-  if(edge.id===e.id||edge.type!=='line'||!layerFor(edge).visible)continue;
-  const point=unrestrictedIntersection(origin,old,edge.a,edge.b);
-  if(!point)continue;
-  const advance=(point.x-old.x)*u.x+(point.y-old.y)*u.y;
-  const span=sub(edge.b,edge.a),den=span.x*span.x+span.y*span.y;
-  if(advance<=1e-8||den<=1e-12)continue;
-  const t=((point.x-edge.a.x)*span.x+(point.y-edge.a.y)*span.y)/den;
-  if(t<-1e-8||t>1+1e-8)continue;
-  if(advance<smallest){smallest=advance;best=point}
+  if(edge.id===e.id||!layerFor(edge).visible)continue;
+  // Supports real LINE / RECT / POLYLINE and tessellated CIRCLE / ARC boundaries.
+  for(const [a,b] of cadTrimBoundaries(edge)){
+   const point=unrestrictedIntersection(origin,old,a,b);
+   if(!point)continue;
+   const advance=(point.x-old.x)*u.x+(point.y-old.y)*u.y;
+   const span=sub(b,a),den=span.x*span.x+span.y*span.y;
+   if(advance<=1e-8||den<=1e-12)continue;
+   const t=((point.x-a.x)*span.x+(point.y-a.y)*span.y)/den;
+   if(t<-1e-8||t>1+1e-8)continue;
+   if(advance<smallest){smallest=advance;best=point}
+  }
  }
- if(!best)return toast('No forward LINE boundary found; drawing unchanged');
- saveHistory();e[start?'a':'b']=best;updateAll();log('EXTEND');toast('Line extended to real boundary');
+ if(!best)return toast('EXTEND: no forward boundary found; unchanged');
+ saveHistory();e[start?'a':'b']=best;updateAll();log('EXTEND');toast('EXTEND: nearest visible boundary reached');
 }
 function joinSelectedLines(){
  const selected=validEditSelection();
@@ -1799,7 +1805,49 @@ function cadTransferLayer(copyOnly){
  }
  updateAll();
 }
+/* STRETCH endpoint / polyline vertex: select objects, choose reference grip,
+   then destination. Only vertices near the chosen grip move, others stay fixed. */
+function cadStretchAt(p){
+ const selected=validEditSelection().filter(e=>['line','polyline','rect'].includes(e.type));
+ if(!selected.length)return toast('STRETCH: select editable lines, polylines or rectangles first');
+ if(!state.modifyCandidate||state.modifyCandidate.kind!=='stretch'){
+  const available=[];
+  for(const e of selected){
+   const vertices=e.type==='rect'?
+    [P(e.a.x,e.a.y),P(e.b.x,e.a.y),P(e.b.x,e.b.y),P(e.a.x,e.b.y)]:
+    e.type==='line'?[e.a,e.b]:e.pts||[];
+   for(const vertex of vertices)available.push({point:vertex,id:e.id});
+  }
+  const nearest=available.sort((x,y)=>dist(x.point,p)-dist(y.point,p))[0];
+  if(!nearest||dist(nearest.point,p)>Math.max(14/state.view.scale,1e-7))return toast('STRETCH: click a selected endpoint / vertex grip');
+  state.modifyCandidate={kind:'stretch',base:clone(nearest.point),ids:selected.map(e=>e.id)};
+  state.stage=[clone(nearest.point)];prompt();schedule();
+  toast('STRETCH: choose new position for selected coincident vertices');
+  return;
+ }
+ const base=state.modifyCandidate.base,delta=sub(p,base),tol=Math.max(1e-7,5/state.view.scale);
+ if(Math.hypot(delta.x,delta.y)<1e-10){state.modifyCandidate=null;state.stage=[];return toast('STRETCH: zero displacement')}
+ const eligible=new Set(state.modifyCandidate.ids);
+ const replacements=new Map();
+ for(const e of state.entities){
+  if(!eligible.has(e.id))continue;
+  const shift=v=>dist(v,base)<=tol?add(v,delta):clone(v);
+  if(e.type==='line'){
+   const n=clone(e);n.a=shift(e.a);n.b=shift(e.b);replacements.set(e.id,n);
+  }else if(e.type==='polyline'){
+   const n=clone(e);n.pts=e.pts.map(shift);replacements.set(e.id,n);
+  }else if(e.type==='rect'){
+   // Preserve all four rectangle edges, even after moving just one corner.
+   const pts=[P(e.a.x,e.a.y),P(e.b.x,e.a.y),P(e.b.x,e.b.y),P(e.a.x,e.b.y)].map(shift);
+   const n=clone(e);n.type='polyline';n.pts=pts;n.closed=true;delete n.a;delete n.b;replacements.set(e.id,n);
+  }
+ }
+ saveHistory();state.entities=state.entities.map(e=>replacements.get(e.id)||e);
+ state.modifyCandidate=null;state.stage=[];updateAll();
+ toast('STRETCH: grip updated · '+replacements.size+' selected objects checked');log('STRETCH');
+}
 function handlePoint(p,shift){const t=state.tool;
+ if(t==='stretch')return cadStretchAt(p);
  if(t==='breakLine')return breakCadLineAt(p);
  if(t==='lengthen')return lengthenCadLineAt(p);
  if(t==='peditMove'||t==='peditInsert')return applyPeditAt(p,t);
@@ -2086,7 +2134,7 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
    const dest=add(origin,mul(delta,length/magnitude));
    handlePoint(dest,false);schedule();toast('Segmento / Segment: '+length+' '+state.unit);return;
   }
- }let aliases={BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
+ }let aliases={STRETCH:'stretch',ESTIRAR:'stretch',BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
   const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
   if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
   else setTool(aliases[cmd]);
