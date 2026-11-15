@@ -696,6 +696,7 @@ function setTool(t){
 
  const dimensionKinds={dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
+ if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['move','copy','rotate','scale','mirror','erase','offset','trim','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
 function prompt(){const messages={select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'Specify scale reference point':'Select objects, then choose pivot',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',trim:'Click the line section to trim to a crossing LINE',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',fillet:state.modifyCandidate?'Select second line near corner':'Select first LINE near its corner',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`}
@@ -2447,9 +2448,10 @@ function insertSelectedBlock(point){
  const items=blockInsertionEntities(block,point,factor,angle);
  saveHistory();
  for(const item of items){item.id=state.nextId++;if(!state.layers.some(l=>l.id===item.layer))item.layer=state.layerId;state.entities.push(item)}
- state.stage=[];state.tool='select';state.selected=items.map(e=>e.id);
+ const repeat=Boolean(state.galleryRepeatedInsert);
+ state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:items.map(e=>e.id);
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
- updateAll();toast('Block inserted at X '+units(point.x)+', Y '+units(point.y));
+ updateAll();toast('Block inserted at X '+units(point.x)+', Y '+units(point.y)+(repeat?' · Click again or Esc to finish':''));
 }
 async function importCADBlock(file){
  if(!file||file.size>12*1024*1024)throw Error('Block file exceeds the 12 MB limit');
@@ -2531,7 +2533,7 @@ function initPermanentBlockGallery(){
   const key='BL '+x.id;
   if(!state.blocks[key]){saveHistory();state.blocks[key]={name:key,entities:normalizeBlockEntities(entities)};renderBlockLibrary();queueLocalBackup()}
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
-  setTool('insertBlock');$('blHelp').textContent='Selected: '+x.id+' · Click a point in the drawing to insert.';toast('Click drawing to place symbol at 1:1');
+  state.galleryRepeatedInsert=true;setTool('insertBlock');$('blHelp').textContent='Selected: '+x.id+' · Click in the drawing to insert repeatedly; Esc to finish.';toast('Click drawing to place symbol at 1:1');
  }
  function showCards(){
   for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
