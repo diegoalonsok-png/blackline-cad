@@ -640,6 +640,50 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  .brandbar .right{min-width:0}
 }
 @media(prefers-reduced-motion:reduce){.ribbon-shell .ribbon .tool{transition:none!important}}
+
+/* Blackline graphite interface 2026 · white bespoke line icons, soft controls */
+:root{--cad-ui-base:#34363b;--cad-ui-raised:#44474e;--cad-ui-toolbar:#303237;--cad-ui-text:#f5f6f8;--cad-ui-muted:#c3c8d0;--cad-ui-edge:#5a5e67;--cad-ui-input:#292b30}
+.app .brandbar,.app .tabbar,.app .ribbon-shell,.app .ribbon{background:var(--cad-ui-toolbar)!important;border-color:var(--cad-ui-edge)!important}
+.app .sidebar,.app .sidebar.rightside,.app .panel,.app .cad-palette,.app .cmd,.app .status{background:var(--cad-ui-base)!important}
+.app .panel-title,.app .palette-title{background:#3e4148!important;color:#f7f8fa!important}
+.app .tool,.app .btn,.app .status button,.app .tabbar button,.app .sidebar button{
+ border-radius:9px!important;border:1px solid #616671!important;
+ background:#44474e!important;color:#f6f7f9!important;
+ transition:transform .16s cubic-bezier(.2,.8,.2,1),box-shadow .16s ease,background .16s ease,border-color .16s ease!important
+}
+.app .ribbon .tool{background:#383b41!important;border:1px solid transparent!important;border-radius:10px!important}
+.app .ribbon .tool svg{stroke:#f5f6f8!important;stroke-width:1.9!important;fill:none;overflow:visible;
+ filter:drop-shadow(0 1px 1px #0004);transition:transform .18s ease!important}
+.app .ribbon .tool:hover:not(:disabled){background:#515660!important;border-color:#818997!important;transform:translateY(-1px)!important}
+.app .ribbon .tool:hover svg{transform:translateY(-1px) rotate(-5deg) scale(1.14)}
+.app .ribbon .tool:active svg{transform:scale(.9) rotate(3deg)}
+.app .ribbon .tool.active,.app .ribbon .tool[aria-pressed=true]{
+ background:#525b65!important;border-color:#b0d7e9!important;
+ box-shadow:inset 0 0 0 1px #98cadc,0 0 10px #83c9e544!important
+}
+.app .ribbon .tool.active svg{stroke:#fff!important}
+.app .ribbon .tool.active::after{background:#a9ebd1!important}
+.app .btn:hover:not(:disabled),.app .sidebar button:hover:not(:disabled){background:#545962!important;border-color:#9aa4b3!important;box-shadow:0 1px 8px #0003!important}
+.app button:focus-visible{outline:2px solid #c8e6f5!important;outline-offset:2px}
+.app input:not([type=color]),.app select,.app textarea{background:#292d33!important;color:#f6f7f9!important;border-color:#626873!important;border-radius:9px!important}
+.app #blacklineBlockGallery .panel-title{background:#454951!important}
+.app #blacklineBlockGallery #blCards button{background:#3c4148!important}
+.app #blacklineBlockGallery #blCards button:hover{background:#555d66!important}
+/* Resize handle is discoverable and draggable, rather than an invisible strip */
+#ribbonSizer{
+ display:block!important;height:11px!important;z-index:31!important;
+ background:linear-gradient(to bottom,transparent 0 3px,#707781 3px 5px,transparent 5px)!important;
+ cursor:ns-resize!important;touch-action:none!important
+}
+#ribbonSizer::after{
+ content:"";position:absolute;left:50%;top:2px;transform:translateX(-50%);
+ width:48px;height:5px;border-radius:20px;background:#a0a8b4;
+ box-shadow:0 0 0 2px #303237,0 1px 4px #0008;
+}
+#ribbonSizer:hover,#ribbonSizer.resizing{background:#7fa8bb36!important}
+#ribbonSizer:hover::after,#ribbonSizer.resizing::after{background:#e0eff8}
+.ribbon-shell .ribbon .tool{min-width:40px!important}
+@media(prefers-reduced-motion:reduce){.app .ribbon .tool,.app .ribbon .tool svg,.app .btn{transition:none!important;animation:none!important}}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 </head>
@@ -3003,11 +3047,11 @@ function initBlocks(){
 
 
 
-const DEFAULT_DISPLAY_COLORS={cursor:'#ffff00',background:'#10171c',grid:'#27343b',axes:'#59636e',selection:'#e9edf2',size:75,width:1};
+const DEFAULT_DISPLAY_COLORS={cursor:'#ffe15a',background:'#292b2f',grid:'#373a3f',axes:'#676c75',selection:'#f0f3f6',size:75,width:1};
 let displayColors={...DEFAULT_DISPLAY_COLORS},crosshairVisible=false;
 function initDisplayColors(){
  const themes={
-  dark:{cursor:'#ffff00',background:'#10171c',grid:'#27343b',axes:'#59636e',selection:'#e9edf2'},
+  dark:{cursor:'#ffe15a',background:'#292b2f',grid:'#373a3f',axes:'#676c75',selection:'#f0f3f6'},
   black:{cursor:'#ffff00',background:'#050505',grid:'#292929',axes:'#666666',selection:'#ffffff'},
   light:{cursor:'#202020',background:'#f6f7f8',grid:'#d7dbde',axes:'#8a9299',selection:'#0067a5'},
   blueprint:{cursor:'#f7e794',background:'#0d2948',grid:'#214569',axes:'#7396b9',selection:'#ffffff'}
@@ -3020,7 +3064,14 @@ function initDisplayColors(){
   schedule();
  };
 
- try{const saved=JSON.parse(localStorage.getItem('cad2d-display-colors')||'null');if(saved&&typeof saved==='object')displayColors={...displayColors,...saved}}catch(ex){}
+ try{
+ const saved=JSON.parse(localStorage.getItem('cad2d-display-colors')||'null');
+ if(saved&&typeof saved==='object'){
+  const legacy= saved.background==='#10171c'&&saved.grid==='#27343b'&&saved.axes==='#59636e';
+  displayColors={...displayColors,...saved,...(legacy?{background:DEFAULT_DISPLAY_COLORS.background,grid:DEFAULT_DISPLAY_COLORS.grid,axes:DEFAULT_DISPLAY_COLORS.axes}:{})};
+  if(legacy)localStorage.setItem('cad2d-display-colors',JSON.stringify(displayColors));
+ }
+}catch(ex){}
  const mapping={cursorColor:'cursor',modelBgColor:'background',modelGridColor:'grid',modelAxesColor:'axes',selectionColor:'selection',crosshairSize:'size',cursorWidth:'width'};
  function refresh(){
   Object.entries(mapping).forEach(([id,key])=>{const el=$(id);if(el)el.value=String(displayColors[key])});
@@ -3361,7 +3412,7 @@ function initCadColorPopover(){
  const paletteTone=$('cadPaletteTone'),paletteToneLabel=$('cadPaletteToneLabel'),swatches=$('cadPaletteToneSwatches');
  const toneNames=['Negro','Antracita','Gris medio','Gris claro','Blanco tiza'];
  const paletteHex=n=>{const v=Math.max(0,Math.min(255,Math.round(n)));return '#'+v.toString(16).padStart(2,'0').repeat(3)};
- let cadPaletteHue='#252525';
+ let cadPaletteHue='#42454b';
  try{const oldHue=localStorage.getItem('cad2d-palette-hue');if(oldHue&&/^#[0-9a-f]{6}$/i.test(oldHue))cadPaletteHue=oldHue}catch(e){}
  const hueRow=document.createElement('label');hueRow.className='cad-ui-hue-row';hueRow.textContent='Color de barras y botones';
  const huePicker=document.createElement('input');huePicker.type='color';huePicker.value=cadPaletteHue;huePicker.id='cadPaletteHue';hueRow.append(huePicker);toneBox.insertBefore(hueRow,paletteTone);
@@ -3394,7 +3445,7 @@ function initCadColorPopover(){
  }
  paletteTone.addEventListener('input',()=>setPaletteTone(paletteTone.value));
  huePicker.addEventListener('input',()=>{cadPaletteHue=huePicker.value;try{localStorage.setItem('cad2d-palette-hue',cadPaletteHue)}catch(e){}setPaletteTone(paletteTone.value)});
- let savedTone=8;try{const modern=localStorage.getItem('cad2d-palette-tone-v2');const legacy=localStorage.getItem('cad2d-palette-tone');if(modern!==null&&Number.isFinite(Number(modern)))savedTone=Number(modern);else if(legacy!==null&&Number.isFinite(Number(legacy))&&Number(legacy)!==19)savedTone=Number(legacy)}catch(e){}
+ let savedTone=22;try{const modern=localStorage.getItem('cad2d-palette-tone-v2');const legacy=localStorage.getItem('cad2d-palette-tone');if(modern!==null&&Number.isFinite(Number(modern)))savedTone=Number(modern);else if(legacy!==null&&Number.isFinite(Number(legacy))&&Number(legacy)!==19)savedTone=Number(legacy);if(localStorage.getItem('cad2d-graphite-v1')!=='1'){if(savedTone===8)savedTone=22;localStorage.setItem('cad2d-graphite-v1','1')}}catch(e){}
  setPaletteTone(savedTone);
  const note=document.createElement('div');note.className='cad-color-help';note.textContent='Elegí un esquema o personalizá cada color. Se guarda automáticamente en este navegador.';panel.append(note);
  const presets=document.createElement('div');presets.className='cad-color-presets';
