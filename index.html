@@ -2404,7 +2404,15 @@ function blockInsertionEntities(block,point,scale,angle){
  const theta=angle*Math.PI/180,cos=Math.cos(theta),sin=Math.sin(theta);
  const transform=p=>P(point.x+scale*(p.x*cos-p.y*sin),point.y+scale*(p.x*sin+p.y*cos));
  return block.entities.map(entity=>{
-  const e=transformEntity(entity,transform);
+  // A rotated rectangle cannot be stored as opposite corners alone: that
+  // would silently change its shape. Convert to a closed four-sided polyline.
+  const e=entity.type==='rect'&&Math.abs(Math.sin(theta))>1e-10
+   ?{...clone(entity),type:'polyline',pts:[
+     transform(P(entity.a.x,entity.a.y)),transform(P(entity.b.x,entity.a.y)),
+     transform(P(entity.b.x,entity.b.y)),transform(P(entity.a.x,entity.b.y))
+    ],closed:true}
+   :transformEntity(entity,transform);
+  if(e.type==='polyline'&&entity.type==='rect'){delete e.a;delete e.b}
   if(e.r!==undefined)e.r*=scale;
   if(e.rx!==undefined)e.rx*=scale;
   if(e.ry!==undefined)e.ry*=scale;
