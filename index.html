@@ -864,9 +864,13 @@ function dimensionPrimitives(e){
  const measure=mode==='horizontal'?Math.abs(v.x):mode==='vertical'?Math.abs(v.y):len;
  if(measure<=1e-10)return [];
  const signedOffset=mode==='horizontal'?e.p.y-e.a.y:mode==='vertical'?e.a.x-e.p.x:(e.p.x-e.a.x)*n.x+(e.p.y-e.a.y)*n.y;
- const aa=add(a,mul(n,signedOffset)),bb=add(b,mul(n,signedOffset));
- line(a,add(aa,mul(n,Math.sign(signedOffset||1)*height*.5)));
- line(b,add(bb,mul(n,Math.sign(signedOffset||1)*height*.5)));
+ // Project both witness points onto the same dimension axis. Merely
+ // translating each endpoint by the offset leaves diagonal horizontal/vertical cotas.
+ const aa=mode==='horizontal'?P(a.x,e.p.y):mode==='vertical'?P(e.p.x,a.y):add(a,mul(n,signedOffset));
+ const bb=mode==='horizontal'?P(b.x,e.p.y):mode==='vertical'?P(e.p.x,b.y):add(b,mul(n,signedOffset));
+ const extensionSign=Math.sign(signedOffset)||1;
+ line(a,add(aa,mul(n,extensionSign*height*.5)));
+ line(b,add(bb,mul(n,extensionSign*height*.5)));
  line(aa,bb);
  const direction=mul(sub(bb,aa),1/(dist(aa,bb)||1));
  tip(aa,direction);tip(bb,mul(direction,-1));
