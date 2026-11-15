@@ -743,6 +743,8 @@ Object.assign(icons,{
 });
 toolDefs.stretch=['Stretch','stretch'];icons.stretch='<path d="M4 20 20 4M4 4v16h16"/><circle cx="20" cy="4" r="2"/><path d="m11 4 9 0 0 9"/>';
 ribbonTabs.modify[0].push('stretch');
+toolDefs.arraypolar=['Polar array','array'];icons.arraypolar='<circle cx="12" cy="12" r="2"/><path d="M12 3a9 9 0 1 1-9 9"/><circle cx="12" cy="3" r="1.5"/><circle cx="21" cy="12" r="1.5"/><circle cx="12" cy="21" r="1.5"/><circle cx="3" cy="12" r="1.5"/>';
+ribbonTabs.modify.push(['ARRAYS','array','arraypolar']);
 ribbonTabs.modify.push(['CLEANUP','overkill','selectsimilar','copytolayer','changelayer']);
 function buildRibbon(tab){
  const def=ribbonTabs[tab]||ribbonTabs.home;
@@ -789,6 +791,7 @@ function setTool(t){
  if(t==='join')return joinSelectedLines();
  if(t==='explode')return explodeSelected();
  if(t==='array')return arraySelected();
+ if(t==='arraypolar')return cadPolarArray();
  if(t==='reverse')return reverseSelected();
  if(t==='color'){const panel=$('cadPropertiesPanel');panel?.scrollIntoView({block:'nearest'});toast('Choose a color and apply to selected objects');return}
 
@@ -1051,8 +1054,8 @@ function snapPoint(p){
     if(cadOsnapEnabled('MID'))candidates.push([mul(add(e.a,e.b),.5),'MID']);
     if(nearbyLines.length<70)nearbyLines.push(e);
    }
-   if(e.type==='rect'){if(cadOsnapEnabled('END'))candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END']);if(cadOsnapEnabled('CENTER'))candidates.push([mul(add(e.a,e.b),.5),'CENTER'])}
-   if(cadOsnapEnabled('MID')&&e.type==='polyline'&&e.pts?.length>1)for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);
+   if(e.type==='rect'){if(cadOsnapEnabled('END'))candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END']);if(cadOsnapEnabled('CENTER'))candidates.push([mul(add(e.a,e.b),.5),'CENTER']);if(cadOsnapEnabled('MID')){const x=(e.a.x+e.b.x)/2,y=(e.a.y+e.b.y)/2;candidates.push([P(x,e.a.y),'MID'],[P(x,e.b.y),'MID'],[P(e.a.x,y),'MID'],[P(e.b.x,y),'MID'])}}
+   if(cadOsnapEnabled('MID')&&e.type==='polyline'&&e.pts?.length>1){for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);if(e.closed&&e.pts.length>2)candidates.push([mul(add(e.pts.at(-1),e.pts[0]),.5),'MID'])}
    if(cadOsnapEnabled('CENTER')&&(e.type==='circle'||e.type==='arc'||e.type==='ellipse'))candidates.push([e.c,'CENTER']);
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
@@ -1846,6 +1849,40 @@ function cadStretchAt(p){
  state.modifyCandidate=null;state.stage=[];updateAll();
  toast('STRETCH: grip updated · '+replacements.size+' selected objects checked');log('STRETCH');
 }
+function cadPolarArray(){
+ const sources=validEditSelection();
+ if(!sources.length)return toast('POLAR ARRAY: select editable objects first');
+ const rawCount=window.prompt('POLAR ARRAY: total number of items (including original, 2–360):','6');
+ if(rawCount===null)return;
+ const count=Number(rawCount);
+ if(!Number.isInteger(count)||count<2||count>360||sources.length*(count-1)>20000)return toast('POLAR ARRAY: invalid count or 20,000 entity limit');
+ const rawCenter=window.prompt('POLAR ARRAY center (X,Y) in drawing units:','0,0');
+ if(rawCenter===null)return;
+ const centerMatch=rawCenter.trim().match(/^\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*[,;]\s*(-?(?:\d+(?:\.\d*)?|\.\d+))\s*$/);
+ if(!centerMatch)return toast('POLAR ARRAY: enter X,Y coordinates');
+ const center=P(Number(centerMatch[1]),Number(centerMatch[2]));
+ const rawAngle=window.prompt('POLAR ARRAY total angle in degrees (360 = full circle):','360');
+ if(rawAngle===null)return;
+ const degrees=Number(rawAngle);
+ if(!Number.isFinite(degrees)||Math.abs(degrees)<1e-9||Math.abs(degrees)>360)return toast('POLAR ARRAY: use an angle between -360 and 360, excluding zero');
+ const full=Math.abs(Math.abs(degrees)-360)<1e-9,divisor=full?count:count-1,added=[];
+ for(let i=1;i<count;i++){
+  const angle=(degrees*i/divisor)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+  const transform=p=>{const q=sub(p,center);return add(center,P(q.x*cos-q.y*sin,q.x*sin+q.y*cos))};
+  for(const source of sources){
+   let entity=transformEntity(source,transform);
+   if(entity.type==='rect'&&Math.abs(sin)>1e-10){
+    entity.type='polyline';entity.pts=[P(source.a.x,source.a.y),P(source.b.x,source.a.y),P(source.b.x,source.b.y),P(source.a.x,source.b.y)].map(transform);entity.closed=true;delete entity.a;delete entity.b;
+   }
+   if(entity.type==='arc'){entity.a0+=angle;entity.a1+=angle}
+   if(entity.type==='ellipse')entity.rotation=(entity.rotation||0)+angle;
+   if(entity.type==='text')entity.rotation=(Number(entity.rotation)||0)+angle*180/Math.PI;
+   entity.id=state.nextId+added.length;added.push(entity);
+  }
+ }
+ saveHistory();state.nextId+=added.length;state.entities.push(...added);state.selected=[];updateAll();
+ toast('POLAR ARRAY: '+added.length+' objects created');log('ARRAYPOLAR');
+}
 function handlePoint(p,shift){const t=state.tool;
  if(t==='stretch')return cadStretchAt(p);
  if(t==='breakLine')return breakCadLineAt(p);
@@ -2102,6 +2139,7 @@ function matchCadPropertiesAt(point){
 }
 
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();
+ if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
  if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
  if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
  if(upper==='COPYTOLAYER'||upper==='COPIARACAPA')return cadTransferLayer(true);
