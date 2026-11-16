@@ -146,8 +146,8 @@ requestAnimationFrame(requestResize);
  document.body.append(bubble);let active=null;
  function hide(){bubble.style.display='none';active=null}
  function show(el){
-  if(!el||!el.getAttribute('title'))return hide();
-  const label=el.getAttribute('title');if(!label)return hide();
+  if(!el)return hide();
+  const label=el.dataset.blTooltip||el.getAttribute('title');if(!label)return hide();
   active=el;el.dataset.blTooltip=label;el.removeAttribute('title');
   bubble.textContent=label;bubble.style.display='block';
   const r=el.getBoundingClientRect(),w=bubble.offsetWidth,h=bubble.offsetHeight;
@@ -155,11 +155,11 @@ requestAnimationFrame(requestResize);
   bubble.style.top=(r.bottom+h+9<innerHeight?r.bottom+7:Math.max(5,r.top-h-7))+'px';
  }
  document.addEventListener('pointerover',e=>{
-  const el=e.target.closest?.('button[title],.tool[title],[role="button"][title]');
+  const el=e.target.closest?.('button[title],button[data-bl-tooltip],.tool[title],.tool[data-bl-tooltip],[role="button"][title],[role="button"][data-bl-tooltip]');
   if(el&&el!==active)show(el);
  },true);
  document.addEventListener('pointerout',e=>{if(active&&!active.contains(e.relatedTarget))hide()},true);
- document.addEventListener('focusin',e=>{const el=e.target.closest?.('button[title],.tool[title],[role="button"][title]');if(el)show(el)},true);
+ document.addEventListener('focusin',e=>{const el=e.target.closest?.('button[title],button[data-bl-tooltip],.tool[title],.tool[data-bl-tooltip],[role="button"][title],[role="button"][data-bl-tooltip]');if(el)show(el)},true);
  document.addEventListener('focusout',hide,true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()},true);
  document.addEventListener('scroll',hide,true);
