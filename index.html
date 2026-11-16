@@ -2603,6 +2603,8 @@ function matchCadPropertiesAt(point){
 
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=cad2dNormalizeCommand(value);
  value=upper;
+ // Remember only recognized action names; numeric parameters never replace the last command.
+ if(!parseCoordinate(value)&&!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value)&&/^[A-Z_]+$/.test(upper)&&upper!=='U'&&upper!=='UNDO'&&upper!=='REDO')cad2dLastCommand=upper;
  if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper))return setTool('zoomWindow');
  if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
@@ -3127,37 +3129,70 @@ $('restoreLocalBackup').onclick=restoreLocalBackup;
 $('clearLocalBackup').onclick=deleteLocalBackup;
 
 /* Right mouse button behaves like a CAD contextual menu, not the browser menu */
+let cad2dLastCommand='';
+function cad2dExecuteContextCommand(name){
+ $('command').value=name;runCommand();canvas.focus({preventScroll:true});
+}
 function openCadContextMenu(x,y,worldPoint){
- const menu=$('cadContextMenu');
- const selected=state.selected.length;
- const inCommand=state.stage.length>0;
- const actions=[
-  ...(inCommand?[['Finish current command',()=>finishStage()],['Cancel command',()=>{state.stage=[];state.drag=null;prompt();schedule()}],['---']]:[]),
-  ['Zoom extents',()=>zoomExtents()],
-  ['Zoom in here',()=>centerZoom(1.5,P(x-wrap.getBoundingClientRect().left,y-wrap.getBoundingClientRect().top))],
-  ['Zoom out here',()=>centerZoom(1/1.5,P(x-wrap.getBoundingClientRect().left,y-wrap.getBoundingClientRect().top))],
-  ['---'],
-  ['Select',()=>setTool('select')],
-  ['Pan',()=>setTool('pan')],
-  ['Line',()=>setTool('line')],
-  ['Polyline',()=>setTool('polyline')],
-  ['---'],
-  ['Delete selection'+(selected?' ('+selected+')':''),()=>eraseSelected(),!selected],
-  ['Create block from selection',()=>$('createBlockBtn').click(),!selected],
-  ['Insert block at point',()=>$('insertBlockBtn').click(),!selectedBlock()],
-  ['Export chosen block',()=>$('exportBlockBtn').click(),!selectedBlock()],
-  ['---'],
-  ['Toggle grid',()=>toggle('gridOn','gridToggle')],
-  ['Toggle object snap',()=>toggle('osnapOn','osnapToggle')],
-  ['Print / PDF (A0–A4)',()=>openPrint()]
+ const menu=$('cadContextMenu');menu.setAttribute('role','menu');
+ const target=pick(worldPoint);
+ // Right click on an unselected drawable makes that object available for contextual editing.
+ if(target&&layerFor(target).visible&&!layerFor(target).locked&&!state.selected.includes(target.id)&&state.tool==='select'){
+  state.selected=[target.id];updateProps();schedule();
+ }
+ const count=state.selected.length,active=state.tool!=='select'&&state.tool!=='pan';
+ const title=active?'Comando activo · '+state.tool:count?'Selección · '+count+' objeto(s)':'Espacio modelo';
+ const item=(label,action,disabled=false)=>({label,action,disabled});
+ const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
+ const actions=active?[
+   item('↵ Finalizar / Enter',()=>finishStage()),
+   item('✕ Cancelar / Esc',()=>setTool('select')),
+   item('Deshacer último paso',()=>{if(['line','polyline'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
+   null,
+   command('Recortar · TR','TRIM'),command('Desfase · O','OFFSET'),
+   command('Zoom ventana · Z','Z'),
+   item('Zoom extensión · ZE',()=>zoomExtents()),
+ ]:count?[
+   command('Mover · M','MOVE'),command('Copiar · CO','COPY'),
+   command('Girar · RO','ROTATE'),command('Escalar · SC','SCALE'),
+   command('Simetría · MI','MIRROR'),command('Desfase · O','OFFSET'),
+   null,
+   item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+   item('Copiar al portapapeles · Ctrl+C',()=>copySelectedCadObjects()),
+   command('Crear bloque · B','BLOCK'),
+   item('Borrar selección · E',()=>eraseSelected()),
+   item('Deseleccionar',()=>{state.selected=[];updateProps();schedule()}),
+ ]:[
+   ...(cad2dLastCommand?[command('Repetir: '+cad2dLastCommand,cad2dLastCommand),null]:[]),
+   command('Línea · L','LINE'),command('Polilínea · PL','PLINE'),
+   command('Rectángulo · REC','RECTANGLE'),command('Círculo · C','CIRCLE'),
+   command('Desfase · O','OFFSET'),command('Recortar · TR','TRIM'),
+   null,
+   item('Pegar objetos · Ctrl+V',()=>pasteCadObjects(),!cadClipboard.length),
+   command('Insertar bloque · I','INSERT'),
+   command('Capas · LA','LAYER'),
+   item('Zoom ventana · Z',()=>setTool('zoomWindow')),
+   item('Zoom extensión · ZE',()=>zoomExtents()),
+   item('Encuadre · PAN',()=>setTool('pan')),
  ];
+ actions.push(null,
+  item('Ortogonal · F8'+(state.orthoOn?' ✓':''),()=>toggle('orthoOn','orthoToggle')),
+  item('OSNAP · F3'+(state.osnapOn?' ✓':''),()=>toggle('osnapOn','osnapToggle')),
+  item('Polar · F10'+(state.polarOn?' ✓':''),()=>togglePolar()),
+  item('Rejilla · F7'+(state.gridOn?' ✓':''),()=>toggle('gridOn','gridToggle')),
+  null,
+  item('Historial de comandos · F2',()=>cad2dToggleCommandHistory()),
+  item('Ayuda · F1',()=>$('helpBackdrop').classList.add('show'))
+ );
  menu.replaceChildren();
- const heading=document.createElement('div');heading.className='context-title';heading.textContent='CAD2D · Drawing';menu.appendChild(heading);
- for(const [label,cb,disabled] of actions){
-  if(label==='---'){menu.appendChild(document.createElement('hr'));continue}
-  const button=document.createElement('button');button.type='button';button.role='menuitem';button.textContent=label;button.disabled=!!disabled;
-  button.onclick=()=>{menu.classList.remove('open');cb()};
-  menu.appendChild(button);
+ const heading=document.createElement('div');heading.className='context-title';heading.textContent='CAD2D · '+title;
+ menu.append(heading);
+ for(const action of actions){
+  if(!action){menu.append(document.createElement('hr'));continue}
+  const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');
+  button.textContent=action.label;button.disabled=Boolean(action.disabled);
+  button.onclick=()=>{menu.classList.remove('open');action.action()};
+  menu.append(button);
  }
  menu.classList.add('open');
  menu.style.left='0px';menu.style.top='0px';
