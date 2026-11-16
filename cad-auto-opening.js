@@ -14,7 +14,7 @@
    const d={x:e.b.x-e.a.x,y:e.b.y-e.a.y},length=Math.hypot(d.x,d.y);
    if(length<eps)continue;
    // Line orientation must match the axis of the inserted opening.
-   if(Math.abs((d.x*vy-d.y*vx)/length)>1e-4)continue;
+   if(Math.abs((d.x*vx+d.y*vy)/length)>1e-4)continue;
    const offsetA=(e.a.x-origin.x)*vx+(e.a.y-origin.y)*vy;
    const offsetB=(e.b.x-origin.x)*vx+(e.b.y-origin.y)*vy;
    if(Math.max(Math.abs(offsetA),Math.abs(offsetB))>maxOffset+eps)continue;
