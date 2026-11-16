@@ -1,0 +1,27 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {patterns,passes}=require('../cad-hatch-patterns.js');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+test('nine architectural hatch recipes are exposed',()=>assert.equal(Object.keys(patterns).length,10));
+test('single preserves selected angle and spacing',()=>assert.deepEqual(passes('single',.25,37),[{angle:37,spacing:.25}]));
+test('cross creates perpendicular directions',()=>assert.deepEqual(passes('cross',.2,45),[{angle:45,spacing:.2},{angle:135,spacing:.2}]));
+test('grid always horizontal and vertical',()=>assert.deepEqual(passes('grid',1,30),[{angle:0,spacing:1},{angle:90,spacing:1}]));
+test('architectural dense steel preset has positive interval',()=>assert.deepEqual(passes('steel',1,0),[{angle:45,spacing:.45}]));
+test('concrete preset has three directions',()=>assert.deepEqual(passes('concrete',1,0).map(x=>x.angle),[0,60,120]));
+test('invalid hatch pattern cannot create geometry',()=>assert.equal(passes('unknown',1,0),null));
+test('invalid spacing cannot create geometry',()=>assert.equal(passes('single',0,0),null));
+test('hatch code retains 12000 line cap before saveHistory',()=>{
+ assert.match(html,/const segments=hatchPolygonSegments\(vertices,direction\.spacing,direction\.angle,12000-created\.length\)/);
+ assert.match(html,/if\(created\.length>12000\)return toast/);
+});
+test('typography controls and state round trip',()=>{
+ for(const id of ['textUnderline','textHighlight','textHighlightColor'])assert.match(html,new RegExp('id="'+id+'"'));
+ assert.match(html,/underline:\$\('textUnderline'\)\.checked/);
+ assert.match(html,/highlight:\$\('textHighlight'\)\.checked/);
+ assert.match(html,/\$\('textUnderline'\)\.checked=!!e\.underline/);
+});
+test('canvas and print SVG draw underline and highlight',()=>{
+ assert.match(html,/if\(e\.highlight\)\{ctx\.fillStyle/);
+ assert.match(html,/if\(e\.underline\)\{ctx\.beginPath/);
+ assert.match(html,/if\(e\.highlight\)svg\.push/);
+ assert.match(html,/if\(e\.underline\)svg\.push/);
+});
