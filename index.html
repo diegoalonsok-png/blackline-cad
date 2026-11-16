@@ -1210,7 +1210,32 @@ function dimensionPrimitives(e){
 /* Block references are one model entity, expanded only for screen/plot interchange.
    Their position is the editable insertion pivot. The original definition remains reusable. */
 /* Explicit parametric symbols retain dimensions per placed instance. */
+function blDynBounds(def){
+ const pts=(def?.entities||[]).flatMap(e=>e.type==='polyline'?(e.pts||[]):e.type==='text'?[e.p]:[e.a,e.b]).filter(p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y));
+ if(!pts.length)return null;
+ const minX=Math.min(...pts.map(p=>p.x)),maxX=Math.max(...pts.map(p=>p.x)),minY=Math.min(...pts.map(p=>p.y)),maxY=Math.max(...pts.map(p=>p.y));
+ return maxX-minX>1e-8&&maxY-minY>1e-8?{minX,minY,width:maxX-minX,height:maxY-minY}:null;
+}
+function blDynEligible(def){return !!def&&!def.parametric&&Array.isArray(def.entities)&&def.entities.length>0&&def.entities.every(e=>['line','rect','polyline','text'].includes(e.type))&&!!blDynBounds(def)}
+function blDynDimensions(def,ref){
+ const b=def?.dynamic2d&&blDynBounds(def);if(!b)return null;
+ const width=Number(ref.dynamic?.width??b.width),height=Number(ref.dynamic?.height??b.height);
+ return width>0&&height>0&&width<1e8&&height<1e8?{b,width,height}:null;
+}
+function blDynHandles(ref){
+ const d=blDynDimensions(state.blocks?.[ref.blockName],ref);if(!d)return [];
+ const theta=(Number(ref.rotation)||0)*Math.PI/180,co=Math.cos(theta),si=Math.sin(theta),k=Number(ref.scale)||1;
+ const tr=(x,y)=>P(ref.p.x+k*(x*co-y*si),ref.p.y+k*(x*si+y*co));
+ return [{axis:'width',point:tr(d.b.minX+d.width,d.b.minY+d.height/2)},{axis:'height',point:tr(d.b.minX+d.width/2,d.b.minY+d.height)}];
+}
 function blockInstanceGeometry(definition,ref){
+ const dyn=blDynDimensions(definition,ref);
+ if(dyn){
+  const {b,width,height}=dyn,sx=width/b.width,sy=height/b.height;
+  const tr=p=>P(b.minX+(p.x-b.minX)*sx,b.minY+(p.y-b.minY)*sy);
+  return definition.entities.map(e=>{const obj=clone(e);for(const key of ['a','b','c','p'])if(obj[key])obj[key]=tr(obj[key]);if(obj.pts)obj.pts=obj.pts.map(tr);return obj});
+ }
+
  const param=definition.parametric;
  if(!param||!ref.params)return definition.entities;
  const w=Number(ref.params.width),h=Number(ref.params.depth);
@@ -1273,6 +1298,7 @@ function blockChildren(ref){
 /* Block grip editing: translate the reference rather than exploding its children. */
 function blockGripPoints(ref){
  if(ref.type!=='blockRef')return [];
+ if(blDynHandles(ref).length)return [ref.p,...blDynHandles(ref).map(h=>h.point)];
  const points=[ref.p],seen=new Set(),unique=[];
  for(const entity of blockChildren(ref)){
   if(entity.type==='line'||entity.type==='dimension')points.push(entity.a,entity.b);
@@ -1377,6 +1403,9 @@ function findSelectedBlockGrip(raw){
    const d=dist(raw,screen(vertex));
    if(d<limit){limit=d;best={id,vertex}}
   }
+  for(const handle of blDynHandles(e)){
+   const d=dist(raw,screen(handle.point));if(d<limit){limit=d;best={id,vertex:handle.point,axis:handle.axis}}
+  }
  }
  return best;
 }
@@ -1389,6 +1418,11 @@ function drawBlockGrips(ref){
   ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);
  }
  ctx.restore();
+ if(blDynHandles(ref).length){
+  ctx.save();ctx.fillStyle='#ffdc5f';ctx.strokeStyle='#513b0e';ctx.lineWidth=1.5;
+  for(const h of blDynHandles(ref)){const p=screen(h.point),a=gripSettings.size/2+2;ctx.beginPath();ctx.moveTo(p.x,p.y-a);ctx.lineTo(p.x+a,p.y);ctx.lineTo(p.x,p.y+a);ctx.lineTo(p.x-a,p.y);ctx.closePath();ctx.fill();ctx.stroke()}
+  ctx.restore();
+ }
 }
 function blockGripTargetPoint(d,raw){
  const origin=world(raw),startWorld=world(d.start);
@@ -2751,7 +2785,7 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
   const grip=findSelectedBlockGrip(raw);
   if(grip){
    const entity=state.entities.find(e=>e.id===grip.id);
-   state.drag={type:'blockGrip',id:grip.id,start:raw,last:raw,vertex:grip.vertex,original:P(entity.p.x,entity.p.y),moved:false};
+   state.drag={type:'blockGrip',id:grip.id,start:raw,last:raw,vertex:grip.vertex,original:P(entity.p.x,entity.p.y),originalDynamic:clone(entity.dynamic||{}),axis:grip.axis||null,moved:false};
    canvas.style.cursor='grabbing';return;
   }
  }
@@ -2775,7 +2809,15 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
    if(movement>3&&!d.moved){saveHistory();d.moved=true}
    if(d.moved){
     const target=blockGripTargetPoint(d,raw);
-    obj.p=P(d.original.x+target.x-d.vertex.x,d.original.y+target.y-d.vertex.y);
+    if(d.axis){
+     const dims=blDynDimensions(state.blocks?.[obj.blockName],obj);
+     if(dims){
+      const angle=(Number(obj.rotation)||0)*Math.PI/180,co=Math.cos(angle),si=Math.sin(angle),scale=Number(obj.scale)||1;
+      const delta=P((target.x-obj.p.x)/scale,(target.y-obj.p.y)/scale),local=P(delta.x*co+delta.y*si,-delta.x*si+delta.y*co);
+      const value=d.axis==='width'?local.x-dims.b.minX:local.y-dims.b.minY;
+      if(Number.isFinite(value)&&value>0.000001&&value<1e8)obj.dynamic={...obj.dynamic,[d.axis]:value};
+     }
+    }else obj.p=P(d.original.x+target.x-d.vertex.x,d.original.y+target.y-d.vertex.y);
    }
   }
  }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}
@@ -2798,7 +2840,7 @@ canvas.addEventListener('pointerup',ev=>{
  }
  if(d.type==='blockGrip'){
   canvas.style.cursor='';
-  if(d.moved){const ref=state.entities.find(e=>e.id===d.id);const result=ref?.type==='blockRef'?relocateOpeningWithBlock(ref,d.original):{ok:true,cut:0};updateAll();toast(!result.ok?'Vano protegido: pared modificada. No se movió el bloque.':result.cut?'Bloque y vano desplazados · Ctrl+Z para deshacer':'Bloque desplazado · Ctrl+Z para deshacer')}
+  if(d.moved){const ref=state.entities.find(e=>e.id===d.id);const result=d.axis?{ok:true,cut:0}:ref?.type==='blockRef'?relocateOpeningWithBlock(ref,d.original):{ok:true,cut:0};updateAll();toast(d.axis?'Bloque dinámico: '+(d.axis==='width'?'ancho':'alto')+' actualizado':!result.ok?'Vano protegido: movimiento cancelado':result.cut?'Bloque y vano desplazados':'Bloque desplazado')}
   else schedule();
   return;
  }
@@ -2832,7 +2874,7 @@ canvas.addEventListener('pointercancel',ev=>{
  state.drag=null;canvas.style.cursor='';
  if(d.moved){
   const obj=state.entities.find(e=>e.id===d.id);
-  if(obj&&obj.type==='blockRef')obj.p=P(d.original.x,d.original.y);
+  if(obj&&obj.type==='blockRef'){obj.p=P(d.original.x,d.original.y);obj.dynamic=clone(d.originalDynamic||{})}
   // The cancelled operation must not become an undo step.
   if(state.history.length)state.history.pop();
   updateAll();
@@ -4022,6 +4064,7 @@ function insertSelectedBlock(point){
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  saveHistory();
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
+ if(block.dynamic2d){const b=blDynBounds(block);if(b)ref.dynamic={width:b.width,height:b.height}}
  if(block.parametric){
   ref.params={...block.parametric.defaults};
   if(['swing-door','double-door','framed-window'].includes(block.parametric.kind)){
