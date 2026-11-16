@@ -224,3 +224,11 @@ Keep GitHub Pages as the free development/QA environment. After confirming CAD e
 - **PEDIT / PE**: select one unlocked polyline, choose vertex index (1-based), then move, insert a vertex after the chosen vertex, or delete a vertex. Moving/inserting accepts a click or exact X,Y typed in the command bar. Minimum vertex counts prevent invalid polylines. This is a subset of classic PEDIT, not full width/spline/curve fit editing.
 
 JavaScript syntax verified. Logic tests passed for fast vs slow and near vs distant middle-button clicks, active vs idle command cursor state, LENGTHEN positive/negative/total length (with invalid values rejected), and PEDIT moving/inserting/deleting vertices (with invalid index rejected). Full in-browser UI and physical mouse double-click behavior have not yet been verified.
+
+## Independencia, propiedad intelectual y compatibilidad
+
+Blackline CAD es una aplicación independiente; no está afiliada, patrocinada ni respaldada por Autodesk, Inc. Las marcas Autodesk y AutoCAD pertenecen a sus titulares y se mencionan únicamente cuando es necesario describir la interoperabilidad.
+
+**Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia del prototipo no equivale a certificación legal completa.
+
+**Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG es diagnóstica y no importa geometría: no habilitar importación/conversión DWG sin verificar licencias, condiciones de distribución y fidelidad técnica de una solución autorizada. No publicar la función como disponible hasta entonces.
