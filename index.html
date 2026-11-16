@@ -1008,13 +1008,16 @@ function drawCrosshair(){
  ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
  ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
  }
- /* Keep the centre pickbox hollow and visible at all times. Active tools
-    use a thicker cyan outline, never a solid fill hiding geometry. */
- ctx.fillStyle=displayColors.background;
- ctx.strokeStyle=selecting||positioningOffset?displayColors.cursor:active?'#a0e8ff':displayColors.cursor;ctx.lineWidth=selecting||positioningOffset?1.8:active?2:1.5;
- if(!selecting)ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
- ctx.strokeRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
- if(active&&!selecting&&!positioningOffset){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
+ /* The idle CAD cursor is only a crosshair. Show the configurable
+    pickbox after a drawing or editing command has actually been activated. */
+ if(active){
+  ctx.fillStyle=displayColors.background;
+  ctx.strokeStyle=selecting||positioningOffset?displayColors.cursor:'#a0e8ff';
+  ctx.lineWidth=selecting||positioningOffset?1.8:2;
+  if(!selecting)ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+  ctx.strokeRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+  if(!selecting&&!positioningOffset){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
+ }
  if(positioningOffset){ctx.setLineDash([3,3]);ctx.strokeStyle='#ffe25a';ctx.beginPath();ctx.arc(q.x,q.y,13,0,TAU);ctx.stroke();}
  ctx.restore();
 }
