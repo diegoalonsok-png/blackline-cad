@@ -54,7 +54,7 @@ function init(){
   const name=document.createElement('div');name.textContent=d.name;name.style.cssText='font-size:11px;line-height:1.4;margin:5px 0';
   const btn=document.createElement('button');btn.className='btn';btn.type='button';btn.textContent='Insertar bloque';btn.style.cssText='width:100%;font-size:10px';
   btn.onclick=()=>{
-   const key='BL Adaptado · '+d.key;
+   const key='BL Adaptado v2 · '+d.key;
    try{if(!api.hasBlock(key)){
     const unitFactor=({m:1,cm:100,mm:1000,in:39.37007874,ft:3.280839895}[api.unit()]||1);
     const param=d.key==='puerta90'?{kind:'swing-door',defaults:{width:.9*unitFactor,mirror:false}}:
