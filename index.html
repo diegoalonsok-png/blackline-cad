@@ -2073,9 +2073,17 @@ function togglePolar(){
  toast('POLAR '+(state.polarOn?'ON · '+state.polarAngle+'°':'OFF'));schedule();
 }
 function renderLayers(){$('layerCount').textContent=state.layers.length;$('layers').innerHTML=state.layers.map(l=>`<div class="layer-row ${l.id===state.layerId?'current':''}"><button data-layer="${escapeHTML(l.id)}" data-act="visible" title="Toggle visibility">${l.visible?'◉':'◌'}</button><button data-layer="${escapeHTML(l.id)}" data-act="lock" title="Toggle lock">${l.locked?'🔒':'◇'}</button><input type="color" data-layer="${escapeHTML(l.id)}" data-act="color" value="${l.color}"><span class="layer-name" data-layer="${escapeHTML(l.id)}" data-act="select" title="Set current layer">${escapeHTML(l.name)}</span><select class="layer-weight" data-layer="${escapeHTML(l.id)}" data-act="weight" title="Layer lineweight in millimeters">${[.05,.09,.13,.18,.25,.35,.50,.70,1.0,1.4,2].map(w=>`<option value="${w}" ${Math.abs((l.width||.25)-w)<.001?'selected':''}>${w.toFixed(2)}</option>`).join('')}</select><button data-layer="${escapeHTML(l.id)}" data-act="rename" title="Rename layer">✎</button></div>`).join('');$('layers').querySelectorAll('[data-act]').forEach(el=>{const handler=()=>{let l=state.layers.find(x=>x.id===el.dataset.layer),a=el.dataset.act;if(!l)return;if(a==='select'){state.layerId=l.id}else if(a==='color'){saveHistory();l.color=el.value}else if(a==='weight'){saveHistory();l.width=Number(el.value);state.lineWidth=l.width;$('lineWidth').value=l.width}else if(a==='visible'){saveHistory();l.visible=!l.visible}else if(a==='lock'){saveHistory();l.locked=!l.locked}else if(a==='rename'){let name=window.prompt('New layer name:',l.name);if(name?.trim()){saveHistory();l.name=name.trim()}}renderLayers();schedule();queueLocalBackup()};el.addEventListener(el.tagName==='INPUT'?'change':el.tagName==='SELECT'?'change':'click',handler)})}
-function updateProps(){const ids=state.selected,items=state.entities.filter(e=>ids.includes(e.id));$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
+function updateProps(){const ids=state.selected,items=state.entities.filter(e=>ids.includes(e.id));
+ const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
+ const blockUI=$('blSelectedBlockEditor');
+ if(blockUI){blockUI.hidden=!block;if(block){
+  $('blSelectedBlockName').textContent=block.blockName;
+  $('blRefX').value=Number(block.p.x.toFixed(5));$('blRefY').value=Number(block.p.y.toFixed(5));
+  $('blRefScale').value=block.scale;$('blRefAngle').value=block.rotation||0;
+ }}
+$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
-function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){v.scale=(Number(v.scale)||1)*ratio;return v}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
+function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef')return vfor(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
 function openCadUnitsDialog(){
  const labels={mm:'Milímetros / Millimeters',cm:'Centímetros / Centimeters',m:'Metros / Meters',in:'Pulgadas / Inches',ft:'Pies / Feet'};
  const answer=window.prompt('UNITS / UNIDADES — unidad actual: '+labels[state.unit]+'\\nEscribí mm, cm, m, in o ft. La geometría se convierte manteniendo medidas físicas.',state.unit);
@@ -3636,6 +3644,20 @@ window.BlacklineBlockAPI=Object.freeze({
  }
 });
 initBlocks();initPermanentBlockGallery();initDockablePalettes();
+(function installBlockReferenceEditor(){
+ const pane=$('properties')?.closest('.panel');if(!pane)return;
+ const box=document.createElement('section');box.id='blSelectedBlockEditor';box.hidden=true;
+ box.style.cssText='padding:9px;margin-top:8px;border:1px solid #536a78;border-radius:8px';
+ box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
+ pane.querySelector('.panel-content')?.append(box);
+ $('blApplyBlockRef').onclick=()=>{
+  const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');if(!ref)return;
+  const x=Number($('blRefX').value),y=Number($('blRefY').value),scale=Number($('blRefScale').value),angle=Number($('blRefAngle').value);
+  if(![x,y,scale,angle].every(Number.isFinite)||scale<=0)return toast('Pivote, escala o giro inválidos');
+  saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;updateAll();toast('Bloque actualizado como unidad');
+ };
+})();
+
  // Status bar shortcuts reuse tested command dispatch instead of duplicating geometry code.
  for(const [id,command] of [['cadStatusPan','PAN'],['cadStatusZoom','ZOOM'],['cadStatusScissor','TIJERA'],['cadStatusLayer','LAYER'],['cadStatusUnits','UNITS'],['cadStatusLayout','LAYOUT'],['cadStatusUndo','UNDO'],['cadStatusRedo','REDO']]){
   const button=$(id);if(button)button.addEventListener('click',()=>{$('command').value=command;runCommand()});
