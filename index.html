@@ -1236,7 +1236,7 @@ function centerZoom(f,at){let old=world(at);state.view.scale=Math.min(150000,Mat
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
 const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
-let cadActiveOsnaps=new Set(CAD_OSNAP_TYPES);
+let cadActiveOsnaps=new Set(['END','POINT','MID','CENTER','INT','QUAD']); // Keep existing defaults; extra OSNAP modes are opt-in.
 try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if(Array.isArray(saved))cadActiveOsnaps=new Set(saved.filter(x=>CAD_OSNAP_TYPES.includes(x)))}catch(e){}
 function cadOsnapEnabled(kind){return cadActiveOsnaps.has(kind)}
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
