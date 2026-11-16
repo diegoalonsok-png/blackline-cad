@@ -19,6 +19,9 @@ function setSection(key,checked){
 }
 setSection('right',true);
 setSection('left',false);
+const workspace=d.querySelector('.workspace');
+try{if(workspace&&!localStorage.getItem('blackline-modern-right-v1')){const width=parseFloat(getComputedStyle(workspace).getPropertyValue('--right-width'))||202;if(width<260){workspace.style.setProperty('--right-width','280px');localStorage.setItem('cad2d-right-width','280');}localStorage.setItem('blackline-modern-right-v1','1')}}catch(e){}
+
 function movePanels(){
  if(!right)return;
  const selection=$('selectionSummary')?.closest('.panel');
