@@ -771,7 +771,7 @@ ribbonTabs.output.push(['PROJECT','open','dxf','pdf','purge']);
 toolDefs.exportmenu=['Exportar','save'];
 ribbonTabs.home.push(['EXPORT','dxf','exportmenu']);
 ribbonTabs.output.push(['EXPORTAR','dxf','exportmenu']);
-let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#8cd2de',visible:true,locked:false},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'walls',unit:'m',grid:1,precision:2,lineWidth:.25,gridOn:true,snapOn:false,orthoOn:false,polarOn:false,polarAngle:45,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
+let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#ff3333',visible:true,locked:false,width:.30},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false,width:.05},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'walls',unit:'m',grid:1,precision:2,lineWidth:.30,gridOn:true,snapOn:false,orthoOn:false,polarOn:false,polarAngle:45,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
 const canvas=$('cadCanvas'),wrap=$('canvasWrap'),ctx=canvas.getContext('2d');canvas.tabIndex=0;canvas.setAttribute('aria-label','CAD model space: click to draw, type numbers for exact distance');let dpr=1,drawPending=false,spaceDown=false,pointer={x:0,y:0},lastClick=0;
 Object.assign(icons,{
  line:'<path d="M5 18 19 6"/><circle cx="5" cy="18" r="1.7"/><circle cx="19" cy="6" r="1.7"/>',
@@ -902,9 +902,12 @@ function prompt(){const messages={select:'Select: drag → window, ← crossing 
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
-function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}function layerFor(e){return state.layers.find(l=>l.id===e.layer)||state.layers[0]}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
+function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}function layerFor(e){return state.layers.find(l=>l.id===e.layer)||state.layers[0]}
+function ensureArchitecturalLayer(kind){const id=kind==='walls'?'walls':'openings',name=kind==='walls'?'WALLS':'OPENINGS';const existing=state.layers.find(l=>l.id===id||l.name.toUpperCase()===name);if(existing)return existing.id;state.layers.push({id,name,color:kind==='walls'?'#ff3333':'#e0ba83',visible:true,locked:false,width:kind==='walls'?.30:.05,linetype:'CONTINUOUS'});return id}
+function explicitWallLayerName(name){return /^(WALLS?|MUROS?|A[-_ ]?WALL|A[-_ ]?MURO|PAREDES?|MAMPOSTERIA|MAMPOSTERÍA)$/i.test(String(name||'').trim())}
+function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallLayerName(l.name)){l.color='#ff3333';l.width=.30}}}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
 function historySnapshot(){return {entities:clone(state.entities),layers:clone(state.layers),blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId}}function saveHistory(){state.history.push(historySnapshot());if(state.history.length>75)state.history.shift();state.future=[]}function undo(){if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());state.selected=[];updateAll();log('UNDO')}function redo(){if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());Object.assign(state,state.future.pop());state.selected=[];updateAll();log('REDO')}
-function newEntity(e){e.id=state.nextId++;e.layer=e.layer||state.layerId;e.width=e.width||state.lineWidth;state.entities.push(e);updateAll()}
+function newEntity(e){e.id=state.nextId++;e.layer=e.layer||state.layerId;const layer=layerFor(e);e.width=e.width??layer.width??state.lineWidth;state.entities.push(e);updateAll()}
 function updateAll(){renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));schedule()}
@@ -1087,7 +1090,7 @@ function blockInstanceGeometry(definition,ref){
  if(!param||!ref.params)return definition.entities;
  const w=Number(ref.params.width),h=Number(ref.params.depth);
  if(!Number.isFinite(w)||w<=0||w>1e8)return definition.entities;
- const base={layer:'0',width:.25},P2=(x,y)=>P(x,y);
+ const base={layer:'openings',width:.05},P2=(x,y)=>P(x,y);
  const framed=(kind)=>{
   const t=Number(ref.params.frameWidth??param.defaults.frameWidth);
   const d=Number(ref.params.frameDepth??param.defaults.frameDepth);
@@ -1128,7 +1131,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer}));
+ return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
 }
 function flattenCADEntities(entities){return entities.flatMap(e=>e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e])}
 
@@ -2612,6 +2615,7 @@ function importDXF(text,name){
  saveHistory();
  state.unit=from;state.grid=from==='m'?1:from==='mm'?100:10;
  state.layers=[...layers.values()];
+ suggestWallLayerFromDXF(state.layers);
  state.entities=entities;state.nextId=entities.length+1;state.layerId=state.layers[0].id;state.selected=[];
  state.file=name.replace(/\.dxf$/i,'');$('filename').textContent=state.file+'.dxf';
  $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
@@ -2997,7 +3001,8 @@ function insertSelectedBlock(point){
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  saveHistory();
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
- if(block.parametric)ref.params={...block.parametric.defaults};
+ if(block.parametric){ref.params={...block.parametric.defaults};if(['swing-door','framed-window'].includes(block.parametric.kind)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}}
+ else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
  state.entities.push(ref);
  const repeat=Boolean(state.galleryRepeatedInsert);
  state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
