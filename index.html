@@ -1665,6 +1665,7 @@ if(t==='polyline'){
  prompt();schedule();return
 }if(t==='distance'){s.push(p);if(s.length===2){let d=dist(s[0],s[1]);log(`Distance: ${units(d)} ${state.unit}; Angle: ${(ang(s[0],s[1])*180/Math.PI).toFixed(2)}°`);toast(`Distance ${units(d)} ${state.unit}`);s.length=0}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
 function cancelCadCommand(){
+ cadSelectionAnchor=null;cadSelectionAnchorShift=false;
  cadZoomOptionPending=false;
  // ESC means cancel, never commit provisional PLINE vertices.
  clearOtrackAnchors(false);
@@ -2685,7 +2686,7 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
  }
  if(t==='insertBlock'){insertSelectedBlock(p);return}createAt(p)}
 // AutoCAD-style two-click blue/green selection plus freehand crossing/window lasso.
-let cadSelectionAnchor=null,cadSelectionAnchorShift=false;
+let cadSelectionAnchor=null,cadSelectionAnchorShift=false,cadLastWindowSelectionAt=0;
 function cadSelectionBox(e){
  const bb=boundsEntity(e);if(!bb)return null;
  return {l:screen(P(bb.minX,0)).x,r:screen(P(bb.maxX,0)).x,t:screen(P(0,bb.maxY)).y,b:screen(P(0,bb.minY)).y};
@@ -2725,7 +2726,7 @@ function cadApplyWindowSelection(start,end,shift,path){
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
  }).map(e=>e.id);
  state.selected=shift?[...new Set([...state.selected,...ids])]:ids;
- updateProps();schedule();
+ cadLastWindowSelectionAt=performance.now();updateProps();schedule();
  toast((crossing?'Ventana verde · cruce':'Ventana azul · contenido')+' · '+ids.length+' objetos');
 }
 let lastMiddleClick=null;
@@ -2778,7 +2779,7 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
  }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}
  else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7){d.type='selection';d.path=[d.start,raw];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
- schedule()});
+ }schedule()});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
@@ -2834,7 +2835,7 @@ canvas.addEventListener('pointercancel',ev=>{
   updateAll();
  }else schedule();
 });
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
   if(!boxes.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
