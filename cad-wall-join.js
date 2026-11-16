@@ -31,7 +31,7 @@
     if(!crossing)continue;
     const p=crossing.point;
     const gap=dist(candidate[end],p);
-    if(gap>tolerance||gap<=1e-9)continue;
+    if(gap>tolerance)continue;
     const otherEnd=end==='a'?'b':'a';
     if(dist(candidate[otherEnd],p)<=1e-8)continue;
     const wallLen=dist(wall.a,wall.b);
