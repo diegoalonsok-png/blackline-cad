@@ -38,7 +38,10 @@
     const wallTol=tolerance/wallLen;
     // T intersection: keep the existing continuous wall untouched.
     if(crossing.s>=-1e-8&&crossing.s<=1+1e-8){
-     if(!best||gap<best.gap)best={gap,p,wall:null};
+     const towardA=dist(wall.a,p),towardB=dist(wall.b,p);
+     const adjust=towardA<=tolerance&&towardA<=towardB?{id:wall.id,end:'a',point:p}:
+      towardB<=tolerance?{id:wall.id,end:'b',point:p}:null;
+     if(!best||gap<best.gap)best={gap,p,wall:adjust};
     }else if(crossing.s<0&&crossing.s>=-wallTol){
      // L: both nearest tips meet at the mathematical intersection.
      if(!best||gap<best.gap)best={gap,p,wall:{id:wall.id,end:'a',point:p}};
