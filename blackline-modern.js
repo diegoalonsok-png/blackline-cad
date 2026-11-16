@@ -164,3 +164,19 @@ requestAnimationFrame(requestResize);
  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()},true);
  document.addEventListener('scroll',hide,true);
 })();
+
+
+/* User-switchable light/dark CAD interface; geometry and plot color are untouched. */
+(function initBlacklineTheme(){
+ const host=document.querySelector('.brandbar .right')||document.querySelector('.brandbar');
+ if(!host)return;
+ const b=document.createElement('button');b.id='blThemeToggle';b.type='button';b.className='btn slim';b.style.whiteSpace='nowrap';
+ const saved=(()=>{try{return localStorage.getItem('blackline-ui-theme')}catch(e){return null}})();
+ function apply(theme){
+  const light=theme==='light';document.querySelector('.app')?.classList.toggle('bl-light',light);
+  b.textContent=light?'☾ Oscuro':'☼ Claro';b.title=light?'Cambiar a modo oscuro':'Cambiar a modo claro';b.setAttribute('aria-pressed',String(light));
+  try{localStorage.setItem('blackline-ui-theme',light?'light':'dark')}catch(e){}
+ }
+ b.onclick=()=>apply(document.querySelector('.app')?.classList.contains('bl-light')?'dark':'light');
+ host.prepend(b);apply(saved==='light'?'light':'dark');
+})();
