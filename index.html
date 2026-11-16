@@ -1203,13 +1203,69 @@ function blockChildren(ref){
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
  return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
 }
+/* Block grip editing: translate the reference rather than exploding its children. */
+function blockGripPoints(ref){
+ if(ref.type!=='blockRef')return [];
+ const points=[ref.p],seen=new Set(),unique=[];
+ for(const entity of blockChildren(ref)){
+  if(entity.type==='line'||entity.type==='dimension')points.push(entity.a,entity.b);
+  else if(entity.type==='rect'&&entity.a&&entity.b)
+   points.push(entity.a,entity.b,P(entity.a.x,entity.b.y),P(entity.b.x,entity.a.y));
+  else if(entity.type==='polyline'&&entity.pts)points.push(...entity.pts);
+  else if(entity.type==='text')points.push(entity.p);
+  else if((entity.type==='circle'||entity.type==='arc')&&entity.c){
+   points.push(entity.c);
+   if(Number.isFinite(entity.r)){
+    if(entity.type==='circle')for(const angle of [0,Math.PI/2,Math.PI,3*Math.PI/2])points.push(P(entity.c.x+entity.r*Math.cos(angle),entity.c.y+entity.r*Math.sin(angle)));
+    else for(const angle of [entity.a0,entity.a1])points.push(P(entity.c.x+entity.r*Math.cos(angle),entity.c.y+entity.r*Math.sin(angle)));
+   }
+  }
+  else if(entity.type==='ellipse'&&entity.c)points.push(entity.c);
+ }
+ for(const p of points){
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+  const key=p.x.toFixed(8)+','+p.y.toFixed(8);
+  if(!seen.has(key)){seen.add(key);unique.push(P(p.x,p.y));if(unique.length>=160)break}
+ }
+ return unique;
+}
+function findSelectedBlockGrip(raw){
+ let best=null,limit=10;
+ for(const id of state.selected){
+  const e=state.entities.find(entity=>entity.id===id);
+  if(!e||e.type!=='blockRef'||!layerFor(e).visible||layerFor(e).locked)continue;
+  for(const vertex of blockGripPoints(e)){
+   const d=dist(raw,screen(vertex));
+   if(d<limit){limit=d;best={id,vertex}}
+  }
+ }
+ return best;
+}
+function drawBlockGrips(ref){
+ ctx.save();ctx.fillStyle='#8fe3fc';ctx.strokeStyle='#143244';ctx.lineWidth=1;
+ for(const vertex of blockGripPoints(ref)){
+  const p=screen(vertex);
+  if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
+  ctx.fillRect(p.x-4,p.y-4,8,8);ctx.strokeRect(p.x-4,p.y-4,8,8);
+ }
+ ctx.restore();
+}
+function blockGripTargetPoint(d,raw){
+ const origin=world(raw),startWorld=world(d.start);
+ let target=P(d.vertex.x+origin.x-startWorld.x,d.vertex.y+origin.y-startWorld.y);
+ if(state.snapOn&&state.grid>0){
+  target=P(Math.round(target.x/state.grid)*state.grid,Math.round(target.y/state.grid)*state.grid);
+ }
+ return target;
+}
+
 function flattenCADEntities(entities){return entities.flatMap(e=>e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e])}
 
 function drawEntity(e,forceColor){if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(state.selected.includes(e.id)){
-   const pivot=screen(e.p);ctx.save();ctx.strokeStyle=displayColors.selection;ctx.strokeRect(pivot.x-5,pivot.y-5,10,10);ctx.restore();
+   drawBlockGrips(e);
   }
   return;
  }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width||.25)*3+1):Math.max(.75,(e.width||.25)*3);if(isSelected)ctx.setLineDash([5,3]);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='text'){const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);ctx.fillText(e.text||'',0,0);ctx.restore();return}ctx.beginPath();tracePath(e);ctx.stroke();if(e.type==='dimension'){const mid=screen(mul(add(e.a,e.b),.5)),perp=sub(e.p,mul(add(e.a,e.b),.5));let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p=screen(add(mul(add(e.a,e.b),.5),P(nx*off,ny*off)));ctx.fillStyle=ctx.strokeStyle;ctx.font='11px Consolas,monospace';ctx.textAlign='center';ctx.fillText(`${units(L)} ${state.unit}`,p.x,p.y-6);ctx.textAlign='start'}ctx.restore()}
@@ -2376,11 +2432,35 @@ function registerMiddleClick(time,point){
 }
 canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
+ if(state.tool==='select'&&!ev.shiftKey){
+  const grip=findSelectedBlockGrip(raw);
+  if(grip){
+   const entity=state.entities.find(e=>e.id===grip.id);
+   state.drag={type:'blockGrip',id:grip.id,start:raw,last:raw,vertex:grip.vertex,original:P(entity.p.x,entity.p.y),moved:false};
+   canvas.style.cursor='grabbing';return;
+  }
+ }
  state.drag={type:'click',start:raw,last:raw,shift:ev.shiftKey};if(state.tool==='select'){const e=pick(world(raw));if(!e)state.drag.type='selection'} });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}else if(d.type==='click'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7&&state.tool==='select'){d.type='selection'}}schedule()});
+canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='blockGrip'){
+  const obj=state.entities.find(e=>e.id===d.id);
+  if(obj&&obj.type==='blockRef'&&!layerFor(obj).locked){
+   const movement=Math.hypot(raw.x-d.start.x,raw.y-d.start.y);
+   if(movement>3&&!d.moved){saveHistory();d.moved=true}
+   if(d.moved){
+    const target=blockGripTargetPoint(d,raw);
+    obj.p=P(d.original.x+target.x-d.vertex.x,d.original.y+target.y-d.vertex.y);
+   }
+  }
+ }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}else if(d.type==='click'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7&&state.tool==='select'){d.type='selection'}}schedule()});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
+ if(d.type==='blockGrip'){
+  canvas.style.cursor='';
+  if(d.moved){updateAll();toast('Bloque desplazado desde su vértice · Ctrl+Z para deshacer')}
+  else schedule();
+  return;
+ }
  if(d.type==='pan'){
   if(d.middle){
    const movement=dist(raw,d.start);
@@ -2404,6 +2484,17 @@ canvas.addEventListener('pointerup',ev=>{
   const y1=screen(P(0,bb.maxY)).y,y2=screen(P(0,bb.minY)).y;
   return crossing?(x2>=l&&x1<=r&&y2>=t&&y1<=b):(x1>=l&&x2<=r&&y1>=t&&y2<=b);
  }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
+canvas.addEventListener('pointercancel',ev=>{
+ const d=state.drag;if(d?.type!=='blockGrip')return;
+ state.drag=null;canvas.style.cursor='';
+ if(d.moved){
+  const obj=state.entities.find(e=>e.id===d.id);
+  if(obj&&obj.type==='blockRef')obj.p=P(d.original.x,d.original.y);
+  // The cancelled operation must not become an undo step.
+  if(state.history.length)state.history.pop();
+  updateAll();
+ }else schedule();
+});
 canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
