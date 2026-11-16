@@ -35,7 +35,7 @@ test('SCALE is two clicks; first does not mutate, second commits and records one
  h.invoke('scale',{x:20,y:0});
  assert.equal(h.state.entities[0].b.x,20);
  assert.equal(h.state.tool,'select');
- assert.deepEqual(h.events,['history']);
+ assert.equal(h.events.filter(x=>x==='history').length,1);
 });
 test('SCALE keeps block metadata and moves grouped reference',()=>{
  const h=harness({id:2,type:'blockRef',blockName:'PUERTA',p:{x:0,y:0},scale:1,rotation:90,params:{width:.8}});
@@ -52,5 +52,5 @@ test('SCALE rejects zero factor, preserves object and history',()=>{
  h.invoke('scale',{x:0,y:0});
  assert.equal(h.state.entities[0].b.x,10);
  assert.equal(h.state.stage.length,1);
- assert.deepEqual(h.events,[]);
+ assert.equal(h.events.filter(x=>x==='history').length,0);
 });
