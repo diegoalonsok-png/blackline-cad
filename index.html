@@ -1483,6 +1483,15 @@ if(t==='polyline'){
  }
  prompt();schedule();return
 }if(t==='distance'){s.push(p);if(s.length===2){let d=dist(s[0],s[1]);log(`Distance: ${units(d)} ${state.unit}; Angle: ${(ang(s[0],s[1])*180/Math.PI).toFixed(2)}°`);toast(`Distance ${units(d)} ${state.unit}`);s.length=0}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
+function cancelCadCommand(){
+ // ESC means cancel, never commit provisional PLINE vertices.
+ clearOtrackAnchors(false);
+ $('command').value='';
+ state.modifyCandidate=null;
+ state.stage=[];state.drag=null;
+ setTool('select');
+ toast('Comando cancelado / Command cancelled');
+}
 function finishStage(close=false){
  const s=state.stage,t=state.tool;
  if(t==='area')return finishCadArea();
@@ -2967,7 +2976,7 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='F11'){ev.preventDefault();toggleOtrack()}
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();clearOtrackAnchors(false);$('command').value='';if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
 // Full CAD command typing directly from the drawing area, without clicking the bottom field.
 document.addEventListener('keydown',ev=>{
  if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1||!/[a-zA-Z]/.test(ev.key))return;
@@ -3375,7 +3384,7 @@ function openCadContextMenu(x,y,worldPoint){
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
  const actions=active?[
    item('↵ Finalizar / Enter',()=>finishStage()),
-   item('✕ Cancelar / Esc',()=>setTool('select')),
+   item('✕ Cancelar / Esc',()=>cancelCadCommand()),
    item('Deshacer último paso',()=>{if(['line','polyline'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
    null,
    command('Recortar · TR','TRIM'),command('Desfase · O','OFFSET'),
@@ -3408,6 +3417,7 @@ function openCadContextMenu(x,y,worldPoint){
   item('Ortogonal · F8'+(state.orthoOn?' ✓':''),()=>toggle('orthoOn','orthoToggle')),
   item('OSNAP · F3'+(state.osnapOn?' ✓':''),()=>toggle('osnapOn','osnapToggle')),
   item('Polar · F10'+(state.polarOn?' ✓':''),()=>togglePolar()),
+  item('Rastreo OSNAP · F11'+(otrkOn?' ✓':''),()=>toggleOtrack()),
   item('Rejilla · F7'+(state.gridOn?' ✓':''),()=>toggle('gridOn','gridToggle')),
   null,
   item('Historial de comandos · F2',()=>cad2dToggleCommandHistory()),
