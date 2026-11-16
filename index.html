@@ -1298,7 +1298,7 @@ function initGripSettings(){
  $('cadResetGrips').onclick=()=>set(helper.defaults);
  show();
 }
-function gripHitRadius(){return window.BlacklineGripSettings?.hitRadius(gripSettings)||10}
+function gripHitRadius(){return Math.max(10,Math.ceil(gripSettings.size/2)+4)}
 function findWallMiddleGrip(raw){
  if(!window.BlacklineWallGrip)return null;
  let best=null,limit=gripHitRadius();
