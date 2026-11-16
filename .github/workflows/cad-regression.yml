@@ -1,0 +1,34 @@
+name: Blackline CAD regression checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cad-static:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate inline JavaScript in index.html
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const vm = require('node:vm');
+          const html = fs.readFileSync('index.html','utf8');
+          const inline = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x => x[1]).filter(x => x.trim());
+          for(const [index, source] of inline.entries()) new vm.Script(source, {filename: 'inline-' + index + '.js'});
+          console.log('Validated', inline.length, 'inline scripts');
+          NODE
+      - name: Run CAD geometry regression tests
+        run: node --test tests/*.test.cjs
