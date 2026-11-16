@@ -948,27 +948,99 @@ function cadWallFaces(a,b,width,justify){
  const offsets=justify==='left'?[0,width]:justify==='right'?[0,-width]:[-width/2,width/2];
  return offsets.map(d=>({a:add(a,mul(n,d)),b:add(b,mul(n,d))}));
 }
+// Resolve ordinary L / T joins without changing stored wall thicknesses.
+// Never rewrite generated opening fragments or locked wall geometry.
+function cadWallEditableGroups(exclude){
+ const groups=new Map();
+ for(const e of state.entities){
+  if(e.type!=='line'||!e.wall2d||e.autoOpeningRef!==undefined||!layerFor(e).visible||layerFor(e).locked||e.wall2d.group===exclude)continue;
+  if(!groups.has(e.wall2d.group))groups.set(e.wall2d.group,[]);
+  groups.get(e.wall2d.group).push(e);
+ }
+ return [...groups.values()].filter(g=>g.length===2&&g.some(e=>e.wall2d.face===0)&&g.some(e=>e.wall2d.face===1));
+}
+function cadWallJoinNewFaces(newFaces){
+ const groups=cadWallEditableGroups(newFaces[0].wall2d.group);
+ const meta=newFaces[0].wall2d;
+ const joins=[],tol=Math.max(1e-7,Math.min(meta.thickness*.45,.05*1000/U[state.unit]));
+ const tipOf=(e,which)=>e[which],guideTip=(e,which)=>e.wall2d?.['guide'+(which==='a'?'A':'B')];
+ const nearSegment=(p,a,b)=>{
+  const v=sub(b,a),den=v.x*v.x+v.y*v.y;
+  if(den<1e-12)return null;
+  const t=((p.x-a.x)*v.x+(p.y-a.y)*v.y)/den;
+  const projected=add(a,mul(v,t));
+  return {t,distance:dist(p,projected)};
+ };
+ for(const group of groups){
+  const host=group[0].wall2d;
+  const isCorner=(x,y)=>dist(meta[x],host[y])<=tol;
+  let best=null;
+  for(const x of ['guideA','guideB'])for(const y of ['guideA','guideB']){
+   const p=meta[x],q=host[y],delta=dist(p,q);
+   if(delta>tol||best&&delta>=best.delta)continue;
+   const va=sub(meta.guideB,meta.guideA),vb=sub(host.guideB,host.guideA);
+   const cross=Math.abs(va.x*vb.y-va.y*vb.x)/(Math.hypot(va.x,va.y)*Math.hypot(vb.x,vb.y));
+   if(cross<.04)continue;
+   best={x:x==='guideA'?'a':'b',y:y==='guideA'?'a':'b',delta};
+  }
+  if(best){
+   let chosen=null;
+   const newArr=[...newFaces].sort((a,b)=>a.wall2d.face-b.wall2d.face);
+   const hostArr=[...group].sort((a,b)=>a.wall2d.face-b.wall2d.face);
+   for(const pairing of [[0,1],[1,0]]){
+    let cost=0,points=[],valid=true;
+    for(let i=0;i<2;i++){
+     const n=newArr[i],h=hostArr[pairing[i]],q=unrestrictedIntersection(n.a,n.b,h.a,h.b);
+     const threshold=Math.max(n.wall2d.thickness,h.wall2d.thickness)*5;
+     if(!q||dist(q,tipOf(n,best.x))>threshold||dist(q,tipOf(h,best.y))>threshold){valid=false;break}
+     cost+=dist(q,tipOf(n,best.x))+dist(q,tipOf(h,best.y));points.push(q);
+    }
+    if(valid&&(!chosen||cost<chosen.cost))chosen={cost,pairing,points};
+   }
+   if(chosen){
+    for(let i=0;i<2;i++){newArr[i][best.x]=clone(chosen.points[i]);hostArr[chosen.pairing[i]][best.y]=clone(chosen.points[i])}
+    joins.push('L');continue;
+   }
+  }
+  // T intersection: an endpoint of the newly drawn wall meets the interior
+  // of a preexisting host. Butt the new wall against the NEAREST host face.
+  // The host remains continuous; cutting it would destroy existing openings.
+  const axis=cadWallCenterline(host);if(!axis)continue;
+  for(const tip of ['a','b']){
+   const p=meta[tip==='a'?'guideA':'guideB'];
+   const projected=nearSegment(p,axis.a,axis.b);
+   if(!projected||projected.t<=1e-5||projected.t>=1-1e-5||projected.distance>tol)continue;
+   const faceTargets=[];
+   let possible=true;
+   for(const face of newFaces){
+    const intersections=group.map(h=>unrestrictedIntersection(face.a,face.b,h.a,h.b)).filter(Boolean);
+    if(!intersections.length){possible=false;break}
+    intersections.sort((a,b)=>dist(a,face[tip])-dist(b,face[tip]));
+    const target=intersections[0];
+    const max=Math.max(meta.thickness,host.thickness)*2;
+    if(dist(target,face[tip])>max){possible=false;break}
+    faceTargets.push(target);
+   }
+   if(possible&&faceTargets.length===2){
+    newFaces.forEach((e,i)=>{e[tip]=clone(faceTargets[i])});
+    joins.push('T');break;
+   }
+  }
+ }
+ return joins;
+}
 function cadMakeWallSegment(a,b){
  const width=cadWallThickness(),justify=cadWallJustify(),faces=cadWallFaces(a,b,width,justify);
  if(!faces)return toast('MURO: indicá dos puntos distintos');
  const layer=ensureArchitecturalLayer('walls'),group='wall-'+state.nextId;
- // Join successive wall faces at a mitred corner when the previous segment
- // shares the axis endpoint and both settings match.
- const previous=state.entities.slice(-2);
- const consecutive=previous.length===2&&previous.every((e,i)=>e.type==='line'&&e.wall2d?.face===i
-  &&Math.abs(e.wall2d.thickness-width)<1e-8&&e.wall2d.justify===justify
-  &&dist(e.wall2d.guideB,a)<1e-8&&e.wall2d.group===previous[0].wall2d.group);
- const miters=consecutive?faces.map((f,i)=>{
-  const e=previous[i],q=unrestrictedIntersection(e.a,e.b,f.a,f.b);
-  return q&&dist(q,a)<=width*5&&dist(q,e.b)<=width*5&&dist(q,f.a)<=width*5?q:null;
- }):[];
  saveHistory();
- if(consecutive)for(let i=0;i<2;i++)if(miters[i]){previous[i].b=miters[i];faces[i].a=clone(miters[i])}
  for(let i=0;i<2;i++)state.entities.push({
   id:state.nextId++,type:'line',a:faces[i].a,b:faces[i].b,layer,width:.25,
   wall2d:{group,face:i,thickness:width,justify,guideA:clone(a),guideB:clone(b)}
  });
- updateAll();log('MURO 2D '+(width*U[state.unit]/1000).toFixed(2)+' m · '+justify);
+ const joined=cadWallJoinNewFaces(state.entities.slice(-2));
+ updateAll();if(joined.length)toast('MUROS: '+joined.join(' / ')+' conectados automáticamente');
+ log('MURO 2D '+(width*U[state.unit]/1000).toFixed(2)+' m · '+justify);
 }
 function cadWallCenterline(meta){
  if(!meta?.guideA||!meta?.guideB)return null;
