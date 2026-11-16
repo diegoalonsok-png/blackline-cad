@@ -9,7 +9,11 @@ app.classList.add('blackline-modern');
 try{if(!localStorage.getItem('blackline-modern-ribbon-v1')){const current=parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42;if(current<58){app.style.setProperty('--ribbon-height','61px');localStorage.setItem('cad2d-ribbon-height','61');}localStorage.setItem('blackline-modern-ribbon-v1','1')}}catch(e){}
 const brand=d.querySelector('.brand');
 if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='CAD2D';const sm=brand.querySelector('small');if(sm)sm.textContent='DIBUJO ARQUITECTÓNICO · 2D';}
-const mark=d.querySelector('.brandbar .mark');if(mark)mark.textContent='◇';
+const mark=d.querySelector('.brandbar .mark');
+if(mark){
+ mark.innerHTML='<svg class="cad2d-logo-symbol" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 4 34 12 34 28 20 36 6 28 6 12Z"/><path d="M6 12 20 20 34 12M20 20V36M20 4V12"/><path d="M14 8 26 15 26 25 20 29 14 25V15" opacity=".55"/></svg>';
+ mark.setAttribute('aria-label','Menú CAD2D');mark.setAttribute('aria-keyshortcuts','Enter Space');
+}
 d.title='CAD2D — Diseño arquitectónico 2D';
 const left=d.querySelector('.workspace>.sidebar:not(.rightside)');
 const right=d.querySelector('.workspace>.sidebar.rightside');
@@ -62,12 +66,19 @@ const iconPaths={
  rect:'<rect x="4" y="5" width="16" height="14" rx="1.5"/>',
  circle:'<circle cx="12" cy="12" r="8"/>',
  arc:'<path d="M4 18 A10 10 0 0 1 20 18"/>',
- trim:'<path d="M5 6 19 20M19 6 5 20"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/>',
+ trim:'<path d="M4 6 18 20 M18 6 4 20"/><path d="M8 5h8 M8 19h8" stroke-dasharray="2 2"/><circle cx="5" cy="6" r="1.5"/><circle cx="19" cy="6" r="1.5"/>',
  move:'<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
  copy:'<rect x="4" y="4" width="12" height="12" rx="1.5"/><rect x="8" y="8" width="12" height="12" rx="1.5"/>',
  rotate:'<path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/>',
  dimension:'<path d="M4 5v14M20 5v14M5 12h14M8 9l-3 3 3 3m8-6 3 3-3 3"/>',
- blockgallery:'<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/>'
+ blockgallery:'<path d="M12 2 21 7 21 17 12 22 3 17 3 7Z M3 7 12 12 21 7 M12 12V22"/>',
+ layers:'<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5 M3 16l9 5 9-5"/>',
+ scissors:'<circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="m8 8 12 12 M8 16 20 4"/>',
+ offset:'<path d="M4 19 16 7 M9 20 21 8 M4 7h10"/>',
+ fillet:'<path d="M4 20V12A8 8 0 0 1 12 4h8"/>',
+ erase:'<path d="m4 14 10-10 7 7-10 10H8z M8 21h13"/>',
+ text:'<path d="M4 5h16 M12 5v15 M8 20h8"/>',
+ layersstatus:'<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5 M3 16l9 5 9-5"/>'
 };
 const rails=[
  ['select','Seleccionar','home'],['line','Línea','home'],['polyline','Polilínea','home'],
