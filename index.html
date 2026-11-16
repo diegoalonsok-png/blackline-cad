@@ -938,18 +938,24 @@ function drawCrosshair(){
  const q=screen(state.mouse),w=canvas.width/dpr,h=canvas.height/dpr;
  if(!Number.isFinite(q.x)||!Number.isFinite(q.y))return;
  const halfX=w*displayColors.size/200,halfY=h*displayColors.size/200;
- const active=hasActiveCadCommand(),size=active?9:7;
+ const selectingOffset=state.tool==='offset'&&!state.modifyCandidate;
+ const positioningOffset=state.tool==='offset'&&!!state.modifyCandidate;
+ const pickMode=selectingOffset||['trim','trimScissor','erase','extend','breakLine','lengthen'].includes(state.tool);
+ const active=hasActiveCadCommand(),size=pickMode?12:positioningOffset?10:active?9:7;
  ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=displayColors.width;
+ if(!pickMode){
  ctx.beginPath();
  ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
  ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
+ }
  /* Keep the centre pickbox hollow and visible at all times. Active tools
     use a thicker cyan outline, never a solid fill hiding geometry. */
  ctx.fillStyle=displayColors.background;
- ctx.strokeStyle=active?'#a0e8ff':'#ffe25a';ctx.lineWidth=active?2:1.5;
+ ctx.strokeStyle=pickMode||positioningOffset?'#ffe25a':active?'#a0e8ff':'#ffe25a';ctx.lineWidth=pickMode||positioningOffset?1.8:active?2:1.5;
  ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
  ctx.strokeRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
- if(active){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
+ if(active&&!pickMode&&!positioningOffset){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
+ if(positioningOffset){ctx.setLineDash([3,3]);ctx.strokeStyle='#ffe25a';ctx.beginPath();ctx.arc(q.x,q.y,13,0,TAU);ctx.stroke();}
  ctx.restore();
 }
 function drawSnapMarker(){
@@ -1627,7 +1633,7 @@ function offsetAt(e,sidePoint){
   next=cadOffsetPolyline([P(x1,y1),P(x2,y1),P(x2,y2),P(x1,y2)],true,amount,sidePoint);
  }else return toast('OFFSET: objeto aún no compatible');
  if(!next)return toast('OFFSET: no se pudo crear una paralela válida; verificá distancia y geometría');
- delete next.id;saveHistory();newEntity(next);state.modifyCandidate=null;state.selected=[];updateProps();prompt();log('OFFSET '+amount+' '+state.unit);toast('Paralela creada / OFFSET '+amount+' '+state.unit);
+ delete next.id;saveHistory();newEntity(next);state.modifyCandidate=null;state.selected=[];updateProps();prompt();schedule();log('OFFSET '+amount+' '+state.unit);toast('Paralela creada / OFFSET '+amount+' '+state.unit+' · Seleccioná otra línea');
 }
 function cornerModification(first,second,firstPick,secondPick,kind){
  if(first.type!=='line'||second.type!=='line'||first.id===second.id)return {error:'Select two different LINE entities'};
@@ -2165,7 +2171,7 @@ function handlePoint(p,shift){const t=state.tool;
  if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
  if(t==='matchprop'){matchCadPropertiesAt(p);return}
  if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
-if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){return trimNearestAt(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Elegí el lado / Click side')}else toast('Seleccioná línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){return trimNearestAt(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();schedule();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Ahora hacé clic del lado interior o exterior')}else toast('OFFSET: seleccioná con el cuadrado amarillo una línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
