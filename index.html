@@ -929,7 +929,14 @@ function inViewport(e,w,h){
  const sc=state.view.scale,ox=state.view.ox,oy=state.view.oy,pad=30;
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
-function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const visible=state.entities.filter(e=>layerFor(e).visible&&inViewport(e,w,h));for(const e of visible)drawEntity(e);if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.tool==='zoomWindow'){
+function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+ for(const e of state.entities){
+  if(!layerFor(e).visible)continue;
+  if(fastView
+   ? !BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
+   : !inViewport(e,w,h))continue;
+  drawEntity(e);
+ }if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.tool==='zoomWindow'){
    const a=state.drag?.type==='zoomWindow'&&state.drag.start||state.stage[0];
    const b=state.drag?.type==='zoomWindow'&&state.drag.last||screen(state.mouse);
    if(a)drawZoomWindow(a,b);
@@ -4312,4 +4319,5 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script defer src="assets/cad2d-curated-library.js?v=20261116-authentic50"></script>
 <script src="cad-osnap-math.js?v=20261116"></script>
 <script src="cad-scale-math.js?v=20261116"></script>
+<script src="cad-performance.js?v=20261116"></script>
 </body></html>
