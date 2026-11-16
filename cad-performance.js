@@ -27,7 +27,7 @@
   if((e.type==='circle'||e.type==='arc')&&finite(e.c)&&Number.isFinite(e.r)&&e.r>=0){
    return {minX:e.c.x-e.r,maxX:e.c.x+e.r,minY:e.c.y-e.r,maxY:e.c.y+e.r};
   }
-  if(e.type==='polyline'&&Array.isArray(e.pts)&&e.pts.length){
+  if(e.type==='polyline'&&Array.isArray(e.pts)&&e.pts.length&&!e.bulges&&!e.bulge){
    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
    for(const p of e.pts){
     if(!finite(p))return null;
