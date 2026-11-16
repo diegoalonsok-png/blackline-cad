@@ -896,6 +896,7 @@ function ribbonAction(t){
  if(commandTools[t]){$('command').value=commandTools[t];return runCommand()}
  if(t==='print')return openPrint();if(t==='save')return saveJSON();if(t==='help')return $('helpBackdrop').classList.add('show');if(t==='zoom')return setTool('zoomWindow');if(t==='grid')return toggle('gridOn','gridToggle');setTool(t)}
 function setTool(t){
+ cadSelectionAnchor=null;cadSelectionAnchorShift=false;
  otrkAnchors=[];otrkGuide=null;
  if(t==='layout')return switchCadSpace('layout');
  if(t==='area')return reportCadArea();
@@ -2738,6 +2739,7 @@ function registerMiddleClick(time,point){
 }
 canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
+ if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
