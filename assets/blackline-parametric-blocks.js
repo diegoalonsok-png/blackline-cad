@@ -53,7 +53,9 @@ const init=()=>{
    name="BL PARAM table "+width.toFixed(2)+"x"+depth.toFixed(2)+"m";
   }
   try{
-   if(!api.hasBlock(name))api.addBlock(name,elements);
+   if(!api.hasBlock(name))api.addBlock(name,elements,door
+    ?{kind:'swing-door',defaults:{width:m2u(width),mirror:right}}
+    :{kind:'rect-table',defaults:{width:m2u(width),depth:m2u(depth)}});
    api.selectBlock(name);
    // The application's existing BLOCK INSERT command handles placement/rotation.
    msg.textContent=name+" · Seleccionado. Hacé clic en el dibujo para insertarlo. Rotación: campo Angle en Bloques.";
