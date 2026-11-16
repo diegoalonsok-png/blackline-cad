@@ -2477,10 +2477,9 @@ function initCadCommandFinder(){
   event.preventDefault();
   const query=clean(input.value);if(!query)return;
   const target=query;
-  const match=CAD_COMMANDS.find(x=>clean(x[0])===target||clean(x[1])===target)
-   ||CAD_COMMANDS.find(x=>clean(x[0]).startsWith(target)||clean(x[1]).startsWith(target));
-  if(match)executeCADSearchCommand(match[0]);
-  else{out.hidden=true;input.setAttribute('aria-expanded','false');$('command').value=target;input.value='';runCommand()}
+  // Never use fuzzy prefix matching: DIM must not accidentally launch DIMSTYLE.
+  // The same parser serves both command fields, including bilingual aliases.
+  executeCADSearchCommand(target);
  });
  input.addEventListener('input',()=>{out.hidden=true;input.setAttribute('aria-expanded','false')});
  input.addEventListener('focus',()=>{out.hidden=true;input.setAttribute('aria-expanded','false')});
