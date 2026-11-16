@@ -1015,10 +1015,14 @@ function cadWallJoinNewFaces(newFaces){
    for(const face of newFaces){
     const intersections=group.map(h=>unrestrictedIntersection(face.a,face.b,h.a,h.b)).filter(Boolean);
     if(!intersections.length){possible=false;break}
-    intersections.sort((a,b)=>dist(a,face[tip])-dist(b,face[tip]));
-    const target=intersections[0];
+    const inside=tip==='a'?sub(face.b,face.a):sub(face.a,face.b);
+    const ilen=Math.hypot(inside.x,inside.y)||1;
+    // Join the nearer host face on the approaching side, not the far face.
+    const approach=intersections.map(q=>({q,s:((q.x-face[tip].x)*inside.x+(q.y-face[tip].y)*inside.y)/ilen}))
+      .filter(v=>v.s>=-1e-8).sort((a,b)=>a.s-b.s);
+    const target=approach[0]?.q;
     const max=Math.max(meta.thickness,host.thickness)*2;
-    if(dist(target,face[tip])>max){possible=false;break}
+    if(!target||dist(target,face[tip])>max){possible=false;break}
     faceTargets.push(target);
    }
    if(possible&&faceTargets.length===2){
