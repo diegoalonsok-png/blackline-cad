@@ -4,6 +4,7 @@
 "use strict";
 const $ = id => document.getElementById(id);
 const sourceUnits = {1:.0254,2:.3048,4:.001,5:.01,6:1,7:1000,8:2.54e-8,9:.0000254,10:.9144};
+const cad=()=>window.BlacklineBlockAPI;
 const categories = [
  [/^ca_arb|arbol|tree/i,"Árboles y vegetación"],
  [/^ca_puerta|abertura|window|door/i,"Puertas y aberturas"],
@@ -75,6 +76,33 @@ async function readDXF(file,onProgress){
 const value=(e,c,n=0)=>e.g[c]?.[n];
 const num=(e,c,n=0,def=0)=>parseFloatOr(value(e,c,n),def);
 function transformPoint(x,y,t){return {x:t.x+t.a*x+t.b*y,y:t.y+t.c*x+t.d*y}}
+function blockPreview(block){
+ const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
+ svg.setAttribute("viewBox","0 0 120 95");svg.setAttribute("role","img");svg.setAttribute("aria-label","Vista previa de "+block.name);
+ svg.style.cssText="display:block;width:100%;height:90px;min-height:90px;background:#0f1b23;border-radius:4px";
+ const primitives=[],xs=[],ys=[];
+ const point=(x,y)=>{if(Number.isFinite(x)&&Number.isFinite(y)){xs.push(x);ys.push(y);}};
+ for(const e of block.items){
+  if(primitives.length>=220)break;
+  const type=e.type;
+  if(type==="LINE"){const x=num(e,"10"),y=num(e,"20"),xx=num(e,"11"),yy=num(e,"21");primitives.push({type,x,y,xx,yy});point(x,y);point(xx,yy);}
+  else if(type==="LWPOLYLINE"&&e.vertices.length>=2){const pts=e.vertices.slice(0,220).map(p=>[p.x,p.y]);primitives.push({type,pts});pts.forEach(p=>point(...p));}
+  else if(type==="CIRCLE"||type==="ARC"){const x=num(e,"10"),y=num(e,"20"),r=num(e,"40");if(r>0){primitives.push({type,x,y,r});point(x-r,y-r);point(x+r,y+r);}}
+ }
+ if(!xs.length){const text=document.createElementNS(ns,"text");text.setAttribute("x","60");text.setAttribute("y","49");text.setAttribute("fill","#91a2ac");text.setAttribute("font-size","10");text.setAttribute("text-anchor","middle");text.textContent="Vista 2D no disponible";svg.append(text);return svg;}
+ const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ const scale=Math.min(108/Math.max(maxX-minX,1e-8),83/Math.max(maxY-minY,1e-8));
+ const group=document.createElementNS(ns,"g");
+ group.setAttribute("transform","translate("+(60-(maxX+minX)*scale/2)+" "+(47.5+(maxY+minY)*scale/2)+") scale("+scale+" "+(-scale)+")");
+ group.setAttribute("fill","none");group.setAttribute("stroke","#9bd5ed");group.setAttribute("stroke-width",String(Math.max(.0001,1.2/scale)));
+ for(const p of primitives){let shape;
+  if(p.type==="LINE"){shape=document.createElementNS(ns,"line");shape.setAttribute("x1",p.x);shape.setAttribute("y1",p.y);shape.setAttribute("x2",p.xx);shape.setAttribute("y2",p.yy);}
+  else if(p.type==="LWPOLYLINE"){shape=document.createElementNS(ns,"polyline");shape.setAttribute("points",p.pts.map(x=>x.join(",")).join(" "));}
+  else{shape=document.createElementNS(ns,"circle");shape.setAttribute("cx",p.x);shape.setAttribute("cy",p.y);shape.setAttribute("r",p.r);}
+  group.append(shape);
+ }
+ svg.append(group);return svg;
+}
 function categoryPanel(){
  const parent=$("blBody");if(!parent)return;
  const area=document.createElement("div");area.id="blDxfImportArea";
@@ -82,25 +110,34 @@ function categoryPanel(){
  area.innerHTML='<label style="display:block;font-weight:600;margin-bottom:6px">Colecciones DXF · bloques originales</label><input type="file" id="blDxfLibraryFile" accept=".dxf" style="width:100%;font-size:11px"><p id="blDxfLibraryStatus" style="font-size:11px;line-height:1.5">Seleccioná tu archivo DXF para catalogar los bloques sin alterar el dibujo.</p><input type="search" id="blDxfBlockSearch" placeholder="Buscar nombre de bloque" aria-label="Buscar bloques DXF" style="width:100%;min-width:0;margin:5px 0" disabled><div id="blDxfCategories" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0"></div><div id="blDxfCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:320px;overflow:auto"></div><button type="button" id="blDxfMore" class="btn slim" hidden>Mostrar más bloques</button>';
  parent.append(area);
  const input=$("blDxfLibraryFile"),status=$("blDxfLibraryStatus"),cats=$("blDxfCategories"),cards=$("blDxfCards"),search=$("blDxfBlockSearch"),more=$("blDxfMore");
- const all=()=>collection?[...collection.blocks.values()].filter(b=>categoryFor(b.name)===selectedCategory&&b.name.toLocaleLowerCase().includes(searchText)):[];
+ const all=()=>collection?[...collection.blocks.values()].filter(b=>(selectedCategory==="Todas"||categoryFor(b.name)===selectedCategory)&&b.name.toLocaleLowerCase().includes(searchText)):[];
  function render(){
   if(!collection)return;cats.replaceChildren();cards.replaceChildren();
-  const numbers=new Map();for(const b of collection.blocks.values()){const c=categoryFor(b.name);numbers.set(c,(numbers.get(c)||0)+1)}
+  const numbers=new Map([["Todas",collection.blocks.size]]);for(const b of collection.blocks.values()){const c=categoryFor(b.name);numbers.set(c,(numbers.get(c)||0)+1)}
   for(const [c,count] of numbers){
    const btn=document.createElement("button");btn.type="button";btn.className="btn slim";btn.textContent=c+" ("+count+")";btn.style.cssText="font-size:10px;white-space:normal";
    if(c===selectedCategory)btn.setAttribute("aria-pressed","true");
    btn.onclick=()=>{selectedCategory=c;shown=60;render()};cats.append(btn);
   }
   const matches=all();for(const b of matches.slice(0,shown)){
-   const btn=document.createElement("button");btn.type="button";btn.className="btn";btn.textContent=b.name;
-   btn.title=b.items.length+" entidades de origen · insertar bloque";btn.style.cssText="font-size:11px;white-space:normal;overflow-wrap:anywhere;min-height:42px;text-align:left;padding:6px";
-   btn.onclick=()=>insert(b);cards.append(btn);
+   const card=document.createElement("div");card.className="bl-dxf-block-card";
+   card.style.cssText="min-width:0;border:1px solid #3e5260;border-radius:5px;padding:5px;display:flex;flex-direction:column;gap:5px";
+   card.append(blockPreview(b));
+   const label=document.createElement("div");label.textContent=b.name;label.title=b.name;label.style.cssText="font-size:11px;overflow-wrap:anywhere";card.append(label);
+   const key="OLIMPIADAS · "+b.name,existing=Boolean(cad()?.hasBlock(key));
+   const btn=document.createElement("button");btn.type="button";btn.className="btn slim";
+   btn.textContent=existing?"Ya está en la paleta":"Añadir a paleta";
+   btn.disabled=existing;btn.onclick=()=>addToPalette(b,btn);
+   card.append(btn);
+   if(existing){const pick=document.createElement("button");pick.type="button";pick.className="btn slim";pick.textContent="Insertar en el plano";pick.onclick=()=>cad().selectBlock(key);card.append(pick)}
+   cards.append(card);
   }
   more.hidden=matches.length<=shown;more.textContent="Mostrar más ("+shown+" / "+matches.length+")";
  }
- function insert(b){
+ function addToPalette(b,button){
+  const api=cad();if(!api){status.textContent="El motor de bloques todavía no está disponible. Actualizá la página y volvé a intentar.";return}
   const unitMeters={mm:.001,cm:.01,m:1,in:.0254,ft:.3048};
-  const factor=(sourceUnits[collection.units]||1)/(unitMeters[state.unit]||1);
+  const factor=(sourceUnits[collection.units]||1)/(unitMeters[api.unit()]||1);
   const output=[],stack=new Set(),skipped={value:0};
   function flatten(block,t,depth){
    if(depth>12||stack.has(block.name)||output.length>45000)return;
@@ -139,12 +176,11 @@ function categoryPanel(){
   for(const e of output){for(const key of ["a","b","c"]){if(e[key]?.x!==undefined){e[key].x*=factor;e[key].y*=factor}}if(e.pts)e.pts.forEach(p=>{p.x*=factor;p.y*=factor});if(e.r)e.r*=factor;if(e.rx)e.rx*=factor;if(e.ry)e.ry*=factor}
   const key="OLIMPIADAS · "+b.name;
   try{
-   const geometry=normalizeBlockEntities(output);
-   if(state.blocks[key]&&!window.confirm("Ya existe "+key+". ¿Reemplazar su definición?"))return;
-   saveHistory();state.blocks[key]={name:key,entities:geometry};renderBlockLibrary();
-   $("blockLibrary").value=key;$("blockScale").value="1";$("blockRotation").value="0";
-   state.galleryRepeatedInsert=true;setTool("insertBlock");
-   status.textContent="Bloque preparado: "+b.name+" · "+geometry.length+" entidades 2D"+(skipped.value?" · "+skipped.value+" entidades complejas no convertidas":"")+". Hacé clic sobre el plano para insertarlo.";
+   if(api.hasBlock(key)){status.textContent="Este bloque ya se encuentra en la paleta: "+b.name;return}
+   const count=api.addBlock(key,output);
+   button.textContent="Ya está en la paleta";button.disabled=true;
+   const pick=document.createElement("button");pick.type="button";pick.className="btn slim";pick.textContent="Insertar en el plano";pick.onclick=()=>api.selectBlock(key);button.parentElement.append(pick);
+   status.textContent="Añadido a la paleta: "+b.name+" · "+count+" entidades 2D"+(skipped.value?" · "+skipped.value+" entidades complejas omitidas":"")+". Usá Insertar en el plano cuando quieras colocarlo.";
   }catch(error){status.textContent="No se pudo convertir "+b.name+": "+error.message}
  }
  input.addEventListener("change",async()=>{
@@ -152,8 +188,8 @@ function categoryPanel(){
   input.disabled=true;status.textContent="Leyendo bloques del DXF…";try{
    const parsed=await readDXF(file,pct=>status.textContent="Organizando biblioteca: "+pct+" %");
    collection=parsed;shown=60;searchText="";search.value="";search.disabled=false;
-   selectedCategory=categoryFor([...collection.blocks.values()][0]?.name||"");
-   status.textContent=collection.blocks.size+" bloques nombrados encontrados en "+file.name+". Elegí una categoría y un bloque para insertarlo.";
+   selectedCategory="Todas";
+   status.textContent=collection.blocks.size+" bloques nombrados encontrados en "+file.name+". Elegí una categoría y pulsá Añadir a paleta en los bloques que quieras conservar.";
    render();
   }catch(e){status.textContent="Error al importar la biblioteca: "+e.message}finally{input.disabled=false}
  });
