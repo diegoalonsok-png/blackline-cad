@@ -2081,32 +2081,24 @@ function executeCADSearchCommand(name){
 }
 function initCadCommandFinder(){
  const input=$('cadCommandSearch'),out=$('cadCommandResults');
- function render(){
-  const q=input.value.trim().toUpperCase(),all=q?CAD_COMMANDS.filter(x=>(x[0]+' '+x[1]+' '+x[2]).toUpperCase().includes(q)):CAD_COMMANDS.slice(0,10);
-  const matches=all.slice(0,12);out.replaceChildren();
-  if(!matches.length){const hint=document.createElement('div');hint.className='cad-command-empty';hint.textContent='No matching CAD2D command.';out.append(hint)}
-  for(const item of matches){
-   const button=document.createElement('button');button.type='button';button.className='cad-command-result';
-   const code=document.createElement('strong');code.textContent=item[0]+(item[1]?' · '+item[1]:'');
-   const desc=document.createElement('small');desc.textContent=item[2];
-   button.append(code,desc);button.onmousedown=e=>e.preventDefault();button.onclick=()=>executeCADSearchCommand(item[0]);out.append(button);
-  }
-  out.hidden=false;input.setAttribute('aria-expanded','true');
- }
- input.addEventListener('input',render);
- input.addEventListener('focus',render);
+ // Compact command field: no popover on focus or typing, so the ribbon stays unobstructed.
+ out.hidden=true;input.setAttribute('aria-expanded','false');
+ const clean=value=>String(value||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const aliases={LINEA:'LINE',RECORTAR:'TRIM',CORTAR:'TRIM',BORRAR:'ERASE',MOVER:'MOVE',COPIAR:'COPY',GIRAR:'ROTATE',ACOTAR:'DIM',CIRCULO:'CIRCLE',RECTANGULO:'RECTANGLE',POLILINEA:'PLINE'};
  input.addEventListener('keydown',event=>{
-  if(event.key==='Escape'){out.hidden=true;input.blur();event.stopPropagation()}
-  if(event.key==='Enter'){
-   event.preventDefault();
-   const match=CAD_COMMANDS.find(x=>x[0]===input.value.trim().toUpperCase())||CAD_COMMANDS.find(x=>(x[0]+' '+x[1]).toUpperCase().includes(input.value.trim().toUpperCase()));
-   if(match)executeCADSearchCommand(match[0]);
-  }
+  if(event.key==='Escape'){event.preventDefault();input.value='';input.blur();out.hidden=true;return;}
+  if(event.key!=='Enter')return;
+  event.preventDefault();
+  const query=clean(input.value);if(!query)return;
+  const target=aliases[query]||query;
+  const match=CAD_COMMANDS.find(x=>clean(x[0])===target||clean(x[1])===target)
+   ||CAD_COMMANDS.find(x=>clean(x[0]).startsWith(target)||clean(x[1]).startsWith(target));
+  if(match)executeCADSearchCommand(match[0]);
+  else{out.hidden=true;input.setAttribute('aria-expanded','false');$('command').value=target;input.value='';runCommand()}
  });
- document.addEventListener('pointerdown',event=>{if(!$('cadCommandFinder').contains(event.target))out.hidden=true});
+ input.addEventListener('input',()=>{out.hidden=true;input.setAttribute('aria-expanded','false')});
+ input.addEventListener('focus',()=>{out.hidden=true;input.setAttribute('aria-expanded','false')});
 }
-
-
 
 let cadClipboard=[];
 function copySelectedCadObjects(){
