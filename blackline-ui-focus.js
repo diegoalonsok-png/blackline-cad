@@ -63,7 +63,7 @@
   const collapse=title.querySelector('[data-palette-act="collapse"]');
   if(collapse){
    const setAria=()=>{const hidden=panel.classList.contains('bl-focus-collapsed')||panel.classList.contains('collapsed');collapse.setAttribute('aria-expanded',String(!hidden));};
-   collapse.addEventListener('click',()=>{panel.classList.remove('bl-focus-collapsed');setAria();requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))});
+   collapse.addEventListener('click',e=>{if(panel.classList.contains('bl-focus-collapsed')){e.preventDefault();e.stopImmediatePropagation();panel.classList.remove('bl-focus-collapsed');panel.classList.remove('collapsed');collapse.textContent='−';setAria();requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')))}else requestAnimationFrame(setAria)},true);
    setAria();
   }
  }
