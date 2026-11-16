@@ -3040,6 +3040,7 @@ function importPlanarExchange(format,contents,filename){
   factor=U[result.unit]/U[state.unit];
  }
  const entities=result.entities.map(e=>factor===1?e:transformEntity(e,p=>P(p.x*factor,p.y*factor)));
+ if(state.entities.length&&!window.confirm('Importar este archivo reemplazará el dibujo actual. Guardalo antes en CADJSON si querés conservarlo. ¿Continuar?'))return;
  saveHistory();
  state.entities=entities.map((e,i)=>({...e,id:i+1}));
  state.nextId=state.entities.length+1;
