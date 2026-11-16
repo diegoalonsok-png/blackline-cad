@@ -732,7 +732,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 </section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.geojson,.csv" style="display:none">
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -3028,7 +3028,36 @@ async function convertDWGAutomatically(file){
  importDXF(dxf,file.name.replace(/\.dwg$/i,'.dxf'));
  log('DWG converted via external service; verify layers, unsupported entities and 1:1 units.');
 }
-async function loadDrawingFile(f){if(!f)return;try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text();if(/\.dxf$/i.test(f.name)&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name))importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=f.name.replace(/\.(cadjson|json)$/i,'');$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+function importPlanarExchange(format,contents,filename){
+ if(!window.BlacklineInterchange)throw Error('Módulo de intercambio no disponible');
+ if(contents.length>20*1024*1024)throw Error('Archivo demasiado grande (máx. 20 MB)');
+ const result=format==='csv'?BlacklineInterchange.importCSV(contents):BlacklineInterchange.importGeoJSON(JSON.parse(contents));
+ if(!result.entities.length)throw Error('No hay geometría 2D compatible. No se modificó el dibujo.');
+ if(format==='geojson'&&!result.markedPlanar&&!window.confirm('GeoJSON sin declaración de coordenadas planas. No se convierten latitud/longitud o proyecciones. ¿Importar valores literalmente en las unidades actuales?'))return;
+ let factor=1;
+ if(result.unit&&result.unit!==state.unit){
+  if(!U[result.unit])throw Error('Unidad no reconocida en el archivo: '+result.unit);
+  factor=U[result.unit]/U[state.unit];
+ }
+ const entities=result.entities.map(e=>factor===1?e:transformEntity(e,p=>P(p.x*factor,p.y*factor)));
+ saveHistory();
+ state.entities=entities.map((e,i)=>({...e,id:i+1}));
+ state.nextId=state.entities.length+1;
+ const unique=[...new Set(entities.map(e=>e.layer||'0'))];
+ state.layers=unique.map(name=>({id:name,name,color:'#c6cbd1',visible:true,locked:false,width:.25,linetype:'CONTINUOUS'}));
+ state.layerId=state.layers[0].id;
+ state.blocks={};state.selected=[];state.stage=[];
+ state.file=filename.slice(0,filename.lastIndexOf('.'))||filename;
+ renderBlockLibrary();updateAll();zoomExtents();
+ const skipped=Object.values(result.skipped||{}).reduce((a,n)=>a+n,0);
+ toast('Importados '+entities.length+' objetos · '+state.unit+(skipped?' · '+skipped+' omitidos':''));
+ if(skipped)log('Geometrías no compatibles: '+JSON.stringify(result.skipped));
+}
+async function loadDrawingFile(f){if(!f)return;try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text();if(/\.dxf$/i.test(f.name)&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name))importDXF(txt,f.name);
+else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);
+else if(/\.geojson$/i.test(f.name))importPlanarExchange('geojson',txt,f.name);
+else if(/\.csv$/i.test(f.name))importPlanarExchange('csv',txt,f.name);
+else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=f.name.replace(/\.(cadjson|json)$/i,'');$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function exportDXF(entities=state.entities,filename=state.file,layers=state.layers){let data=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1015','9','$INSUNITS','70',String(({mm:4,cm:5,m:6,in:1,ft:2})[state.unit]||6),'0','ENDSEC','0','SECTION','2','TABLES','0','TABLE','2','LAYER','70',String(layers.length)];for(const l of layers)data.push('0','LAYER','2',l.name,'70',String(l.locked?4:0),'62',String(l.visible?7:-7),'6',l.linetype||'CONTINUOUS','370',String(Math.round((l.width||.25)*100)),'420',String(parseInt((l.color||'#c6cbd1').replace('#',''),16)));data.push('0','ENDTAB','0','TABLE','2','STYLE','70','3');for(const item of [['STANDARD','Arial'],['CAD2D_MONO','Courier New'],['CAD2D_SERIF','Times New Roman']])data.push('0','STYLE','2',item[0],'70','0','40','0','41','1','50','0','71','0','42','0','3',item[1],'4','');data.push('0','ENDTAB','0','ENDSEC','0','SECTION','2','ENTITIES');const pos=(x,y)=>['10',dxfNum(x),'20',dxfNum(y),'30','0'];for(const e of flattenCADEntities(entities)){const lay=layerFor(e),base=['0',e.type==='rect'?'LWPOLYLINE':e.type==='polyline'?'LWPOLYLINE':e.type==='dimension'?'LINE':e.type==='ellipse'?'ELLIPSE':e.type.toUpperCase(),'8',lay.name,'370',String(Math.round((e.width||lay.width||.25)*100)),'6',e.linetype||'BYLAYER'];if(e.color)base.push('420',String(parseInt(e.color.replace('#',''),16)));if(['line','dimension'].includes(e.type))data.push(...base,...pos(e.a.x,e.a.y),'11',dxfNum(e.b.x),'21',dxfNum(e.b.y),'31','0');else if(['polyline','rect'].includes(e.type)){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;data.push(...base,'90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),...pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]))}else if(e.type==='circle')data.push(...base,...pos(e.c.x,e.c.y),'40',dxfNum(e.r));else if(e.type==='arc')data.push(...base,...pos(e.c.x,e.c.y),'40',dxfNum(e.r),'50',dxfNum(((e.a0*180/Math.PI)%360+360)%360),'51',dxfNum(((e.a1*180/Math.PI)%360+360)%360));else if(e.type==='ellipse'){const major=Math.max(e.rx,e.ry),minor=Math.min(e.rx,e.ry),rotation=(e.rotation||0)+(e.ry>e.rx?Math.PI/2:0);if(!(major>0&&minor>0))continue;data.push(...base,...pos(e.c.x,e.c.y),'11',dxfNum(major*Math.cos(rotation)),'21',dxfNum(major*Math.sin(rotation)),'31','0','40',dxfNum(minor/major),'41','0','42',dxfNum(TAU))}else if(e.type==='text')data.push(...base,...pos(e.p.x,e.p.y),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));}data.push('0','ENDSEC','0','EOF');download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf');toast('DXF exported')}$('dxfBtn').onclick=()=>exportDXF();
@@ -4176,6 +4205,20 @@ function refreshCadQuickProperties(){
 }
 
 /* Export formats with explicit distinction between editable CAD and print formats. */
+function exportPlanarExchange(format){
+ if(!window.BlacklineInterchange)return toast('Módulo de intercambio no disponible');
+ if(!state.entities.length)return toast('El dibujo está vacío');
+ const expanded=flattenCADEntities(state.entities).filter(e=>layerFor(e).visible);
+ const exported=format==='csv'
+  ?BlacklineInterchange.exportCSV(expanded,state.unit)
+  :BlacklineInterchange.exportGeoJSON(expanded,state.unit);
+ const content=format==='csv'?exported.content:JSON.stringify(exported.document,null,2);
+ const count=format==='csv'?exported.rows:exported.document.features.length;
+ if(!count)return toast('No hay líneas o contornos para exportar');
+ download(state.file+'.'+format,content,format==='csv'?'text/csv;charset=utf-8':'application/geo+json');
+ const skipped=Object.values(exported.skipped).reduce((sum,n)=>sum+n,0);
+ toast(format.toUpperCase()+' exportado'+(skipped?' · '+skipped+' entidades omitidas':''));
+}
 function exportCadOpenSVG(){
  if(!state.entities.length)return toast('El dibujo está vacío / Drawing is empty');
  const svg=makeSVG(plotOptions());
@@ -4198,13 +4241,15 @@ function initCadExportPopover(){
  const option=(name,detail,fn)=>{const b=document.createElement('button');b.type='button';b.className='cad-export-option';const left=document.createElement('strong');left.textContent=name;const right=document.createElement('small');right.textContent=detail;b.append(left,right);b.onclick=()=>{close();fn()};p.append(b)};
  label('Dibujo editable');
  option('Guardar .DXF','CAD 2D · 1:1',()=>exportDXF());
- option('Guardar proyecto .CADJSON','Edición en CAD2D',()=>saveJSON());
+ option('Guardar proyecto .CADJSON','Edición completa en CAD2D',()=>saveJSON());
+ option('Exportar .GEOJSON','Líneas y polígonos · coordenadas locales',()=>exportPlanarExchange('geojson'));
+ option('Exportar .CSV','Vértices, coordenadas, capas y unidades',()=>exportPlanarExchange('csv'));
  label('Gráficos e impresión');
  option('Exportar .SVG','Vector abierto',()=>exportCadOpenSVG());
  option('Exportar .PDF','Impresión vectorial',()=>openPrint());
  option('Exportar .PNG','Imagen',()=>$('pngBtn').click());
  label('Formato DWG');
- const note=document.createElement('div');note.className='cad-export-note';note.textContent='DWG no se exporta directamente: no hay conversor DWG configurado. Usá DXF para abrir el plano en AutoCAD, LibreCAD, QCAD u otras aplicaciones compatibles y guardar como DWG desde un conversor externo que lo admita. DXF es el formato de intercambio editable recomendado.';p.append(note);
+ const note=document.createElement('div');note.className='cad-export-note';note.textContent='GeoJSON/CSV son formatos de geometría parcial y no conservan bloques paramétricos ni cotas. DWG no se exporta directamente: no hay conversor DWG configurado. Usá DXF para abrir el plano en AutoCAD, LibreCAD, QCAD u otras aplicaciones compatibles y guardar como DWG desde un conversor externo que lo admita. DXF es el formato de intercambio editable recomendado.';p.append(note);
  btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-haspopup','dialog');
  btn.onclick=()=>p.hidden?openCadExportPopover():close();
  $('cadSaveDxfStatus').onclick=()=>exportDXF();
@@ -4383,5 +4428,6 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-osnap-math.js?v=20261116"></script>
 <script src="cad-scale-math.js?v=20261116"></script>
 <script src="cad-object-tracking.js?v=20261116"></script>
+<script src="cad-interchange.js?v=20261116"></script>
 <script src="cad-performance.js?v=20261116"></script>
 </body></html>
