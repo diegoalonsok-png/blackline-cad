@@ -2231,6 +2231,7 @@ function matchCadPropertiesAt(point){
 }
 
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();
+ if(upper==='POLAR')return togglePolar();
  if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
  if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
  if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
