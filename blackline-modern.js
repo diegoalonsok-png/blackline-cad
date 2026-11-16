@@ -8,9 +8,9 @@ app.classList.add('blackline-modern');
 // Raise legacy compact 42px ribbon once for the new 39px icon tiles; users can resize afterward.
 try{if(!localStorage.getItem('blackline-modern-ribbon-v1')){const current=parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42;if(current<58){app.style.setProperty('--ribbon-height','61px');localStorage.setItem('cad2d-ribbon-height','61');}localStorage.setItem('blackline-modern-ribbon-v1','1')}}catch(e){}
 const brand=d.querySelector('.brand');
-if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='Blackline CAD';const sm=brand.querySelector('small');if(sm)sm.textContent='DIBUJO ARQUITECTÓNICO · 2D';}
+if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='CAD2D';const sm=brand.querySelector('small');if(sm)sm.textContent='DIBUJO ARQUITECTÓNICO · 2D';}
 const mark=d.querySelector('.brandbar .mark');if(mark)mark.textContent='◇';
-d.title='Blackline CAD — Diseño arquitectónico 2D';
+d.title='CAD2D — Diseño arquitectónico 2D';
 const left=d.querySelector('.workspace>.sidebar:not(.rightside)');
 const right=d.querySelector('.workspace>.sidebar.rightside');
 function setSection(key,checked){
@@ -187,12 +187,12 @@ requestAnimationFrame(requestResize);
  const mark=document.querySelector('.brandbar .mark');
  if(!mark||document.getElementById('blFileMenu'))return;
  mark.setAttribute('role','button');mark.setAttribute('tabindex','0');
- mark.setAttribute('aria-label','Menú Blackline CAD: archivos e impresión');
+ mark.setAttribute('aria-label','Menú CAD2D: archivos e impresión');
  mark.setAttribute('aria-haspopup','menu');mark.setAttribute('aria-expanded','false');
- mark.title='Menú Blackline CAD · Archivo';
+ mark.title='Menú CAD2D · Archivo';
  mark.style.cursor='pointer';
  const menu=document.createElement('div');menu.id='blFileMenu';
- menu.setAttribute('role','menu');menu.setAttribute('aria-label','Archivo Blackline CAD');
+ menu.setAttribute('role','menu');menu.setAttribute('aria-label','Archivo CAD2D');
  menu.hidden=true;
  const actions=[
   ['file-new','Nuevo dibujo','file-plus'],
@@ -208,7 +208,7 @@ requestAnimationFrame(requestResize);
   download:'<path d="M5 3h14v18H5zM12 7v10m-4-4 4 4 4-4"/>',
   printer:'<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>'
  };
- const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='BLACKLINE CAD · ARCHIVO';menu.append(title);
+ const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='CAD2D · ARCHIVO';menu.append(title);
  for(const [id,label,icon] of actions){
   const button=document.createElement('button');button.type='button';button.dataset.blFileAction=id;button.setAttribute('role','menuitem');
   button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+icons[icon]+'</svg><span></span>';
