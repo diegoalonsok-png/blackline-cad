@@ -55,6 +55,15 @@ The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, b
 - The idle cursor shows a crosshair without a central square. The adjustable pickbox is shown only with active drawing/editing commands; selection/editing modes use a square selector.
 - These changes concern interaction and viewport state, not model coordinates or saved entity geometry.
 
+## Parametric architectural walls (first 2D stage)
+
+- Use **MURO** / **WALL** or the *Muros paramétricos 2D* panel to draw a linked pair of wall faces, with a true model-space thickness.
+- Presets: **8, 10, 12, 15, 20, 30 cm**, plus custom thickness (4 cm to 3 m); default 20 cm. Thickness may differ from segment to segment.
+- Reference-line justification: **left / center / right**, relative to drawing direction. Consecutive clicks create continuous wall runs; Enter ends the operation.
+- New unobstructed wall segments automatically join independently created compatible wall segments at **L corners** (mitred faces), and form conservative **T butt joints** at the near face of an existing wall. Different thicknesses are allowed.
+- Parametric doors and windows placed near these walls auto-align and cut **both wall faces together**, never just one. An unsupported condition leaves the wall untouched instead of attempting a risky partial cut. Existing opening fragments and locked objects are not silently rewritten by auto-join.
+- These operations are a limited Blackline native 2D representation, not yet an AutoCAD Architecture AEC wall entity or a guarantee of comprehensive X / complex junction resolution. Validate real drawings and DXF interchange before production reliance.
+
 ## Dynamic 2D blocks — opt-in first stage
 
 - Select an inserted block reference and use **Selection / Properties → BLOQUE DINÁMICO 2D → Activar estiramiento** to enable dynamic dimensions for that block definition.
