@@ -1000,23 +1000,24 @@ function drawCrosshair(){
  const selectingOffset=state.tool==='offset'&&!state.modifyCandidate;
  const positioningOffset=state.tool==='offset'&&!!state.modifyCandidate;
  const pickMode=selectingOffset||['trim','trimScissor','erase','extend','breakLine','lengthen'].includes(state.tool);
- const active=hasActiveCadCommand(),cursorMode=window.BlacklineCursorMode?.mode(state.tool,state.modifyCandidate,state.drag?.type)||'drawing';
- const selecting=cursorMode==='selector';const size=Math.max(5,Math.min(60,Number(displayColors.pickboxSize)||9));
+ const cursorMode=window.BlacklineCursorMode?.mode(state.tool,state.modifyCandidate,state.drag?.type)||'idle';
+ const selecting=cursorMode==='selector',idle=cursorMode==='idle';
+ const size=Math.max(5,Math.min(60,Number(displayColors.pickboxSize)||9));
  ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=displayColors.width;
  if(!selecting){
- ctx.beginPath();
- ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
- ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(Math.max(0,q.x-halfX),q.y);ctx.lineTo(Math.min(w,q.x+halfX),q.y);
+  ctx.moveTo(q.x,Math.max(0,q.y-halfY));ctx.lineTo(q.x,Math.min(h,q.y+halfY));ctx.stroke();
  }
- /* The idle CAD cursor is only a crosshair. Show the configurable
-    pickbox after a drawing or editing command has actually been activated. */
- if(active){
-  ctx.fillStyle=displayColors.background;
-  ctx.strokeStyle=selecting||positioningOffset?displayColors.cursor:'#a0e8ff';
-  ctx.lineWidth=selecting||positioningOffset?1.8:2;
-  if(!selecting)ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+ // Idle: crosshair + pickbox. Drawing: crosshair only.
+ // Selection/editing: hollow pickbox only, preserving visibility of geometry.
+ if(idle||selecting){
+  ctx.strokeStyle=displayColors.cursor;ctx.lineWidth=1.5;
+  if(selecting){
+   ctx.fillStyle=displayColors.background;
+   ctx.fillRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
+  }
   ctx.strokeRect(Math.round(q.x-size/2),Math.round(q.y-size/2),size,size);
-  if(!selecting&&!positioningOffset){ctx.fillStyle='#a0e8ff';ctx.fillRect(Math.round(q.x-1),Math.round(q.y-1),2,2)}
  }
  if(positioningOffset){ctx.setLineDash([3,3]);ctx.strokeStyle='#ffe25a';ctx.beginPath();ctx.arc(q.x,q.y,13,0,TAU);ctx.stroke();}
  ctx.restore();
