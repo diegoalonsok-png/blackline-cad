@@ -971,10 +971,13 @@ function drawCrosshair(){
  ctx.restore();
 }
 function drawSnapMarker(){
- if(!crosshairVisible||!state.osnapOn||!snapIndicator)return;
+ if(!state.osnapOn||!snapIndicator)return;
  const p=screen(snapIndicator.point);ctx.save();ctx.strokeStyle=displayColors.cursor;ctx.fillStyle=displayColors.background;
  ctx.lineWidth=1.2;ctx.beginPath();const d=5;
- if(snapIndicator.type==='INT'){ctx.moveTo(p.x-d,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.moveTo(p.x+d,p.y-d);ctx.lineTo(p.x-d,p.y+d)}
+ if(snapIndicator.type==='PERP'){ctx.moveTo(p.x-d,p.y-d);ctx.lineTo(p.x-d,p.y+d);ctx.lineTo(p.x+d,p.y+d)}
+ else if(snapIndicator.type==='TAN'){ctx.arc(p.x,p.y,d,0,TAU);ctx.moveTo(p.x-d,p.y+d);ctx.lineTo(p.x+d,p.y+d)}
+ else if(snapIndicator.type==='NEAREST'){ctx.moveTo(p.x-d,p.y);ctx.lineTo(p.x+d,p.y);ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x,p.y+d)}
+ else if(snapIndicator.type==='INT'){ctx.moveTo(p.x-d,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.moveTo(p.x+d,p.y-d);ctx.lineTo(p.x-d,p.y+d)}
  else if(snapIndicator.type==='QUAD'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y);ctx.lineTo(p.x,p.y+d);ctx.lineTo(p.x-d,p.y);ctx.closePath()}
  else if(snapIndicator.type==='MID'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.lineTo(p.x-d,p.y+d);ctx.closePath()}
  else if(snapIndicator.type==='CENTER'){ctx.arc(p.x,p.y,d,0,TAU)}
@@ -1232,7 +1235,7 @@ function drawTransformPreview(){const d=state.drag;if(!d.base||!d.lastWorld)retu
 function centerZoom(f,at){let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
-const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD'];
+const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
 let cadActiveOsnaps=new Set(CAD_OSNAP_TYPES);
 try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if(Array.isArray(saved))cadActiveOsnaps=new Set(saved.filter(x=>CAD_OSNAP_TYPES.includes(x)))}catch(e){}
 function cadOsnapEnabled(kind){return cadActiveOsnaps.has(kind)}
@@ -1258,12 +1261,25 @@ function snapPoint(p){
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    if(e.type==='line'){
+    if(window.BlacklineOSNAPMath){
+     if(cadOsnapEnabled('NEAREST')){
+      const pt=BlacklineOSNAPMath.nearestOnSegment(q,e.a,e.b);
+      if(pt)candidates.push([pt,'NEAREST']);
+     }
+     if(cadOsnapEnabled('PERP')&&state.stage.length&&['line','polyline','dimension','move','copy'].includes(state.tool)){
+      const pt=BlacklineOSNAPMath.perpendicular(state.stage.at(-1),e.a,e.b);
+      if(pt)candidates.push([pt,'PERP']);
+     }
+    }
     if(cadOsnapEnabled('MID'))candidates.push([mul(add(e.a,e.b),.5),'MID']);
     if(nearbyLines.length<70)nearbyLines.push(e);
    }
    if(e.type==='rect'){if(cadOsnapEnabled('END'))candidates.push([P(e.a.x,e.b.y),'END'],[P(e.b.x,e.a.y),'END']);if(cadOsnapEnabled('CENTER'))candidates.push([mul(add(e.a,e.b),.5),'CENTER']);if(cadOsnapEnabled('MID')){const x=(e.a.x+e.b.x)/2,y=(e.a.y+e.b.y)/2;candidates.push([P(x,e.a.y),'MID'],[P(x,e.b.y),'MID'],[P(e.a.x,y),'MID'],[P(e.b.x,y),'MID'])}}
    if(cadOsnapEnabled('MID')&&e.type==='polyline'&&e.pts?.length>1){for(let i=1;i<e.pts.length;i++)candidates.push([mul(add(e.pts[i-1],e.pts[i]),.5),'MID']);if(e.closed&&e.pts.length>2)candidates.push([mul(add(e.pts.at(-1),e.pts[0]),.5),'MID'])}
    if(cadOsnapEnabled('CENTER')&&(e.type==='circle'||e.type==='arc'||e.type==='ellipse'))candidates.push([e.c,'CENTER']);
+   if(cadOsnapEnabled('TAN')&&e.type==='circle'&&state.stage.length&&window.BlacklineOSNAPMath){
+     for(const tangent of BlacklineOSNAPMath.tangentPoints(state.stage.at(-1),e.c,e.r))candidates.push([tangent,'TAN']);
+   }
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
@@ -3851,7 +3867,7 @@ function initDockablePalettes(){
 function initCadStatusMenus(){
  const menu=$('cadStatusMenu'), arrows=[...document.querySelectorAll('[data-status-menu]')];
  const title={grid:'GRID · Grilla',snap:'SNAP · Ajuste de grilla',ortho:'ORTHO · Ortogonal',polar:'POLAR · Rastreo angular',osnap:'OSNAP · Referencias a objetos',measure:'DIST · Medición',scale:'1:1 · Unidades y escala'};
- const modes={END:'Extremo / Endpoint',POINT:'Vértice / Point',MID:'Punto medio / Midpoint',CENTER:'Centro / Center',INT:'Intersección / Intersection',QUAD:'Cuadrante / Quadrant'};
+ const modes={END:'Extremo / Endpoint',POINT:'Vértice / Point',MID:'Punto medio / Midpoint',CENTER:'Centro / Center',INT:'Intersección / Intersection',QUAD:'Cuadrante / Quadrant',PERP:'Perpendicular',NEAREST:'Más cercano / Nearest',TAN:'Tangente / Tangent'};
  let active=null;
  const entry=(label,action,checked=false)=>{
   const b=document.createElement('button');b.type='button';b.className=checked?'selected':'';
@@ -4136,4 +4152,5 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script defer src="assets/dxf-featured-blocks.js?v=20261116-featured4"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261116-frame1"></script>
 <script defer src="assets/cad2d-curated-library.js?v=20261116-authentic50"></script>
+<script src="cad-osnap-math.js?v=20261116"></script>
 </body></html>
