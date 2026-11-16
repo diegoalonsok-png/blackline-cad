@@ -75,3 +75,61 @@
 
 /* Respect the existing workspace visibility controls. */
 .app.blackline-modern #blacklineBlockGallery[hidden],.app.blackline-modern .panel[hidden]{display:none!important}
+
+
+/* Readable light interface (UI only). Model background is not altered. */
+.app.blackline-modern.bl-light{
+ --bl-bg:#e6e9ee;--bl-panel:#f7f8fa;--bl-border:#b9c2cc;--bl-icon:#1b2938;
+ --cad-ui-base:#ecf0f4;--cad-ui-raised:#fff;--cad-ui-toolbar:#e4e9ef;
+ --cad-ui-input:#fff;--cad-ui-text:#172536;--cad-ui-muted:#526273;--cad-ui-edge:#b8c2cf;
+ background:#e9edf2!important;color:#172536!important;
+}
+.app.blackline-modern.bl-light .brandbar,
+.app.blackline-modern.bl-light .tabbar,
+.app.blackline-modern.bl-light .ribbon-shell,
+.app.blackline-modern.bl-light .ribbon,
+.app.blackline-modern.bl-light .status,
+.app.blackline-modern.bl-light .cmd,
+.app.blackline-modern.bl-light .sidebar,
+.app.blackline-modern.bl-light .panel,
+.app.blackline-modern.bl-light .panel-title,
+.app.blackline-modern.bl-light .cad-workspace-controls{
+ background:#eef1f5!important;color:#1b2938!important;border-color:#b5bec9!important;
+}
+.app.blackline-modern.bl-light .brand,
+.app.blackline-modern.bl-light .tab,
+.app.blackline-modern.bl-light .panel-title,
+.app.blackline-modern.bl-light .brand small,
+.app.blackline-modern.bl-light .status .coords{
+ color:#263543!important;
+}
+.app.blackline-modern.bl-light .brandbar .btn,
+.app.blackline-modern.bl-light .cad-workspace-controls .btn,
+.app.blackline-modern.bl-light .tool,
+.app.blackline-modern.bl-light .bl-icon-rail button,
+.app.blackline-modern.bl-light .status button,
+.app.blackline-modern.bl-light .btn,
+.app.blackline-modern.bl-light .filename,
+.app.blackline-modern.bl-light .cad-command-finder,
+.app.blackline-modern.bl-light input:not([type="color"]),
+.app.blackline-modern.bl-light select{
+ background:#fff!important;color:#1d2a39!important;border-color:#aebac7!important;
+}
+.app.blackline-modern.bl-light .tool.active,
+.app.blackline-modern.bl-light .tab.active,
+.app.blackline-modern.bl-light .status button.on{
+ background:#c9e0f0!important;color:#142736!important;border-color:#6391ae!important;
+}
+.app.blackline-modern.bl-light .tool svg,
+.app.blackline-modern.bl-light .bl-icon-rail svg{stroke:#1b2b3a!important}
+.app.blackline-modern.bl-light .tool.active svg{stroke:#0a526e!important}
+.app.blackline-modern.bl-light .brandbar .mark{background:#fff!important;color:#203044!important;border-color:#8093a7!important}
+.app.blackline-modern.bl-light .filename,
+.app.blackline-modern.bl-light .panel-content,
+.app.blackline-modern.bl-light .help,
+.app.blackline-modern.bl-light .hint{color:#455567!important}
+.app.blackline-modern.bl-light .cad-command-results,
+.app.blackline-modern.bl-light .modal,
+.app.blackline-modern.bl-light .cad-status-menu{background:#f7f9fb!important;color:#243447!important}
+.app.blackline-modern.bl-light .cad-layout-workspace,
+.app.blackline-modern.bl-light .cad-layout-paperboard{background:#e0e5eb!important}
