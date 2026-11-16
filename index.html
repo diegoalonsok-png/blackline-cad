@@ -2691,8 +2691,33 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();$('command').value='';$('command').blur();if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended')}
 });
+
+function cad2dToggleCommandHistory(){
+ const existing=document.getElementById('cad2dHistory');
+ if(existing){existing.remove();return}
+ const box=document.createElement('section');box.id='cad2dHistory';box.setAttribute('role','dialog');
+ box.setAttribute('aria-label','Historial de comandos');
+ box.style.cssText='position:fixed;bottom:90px;left:16px;z-index:100000;max-height:45vh;overflow:auto;width:min(550px,calc(100vw - 32px));background:#151c24;color:#eef4f8;border:1px solid #68889e;border-radius:12px;box-shadow:0 12px 30px #0009;padding:12px';
+ const head=document.createElement('div');head.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
+ const title=document.createElement('b');title.textContent='CAD2D · Historial de comandos';
+ const close=document.createElement('button');close.type='button';close.className='btn';close.textContent='Cerrar';close.onclick=()=>box.remove();
+ head.append(title,close);
+ const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;font:12px/1.55 ui-monospace,monospace;max-height:35vh;overflow:auto';
+ pre.textContent=state.logs.length?state.logs.slice(-100).join('\n'):'Sin comandos registrados';
+ box.append(head,pre);document.body.append(box);close.focus();
+}
+function cad2dToggleCommandBar(){
+ const bar=document.querySelector('.command-row'),parent=bar?.parentElement;
+ if(!bar||!parent)return toast('Barra de comandos no disponible');
+ const hidden=bar.style.display!=='none';bar.style.display=hidden?'none':'';
+ if(!hidden){$('command').focus();toast('Línea de comandos visible')}
+ else toast('Línea de comandos oculta · Ctrl+9 para restaurar');
+}
 document.addEventListener('keydown',ev=>{
  const focused=document.activeElement?.tagName||'',isEditing=['INPUT','TEXTAREA','SELECT'].includes(focused);
+ if((ev.ctrlKey||ev.metaKey)&&ev.key==='1'){ev.preventDefault();openCadQuickProperties();return}
+ if((ev.ctrlKey||ev.metaKey)&&ev.key==='9'){ev.preventDefault();cad2dToggleCommandBar();return}
+ if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='n'){ev.preventDefault();$('command').value='NEW';runCommand();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='o'){ev.preventDefault();openFile();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();saveJSON();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='p'){ev.preventDefault();openPrint();return}
@@ -2702,7 +2727,10 @@ document.addEventListener('keydown',ev=>{
   if(key==='v'){if(cadClipboard.length){ev.preventDefault();pasteCadObjects();return}}
   if(key==='x'){ev.preventDefault();cutSelectedCadObjects();return}
  }
- if(isEditing||ev.ctrlKey||ev.metaKey||ev.altKey)return;
+ if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
+ if(ev.key==='F1'){ev.preventDefault();$('helpBackdrop').classList.add('show');return}
+ if(ev.key==='F2'){ev.preventDefault();cad2dToggleCommandHistory();return}
+ if(isEditing)return;
  if(ev.key==='F3'){ev.preventDefault();toggle('osnapOn','osnapToggle')}
  if(ev.key==='F7'){ev.preventDefault();toggle('gridOn','gridToggle')}
  if(ev.key==='F8'){ev.preventDefault();toggle('orthoOn','orthoToggle')}
