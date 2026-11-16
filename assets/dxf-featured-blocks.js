@@ -5,7 +5,8 @@
 (()=>{
 "use strict";
 const defs=[
- {name:'Puerta simple 90 cm',cat:'Aberturas',key:'puerta90',parts:[['line',0,0,0,.9],['line',0,0,.9,0],['arc',0,0,.9,0,Math.PI/2]],pivot:[0,0]},
+ {name:'Puerta con marco 90 cm',cat:'Aberturas',key:'puerta90marco',parts:[['rect',0,-.06,.05,.12],['rect',.85,-.06,.05,.12],['line',.05,0,.05,.8],['arc',.05,0,.8,0,Math.PI/2]],pivot:[0,0]},
+ {name:'Ventana con marco 120 cm',cat:'Aberturas',key:'ventana120marco',parts:[['rect',0,-.06,.05,.12],['rect',1.15,-.06,.05,.12],['line',.05,-.06,1.15,-.06],['line',.05,.06,1.15,.06],['line',.05,-.014,1.15,-.014],['line',.05,.014,1.15,.014]],pivot:[0,0]},
  {name:'Mesa circular Ø 120 cm',cat:'Mobiliario',key:'mesa120',parts:[['circle',.6,.6,.6],['line',.6,.6,.6,1.2]],pivot:[.6,.6]},
  {name:'Silla 50 × 50 cm',cat:'Mobiliario',key:'silla50',parts:[['rect',0,0,.5,.5],['line',.06,.39,.44,.39],['line',.06,.08,.06,.39],['line',.44,.08,.44,.39]],pivot:[.25,.25]},
  {name:'Sanitario · planta 40 × 70 cm',cat:'Sanitarios',key:'sanitario40',parts:[['rect',0,0,.4,.18],['ellipse',.2,.43,.18,.25],['circle',.2,.43,.07]],pivot:[.2,.35]}
@@ -46,7 +47,7 @@ function preview(d){
 }
 function init(){
  const body=$('blBody'),api=window.BlacklineBlockAPI;if(!body||!api||$('blDxfFeatured'))return;
- const panel=document.createElement('section');panel.id='blDxfFeatured';panel.innerHTML='<h3 style="font-size:12px;margin:8px 0">Bloques arquitectónicos · DXF adaptado</h3><p style="font-size:10px;line-height:1.5">Cuatro símbolos simplificados basados en categorías de BLOQUES OLIMPIADAS.dxf. No reproducen exactamente el original. Cuentan con pivote y dimensiones arquitectónicas definidas.</p><div id="blDxfFeaturedCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px"></div>';
+ const panel=document.createElement('section');panel.id='blDxfFeatured';panel.innerHTML='<h3 style="font-size:12px;margin:8px 0">Bloques arquitectónicos · DXF adaptado</h3><p style="font-size:10px;line-height:1.5">Cinco símbolos simplificados basados en categorías de BLOQUES OLIMPIADAS.dxf. No reproducen exactamente el original. Cuentan con pivote y dimensiones arquitectónicas definidas.</p><div id="blDxfFeaturedCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px"></div>';
  const importArea=$('blDxfImportArea');if(importArea)importArea.before(panel);else body.prepend(panel);
  const cards=$('blDxfFeaturedCards');
  for(const d of defs){
@@ -54,10 +55,11 @@ function init(){
   const name=document.createElement('div');name.textContent=d.name;name.style.cssText='font-size:11px;line-height:1.4;margin:5px 0';
   const btn=document.createElement('button');btn.className='btn';btn.type='button';btn.textContent='Insertar bloque';btn.style.cssText='width:100%;font-size:10px';
   btn.onclick=()=>{
-   const key='BL Adaptado v2 · '+d.key;
+   const key='BL Adaptado v3 · '+d.key;
    try{if(!api.hasBlock(key)){
     const unitFactor=({m:1,cm:100,mm:1000,in:39.37007874,ft:3.280839895}[api.unit()]||1);
-    const param=d.key==='puerta90'?{kind:'swing-door',defaults:{width:.9*unitFactor,mirror:false}}:
+    const param=d.key==='puerta90marco'?{kind:'swing-door',defaults:{width:.9*unitFactor,frameWidth:.05*unitFactor,frameDepth:.12*unitFactor,mirror:false}}:
+      d.key==='ventana120marco'?{kind:'framed-window',defaults:{width:1.2*unitFactor,frameWidth:.05*unitFactor,frameDepth:.12*unitFactor}}:
       d.key==='mesa120'?{kind:'round-table',defaults:{width:1.2*unitFactor}}:null;
     api.addBlock(key,elements(d,api.unit()),param);
    }api.selectBlock(key);btn.textContent='Listo · clic en plano'}catch(ex){btn.textContent='Error: '+ex.message}
