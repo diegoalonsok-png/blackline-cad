@@ -1470,6 +1470,36 @@ function trimLine(e,p){
  toast(pieces.length===2?'TRIM: vano abierto entre límites':'TRIM: tramo recortado');
 }
 /* TRIM quick mode: nearest editable straight edge, repeated one-click cuts. */
+/* Reproducible geometry check: 5×4 m clear room, 0.30 m walls, door 0.90, window 1.20.
+   Opt-in only: never replace the current drawing without confirmation. */
+function loadRoomTest(){
+ if(!window.confirm('Abrir prueba de cuarto 5 × 4 m con puerta y ventana? Guardá antes tu proyecto: reemplazará el dibujo en pantalla.'))return;
+ saveHistory();
+ state.unit='m';state.grid=1;state.selected=[];state.stage=[];state.tool='select';
+ state.entities=[];state.nextId=1;
+ const walls=ensureArchitecturalLayer('walls'),openings=ensureArchitecturalLayer('openings');
+ const line=(x0,y0,x1,y1)=>state.entities.push({id:state.nextId++,type:'line',a:P(x0,y0),b:P(x1,y1),layer:walls,width:.30});
+ // South wall: 90 cm entrance, between x=1.20 and 2.10.
+ for(const y of [0,-.30]){line(-.30,y,1.20,y);line(2.10,y,5.30,y)}
+ line(1.20,-.30,1.20,0);line(2.10,-.30,2.10,0);
+ // North wall: 1.20 m framed window, x=3.20 to 4.40.
+ for(const y of [4,4.30]){line(-.30,y,3.20,y);line(4.40,y,5.30,y)}
+ line(3.20,4,3.20,4.30);line(4.40,4,4.40,4.30);
+ // Continuous longitudinal walls; clear interior 5.00 × 4.00 m.
+ line(0,0,0,4);line(-.30,-.30,-.30,4.30);
+ line(5,0,5,4);line(5.30,-.30,5.30,4.30);
+ const door='CAD2D ROOM 5x4 · PUERTA 090 V3',windowName='CAD2D ROOM 5x4 · VENTANA 120 V3';
+ if(!state.blocks[door])state.blocks[door]={name:door,entities:[{type:'line',a:P(0,0),b:P(.9,0),layer:openings}],parametric:{kind:'swing-door',defaults:{width:.9,frameWidth:.05,frameDepth:.30,mirror:false}}};
+ if(!state.blocks[windowName])state.blocks[windowName]={name:windowName,entities:[{type:'line',a:P(0,0),b:P(1.2,0),layer:openings}],parametric:{kind:'framed-window',defaults:{width:1.2,frameWidth:.05,frameDepth:.30,mullion:true}}};
+ for(const [name,x,y] of [[door,1.20,-.15],[windowName,3.20,4.15]]){
+  const d=state.blocks[name];state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:P(x,y),scale:1,rotation:0,layer:openings,lineweight:.05,params:{...d.parametric.defaults}});
+ }
+ state.layerId=walls;state.lineWidth=.30;
+ $('units').value='m';$('canvasUnits').textContent='· m';$('gridSpacing').value='1';$('lineWidth').value='.30';
+ state.file='PRUEBA-CUARTO-5x4';$('filename').textContent=state.file+'.dxf';
+ renderBlockLibrary();buildRibbon('home');updateAll();zoomExtents();
+ toast('Prueba 5×4: interior libre, muros 0.30, puerta 0.90 y ventana 1.20 · TRIM para recortar');
+}
 function trimNearestAt(point){
  const tol=12/state.view.scale;
  let best=null;
@@ -2239,6 +2269,7 @@ function parseCoordinate(s){
 
 /* Searchable registry: only commands whose action is implemented in this build. */
 const CAD_COMMANDS=[
+ ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['MURO','WALLS','Seleccionar capa roja de muros de línea 0.30 mm o aplicar a selección'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
  ['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL','Connected editable polyline'],
  ['POLYGON','POL','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
@@ -2410,6 +2441,7 @@ function matchCadPropertiesAt(point){
 
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
+ if(['PRUEBA5X4','CUARTO5X4','ROOM5X4'].includes(upper))return loadRoomTest();
  if(upper==='MURO'||upper==='MUROS'||upper==='WALLS')return setArchitecturalLayer('walls');
  if(upper==='ABERTURA'||upper==='ABERTURAS'||upper==='OPENINGS')return setArchitecturalLayer('openings');
  if(upper==='GRID'||upper==='GRILLA')return toggle('gridOn','gridToggle');
