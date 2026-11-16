@@ -965,12 +965,14 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
    ? !BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
    : !inViewport(e,w,h))continue;
   drawEntity(e);
+  if(e.type==='line'&&state.selected.includes(e.id))drawWallMiddleGrip(e);
  }if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.tool==='zoomWindow'){
    const a=state.drag?.type==='zoomWindow'&&state.drag.start||state.stage[0];
    const b=state.drag?.type==='zoomWindow'&&state.drag.last||screen(state.mouse);
    if(a)drawZoomWindow(a,b);
  }
  if(state.drag?.type==='transform')drawTransformPreview();
+ if(state.drag?.type==='wallMiddleGrip'&&state.drag.preview){drawEntity(state.drag.preview,'#ffcf70')}
  drawInteractiveScalePreview();
  if(state.tool==='trim'&&state.modifyCandidate?.mode==='trimFence'&&state.modifyCandidate.first){
   const a=screen(state.modifyCandidate.first),b=screen(state.mouse);
@@ -978,7 +980,7 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
   ctx.fillStyle='#ffe15a';ctx.fillRect(a.x-3,a.y-3,6,6);ctx.restore();
  }
- drawOtrackGuides();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
+ drawOtrackGuides();drawWallDragMeasurement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
@@ -1264,6 +1266,54 @@ function blockGripPoints(ref){
   if(!seen.has(key)){seen.add(key);unique.push(P(p.x,p.y));if(unique.length>=160)break}
  }
  return unique;
+}
+function isEditableWall(e){
+ if(!e||e.type!=='line'||e.autoOpeningRef!==undefined)return false;
+ const l=layerFor(e);return l.visible&&!l.locked&&explicitWallLayerName(l.name);
+}
+function findWallMiddleGrip(raw){
+ if(!window.BlacklineWallGrip)return null;
+ let best=null,limit=10;
+ for(const id of state.selected){
+  const e=state.entities.find(x=>x.id===id);
+  if(!isEditableWall(e))continue;
+  const midpoint=BlacklineWallGrip.midpoint(e),screenPoint=screen(midpoint),gap=dist(screenPoint,raw);
+  if(gap<limit){limit=gap;best={id,midpoint}}
+ }
+ return best;
+}
+function drawWallMiddleGrip(e){
+ if(!isEditableWall(e)||!window.BlacklineWallGrip)return;
+ const p=screen(BlacklineWallGrip.midpoint(e));
+ ctx.save();ctx.fillStyle='#ffcb69';ctx.strokeStyle='#172734';ctx.lineWidth=1.5;
+ ctx.fillRect(p.x-5,p.y-5,10,10);ctx.strokeRect(p.x-5,p.y-5,10,10);ctx.restore();
+}
+function drawWallDragMeasurement(){
+ const d=state.drag;if(d?.type!=='wallMiddleGrip'||!d.preview||!window.BlacklineWallGrip)return;
+ const candidate=d.preview,point=screen(BlacklineWallGrip.midpoint(candidate)),n=BlacklineWallGrip.normal(candidate);
+ if(!n)return;
+ const base=screen(BlacklineWallGrip.midpoint(d.original));
+ ctx.save();ctx.lineWidth=1.4;ctx.strokeStyle='#ffc76b';ctx.setLineDash([4,4]);
+ ctx.beginPath();ctx.moveTo(base.x,base.y);ctx.lineTo(point.x,point.y);ctx.stroke();
+ ctx.setLineDash([]);
+ const distance=BlacklineWallGrip.nearestParallelWall(candidate,
+  state.entities.filter(e=>isEditableWall(e)&&e.id!==candidate.id));
+ const change=Number(d.shift?.displacement||0);
+ const label='Desplazamiento '+(change>=0?'+':'')+units(change)+' '+state.unit+
+  (distance?' · espacio '+units(Math.abs(distance.signed))+' '+state.unit:'');
+ ctx.font='12px Consolas,monospace';
+ const w=Math.min(canvas.width/dpr-12,Math.max(160,ctx.measureText(label).width+16));
+ const x=Math.max(6,Math.min(canvas.width/dpr-w-6,point.x+16)),y=Math.max(6,Math.min(canvas.height/dpr-28,point.y-32));
+ ctx.fillStyle='#182732';ctx.fillRect(x,y,w,25);ctx.strokeStyle='#ffca68';ctx.strokeRect(x,y,w,25);
+ ctx.fillStyle='#ffe7ac';ctx.fillText(label,x+8,y+17,w-14);
+ if(distance){
+  // Temporary, non-printing clearance line between parallel walls.
+  const end=screen(P(BlacklineWallGrip.midpoint(candidate).x+n.x*distance.signed,
+   BlacklineWallGrip.midpoint(candidate).y+n.y*distance.signed));
+  ctx.beginPath();ctx.strokeStyle='#8ce3f0';ctx.setLineDash([4,3]);
+  ctx.moveTo(point.x,point.y);ctx.lineTo(end.x,end.y);ctx.stroke();
+ }
+ ctx.restore();
 }
 function findSelectedBlockGrip(raw){
  let best=null,limit=10;
@@ -2551,6 +2601,13 @@ function registerMiddleClick(time,point){
 canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
  if(state.tool==='select'&&!ev.shiftKey){
+  const wallGrip=findWallMiddleGrip(raw);
+  if(wallGrip){
+   const entity=state.entities.find(e=>e.id===wallGrip.id);
+   state.drag={type:'wallMiddleGrip',id:wallGrip.id,start:raw,last:raw,original:clone(entity),
+    midpoint:wallGrip.midpoint,preview:null,shift:null};
+   canvas.style.cursor='grabbing';return;
+  }
   const grip=findSelectedBlockGrip(raw);
   if(grip){
    const entity=state.entities.find(e=>e.id===grip.id);
@@ -2559,7 +2616,13 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
   }
  }
  state.drag={type:'click',start:raw,last:raw,shift:ev.shiftKey};if(state.tool==='select'){const e=pick(world(raw));if(!e)state.drag.type='selection'} });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='blockGrip'){
+canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='wallMiddleGrip'){
+  if(window.BlacklineWallGrip){
+   const shift=BlacklineWallGrip.projectShift(d.original,world(d.start),world(raw),
+    state.snapOn?state.grid:0);
+   if(shift){d.shift=shift;d.preview=BlacklineWallGrip.shifted(d.original,shift)}
+  }
+ }else if(d.type==='blockGrip'){
   const obj=state.entities.find(e=>e.id===d.id);
   if(obj&&obj.type==='blockRef'&&!layerFor(obj).locked){
    const movement=Math.hypot(raw.x-d.start.x,raw.y-d.start.y);
@@ -2573,6 +2636,17 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
+ if(d.type==='wallMiddleGrip'){
+  canvas.style.cursor='';
+  if(d.preview&&Math.abs(d.shift?.displacement||0)>1e-9){
+   const object=state.entities.find(e=>e.id===d.id);
+   if(isEditableWall(object)){
+    saveHistory();object.a=P(d.preview.a.x,d.preview.a.y);object.b=P(d.preview.b.x,d.preview.b.y);
+    updateAll();toast('Muro desplazado · '+units(d.shift.displacement)+' '+state.unit+' · Ctrl+Z para deshacer');
+   }
+  }else schedule();
+  return;
+ }
  if(d.type==='blockGrip'){
   canvas.style.cursor='';
   if(d.moved){const ref=state.entities.find(e=>e.id===d.id);const result=ref?.type==='blockRef'?relocateOpeningWithBlock(ref,d.original):{ok:true,cut:0};updateAll();toast(!result.ok?'Vano protegido: pared modificada. No se movió el bloque.':result.cut?'Bloque y vano desplazados · Ctrl+Z para deshacer':'Bloque desplazado · Ctrl+Z para deshacer')}
@@ -2603,7 +2677,8 @@ canvas.addEventListener('pointerup',ev=>{
   return crossing?(x2>=l&&x1<=r&&y2>=t&&y1<=b):(x1>=l&&x2<=r&&y1>=t&&y2<=b);
  }).map(e=>e.id);state.selected=d.shift?[...new Set([...state.selected,...ids])]:ids;updateProps();schedule();return}const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('pointercancel',ev=>{
- const d=state.drag;if(d?.type!=='blockGrip')return;
+ const d=state.drag;if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
+ if(d?.type!=='blockGrip')return;
  state.drag=null;canvas.style.cursor='';
  if(d.moved){
   const obj=state.entities.find(e=>e.id===d.id);
@@ -4580,6 +4655,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-object-tracking.js?v=20261116"></script>
 <script src="cad-auto-opening.js?v=20261116"></script>
 <script src="cad-wall-join.js?v=20261116"></script>
+<script src="cad-wall-grip.js?v=20261116"></script>
 <script src="cad-hatch-patterns.js?v=20261116"></script>
 <script src="cad-performance.js?v=20261116"></script>
 </body></html>
