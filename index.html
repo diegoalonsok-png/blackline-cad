@@ -952,7 +952,18 @@ function cadMakeWallSegment(a,b){
  const width=cadWallThickness(),justify=cadWallJustify(),faces=cadWallFaces(a,b,width,justify);
  if(!faces)return toast('MURO: indicá dos puntos distintos');
  const layer=ensureArchitecturalLayer('walls'),group='wall-'+state.nextId;
+ // Join successive wall faces at a mitred corner when the previous segment
+ // shares the axis endpoint and both settings match.
+ const previous=state.entities.slice(-2);
+ const consecutive=previous.length===2&&previous.every((e,i)=>e.type==='line'&&e.wall2d?.face===i
+  &&Math.abs(e.wall2d.thickness-width)<1e-8&&e.wall2d.justify===justify
+  &&dist(e.wall2d.guideB,a)<1e-8&&e.wall2d.group===previous[0].wall2d.group);
+ const miters=consecutive?faces.map((f,i)=>{
+  const e=previous[i],q=unrestrictedIntersection(e.a,e.b,f.a,f.b);
+  return q&&dist(q,a)<=width*5&&dist(q,e.b)<=width*5&&dist(q,f.a)<=width*5?q:null;
+ }):[];
  saveHistory();
+ if(consecutive)for(let i=0;i<2;i++)if(miters[i]){previous[i].b=miters[i];faces[i].a=clone(miters[i])}
  for(let i=0;i<2;i++)state.entities.push({
   id:state.nextId++,type:'line',a:faces[i].a,b:faces[i].b,layer,width:.25,
   wall2d:{group,face:i,thickness:width,justify,guideA:clone(a),guideB:clone(b)}
@@ -1797,6 +1808,11 @@ function finishStage(close=false){
 }
 function undoDrawingVertex(){
  const s=state.stage,t=state.tool;
+ if(t==='wall2d'&&s.length){
+  if(s.length===1){s.pop();prompt();schedule();return}
+  if(!state.history.length)return toast('No hay segmentos de muro para deshacer');
+  const points=clone(s.slice(0,-1));undo();state.tool='wall2d';state.stage=points;prompt();schedule();return;
+ }
  if(!['line','polyline'].includes(t)||!s.length)return toast('No current point to undo');
  if(t==='polyline'){s.pop();prompt();schedule();return}
  if(s.length===1){s.pop();prompt();schedule();return}
