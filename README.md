@@ -55,6 +55,14 @@ The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, b
 - The idle cursor shows a crosshair without a central square. The adjustable pickbox is shown only with active drawing/editing commands; selection/editing modes use a square selector.
 - These changes concern interaction and viewport state, not model coordinates or saved entity geometry.
 
+## General workflow improvements (November 2026)
+
+- **Right click on an inserted block → Editar bloque (BEDIT)** opens a guarded 2D block-definition editor. The editable JSON is validated before saving, with Cancel, Export backup copy, and Undo support. Existing specialized parametric blocks are edited via the Properties palette rather than overwriting the parametric generator.
+- **I + Enter** opens the computer file picker for importing supported `.cadblock` or `.dxf` block libraries; **W + Enter** exports the selected block to a portable `.cadblock` file. **INSERT + Enter** continues to insert a previously chosen library definition.
+- Native `.cadblock` export **version 2** preserves `dynamic2d` and supported parametric definition defaults. The importer accepts older version 1 and new version 2, converts length parameters between model units, validates metadata before mutation, and refuses to overwrite definitions that are already used by placed references.
+- One gallery-thumbnail click selects a symbol and arms its insertion; a second click in the canvas places **one** instance. The older repeat-insert default has been disabled in this gallery workflow.
+- This is **not** an AutoCAD native dynamic DWG editing implementation; unsupported file geometry and proprietary dynamic constraints remain outside scope. Verify graphical behavior in a browser prior to production use.
+
 ## Parametric architectural walls (first 2D stage)
 
 - Use **MURO** / **WALL** or the *Muros paramétricos 2D* panel to draw a linked pair of wall faces, with a true model-space thickness.
