@@ -88,7 +88,7 @@ function init(){
  const section=document.createElement('section');section.id='cad2dReal50';
  section.style.cssText='border:1px solid #536b7c;border-radius:11px;margin:10px 0;padding:9px';
  section.innerHTML='<div style="font-weight:750;font-size:12px;margin-bottom:7px">50 BLOQUES REALES · OLIMPIADAS</div><p style="font-size:10px;line-height:1.5;margin:4px 0 8px">Cargá el archivo CAD2D_50_bloques_olimpiadas.json. Los símbolos proceden de tu DXF original y las miniaturas representan exactamente las mismas entidades que se insertan. Escala física normalizada provisoriamente: verificá medidas.</p><input type="file" id="cad2dReal50File" accept=".json,application/json" style="font-size:10px;width:100%"><div id="cad2dReal50Status" role="status" style="font-size:10px;margin:8px 0"></div><input id="cad2dReal50Search" type="search" placeholder="Buscar en 50 bloques…" style="width:100%;margin:5px 0" hidden><div id="cad2dReal50Tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0"></div><div id="cad2dReal50Grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:400px;overflow:auto"></div>';
- const before=$('blParametricPanel');if(before)before.before(section);else host.prepend(section);
+ host.prepend(section);
  const status=$('cad2dReal50Status'),input=$('cad2dReal50File'),tabs=$('cad2dReal50Tabs'),grid=$('cad2dReal50Grid'),search=$('cad2dReal50Search');
  function show(){
   tabs.replaceChildren();grid.replaceChildren();
