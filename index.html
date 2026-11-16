@@ -1115,6 +1115,20 @@ function dimensionPrimitives(e){
    Their position is the editable insertion pivot. The original definition remains reusable. */
 /* Explicit parametric symbols retain dimensions per placed instance. */
 function blockInstanceGeometry(definition,ref){
+ if(definition.dynamic2d?.type==='linear-stretch'&&!definition.parametric){
+  const config=definition.dynamic2d,original=Number(config.length);
+  const desired=Number(ref.params?.dynamicLength??original);
+  if(Number.isFinite(original)&&original>0&&Number.isFinite(desired)&&desired>0&&desired<1e8){
+   const threshold=Number(config.threshold),delta=desired-original;
+   return definition.entities.map(source=>{
+    const e=clone(source);
+    const move=p=>P(p.x+(p.x>=threshold-1e-8?delta:0),p.y);
+    if(e.a)e.a=move(e.a);if(e.b)e.b=move(e.b);if(e.p)e.p=move(e.p);
+    if(e.c)e.c=move(e.c);if(e.pts)e.pts=e.pts.map(move);
+    return e;
+   });
+  }
+ }
  const param=definition.parametric;
  if(!param||!ref.params)return definition.entities;
  const w=Number(ref.params.width),h=Number(ref.params.depth);
@@ -2683,6 +2697,8 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
  if(cmd==='QSAVE'||cmd==='SAVEAS')return saveJSON();
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){if(window.confirm('Create a new drawing? Save your current work first.')){saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];state.file='Untitled Drawing';state.nextId=1;renderBlockLibrary();updateAll();zoomExtents()}return}
+ if(['BEDIT','EDITARBLOQUE','EDITARBLOQUES'].includes(cmd))return openDynamicBlockEditor(false);
+ if(['TESTBLOCK','PROBARBLOQUE'].includes(cmd))return openDynamicBlockEditor(true);
  if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
  if(cmd==='INSERT'||cmd==='I')return $('insertBlockBtn').click();
  if(cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return $('exportBlockBtn').click();
@@ -3641,6 +3657,126 @@ function initBlocks(){
   if(!window.confirm('Eliminar definición sin inserciones: '+name+'?'))return;
   saveHistory();delete state.blocks[name];renderBlockLibrary();queueLocalBackup();toast('Block definition removed');
  };
+}
+
+
+/* A limited, non-destructive 2D dynamic block editor.
+   Parameter: horizontal linear span. Action: stretch vertices to the right of
+   a split line. This is intentionally not an AutoCAD DWG dynamic-block parser. */
+function openDynamicBlockEditor(testOnly=false){
+ const picked=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');
+ const name=picked?.blockName||$('blockLibrary')?.value;
+ const def=name&&state.blocks[name];
+ if(!def){toast('BEDIT: seleccioná un bloque insertado o elegí uno de la biblioteca');return}
+ if(def.parametric){toast('Este bloque ya usa parámetros arquitectónicos: editá sus medidas desde Propiedades del bloque. BEDIT lineal se reserva para bloques 2D genéricos.');return}
+ if(!Array.isArray(def.entities)||!def.entities.length){toast('BEDIT: geometría no disponible');return}
+ const coords=[];
+ for(const entity of def.entities){
+  if(entity.a)coords.push(entity.a);
+  if(entity.b)coords.push(entity.b);
+  if(entity.c)coords.push(entity.c);
+  if(entity.p)coords.push(entity.p);
+  if(Array.isArray(entity.pts))coords.push(...entity.pts);
+ }
+ if(!coords.length){toast('BEDIT: no se encontraron vértices');return}
+ const xs=coords.filter(p=>Number.isFinite(p.x)).map(p=>p.x);
+ const low=Math.min(...xs),high=Math.max(...xs),span=high-low;
+ if(!(span>1e-8)){toast('BEDIT: el bloque necesita una longitud horizontal mayor que cero');return}
+ const existing=def.dynamic2d?.type==='linear-stretch'?def.dynamic2d:null;
+ const panel=document.createElement('div');
+ panel.className='bl-dynamic-modal';
+ panel.style.cssText='position:fixed;inset:0;z-index:9997;background:#03070bc9;display:grid;place-items:center;padding:16px';
+ const card=document.createElement('section');
+ card.style.cssText='width:min(670px,96vw);max-height:92vh;overflow:auto;background:#202a34;color:#eef5f8;border:1px solid #7894a7;border-radius:13px;padding:20px;box-shadow:0 20px 70px #000b;font:13px/1.5 system-ui';
+ const heading=document.createElement('h2');heading.textContent=(testOnly?'TESTBLOCK · Probar bloque':'BEDIT · Editor de bloques')+' · '+name;heading.style.margin='0 0 9px';
+ const note=document.createElement('p');note.style.color='#bac9d3';
+ note.textContent='Parámetro lineal horizontal + acción Estirar. Los vértices del lado derecho de la línea de corte se desplazan. No modifica círculos ni arcos de forma paramétrica.';
+ const row=document.createElement('div');row.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:14px 0';
+ function field(label,value,min,step){
+  const wrap=document.createElement('label');wrap.textContent=label;wrap.style.cssText='display:grid;gap:5px';
+  const input=document.createElement('input');input.type='number';input.step=step||'any';
+  input.min=String(min);input.value=String(value);
+  input.style.cssText='background:#0e1720;border:1px solid #52687a;border-radius:6px;color:white;padding:10px;width:100%';
+  wrap.append(input);row.append(wrap);return input;
+ }
+ const baseLength=existing?.length||span;
+ const lengthInput=field('Distancia base del parámetro',baseLength,.000001);
+ const splitInput=field('Posición X de la línea de estiramiento',existing?.threshold??(low+span*.5),low);
+ const testInput=field('Probar ancho (unidad del modelo)',picked?.params?.dynamicLength??baseLength,.000001);
+ const help=document.createElement('p');help.style.cssText='color:#c7d4db;font-size:12px';
+ help.textContent='Definición: el punto inicial es el extremo izquierdo; el final es el extremo derecho. La línea de estiramiento define cuáles vértices se desplazan.';
+ const preview=document.createElement('div');preview.style.cssText='height:230px;background:#111820;border:1px solid #42596b;border-radius:8px;margin:12px 0;overflow:hidden';
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox','0 0 600 220');svg.setAttribute('width','100%');svg.setAttribute('height','100%');preview.append(svg);
+ const status=document.createElement('p');status.style.cssText='min-height:20px;color:#e7c88c;font-size:12px';
+ const buttons=document.createElement('div');buttons.style.cssText='display:flex;justify-content:flex-end;gap:9px;flex-wrap:wrap';
+ const closeButton=document.createElement('button');closeButton.textContent='Cerrar sin guardar';
+ const saveButton=document.createElement('button');saveButton.textContent=testOnly?'Aplicar medida a la inserción':'Guardar parámetro + acción';
+ for(const button of [closeButton,saveButton])button.style.cssText='border:1px solid #668095;border-radius:7px;padding:10px 14px;background:#2a4052;color:#f4f8fa;cursor:pointer';
+ buttons.append(closeButton,saveButton);
+ card.append(heading,note,row,help,preview,status,buttons);panel.append(card);document.body.append(panel);
+ const cancel=()=>panel.remove();closeButton.onclick=cancel;
+ panel.addEventListener('click',e=>{if(e.target===panel)dispose()});
+ const escape=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();document.removeEventListener('keydown',escape,true);cancel()}};
+ document.addEventListener('keydown',escape,true);
+ const dispose=()=>{document.removeEventListener('keydown',escape,true);cancel()};
+ closeButton.onclick=dispose;
+ function values(){
+  const length=Number(lengthInput.value),split=Number(splitInput.value),test=Number(testInput.value);
+  if(!Number.isFinite(length)||length<=0||length>1e8)return null;
+  if(!Number.isFinite(split)||split<low||split>high)return null;
+  if(!Number.isFinite(test)||test<=0||test>1e8)return null;
+  return {length,split,test};
+ }
+ function render(){
+  svg.replaceChildren();const v=values();
+  if(!v){status.textContent='Ingresá medidas positivas y una línea de corte dentro de la definición.';return}
+  const dx=v.test-v.length;
+  const px=p=>({x:p.x+(p.x>=v.split-1e-8?dx:0),y:p.y});
+  const points=[];
+  const segments=[];
+  for(const e of def.entities){
+   if(e.type==='line'){segments.push([px(e.a),px(e.b)])}
+   else if(e.type==='polyline'&&Array.isArray(e.pts)){
+    for(let j=1;j<e.pts.length;j++)segments.push([px(e.pts[j-1]),px(e.pts[j])]);
+    if(e.closed&&e.pts.length>2)segments.push([px(e.pts.at(-1)),px(e.pts[0])]);
+   }
+   else if(e.type==='rect'){const a=e.a,b=e.b,p=[{x:a.x,y:a.y},{x:a.x,y:b.y},{x:b.x,y:b.y},{x:b.x,y:a.y}].map(px);for(let j=0;j<4;j++)segments.push([p[j],p[(j+1)%4]])}
+   else if(e.type==='circle'||e.type==='arc'){
+    const center=px(e.c);
+    const begin=e.type==='circle'?0:e.a0,end=e.type==='circle'?Math.PI*2:e.a1;
+    const n=48;
+    for(let j=1;j<=n;j++){
+     const angle1=begin+(end-begin)*(j-1)/n,angle2=begin+(end-begin)*j/n;
+     segments.push([{x:center.x+e.r*Math.cos(angle1),y:center.y+e.r*Math.sin(angle1)},{x:center.x+e.r*Math.cos(angle2),y:center.y+e.r*Math.sin(angle2)}]);
+    }
+   }
+  }
+  for(const seg of segments)points.push(...seg);
+  if(!points.length){status.textContent='Vista previa disponible para líneas, polilíneas, rectángulos, círculos y arcos.';return}
+  const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x));
+  const minY=Math.min(...points.map(p=>p.y)),maxY=Math.max(...points.map(p=>p.y));
+  const scale=Math.min(530/Math.max(maxX-minX,.001),165/Math.max(maxY-minY,.001),1e5);
+  const sx=x=>35+(x-minX)*scale,sy=y=>190-(y-minY)*scale;
+  const ns='http://www.w3.org/2000/svg';
+  for(const [a,b] of segments){const line=document.createElementNS(ns,'line');line.setAttribute('x1',sx(a.x));line.setAttribute('y1',sy(a.y));line.setAttribute('x2',sx(b.x));line.setAttribute('y2',sy(b.y));line.setAttribute('stroke','#8fd9f4');line.setAttribute('stroke-width','1.8');svg.append(line)}
+  const cut=document.createElementNS(ns,'line');cut.setAttribute('x1',sx(v.split));cut.setAttribute('x2',sx(v.split));cut.setAttribute('y1',0);cut.setAttribute('y2',220);cut.setAttribute('stroke','#e9b776');cut.setAttribute('stroke-dasharray','6 5');svg.append(cut);
+  status.textContent='Prueba: variación de ancho '+dx.toFixed(3)+' · Las inserciones existentes no cambian hasta aplicar una medida.';
+ }
+ for(const input of [lengthInput,splitInput,testInput])input.addEventListener('input',render);
+ saveButton.onclick=()=>{
+  const v=values();if(!v){status.textContent='Valores inválidos. No se guardaron cambios.';return}
+  if(testOnly){
+   if(!picked){status.textContent='Seleccioná una inserción en el plano para aplicar la medida.';return}
+   if(!def.dynamic2d){status.textContent='Primero guardá el parámetro con BEDIT.';return}
+   saveHistory();picked.params={...(picked.params||{}),dynamicLength:v.test};updateAll();dispose();toast('TESTBLOCK: ancho aplicado a esta inserción');return;
+  }
+  // A single reversible change updates the definition; copies stay intact.
+  saveHistory();
+  def.dynamic2d={type:'linear-stretch',length:v.length,threshold:v.split,version:1};
+  updateAll();dispose();toast('BEDIT: parámetro lineal y acción estirar guardados');
+ };
+ render();
 }
 
 /* Keep the Layers palette at the top of the left dock, above Drawing properties. */
