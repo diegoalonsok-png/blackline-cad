@@ -1097,6 +1097,10 @@ function blockInstanceGeometry(definition,ref){
    {...base,type:'arc',c:P2(hinge,0),r:w,a0:right?Math.PI/2:0,a1:right?Math.PI:Math.PI/2}
   ];
  }
+ if(param.kind==='round-table'){
+  const r=w/2;
+  return [{...base,type:'circle',c:P2(0,0),r}];
+ }
  if(param.kind==='rect-table'&&Number.isFinite(h)&&h>0&&h<1e8){
   return [
    {...base,type:'rect',a:P2(0,0),b:P2(w,h)},
@@ -3677,7 +3681,7 @@ window.BlacklineBlockAPI=Object.freeze({
   if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
   const normalized=normalizeBlockEntities(entities);
   saveHistory();
-  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','rect-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
+  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
   renderBlockLibrary();queueLocalBackup();
   return normalized.length;
  },
