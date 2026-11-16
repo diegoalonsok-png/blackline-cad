@@ -1109,11 +1109,12 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:state.layers.some(l=>l.id===e.layer)?e.layer:ref.layer}));
+ return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer}));
 }
 function flattenCADEntities(entities){return entities.flatMap(e=>e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e])}
 
 function drawEntity(e,forceColor){if(e.type==='blockRef'){
+  if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(state.selected.includes(e.id)){
    const pivot=screen(e.p);ctx.save();ctx.strokeStyle=displayColors.selection;ctx.strokeRect(pivot.x-5,pivot.y-5,10,10);ctx.restore();
@@ -2104,10 +2105,19 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
   $('blSelectedBlockName').textContent=block.blockName;
   $('blRefX').value=Number(block.p.x.toFixed(5));$('blRefY').value=Number(block.p.y.toFixed(5));
   $('blRefScale').value=block.scale;$('blRefAngle').value=block.rotation||0;
+  const para=state.blocks?.[block.blockName]?.parametric;
+  const paraBox=$('blRefParametric');if(paraBox){paraBox.hidden=!para;
+   if(para){$('blRefWidth').value=Number(block.params?.width??para.defaults.width);
+    $('blRefDepthRow').hidden=para.kind!=='rect-table';
+    $('blRefMirrorRow').hidden=para.kind!=='swing-door';
+    $('blRefDepth').value=Number(block.params?.depth??para.defaults.depth??0);
+    $('blRefMirror').checked=Boolean(block.params?.mirror??para.defaults.mirror);
+   }
+  }
  }}
 $('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
-function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef')return v;for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
+function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){if(v.params){for(const k of ['width','depth'])if(Number.isFinite(v.params[k]))v.params[k]*=ratio;}return v;}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
 function openCadUnitsDialog(){
  const labels={mm:'Milímetros / Millimeters',cm:'Centímetros / Centimeters',m:'Metros / Meters',in:'Pulgadas / Inches',ft:'Pies / Feet'};
  const answer=window.prompt('UNITS / UNIDADES — unidad actual: '+labels[state.unit]+'\\nEscribí mm, cm, m, in o ft. La geometría se convierte manteniendo medidas físicas.',state.unit);
@@ -3678,13 +3688,19 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  const pane=$('properties')?.closest('.panel');if(!pane)return;
  const box=document.createElement('section');box.id='blSelectedBlockEditor';box.hidden=true;
  box.style.cssText='padding:9px;margin-top:8px;border:1px solid #536a78;border-radius:8px';
- box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
+ box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
  pane.querySelector('.panel-content')?.append(box);
  $('blApplyBlockRef').onclick=()=>{
   const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');if(!ref)return;
   const x=Number($('blRefX').value),y=Number($('blRefY').value),scale=Number($('blRefScale').value),angle=Number($('blRefAngle').value);
   if(![x,y,scale,angle].every(Number.isFinite)||scale<=0)return toast('Pivote, escala o giro inválidos');
-  saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;updateAll();toast('Bloque actualizado como unidad');
+  const param=state.blocks?.[ref.blockName]?.parametric;let w,d;
+  if(param){w=Number($('blRefWidth').value);d=Number($('blRefDepth').value);
+   if(!Number.isFinite(w)||w<=0||w>1e8||(param.kind==='rect-table'&&(!Number.isFinite(d)||d<=0||d>1e8)))return toast('Ancho o profundidad inválidos');
+  }
+  saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;
+  if(param)ref.params={...ref.params,width:w,...(param.kind==='rect-table'?{depth:d}:{mirror:$('blRefMirror').checked})};
+  updateAll();toast('Bloque actualizado como unidad');
  };
 })();
 
