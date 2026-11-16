@@ -978,7 +978,7 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
  if(state.tool==='select'&&(cadSelectionAnchor||state.drag?.type==='selection')){
   const d=state.drag?.type==='selection'?state.drag:null;
   const a=d?.start||cadSelectionAnchor,b=d?.last||pointer;
-  const lasso=d&&d.path?.length>=3&&d.path.some(pt=>Math.abs(pt.y-a.y)>8);
+  const lasso=!!d&&Array.isArray(d.path)&&d.path.length>=2;
   if(a&&b){
    const crossing=b.x<a.x;
    ctx.save();ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';
@@ -2717,7 +2717,7 @@ function cadLassoHitsBox(poly,bb,crossing){
 }
 function cadApplyWindowSelection(start,end,shift,path){
  const crossing=end.x<start.x;
- const useLasso=Array.isArray(path)&&path.length>=3&&path.some(p=>Math.abs(p.y-start.y)>8);
+ const useLasso=Array.isArray(path)&&path.length>=2;
  const poly=useLasso?[start,...path]:null;
  const l=Math.min(start.x,end.x),r=Math.max(start.x,end.x),t=Math.min(start.y,end.y),b=Math.max(start.y,end.y);
  const ids=state.entities.filter(e=>{
@@ -2779,7 +2779,7 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
    }
   }
  }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}
- else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7){d.type='selection';d.path=[d.start,raw];cadSelectionAnchor=null}
+ else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
  }schedule()});
 canvas.addEventListener('pointerup',ev=>{
@@ -2823,10 +2823,11 @@ canvas.addEventListener('pointerup',ev=>{
   else toast('Elegí la esquina opuesta de la ventana');
   schedule();return;
  }
- if(d.type==='selection'){cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
+ if(d.type==='selection'){if(dist(d.path.at(-1),raw)>0.5)d.path.push(P(raw.x,raw.y));cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
  const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('pointercancel',ev=>{
  const d=state.drag;if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
+ if(d?.type==='selection'||d?.type==='selectionStart'||d?.type==='selectionSecond'){state.drag=null;cadSelectionAnchor=null;cadSelectionAnchorShift=false;schedule();return}
  if(d?.type!=='blockGrip')return;
  state.drag=null;canvas.style.cursor='';
  if(d.moved){
