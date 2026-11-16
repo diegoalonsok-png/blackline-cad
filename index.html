@@ -3467,6 +3467,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='QSAVE'||cmd==='SAVEAS')return saveJSON();
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){if(window.confirm('Create a new drawing? Save your current work first.')){saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];state.file='Untitled Drawing';state.nextId=1;renderBlockLibrary();updateAll();zoomExtents()}return}
+ if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(cmd))return cadEditBlockDefinition(cadActiveBlockRef()?.blockName||$('blockLibrary').value);
  if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
  if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
  if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
@@ -3927,6 +3928,42 @@ let cad2dLastCommand='';
 function cad2dExecuteContextCommand(name){
  $('command').value=name;runCommand();canvas.focus({preventScroll:true});
 }
+function cadEditBlockDefinition(name){
+ const def=state.blocks?.[name];
+ if(!def)return toast('EDITAR BLOQUE: seleccioná una referencia en el dibujo o elegí una definición');
+ if(def.parametric){
+  const ref=state.entities.find(e=>e.type==='blockRef'&&e.blockName===name);
+  if(ref){state.selected=[ref.id];updateProps();$('blSelectedBlockEditor')?.scrollIntoView({block:'nearest'});}
+  return toast('Bloque paramétrico: editá sus parámetros en Propiedades');
+ }
+ document.getElementById('cadBlockDefEditor')?.remove();
+ const overlay=document.createElement('div');overlay.id='cadBlockDefEditor';
+ overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
+ const panel=document.createElement('section');panel.style.cssText='width:min(780px,96vw);max-height:92vh;padding:16px;background:#1e2930;color:#e8f4fa;border:1px solid #6a8794;border-radius:12px;display:flex;flex-direction:column;gap:10px';
+ const heading=document.createElement('h3');heading.style.margin='0';heading.textContent='EDITAR BLOQUE · '+name;
+ const hint=document.createElement('p');hint.textContent='Editor de definición: editá las entidades 2D en JSON. Guardar modifica todas las inserciones; Cancelar conserva el dibujo. Antes de editar, guardá una copia del proyecto.';hint.style.margin='0';
+ const area=document.createElement('textarea');area.value=JSON.stringify(def.entities,null,2);area.spellcheck=false;area.setAttribute('aria-label','Entidades JSON de la definición de bloque');
+ area.style.cssText='min-height:220px;height:50vh;resize:vertical;background:#10181d;color:#d8eef8;border:1px solid #668293;border-radius:6px;padding:12px;font:12px/1.5 monospace;width:100%;box-sizing:border-box';
+ const status=document.createElement('p');status.style.cssText='color:#f7ca88;margin:0';status.setAttribute('aria-live','polite');
+ const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap';
+ const cancel=document.createElement('button');cancel.className='btn';cancel.textContent='Cancelar';cancel.onclick=()=>overlay.remove();
+ const exportCopy=document.createElement('button');exportCopy.className='btn';exportCopy.textContent='Exportar copia';
+ exportCopy.onclick=()=>{const old=$('blockLibrary').value;$('blockLibrary').value=name;$('exportBlockBtn').click();$('blockLibrary').value=old};
+ const save=document.createElement('button');save.className='btn primary';save.textContent='Guardar definición';
+ save.onclick=()=>{
+  try{
+   const parsed=JSON.parse(area.value);
+   const entities=normalizeBlockEntities(parsed);
+   saveHistory();def.entities=entities;
+   updateAll();renderBlockLibrary();queueLocalBackup();overlay.remove();
+   toast('Bloque actualizado: '+name+' · '+entities.length+' entidades (Ctrl+Z para deshacer)');
+  }catch(err){status.textContent='No se modificó el bloque: '+err.message;}
+ };
+ actions.append(cancel,exportCopy,save);panel.append(heading,hint,area,status,actions);overlay.append(panel);document.body.append(overlay);
+ overlay.addEventListener('pointerdown',ev=>{if(ev.target===overlay)overlay.remove()});
+ overlay.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.stopPropagation();ev.preventDefault();overlay.remove()}});
+ area.focus();
+}
 function openCadContextMenu(x,y,worldPoint){
  const menu=$('cadContextMenu');menu.setAttribute('role','menu');
  const target=pick(worldPoint);
@@ -3935,13 +3972,14 @@ function openCadContextMenu(x,y,worldPoint){
   state.selected=[target.id];updateProps();schedule();
  }
  const count=state.selected.length,active=state.tool!=='select'&&state.tool!=='pan';
+ const blockTarget=target?.type==='blockRef'?target:cadActiveBlockRef();
  const title=active?'Comando activo · '+state.tool:count?'Selección · '+count+' objeto(s)':'Espacio modelo';
  const item=(label,action,disabled=false)=>({label,action,disabled});
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
  const actions=active?[
    item('↵ Finalizar / Enter',()=>finishStage()),
    item('✕ Cancelar / Esc',()=>cancelCadCommand()),
-   item('Deshacer último paso',()=>{if(['line','polyline'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
+   item('Deshacer último paso',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
    null,
    command('Recortar · TR','TRIM'),command('Desfase · O','OFFSET'),
    command('Zoom ventana · Z','Z'),
@@ -3951,6 +3989,7 @@ function openCadContextMenu(x,y,worldPoint){
    command('Girar · RO','ROTATE'),command('Escalar · SC','SCALE'),
    command('Simetría · MI','MIRROR'),command('Desfase · O','OFFSET'),
    null,
+   ...(blockTarget?[item('Editar bloque · BEDIT',()=>cadEditBlockDefinition(blockTarget.blockName)),item('Exportar bloque · W',()=>cadExportActiveBlock())]:[]),
    item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
    item('Copiar al portapapeles · Ctrl+C',()=>copySelectedCadObjects()),
    command('Crear bloque · B','BLOCK'),
