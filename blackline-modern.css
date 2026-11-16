@@ -146,3 +146,105 @@
 #blFileMenu:has(~ .app.bl-light),body:has(.app.blackline-modern.bl-light) #blFileMenu{background:#f9fafb;color:#1d2d3e;border-color:#aebac7;box-shadow:0 12px 32px #14263833}
 body:has(.app.blackline-modern.bl-light) #blFileMenu .bl-file-menu-title{color:#5b6d7d;border-color:#cbd4dd}
 body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.blackline-modern.bl-light) #blFileMenu button:focus-visible{background:#dae9f3}
+
+
+/* CAD2D design system v3 — original implementation after approved visual concept.
+   UI-only; preserves coordinates, geometry, all event bindings and native drawing behavior. */
+.app.blackline-modern:not(.bl-light){
+ --cad-ui-base:#101318;--cad-ui-raised:#1a2027;--cad-ui-toolbar:#11151b;
+ --cad-ui-input:#161c23;--cad-ui-text:#edf2f7;--cad-ui-muted:#a6b2bf;
+ --cad-ui-edge:#35424e;--bl-bg:#0b0e12;--bl-panel:#161b21;
+}
+.app.blackline-modern:not(.bl-light) .brandbar{
+ background:#101318!important;border-bottom:1px solid #303d4a!important;
+ box-shadow:inset 0 -1px 0 #141a20!important;gap:9px!important;
+}
+.app.blackline-modern .brandbar .mark{
+ width:35px!important;height:35px!important;min-width:35px!important;border-radius:11px!important;
+ border:1px solid #718596!important;background:linear-gradient(165deg,#171f27,#090d12)!important;
+ box-shadow:inset 0 1px 0 #ffffff1b,0 0 0 2px #26323c6e!important;
+ color:#f2f7fa!important;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s;
+}
+.app.blackline-modern .mark .cad2d-logo-symbol{height:28px!important;width:28px!important;display:block!important;fill:none!important;stroke:currentColor!important;stroke-width:1.7!important;stroke-linejoin:round!important;stroke-linecap:round!important}
+.app.blackline-modern .brandbar .mark:hover,.app.blackline-modern .brandbar .mark:focus-visible{
+ border-color:#d5e8f3!important;box-shadow:0 0 0 2px #89c0e530!important;outline:none;
+}
+.app.blackline-modern .brand{font-weight:750!important;font-size:17px!important;letter-spacing:-.48px!important;color:#f4f6f9!important}
+.app.blackline-modern .brand small{letter-spacing:.85px!important;font-size:8px!important;color:#a5b2bd!important}
+.app.blackline-modern:not(.bl-light) .filename,.app.blackline-modern:not(.bl-light) .cad-command-finder{
+ background:#171c24!important;border:1px solid #37414e!important;color:#d7e0e9!important;
+ border-radius:10px!important;box-shadow:inset 0 1px 0 #ffffff08!important;
+}
+.app.blackline-modern:not(.bl-light) .brandbar .btn,.app.blackline-modern:not(.bl-light) .cad-workspace-controls .btn{
+ background:linear-gradient(180deg,#1c232d,#161a22)!important;border:1px solid #364452!important;
+ border-radius:9px!important;color:#e8edf1!important;box-shadow:inset 0 1px 0 #ffffff0b!important;
+}
+.app.blackline-modern:not(.bl-light) .tabbar{background:#0e1319!important;border-color:#33414e!important}
+.app.blackline-modern:not(.bl-light) .tabbar .tab.active{
+ background:linear-gradient(180deg,#272f39,#20252e)!important;
+ border:1px solid #728491!important;border-bottom:2px solid #89cadd!important;
+ border-radius:8px 8px 0 0!important;
+}
+.app.blackline-modern:not(.bl-light) .ribbon-shell{
+ background:#131820!important;border-color:#34404c!important;
+ border-radius:12px!important;box-shadow:inset 0 1px 0 #ffffff0a,0 5px 14px #0005!important;
+}
+.app.blackline-modern:not(.bl-light) .ribbon .tool,
+.app.blackline-modern:not(.bl-light) .ribbon .group.stack .tool,
+.app.blackline-modern:not(.bl-light).cad-ribbon-compact .ribbon .tool,
+.app.blackline-modern:not(.bl-light).cad-ribbon-compact .ribbon .group.stack .tool{
+ background:#050709!important;border-color:#0c1015!important;border-radius:11px!important;
+ box-shadow:inset 0 1px 0 #ffffff0b,0 2px 4px #0004!important;
+ transition:background .12s,border-color .12s,transform .12s!important;
+}
+.app.blackline-modern:not(.bl-light) .ribbon .tool:hover{
+ background:#1c2631!important;border-color:#698296!important;transform:translateY(-1px);
+}
+.app.blackline-modern:not(.bl-light) .ribbon .tool.active{
+ background:#21313d!important;border-color:#9cbcd0!important;box-shadow:0 0 0 1px #bed9ea46!important;
+}
+.app.blackline-modern:not(.bl-light) .ribbon .tool svg{
+ stroke:#f7f9fc!important;stroke-width:1.75!important;width:23px!important;height:23px!important;
+}
+.app.blackline-modern:not(.bl-light) .ribbon .group{border-color:#3a4652!important}
+.app.blackline-modern:not(.bl-light) .bl-icon-rail{
+ background:#121820f0!important;border-color:#394957!important;border-radius:14px!important;
+ box-shadow:0 8px 28px #0008!important;
+}
+.app.blackline-modern:not(.bl-light) .bl-icon-rail button{
+ border-radius:11px!important;background:#06080b!important;border:1px solid #131921!important;
+ box-shadow:inset 0 1px 0 #ffffff0b!important;
+}
+.app.blackline-modern:not(.bl-light) .bl-icon-rail button:hover,
+.app.blackline-modern:not(.bl-light) .bl-icon-rail button[aria-pressed=true]{
+ background:#273743!important;border-color:#b3d5e5!important;
+}
+.app.blackline-modern:not(.bl-light) .bl-icon-rail button svg{stroke:#f8fafc!important;stroke-width:1.8!important}
+.app.blackline-modern:not(.bl-light) .sidebar{background:#0e141a!important;border-color:#263541!important}
+.app.blackline-modern:not(.bl-light) .sidebar>.panel{
+ background:#161d24!important;border:1px solid #364553!important;border-radius:14px!important;
+}
+.app.blackline-modern:not(.bl-light) .panel-title{
+ background:#303943!important;border-color:#566776!important;color:#f2f5f8!important;
+ font-weight:700!important;letter-spacing:.35px!important;
+}
+.app.blackline-modern:not(.bl-light) #blCards button{
+ background:linear-gradient(145deg,#39424d,#2c3540)!important;
+ border:1px solid #455362!important;border-radius:13px!important;
+}
+.app.blackline-modern:not(.bl-light) #blCards button:hover{
+ border-color:#b9d2df!important;box-shadow:0 0 0 1px #c3deea2d!important;
+}
+.app.blackline-modern:not(.bl-light) #blCards svg *{stroke:#f3f6f9!important}
+.app.blackline-modern:not(.bl-light) .cmd .command-row{
+ background:#161b23!important;border-color:#3a4a58!important;border-radius:11px!important;
+}
+.app.blackline-modern:not(.bl-light) .status button{
+ background:#181e27!important;border-color:#344351!important;border-radius:8px!important;
+}
+.app.blackline-modern:not(.bl-light) .status button.on{
+ background:#283744!important;border-color:#85aebe!important;color:#f6fcff!important;
+}
+@media (prefers-reduced-motion:reduce){
+ .app.blackline-modern .ribbon .tool,.app.blackline-modern .brandbar .mark{transition:none!important;transform:none!important}
+}
