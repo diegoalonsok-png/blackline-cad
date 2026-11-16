@@ -2853,7 +2853,7 @@ function cad2dNormalizeCommand(value){
 const CAD_COMMANDS=[
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['MURO','WALLS','Seleccionar capa roja de muros de línea 0.30 mm o aplicar a selección'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
- ['ZOOM','Z','Zoom por ventana azul o verde · clic-clic o arrastrar'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
+ ['ZOOM','Z','Z + Enter, − + Enter aleja; + acerca; E encuadra; W ventana'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
  ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
  ['ARC','A','Center and arc endpoints'],['ELLIPSE','EL','Ellipse'],['HATCH','H','Hatch selected closed boundaries'],
  ['TABLE','','Insert editable table'],['TEXT','T','Insert single-line annotation'],
@@ -3019,13 +3019,34 @@ function matchCadPropertiesAt(point){
  saveHistory();copyCadProperties(from,e);updateAll();toast('Object properties copied · select another target or press Enter');
 }
 
-function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}const upper=cad2dNormalizeCommand(value);
+let cadZoomOptionPending=false;
+function cadZoomStep(direction){
+ const at=P(wrap.clientWidth/2,wrap.clientHeight/2);
+ const previous=state.view.scale;
+ centerZoom(direction==='out'?0.8:1.25,at);
+ cadZoomOptionPending=false;state.tool='select';state.stage=[];state.modifyCandidate=null;
+ prompt();schedule();
+ toast(direction==='out'?'ZOOM −: dibujo alejado':'ZOOM +: dibujo ampliado');
+ log('ZOOM '+(direction==='out'?'OUT':'IN')+' '+previous.toFixed(3)+' → '+state.view.scale.toFixed(3));
+}
+function runCommand(){let value=$('command').value.trim();$('command').value='';
+ if(cadZoomOptionPending&&['-','_','OUT','ALEJAR','MENOS'].includes(value.toUpperCase()))return cadZoomStep('out');
+ if(cadZoomOptionPending&&['+','IN','ACERCAR','MAS'].includes(value.toUpperCase()))return cadZoomStep('in');
+ if(cadZoomOptionPending&&['E','EXTENTS','EXTENSION'].includes(value.toUpperCase())){cadZoomOptionPending=false;return zoomExtents()}
+ if(cadZoomOptionPending&&['W','VENTANA'].includes(value.toUpperCase())){cadZoomOptionPending=false;return setTool('zoomWindow')}
+ if(value&&!['Z','ZOOM','ZW','ZOOMVENTANA'].includes(value.toUpperCase()))cadZoomOptionPending=false;
+ if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}const upper=cad2dNormalizeCommand(value);
  value=upper;
  // Remember only recognized action names; numeric parameters never replace the last command.
  if(/^[A-Z_]+$/.test(upper)&&!['U','UNDO','REDO','NEW','OPEN','QSAVE'].includes(upper))cad2dLastCommand=upper;
  if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
  if(['OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'].includes(upper))return clearOtrackAnchors();
- if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper))return setTool('zoomWindow');
+ if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper)){
+  setTool('zoomWindow');cadZoomOptionPending=true;
+  $('command').focus();$('command').placeholder='ZOOM: − alejar · + acercar · E extensión · W ventana';
+  toast('ZOOM: escribí − y Enter para alejar, o elegí ventana');
+  return;
+ }
  if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
  if(['PRUEBA5X4','CUARTO5X4','ROOM5X4'].includes(upper))return loadRoomTest();
@@ -3108,7 +3129,7 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
  if(cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return $('exportBlockBtn').click();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA')return setTool('zoomWindow');if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();$('command').value='';$('command').blur();if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended')}
 });
