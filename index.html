@@ -1111,9 +1111,18 @@ function blockInstanceGeometry(definition,ref){
   const line=(x0,y0,x1,y1)=>({...base,type:'line',a:P2(x0,y0),b:P2(x1,y1)});
   const jambs=[rect(0,-d/2,t,d/2),rect(w-t,-d/2,w,d/2)];
   if(kind==='window'){
-   // Double jambs, continuous sill/sash lines and central glass indication in plan.
-   return [...jambs,line(t,-d/2,w-t,-d/2),line(t,d/2,w-t,d/2),
+   // Keep jamb sizes fixed while stretching the glazing length.
+   const lines=[...jambs,line(t,-d/2,w-t,-d/2),line(t,d/2,w-t,d/2),
     line(t,-t*.28,w-t,-t*.28),line(t,t*.28,w-t,t*.28)];
+   if(ref.params.mullion)lines.push(rect(w/2-t/2,-d/2,w/2+t/2,d/2));
+   return lines;
+  }
+  if(kind==='double-door'){
+   const span=(w-2*t)/2,hingeLeft=t,hingeRight=w-t;
+   return [...jambs,
+    line(hingeLeft,0,hingeLeft,span),line(hingeRight,0,hingeRight,span),
+    {...base,type:'arc',c:P2(hingeLeft,0),r:span,a0:0,a1:Math.PI/2},
+    {...base,type:'arc',c:P2(hingeRight,0),r:span,a0:Math.PI/2,a1:Math.PI}];
   }
   const right=Boolean(ref.params.mirror),hinge=right?w-t:t,leaf=right?t:w-t;
   const span=w-2*t;
@@ -1125,6 +1134,9 @@ function blockInstanceGeometry(definition,ref){
  }
  if(param.kind==='framed-window'){
   return framed('window')||definition.entities;
+ }
+ if(param.kind==='double-door'){
+  return framed('double-door')||definition.entities;
  }
  if(param.kind==='round-table'){
   const r=w/2;
@@ -2148,8 +2160,10 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
    if(para){$('blRefWidth').value=Number(block.params?.width??para.defaults.width);
     $('blRefDepthRow').hidden=para.kind!=='rect-table';
     $('blRefMirrorRow').hidden=para.kind!=='swing-door';
-    $('blRefFrameRow').hidden=!['swing-door','framed-window'].includes(para.kind);
-    $('blRefJambRow').hidden=!['swing-door','framed-window'].includes(para.kind);
+    $('blRefFrameRow').hidden=!['swing-door','double-door','framed-window'].includes(para.kind);
+    $('blRefJambRow').hidden=!['swing-door','double-door','framed-window'].includes(para.kind);
+    $('blRefMullionRow').hidden=para.kind!=='framed-window';
+    $('blRefMullion').checked=Boolean(block.params?.mullion??para.defaults.mullion);
     $('blRefFrame').value=Number(block.params?.frameWidth??para.defaults.frameWidth??0);
     $('blRefJamb').value=Number(block.params?.frameDepth??para.defaults.frameDepth??0);
     $('blRefDepth').value=Number(block.params?.depth??para.defaults.depth??0);
@@ -3015,7 +3029,7 @@ function insertSelectedBlock(point){
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  saveHistory();
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
- if(block.parametric){ref.params={...block.parametric.defaults};if(['swing-door','framed-window'].includes(block.parametric.kind)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}}
+ if(block.parametric){ref.params={...block.parametric.defaults};if(['swing-door','double-door','framed-window'].includes(block.parametric.kind)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}}
  else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
  state.entities.push(ref);
  const repeat=Boolean(state.galleryRepeatedInsert);
@@ -3719,7 +3733,7 @@ window.BlacklineBlockAPI=Object.freeze({
   if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
   const normalized=normalizeBlockEntities(entities);
   saveHistory();
-  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','framed-window','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
+  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','double-door','framed-window','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
   renderBlockLibrary();queueLocalBackup();
   return normalized.length;
  },
@@ -3735,7 +3749,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  const pane=$('properties')?.closest('.panel');if(!pane)return;
  const box=document.createElement('section');box.id='blSelectedBlockEditor';box.hidden=true;
  box.style.cssText='padding:9px;margin-top:8px;border:1px solid #536a78;border-radius:8px';
- box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label><label id="blRefFrameRow">Espesor de marco (unidad del modelo) <input id="blRefFrame" type="number" step="any" min=".00001"></label><label id="blRefJambRow">Profundidad de marco (unidad del modelo) <input id="blRefJamb" type="number" step="any" min=".00001"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
+ box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label><label id="blRefMullionRow">Parteluz central <input id="blRefMullion" type="checkbox"></label><label id="blRefFrameRow">Espesor de marco (unidad del modelo) <input id="blRefFrame" type="number" step="any" min=".00001"></label><label id="blRefJambRow">Profundidad de marco (unidad del modelo) <input id="blRefJamb" type="number" step="any" min=".00001"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
  pane.querySelector('.panel-content')?.append(box);
  $('blApplyBlockRef').onclick=()=>{
   const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');if(!ref)return;
@@ -3744,7 +3758,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
   const param=state.blocks?.[ref.blockName]?.parametric;let w,d;
   if(param){w=Number($('blRefWidth').value);d=Number($('blRefDepth').value);
    if(!Number.isFinite(w)||w<=0||w>1e8||(param.kind==='rect-table'&&(!Number.isFinite(d)||d<=0||d>1e8)))return toast('Ancho o profundidad inválidos');
-   if(['swing-door','framed-window'].includes(param.kind)){
+   if(['swing-door','double-door','framed-window'].includes(param.kind)){
     const t=Number($('blRefFrame').value),j=Number($('blRefJamb').value);
     if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(j)&&j>0&&j<w*.6))return toast('El espesor y la profundidad del marco deben ser positivos y proporcionales al vano');
    }
@@ -3753,7 +3767,8 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
   if(param)ref.params={...ref.params,width:w,
    ...(param.kind==='rect-table'?{depth:d}:{}),
    ...(param.kind==='swing-door'?{mirror:$('blRefMirror').checked}:{}),
-   ...(['swing-door','framed-window'].includes(param.kind)?{frameWidth:Number($('blRefFrame').value),frameDepth:Number($('blRefJamb').value)}:{})
+   ...(param.kind==='framed-window'?{mullion:$('blRefMullion').checked}:{}),
+   ...(['swing-door','double-door','framed-window'].includes(param.kind)?{frameWidth:Number($('blRefFrame').value),frameDepth:Number($('blRefJamb').value)}:{})
   };
   updateAll();toast('Bloque actualizado como unidad');
  };
