@@ -22,7 +22,7 @@ function start(options={}){
  const messages=[],events=[],storage={};
  const runtime=new Function('state','ui','messages','events','storage','P','copy','door','plan',`
  const $=id=>ui[id];const clone=copy;const localStorage={getItem:key=>storage[key]??null,setItem:(key,val)=>{storage[key]=val}};
- const window={BlacklineAutoOpening:{plan}};
+ const window={BlacklineAutoOpening:{plan}},BlacklineAutoOpening=window.BlacklineAutoOpening;
  const layerFor=e=>state.layers.find(l=>l.id===e.layer)||state.layers[0];
  const explicitWallLayerName=name=>/^(WALLS?|MUROS?)$/i.test(name);
  const ensureArchitecturalLayer=()=> 'openings';
