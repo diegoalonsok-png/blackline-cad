@@ -2930,6 +2930,15 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
   $('blSelectedBlockName').textContent=block.blockName;
   $('blRefX').value=Number(block.p.x.toFixed(5));$('blRefY').value=Number(block.p.y.toFixed(5));
   $('blRefScale').value=block.scale;$('blRefAngle').value=block.rotation||0;
+  const def=state.blocks?.[block.blockName],dims=blDynDimensions(def,block),bounds=blDynBounds(def);
+  const dynBox=$('blDynamicEditor');
+  if(dynBox){
+   dynBox.hidden=!(blDynEligible(def)||def?.dynamic2d);
+   $('blEnableDynamic').checked=!!def?.dynamic2d;
+   $('blDynamicDimensions').hidden=!def?.dynamic2d;
+   $('blDynWidth').value=Number((dims?.width??bounds?.width??0).toFixed(5));
+   $('blDynHeight').value=Number((dims?.height??bounds?.height??0).toFixed(5));
+  }
   const para=state.blocks?.[block.blockName]?.parametric;
   const paraBox=$('blRefParametric');if(paraBox){paraBox.hidden=!para;
    if(para){$('blRefWidth').value=Number(block.params?.width??para.defaults.width);
@@ -4853,6 +4862,19 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  box.style.cssText='padding:9px;margin-top:8px;border:1px solid #536a78;border-radius:8px';
  box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label><label id="blRefMullionRow">Parteluz central <input id="blRefMullion" type="checkbox"></label><label id="blRefFrameRow">Espesor de marco (unidad del modelo) <input id="blRefFrame" type="number" step="any" min=".00001"></label><label id="blRefJambRow">Profundidad de marco (unidad del modelo) <input id="blRefJamb" type="number" step="any" min=".00001"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
  pane.querySelector('.panel-content')?.append(box);
+ const dynPanel=document.createElement('section');
+ dynPanel.id='blDynamicEditor';dynPanel.hidden=true;
+ dynPanel.style.cssText='margin:9px 0;padding:8px;border:1px solid #526e7e;border-radius:6px';
+ dynPanel.innerHTML='<b>BLOQUE DINÁMICO 2D</b><label style="display:block;margin:6px 0"><input type="checkbox" id="blEnableDynamic"> Activar estiramiento en esta definición</label><div id="blDynamicDimensions" hidden><label>Ancho <input id="blDynWidth" type="number" step="any" min="0.000001"></label><label>Alto <input id="blDynHeight" type="number" step="any" min="0.000001"></label><p class="help">Arrastrá grips amarillos para modificar ancho y alto de esta copia sin explotar el bloque.</p></div>';
+ box.insertBefore(dynPanel,$('blApplyBlockRef'));
+ $('blEnableDynamic').onchange=()=>{
+  const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef'),def=ref&&state.blocks?.[ref.blockName];
+  if(!def)return;
+  if(!blDynEligible(def)&&!def.dynamic2d){$('blEnableDynamic').checked=false;return toast('Compatible con líneas, polilíneas, rectángulos y textos 2D con ancho y alto válidos')}
+  saveHistory();def.dynamic2d=$('blEnableDynamic').checked;
+  if(def.dynamic2d){const b=blDynBounds(def);for(const item of state.entities.filter(e=>e.type==='blockRef'&&e.blockName===ref.blockName))item.dynamic=item.dynamic||{width:b.width,height:b.height}}
+  updateAll();toast(def.dynamic2d?'Modo dinámico habilitado · grips amarillos':'Modo dinámico deshabilitado');
+ };
  $('blApplyBlockRef').onclick=()=>{
   const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');if(!ref)return;
   const x=Number($('blRefX').value),y=Number($('blRefY').value),scale=Number($('blRefScale').value),angle=Number($('blRefAngle').value);
@@ -4866,7 +4888,10 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
    }
   }
   const originalPoint=P(ref.p.x,ref.p.y),originalRef=clone(ref);
+  const dynDef=state.blocks?.[ref.blockName],dw=Number($('blDynWidth').value),dh=Number($('blDynHeight').value);
+  if(dynDef?.dynamic2d&&!(dw>0&&dh>0&&dw<1e8&&dh<1e8))return toast('Ancho/alto dinámico inválidos');
   saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;
+  if(dynDef?.dynamic2d)ref.dynamic={width:dw,height:dh};
   if(param)ref.params={...ref.params,width:w,
    ...(param.kind==='rect-table'?{depth:d}:{}),
    ...(param.kind==='swing-door'?{mirror:$('blRefMirror').checked}:{}),
