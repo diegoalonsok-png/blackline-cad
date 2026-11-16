@@ -934,6 +934,62 @@ function setArchitecturalLayer(kind){
  const widthInput=$('lineWidth');if(widthInput)widthInput.value=state.lineWidth;
  renderLayers();schedule();toast('Capa actual: '+(kind==='walls'?'WALLS, rojo 0.30 mm':'OPENINGS, 0.05 mm'));
 }
+// Native 2D architectural walls: paired faces with persisted thickness.
+function cadWallThickness(){
+ const n=Number($('cadWallThickness')?.value);
+ return Number.isFinite(n)&&n>=.04&&n<=3?n*1000/U[state.unit]:.2*1000/U[state.unit];
+}
+function cadWallJustify(){return ['left','center','right'].includes($('cadWallJustification')?.value)?$('cadWallJustification').value:'center'}
+function cadWallFaces(a,b,width,justify){
+ const v=sub(b,a),length=Math.hypot(v.x,v.y);
+ if(!(length>1e-9&&width>0))return null;
+ const n=P(-v.y/length,v.x/length);
+ const offsets=justify==='left'?[0,-width]:justify==='right'?[0,width]:[-width/2,width/2];
+ return offsets.map(d=>({a:add(a,mul(n,d)),b:add(b,mul(n,d))}));
+}
+function cadMakeWallSegment(a,b){
+ const width=cadWallThickness(),justify=cadWallJustify(),faces=cadWallFaces(a,b,width,justify);
+ if(!faces)return toast('MURO: indicá dos puntos distintos');
+ const layer=ensureArchitecturalLayer('walls'),group='wall-'+state.nextId;
+ saveHistory();
+ for(let i=0;i<2;i++)state.entities.push({
+  id:state.nextId++,type:'line',a:faces[i].a,b:faces[i].b,layer,width:.25,
+  wall2d:{group,face:i,thickness:width,justify,guideA:clone(a),guideB:clone(b)}
+ });
+ updateAll();log('MURO 2D '+$('cadWallThickness').value+' m · '+justify);
+}
+function cadWallCenterline(meta){
+ if(!meta?.guideA||!meta?.guideB)return null;
+ const a=meta.guideA,b=meta.guideB,v=sub(b,a),len=Math.hypot(v.x,v.y);
+ if(!(len>1e-9))return null;
+ const n=P(-v.y/len,v.x/len),side=meta.justify==='left'?-1:meta.justify==='right'?1:0;
+ const shift=mul(n,side*Number(meta.thickness)/2);
+ return {a:add(a,shift),b:add(b,shift),length:len};
+}
+function cadAlignOpeningToWall(ref,block,clickPoint){
+ if(!autoOpeningEnabled||!block?.parametric||!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return false;
+ const openingWidth=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
+ if(!(openingWidth>0))return false;
+ const threshold=Math.max(.30*1000/U[state.unit],8/Math.max(state.view.scale,.01));
+ let best=null;
+ for(const entity of state.entities){
+  if(entity.type!=='line'||!entity.wall2d)continue;
+  const layer=layerFor(entity);if(layer.locked||!layer.visible)continue;
+  const line=cadWallCenterline(entity.wall2d);if(!line||line.length<=openingWidth+1e-8)continue;
+  const v=sub(line.b,line.a),len2=v.x*v.x+v.y*v.y;
+  const t=Math.max(0,Math.min(1,((clickPoint.x-line.a.x)*v.x+(clickPoint.y-line.a.y)*v.y)/len2));
+  const center=add(line.a,mul(v,t)),d=dist(center,clickPoint);
+  if(d>threshold+entity.wall2d.thickness/2||best&&d>=best.distance)continue;
+  const u=mul(v,1/line.length),half=openingWidth/2;
+  if(t*line.length<half+1e-7||(1-t)*line.length<half+1e-7)continue;
+  best={distance:d,center,u,thickness:entity.wall2d.thickness};
+ }
+ if(!best)return false;
+ ref.p=add(best.center,mul(best.u,-openingWidth/2));
+ ref.rotation=Math.atan2(best.u.y,best.u.x)*180/Math.PI;
+ ref.wallThickness=best.thickness;
+ return true;
+}
 let autoWallJoinEnabled=true;
 try{autoWallJoinEnabled=localStorage.getItem('blackline-wall-auto-join')!=='false'}catch(e){}
 function applyAutoWallJoin(entity){
