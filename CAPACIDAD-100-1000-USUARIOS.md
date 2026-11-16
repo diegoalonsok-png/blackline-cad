@@ -45,3 +45,22 @@ Los cálculos de visibilidad de los objetos estándar (línea, rectángulo, cír
 - Verificación de recuperación de datos y ausencia de pérdida al cerrar o recargar el navegador.
 
 Esta versión implementa mejoras y herramientas de medición, **no certifica** todavía el soporte de 1.000 usuarios simultáneos en producción.
+
+
+## Resultados confirmados en GitHub Actions (PR #14)
+
+El workflow de validación ejecutado el 16 de noviembre de 2026 concluyó con **éxito** tanto en la batería geométrica como en ambos escenarios locales. Estos resultados corresponden a `127.0.0.1` dentro del runner; **NO** deben extrapolarse a latencia de red o concurrencia de GitHub Pages.
+
+| Métrica | 100 sesiones | 1.000 sesiones |
+| --- | ---: | ---: |
+| Límite de sesiones paralelas | 50 | 50 |
+| Solicitudes realizadas | 1.000 | 10.000 |
+| Sesiones fallidas | 0 | 0 |
+| Transferencia agregada | 43,98 MiB | 439,75 MiB |
+| Duración local | 0,17 s | 0,78 s |
+| Latencia p95 por solicitud | 9,68 ms | 7,35 ms |
+| Latencia p95 por sesión | 162,65 ms | 70,25 ms |
+
+Registros de la ejecución: https://github.com/diegoalonsok-png/blackline-cad/actions/runs/43938886706.
+
+Prueba de regresión general también exitosa: https://github.com/diegoalonsok-png/blackline-cad/actions/runs/43938886830.
