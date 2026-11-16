@@ -5,6 +5,8 @@ const d=document,app=d.querySelector('.app'),canvasWrap=d.getElementById('canvas
 if(!app||!canvasWrap)return;
 const $=id=>d.getElementById(id);
 app.classList.add('blackline-modern');
+// Raise legacy compact 42px ribbon once for the new 39px icon tiles; users can resize afterward.
+try{if(!localStorage.getItem('blackline-modern-ribbon-v1')){const current=parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42;if(current<58){app.style.setProperty('--ribbon-height','61px');localStorage.setItem('cad2d-ribbon-height','61');}localStorage.setItem('blackline-modern-ribbon-v1','1')}}catch(e){}
 const brand=d.querySelector('.brand');
 if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='Blackline CAD';const sm=brand.querySelector('small');if(sm)sm.textContent='DIBUJO ARQUITECTÓNICO · 2D';}
 const mark=d.querySelector('.brandbar .mark');if(mark)mark.textContent='◇';
@@ -33,6 +35,22 @@ function movePanels(){
  if(propsTitle?.nodeType===Node.TEXT_NODE)propsTitle.textContent='PROPIEDADES ';
 }
 movePanels();
+function revealBlocks(){
+ setSection('right',true);
+ const gallery=$('blacklineBlockGallery');
+ if(!gallery)return;
+ if(!gallery.classList.contains('floating')&&right)right.prepend(gallery);
+ const body=$('blBody');if(body)body.hidden=false;
+ const toggle=$('blCollapse');if(toggle){toggle.textContent='−';toggle.setAttribute('aria-expanded','true');}
+ if(right)right.scrollTop=0;
+ gallery.scrollIntoView({block:'nearest',behavior:'smooth'});
+}
+// Stop the legacy gallery command from moving the library into a hidden left sidebar.
+const ribbonDock=$('ribbon');
+ribbonDock?.addEventListener('click',event=>{
+ const control=event.target.closest('[data-tool="blockgallery"]');
+ if(control){event.preventDefault();event.stopImmediatePropagation();revealBlocks();}
+},true);
 // Keep existing movable palette infrastructure and CAD button handlers.
 const iconPaths={
  select:'<path d="M5 3 5 21 10 16 14 22 17 20 13 14 21 12Z"/>',
@@ -60,7 +78,7 @@ for(const [key,title,tab] of rails){
  const btn=d.createElement('button');btn.type='button';btn.title=title;btn.setAttribute('aria-label',title);btn.dataset.blCommand=key;
  btn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+iconPaths[key]+'</svg>';
  btn.addEventListener('click',()=>{
-  if(key==='blockgallery')setSection('right',true);
+  if(key==='blockgallery'){revealBlocks();return;}
   let tool=d.querySelector('#ribbon [data-tool="'+key+'"]');
   if(tool){tool.click();return;}
   const nav=d.querySelector('#tabs .tab[data-tab="'+tab+'"]');
