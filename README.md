@@ -47,6 +47,14 @@ DXF files with missing/unsupported `$INSUNITS` require explicit user unit select
 
 The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, but binary geometry cannot be decoded by the static frontend. `backend/dwg_service.py` provides an **optional, not-yet-deployed** FastAPI adapter to a separately installed ODA File Converter. The website's `DWG_CONVERTER_ENDPOINT` variable stays blank until the converter has been licensed, secured, deployed and tested. Even when operational, the current DXF import path cannot guarantee the preservation of advanced blocks, layouts, xrefs, hatches or proxy objects. Direct DWG open is therefore **not working yet**. Test on representative files before launching commercially.
 
+## AutoCAD-style interaction improvements (November 2026)
+
+- `Z` / `ZOOM` followed by Enter enters zoom options: `-` to zoom out, `+` to zoom in, `E` for extents, `W` for a rectangular window, and `P` for the previous viewport.
+- Numeric zoom factors such as `2x`, `0.5x`, or `2` work after entering ZOOM. `ZP` / `ZOOMPREVIOUS` restores an earlier viewport. Up to 30 previous viewport states are retained for the current session.
+- `SELECTALL` selects visible, unlocked entities; `SELECTINVERT` inverts that selection among visible, unlocked entities; `DESELECT` clears it. Ctrl/Cmd+A selects all while the model canvas itself has keyboard focus.
+- The idle cursor shows a crosshair without a central square. The adjustable pickbox is shown only with active drawing/editing commands; selection/editing modes use a square selector.
+- These changes concern interaction and viewport state, not model coordinates or saved entity geometry.
+
 ## Current keyboard shortcuts
 
 `F3`: OSNAP; `F7`: grid; `F8`: ortho; `F9`: snap; `Ctrl/Cmd+O`: open; `Ctrl/Cmd+S`: save project; `Ctrl/Cmd+P`: plot; `Ctrl/Cmd+Z`: undo. Double-click on the idle model canvas zooms to drawing extents; right click opens the CAD context menu.
