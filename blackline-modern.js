@@ -180,3 +180,59 @@ requestAnimationFrame(requestResize);
  b.onclick=()=>apply(document.querySelector('.app')?.classList.contains('bl-light')?'dark':'light');
  host.prepend(b);apply(saved==='light'?'light':'dark');
 })();
+
+
+/* Original Blackline file application menu, attached to the existing brand mark. */
+(function initBlacklineFileMenu(){
+ const mark=document.querySelector('.brandbar .mark');
+ if(!mark||document.getElementById('blFileMenu'))return;
+ mark.setAttribute('role','button');mark.setAttribute('tabindex','0');
+ mark.setAttribute('aria-label','Menú Blackline CAD: archivos e impresión');
+ mark.setAttribute('aria-haspopup','menu');mark.setAttribute('aria-expanded','false');
+ mark.title='Menú Blackline CAD · Archivo';
+ mark.style.cursor='pointer';
+ const menu=document.createElement('div');menu.id='blFileMenu';
+ menu.setAttribute('role','menu');menu.setAttribute('aria-label','Archivo Blackline CAD');
+ menu.hidden=true;
+ const actions=[
+  ['file-new','Nuevo dibujo','file-plus'],
+  ['file-open','Abrir archivo','folder-open'],
+  ['file-save','Guardar proyecto','save'],
+  ['file-dxf','Guardar DXF','download'],
+  ['file-print','Imprimir / Exportar PDF','printer']
+ ];
+ const icons={
+  'file-plus':'<path d="M4 3h11l5 5v13H4zM15 3v5h5M12 12v7m-3.5-3.5h7"/>',
+  'folder-open':'<path d="M3 7V4h7l3 3h8v4M3 11h18l-3 10H5z"/>',
+  save:'<path d="M4 3h14l3 3v15H3zM8 3v7h9V3M8 21v-8h9v8"/>',
+  download:'<path d="M5 3h14v18H5zM12 7v10m-4-4 4 4 4-4"/>',
+  printer:'<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>'
+ };
+ const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='BLACKLINE CAD · ARCHIVO';menu.append(title);
+ for(const [id,label,icon] of actions){
+  const button=document.createElement('button');button.type='button';button.dataset.blFileAction=id;button.setAttribute('role','menuitem');
+  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+icons[icon]+'</svg><span></span>';
+  button.querySelector('span').textContent=label;
+  menu.append(button);
+ }
+ document.body.append(menu);
+ function close(){menu.hidden=true;mark.setAttribute('aria-expanded','false')}
+ function open(){const r=mark.getBoundingClientRect();menu.hidden=false;mark.setAttribute('aria-expanded','true');menu.style.left=Math.max(8,Math.min(window.innerWidth-menu.offsetWidth-8,r.left))+'px';menu.style.top=Math.max(8,Math.min(window.innerHeight-menu.offsetHeight-8,r.bottom+8))+'px'}
+ function toggle(){if(menu.hidden)open();else close()}
+ const runCommand=command=>{const input=document.getElementById('command'),run=document.getElementById('runCommand');if(input&&run){input.value=command;run.click()}};
+ mark.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();toggle()});
+ mark.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle()}if(e.key==='Escape')close()});
+ menu.addEventListener('click',e=>{
+  const b=e.target.closest('[data-bl-file-action]');if(!b)return;
+  const key=b.dataset.blFileAction;close();
+  if(key==='file-new')runCommand('NEW');
+  if(key==='file-open')document.getElementById('openBtn')?.click();
+  if(key==='file-save')document.getElementById('saveProjectBtn')?.click();
+  if(key==='file-dxf')document.getElementById('dxfBtn')?.click();
+  if(key==='file-print')document.getElementById('pdfBtn')?.click();
+ });
+ document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!mark.contains(e.target))close()},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){e.preventDefault();close();mark.focus()}});
+ window.addEventListener('resize',close);
+ document.addEventListener('scroll',()=>{if(!menu.hidden)close()},true);
+})();
