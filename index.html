@@ -930,7 +930,7 @@ function inViewport(e,w,h){
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
 function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const visible=state.entities.filter(e=>layerFor(e).visible&&inViewport(e,w,h));for(const e of visible)drawEntity(e);if(state.stage.length)previewEntity();if(state.drag?.type==='selection'){const a=state.drag.start,b=state.drag.last;ctx.save();const crossing=b.x<a.x;ctx.strokeStyle=crossing?'#39dc85':'#59a9ff';ctx.fillStyle=crossing?'rgba(57,220,133,.16)':'rgba(89,169,255,.14)';ctx.lineWidth=1.3;ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.restore()}if(state.drag?.type==='transform')drawTransformPreview();
- if(state.tool==='trim'&&state.modifyCandidate?.mode==='trimFence'){
+ if(state.tool==='trim'&&state.modifyCandidate?.mode==='trimFence'&&state.modifyCandidate.first){
   const a=screen(state.modifyCandidate.first),b=screen(state.mouse);
   ctx.save();ctx.strokeStyle='#ffe15a';ctx.lineWidth=1.5;ctx.setLineDash([7,5]);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
