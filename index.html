@@ -945,7 +945,7 @@ function cadWallFaces(a,b,width,justify){
  const v=sub(b,a),length=Math.hypot(v.x,v.y);
  if(!(length>1e-9&&width>0))return null;
  const n=P(-v.y/length,v.x/length);
- const offsets=justify==='left'?[0,-width]:justify==='right'?[0,width]:[-width/2,width/2];
+ const offsets=justify==='left'?[0,width]:justify==='right'?[0,-width]:[-width/2,width/2];
  return offsets.map(d=>({a:add(a,mul(n,d)),b:add(b,mul(n,d))}));
 }
 function cadMakeWallSegment(a,b){
@@ -974,7 +974,7 @@ function cadWallCenterline(meta){
  if(!meta?.guideA||!meta?.guideB)return null;
  const a=meta.guideA,b=meta.guideB,v=sub(b,a),len=Math.hypot(v.x,v.y);
  if(!(len>1e-9))return null;
- const n=P(-v.y/len,v.x/len),side=meta.justify==='left'?-1:meta.justify==='right'?1:0;
+ const n=P(-v.y/len,v.x/len),side=meta.justify==='left'?1:meta.justify==='right'?-1:0;
  const shift=mul(n,side*Number(meta.thickness)/2);
  return {a:add(a,shift),b:add(b,shift),length:len};
 }
