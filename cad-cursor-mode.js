@@ -5,7 +5,14 @@
  const normalizeSize=n=>Number.isFinite(Number(n))?Math.max(5,Math.min(60,Math.round(Number(n)))):DEFAULT_SIZE;
  const selectorTools=new Set(['erase','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop','stretch']);
  const selectorMode=(tool,candidate)=>tool==='offset'?!candidate:selectorTools.has(tool);
- const mode=(tool,candidate,drag)=>drag==='pan'?'pan':drag==='wallMiddleGrip'||drag==='blockGrip'?'grip':selectorMode(tool,candidate)?'selector':'drawing';
+ // AutoCAD cursor: idle = crosshair + pickbox, point input = crosshair,
+ // entity selection = pickbox only. Geometry and snaps are unaffected.
+ const mode=(tool,candidate,drag)=>{
+  if(drag==='pan')return 'pan';
+  if(drag==='wallMiddleGrip'||drag==='blockGrip')return 'grip';
+  if(tool==='select'||!tool)return 'idle';
+  return selectorMode(tool,candidate)?'selector':'drawing';
+ };
  const hitRadius=size=>Math.max(9,Math.ceil(normalizeSize(size)/2)+3);
  return Object.freeze({DEFAULT_SIZE,normalizeSize,selectorMode,mode,hitRadius});
 });
