@@ -2410,17 +2410,39 @@ function parseCoordinate(s){
 }
 
 /* Searchable registry: only commands whose action is implemented in this build. */
+/* Un solo diccionario para las barras superior e inferior.
+   Los alias no copian código externo y las colisiones conservan el uso anterior:
+   REC=rectángulo, B=bloque, D=estilo de cota, U=deshacer; RR/BR/UNIR resuelven español. */
+const CAD2D_TYPED_ALIASES={
+ LINEA:'LINE',LINEAS:'LINE',POLILINEA:'PLINE',POLILINEAS:'PLINE',
+ POL:'PLINE',POLIGONO:'POLYGON',PG:'POLYGON',RECTANGULO:'RECTANGLE',
+ CIRCULO:'CIRCLE',ARCO:'ARC',ELIPSE:'ELLIPSE',SB:'HATCH',SOM:'HATCH',SOMBREADO:'HATCH',
+ DESPL:'MOVE',DESPLAZAR:'MOVE',MOVER:'MOVE',CP:'COPY',COP:'COPY',COPIAR:'COPY',
+ GI:'ROTATE',GIRAR:'ROTATE',ROTAR:'ROTATE',RR:'TRIM',RECORTAR:'TRIM',CORTAR:'TRIM',
+ AL:'EXTEND',ALARGA:'EXTEND',ALARGAR:'EXTEND',DF:'OFFSET',DES:'OFFSET',DESFASE:'OFFSET',
+ SI:'MIRROR',SIM:'MIRROR',SIMETRIA:'MIRROR',MP:'FILLET',EMP:'FILLET',EMPALME:'FILLET',
+ ES:'SCALE',ESCALA:'SCALE',ESCALAR:'SCALE',EI:'STRETCH',ESTIRA:'STRETCH',ESTIRAR:'STRETCH',
+ BOR:'ERASE',BORRAR:'ERASE',DP:'EXPLODE',DESCOMP:'EXPLODE',DESCOMPONER:'EXPLODE',
+ UNIR:'JOIN',BQ:'BLOCK',BLOQUE:'BLOCK',CA:'LAYER',CAPA:'LAYER',CAPAS:'LAYER',
+ ACO:'DIM',ACOTAR:'DIM',TXT:'TEXT',TXM:'TEXT',TM:'TEXT',
+ ZW:'ZOOM',ZOOMVENTANA:'ZOOM',ZE:'ZOOMEXTENTS',ENCUADRAR:'ZOOMEXTENTS',
+ TRIMFENCE:'TRIMFENCE',TF:'TRIMFENCE',TIJERA:'TIJERA'
+};
+function cad2dNormalizeCommand(value){
+ const raw=String(value||'').trim().replace(/^[_-]+/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+ return CAD2D_TYPED_ALIASES[raw]||raw;
+}
 const CAD_COMMANDS=[
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['MURO','WALLS','Seleccionar capa roja de muros de línea 0.30 mm o aplicar a selección'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
- ['ZOOM','Z','Zoom por ventana azul o verde · clic-clic o arrastrar'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL','Connected editable polyline'],
- ['POLYGON','POL','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
+ ['ZOOM','Z','Zoom por ventana azul o verde · clic-clic o arrastrar'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
+ ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
  ['ARC','A','Center and arc endpoints'],['ELLIPSE','EL','Ellipse'],['HATCH','H','Hatch selected closed boundaries'],
  ['TABLE','','Insert editable table'],['TEXT','T','Insert single-line annotation'],
- ['MOVE','M','Move selected entities'],['COPY','CO','Duplicate selected entities'],
+ ['MOVE','M / DESPL','Move selected entities'],['COPY','CO / CP','Duplicate selected entities'],
  ['ROTATE','RO','Rotate selected objects'],['SCALE','SC','Scale selected objects'],
- ['MIRROR','MI','Mirror entities'],['OFFSET','O','Parallel line or circle · distance + Enter'],
- ['TRIM','TR','Cut to line crossing'],['BREAK','BR','Remove part of a straight line between two points'],['LENGTHEN','LEN','Change a LINE length at chosen end'],['PEDIT','PE','Edit polyline vertex geometry'],['EXTEND','EX','Extend to line boundary'],
+ ['MIRROR','MI','Mirror entities'],['OFFSET','O / DF','Parallel line or circle · distance + Enter'],
+ ['TRIM','TR / RR','Recortar con clic o barrido de dos puntos'],['BREAK','BR','Remove part of a straight line between two points'],['LENGTHEN','LEN','Change a LINE length at chosen end'],['PEDIT','PE','Edit polyline vertex geometry'],['EXTEND','EX','Extend to line boundary'],
  ['FILLET','F','Radius fillet'],['CHAMFER','CHA','Equal-distance bevel'],
  ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
  ['EXPLODE','X','Separate polyline into lines'],['ERASE','E','Erase entity'],
@@ -2434,7 +2456,7 @@ const CAD_COMMANDS=[
  ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
  ['BLOCK','B','Create reusable block'],['INSERT','I','Insert reusable block'],
  ['WBLOCK','','Export block library item'],['UNITS','','Change model units'],['SVG','','Export drawing as SVG vector'],['EXPORTMENU','','Open export formats'],
- ['ZOOM','Z','Zoom model extents'],['PAN','P','Pan model space'],
+ ['PAN','P','Pan model space'],
  ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
  ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
  ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],['COPYCLIP','CTRL+C','Copy selected CAD objects'],['PASTECLIP','CTRL+V','Paste objects at model cursor'],['NEW','','Start a new drawing (confirmation)'],
@@ -2448,14 +2470,13 @@ function initCadCommandFinder(){
  const input=$('cadCommandSearch'),out=$('cadCommandResults');
  // Compact command field: no popover on focus or typing, so the ribbon stays unobstructed.
  out.hidden=true;input.setAttribute('aria-expanded','false');
- const clean=value=>String(value||'').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- const aliases={LINEA:'LINE',RECORTAR:'TRIM',CORTAR:'TRIM',BORRAR:'ERASE',MOVER:'MOVE',COPIAR:'COPY',GIRAR:'ROTATE',ACOTAR:'DIM',CIRCULO:'CIRCLE',RECTANGULO:'RECTANGLE',POLILINEA:'PLINE'};
+ const clean=cad2dNormalizeCommand;
  input.addEventListener('keydown',event=>{
   if(event.key==='Escape'){event.preventDefault();input.value='';input.blur();out.hidden=true;return;}
   if(event.key!=='Enter')return;
   event.preventDefault();
   const query=clean(input.value);if(!query)return;
-  const target=aliases[query]||query;
+  const target=query;
   const match=CAD_COMMANDS.find(x=>clean(x[0])===target||clean(x[1])===target)
    ||CAD_COMMANDS.find(x=>clean(x[0]).startsWith(target)||clean(x[1]).startsWith(target));
   if(match)executeCADSearchCommand(match[0]);
@@ -2581,7 +2602,8 @@ function matchCadPropertiesAt(point){
  saveHistory();copyCadProperties(from,e);updateAll();toast('Object properties copied · select another target or press Enter');
 }
 
-function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();
+function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=cad2dNormalizeCommand(value);
+ value=upper;
  if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper))return setTool('zoomWindow');
  if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
@@ -2628,7 +2650,7 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
    const dest=add(origin,mul(delta,length/magnitude));
    handlePoint(dest,false);schedule();toast('Segmento / Segment: '+length+' '+state.unit);return;
   }
- }let aliases={STRETCH:'stretch',ESTIRAR:'stretch',BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',TIJERA:'trimScissor',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
+ }let aliases={S:'stretch',STRETCH:'stretch',ESTIRAR:'stretch',BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',TIJERA:'trimScissor',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polyline',PG:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=value.toUpperCase();if(aliases[cmd]){
   const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
   if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
   else setTool(aliases[cmd]);
@@ -2666,7 +2688,7 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
  if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA')return setTool('zoomWindow');if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
- if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();runCommand();return}
+ if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();$('command').value='';$('command').blur();if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended')}
 });
 document.addEventListener('keydown',ev=>{
