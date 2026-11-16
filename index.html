@@ -2547,7 +2547,7 @@ canvas.addEventListener('pointerup',ev=>{
  if(!d)return;
  if(d.type==='blockGrip'){
   canvas.style.cursor='';
-  if(d.moved){updateAll();toast('Bloque desplazado desde su vértice · Ctrl+Z para deshacer')}
+  if(d.moved){const ref=state.entities.find(e=>e.id===d.id);const result=ref?.type==='blockRef'?relocateOpeningWithBlock(ref,d.original):{ok:true,cut:0};updateAll();toast(!result.ok?'Vano protegido: pared modificada. No se movió el bloque.':result.cut?'Bloque y vano desplazados · Ctrl+Z para deshacer':'Bloque desplazado · Ctrl+Z para deshacer')}
   else schedule();
   return;
  }
@@ -3623,7 +3623,7 @@ function autoCutWallForOpening(ref,block){
  if(!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return 0;
  const width=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
  const wallLines=state.entities.filter(e=>{
-  if(e.type!=='line'||!e.id)return false;
+  if(e.type!=='line'||!e.id||e.autoOpeningRef!==undefined)return false;
   const l=layerFor(e);
   return l.visible&&!l.locked&&(explicitWallLayerName(l.id)||explicitWallLayerName(l.name));
  });
@@ -3636,12 +3636,51 @@ function autoCutWallForOpening(ref,block){
  for(const edit of edits){
   const wall=state.entities.find(e=>e.id===edit.id);
   if(!wall)continue;
-  generated.push({...clone(wall),id:state.nextId++,a:edit.first.a,b:edit.first.b},
-   {...clone(wall),id:state.nextId++,a:edit.second.a,b:edit.second.b});
+  const original=clone(wall);
+  const makePart=(piece,role)=>({
+   ...clone(wall),id:state.nextId++,a:piece.a,b:piece.b,
+   autoOpeningRef:ref.id,autoOpeningSource:original.id,autoOpeningRole:role,
+   autoOpeningOriginal:clone(original),autoOpeningShape:clone(piece)
+  });
+  generated.push(makePart(edit.first,'first'),makePart(edit.second,'second'));
  }
  state.entities=state.entities.filter(e=>!removed.has(e.id));
  state.entities.push(...generated);
  return edits.length;
+}
+function relocateOpeningWithBlock(ref,previous){
+ if(!autoOpeningEnabled||!window.BlacklineAutoOpening)return {ok:true,cut:0};
+ const block=state.blocks?.[ref.blockName];
+ if(!block?.parametric||!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return {ok:true,cut:0};
+ const fragments=state.entities.filter(e=>e.autoOpeningRef===ref.id);
+ if(!fragments.length)return {ok:true,cut:autoCutWallForOpening(ref,block)};
+ // An edited or missing wall fragment must never be silently reconstructed.
+ const groups=new Map();
+ for(const f of fragments){
+  if(!groups.has(f.autoOpeningSource))groups.set(f.autoOpeningSource,[]);
+  groups.get(f.autoOpeningSource).push(f);
+ }
+ const restored=[];
+ const match=(a,b)=>a&&b&&Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+ for(const parts of groups.values()){
+  const first=parts.find(e=>e.autoOpeningRole==='first');
+  const second=parts.find(e=>e.autoOpeningRole==='second');
+  if(parts.length!==2||!first||!second||
+     !match(first.a,first.autoOpeningShape?.a)||!match(first.b,first.autoOpeningShape?.b)||
+     !match(second.a,second.autoOpeningShape?.a)||!match(second.b,second.autoOpeningShape?.b)||
+     !first.autoOpeningOriginal||!second.autoOpeningOriginal){
+   ref.p=P(previous.x,previous.y);
+   return {ok:false,cut:0};
+  }
+  restored.push(clone(first.autoOpeningOriginal));
+ }
+ // Restore exactly the original wall lines we cut on insertion, then re-cut
+ // for the block's new position. Undo is one operation: the drag's saveHistory.
+ const owned=new Set(fragments.map(e=>e.id));
+ state.entities=state.entities.filter(e=>!owned.has(e.id));
+ state.entities.push(...restored);
+ const count=autoCutWallForOpening(ref,block);
+ return {ok:true,cut:count};
 }
 function insertSelectedBlock(point){
  const block=selectedBlock();if(!block)return toast('Choose a block first');
@@ -4433,6 +4472,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
     if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(j)&&j>0&&j<w*.6))return toast('El espesor y la profundidad del marco deben ser positivos y proporcionales al vano');
    }
   }
+  const originalPoint=P(ref.p.x,ref.p.y);
   saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;
   if(param)ref.params={...ref.params,width:w,
    ...(param.kind==='rect-table'?{depth:d}:{}),
@@ -4440,7 +4480,8 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
    ...(param.kind==='framed-window'?{mullion:$('blRefMullion').checked}:{}),
    ...(['swing-door','double-door','framed-window'].includes(param.kind)?{frameWidth:Number($('blRefFrame').value),frameDepth:Number($('blRefJamb').value)}:{})
   };
-  updateAll();toast('Bloque actualizado como unidad');
+  const movedOpening=relocateOpeningWithBlock(ref,originalPoint);
+  updateAll();toast(movedOpening.ok?'Bloque actualizado como unidad'+(movedOpening.cut?' · vano actualizado':''):'Vano protegido: pared modificada; movimiento cancelado');
  };
 })();
 
