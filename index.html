@@ -2601,10 +2601,10 @@ function matchCadPropertiesAt(point){
  saveHistory();copyCadProperties(from,e);updateAll();toast('Object properties copied · select another target or press Enter');
 }
 
-function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=cad2dNormalizeCommand(value);
+function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}const upper=cad2dNormalizeCommand(value);
  value=upper;
  // Remember only recognized action names; numeric parameters never replace the last command.
- if(!parseCoordinate(value)&&!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value)&&/^[A-Z_]+$/.test(upper)&&upper!=='U'&&upper!=='UNDO'&&upper!=='REDO')cad2dLastCommand=upper;
+ if(/^[A-Z_]+$/.test(upper)&&!['U','UNDO','REDO','NEW','OPEN','QSAVE'].includes(upper))cad2dLastCommand=upper;
  if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper))return setTool('zoomWindow');
  if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
@@ -2738,7 +2738,7 @@ document.addEventListener('keydown',ev=>{
   if(ev.key==='F10'){ev.preventDefault();togglePolar()}
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();$('command').value='';if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();$('command').value='';if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended');return}if(ev.code==='Space'&&!ev.repeat){if(document.activeElement.tagName!=='INPUT'){ev.preventDefault();spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
 // Full CAD command typing directly from the drawing area, without clicking the bottom field.
 document.addEventListener('keydown',ev=>{
  if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1||!/[a-zA-Z]/.test(ev.key))return;
