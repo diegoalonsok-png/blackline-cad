@@ -137,3 +137,30 @@ if(cssDemoMedia.matches)setSection('left',false);
 const requestResize=()=>{window.dispatchEvent(new Event('resize'));$('cadCanvas')?.dispatchEvent(new Event('cad-workspace-resize'));};
 requestAnimationFrame(requestResize);
 })();
+
+/* Instant accessible CAD hover labels instead of browser-delayed native title tooltips. */
+(function instantCadTooltips(){
+ const bubble=document.createElement('div');bubble.id='blInstantTooltip';
+ bubble.setAttribute('role','tooltip');
+ bubble.style.cssText='position:fixed;z-index:2147483000;pointer-events:none;display:none;max-width:290px;padding:6px 9px;border:1px solid #698297;border-radius:6px;background:#18212b;color:#f3f7fa;box-shadow:0 6px 20px #0009;font:12px/1.35 system-ui,sans-serif;white-space:normal';
+ document.body.append(bubble);let active=null;
+ function hide(){bubble.style.display='none';active=null}
+ function show(el){
+  if(!el||!el.getAttribute('title'))return hide();
+  const label=el.getAttribute('title');if(!label)return hide();
+  active=el;el.dataset.blTooltip=label;el.removeAttribute('title');
+  bubble.textContent=label;bubble.style.display='block';
+  const r=el.getBoundingClientRect(),w=bubble.offsetWidth,h=bubble.offsetHeight;
+  bubble.style.left=Math.max(5,Math.min(innerWidth-w-6,r.left+(r.width-w)/2))+'px';
+  bubble.style.top=(r.bottom+h+9<innerHeight?r.bottom+7:Math.max(5,r.top-h-7))+'px';
+ }
+ document.addEventListener('pointerover',e=>{
+  const el=e.target.closest?.('button[title],.tool[title],[role="button"][title]');
+  if(el&&el!==active)show(el);
+ },true);
+ document.addEventListener('pointerout',e=>{if(active&&!active.contains(e.relatedTarget))hide()},true);
+ document.addEventListener('focusin',e=>{const el=e.target.closest?.('button[title],.tool[title],[role="button"][title]');if(el)show(el)},true);
+ document.addEventListener('focusout',hide,true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')hide()},true);
+ document.addEventListener('scroll',hide,true);
+})();
