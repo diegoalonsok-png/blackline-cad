@@ -1,0 +1,31 @@
+name: CAD capacity and geometry smoke checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'cad-performance.js'
+      - 'tests/performance.test.cjs'
+      - 'scripts/simulate-concurrent-users.cjs'
+      - '.github/workflows/cad-capacity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify geometry and viewport filtering
+        run: node --test tests/performance.test.cjs
+      - name: Simulate 100 locally served user sessions
+        run: node scripts/simulate-concurrent-users.cjs --users=100 --concurrency=50
+      - name: Simulate 1000 locally served user sessions
+        run: node scripts/simulate-concurrent-users.cjs --users=1000 --concurrency=50
