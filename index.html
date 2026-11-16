@@ -1174,13 +1174,59 @@ function blockChildren(ref){
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
  return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
 }
+/* CAD vertex grips: move an inserted BLOCK reference as one object.
+   Never explode block geometry; all coordinates stay in model units. */
+function blockGripPoints(ref){
+ const points=[ref.p],seen=new Set();
+ const addGrip=p=>{if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))return;const key=p.x.toFixed(7)+','+p.y.toFixed(7);if(!seen.has(key)&&points.length<160){seen.add(key);points.push(P(p.x,p.y))}};
+ seen.add(ref.p.x.toFixed(7)+','+ref.p.y.toFixed(7));
+ for(const e of blockChildren(ref)){
+  if(e.type==='line'){addGrip(e.a);addGrip(e.b)}
+  else if(e.type==='polyline'){for(const p of e.pts||[])addGrip(p)}
+  else if(e.type==='rect'){addGrip(e.a);addGrip(e.b);addGrip(P(e.a.x,e.b.y));addGrip(P(e.b.x,e.a.y))}
+  else if(e.type==='arc'){addGrip(P(e.c.x+e.r*Math.cos(e.a0),e.c.y+e.r*Math.sin(e.a0)));addGrip(P(e.c.x+e.r*Math.cos(e.a1),e.c.y+e.r*Math.sin(e.a1)))}
+  else if(e.type==='circle'){for(const a of [0,Math.PI/2,Math.PI,3*Math.PI/2])addGrip(P(e.c.x+e.r*Math.cos(a),e.c.y+e.r*Math.sin(a)))}
+  else for(const p of getVertices(e))addGrip(p);
+  if(points.length>=160)break;
+ }
+ return points;
+}
+function findBlockGrip(raw){
+ const p=world(raw),limit=9,possible=[];
+ const selected=new Set(state.selected);
+ for(let i=state.entities.length-1;i>=0;i--){
+  const e=state.entities[i];
+  if(e.type!=='blockRef'||!layerFor(e).visible||layerFor(e).locked)continue;
+  // Require selection before vertex dragging, to avoid accidental edits
+  // while clicking other entities that overlap a block.
+  if(!selected.has(e.id))continue;
+  for(const vertex of blockGripPoints(e)){
+   const d=dist(screen(vertex),raw);
+   if(d<=limit)possible.push({entity:e,vertex,d});
+  }
+ }
+ possible.sort((a,b)=>a.d-b.d);
+ return possible[0]||null;
+}
+function drawBlockGrips(ref){
+ const active=state.drag?.type==='blockGrip'&&state.drag.id===ref.id;
+ ctx.save();
+ for(const vertex of blockGripPoints(ref)){
+  const p=screen(vertex);
+  ctx.fillStyle=active?'#ffdf79':'#8ce8ff';
+  ctx.strokeStyle='#10202a';ctx.lineWidth=1.2;
+  ctx.fillRect(p.x-4,p.y-4,8,8);ctx.strokeRect(p.x-4,p.y-4,8,8);
+ }
+ ctx.restore();
+}
+
 function flattenCADEntities(entities){return entities.flatMap(e=>e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e])}
 
 function drawEntity(e,forceColor){if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(state.selected.includes(e.id)){
-   const pivot=screen(e.p);ctx.save();ctx.strokeStyle=displayColors.selection;ctx.strokeRect(pivot.x-5,pivot.y-5,10,10);ctx.restore();
+   drawBlockGrips(e);
   }
   return;
  }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width||.25)*3+1):Math.max(.75,(e.width||.25)*3);if(isSelected)ctx.setLineDash([5,3]);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='text'){const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);ctx.fillText(e.text||'',0,0);ctx.restore();return}ctx.beginPath();tracePath(e);ctx.stroke();if(e.type==='dimension'){const mid=screen(mul(add(e.a,e.b),.5)),perp=sub(e.p,mul(add(e.a,e.b),.5));let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p=screen(add(mul(add(e.a,e.b),.5),P(nx*off,ny*off)));ctx.fillStyle=ctx.strokeStyle;ctx.font='11px Consolas,monospace';ctx.textAlign='center';ctx.fillText(`${units(L)} ${state.unit}`,p.x,p.y-6);ctx.textAlign='start'}ctx.restore()}
@@ -2292,11 +2338,37 @@ function registerMiddleClick(time,point){
  return isDouble;
 }
 canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
+ if(state.tool==='select'&&!ev.shiftKey){
+  const grip=findBlockGrip(raw);
+  if(grip){state.drag={type:'blockGrip',id:grip.entity.id,start:raw,last:raw,
+   vertex:P(grip.vertex.x,grip.vertex.y),original:P(grip.entity.p.x,grip.entity.p.y),moved:false};
+   canvas.style.cursor='grabbing';schedule();return}
+ }
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
  state.drag={type:'click',start:raw,last:raw,shift:ev.shiftKey};if(state.tool==='select'){const e=pick(world(raw));if(!e)state.drag.type='selection'} });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}else if(d.type==='click'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7&&state.tool==='select'){d.type='selection'}}schedule()});
+canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='blockGrip'){
+  const target=state.entities.find(e=>e.id===d.id);
+  if(target&&target.type==='blockRef'){
+   const movement=Math.hypot(raw.x-d.start.x,raw.y-d.start.y);
+   if(movement>3||d.moved){
+    if(!d.moved){saveHistory();d.moved=true}
+    const here=world(raw);
+    // Preserve the grabbed vertex's exact offset from insertion pivot.
+    // Grid snapping is applied to the grabbed vertex (not the pivot).
+    const next=state.snapOn&&state.grid>0?P(Math.round(here.x/state.grid)*state.grid,Math.round(here.y/state.grid)*state.grid):here;
+    target.p=P(d.original.x+next.x-d.vertex.x,d.original.y+next.y-d.vertex.y);
+    state.mouse=next;
+   }
+  }
+ }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}else if(d.type==='click'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>7&&state.tool==='select'){d.type='selection'}}schedule()});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
+ if(d?.type==='blockGrip'){
+  canvas.style.cursor='';
+  if(d.moved){updateAll();toast('Bloque desplazado desde su vértice · MOVE BLOCK')}
+  else schedule();
+  return;
+ }
  if(!d)return;
  if(d.type==='pan'){
   if(d.middle){
