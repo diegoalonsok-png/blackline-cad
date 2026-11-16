@@ -1,0 +1,74 @@
+/* Blackline CAD — diseño monocromo 2026-11-16.
+   No modifica geometría, comandos, guardado ni escala de dibujos. */
+:root{--bl-bg:#0d0f12;--bl-panel:#17191e;--bl-border:#333740;--bl-icon:#f2f4f7}
+.app.blackline-modern{background:var(--bl-bg)!important;color:#e9ebef!important;--cad-ui-base:#141519;--cad-ui-raised:#1d2026;--cad-ui-toolbar:#15171b;--cad-ui-input:#191b21;--cad-ui-text:#f0f2f5;--cad-ui-muted:#a6aeb9;--cad-ui-edge:#353a43}
+.app.blackline-modern:not(.cad-focus):not(.cad-hide-ribbon):not(.ribbon-undocked){grid-template-rows:48px 29px var(--ribbon-height,58px) minmax(0,1fr) 54px 34px!important}
+.app.blackline-modern .brandbar{height:48px!important;padding:0 12px!important;gap:10px!important;background:#111216!important;border-bottom:1px solid #32353d!important}
+.app.blackline-modern .mark{background:#0e1014!important;color:#f5f6f8!important;border:1px solid #777d88!important;border-radius:9px!important;width:30px!important;height:30px!important;display:grid!important;place-items:center!important;font:23px Arial,sans-serif!important}
+.app.blackline-modern .brand{font:650 16px/1.1 Inter,Segoe UI,Arial,sans-serif!important;color:#f5f6f8!important;letter-spacing:-.3px!important}
+.app.blackline-modern .brand small{font:500 8px/1.1 Inter,Segoe UI,Arial,sans-serif!important;color:#8e969f!important;letter-spacing:.6px!important;margin-top:4px!important}
+.app.blackline-modern .filename{background:#1a1b21!important;border:1px solid #373a43!important;color:#cdd1d8!important;border-radius:8px!important;padding:6px 9px!important;min-width:95px!important;max-width:165px!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app.blackline-modern .cad-command-finder{background:#181a20!important;border:1px solid #393c45!important;border-radius:10px!important;min-width:140px!important;max-width:230px!important}
+.app.blackline-modern .brandbar .btn,.app.blackline-modern .cad-workspace-controls .btn{background:#1c1f25!important;color:#e9ebee!important;border:1px solid #363b44!important;border-radius:8px!important;min-height:29px!important;padding:4px 8px!important;font-size:10px!important}
+.app.blackline-modern .brandbar .btn:hover,.app.blackline-modern .cad-workspace-controls .btn:hover{background:#2c3038!important;border-color:#757d8a!important}
+.app.blackline-modern .tabbar{height:29px!important;min-height:29px!important;background:#111317!important;border-bottom:1px solid #31343c!important;padding:0 12px!important;gap:5px!important}
+.app.blackline-modern .tabbar .tab{font-size:10px!important;padding:4px 11px!important;color:#b7bec7!important;background:transparent!important;border-radius:5px 5px 0 0!important}
+.app.blackline-modern .tabbar .tab.active{color:#fff!important;background:#282b32!important;border-bottom:2px solid #f4f5f7!important}
+.app.blackline-modern .ribbon-shell{height:calc(var(--ribbon-height,58px) - 6px)!important;margin:2px 9px 4px!important;min-height:40px!important;max-height:none!important;background:#16181d!important;border:1px solid #31343c!important;border-radius:12px!important;box-shadow:0 4px 13px #0004!important;overflow:hidden!important}
+.app.blackline-modern .ribbon,.app.blackline-modern.cad-ribbon-compact .ribbon{background:transparent!important;padding:3px 8px!important;gap:7px!important;align-items:center!important}
+.app.blackline-modern .ribbon .group,.app.blackline-modern .ribbon .group.stack,.app.blackline-modern.cad-ribbon-compact .ribbon .group,.app.blackline-modern.cad-ribbon-compact .ribbon .group.stack{display:flex!important;flex-direction:row!important;align-items:center!important;gap:4px!important;flex-shrink:0!important;padding:0 8px 4px 0!important;border-right:1px solid #343840!important}
+.app.blackline-modern .ribbon .group:after{font-size:7.5px!important;color:#8b939e!important;letter-spacing:.6px!important;bottom:-3px!important}
+.app.blackline-modern .ribbon .tool,.app.blackline-modern .ribbon .group.stack .tool,.app.blackline-modern.cad-ribbon-compact .ribbon .tool,.app.blackline-modern.cad-ribbon-compact .ribbon .group.stack .tool{display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;min-width:39px!important;max-width:39px!important;width:39px!important;height:39px!important;min-height:39px!important;padding:6px!important;gap:0!important;background:#07080b!important;border:1px solid #15171b!important;border-radius:10px!important;box-shadow:inset 0 1px 0 #ffffff0b!important}
+.app.blackline-modern .ribbon .tool svg,.app.blackline-modern.cad-ribbon-compact .ribbon .tool svg{width:23px!important;height:23px!important;stroke:#f0f2f5!important;stroke-width:1.85!important;fill:none!important;stroke-linecap:round!important;stroke-linejoin:round!important}
+.app.blackline-modern .ribbon .tool span{display:none!important}
+.app.blackline-modern .ribbon .tool:hover{background:#292d35!important;border-color:#686e7b!important}
+.app.blackline-modern .ribbon .tool.active{background:#242932!important;border:1px solid #dce2ea!important;box-shadow:0 0 0 2px #ffffff19,0 0 9px #ffffff21!important}
+.app.blackline-modern .ribbon-grip,.app.blackline-modern .cad-ribbon-size{background:#1a1b20!important;border-color:#343740!important;color:#f1f2f4!important}
+.app.blackline-modern .workspace{background:#0c0e12!important;gap:0!important;min-height:0!important}
+.app.blackline-modern:not(.cad-hide-left):not(.cad-hide-right):not(.cad-focus) .workspace{grid-template-columns:var(--left-width,215px) minmax(0,1fr) var(--right-width,272px)!important}
+.app.blackline-modern.cad-hide-left:not(.cad-hide-right):not(.cad-focus) .workspace{grid-template-columns:minmax(0,1fr) var(--right-width,272px)!important}
+.app.blackline-modern .sidebar{background:#121418!important;border-left:1px solid #2b2e35!important;border-right:1px solid #2b2e35!important;padding:5px 4px!important;scrollbar-color:#3b414a #121418!important}
+.app.blackline-modern .sidebar>.panel{background:#191b20!important;border:1px solid #2e3138!important;border-radius:12px!important;margin:4px 3px 8px!important;box-shadow:none!important}
+.app.blackline-modern .panel-title{background:#1c1e24!important;color:#e3e5e9!important;border-bottom:1px solid #343840!important;padding:8px 10px!important;font-size:11px!important;letter-spacing:.15px!important}
+.app.blackline-modern .panel-content{padding:9px!important}
+.app.blackline-modern .sidebar .btn,.app.blackline-modern .sidebar button{background:#111317!important;color:#e7e9ec!important;border:1px solid #343940!important;border-radius:8px!important}
+.app.blackline-modern .sidebar .btn:hover,.app.blackline-modern .sidebar button:hover{background:#2b2e36!important}
+.app.blackline-modern .sidebar select,.app.blackline-modern .sidebar input:not([type=color]){background:#101216!important;border:1px solid #393e47!important;color:#f0f2f4!important;border-radius:7px!important}
+.app.blackline-modern .layer-row{border-bottom:1px solid #2b2e35!important;color:#ccd1d9!important}
+.app.blackline-modern .layer-row.current{background:#30343d!important}
+.app.blackline-modern .canvas-wrap{background:#0c0f13!important;border:0!important;border-radius:0!important;margin:0!important;min-width:0!important}
+.app.blackline-modern .canvas-overlay{left:69px!important;top:12px!important;background:#16191edb!important;color:#b9c0cb!important;border:1px solid #373b45!important;border-radius:9px!important;padding:6px 9px!important}
+.app.blackline-modern .canvas-overlay b{color:#f4f5f7!important}
+.app.blackline-modern .view-tools button{background:#0a0b0ee8!important;color:#f2f4f5!important;border:1px solid #414650!important;border-radius:9px!important}
+.app.blackline-modern .cad-space-tab,.app.blackline-modern .canvas-bottom button{border-radius:8px!important;background:#191b20!important;border:1px solid #40444c!important;color:#edeff2!important}
+.app.blackline-modern .cmd{background:#101216!important;border-top:1px solid #30343b!important;padding:5px 12px!important}
+.app.blackline-modern .cmd .command-row{background:#171a21!important;border:1px solid #3c424d!important;border-radius:9px!important;padding:4px 8px!important}
+.app.blackline-modern .cmd .command-row #command{background:transparent!important;color:#fff!important;border:0!important}
+.app.blackline-modern .cmd .log{height:17px!important;line-height:15px!important;font-size:10px!important}
+.app.blackline-modern .status{background:#101216!important;border-top:1px solid #31343b!important}
+.app.blackline-modern .status button{background:#191c22!important;border:1px solid #393e47!important;color:#e9eaee!important;border-radius:7px!important;min-height:24px!important}
+.app.blackline-modern .status button.on{background:#323743!important;border-color:#7c8491!important;color:#fff!important}
+.blackline-modern .bl-icon-rail{position:absolute;top:12px;left:10px;width:49px;max-height:calc(100% - 70px);overflow-y:auto;scrollbar-width:none;z-index:5;display:flex;flex-direction:column;align-items:center;gap:5px;padding:6px 4px;border-radius:13px;background:#13151be8;border:1px solid #333740;box-shadow:0 9px 24px #0007}
+.blackline-modern .bl-icon-rail::-webkit-scrollbar{display:none}
+.blackline-modern .bl-icon-rail button{display:grid;place-items:center;flex-shrink:0;width:38px;height:38px;padding:7px;background:#06070a;color:#f2f4f5;border:1px solid #16181d;border-radius:10px;cursor:pointer}
+.blackline-modern .bl-icon-rail button:hover,.blackline-modern .bl-icon-rail button[aria-pressed=true]{background:#30343d;border:1px solid #e1e4eb;box-shadow:0 0 8px #ffffff22}
+.blackline-modern .bl-icon-rail svg{width:22px;height:22px;stroke:#f2f4f6;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.blackline-modern .bl-icon-divider{height:1px;width:28px;background:#3b4049;margin:3px 0}
+.blackline-modern #blacklineBlockGallery{min-height:230px!important;max-height:min(56vh,520px)!important;display:flex!important;flex-direction:column!important}
+.blackline-modern #blacklineBlockGallery #blBody{min-height:0!important;overflow:auto!important;flex:1!important}
+.blackline-modern #blCategories{display:flex!important;flex-wrap:wrap!important;gap:4px!important}
+.blackline-modern #blCategories button{font-size:9px!important;padding:5px 7px!important;background:#08090d!important}
+.blackline-modern #blCards{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;max-height:260px!important}
+.blackline-modern #blCards button{background:#090a0d!important;border:1px solid #383d47!important;border-radius:10px!important;min-height:65px!important;overflow:hidden}
+.blackline-modern #blCards button:hover{border-color:#cbd0d9!important}
+.blackline-modern #blCards svg{background:transparent!important}
+.blackline-modern #blCards svg *{stroke:#f0f1f4!important}
+.blackline-modern .bl-block-search{display:block;width:100%;padding:7px 9px;margin-bottom:8px;border:1px solid #454a54;background:#0c0e12;color:#fafafa;border-radius:8px;outline-offset:2px}
+.blackline-modern .bl-imported-title{font-size:10px;color:#aeb4c0;letter-spacing:.3px;border-top:1px solid #32363e;margin-top:9px;padding-top:9px}
+.blackline-modern .bl-user-blocks{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+.blackline-modern .bl-user-blocks button{display:flex;align-items:center;gap:5px;min-width:0;padding:7px 6px;font-size:10px;text-align:left;border-radius:8px;white-space:normal;overflow-wrap:anywhere}
+.blackline-modern .bl-user-blocks button::before{content:"▣";color:#f5f5f5;font-size:15px}
+.blackline-modern .bl-archive-note{color:#858f9a;font-size:9px;line-height:1.35;margin-top:7px}
+.blackline-modern .cad-floating-tools:not(.floating){opacity:.96}
+@media(max-width:1250px){.app.blackline-modern .brandbar .smallhide{display:none!important}.app.blackline-modern .brand small{display:none!important}.app.blackline-modern .cad-command-finder{max-width:145px!important}}
+@media(max-width:850px){.app.blackline-modern .workspace{grid-template-columns:minmax(0,1fr)!important}.app.blackline-modern .workspace>.sidebar{display:none!important}.app.blackline-modern .brandbar{gap:5px!important}.app.blackline-modern .filename{display:none!important}.app.blackline-modern .cad-command-finder{display:none!important}.app.blackline-modern .bl-icon-rail{max-height:calc(100% - 90px)}}
