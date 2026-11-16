@@ -236,3 +236,20 @@ requestAnimationFrame(requestResize);
  window.addEventListener('resize',close);
  document.addEventListener('scroll',()=>{if(!menu.hidden)close()},true);
 })();
+
+
+/* Keep the ribbon-height drag handle below controls, never across clickable icons. */
+(function keepRibbonSizerBelowButtons(){
+ const app=document.querySelector('.app'),shell=document.getElementById('ribbonShell'),handle=document.getElementById('ribbonSizer');
+ if(!app||!shell||!handle)return;
+ function align(){
+  const a=app.getBoundingClientRect(),r=shell.getBoundingClientRect();
+  if(shell.classList.contains('floating')||app.classList.contains('ribbon-undocked'))return;
+  // The sizer is absolutely positioned against .app; derive its actual row, not a fragile CSS sum.
+  handle.style.setProperty('top',Math.round(r.bottom-a.top+1)+'px','important');
+  handle.style.setProperty('height','8px','important');
+ }
+ const observer=new ResizeObserver(align);observer.observe(shell);observer.observe(app);
+ window.addEventListener('resize',align);
+ requestAnimationFrame(align);
+})();
