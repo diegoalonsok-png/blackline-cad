@@ -55,6 +55,14 @@ The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, b
 - The idle cursor shows a crosshair without a central square. The adjustable pickbox is shown only with active drawing/editing commands; selection/editing modes use a square selector.
 - These changes concern interaction and viewport state, not model coordinates or saved entity geometry.
 
+## Dynamic 2D blocks — opt-in first stage
+
+- Select an inserted block reference and use **Selection / Properties → BLOQUE DINÁMICO 2D → Activar estiramiento** to enable dynamic dimensions for that block definition.
+- Supported for blocks built from LINE, RECTANGLE, POLYLINE, and TEXT with nonzero local width and height. Existing parametric door/window/table definitions keep their existing dedicated controls. Unsupported geometries are not silently transformed.
+- Selected dynamic blocks expose two **yellow diamond grips** for independent local X (width) and Y (height) stretching, plus the usual insertion-point grip for moving the block. Dimensions can also be entered numerically in Properties and applied without exploding the block.
+- Each block reference stores independent width/height values in the CADJSON project; changing one instance does not resize other references. The underlying definition remains intact. Undo works via the existing drawing history.
+- Current scope is a Blackline CAD native 2D dynamic-block subset, **not** AutoCAD's complete dynamic-block authoring engine. AutoCAD DWG dynamic constraints, lookup tables, visibility states, stretch actions, and anonymous block records are not imported or round-tripped as native editable dynamic features.
+
 ## Current keyboard shortcuts
 
 `F3`: OSNAP; `F7`: grid; `F8`: ortho; `F9`: snap; `Ctrl/Cmd+O`: open; `Ctrl/Cmd+S`: save project; `Ctrl/Cmd+P`: plot; `Ctrl/Cmd+Z`: undo. Double-click on the idle model canvas zooms to drawing extents; right click opens the CAD context menu.
