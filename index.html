@@ -3668,6 +3668,7 @@ function openDynamicBlockEditor(testOnly=false){
  const name=picked?.blockName||$('blockLibrary')?.value;
  const def=name&&state.blocks[name];
  if(!def){toast('BEDIT: seleccioná un bloque insertado o elegí uno de la biblioteca');return}
+ if(def.parametric){toast('Este bloque ya usa parámetros arquitectónicos: editá sus medidas desde Propiedades del bloque. BEDIT lineal se reserva para bloques 2D genéricos.');return}
  if(!Array.isArray(def.entities)||!def.entities.length){toast('BEDIT: geometría no disponible');return}
  const coords=[];
  for(const entity of def.entities){
@@ -3715,7 +3716,7 @@ function openDynamicBlockEditor(testOnly=false){
  buttons.append(closeButton,saveButton);
  card.append(heading,note,row,help,preview,status,buttons);panel.append(card);document.body.append(panel);
  const cancel=()=>panel.remove();closeButton.onclick=cancel;
- panel.addEventListener('click',e=>{if(e.target===panel)cancel()});
+ panel.addEventListener('click',e=>{if(e.target===panel)dispose()});
  const escape=e=>{if(e.key==='Escape'){e.stopImmediatePropagation();e.preventDefault();document.removeEventListener('keydown',escape,true);cancel()}};
  document.addEventListener('keydown',escape,true);
  const dispose=()=>{document.removeEventListener('keydown',escape,true);cancel()};
