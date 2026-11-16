@@ -3266,11 +3266,44 @@ function initPermanentBlockGallery(){
   b.onclick=()=>{activeCategory=cat;showCards()};
   chooser.append(b);
  }
- const svgFor=x=>{
- const transform='translate(14 116) scale(85 -85)';const scale=95/Math.max(x.w,x.h);
- const shapes=x.draw.map(d=>{const n=d[0],v=d.slice(1);if(n==='line')return '<line x1="'+v[0]+'" y1="'+v[1]+'" x2="'+v[2]+'" y2="'+v[3]+'"/>';if(n==='rect')return '<rect x="'+v[0]+'" y="'+v[1]+'" width="'+v[2]+'" height="'+v[3]+'"/>';if(n==='circle')return '<circle cx="'+v[0]+'" cy="'+v[1]+'" r="'+v[2]+'"/>';if(n==='ellipse')return '<ellipse cx="'+v[0]+'" cy="'+v[1]+'" rx="'+v[2]+'" ry="'+v[3]+'"/>';if(n==='arc'){let [cx,cy,r,a,b]=v;let p=a*Math.PI/180,q=b*Math.PI/180;return '<path d="M '+(cx+r*Math.cos(p))+' '+(cy+r*Math.sin(p))+' A '+r+' '+r+' 0 0 1 '+(cx+r*Math.cos(q))+' '+(cy+r*Math.sin(q))+'"/>'}return ''}).join('');
- return '<svg viewBox="0 0 130 130" role="img" aria-label="'+x.id+'" style="height:112px;width:100%;background:#111c22;border-radius:5px"><g transform="translate(15 115) scale('+scale+' -'+scale+')" fill="none" stroke="#9bd5ed" stroke-width="'+(1.5/scale)+'">'+shapes+'</g></svg>'
- };
+
+ function svgFor(x){
+  const defaults=x.kind?{width:x.w,frameWidth:.05,frameDepth:x.kind==='framed-window'?.20:.12,mirror:false,mullion:Boolean(x.mullion)}:null;
+  const geometry=x.kind?blockInstanceGeometry({parametric:{kind:x.kind,defaults},entities:[]},{params:defaults}):x.draw.map(d=>{
+   const t=d[0],v=d.slice(1);
+   if(t==='line')return {type:'line',a:P(v[0],v[1]),b:P(v[2],v[3])};
+   if(t==='rect')return {type:'rect',a:P(v[0],v[1]),b:P(v[0]+v[2],v[1]+v[3])};
+   if(t==='circle')return {type:'circle',c:P(v[0],v[1]),r:v[2]};
+   if(t==='ellipse')return {type:'ellipse',c:P(v[0],v[1]),rx:v[2],ry:v[3],rotation:0};
+   if(t==='arc')return {type:'arc',c:P(v[0],v[1]),r:v[2],a0:v[3]*Math.PI/180,a1:v[4]*Math.PI/180};
+   return null;
+  }).filter(Boolean);
+  const pts=[],track=p=>{if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))pts.push(p)};
+  for(const e of geometry){
+   if(e.a)track(e.a);if(e.b)track(e.b);
+   if(e.pts)e.pts.forEach(track);
+   if(e.c){const rx=e.r||e.rx||0,ry=e.r||e.ry||0;track(P(e.c.x-rx,e.c.y-ry));track(P(e.c.x+rx,e.c.y+ry))}
+  }
+  if(!pts.length)return '<svg viewBox="0 0 100 100" aria-hidden="true"></svg>';
+  const x0=Math.min(...pts.map(p=>p.x)),x1=Math.max(...pts.map(p=>p.x));
+  const y0=Math.min(...pts.map(p=>p.y)),y1=Math.max(...pts.map(p=>p.y));
+  const width=Math.max(.0001,x1-x0),height=Math.max(.0001,y1-y0),pad=Math.max(width,height)*.10;
+  const stroke=Math.max(.0001,Math.max(width,height)/140);
+  const shape=geometry.map(e=>{
+   if(e.type==='line')return '<line x1="'+e.a.x+'" y1="'+e.a.y+'" x2="'+e.b.x+'" y2="'+e.b.y+'"/>';
+   if(e.type==='rect')return '<rect x="'+Math.min(e.a.x,e.b.x)+'" y="'+Math.min(e.a.y,e.b.y)+'" width="'+Math.abs(e.b.x-e.a.x)+'" height="'+Math.abs(e.b.y-e.a.y)+'"/>';
+   if(e.type==='polyline')return '<polyline points="'+e.pts.map(p=>p.x+','+p.y).join(' ')+'"/>';
+   if(e.type==='circle')return '<circle cx="'+e.c.x+'" cy="'+e.c.y+'" r="'+e.r+'"/>';
+   if(e.type==='ellipse')return '<ellipse cx="'+e.c.x+'" cy="'+e.c.y+'" rx="'+e.rx+'" ry="'+e.ry+'"/>';
+   if(e.type==='arc'){
+    const sweep=arcSweep(e.a0,e.a1);
+    const a=e.a0,b=a+sweep;
+    return '<path d="M '+(e.c.x+e.r*Math.cos(a))+' '+(e.c.y+e.r*Math.sin(a))+' A '+e.r+' '+e.r+' 0 '+(sweep>Math.PI?1:0)+' 1 '+(e.c.x+e.r*Math.cos(b))+' '+(e.c.y+e.r*Math.sin(b))+'"/>';
+   }
+   return '';
+  }).join('');
+  return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="#ecf4fc" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
+ }
  function install(x){
   const factor=U.m/U[state.unit];
   const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e']}[x.cat];
@@ -3317,7 +3350,7 @@ function initPermanentBlockGallery(){
    if(x.kind)button.dataset.dynamic='true';
    button.setAttribute('aria-label','Insert '+x.id+' at 1:1');
    button.title=x.id+' · ancho '+x.w+' m · marco paramétrico 0,05 m · clic para insertar';
-   button.innerHTML=svgFor(x)+(x.kind?'<span style="font-size:9px;display:block;color:#9cdeed">↔ EDITABLE</span>':'');
+   button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.kind?'<span style="font-size:9px;display:block;color:#9cdeed">↔ PARAMÉTRICO</span>':'');
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
    button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{install(x);for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
