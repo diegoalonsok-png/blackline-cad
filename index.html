@@ -2249,6 +2249,10 @@ function matchCadPropertiesAt(point){
 
 function runCommand(){let value=$('command').value.trim();$('command').value='';if(!value)return finishStage();const upper=value.toUpperCase();
  if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
+ if(upper==='GRID'||upper==='GRILLA')return toggle('gridOn','gridToggle');
+ if(upper==='SNAP')return toggle('snapOn','snapToggle');
+ if(upper==='ORTHO'||upper==='ORTOGONAL')return toggle('orthoOn','orthoToggle');
+ if(upper==='OSNAP')return toggle('osnapOn','osnapToggle');
  if(upper==='POLAR')return togglePolar();
  if(upper==='TIJERA'||upper==='TRIM2'||upper==='TS')return setTool('trimScissor');
  if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
