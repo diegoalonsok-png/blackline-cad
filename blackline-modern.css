@@ -72,3 +72,6 @@
 .blackline-modern .cad-floating-tools:not(.floating){opacity:.96}
 @media(max-width:1250px){.app.blackline-modern .brandbar .smallhide{display:none!important}.app.blackline-modern .brand small{display:none!important}.app.blackline-modern .cad-command-finder{max-width:145px!important}}
 @media(max-width:850px){.app.blackline-modern .workspace{grid-template-columns:minmax(0,1fr)!important}.app.blackline-modern .workspace>.sidebar{display:none!important}.app.blackline-modern .brandbar{gap:5px!important}.app.blackline-modern .filename{display:none!important}.app.blackline-modern .cad-command-finder{display:none!important}.app.blackline-modern .bl-icon-rail{max-height:calc(100% - 90px)}}
+
+/* Respect the existing workspace visibility controls. */
+.app.blackline-modern #blacklineBlockGallery[hidden],.app.blackline-modern .panel[hidden]{display:none!important}
