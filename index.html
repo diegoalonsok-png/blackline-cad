@@ -3483,6 +3483,26 @@ initCadStatusMenus();
 initCadExportPopover();
 initCadQuickProperties();
 initCadColorPopover();
+// Public, narrowly scoped bridge for independently loaded DXF block collections.
+window.BlacklineBlockAPI=Object.freeze({
+ unit:()=>state.unit,
+ hasBlock:name=>Boolean(state.blocks[name]),
+ addBlock:(name,entities)=>{
+  if(typeof name!=='string'||!name.trim())throw Error('Nombre de bloque inválido');
+  if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
+  const normalized=normalizeBlockEntities(entities);
+  saveHistory();
+  state.blocks[name]={name,entities:normalized};
+  renderBlockLibrary();queueLocalBackup();
+  return normalized.length;
+ },
+ selectBlock:name=>{
+  if(!state.blocks[name])throw Error('El bloque no existe en la paleta');
+  $('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';
+  state.galleryRepeatedInsert=true;setTool('insertBlock');
+  toast('Bloque '+name+' listo para insertar');
+ }
+});
 initBlocks();initPermanentBlockGallery();initDockablePalettes();
 initAdjustableChrome();initMovableRibbon();initDisplayColors();initTypographyPalette();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
