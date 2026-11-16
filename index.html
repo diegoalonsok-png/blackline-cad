@@ -3629,7 +3629,7 @@ function autoCutWallForOpening(ref,block){
  });
  // Only cut correctly aligned wall lines crossing the whole opening.
  // The tolerable perpendicular distance is narrow, measured in drawing units.
- const maxOffset=Math.min(.25*ref.scale,Math.max(.08*ref.scale,width*.1));
+ const maxOffset=Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
  const edits=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
  if(!edits.length)return 0;
  const removed=new Set(edits.map(e=>e.id)),generated=[];
