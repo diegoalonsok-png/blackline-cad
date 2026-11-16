@@ -4410,13 +4410,6 @@ async function importCADBlock(file){
   for(const key of ['r','rx','ry','h'])if(item[key]!==undefined)item[key]*=factor;
   return item;
  });
- if(state.blocks[name]&&!window.confirm('Replace existing block '+name+'?'))return;
- saveHistory();
- if(Array.isArray(data.layers))for(const layer of data.layers){
-  if(!layer||typeof layer.id!=='string'||typeof layer.name!=='string')continue;
-  if(layer.id.length>100||layer.name.length>100)continue;
-  if(!state.layers.some(x=>x.id===layer.id))state.layers.push({id:layer.id,name:layer.name,color:/^#[0-9a-f]{6}$/i.test(layer.color)?layer.color:'#c6cbd1',width:Math.max(.05,Math.min(2,Number(layer.width)||.25)),visible:true,locked:false});
- }
  const metadata={};
  if(data.parametric&&typeof data.parametric==='object'){
   const kind=data.parametric.kind;
@@ -4442,6 +4435,14 @@ async function importCADBlock(file){
   const def={entities:converted};
   if(!blDynEligible(def))throw Error('Geometría no compatible con bloque dinámico X/Y');
   metadata.dynamic2d=true;
+ }
+ if(state.blocks[name]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===name))throw Error('El bloque ya tiene inserciones: importá la nueva versión con otro nombre para no reemplazarlas');
+ if(state.blocks[name]&&!window.confirm('Replace existing block '+name+'?'))return;
+ saveHistory();
+ if(Array.isArray(data.layers))for(const layer of data.layers){
+  if(!layer||typeof layer.id!=='string'||typeof layer.name!=='string')continue;
+  if(layer.id.length>100||layer.name.length>100)continue;
+  if(!state.layers.some(x=>x.id===layer.id))state.layers.push({id:layer.id,name:layer.name,color:/^#[0-9a-f]{6}$/i.test(layer.color)?layer.color:'#c6cbd1',width:Math.max(.05,Math.min(2,Number(layer.width)||.25)),visible:true,locked:false});
  }
  state.blocks[name]={name,entities:converted,...metadata};
  renderLayers();renderBlockLibrary();$('blockLibrary').value=name;
