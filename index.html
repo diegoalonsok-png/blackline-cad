@@ -1088,14 +1088,29 @@ function blockInstanceGeometry(definition,ref){
  const w=Number(ref.params.width),h=Number(ref.params.depth);
  if(!Number.isFinite(w)||w<=0||w>1e8)return definition.entities;
  const base={layer:'0',width:.25},P2=(x,y)=>P(x,y);
+ const framed=(kind)=>{
+  const t=Number(ref.params.frameWidth??param.defaults.frameWidth);
+  const d=Number(ref.params.frameDepth??param.defaults.frameDepth);
+  // Avoid impossible frame-to-opening ratios. All lengths are in model units.
+  if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(d)&&d>0&&d<w*.6))return null;
+  const rect=(x0,y0,x1,y1)=>({...base,type:'rect',a:P2(x0,y0),b:P2(x1,y1)});
+  const line=(x0,y0,x1,y1)=>({...base,type:'line',a:P2(x0,y0),b:P2(x1,y1)});
+  const jambs=[rect(0,-d/2,t,d/2),rect(w-t,-d/2,w,d/2)];
+  if(kind==='window'){
+   // Double jambs, continuous sill/sash lines and central glass indication in plan.
+   return [...jambs,line(t,-d/2,w-t,-d/2),line(t,d/2,w-t,d/2),
+    line(t,-t*.28,w-t,-t*.28),line(t,t*.28,w-t,t*.28)];
+  }
+  const right=Boolean(ref.params.mirror),hinge=right?w-t:t,leaf=right?t:w-t;
+  const span=w-2*t;
+  return [...jambs,line(hinge,0,hinge,span),
+   {...base,type:'arc',c:P2(hinge,0),r:span,a0:right?Math.PI/2:0,a1:right?Math.PI:Math.PI/2}];
+ };
  if(param.kind==='swing-door'){
-  const right=Boolean(ref.params.mirror);
-  const hinge=right?w:0,tip=right?0:w;
-  return [
-   {...base,type:'line',a:P2(0,0),b:P2(w,0)},
-   {...base,type:'line',a:P2(hinge,0),b:P2(hinge,w)},
-   {...base,type:'arc',c:P2(hinge,0),r:w,a0:right?Math.PI/2:0,a1:right?Math.PI:Math.PI/2}
-  ];
+  return framed('door')||definition.entities;
+ }
+ if(param.kind==='framed-window'){
+  return framed('window')||definition.entities;
  }
  if(param.kind==='round-table'){
   const r=w/2;
@@ -2119,6 +2134,10 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
    if(para){$('blRefWidth').value=Number(block.params?.width??para.defaults.width);
     $('blRefDepthRow').hidden=para.kind!=='rect-table';
     $('blRefMirrorRow').hidden=para.kind!=='swing-door';
+    $('blRefFrameRow').hidden=!['swing-door','framed-window'].includes(para.kind);
+    $('blRefJambRow').hidden=!['swing-door','framed-window'].includes(para.kind);
+    $('blRefFrame').value=Number(block.params?.frameWidth??para.defaults.frameWidth??0);
+    $('blRefJamb').value=Number(block.params?.frameDepth??para.defaults.frameDepth??0);
     $('blRefDepth').value=Number(block.params?.depth??para.defaults.depth??0);
     $('blRefMirror').checked=Boolean(block.params?.mirror??para.defaults.mirror);
    }
@@ -2126,7 +2145,7 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
  }}
 $('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
-function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){if(v.params){for(const k of ['width','depth'])if(Number.isFinite(v.params[k]))v.params[k]*=ratio;}return v;}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
+function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){if(v.params){for(const k of ['width','depth','frameWidth','frameDepth'])if(Number.isFinite(v.params[k]))v.params[k]*=ratio;}return v;}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
 function openCadUnitsDialog(){
  const labels={mm:'Milímetros / Millimeters',cm:'Centímetros / Centimeters',m:'Metros / Meters',in:'Pulgadas / Inches',ft:'Pies / Feet'};
  const answer=window.prompt('UNITS / UNIDADES — unidad actual: '+labels[state.unit]+'\\nEscribí mm, cm, m, in o ft. La geometría se convierte manteniendo medidas físicas.',state.unit);
@@ -3681,7 +3700,7 @@ window.BlacklineBlockAPI=Object.freeze({
   if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
   const normalized=normalizeBlockEntities(entities);
   saveHistory();
-  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
+  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','framed-window','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
   renderBlockLibrary();queueLocalBackup();
   return normalized.length;
  },
@@ -3697,7 +3716,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  const pane=$('properties')?.closest('.panel');if(!pane)return;
  const box=document.createElement('section');box.id='blSelectedBlockEditor';box.hidden=true;
  box.style.cssText='padding:9px;margin-top:8px;border:1px solid #536a78;border-radius:8px';
- box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
+ box.innerHTML='<b style="font-size:11px">BLOQUE · INSERCIÓN EDITABLE</b><div id="blSelectedBlockName" style="font-size:11px;overflow-wrap:anywhere;margin:7px 0"></div><label>Pivote X <input id="blRefX" type="number" step="any"></label><label>Pivote Y <input id="blRefY" type="number" step="any"></label><label>Escala <input id="blRefScale" type="number" step="any" min=".00001"></label><label>Rotación ° <input id="blRefAngle" type="number" step="any"></label><div id="blRefParametric" hidden><hr><b style="font-size:11px">PARÁMETROS DEL BLOQUE</b><label>Ancho (unidad del modelo) <input id="blRefWidth" type="number" step="any" min=".00001"></label><label id="blRefDepthRow">Profundidad <input id="blRefDepth" type="number" step="any" min=".00001"></label><label id="blRefMirrorRow">Invertir apertura <input id="blRefMirror" type="checkbox"></label><label id="blRefFrameRow">Espesor de marco (unidad del modelo) <input id="blRefFrame" type="number" step="any" min=".00001"></label><label id="blRefJambRow">Profundidad de marco (unidad del modelo) <input id="blRefJamb" type="number" step="any" min=".00001"></label></div><button type="button" class="btn" id="blApplyBlockRef" style="width:100%;margin-top:6px">Aplicar al bloque</button>';
  pane.querySelector('.panel-content')?.append(box);
  $('blApplyBlockRef').onclick=()=>{
   const ref=state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef');if(!ref)return;
@@ -3706,9 +3725,17 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
   const param=state.blocks?.[ref.blockName]?.parametric;let w,d;
   if(param){w=Number($('blRefWidth').value);d=Number($('blRefDepth').value);
    if(!Number.isFinite(w)||w<=0||w>1e8||(param.kind==='rect-table'&&(!Number.isFinite(d)||d<=0||d>1e8)))return toast('Ancho o profundidad inválidos');
+   if(['swing-door','framed-window'].includes(param.kind)){
+    const t=Number($('blRefFrame').value),j=Number($('blRefJamb').value);
+    if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(j)&&j>0&&j<w*.6))return toast('El espesor y la profundidad del marco deben ser positivos y proporcionales al vano');
+   }
   }
   saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;
-  if(param)ref.params={...ref.params,width:w,...(param.kind==='rect-table'?{depth:d}:{mirror:$('blRefMirror').checked})};
+  if(param)ref.params={...ref.params,width:w,
+   ...(param.kind==='rect-table'?{depth:d}:{}),
+   ...(param.kind==='swing-door'?{mirror:$('blRefMirror').checked}:{}),
+   ...(['swing-door','framed-window'].includes(param.kind)?{frameWidth:Number($('blRefFrame').value),frameDepth:Number($('blRefJamb').value)}:{})
+  };
   updateAll();toast('Bloque actualizado como unidad');
  };
 })();
