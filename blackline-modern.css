@@ -133,3 +133,16 @@
 .app.blackline-modern.bl-light .cad-status-menu{background:#f7f9fb!important;color:#243447!important}
 .app.blackline-modern.bl-light .cad-layout-workspace,
 .app.blackline-modern.bl-light .cad-layout-paperboard{background:#e0e5eb!important}
+
+
+/* Logo-triggered application file menu */
+#blFileMenu{position:fixed;z-index:2147482000;width:252px;max-width:calc(100vw - 16px);padding:8px;background:#1c2027;color:#f3f5f7;border:1px solid #525c6b;border-radius:11px;box-shadow:0 12px 36px #000b}
+#blFileMenu[hidden]{display:none!important}
+#blFileMenu .bl-file-menu-title{font:700 10px/1.5 Inter,Segoe UI,Arial,sans-serif;letter-spacing:1.2px;color:#9eaab9;padding:8px 10px 11px;border-bottom:1px solid #3d4550;margin-bottom:5px}
+#blFileMenu button{width:100%;display:flex;align-items:center;gap:12px;padding:11px 10px;border:0;border-radius:7px;background:transparent;color:inherit;text-align:left;font:500 13px/1.3 Inter,Segoe UI,Arial,sans-serif;cursor:pointer}
+#blFileMenu button:hover,#blFileMenu button:focus-visible{background:#374451;outline:none}
+#blFileMenu button svg{width:20px;height:20px;flex:none}
+.app.blackline-modern .brandbar .mark[aria-expanded="true"]{border-color:#92c5e0!important;box-shadow:0 0 0 2px #7db7d855}
+#blFileMenu:has(~ .app.bl-light),body:has(.app.blackline-modern.bl-light) #blFileMenu{background:#f9fafb;color:#1d2d3e;border-color:#aebac7;box-shadow:0 12px 32px #14263833}
+body:has(.app.blackline-modern.bl-light) #blFileMenu .bl-file-menu-title{color:#5b6d7d;border-color:#cbd4dd}
+body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.blackline-modern.bl-light) #blFileMenu button:focus-visible{background:#dae9f3}
