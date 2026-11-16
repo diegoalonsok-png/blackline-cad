@@ -4089,6 +4089,18 @@ window.BlacklineBlockAPI=Object.freeze({
   $('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';
   state.galleryRepeatedInsert=true;setTool('insertBlock');
   toast('Bloque '+name+' listo para insertar');
+ },
+ insertAtScreen:(name,clientX,clientY)=>{
+  if(!state.blocks[name])throw Error('Bloque inexistente: '+name);
+  const rect=canvas.getBoundingClientRect();
+  const x=Number(clientX)-rect.left,y=Number(clientY)-rect.top;
+  if(!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>rect.width||y>rect.height)throw Error('Soltá el bloque dentro del dibujo');
+  $('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';
+  state.galleryRepeatedInsert=false;
+  setTool('insertBlock');
+  const p=snapPoint(world(P(x,y)));
+  insertSelectedBlock(p);
+  return {x:p.x,y:p.y};
  }
 });
 initBlocks();initPermanentBlockGallery();initDockablePalettes();
@@ -4136,4 +4148,6 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script defer src="assets/dxf-featured-blocks.js?v=20261116-featured4"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261116-frame1"></script>
 <script defer src="assets/cad2d-curated-library.js?v=20261116-authentic50"></script>
+<a href="./estado-comandos.html" target="_blank" rel="noopener" title="Estado real de los comandos CAD" style="position:fixed;right:12px;bottom:125px;z-index:3;padding:6px 9px;border:1px solid #647b89;border-radius:7px;background:#1e2b35;color:#e5f0f5;font:11px system-ui;text-decoration:none">✓ Estado de comandos</a>
+<script src="blackline-drag-blocks.js?v=20261116"></script>
 </body></html>
