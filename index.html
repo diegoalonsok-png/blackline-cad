@@ -3024,8 +3024,8 @@ const CAD_COMMANDS=[
  ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
  ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
  ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
- ['BLOCK','B','Create reusable block'],['INSERT','I','Insert reusable block'],
- ['WBLOCK','','Export block library item'],['UNITS','','Change model units'],['SVG','','Export drawing as SVG vector'],['EXPORTMENU','','Open export formats'],
+ ['BLOCK','B','Create reusable block'],['INSERT','','Insert from existing library'],['IMPORTBLOCK','I','Import block from desktop'],
+ ['WBLOCK','W','Export selected block'],['UNITS','','Change model units'],['SVG','','Export drawing as SVG vector'],['EXPORTMENU','','Open export formats'],
  ['PAN','P','Pan model space'],
  ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
  ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
@@ -3303,8 +3303,8 @@ if(['line','polyline'].includes(state.tool)&&state.stage.length){if(upper==='U'|
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){if(window.confirm('Create a new drawing? Save your current work first.')){saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];state.file='Untitled Drawing';state.nextId=1;renderBlockLibrary();updateAll();zoomExtents()}return}
  if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
- if(cmd==='INSERT'||cmd==='I')return $('insertBlockBtn').click();
- if(cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return $('exportBlockBtn').click();
+ if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
+ if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
  if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
@@ -4321,8 +4321,8 @@ function initPermanentBlockGallery(){
    renderBlockLibrary();queueLocalBackup()
   }
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
-  state.galleryRepeatedInsert=true;setTool('insertBlock');
-  $('blHelp').textContent='Selected: '+x.id+' · click to place more copies; Esc to finish';
+  state.galleryRepeatedInsert=false;setTool('insertBlock');
+  $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar una copia';
   toast('Ready to insert at 1:1 · '+layer.name);
  }
  function showCards(){
@@ -4344,6 +4344,15 @@ function initPermanentBlockGallery(){
 
 }
 
+function cadActiveBlockRef(){return state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef')||null}
+function cadExportActiveBlock(){
+ const ref=cadActiveBlockRef();if(ref&&state.blocks[ref.blockName])$('blockLibrary').value=ref.blockName;
+ if(!selectedBlock()){const keys=Object.keys(state.blocks||{});
+  if(keys.length===1)$('blockLibrary').value=keys[0];
+  else return toast(keys.length?'WBLOCK: seleccioná un bloque en el dibujo o Biblioteca':'WBLOCK: biblioteca vacía');
+ }
+ $('exportBlockBtn').click();
+}
 function initBlocks(){
  renderBlockLibrary();
  $('createBlockBtn').onclick=()=>{
@@ -4365,6 +4374,7 @@ function initBlocks(){
   toast('Block created: '+key+' · '+entries.length+' entities');
  };
  $('insertBlockBtn').onclick=()=>{
+  state.galleryRepeatedInsert=false;
   if(!selectedBlock())return toast('Choose a block');
   setTool('insertBlock');
   toast('Click an insertion point or type X,Y in the command bar');
@@ -4851,7 +4861,7 @@ window.BlacklineBlockAPI=Object.freeze({
  selectBlock:name=>{
   if(!state.blocks[name])throw Error('El bloque no existe en la paleta');
   $('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';
-  state.galleryRepeatedInsert=true;setTool('insertBlock');
+  state.galleryRepeatedInsert=false;setTool('insertBlock');
   toast('Bloque '+name+' listo para insertar');
  }
 });
