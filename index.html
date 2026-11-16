@@ -3629,7 +3629,7 @@ function autoCutWallForOpening(ref,block){
  });
  // Only cut correctly aligned wall lines crossing the whole opening.
  // The tolerable perpendicular distance is narrow, measured in drawing units.
- const maxOffset=Math.min(.25*ref.scale,Math.max(.08*ref.scale,width*.1));
+ const maxOffset=Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
  const edits=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
  if(!edits.length)return 0;
  const removed=new Set(edits.map(e=>e.id)),generated=[];
@@ -3648,10 +3648,34 @@ function autoCutWallForOpening(ref,block){
  state.entities.push(...generated);
  return edits.length;
 }
+function openingOverlapsAnother(ref,block){
+ const width=Number(ref.params?.width??block.parametric?.defaults?.width)*ref.scale;
+ if(!(width>0))return false;
+ const theta=ref.rotation*Math.PI/180,ux=Math.cos(theta),uy=Math.sin(theta),nx=-uy,ny=ux;
+ const pad=Math.max(.01,Math.min(.20*ref.scale,width*.07));
+ for(const other of state.entities){
+  if(other.type!=='blockRef'||other.id===ref.id)continue;
+  const definition=state.blocks?.[other.blockName],kind=definition?.parametric?.kind;
+  if(!['swing-door','double-door','framed-window'].includes(kind))continue;
+  const angle=other.rotation*Math.PI/180;
+  if(Math.abs(Math.sin(angle-theta))>1e-4)continue;
+  const otherWidth=Number(other.params?.width??definition.parametric.defaults?.width)*other.scale;
+  if(!(otherWidth>0))continue;
+  const delta=P(other.p.x-ref.p.x,other.p.y-ref.p.y);
+  if(Math.abs(delta.x*nx+delta.y*ny)>pad)continue;
+  const start=delta.x*ux+delta.y*uy,end=start+otherWidth*Math.cos(angle-theta);
+  if(Math.min(end,start)<width-1e-7&&Math.max(end,start)>1e-7)return true;
+ }
+ return false;
+}
 function relocateOpeningWithBlock(ref,previous){
  if(!autoOpeningEnabled||!window.BlacklineAutoOpening)return {ok:true,cut:0};
  const block=state.blocks?.[ref.blockName];
  if(!block?.parametric||!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return {ok:true,cut:0};
+ if(openingOverlapsAnother(ref,block)){
+  ref.p=P(previous.x,previous.y);
+  return {ok:false,cut:0,reason:'La nueva abertura se superpone con otra'};
+ }
  const fragments=state.entities.filter(e=>e.autoOpeningRef===ref.id);
  if(!fragments.length)return {ok:true,cut:autoCutWallForOpening(ref,block)};
  // An edited or missing wall fragment must never be silently reconstructed.
@@ -3691,7 +3715,7 @@ function insertSelectedBlock(point){
  if(block.parametric){ref.params={...block.parametric.defaults};if(['swing-door','double-door','framed-window'].includes(block.parametric.kind)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}}
  else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
  state.entities.push(ref);
- const cutCount=autoCutWallForOpening(ref,block);
+ const cutCount=openingOverlapsAnother(ref,block)?0:autoCutWallForOpening(ref,block);
  const repeat=Boolean(state.galleryRepeatedInsert);
  state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
@@ -4472,7 +4496,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
     if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(j)&&j>0&&j<w*.6))return toast('El espesor y la profundidad del marco deben ser positivos y proporcionales al vano');
    }
   }
-  const originalPoint=P(ref.p.x,ref.p.y);
+  const originalPoint=P(ref.p.x,ref.p.y),originalRef=clone(ref);
   saveHistory();ref.p=P(x,y);ref.scale=scale;ref.rotation=angle;
   if(param)ref.params={...ref.params,width:w,
    ...(param.kind==='rect-table'?{depth:d}:{}),
@@ -4481,6 +4505,7 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
    ...(['swing-door','double-door','framed-window'].includes(param.kind)?{frameWidth:Number($('blRefFrame').value),frameDepth:Number($('blRefJamb').value)}:{})
   };
   const movedOpening=relocateOpeningWithBlock(ref,originalPoint);
+  if(!movedOpening.ok)Object.assign(ref,originalRef);
   updateAll();toast(movedOpening.ok?'Bloque actualizado como unidad'+(movedOpening.cut?' · vano actualizado':''):'Vano protegido: pared modificada; movimiento cancelado');
  };
 })();
