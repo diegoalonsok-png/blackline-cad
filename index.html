@@ -1193,7 +1193,7 @@ function snapPoint(p){
   for(const e of state.entities){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
-   const candidates=getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT']).filter(item=>cadOsnapEnabled(item[1]));
+   const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    if(e.type==='line'){
     if(cadOsnapEnabled('MID'))candidates.push([mul(add(e.a,e.b),.5),'MID']);
     if(nearbyLines.length<70)nearbyLines.push(e);
@@ -1867,10 +1867,15 @@ function joinSelectedLines(){
  state.selected=[];updateAll();log('JOIN');toast('Joined '+used.size+' LINE objects into a polyline');
 }
 function explodeSelected(){
- const picked=validEditSelection(),supported=picked.filter(e=>e.type==='polyline'||e.type==='rect');
- if(!supported.length)return toast('Select polylines or rectangles to EXPLODE');
+ const picked=validEditSelection(),supported=picked.filter(e=>['polyline','rect','blockRef'].includes(e.type));
+ if(!supported.length)return toast('Elegí polilíneas, rectángulos o un bloque para EXPLODE');
  const added=[];
  for(const e of supported){
+  // Explicit EXPLODE converts a reference to editable primitives. Normal insertion remains grouped.
+  if(e.type==='blockRef'){
+   for(const part of blockChildren(e))added.push({...part,layer:e.layer});
+   continue;
+  }
   const corners=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;
   if(!corners||corners.length<2)continue;
   for(let i=1;i<corners.length;i++)if(dist(corners[i-1],corners[i])>1e-10)added.push({type:'line',a:clone(corners[i-1]),b:clone(corners[i]),layer:e.layer,width:e.width,color:e.color,linetype:e.linetype});
