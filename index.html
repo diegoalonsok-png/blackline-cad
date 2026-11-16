@@ -1469,6 +1469,50 @@ function trimLine(e,p){
  log('TRIM '+(pieces.length===2?'split into two segments':'removed selected segment'));
  toast(pieces.length===2?'TRIM: vano abierto entre límites':'TRIM: tramo recortado');
 }
+/* TRIM quick mode: nearest editable straight edge, repeated one-click cuts. */
+function trimNearestAt(point){
+ const tol=12/state.view.scale;
+ let best=null;
+ for(const entity of state.entities){
+  if(!layerFor(entity).visible||layerFor(entity).locked)continue;
+  if(!['line','polyline','rect'].includes(entity.type))continue;
+  const edges=cadTrimBoundaries(entity);
+  for(let index=0;index<edges.length;index++){
+   const [a,b]=edges[index],distance=segmentDist(point,a,b);
+   if(distance<=tol&&(!best||distance<best.distance-1e-10))
+    best={entity,index,a,b,distance};
+  }
+ }
+ if(!best)return toast('TRIM: hacé clic sobre una línea o borde de polilínea');
+ const {entity,a,b,index}=best,delta=sub(b,a),len2=delta.x*delta.x+delta.y*delta.y;
+ if(len2<1e-16)return toast('TRIM: entidad de longitud cero');
+ const cuts=[];
+ for(const other of state.entities){
+  if(other.id===entity.id||!layerFor(other).visible)continue;
+  const boundaries=other.type==='blockRef'?blockChildren(other).flatMap(cadTrimBoundaries):cadTrimBoundaries(other);
+  for(const [c,d] of boundaries){
+   const hit=lineIntersection(a,b,c,d);
+   if(hit&&hit.t>1e-7&&hit.t<1-1e-7&&!cuts.some(t=>Math.abs(t-hit.t)<1e-7))cuts.push(hit.t);
+  }
+ }
+ if(!cuts.length)return toast('TRIM: sin límites que crucen este tramo; usá TIJERA para cortar entre dos puntos');
+ cuts.sort((x,y)=>x-y);
+ const projected=((point.x-a.x)*delta.x+(point.y-a.y)*delta.y)/len2;
+ const t=Math.max(0,Math.min(1,projected)),bounds=[0,...cuts,1];
+ let slot=bounds.findIndex((v,i)=>i<bounds.length-1&&t>v+1e-7&&t<bounds[i+1]-1e-7);
+ if(slot<0)slot=bounds.findIndex((v,i)=>i<bounds.length-1&&t>=v-1e-7&&t<=bounds[i+1]+1e-7);
+ if(slot<0)slot=bounds.length-2;
+ const t0=bounds[slot],t1=bounds[slot+1],at=u=>P(a.x+delta.x*u,a.y+delta.y*u);
+ const replacement=[];
+ const emit=(aa,bb)=>{if(dist(aa,bb)>1e-9)replacement.push({...clone(entity),type:'line',id:state.nextId+replacement.length,a:clone(aa),b:clone(bb),pts:undefined,closed:undefined})};
+ if(entity.type!=='line')cadTrimBoundaries(entity).forEach(([aa,bb],i)=>{if(i!==index)emit(aa,bb)});
+ if(t0>1e-8)emit(a,at(t0));
+ if(t1<1-1e-8)emit(at(t1),b);
+ const atIndex=state.entities.findIndex(item=>item.id===entity.id);
+ if(atIndex<0)return toast('TRIM: entidad no disponible');
+ saveHistory();state.entities.splice(atIndex,1);state.nextId+=replacement.length;state.entities.push(...replacement);
+ state.selected=[];updateAll();log('TRIM: '+entity.type+' recortado');toast('TRIM: tramo eliminado · Ctrl+Z para deshacer');
+}
 function positiveModifyValue(id){
  const n=Number($(id).value);
  if(!Number.isFinite(n)||n<=0)return null;
@@ -2091,7 +2135,7 @@ function handlePoint(p,shift){const t=state.tool;
  if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
  if(t==='matchprop'){matchCadPropertiesAt(p);return}
  if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
-if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(trimOpeningAtPoint(p))return;if(e)trimLine(e,p);else toast('TRIM: click a segment, or click inside a door rectangle to cut all crossing lines');return}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Elegí el lado / Click side')}else toast('Seleccioná línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){return trimNearestAt(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();toast('OFFSET '+$('offsetDistance').value+' '+state.unit+' · Elegí el lado / Click side')}else toast('Seleccioná línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){if(shift){state.selected=state.selected.includes(e.id)?state.selected.filter(id=>id!==e.id):[...state.selected,e.id]}else state.selected=[e.id]}else if(!shift)state.selected=[];updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
