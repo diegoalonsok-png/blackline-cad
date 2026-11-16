@@ -4417,7 +4417,33 @@ async function importCADBlock(file){
   if(layer.id.length>100||layer.name.length>100)continue;
   if(!state.layers.some(x=>x.id===layer.id))state.layers.push({id:layer.id,name:layer.name,color:/^#[0-9a-f]{6}$/i.test(layer.color)?layer.color:'#c6cbd1',width:Math.max(.05,Math.min(2,Number(layer.width)||.25)),visible:true,locked:false});
  }
- state.blocks[name]={name,entities:converted};
+ const metadata={};
+ if(data.parametric&&typeof data.parametric==='object'){
+  const kind=data.parametric.kind;
+  const allowed=new Set(['swing-door','double-door','framed-window','round-table','rect-table']);
+  const defaults=data.parametric.defaults;
+  if(!allowed.has(kind)||!defaults||typeof defaults!=='object'||Array.isArray(defaults))throw Error('Definición paramétrica no compatible');
+  const clean={};
+  for(const key of ['width','depth','frameWidth','frameDepth']){
+   if(defaults[key]===undefined)continue;
+   const val=Number(defaults[key]);
+   if(!Number.isFinite(val)||val<=0||val>1e8)throw Error('Dimensión paramétrica inválida');
+   clean[key]=val*factor;
+  }
+  if(!(clean.width>0))throw Error('Falta el ancho paramétrico');
+  if(['swing-door','double-door','framed-window'].includes(kind)&&!(clean.frameWidth>0&&clean.frameDepth>0))throw Error('Faltan dimensiones del marco');
+  if(kind==='rect-table'&&!(clean.depth>0))throw Error('Falta profundidad de mesa');
+  if(defaults.mirror!==undefined)clean.mirror=Boolean(defaults.mirror);
+  if(defaults.mullion!==undefined)clean.mullion=Boolean(defaults.mullion);
+  metadata.parametric={kind,defaults:clean};
+ }
+ if(data.dynamic2d===true){
+  if(metadata.parametric)throw Error('El bloque no puede tener ambos motores paramétricos');
+  const def={entities:converted};
+  if(!blDynEligible(def))throw Error('Geometría no compatible con bloque dinámico X/Y');
+  metadata.dynamic2d=true;
+ }
+ state.blocks[name]={name,entities:converted,...metadata};
  renderLayers();renderBlockLibrary();$('blockLibrary').value=name;
  queueLocalBackup();toast('Imported block '+name+' · '+converted.length+' entities');
 }
@@ -4601,7 +4627,7 @@ function initBlocks(){
  };
  $('exportBlockBtn').onclick=()=>{
   const block=selectedBlock();if(!block)return toast('Choose a block to export');
-  const used=new Set(block.entities.map(e=>e.layer));const output={format:'CAD2D-BLOCK-1',version:1,name:block.name,unit:state.unit,layers:state.layers.filter(l=>used.has(l.id)),entities:block.entities};
+  const used=new Set(block.entities.map(e=>e.layer));const output={format:'CAD2D-BLOCK-1',version:2,name:block.name,unit:state.unit,layers:state.layers.filter(l=>used.has(l.id)),entities:block.entities,...(block.parametric?{parametric:clone(block.parametric)}:{}),...(block.dynamic2d?{dynamic2d:true}:{})};
   download(block.name.replace(/[^a-z0-9_-]+/gi,'_')+'.cadblock',JSON.stringify(output,null,2),'application/json');
   toast('Exported portable CAD2D block file');
  };
