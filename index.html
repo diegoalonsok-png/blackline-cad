@@ -1081,11 +1081,35 @@ function dimensionPrimitives(e){
 }
 /* Block references are one model entity, expanded only for screen/plot interchange.
    Their position is the editable insertion pivot. The original definition remains reusable. */
+/* Explicit parametric symbols retain dimensions per placed instance. */
+function blockInstanceGeometry(definition,ref){
+ const param=definition.parametric;
+ if(!param||!ref.params)return definition.entities;
+ const w=Number(ref.params.width),h=Number(ref.params.depth);
+ if(!Number.isFinite(w)||w<=0||w>1e8)return definition.entities;
+ const base={layer:'0',width:.25},P2=(x,y)=>P(x,y);
+ if(param.kind==='swing-door'){
+  const right=Boolean(ref.params.mirror);
+  const hinge=right?w:0,tip=right?0:w;
+  return [
+   {...base,type:'line',a:P2(0,0),b:P2(w,0)},
+   {...base,type:'line',a:P2(hinge,0),b:P2(hinge,w)},
+   {...base,type:'arc',c:P2(hinge,0),r:w,a0:right?Math.PI/2:0,a1:right?Math.PI:Math.PI/2}
+  ];
+ }
+ if(param.kind==='rect-table'&&Number.isFinite(h)&&h>0&&h<1e8){
+  return [
+   {...base,type:'rect',a:P2(0,0),b:P2(w,h)},
+   {...base,type:'line',a:P2(w*.07,h*.5),b:P2(w*.93,h*.5)}
+  ];
+ }
+ return definition.entities;
+}
 function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities(definition,origin,scale,angle).map(e=>({...e,layer:state.layers.some(l=>l.id===e.layer)?e.layer:ref.layer}));
+ return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:state.layers.some(l=>l.id===e.layer)?e.layer:ref.layer}));
 }
 function flattenCADEntities(entities){return entities.flatMap(e=>e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e])}
 
@@ -2933,8 +2957,10 @@ function insertSelectedBlock(point){
  const block=selectedBlock();if(!block)return toast('Choose a block first');
  const factor=Number($('blockScale').value),angle=Number($('blockRotation').value);
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
+ saveHistory();
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
- saveHistory();state.entities.push(ref);
+ if(block.parametric)ref.params={...block.parametric.defaults};
+ state.entities.push(ref);
  const repeat=Boolean(state.galleryRepeatedInsert);
  state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
@@ -3150,10 +3176,12 @@ function initBlocks(){
  $('createBlockBtn').onclick=()=>{
   const selected=state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
   if(!selected.length)return toast('Select drawable objects before creating a block');
+  if(selected.some(e=>e.type==='blockRef'))return toast('Para crear un bloque nuevo seleccioná geometría base, no referencias de otros bloques');
   const name=window.prompt('Block name:', 'BLOCK_'+(Object.keys(state.blocks).length+1));
   if(!name?.trim())return;
   const key=name.trim().slice(0,100);
   if(!/^[\w .\-]+$/.test(key))return toast('Block name: letters, digits, spaces, - and _');
+  if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast('No se puede reemplazar una definición que está en uso. Creá un bloque con otro nombre.');
   if(state.blocks[key]&&!window.confirm('Replace block '+key+'?'))return;
   const bounds=getBounds(selected),origin=P(bounds.minX,bounds.minY);
   const entries=normalizeBlockEntities(selected.map(e=>{
@@ -3190,7 +3218,9 @@ function initBlocks(){
  };
  $('removeBlockBtn').onclick=()=>{
   const name=$('blockLibrary').value;if(!name)return;
-  if(!window.confirm('Remove block definition '+name+'? Inserted geometry stays in the drawing.'))return;
+  const count=state.entities.filter(e=>e.type==='blockRef'&&e.blockName===name).length;
+  if(count)return toast('No se puede borrar: '+count+' inserciones utilizan este bloque. Conservá primero el proyecto.');
+  if(!window.confirm('Eliminar definición sin inserciones: '+name+'?'))return;
   saveHistory();delete state.blocks[name];renderBlockLibrary();queueLocalBackup();toast('Block definition removed');
  };
 }
@@ -3627,12 +3657,12 @@ initCadColorPopover();
 window.BlacklineBlockAPI=Object.freeze({
  unit:()=>state.unit,
  hasBlock:name=>Boolean(state.blocks[name]),
- addBlock:(name,entities)=>{
+ addBlock:(name,entities,parametric=null)=>{
   if(typeof name!=='string'||!name.trim())throw Error('Nombre de bloque inválido');
   if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
   const normalized=normalizeBlockEntities(entities);
   saveHistory();
-  state.blocks[name]={name,entities:normalized};
+  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','rect-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
   renderBlockLibrary();queueLocalBackup();
   return normalized.length;
  },
