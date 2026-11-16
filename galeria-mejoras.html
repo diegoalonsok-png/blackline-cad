@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Blackline CAD · Galería de mejoras</title>
+<style>
+:root{color-scheme:dark;--bg:#0c1015;--panel:#181f28;--edge:#303e4b;--text:#e9f0f5;--muted:#9fb0bf;--accent:#8dcfeb}
+*{box-sizing:border-box}body{margin:0;font:14px/1.48 system-ui,Segoe UI,Arial,sans-serif;background:radial-gradient(ellipse 85% 30% at 50% 0%,#233547 0%,var(--bg) 75%);color:var(--text)}a{color:inherit;text-decoration:none}
+header{position:sticky;top:0;z-index:5;background:#101821ec;backdrop-filter:blur(14px);border-bottom:1px solid var(--edge);padding:12px clamp(16px,4vw,60px);display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:800;letter-spacing:.04em;font-size:16px}.brand em{font-style:normal;color:var(--accent)}
+header a{margin-left:auto;border:1px solid #536477;border-radius:8px;padding:8px 12px;font-size:12px}
+main{max-width:1500px;margin:auto;padding:32px clamp(16px,4vw,60px) 80px}
+.hero{max-width:850px}h1{font-size:clamp(26px,4vw,48px);line-height:1.12;margin:0 0 14px;letter-spacing:-.04em}
+.hero p{color:var(--muted);font-size:15px;margin:0 0 20px}
+.stats{display:flex;flex-wrap:wrap;gap:12px;margin:22px 0 25px}
+.stat{border:1px solid var(--edge);background:#151d26;border-radius:9px;padding:12px 18px;color:var(--muted)}
+.stat b{font-size:21px;color:#f4f9fc;margin-right:6px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin:23px 0 16px}
+.search{min-width:230px;max-width:420px;flex:1;background:#121c26;color:white;border:1px solid #46586a;border-radius:9px;padding:11px 14px;font:inherit}
+select{background:#121c26;color:white;border:1px solid #46586a;border-radius:9px;padding:10px;font:inherit}
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:26px}
+.chip{border:1px solid #3b4b59;background:#1b2630;color:#c7d8e5;border-radius:30px;padding:7px 12px;cursor:pointer;font-size:12px}
+.chip[aria-pressed=true]{background:#294559;color:#d9f3ff;border-color:#6aa4bd}
+.heading{display:flex;justify-content:space-between;align-items:end;margin:0 0 14px}
+.heading h2{margin:0;font-size:18px}.heading span{color:var(--muted);font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
+.card{background:linear-gradient(160deg,#1e2934,#151d26);border:1px solid #344452;border-radius:14px;overflow:hidden;min-height:250px;display:flex;flex-direction:column}
+.card:hover{border-color:#6c9ab0;transform:translateY(-1px);transition:transform .12s}
+.visual{height:104px;display:grid;place-items:center;background-color:#0e1720;background-image:linear-gradient(#27374655 1px,transparent 1px),linear-gradient(90deg,#27374655 1px,transparent 1px);background-size:28px 28px;position:relative}
+.visual svg{width:145px;height:80px;stroke:#96d4ed;fill:none;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
+.visual:after{content:attr(data-code);position:absolute;right:9px;top:8px;color:#a2c4d7;font:10px ui-monospace,monospace}
+.content{padding:14px 15px 17px;display:flex;flex:1;flex-direction:column}
+.meta{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:#a9bdcb;letter-spacing:.02em;margin-bottom:8px}
+.priority{font-weight:700;color:#e0c18d}.priority.crit{color:#f6a6a6}.priority.med{color:#a3b4c3}
+h3{font-size:16px;line-height:1.2;margin:0 0 7px}.desc{color:#aabcc8;font-size:12px;margin:0}
+.footer{margin-top:auto;padding-top:15px;color:#7397ab;font-size:11px}
+.empty{border:1px dashed #526573;border-radius:12px;padding:35px;color:#bdcdda;text-align:center;grid-column:1/-1}
+.note{margin-top:30px;color:#a2b5c0;font-size:12px;border-top:1px solid #364551;padding-top:20px}
+@media(max-width:650px){main{padding-top:20px}.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}}
+</style></head><body>
+<header><span class="brand">◈ BLACKLINE <em>CAD</em></span><span style="color:#adc3d0;font-size:12px">LABORATORIO DE MEJORAS</span><a href="./index.html">Volver al CAD</a></header>
+<main>
+<div class="hero"><h1>Una galería para construir el próximo CAD arquitectónico.</h1>
+<p>Explorá propuestas inspiradas en flujos de trabajo profesionales de AutoCAD e IntelliCAD: geometría exacta, mejores bloques, interfaz clara y archivos fiables. Esta galería es un catálogo de evolución, no una declaración de funciones implementadas.</p></div>
+<div class="stats"><div class="stat"><b id="total">0</b>propuestas</div><div class="stat"><b id="critical">0</b>críticas</div><div class="stat"><b id="areas">0</b>áreas</div></div>
+<div class="controls"><input id="search" class="search" type="search" placeholder="Buscar mejoras: escalar, bloques, DWG, TRIM…" aria-label="Buscar mejoras">
+<select id="priority" aria-label="Filtrar por prioridad"><option value="">Todas las prioridades</option><option value="Crítica">Crítica</option><option value="Alta">Alta</option><option value="Media">Media</option></select></div>
+<div id="chips" class="chips" role="group" aria-label="Categorías de mejoras"></div>
+<div class="heading"><h2 id="title">Todas las mejoras</h2><span id="count"></span></div>
+<div class="grid" id="grid"></div>
+<p class="note">Diseño de referencia y hoja de ruta. Antes de publicar una herramienta corresponde implementarla, probar su precisión y verificar compatibilidad DXF/DWG. Ninguna propuesta de esta página modifica dibujos o archivos.</p>
+</main>
+<script>
+const improvements=[["Dibujo","Línea inteligente","LINE con longitud, ángulo y ortogonal automáticos","Alta","ruler"],["Dibujo","Polilínea avanzada","Arcos, anchos, cierre y edición por vértices","Alta","poly"],["Dibujo","Rectángulos precisos","Dimensiones editables, chaflán y redondeo","Alta","rect"],["Dibujo","Arcos de 3 puntos","Métodos centro, inicio, fin y tangencia","Media","arc"],["Dibujo","Sombras de geometría","Previsualización sin modificar el dibujo original","Media","preview"],["Dibujo","Sombreados HATCH","Patrones arquitectónicos por contorno cerrado","Alta","hatch"],["Modificación","ESCALAR interactivo","Punto base fijo, vista previa y clic para confirmar","Alta","scale"],["Modificación","Mover con pinzamientos","Arrastre desde vértices de objetos y bloques","Alta","move"],["Modificación","TRIM profesional","Recorte de segmentos contra cualquier borde compatible","Crítica","trim"],["Modificación","EXTEND avanzado","Extender líneas, polilíneas y arcos a límites","Alta","extend"],["Modificación","STRETCH por ventana","Estirar vértices sin desplazar toda la figura","Crítica","stretch"],["Modificación","OFFSET de muros","Equidistancias paralelas con encuentros coherentes","Alta","offset"],["Modificación","FILLET / CHAMFER","Radio y chaflán entre geometrías compatibles","Alta","fillet"],["Modificación","Matriz rectangular y polar","Repetición editable con filas, columnas y ángulos","Media","array"],["Modificación","Rotación dinámica","Giro en tiempo real alrededor de un punto base","Media","rotate"],["Modificación","OVERKILL","Borrar duplicados y consolidar segmentos solapados","Media","clean"],["Precisión","OSNAP completo","Extremo, medio, centro, intersección, perpendicular y tangencia","Crítica","snap"],["Precisión","Entrada dinámica","Longitud y ángulo junto al cursor, sin cuadros emergentes","Alta","input"],["Precisión","Rastreo polar","Guías de 30°, 45°, 90° y ángulos personalizados","Alta","polar"],["Precisión","OSNAP para bloques","Detectar puntos reales de inserciones DWG/DXF","Alta","point"],["Precisión","Coordenadas relativas","Valores absolutos, @X,Y y polar @D<ángulo","Alta","coords"],["Precisión","Verificación 1:1","Comprobación visual de unidades y medidas","Crítica","one"],["Bloques","Galería DWG/DXF","Clasificación de puertas, ventanas, muebles y sanitarios","Crítica","blocks"],["Bloques","Punto base editable","Elegir vértice de agarre o inserción sin explotar bloque","Crítica","pivot"],["Bloques","Puertas paramétricas","Ancho, sentido de apertura, giro y hoja doble","Alta","door"],["Bloques","Ventanas paramétricas","Marco, profundidad y paños editables","Alta","window"],["Bloques","Bloques con atributos","Etiquetas, identificadores y propiedades variables","Media","tag"],["Bloques","Biblioteca con búsqueda","Filtros, miniaturas, favoritos e inserción repetida","Alta","search"],["Arquitectura","Muros multicapa","Espesor, materiales y encuentros controlados","Alta","walls"],["Arquitectura","Aberturas sobre muros","Insertar puertas y recortar el hueco sin romper capas","Crítica","opening"],["Arquitectura","Cotas asociativas","Actualizar medidas cuando cambia la geometría","Crítica","dim"],["Arquitectura","Áreas y superficies","Cómputo de recintos y etiquetas automáticas","Alta","area"],["Arquitectura","Escaleras 2D","Huella, contrahuella, número de escalones y sentido","Media","stairs"],["Arquitectura","Símbolos de arquitectura","Ejes, niveles, cortes y referencias de detalle","Media","symbol"],["Interfaz","Cinta compacta","Mostrar más espacio de dibujo y barras replegables","Alta","ribbon"],["Interfaz","Menú contextual inteligente","Acciones pertinentes con clic derecho sobre selección","Alta","menu"],["Interfaz","Paleta de comandos","Buscar por español o inglés y ejecutar con teclado","Alta","terminal"],["Interfaz","Espacio oscuro personalizable","Controles legibles, tonos grises y acentos configurables","Media","theme"],["Interfaz","Propiedades rápidas","Editar capas, color, grosor y dimensiones sin abrir ventanas","Alta","properties"],["Interfaz","Historial de comandos","Repetir, localizar y deshacer operaciones de dibujo","Media","history"],["Archivos","Importar DWG con validación","Conversión real y avisos sobre entidades no admitidas","Crítica","dwg"],["Archivos","DXF de alta fidelidad","Bloques, textos, cotas, unidades y polilíneas preservados","Crítica","dxf"],["Archivos","Layouts y PDF","Ventanas gráficas, escalas, formatos A0–A4 y ploteo","Alta","pdf"],["Archivos","Guardado seguro","Autoguardado local y recuperación de sesiones","Alta","save"],["Rendimiento","Índice espacial","Selección y OSNAP ágiles en planos grandes","Alta","speed"],["Rendimiento","Pruebas de regresión","Casos 1:1, bloques, capas, exportaciones y deshacer","Crítica","test"]];
+const $=id=>document.getElementById(id),categories=['Todas',...new Set(improvements.map(x=>x[0]))];let category='Todas';
+const escapeText=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const normalize=x=>x.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+const diagrams={
+ line:'<path d="M12 63L136 16"/><circle cx="12" cy="63" r="4"/><circle cx="136" cy="16" r="4"/>',
+ rect:'<rect x="19" y="15" width="112" height="50"/><path d="M19 15l10 -10M131 65l9 10"/>',
+ arc:'<path d="M17 66A60 60 0 0 1 135 65"/><circle cx="17" cy="66" r="3"/>',
+ hatch:'<rect x="20" y="13" width="110" height="53"/><path d="M20 45l32-32M20 65l52-52M42 66l53-53M64 66l53-53M86 66l44-44M109 66l21-21"/>',
+ scale:'<rect x="27" y="24" width="38" height="28" stroke-dasharray="4 4"/><rect x="27" y="9" width="92" height="57"/><path d="M65 52l54 14M27 24v42"/><rect x="24" y="63" width="7" height="7"/>',
+ move:'<rect x="23" y="25" width="35" height="35" stroke-dasharray="4 4"/><rect x="93" y="12" width="35" height="35"/><path d="M62 43l24-16m-8 -3l8 3l-3 8"/>',
+ trim:'<path d="M12 39h124M52 10v60M101 10v60"/><path d="M75 15v48" stroke="#e7b66c" stroke-dasharray="5 5"/>',
+ extend:'<path d="M20 12v55M123 12v55M20 40h70" /><path d="M90 40h33" stroke="#e7b66c" stroke-dasharray="6 4"/>',
+ stretch:'<rect x="20" y="21" width="50" height="37" stroke-dasharray="4 4"/><path d="M20 21h110v37H20z"/><path d="M70 40h55m-8 -6l8 6l-8 6"/>',
+ fillet:'<path d="M24 68V40Q24 15 50 15H131"/><path d="M24 15v25M50 15H130" stroke-dasharray="4 4"/>',
+ offset:'<path d="M18 62L102 14M38 75l84-48M63 75l67-39"/>',
+ array:'<rect x="15" y="12" width="29" height="22"/><rect x="57" y="12" width="29" height="22"/><rect x="99" y="12" width="29" height="22"/><rect x="15" y="47" width="29" height="22"/><rect x="57" y="47" width="29" height="22"/><rect x="99" y="47" width="29" height="22"/>',
+ rotate:'<rect x="47" y="29" width="54" height="33" transform="rotate(-23 74 46)"/><path d="M39 42A37 37 0 0 1 114 39m-8 -7l8 7l-10 3"/>',
+ snap:'<path d="M17 59L71 19L132 59"/><rect x="65" y="13" width="12" height="12"/><circle cx="71" cy="19" r="18" stroke-dasharray="3 5"/>',
+ door:'<path d="M24 65h24V15M108 65h21M48 15A50 50 0 0 1 98 65"/><path d="M48 15v50" stroke="#e7b66c"/>',
+ window:'<rect x="24" y="19" width="105" height="44"/><rect x="30" y="25" width="93" height="32"/><path d="M76 25v32M24 41h105"/>',
+ walls:'<path d="M18 15h114v13H31v41H18z"/><path d="M82 28v41H69V28"/>',
+ opening:'<path d="M16 17h42v12H16zM94 17h42v12H94zM16 61h120"/><path d="M58 22v39M58 61A39 39 0 0 0 97 22"/>',
+ dim:'<path d="M20 22h112M20 62h112M20 12v62M132 12v62M20 42h112"/><path d="M27 38l-7 4l7 4M125 38l7 4l-7 4"/>',
+ area:'<path d="M22 17h101v46H22z"/><text x="46" y="47" fill="#96d4ed" stroke="none" font-size="15">25 m²</text>',
+ stairs:'<path d="M18 64h20V53h20V42h20V31h20V20h20"/><path d="M27 17h90m-9 -5l9 5l-9 5"/>',
+ blocks:'<rect x="16" y="12" width="50" height="57"/><rect x="81" y="12" width="50" height="57"/><circle cx="41" cy="40" r="13"/><path d="M86 53h40M90 20h33"/>',
+ pdf:'<rect x="39" y="7" width="72" height="65"/><path d="M53 26h45M53 36h45M53 46h28"/><text x="54" y="65" stroke="none" fill="#96d4ed" font-size="12">A1</text>'
+};
+const fallback='<path d="M20 58l35-36l31 25l43-35"/><circle cx="20" cy="58" r="4"/><circle cx="55" cy="22" r="4"/><circle cx="86" cy="47" r="4"/><circle cx="129" cy="12" r="4"/>';
+function render(){
+ $('chips').replaceChildren();
+ for(const c of categories){const b=document.createElement('button');b.className='chip';b.textContent=c;b.setAttribute('aria-pressed',String(c===category));b.onclick=()=>{category=c;render()};$('chips').append(b)}
+ const query=normalize($('search').value),priority=$('priority').value;
+ const matches=improvements.filter(x=>(category==='Todas'||x[0]===category)&&(!priority||x[3]===priority)&&normalize(x.join(' ')).includes(query));
+ $('title').textContent=category==='Todas'?'Todas las mejoras':category;$('count').textContent=matches.length+' propuestas';
+ const frag=document.createDocumentFragment();
+ for(const x of matches){const card=document.createElement('article');card.className='card';
+ const figure=document.createElement('div');figure.className='visual';figure.dataset.code=x[4].toUpperCase();
+ figure.innerHTML='<svg viewBox="0 0 150 80" aria-hidden="true">'+(diagrams[x[4]]||fallback)+'</svg>';
+ const content=document.createElement('div');content.className='content';
+ const meta=document.createElement('div');meta.className='meta';
+ const cat=document.createElement('span');cat.textContent=x[0];
+ const pri=document.createElement('span');pri.className='priority '+(x[3]==='Crítica'?'crit':x[3]==='Media'?'med':'');pri.textContent=x[3];
+ meta.append(cat,pri);
+ const title=document.createElement('h3');title.textContent=x[1];
+ const desc=document.createElement('p');desc.className='desc';desc.textContent=x[2];
+ const foot=document.createElement('div');foot.className='footer';foot.textContent='Propuesta de mejora · pendiente de validación';
+ content.append(meta,title,desc,foot);card.append(figure,content);frag.append(card)}
+ $('grid').replaceChildren(frag);if(!matches.length){const empty=document.createElement('p');empty.className='empty';empty.textContent='No hay propuestas para estos filtros.';$('grid').append(empty)}
+}
+$('total').textContent=improvements.length;$('critical').textContent=improvements.filter(x=>x[3]==='Crítica').length;$('areas').textContent=categories.length-1;
+$('search').addEventListener('input',render);$('priority').addEventListener('change',render);render();
+</script></body></html>
