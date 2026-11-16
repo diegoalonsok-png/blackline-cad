@@ -4063,8 +4063,21 @@ function autoCutWallForOpening(ref,block){
  });
  // Only cut correctly aligned wall lines crossing the whole opening.
  // The tolerable perpendicular distance is narrow, measured in drawing units.
- const maxOffset=Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
+ const maxOffset=ref.wallThickness
+  ?Math.max(ref.wallThickness/2+(.03*1000/U[state.unit]),.22*ref.scale)
+  :Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
  const edits=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
+ if(ref.wallThickness){
+  // A parametric wall opening must cut BOTH faces atomically.
+  const groups=new Map();
+  for(const e of edits){
+   const line=wallLines.find(x=>x.id===e.id),id=line?.wall2d?.group;
+   if(id){if(!groups.has(id))groups.set(id,new Set());groups.get(id).add(line.wall2d.face)}
+  }
+  const complete=new Set([...groups].filter(([,faces])=>faces.has(0)&&faces.has(1)).map(([id])=>id));
+  const eligible=edits.filter(e=>complete.has(wallLines.find(x=>x.id===e.id)?.wall2d?.group));
+  edits.length=0;edits.push(...eligible);
+ }
  if(!edits.length)return 0;
  const removed=new Set(edits.map(e=>e.id)),generated=[];
  for(const edit of edits){
@@ -4162,12 +4175,15 @@ function insertSelectedBlock(point){
   }
  }
  else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
+ const aligned=cadAlignOpeningToWall(ref,block,point);
  state.entities.push(ref);
  const cutCount=openingOverlapsAnother(ref,block)?0:autoCutWallForOpening(ref,block);
  const repeat=Boolean(state.galleryRepeatedInsert);
  state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
- updateAll();toast('Bloque insertado · X '+units(point.x)+', Y '+units(point.y)+(cutCount?' · '+cutCount+' tramo(s) de muro abierto(s)':'')+(repeat?' · Otro clic para repetir':'') );
+ updateAll();toast('Bloque insertado · X '+units(ref.p.x)+', Y '+units(ref.p.y)
+ +(cutCount?' · vano automático en '+cutCount+' caras de muro':aligned?' · ATENCIÓN: muro detectado pero no se pudo abrir el vano':'')
+ +(repeat?' · Otro clic para repetir':'') );
 }
 
 /* DXF block-library importer: additive; does not alter the open drawing. */
