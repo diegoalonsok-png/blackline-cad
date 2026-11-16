@@ -744,6 +744,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 </section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
+<script src="cad-grip-settings.js?v=20261116"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -4685,7 +4686,6 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-auto-opening.js?v=20261116"></script>
 <script src="cad-wall-join.js?v=20261116"></script>
 <script src="cad-wall-grip.js?v=20261116"></script>
-<script src="cad-grip-settings.js?v=20261116"></script>
 <script src="cad-hatch-patterns.js?v=20261116"></script>
 <script src="cad-performance.js?v=20261116"></script>
 </body></html>
