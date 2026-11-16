@@ -55,7 +55,12 @@ function init(){
   const btn=document.createElement('button');btn.className='btn';btn.type='button';btn.textContent='Insertar bloque';btn.style.cssText='width:100%;font-size:10px';
   btn.onclick=()=>{
    const key='BL Adaptado · '+d.key;
-   try{if(!api.hasBlock(key))api.addBlock(key,elements(d,api.unit()));api.selectBlock(key);btn.textContent='Listo · clic en plano'}catch(ex){btn.textContent='Error: '+ex.message}
+   try{if(!api.hasBlock(key)){
+    const unitFactor=({m:1,cm:100,mm:1000,in:39.37007874,ft:3.280839895}[api.unit()]||1);
+    const param=d.key==='puerta90'?{kind:'swing-door',defaults:{width:.9*unitFactor,mirror:false}}:
+      d.key==='mesa120'?{kind:'round-table',defaults:{width:1.2*unitFactor}}:null;
+    api.addBlock(key,elements(d,api.unit()),param);
+   }api.selectBlock(key);btn.textContent='Listo · clic en plano'}catch(ex){btn.textContent='Error: '+ex.message}
   };
   card.append(preview(d),name,btn);cards.append(card);
  }
