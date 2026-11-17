@@ -35,3 +35,15 @@ test('no hay alias repetidos con destinos contradictorios en registro',()=>{
 test('teclas de función están cableadas sin pasar por órdenes geométricas',()=>{
  for(const key of ['F1','F2','F3','F7','F8','F9','F10','F11'])assert.ok(main.includes("ev.key==='"+key+"'"),key);
 });
+
+test('idioma de alias: colisiones intencionales B D LI AR',()=>{
+ assert.match(main,/en:\{B:'BLOCK',E:'ERASE',D:'DIMSTYLE',LI:'LIST',AR:'ARRAY'/);
+ assert.match(main,/es:\{B:'ERASE',BOR:'ERASE',D:'MOVE',DESPL:'MOVE',LI:'LINE',AR:'ARC'/);
+ assert.match(main,/const profile=forceEnglish\?'en':cad2dAliasLanguage/);
+ assert.match(main,/typed\.startsWith\('_'\)/);
+});
+test('selector de idioma visible y persistente',()=>{
+ assert.match(html,/id="cadAliasLanguage"/);
+ assert.match(main,/localStorage\.setItem\('cad2d-alias-language'/);
+ assert.match(main,/cad2dAliasLanguage=cad2dLanguageSelect\.value==='en'\?'en':'es'/);
+});
