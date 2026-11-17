@@ -3,15 +3,17 @@ const cursor=require('../cad-cursor-mode.js');
 const html=fs.readFileSync(path.resolve(__dirname,'../index.html'),'utf8');
 test('adjustable pickbox is clamped to visible range',()=>{
  assert.equal(cursor.normalizeSize(undefined),9);
- assert.equal(cursor.normalizeSize(40),30);
+ assert.equal(cursor.normalizeSize(40),40);
+ assert.equal(cursor.normalizeSize(100),60);
  assert.equal(cursor.normalizeSize(1),5);
  assert.equal(cursor.normalizeSize(14.6),15);
 });
 test('drawing tools retain crosshair, editing tools show square selector',()=>{
  for(const tool of ['line','polyline','rect','circle','arc','dimension','insertBlock'])
   assert.equal(cursor.mode(tool,null,null),'drawing',tool);
- for(const tool of ['select','trim','erase','extend','breakLine','chamfer','fillet'])
+ for(const tool of ['trim','erase','extend','breakLine','chamfer','fillet'])
   assert.equal(cursor.mode(tool,null,null),'selector',tool);
+ assert.equal(cursor.mode('select',null,null),'idle','Select has both crosshair and pickbox when idle');
 });
 test('OFFSET changes cursor phase with selection',()=>{
  assert.equal(cursor.mode('offset',null,null),'selector');
@@ -27,7 +29,7 @@ test('larger yellow selector increases picking radius',()=>{
  assert.equal(cursor.hitRadius(9),9);
 });
 test('UI exposes pickbox size and persistence via display colors',()=>{
- assert.match(html,/id="cadPickboxSize"[^>]*min="5" max="30"/);
+ assert.match(html,/id="cadPickboxSize"[^>]*min="5" max="60"/);
  assert.match(html,/id="cadPickboxSizeValue"/);
  assert.match(html,/cadPickboxSize:'pickboxSize'/);
  assert.match(html,/localStorage\.setItem\('cad2d-display-colors'/);
