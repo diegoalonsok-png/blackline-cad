@@ -4235,7 +4235,33 @@ function openCadContextMenu(x,y,worldPoint){
  const selectedDimension=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='dimension'):null;
  const item=(label,action,disabled=false)=>({label,action,disabled});
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
+ // Comandos de contexto específicos para la herramienta activa, sin alterar la geometría.
+ const toolOptions=()=>{
+  const t=state.tool,options=[];
+  if(['line','polyline','wall2d'].includes(t)&&state.stage.length){
+   options.push(item('Deshacer último vértice · U',()=>undoDrawingVertex()));
+   if(t==='polyline')options.push(item('Cerrar polilínea · C',()=>closeDrawing(),state.stage.length<2));
+   if(t==='wall2d')options.push(item('Terminar muro · Enter',()=>finishStage()));
+  }
+  if(t==='offset')options.push(item('Distancia de desfase…',()=>{
+   const raw=window.prompt('OFFSET · Distancia ('+state.unit+')',$('offsetDistance').value);
+   if(raw===null)return;
+   const n=Number(raw.trim().replace(',','.'));if(!(Number.isFinite(n)&&n>0))return toast('OFFSET: distancia positiva requerida');
+   $('command').value=String(n);runCommand();
+  }));
+  if(t==='fillet'||t==='chamfer')options.push(item(t==='fillet'?'Radio de empalme…':'Distancia de chaflán…',()=>{
+   const field=t==='fillet'?'filletRadius':'chamferLength',raw=window.prompt((t==='fillet'?'FILLET · Radio':'CHAMFER · Distancia')+' ('+state.unit+')',$(field).value);
+   if(raw===null)return;
+   const n=Number(raw.trim().replace(',','.'));if(!Number.isFinite(n)||n<0)return toast('Valor inválido');
+   $('command').value=String(n);runCommand();
+  }));
+  if(t==='trim'){options.push(command('Recortar por barrido · TF','TRIMFENCE'));options.push(command('Tijera · TS','TIJERA'))}
+  if(t==='dimension')options.push(command('Estilo de cotas · D','DIMSTYLE'));
+  if(t==='insertBlock')options.push(item('Cambiar bloque',()=>$('blockLibrary').focus()));
+  return options.length?[...options,null]:[];
+ };
  const actions=active?[
+   ...toolOptions(),
    item('↵ Finalizar / Enter',()=>finishStage()),
    item('✕ Cancelar / Esc',()=>cancelCadCommand()),
    item('Deshacer último paso',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
@@ -4262,7 +4288,7 @@ function openCadContextMenu(x,y,worldPoint){
    item('Copiar al portapapeles · Ctrl+C',()=>copySelectedCadObjects()),
     item('Cortar al portapapeles · Ctrl+X',()=>cutSelectedCadObjects()),
     item('Pegar · Ctrl+V',()=>pasteCadObjects(),!cadClipboard.length),
-   command('Crear bloque · B','BLOCK'),
+   command('Crear bloque · BL','BLOCK'),
    item('Borrar selección · E',()=>eraseSelected()),
    item('Deseleccionar',()=>{state.selected=[];updateProps();schedule()}),
  ]:[
