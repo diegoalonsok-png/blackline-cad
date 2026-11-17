@@ -3294,7 +3294,13 @@ const CAD2D_TYPED_ALIASES={
   SIMILARES:'SELECTSIMILAR',INVSEL:'SELECTINVERT',
   LIMPIAR:'PURGE',PU:'PURGE',REG:'REGEN',
   VENTANA:'ZOOM',Z:'ZOOM',ZP:'ZOOMPREVIOUS',PANT:'PAN',
-  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP',DED:'DEDIT',EDITARCOTA:'DEDIT',TEXTCOTA:'DEDIT',COTATEXTO:'DEDIT'
+  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP',DED:'DEDIT',EDITARCOTA:'DEDIT',TEXTCOTA:'DEDIT',COTATEXTO:'DEDIT',
+  // Equivalencias de comandos 2D solicitadas; preservar D (DIMSTYLE), B (ERASE) y LI (LIST).
+  RECTANG:'RECTANGLE',SOMBREA:'HATCH',DESPLAZA:'MOVE',COPIA:'COPY',RECORTA:'TRIM',
+  GIRA:'ROTATE',DESCOMP:'EXPLODE',BORRA:'ERASE',IP:'MATCHPROP',IN:'INSERT',
+  RG:'REGEN',ACOTA:'DIM',EMPALMA:'FILLET',SIMETRIA2D:'MIRROR',
+  // MEASUREGEOM agrupa varias mediciones en AutoCAD: no aliasarlo engañosamente a DIST.
+  // MTEXT requiere un editor multilínea real: TXM no acredita la función completa.
 };
 function cad2dNormalizeCommand(value){
  const raw=String(value||'').trim().replace(/^[_-]+/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -3737,8 +3743,38 @@ document.addEventListener('keydown',ev=>{
   $('command').focus();$('command').value=ev.key; $('command').setAttribute('placeholder',state.tool==='offset'?'OFFSET: distancia + Enter':'Distancia / Distance · Enter para dibujar');
  }
 },true);
-function download(name,data,mime='application/octet-stream'){const b=data instanceof Blob?data:new Blob([data],{type:mime});const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1500)}
-function saveJSON(){let data={format:'CAD2D-2',modelScale:'1:1',blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json');toast('Project saved locally')}
+/* A user-initiated save should open the computer's native file chooser when supported.
+ * All bytes stay local; legacy browsers use the standard download fallback.
+ * Never claim a completed save after the user cancels or an I/O error occurs. */
+async function download(name,data,mime='application/octet-stream'){
+ const blob=data instanceof Blob?data:new Blob([data],{type:mime});
+ const filename=String(name||'Dibujo.cadjson').replace(/[\\/:*?"<>|]/g,'_');
+ const ext=(filename.match(/\.[^.]+$/)||['.cadjson'])[0].toLowerCase();
+ const descriptions={'.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
+ const mimeTypes={'.dxf':'application/dxf','.cadjson':'application/json','.svg':'image/svg+xml','.pdf':'application/pdf','.png':'image/png','.txt':'text/plain'};
+ if(typeof window.showSaveFilePicker==='function'&&window.isSecureContext){
+  try{
+   const handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:descriptions[ext]||'Archivo CAD',accept:{[mimeTypes[ext]||'application/octet-stream']:[ext]}}]});
+   const writable=await handle.createWritable();
+   await writable.write(blob);
+   await writable.close();
+   log('GUARDADO: '+handle.name);
+   toast('Archivo guardado en la ubicación elegida');
+   return true;
+  }catch(error){
+   if(error?.name==='AbortError')return false;
+   console.error('[CAD2D guardar archivo]',error);
+   toast('No se pudo guardar: '+(error?.message||'error de escritura'));
+   return false;
+  }
+ }
+ const url=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=url;link.download=filename;document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),30000);
+ toast('Descarga iniciada. Elegí la carpeta desde tu navegador.');
+ return true;
+}
+function saveJSON(){let data={format:'CAD2D-2',modelScale:'1:1',blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};return download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json')}
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
 $('sampleHouseBtn').onclick=async()=>{try{
  const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
@@ -3786,7 +3822,7 @@ function exportDXF(entities=state.entities,filename=state.file,layers=state.laye
     '7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
   }
   data.push(...base,...pos(e.p.x,e.p.y),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
- }}data.push('0','ENDSEC','0','EOF');download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf');toast('DXF exported')}$('dxfBtn').onclick=()=>exportDXF();
+ }}data.push('0','ENDSEC','0','EOF');return download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf')}$('dxfBtn').onclick=()=>exportDXF();
 
 function importSVG(source,name){
  const doc=new DOMParser().parseFromString(source,'image/svg+xml');
