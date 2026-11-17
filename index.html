@@ -1478,6 +1478,14 @@ function blDynBounds(def){
  return maxX-minX>1e-8&&maxY-minY>1e-8?{minX,minY,width:maxX-minX,height:maxY-minY}:null;
 }
 function blDynEligible(def){return !!def&&!def.parametric&&Array.isArray(def.entities)&&def.entities.length>0&&def.entities.every(e=>['line','rect','polyline','text'].includes(e.type))&&!!blDynBounds(def)}
+function cadPrepareDynamicBlock(def){
+ // Each new/imported library definition receives dynamic behavior by default.
+ // Geometry that cannot be stretched without altering curves still supports
+ // uniform scaling, mirror and quarter-turn via quick action grips.
+ if(def&&!def.parametric){def.dynamic2d=blDynEligible(def);def.dynamicActions=true}
+ else if(def){def.dynamicActions=true}
+ return def;
+}
 function blDynDimensions(def,ref){
  const b=def?.dynamic2d&&blDynBounds(def);if(!b)return null;
  const width=Number(ref.dynamic?.width??b.width),height=Number(ref.dynamic?.height??b.height);
@@ -1580,6 +1588,59 @@ function cadOpeningMirrorGeometry(parts,ref){
   if(e.type==='arc'){const start=e.a0;e.a0=-e.a1;e.a1=-start}
   return e;
  });
+}
+function cadGenericBlockGrips(ref){
+ const def=state.blocks?.[ref.blockName];
+ if(!def||def.parametric||def.dynamicActions===false)return [];
+ const p=screen(ref.p||P(0,0));
+ return [
+  {action:'genericMirror',x:p.x-30,y:p.y-37},
+  {action:'genericRotate',x:p.x,y:p.y-37},
+  {action:'genericScale',x:p.x+30,y:p.y-37}
+ ];
+}
+function cadGenericGripHit(raw){
+ for(const id of state.selected){
+  const ref=state.entities.find(e=>e.id===id);
+  if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
+  for(const grip of cadGenericBlockGrips(ref))
+   if(Math.hypot(raw.x-grip.x,raw.y-grip.y)<12)return {id,action:grip.action};
+ }
+ return null;
+}
+function cadGenericBlockAction(grip){
+ const ref=state.entities.find(e=>e.id===grip.id);
+ if(!ref||ref.type!=='blockRef'||layerFor(ref).locked)return;
+ if(grip.action==='genericScale'){
+  const current=Number(ref.scale)||1;
+  const raw=window.prompt('Escala uniforme del bloque (1 = tamaño original)',String(current));
+  if(raw===null)return;const next=Number(raw.replace(',','.'));
+  if(!(next>0&&next<1000&&Number.isFinite(next)))return toast('Escala inválida');
+  saveHistory();ref.scale=next;
+ }else{
+  saveHistory();
+  if(grip.action==='genericRotate')ref.rotation=((Number(ref.rotation)||0)+90)%360;
+  if(grip.action==='genericMirror')ref.flipBlockX=!Boolean(ref.flipBlockX);
+ }
+ updateAll();toast('Bloque dinámico actualizado · Ctrl+Z deshace');
+}
+function cadMirrorGenericBlockGeometry(parts,ref){
+ if(!ref.flipBlockX)return parts;
+ return parts.map(part=>{
+  const e=clone(part);
+  for(const k of ['a','b','c','p'])if(e[k])e[k].x=-e[k].x;
+  if(e.pts)e.pts=e.pts.map(p=>P(-p.x,p.y));
+  if(e.type==='arc'){const a=e.a0;e.a0=Math.PI-e.a1;e.a1=Math.PI-a}
+  if(e.type==='ellipse')e.rotation=Math.PI-(e.rotation||0);
+  if(e.type==='text')e.rotation=180-(e.rotation||0);
+  return e;
+ });
+}
+function cadDrawGenericBlockGrips(ref){
+ const grips=cadGenericBlockGrips(ref);if(!grips.length)return;
+ ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.3;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 15px Arial';
+ for(const g of grips){ctx.fillStyle='#102a39';ctx.strokeStyle='#81dffd';ctx.fillRect(g.x-10,g.y-10,20,20);ctx.strokeRect(g.x-10,g.y-10,20,20);ctx.fillStyle='#85e4ff';ctx.fillText(g.action==='genericMirror'?'↔':g.action==='genericRotate'?'↻':'⤢',g.x,g.y+1)}
+ ctx.restore();
 }
 function cadOpeningQuickGrips(ref){
  const def=state.blocks?.[ref.blockName];
@@ -1751,7 +1812,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
 }
 /* Block grip editing: translate the reference rather than exploding its children. */
 function blockGripPoints(ref){
@@ -1869,6 +1930,7 @@ function findSelectedBlockGrip(raw){
 }
 function drawBlockGrips(ref){
  cadDrawOpeningQuickGrips(ref);
+ cadDrawGenericBlockGrips(ref);
  const half=gripSettings.size/2;
  ctx.save();ctx.fillStyle=gripSettings.blockColor;ctx.strokeStyle='#143244';ctx.lineWidth=1;
  for(const vertex of blockGripPoints(ref)){
@@ -3378,6 +3440,8 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
+  const genericGrip=cadGenericGripHit(raw);
+  if(genericGrip){cadGenericBlockAction(genericGrip);return}
   const openingGrip=cadOpeningQuickHit(raw);
   if(openingGrip){
     if(openingGrip.action==='depth'){
@@ -5130,7 +5194,7 @@ async function importDXFBlockLibrary(file){
    for(const k of ['r','rx','ry','h'])if(shifted[k]!==undefined)shifted[k]*=ratio;
    return shifted;
   });
-  try{state.blocks[key]={name:key,entities:normalizeBlockEntities(converted)};count++}catch(err){skipped++;console.warn('DXF block ignored',key,err)}
+  try{state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(converted)});count++}catch(err){skipped++;console.warn('DXF block ignored',key,err)}
  }
  renderBlockLibrary();queueLocalBackup();
  if(count){const last=Object.keys(state.blocks).at(-1);$('blockLibrary').value=last;state.galleryRepeatedInsert=true;setTool('insertBlock')}
@@ -5188,7 +5252,7 @@ async function importCADBlock(file){
   if(layer.id.length>100||layer.name.length>100)continue;
   if(!state.layers.some(x=>x.id===layer.id))state.layers.push({id:layer.id,name:layer.name,color:/^#[0-9a-f]{6}$/i.test(layer.color)?layer.color:'#c6cbd1',width:Math.max(.05,Math.min(2,Number(layer.width)||.25)),visible:true,locked:false});
  }
- state.blocks[name]={name,entities:converted,...metadata};
+ state.blocks[name]=cadPrepareDynamicBlock({name,entities:converted,...metadata});
  renderLayers();renderBlockLibrary();$('blockLibrary').value=name;
  queueLocalBackup();toast('Imported block '+name+' · '+converted.length+' entities');
 }
@@ -5368,7 +5432,7 @@ function initPermanentBlockGallery(){
     ...(x.kind==='swing-door'?{mirror:false}:{}),
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion)}:{})
    }}:null;
-   state.blocks[key]={name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})};
+   state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})});
    renderBlockLibrary();queueLocalBackup()
   }
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
@@ -5420,7 +5484,7 @@ function initBlocks(){
   const entries=normalizeBlockEntities(selected.map(e=>{
    const item=transformEntity(e,p=>sub(p,origin));delete item.id;return item;
   }));
-  saveHistory();state.blocks[key]={name:key,entities:entries};
+  saveHistory();state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:entries});
   renderBlockLibrary();$('blockLibrary').value=key;queueLocalBackup();
   toast('Block created: '+key+' · '+entries.length+' entities');
  };
@@ -5905,7 +5969,7 @@ window.BlacklineBlockAPI=Object.freeze({
   if(state.blocks[name])throw Error('El bloque ya existe en la paleta');
   const normalized=normalizeBlockEntities(entities);
   saveHistory();
-  state.blocks[name]={name,entities:normalized,...(parametric&&['swing-door','double-door','framed-window','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})};
+  state.blocks[name]=cadPrepareDynamicBlock({name,entities:normalized,...(parametric&&['swing-door','double-door','framed-window','rect-table','round-table'].includes(parametric.kind)?{parametric:{kind:parametric.kind,defaults:clone(parametric.defaults)}}:{})});
   renderBlockLibrary();queueLocalBackup();
   return normalized.length;
  },
