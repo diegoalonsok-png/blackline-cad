@@ -2668,8 +2668,9 @@ function cadHatchLineLoops(){
   let node=first,last=-1,valid=false;
   for(let n=0;n<lines.length+1;n++){
    const options=(graph.get(node)||[]).filter(edge=>edge.i!==last&&!local.has(edge.i));
-   if(options.length!==1)break;
-   const edge=options[0];local.add(edge.i);indices.push(edge.i);path.push(edge.q);last=edge.i;node=edge.to;
+   const choices=n===0?options.filter(edge=>edge.i===i):options;
+   if(choices.length!==1)break;
+   const edge=choices[0];local.add(edge.i);indices.push(edge.i);path.push(edge.q);last=edge.i;node=edge.to;
    if(node===first){valid=path.length>=4;break}
   }
   if(valid){indices.forEach(index=>visited.add(index));loops.push({pts:path.slice(0,-1),layer:lines[i].layer})}
