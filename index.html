@@ -1325,7 +1325,7 @@ function dimensionPrimitives(e){
  const st=e.style||{precision:state.precision,textHeight:.2,arrow:.12,suffix:''};
  const precision=Math.max(0,Math.min(4,Number(st.precision??2)||0)),height=Math.max(.001,Number(st.textHeight)||.2),arrow=Math.max(.001,Number(st.arrow)||.12);
  const suffix=String(st.suffix||''),layer=e.layer||'dimensions',width=e.width||.25,mode=e.mode||'aligned';
- const items=[],line=(a,b)=>items.push({type:'line',a,b,layer,width}),text=(label,p)=>items.push({type:'text',text:label,p,h:height,layer,width,fontFamily:'Arial'});
+ const items=[],line=(a,b)=>items.push({type:'line',a,b,layer,width}),text=(label,p)=>items.push({type:'text',text:e.textOverride==null?label:String(e.textOverride).replace(/<>/g,label),p,h:height,layer,width,fontFamily:'Arial'});
  const tip=(p,v)=>{const length=Math.hypot(v.x,v.y)||1,u=mul(v,1/length),n=P(-u.y,u.x);line(p,add(p,add(mul(u,arrow),mul(n,arrow*.33))));line(p,add(p,sub(mul(u,arrow),mul(n,arrow*.33))))};
  const format=v=>{const target=U[st.displayUnit]?st.displayUnit:state.unit,converted=v*U[state.unit]/U[target],tol=(Number(st.tolerance)||0)*U[state.unit]/U[target],unitLabel=st.displayUnit&&st.displayUnit!=='drawing'?' '+target:'';return converted.toFixed(precision)+(tol>0?' ±'+tol.toFixed(precision):'')+unitLabel+suffix};
  if(!e.a||!e.b||!e.p)return [];
@@ -1632,6 +1632,24 @@ function fontCSS(e,px){const font=safeCADFont(e.fontFamily||'Arial');return (e.i
 function getTextStyleFromPanel(){
  return {text:$('textValue').value,h:Math.max(.001,Number($('textHeight').value)||.25),fontFamily:safeCADFont($('textFont').value),
   rotation:Number($('textAngle').value)||0,bold:$('textWeight').value==='bold',italic:$('textItalic').value==='italic',underline:$('textUnderline').checked,highlight:$('textHighlight').checked,highlightColor:$('textHighlightColor').value};
+}
+function editCadDimensionText(entity){
+ if(!entity||entity.type!=='dimension')return;
+ const auto=dimensionPrimitives({...entity,textOverride:null}).find(part=>part.type==='text')?.text||'';
+ const original=entity.textOverride==null?'<>':String(entity.textOverride);
+ const input=window.prompt('Texto de cota · <> conserva la medida automática · dejar vacío para restaurar',original);
+ if(input===null)return;
+ const value=input.trim();
+ if(value.length>256)return toast('La cota admite hasta 256 caracteres');
+ const newValue=value===''||value==='<>'?null:value;
+ if(newValue===entity.textOverride||newValue===null&&entity.textOverride==null)return;
+ saveHistory();entity.textOverride=newValue;updateAll();
+ toast(newValue===null?'Cota automática restaurada':'Texto de cota actualizado · valor geométrico conservado');
+}
+function editSelectedCadDimensionText(){
+ const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='dimension');
+ if(selected.length!==1)return toast('Seleccioná una sola cota para editar su texto');
+ editCadDimensionText(selected[0]);
 }
 function syncTextPanel(e){
  if(!e||e.type!=='text')return;
@@ -3077,7 +3095,7 @@ canvas.addEventListener('pointercancel',ev=>{
   updateAll();
  }else schedule();
 });
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity);return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
   if(!boxes.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
@@ -3216,7 +3234,7 @@ const CAD2D_TYPED_ALIASES={
   SIMILARES:'SELECTSIMILAR',INVSEL:'SELECTINVERT',
   LIMPIAR:'PURGE',PU:'PURGE',REG:'REGEN',
   VENTANA:'ZOOM',Z:'ZOOM',ZP:'ZOOMPREVIOUS',PANT:'PAN',
-  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP'
+  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP',DED:'DEDIT',EDITARCOTA:'DEDIT',TEXTCOTA:'DEDIT',COTATEXTO:'DEDIT'
 };
 function cad2dNormalizeCommand(value){
  const raw=String(value||'').trim().replace(/^[_-]+/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
@@ -3237,7 +3255,7 @@ const CAD_COMMANDS=[
  ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
  ['EXPLODE','X','Separate polyline into lines'],['ERASE','B / E / BOR','Erase entity'],['SELECTALL','','Seleccionar todos los objetos visibles'],['SELECTINVERT','','Invertir selección'],['DESELECT','','Quitar la selección'],
  ['DIMALIGNED','DAL','Aligned dimension'],
- ['DIMSTYLE','D','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
+ ['DEDIT','DED','Editar texto de una cota seleccionada (<> = medida)'],['DIMSTYLE','D','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
  ['DIMDIAMETER','','Circle diameter'],['LEADER','','Leader with label'],
  ['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
@@ -3550,6 +3568,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='PROPERTIES'||cmd==='PR'||cmd==='CHPROP')return openCadQuickProperties();
  if(cmd==='STYLE'||cmd==='ST'||cmd==='TEXTSTYLE')return openCadPaletteByTitle('Text / Typography');
  if(cmd==='DIMSTYLE'||cmd==='D'||cmd==='DSTYLE')return openCadPaletteByTitle('Dimensions / Annotation');
+ if(cmd==='DEDIT'||cmd==='DIMEDIT'||cmd==='EDITARCOTA'||cmd==='COTATEXTO')return editSelectedCadDimensionText();
  if(cmd==='ED'||cmd==='TEDIT'||cmd==='DDEDIT'){
   const target=selectedCadEntities().find(e=>e.type==='text');
   if(target)syncTextPanel(target);
@@ -4138,6 +4157,7 @@ function openCadContextMenu(x,y,worldPoint){
  const blockTarget=target?.type==='blockRef'?target:cadActiveBlockRef();
  const title=active?'Comando activo · '+state.tool:count?'Selección · '+count+' objeto(s)':'Espacio modelo';
  const selectedText=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='text'):null;
+ const selectedDimension=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='dimension'):null;
  const item=(label,action,disabled=false)=>({label,action,disabled});
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
  const actions=active?[
@@ -4156,6 +4176,7 @@ function openCadContextMenu(x,y,worldPoint){
    null,
    ...(blockTarget?[item('Editar bloque · BEDIT',()=>cadEditBlockDefinition(blockTarget.blockName)),item('Exportar bloque · W',()=>cadExportActiveBlock())]:[]),
    ...(selectedText?[item('Editar texto · ED',()=>{syncTextPanel(selectedText);openCadPaletteByTitle('Text / Typography');})]:[]),
+    ...(selectedDimension?[item('Editar texto de cota · DEDIT',()=>editCadDimensionText(selectedDimension))]:[]),
     item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
     command('Seleccionar similares','SELECTSIMILAR'),
     command('Invertir selección','SELECTINVERT'),
