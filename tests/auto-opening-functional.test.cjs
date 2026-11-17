@@ -115,3 +115,44 @@ test('existing walls on locked layer cannot be cut',()=>{
  assert.equal(owned(app.state,ref.id).length,0);
  assert.equal(app.state.entities.filter(e=>e.type==='line'&&e.layer==='walls').length,2);
 });
+
+test('parametric double-line wall receives a centered door opening across both faces',()=>{
+ const app=start();
+ const wall2d={group:'wall-1',thickness:.18,justify:'center',guideA:P(-2,.09),guideB:P(5,.09)};
+ for(const [i,face] of app.state.entities.slice(0,2).entries()){
+  face.wall2d={...copy(wall2d),face:i};
+ }
+ app.insertSelectedBlock(P(0,.09));
+ const ref=app.state.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref,'door reference inserted');
+ approx(ref.p.x,-.45);approx(ref.p.y,.09);
+ approx(ref.wallThickness,.18);
+ const pieces=owned(app.state,ref.id);
+ assert.equal(pieces.length,4,'both faces split into two segments');
+ assert.equal(new Set(pieces.map(x=>x.wall2d.face)).size,2);
+ assert.equal(app.state.entities.filter(e=>e.layer==='electric').length,1,'other disciplines unchanged');
+});
+test('parametric window produces the same automatic paired-wall void',()=>{
+ const app=start();
+ app.door.parametric.kind='framed-window';
+ const metadata={group:'wall-window',thickness:.18,justify:'center',guideA:P(-2,.09),guideB:P(5,.09)};
+ app.state.entities[0].wall2d={...copy(metadata),face:0};
+ app.state.entities[1].wall2d={...copy(metadata),face:1};
+ app.insertSelectedBlock(P(1,.09));
+ const ref=app.state.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref,'window reference inserted');assert.equal(owned(app.state,ref.id).length,4);
+ assert.equal(app.state.entities.some(e=>e.id===1||e.id===2),false,'both uncut faces replaced');
+});
+test('parametric wall never cuts just one of its two faces',()=>{
+ const app=start();
+ const metadata={group:'wall-incomplete',thickness:.18,justify:'center',guideA:P(-2,.09),guideB:P(5,.09)};
+ app.state.entities[0].wall2d={...copy(metadata),face:0};
+ app.state.entities[1].wall2d={...copy(metadata),face:1};
+ app.state.layers[0].locked=false;
+ // One wall face cannot span the width of the proposed opening.
+ app.state.entities[1].a.x=-.2;
+ app.insertSelectedBlock(P(0,.09));
+ const ref=app.state.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref);assert.equal(owned(app.state,ref.id).length,0);
+ assert.equal(app.state.entities.filter(e=>e.layer==='walls').length,2);
+});
