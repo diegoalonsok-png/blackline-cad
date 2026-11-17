@@ -704,12 +704,33 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 <link rel="stylesheet" href="blackline-modern.css?v=20261116-premium-v3">
+<style id="cad-text-layout-fix">
+/* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
+.app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
+.app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){grid-template-rows:48px 29px 0 39px minmax(0,1fr) 54px 34px!important}
+.app:has(> #cadTextToolbar).cad-focus{grid-template-rows:48px 0 0 0 minmax(0,1fr) 41px 34px!important}
+.app:has(> #cadTextToolbar)>.workspace{min-height:0;overflow:hidden}
+#cadTextToolbar{height:39px;min-height:0;max-height:39px;display:flex;flex-wrap:nowrap;gap:6px;align-items:center;overflow-x:auto;overflow-y:hidden;white-space:nowrap;padding:3px 9px;scrollbar-width:thin;box-sizing:border-box}
+#cadTextToolbar>*{flex-shrink:0}
+#cadTextToolbar #cadTextBarValue{flex:0 0 clamp(155px,22vw,420px);min-width:155px}
+#cadTextToolbar button,#cadTextToolbar input,#cadTextToolbar select{height:28px;max-height:28px}
+#cadTextToolbar .cad-text-divider{height:22px;width:1px;flex:0 0 1px;background:#566775}
+#cadTextToolbar .cad-text-icon-button{min-width:29px;padding:3px 7px}
+#cadTextToolbar #cadTextBarAngle{width:65px}
+#cadTextToolbar #cadTextBarHighlightColor{width:35px;padding:2px}
+#cadTextToolbar .cad-text-note{font-size:10px;color:#b4c7d2}
+.app.cad-focus>#cadTextToolbar{display:none!important}
+@media(max-width:850px){
+ .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:42px 27px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 50px 28px!important}
+ .app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){grid-template-rows:42px 27px 0 39px minmax(0,1fr) 50px 28px!important}
+}
+</style>
 </head>
 <body>
 <div class="app">
  <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="filename" id="filename">Untitled Drawing.dxf</div><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
- <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarPlace" class="btn primary">Colocar texto</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button></div>
+ <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
   <aside class="sidebar"><section class="panel"><div class="panel-title">Drawing properties</div><div class="panel-content"><div class="field"><label>Units</label><select id="units"><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="m" selected>Meters</option><option value="in">Inches</option><option value="ft">Feet</option></select></div><div class="field"><label>Grid spacing</label><input id="gridSpacing" type="number" min="0.00001" step="any" value="1"></div><div class="field"><label>Precision</label><select id="precision"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>6</option></select></div><div class="field"><label>Line width</label><input id="lineWidth" type="number" step="0.05" min="0" max="5" value="0.25"></div><div class="help">Model space is unbounded. Use mouse wheel to zoom and middle mouse / Space + drag to pan. All geometry is stored in drawing units.</div></div></section><section class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column"><div class="panel-title">Layer manager <span id="layerCount">0</span></div><div class="panel-content" style="display:flex;flex-direction:column;flex:1;min-height:0"><div class="smallrow"><button class="btn" id="newLayer">+ Add layer</button><button class="btn" id="removeLayer">Remove</button></div><div class="layer-list" id="layers"></div><p class="help">Select a layer name to make it current. Toggle visibility and lock on each row.</p></div></section><section class="panel"><div class="panel-title">Display / Cursor colors</div><div class="panel-content" id="displaySettings"><div class="field"><label for="cursorColor">Crosshair</label><input type="color" id="cursorColor" value="#ffff00" aria-label="Crosshair color"></div><div class="field"><label for="cadPickboxSize">Cuadrado central / selector <output id="cadPickboxSizeValue">9 px</output></label><input id="cadPickboxSize" type="range" min="5" max="60" step="1" value="9"></div>
 <div class="field"><label for="crosshairSize">Crosshair length</label><select id="crosshairSize"><option value="100">Full viewport (100%)</option><option value="75" selected>Large (75%)</option><option value="50">Medium (50%)</option><option value="25">Short (25%)</option><option value="5">Compact (5%)</option></select></div><div class="field"><label for="cursorWidth">Crosshair weight</label><select id="cursorWidth"><option value="0.75">Fine</option><option value="1" selected>Standard</option><option value="1.5">Bold</option></select></div><div class="field"><label for="modelBgColor">Background</label><input type="color" id="modelBgColor" value="#10171c" aria-label="Model background color"></div><div class="field"><label for="modelGridColor">Grid</label><input type="color" id="modelGridColor" value="#27343b" aria-label="Grid color"></div><div class="field"><label for="modelAxesColor">Axes</label><input type="color" id="modelAxesColor" value="#59636e" aria-label="Axes color"></div><div class="field"><label for="selectionColor">Selection</label><input type="color" id="selectionColor" value="#e9edf2" aria-label="Selection highlight color"></div><div class="field"><label for="cadGripSize">Tamaño grips <output id="cadGripSizeValue">10 px</output></label><input id="cadGripSize" type="range" min="6" max="22" step="1" value="10"></div>
@@ -5328,17 +5349,46 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  $('cadStatusManual')?.addEventListener('click',()=>window.open('./manual-comandos.html','_blank','noopener'));
 initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings();initTypographyPalette();
  (function initCadTextBar(){
- const pairs=[['cadTextBarValue','textValue'],['cadTextBarFont','textFont'],['cadTextBarHeight','textHeight']];
+ const pairs=[['cadTextBarValue','textValue'],['cadTextBarFont','textFont'],['cadTextBarHeight','textHeight'],['cadTextBarAngle','textAngle'],['cadTextBarHighlightColor','textHighlightColor']];
  for(const [bar,palette] of pairs){
-  const b=$(bar),p=$(palette);b.value=p.value;
+  const b=$(bar),p=$(palette);if(!b||!p)continue;
+  if(b.tagName==='SELECT'&&p.tagName==='SELECT')b.innerHTML=p.innerHTML;
+  b.value=p.value;
   b.addEventListener('input',()=>{p.value=b.value;p.dispatchEvent(new Event('input',{bubbles:true}))});
   p.addEventListener('input',()=>{if(document.activeElement!==b)b.value=p.value});
  }
- const toggle=(id,source,active)=>{const btn=$(id),field=$(source);btn.addEventListener('click',()=>{field.value=field.value===active?(active==='bold'?'normal':'normal'):active;field.dispatchEvent(new Event('input',{bubbles:true}));btn.setAttribute('aria-pressed',String(field.value===active))});field.addEventListener('change',()=>btn.setAttribute('aria-pressed',String(field.value===active)))};
+ const toggle=(id,source,active)=>{const btn=$(id),field=$(source);const update=()=>btn.setAttribute('aria-pressed',String(field.type==='checkbox'?field.checked:field.value===active));
+  btn.addEventListener('click',()=>{
+   if(field.type==='checkbox')field.checked=!field.checked;
+   else field.value=field.value===active?'normal':active;
+   field.dispatchEvent(new Event('input',{bubbles:true}));field.dispatchEvent(new Event('change',{bubbles:true}));update();
+  });
+  field.addEventListener('input',update);field.addEventListener('change',update);update();
+ };
  toggle('cadTextBarBold','textWeight','bold');toggle('cadTextBarItalic','textItalic','italic');
- $('cadTextBarPlace').addEventListener('click',()=>$('placeTextBtn').click());
- $('cadTextBarApply').addEventListener('click',()=>{for(const [bar,palette] of pairs)$(palette).value=$(bar).value;$('applyTextBtn').click()});
+ toggle('cadTextBarUnderline','textUnderline',true);toggle('cadTextBarHighlight','textHighlight',true);
+ const syncFromPalette=()=>{for(const [bar,palette] of pairs)if($(bar)&&$(palette))$(bar).value=$(palette).value;
+  for(const [bar,palette,active] of [['cadTextBarBold','textWeight','bold'],['cadTextBarItalic','textItalic','italic'],['cadTextBarUnderline','textUnderline',true],['cadTextBarHighlight','textHighlight',true]]){
+   const field=$(palette);$(bar).setAttribute('aria-pressed',String(field.type==='checkbox'?field.checked:field.value===active));
+  }
+ };
+ $('cadTextBarPlace').addEventListener('click',()=>{
+  if(!$('cadTextBarValue').value.trim())return toast('Escribí un texto antes de colocarlo');
+  $('placeTextBtn').click();canvas.focus({preventScroll:true});
+ });
+ $('cadTextBarApply').addEventListener('click',()=>{$('applyTextBtn').click();});
+ $('cadTextBarEdit').addEventListener('click',()=>{
+  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='text');
+  if(selected.length!==1)return toast('Seleccioná exactamente un texto para editar');
+  syncTextPanel(selected[0]);syncFromPalette();$('cadTextBarValue').focus();$('cadTextBarValue').select();
+ });
+ $('cadTextBarCopy').addEventListener('click',()=>$('copyTextContent').click());
+ $('cadTextBarPaste').addEventListener('click',async()=>{$('pasteTextContent').click();setTimeout(syncFromPalette,150)});
+ $('cadTextBarImport').addEventListener('click',()=>$('importTextNotes').click());
+ $('cadTextBarExport').addEventListener('click',()=>$('exportTextNotes').click());
+ $('cadTextBarPalette').addEventListener('click',()=>openCadPaletteByTitle('Text / Typography'));
  $('cadTextBarValue').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();$('cadTextBarPlace').click()}});
+ syncFromPalette();
  })();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
