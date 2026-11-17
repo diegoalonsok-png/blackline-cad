@@ -4,6 +4,10 @@ const {plan}=require('../cad-auto-opening.js');
 const html=fs.readFileSync(path.resolve(__dirname,'../index.html'),'utf8');
 const begin=html.indexOf('let autoOpeningEnabled=true;'),end=html.indexOf('/* DXF block-library importer:',begin);
 assert.ok(begin>0&&end>begin,'production opening routines found');
+const alignmentStart=html.indexOf('function cadWallCenterline(meta){');
+const alignmentEnd=html.indexOf('let autoWallJoinEnabled=true;',alignmentStart);
+assert.ok(alignmentStart>0&&alignmentEnd>alignmentStart,'real parametric-wall alignment routines found');
+const alignment=html.slice(alignmentStart,alignmentEnd);
 const routines=html.slice(begin,end);
 const P=(x,y)=>({x,y}),copy=x=>JSON.parse(JSON.stringify(x));
 function start(options={}){
@@ -15,7 +19,7 @@ function start(options={}){
   {id:'walls',name:'WALLS',visible:true,locked:false},
   {id:'electric',name:'ELECTRIC',visible:true,locked:false},
   {id:'openings',name:'OPENINGS',visible:true,locked:false}
- ],layerId:'walls',stage:[],tool:'select',selected:[],galleryRepeatedInsert:false,history:[]};
+ ],layerId:'walls',stage:[],tool:'select',selected:[],galleryRepeatedInsert:false,history:[],view:{scale:40},unit:'m'};
  const door={name:'Puerta test',parametric:{kind:'swing-door',defaults:{width:.9,frameWidth:.05,frameDepth:.12}},entities:[]};
  state.blocks[door.name]=door;
  const ui={blockScale:{value:'1'},blockRotation:{value:'0'},blAutoOpening:{checked:true}};
@@ -24,6 +28,9 @@ function start(options={}){
  const $=id=>ui[id];const clone=copy;const localStorage={getItem:key=>storage[key]??null,setItem:(key,val)=>{storage[key]=val}};
  const window={BlacklineAutoOpening:{plan}},BlacklineAutoOpening=window.BlacklineAutoOpening;
  const layerFor=e=>state.layers.find(l=>l.id===e.layer)||state.layers[0];
+ const U={m:1000,cm:10,mm:1};
+ const add=(a,b)=>P(a.x+b.x,a.y+b.y),sub=(a,b)=>P(a.x-b.x,a.y-b.y),mul=(a,n)=>P(a.x*n,a.y*n);
+ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
  const explicitWallLayerName=name=>/^(WALLS?|MUROS?)$/i.test(name);
  const ensureArchitecturalLayer=()=> 'openings';
  const selectedBlock=()=>door;
@@ -31,6 +38,7 @@ function start(options={}){
  const toast=message=>messages.push(message),units=n=>n.toFixed(2);
  const buildRibbon=()=>{},document={querySelector:()=>({dataset:{tab:'home'}})};
  const updateAll=()=>events.push('update');
+ ${alignment}
  ${routines}
  return {insertSelectedBlock,autoCutWallForOpening,relocateOpeningWithBlock,openingOverlapsAnother,configureAutoOpening};
  `)(state,ui,messages,events,storage,P,copy,door,plan);
