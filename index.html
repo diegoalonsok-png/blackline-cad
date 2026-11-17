@@ -1591,7 +1591,7 @@ function cadOpeningMirrorGeometry(parts,ref){
 }
 function cadGenericBlockGrips(ref){
  const def=state.blocks?.[ref.blockName];
- if(!def||def.parametric||def.dynamicActions===false)return [];
+ if(!def||def.dynamicActions===false||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
  const p=screen(ref.p||P(0,0));
  return [
   {action:'genericMirror',x:p.x-30,y:p.y-37},
