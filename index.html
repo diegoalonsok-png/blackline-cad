@@ -3756,9 +3756,9 @@ function exportDXF(entities=state.entities,filename=state.file,layers=state.laye
    // DXF does not support CSS shadows: create an editable offset TEXT behind the label.
    data.push('0','TEXT','8',lay.name,'370',String(Math.round((e.width??lay.width??.25)*100)),'420',color,
     ...pos(e.p.x+offset,e.p.y-offset),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),
-    '7',fontToDXFStyle(e),'1',e.text.replace(/\\r?\\n/g,' '));
+    '7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
   }
-  data.push(...base,...pos(e.p.x,e.p.y),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'1',e.text.replace(/\\r?\\n/g,' '));
+  data.push(...base,...pos(e.p.x,e.p.y),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
  }}data.push('0','ENDSEC','0','EOF');download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf');toast('DXF exported')}$('dxfBtn').onclick=()=>exportDXF();
 
 function importSVG(source,name){
