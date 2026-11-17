@@ -1489,6 +1489,28 @@ function blDynHandles(ref){
  const tr=(x,y)=>P(ref.p.x+k*(x*co-y*si),ref.p.y+k*(x*si+y*co));
  return [{axis:'width',point:tr(d.b.minX+d.width,d.b.minY+d.height/2)},{axis:'height',point:tr(d.b.minX+d.width/2,d.b.minY+d.height)}];
 }
+// Window transverse depth (across the wall) is independent of the long X span.
+// Legacy window records with 0.20/0.30 m depth are capped at 0.15 m on display.
+function cadWindowDepthModel(ref,definition){
+ const scale=Number(ref?.scale)||1,raw=Number(ref?.params?.frameDepth??definition?.parametric?.defaults?.frameDepth);
+ const modelPerMeter=1000/U[state.unit];
+ const actual=Number.isFinite(raw)&&raw>0?raw*scale:0.12*modelPerMeter;
+ return Math.max(0.04,Math.min(0.15,actual/modelPerMeter))*modelPerMeter/scale;
+}
+function cadWindowDepthMeters(ref){
+ const def=state.blocks?.[ref?.blockName];
+ return cadWindowDepthModel(ref,def)*(Number(ref?.scale)||1)*U[state.unit]/1000;
+}
+function cadSetWindowDepth(ref,meters){
+ const def=state.blocks?.[ref?.blockName],scale=Number(ref?.scale)||1,depth=Number(meters);
+ if(def?.parametric?.kind!=='framed-window'||layerFor(ref).locked||!layerFor(ref).visible)return {ok:false,reason:'Ventana no editable'};
+ if(!Number.isFinite(depth)||depth<0.04||depth>0.15)return {ok:false,reason:'Profundidad permitida: 0.04 a 0.15 m'};
+ const model=depth*1000/U[state.unit]/scale;
+ const width=Number(ref.params?.width??def.parametric.defaults.width),t=Number(ref.params?.frameWidth??def.parametric.defaults.frameWidth);
+ if(!(model>0&&model<width*.6&&t>0&&t<width*.2))return {ok:false,reason:'Dimensiones del marco incompatibles con el vano'};
+ saveHistory();ref.params={...def.parametric.defaults,...ref.params,frameDepth:model};
+ updateAll();return {ok:true,depth};
+}
 function blockInstanceGeometry(definition,ref){
  const dyn=blDynDimensions(definition,ref);
  if(dyn){
@@ -1504,7 +1526,7 @@ function blockInstanceGeometry(definition,ref){
  const base={layer:'openings',width:.05},P2=(x,y)=>P(x,y);
  const framed=(kind)=>{
   const t=Number(ref.params.frameWidth??param.defaults.frameWidth);
-  const d=Number(ref.params.frameDepth??param.defaults.frameDepth);
+  const d=param.kind==='framed-window'?cadWindowDepthModel(ref,definition):Number(ref.params.frameDepth??param.defaults.frameDepth);
   // Avoid impossible frame-to-opening ratios. All lengths are in model units.
   if(!(Number.isFinite(t)&&t>0&&t<w*.2&&Number.isFinite(d)&&d>0&&d<w*.6))return null;
   const rect=(x0,y0,x1,y1)=>({...base,type:'rect',a:P2(x0,y0),b:P2(x1,y1)});
@@ -1566,7 +1588,8 @@ function cadOpeningQuickGrips(ref){
  if(!(width>0))return [];
  const theta=(Number(ref.rotation)||0)*Math.PI/180;
  const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
- return [{action:'mirror',x:p.x-44,y:p.y-35},{action:'swing',x:p.x-15,y:p.y-35},{action:'rotate',x:p.x+14,y:p.y-35},{action:'resize',x:p.x+43,y:p.y-35}];
+ return [{action:'mirror',x:p.x-58,y:p.y-35},{action:'swing',x:p.x-29,y:p.y-35},{action:'rotate',x:p.x,y:p.y-35},{action:'resize',x:p.x+29,y:p.y-35},
+  ...(def.parametric.kind==='framed-window'?[{action:'depth',x:p.x+58,y:p.y-35}]:[])];
 }
 function cadOpeningQuickHit(raw){
  for(const id of state.selected){
@@ -1600,6 +1623,7 @@ function cadResizeOpening(ref,meters){
  const snapshot=historySnapshot(),hadWall=state.entities.some(e=>e.autoOpeningRef===ref.id);
  const params={...def.parametric.defaults,...ref.params,width:next};
  if(kind==='framed-window'){
+  params.frameDepth=cadWindowDepthModel(ref,def);
   if(!(Number(params.frameWidth)>0&&Number(params.frameWidth)<next*.2&&Number(params.frameDepth)>0&&Number(params.frameDepth)<next*.6))return {ok:false,reason:'Ancho menor que el marco permitido'};
  }else{
   params.frameWidth=Number(params.frameWidth)*ratio;
@@ -1612,6 +1636,34 @@ function cadResizeOpening(ref,meters){
   return {ok:false,reason:'No se puede actualizar el vano: operación cancelada'};
  }
  updateAll();return {ok:true,width:target,cut:result.cut};
+}
+function cadWindowDepthEditor(ref,client){
+ document.getElementById('cadWindowDepthEditor')?.remove();
+ const overlay=document.createElement('div');overlay.id='cadWindowDepthEditor';overlay.setAttribute('role','dialog');
+ overlay.setAttribute('aria-label','Cota virtual de profundidad del marco');
+ overlay.style.cssText='position:absolute;inset:0;z-index:112;pointer-events:none';
+ const theta=(Number(ref.rotation)||0)*Math.PI/180,depth=cadWindowDepthMeters(ref);
+ const current=screen(ref.p),perp=P(-Math.sin(theta),Math.cos(theta));
+ const a=P(current.x-perp.x*depth*1000/U[state.unit]*state.view.scale/2,current.y+perp.y*depth*1000/U[state.unit]*state.view.scale/2);
+ const b=P(current.x+perp.x*depth*1000/U[state.unit]*state.view.scale/2,current.y-perp.y*depth*1000/U[state.unit]*state.view.scale/2);
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');
+ svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.style.cssText='position:absolute;inset:0;pointer-events:none';
+ const line=document.createElementNS(ns,'line');for(const [key,value] of Object.entries({x1:a.x,y1:a.y,x2:b.x,y2:b.y}))line.setAttribute(key,String(value));
+ line.setAttribute('stroke','#8be4ff');line.setAttribute('stroke-width','1.8');svg.append(line);overlay.append(svg);
+ const field=document.createElement('input');field.type='text';field.inputMode='decimal';field.value=depth.toFixed(2);
+ field.setAttribute('aria-label','Profundidad de ventana en metros, ejemplo 0.12 o 0.15');
+ field.title='Cota virtual editable: 0.12 a 0.15 m habitual; máximo 0.15 m. No se imprime';
+ field.style.cssText='position:absolute;pointer-events:auto;width:102px;height:30px;text-align:center;background:#10344a;color:white;border:1px solid #87def7;border-radius:5px;font:600 13px Consolas,monospace';
+ field.style.left=Math.max(8,Math.min(wrap.clientWidth-110,(a.x+b.x)/2+18))+'px';
+ field.style.top=Math.max(8,Math.min(wrap.clientHeight-40,(a.y+b.y)/2-40))+'px';
+ const close=()=>{overlay.remove();canvas.focus({preventScroll:true});schedule()};
+ const commit=()=>{const value=field.value.trim().replace(',','.');if(!/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value))return toast('Escribí 0.12 o 0.15');
+  const result=cadSetWindowDepth(ref,Number(value));if(!result.ok)return toast(result.reason);
+  close();toast('Profundidad de ventana: '+result.depth.toFixed(2)+' m');
+ };
+ field.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();commit()}else if(ev.key==='Escape'){ev.preventDefault();close()}});
+ field.addEventListener('pointerdown',ev=>ev.stopPropagation());
+ overlay.append(field);wrap.append(overlay);field.focus();field.select();
 }
 function cadOpeningResizeEditor(ref,client){
  // Ephemeral CAD dimension overlay, never an entity and never included in DXF/SVG/PDF.
@@ -1691,7 +1743,7 @@ function cadDrawOpeningQuickGrips(ref){
   ctx.fillStyle='#112b3c';ctx.strokeStyle='#80e2ff';
   ctx.fillRect(grip.x-10,grip.y-10,20,20);ctx.strokeRect(grip.x-10,grip.y-10,20,20);
   ctx.fillStyle='#80e2ff';ctx.font='bold 16px Arial';
-  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':grip.action==='resize'?'⇔':'↻',grip.x,grip.y+1);
+  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':grip.action==='resize'?'⇔':grip.action==='depth'?'↕':'↻',grip.x,grip.y+1);
  }
  ctx.restore();
 }
@@ -2432,7 +2484,7 @@ function loadRoomTest(){
  line(5,0,5,4);line(5.30,-.30,5.30,4.30);
  const door='CAD2D ROOM 5x4 · PUERTA 090 V3',windowName='CAD2D ROOM 5x4 · VENTANA 120 V3';
  if(!state.blocks[door])state.blocks[door]={name:door,entities:[{type:'line',a:P(0,0),b:P(.9,0),layer:openings}],parametric:{kind:'swing-door',defaults:{width:.9,frameWidth:.05,frameDepth:.30,mirror:false}}};
- if(!state.blocks[windowName])state.blocks[windowName]={name:windowName,entities:[{type:'line',a:P(0,0),b:P(1.2,0),layer:openings}],parametric:{kind:'framed-window',defaults:{width:1.2,frameWidth:.05,frameDepth:.30,mullion:true}}};
+ if(!state.blocks[windowName])state.blocks[windowName]={name:windowName,entities:[{type:'line',a:P(0,0),b:P(1.2,0),layer:openings}],parametric:{kind:'framed-window',defaults:{width:1.2,frameWidth:.05,frameDepth:.12,mullion:true}}};
  for(const [name,x,y] of [[door,1.20,-.15],[windowName,3.20,4.15]]){
   const d=state.blocks[name];state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:P(x,y),scale:1,rotation:0,layer:openings,lineweight:.05,params:{...d.parametric.defaults}});
  }
@@ -3328,6 +3380,9 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  if(state.tool==='select'&&!ev.shiftKey){
   const openingGrip=cadOpeningQuickHit(raw);
   if(openingGrip){
+    if(openingGrip.action==='depth'){
+     const ref=state.entities.find(e=>e.id===openingGrip.id);cadWindowDepthEditor(ref,{x:ev.clientX,y:ev.clientY});return;
+    }
     if(openingGrip.action==='resize'){
      const ref=state.entities.find(e=>e.id===openingGrip.id);
      state.drag={type:'openingResize',id:openingGrip.id,start:raw,last:raw,startWidth:cadOpeningWidthMeters(ref)};return;
@@ -5248,7 +5303,7 @@ function initPermanentBlockGallery(){
  }
 
  function svgFor(x){
-  const defaults=x.kind?{width:x.w,frameWidth:.05,frameDepth:x.kind==='framed-window'?.20:.12,mirror:false,mullion:Boolean(x.mullion)}:null;
+  const defaults=x.kind?{width:x.w,frameWidth:.05,frameDepth:x.kind==='framed-window'?.12:.12,mirror:false,mullion:Boolean(x.mullion)}:null;
   const geometry=x.kind?blockInstanceGeometry({parametric:{kind:x.kind,defaults},entities:[]},{params:defaults}):x.draw.map(d=>{
    const t=d[0],v=d.slice(1);
    if(t==='line')return {type:'line',a:P(v[0],v[1]),b:P(v[2],v[3])};
@@ -5309,7 +5364,7 @@ function initPermanentBlockGallery(){
   // Reuse the definition when available; built-ins never overwrite user imports.
   if(!already){
    const param=x.kind?{kind:x.kind,defaults:{
-    width:x.w*factor,frameWidth:.05*factor,frameDepth:(x.kind==='framed-window'?.20:.12)*factor,
+    width:x.w*factor,frameWidth:.05*factor,frameDepth:(x.kind==='framed-window'?.12:.12)*factor,
     ...(x.kind==='swing-door'?{mirror:false}:{}),
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion)}:{})
    }}:null;
