@@ -3294,7 +3294,13 @@ const CAD2D_TYPED_ALIASES={
   SIMILARES:'SELECTSIMILAR',INVSEL:'SELECTINVERT',
   LIMPIAR:'PURGE',PU:'PURGE',REG:'REGEN',
   VENTANA:'ZOOM',Z:'ZOOM',ZP:'ZOOMPREVIOUS',PANT:'PAN',
-  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP',DED:'DEDIT',EDITARCOTA:'DEDIT',TEXTCOTA:'DEDIT',COTATEXTO:'DEDIT'
+  COLOREAR:'COLOR',PAPELETA:'PROPERTIES',AYUDA:'HELP',DED:'DEDIT',EDITARCOTA:'DEDIT',TEXTCOTA:'DEDIT',COTATEXTO:'DEDIT',
+  // Equivalencias de comandos 2D solicitadas; preservar D (DIMSTYLE), B (ERASE) y LI (LIST).
+  RECTANG:'RECTANGLE',SOMBREA:'HATCH',DESPLAZA:'MOVE',COPIA:'COPY',RECORTA:'TRIM',
+  GIRA:'ROTATE',DESCOMP:'EXPLODE',BORRA:'ERASE',IP:'MATCHPROP',IN:'INSERT',
+  RG:'REGEN',ACOTA:'DIM',EMPALMA:'FILLET',SIMETRIA2D:'MIRROR',
+  // MEASUREGEOM agrupa varias mediciones en AutoCAD: no aliasarlo engañosamente a DIST.
+  // MTEXT requiere un editor multilínea real: TXM no acredita la función completa.
 };
 function cad2dNormalizeCommand(value){
  const raw=String(value||'').trim().replace(/^[_-]+/,'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
