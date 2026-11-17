@@ -3716,6 +3716,32 @@ function importDXF(text,name){
 
 const paperSizes={A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],A0:[841,1189],LETTER:[215.9,279.4],LEGAL:[215.9,355.6],ARCHD:[609.6,914.4],'ARCH E':[914.4,1219.2]};
 function plotOptions(){let size=$('paper').value,dim=size==='CUSTOM'?[Number($('paperW').value)||420,Number($('paperH').value)||297]:paperSizes[size].slice();if($('orientation').value==='landscape')dim.sort((a,b)=>b-a);else dim.sort((a,b)=>a-b);let w=dim[0],h=dim[1],margin=Math.max(0,Number($('plotMargin').value)||0),b=getBounds(),dx=Math.max(.001,b.maxX-b.minX),dy=Math.max(.001,b.maxY-b.minY),areaW=Math.max(1,w-2*margin),areaH=Math.max(1,h-2*margin),factor=$('plotScale').value==='fit'?Math.min(areaW/dx,areaH/dy)*.92:U[state.unit]/Number($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value);if(!Number.isFinite(factor)||factor<=0)factor=1;let cx=(b.minX+b.maxX)/2,cy=(b.minY+b.maxY)/2;return{w,h,margin,b,factor,cx,cy,style:$('plotStyle').value,title:$('titleBlock').value}}
+// Independent print preflight: same printable limits for Layout, SVG, and PDF.
+function cadPrintPreflight(o){
+ const messages=[],visible=state.entities.filter(e=>layerFor(e).visible);
+ const pageW=o.w-2*o.margin,pageH=o.h-2*o.margin;
+ const contentW=(o.b.maxX-o.b.minX)*o.factor,contentH=(o.b.maxY-o.b.minY)*o.factor;
+ const clipped=contentW>pageW+.01||contentH>pageH+.01;
+ if(clipped)messages.push('El dibujo excede el área imprimible: hay recorte');
+ if(o.margin<3)messages.push('Margen inferior a 3 mm: riesgo de corte en impresoras');
+ if(!visible.length)messages.push('El plano no contiene geometría visible');
+ const primitives=flattenCADEntities(visible).filter(e=>layerFor(e).visible);
+ const textSmall=primitives.filter(e=>e.type==='text'&&Number(e.h)*o.factor<2.5).length;
+ if(textSmall)messages.push(textSmall+' textos con altura impresa menor que 2,5 mm');
+ if(o.title==='simple'){
+  const x0=o.w-85,y0=o.h-o.margin-29;
+  // Conservative bbox test: warns about drawing content that could be concealed by title block.
+  const overlap=primitives.some(e=>{
+   const b=boundsEntity(e);if(!b)return false;
+   const minX=o.w/2+(b.minX-o.cx)*o.factor,maxX=o.w/2+(b.maxX-o.cx)*o.factor;
+   const minY=o.h/2-(b.maxY-o.cy)*o.factor,maxY=o.h/2-(b.minY-o.cy)*o.factor;
+   return maxX>=x0&&minX<=x0+85&&maxY>=y0&&minY<=y0+29;
+  });
+  if(overlap)messages.push('Posible superposición del dibujo con el cajetín');
+  if(x0<o.margin||y0<o.margin)messages.push('El cajetín invade el margen');
+ }
+ return {clipped,issues:messages,visible:visible.length};
+}
 function colorOutput(e,o){return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
 function escXML(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 function makeSVG(o){const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of flattenCADEntities(state.entities)){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.1,e.width||.25),attr=`fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='line')svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(e.b)}"/>`);else if(e.type==='rect'){let a=px(e.a),b=px(e.b);svg.push(`<rect ${attr} x="${num(Math.min(a[0],b[0]))}" y="${num(Math.min(a[1],b[1]))}" width="${num(Math.abs(a[0]-b[0]))}" height="${num(Math.abs(a[1]-b[1]))}"/>`)}else if(e.type==='polyline')svg.push(`<polyline ${attr} points="${e.pts.map(xy).join(' ')}${e.closed?' '+xy(e.pts[0]):''}"/>`);else if(e.type==='circle'){let a=px(e.c);svg.push(`<circle ${attr} cx="${num(a[0])}" cy="${num(a[1])}" r="${num(e.r*o.factor)}"/>`)}else if(e.type==='ellipse'){let a=px(e.c);svg.push(`<ellipse ${attr} cx="${num(a[0])}" cy="${num(a[1])}" rx="${num(e.rx*o.factor)}" ry="${num(e.ry*o.factor)}" transform="rotate(${num(-(e.rotation||0)*180/Math.PI)} ${num(a[0])} ${num(a[1])})"/>`)}else if(e.type==='arc'){let sweep=arcSweep(e.a0,e.a1),start=add(e.c,P(e.r*Math.cos(e.a0),e.r*Math.sin(e.a0))),end=add(e.c,P(e.r*Math.cos(e.a0+sweep),e.r*Math.sin(e.a0+sweep)));svg.push(`<path ${attr} d="M ${point(start)} A ${num(e.r*o.factor)} ${num(e.r*o.factor)} 0 ${sweep>Math.PI?1:0} 0 ${point(end)}"/>`)}else if(e.type==='text'){
@@ -3759,8 +3785,8 @@ function renderLayoutWorkspace(){
   container.style.width=Math.floor(o.w*ratio)+'px';container.style.height=Math.floor(o.h*ratio)+'px';
   container.innerHTML=makeSVG(o);
   const bbox=o.b,usedW=(bbox.maxX-bbox.minX)*o.factor,usedH=(bbox.maxY-bbox.minY)*o.factor;
-  const clipped=usedW>o.w-2*o.margin+.01||usedH>o.h-2*o.margin+.01;
-  $('cadLayoutStatus').textContent=o.w.toFixed(0)+' × '+o.h.toFixed(0)+' mm · '+($('layoutScale').value==='fit'?'Fit drawing':'1:'+$('layoutScale').value)+' · '+state.entities.length+' entities'+(clipped?' · WARNING: drawing may be clipped at this scale':' · Vector PDF ready');
+  const preflight=cadPrintPreflight(o);
+  $('cadLayoutStatus').textContent=o.w.toFixed(0)+' × '+o.h.toFixed(0)+' mm · '+($('layoutScale').value==='fit'?'Fit drawing':'1:'+$('layoutScale').value)+' · '+preflight.visible+' entidades visibles'+(preflight.issues.length?' · AVISOS: '+preflight.issues.join(' · '):' · PDF vectorial listo');
  }catch(error){$('cadLayoutStatus').textContent='Layout preview error: '+error.message}
 }
 function switchCadSpace(space){
@@ -3787,12 +3813,15 @@ function initLayoutWorkspace(){
 function validateCadPdfExport(options){
  if(!options||![options.w,options.h,options.margin,options.factor].every(Number.isFinite)||options.w<10||options.h<10||options.w>5080||options.h>5080||options.margin<0||options.w<=2*options.margin||options.h<=2*options.margin||options.factor<=0)
   throw Error('Invalid paper, scale or margins. Check PDF plot settings.');
- const count=state.entities.filter(e=>layerFor(e).visible).length;
+ const preflight=cadPrintPreflight(options);
+ const count=preflight.visible;
  if(!count&&!window.confirm('This drawing has no visible geometry. Export an empty PDF sheet?'))return false;
  const drawW=(options.b.maxX-options.b.minX)*options.factor,drawH=(options.b.maxY-options.b.minY)*options.factor;
  const paperW=options.w-2*options.margin,paperH=options.h-2*options.margin;
  if((drawW>paperW+.01||drawH>paperH+.01)&&
     !window.confirm('The drawing exceeds the printable area at this scale. Parts will be clipped. Export the PDF anyway?'))return false;
+ const additional=preflight.issues.filter(x=>!x.includes('excede el área imprimible')&&!x.includes('no contiene geometría visible'));
+ if(additional.length&&!window.confirm('Avisos de preimpresión:\\n'+additional.join('\\n')+'\\n¿Exportar de todos modos?'))return false;
  return true;
 }
 function downloadCadPdf(options,filename){
@@ -3808,7 +3837,10 @@ function downloadCadPdf(options,filename){
 function openPrint(){$('printBackdrop').classList.add('show');updatePreview()}function updatePreview(){let o=plotOptions(),svg=makeSVG(o),scaleValue=$('plotScale').value,fixed=scaleValue!=='fit',actual=(o.b.maxX-o.b.minX)*o.factor,actualH=(o.b.maxY-o.b.minY)*o.factor,availableW=o.w-2*o.margin,availableH=o.h-2*o.margin,clipped=actual>availableW+.01||actualH>availableH+.01;
 $('printPreview').innerHTML=svg;
 $('plotInfo').textContent='Sheet: '+o.w.toFixed(0)+' × '+o.h.toFixed(0)+' mm · '+$('orientation').value+' · '+(fixed?'1:'+ (scaleValue==='custom'?$('customScale').value:scaleValue):'Fit to paper')+' · '+state.entities.length+' entities';
-const warning=$('plotWarning');warning.classList.toggle('plot-alert',clipped);$('plotAutoPaper').style.display=fixed&&clipped?'inline-block':'none';warning.textContent=clipped?'WARNING: The drawing exceeds the printable area at this scale. Use a larger sheet, smaller scale or Fit to paper.':'Vector PDF with exact sheet size. For actual dimensions, select Actual Size / 100% (not Fit to Page) in the printer dialog.';
+const preflight=cadPrintPreflight(o),warning=$('plotWarning');
+ warning.classList.toggle('plot-alert',preflight.issues.length>0);
+ $('plotAutoPaper').style.display=fixed&&clipped?'inline-block':'none';
+ warning.textContent=preflight.issues.length?'PREIMPRESIÓN: '+preflight.issues.join(' · '):'PDF vectorial con tamaño de hoja exacto. Al imprimir, usar Tamaño real / 100 %, no Ajustar a página.';
 const custom=$('paper').value==='CUSTOM';$('paperW').disabled=!custom;$('paperH').disabled=!custom;$('customScale').disabled=scaleValue!=='custom';
 } $('plotAutoPaper').onclick=()=>{const o=plotOptions();const neededW=Math.ceil((o.b.maxX-o.b.minX)*o.factor+2*o.margin+5),neededH=Math.ceil((o.b.maxY-o.b.minY)*o.factor+2*o.margin+5);$('paper').value='CUSTOM';$('paperW').value=Math.max(10,neededW);$('paperH').value=Math.max(10,neededH);$('orientation').value=neededW>=neededH?'landscape':'portrait';updatePreview()};$('pdfBtn').onclick=openPrint;$('closePrint').onclick=()=>$('printBackdrop').classList.remove('show');$('closeHelp').onclick=()=>$('helpBackdrop').classList.remove('show');document.querySelectorAll('#printBackdrop input,#printBackdrop select').forEach(x=>x.onchange=updatePreview);$('svgBtn').onclick=()=>download(`${state.file}.svg`,makeSVG(plotOptions()),'image/svg+xml');
 $('pngBtn').onclick=()=>{const o=plotOptions(),svg=makeSVG(o),img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));img.onload=()=>{const ratio=150/25.4;const c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);let cx=c.getContext('2d');cx.fillStyle='white';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);c.toBlob(b=>{if(b)download(`${state.file}.png`,b,'image/png');URL.revokeObjectURL(url)},'image/png')};img.onerror=()=>toast('PNG export failed');img.src=url};
