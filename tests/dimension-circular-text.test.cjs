@@ -40,7 +40,7 @@ test('toolbar exposes shadow and circle controls without changing the drawing',(
  for(const id of ['cadTextBarShadow','cadTextBarShadowColor','cadTextBarShadowOffset','cadTextBarPath','cadTextBarRadius','cadTextBarStartAngle','cadTextBarDirection'])assert.ok(html.includes('id="'+id+'"'),id);
  assert.match(html,/textShadowOffset/);
  assert.match(html,/function editCadDimensionText/);
- assert.match(html,/editCadDimensionText\(entity\)/);
+ assert.match(html,/function editCadDimensionText\(entity,anchor=null\)/);
 });
 
 test('dimension double-click opens complete inline editor with measured reference and restore',()=>{
