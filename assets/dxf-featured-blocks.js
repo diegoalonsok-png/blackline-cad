@@ -1,5 +1,5 @@
 /* Blackline CAD: architectural 2D adaptations for reliable block insertion.
- * Reference: user-provided BLOQUES OLIMPIADAS.dxf.
+ * Reference: user-provided architectural DXF block drawings.
  * These are simplified, dimensioned replacements, NOT literal reproductions of original geometry.
  */
 (()=>{
@@ -47,7 +47,7 @@ function preview(d){
 }
 function init(){
  const body=$('blBody'),api=window.BlacklineBlockAPI;if(!body||!api||$('blDxfFeatured'))return;
- const panel=document.createElement('section');panel.id='blDxfFeatured';panel.innerHTML='<h3 style="font-size:12px;margin:8px 0">Bloques arquitectónicos · DXF adaptado</h3><p style="font-size:10px;line-height:1.5">Cinco símbolos simplificados basados en categorías de BLOQUES OLIMPIADAS.dxf. No reproducen exactamente el original. Cuentan con pivote y dimensiones arquitectónicas definidas.</p><div id="blDxfFeaturedCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px"></div>';
+ const panel=document.createElement('section');panel.id='blDxfFeatured';panel.innerHTML='<h3 style="font-size:12px;margin:8px 0">Bloques arquitectónicos · DXF adaptado</h3><p style="font-size:10px;line-height:1.5">Cinco símbolos arquitectónicos esquemáticos. No reproducen exactamente el original. Cuentan con pivote y dimensiones arquitectónicas definidas.</p><div id="blDxfFeaturedCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px"></div>';
  const importArea=$('blDxfImportArea');if(importArea)importArea.before(panel);else body.prepend(panel);
  const cards=$('blDxfFeaturedCards');
  for(const d of defs){

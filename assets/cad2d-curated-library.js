@@ -1,4 +1,4 @@
-/* CAD2D · Curated library from user's BLOQUES OLIMPIADAS.dxf
+/* CAD2D · Importación opcional de bibliotecas históricas en JSON
  * No external API, no Autodesk assets. All thumbnails use the exact entities
  * passed to the CAD block engine, and insertion preserves their relative pivot.
  * Metric dimensions in the pack are provisional normalized display sizes.
@@ -87,8 +87,8 @@ function init(){
  if(!host||!api||$('cad2dReal50'))return;
  const section=document.createElement('section');section.id='cad2dReal50';
  section.style.cssText='border:1px solid #536b7c;border-radius:11px;margin:10px 0;padding:9px';
- section.innerHTML='<div style="font-weight:750;font-size:12px;margin-bottom:7px">50 BLOQUES REALES · OLIMPIADAS</div><p style="font-size:10px;line-height:1.5;margin:4px 0 8px">Cargá el archivo CAD2D_50_bloques_olimpiadas.json. Los símbolos proceden de tu DXF original y las miniaturas representan exactamente las mismas entidades que se insertan. Escala física normalizada provisoriamente: verificá medidas.</p><input type="file" id="cad2dReal50File" accept=".json,application/json" style="font-size:10px;width:100%"><div id="cad2dReal50Status" role="status" style="font-size:10px;margin:8px 0"></div><input id="cad2dReal50Search" type="search" placeholder="Buscar en 50 bloques…" style="width:100%;margin:5px 0" hidden><div id="cad2dReal50Tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0"></div><div id="cad2dReal50Grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:400px;overflow:auto"></div>';
- host.prepend(section);
+ section.innerHTML='<div style="font-weight:750;font-size:12px;margin-bottom:7px">IMPORTAR MÁS BLOQUES · JSON</div><p style="font-size:10px;line-height:1.5;margin:4px 0 8px">Opcional: añadí una biblioteca de bloques desde un archivo JSON compatible. Los bloques básicos ya están disponibles arriba, sin cargar archivos. Verificá las medidas del material importado.</p><input type="file" id="cad2dReal50File" accept=".json,application/json" style="font-size:10px;width:100%"><div id="cad2dReal50Status" role="status" style="font-size:10px;margin:8px 0"></div><input id="cad2dReal50Search" type="search" placeholder="Buscar en 50 bloques…" style="width:100%;margin:5px 0" hidden><div id="cad2dReal50Tabs" style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0"></div><div id="cad2dReal50Grid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:400px;overflow:auto"></div>';
+ host.append(section);
  const status=$('cad2dReal50Status'),input=$('cad2dReal50File'),tabs=$('cad2dReal50Tabs'),grid=$('cad2dReal50Grid'),search=$('cad2dReal50Search');
  function show(){
   tabs.replaceChildren();grid.replaceChildren();
@@ -111,10 +111,10 @@ function init(){
   if(file.size>3_000_000){status.textContent='El paquete seleccionado es demasiado grande. Usá la selección JSON de 50 bloques.';return}
   try{
    const pack=JSON.parse(await file.text());
-   if(pack.format!=='CAD2D-OLIMPIADAS-50'||!Array.isArray(pack.records)||pack.records.length!==50)throw Error('Seleccioná el paquete CAD2D de 50 bloques originales');
+   if(pack.format!=='CAD2D-OLIMPIADAS-50'||!Array.isArray(pack.records)||pack.records.length!==50)throw Error('Seleccioná un archivo de biblioteca JSON compatible con 50 registros');
    const prepared=pack.records.map(record=>{
     if(!Array.isArray(record)||typeof record[0]!=='string'||typeof record[1]!=='string'||!Array.isArray(record[4]))throw Error('Registro de bloque inválido');
-    return {record,geometry:unpack(record),key:'OLIMPIADAS REAL · '+record[0]};
+    return {record,geometry:unpack(record),key:'Biblioteca importada · '+record[0]};
    });
    let added=0;const factor=UNIT[api.unit()]||1;
    for(const item of prepared){

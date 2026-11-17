@@ -724,6 +724,52 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:42px 27px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 50px 28px!important}
  .app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){grid-template-rows:42px 27px 0 39px minmax(0,1fr) 50px 28px!important}
 }
+
+/* CAD layout: seven independent rows. A positioned ribbon resize handle must
+   never cover the text toolbar; commands and status keep their own tracks. */
+.app:has(> #cadTextToolbar):not(.cad-focus){
+ grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 42px minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){
+ grid-template-rows:48px 29px 0 42px minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar).cad-focus{
+ grid-template-rows:48px 0 0 0 minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar)>.brandbar{grid-row:1;min-height:0}
+.app:has(> #cadTextToolbar)>.tabbar{grid-row:2;min-height:0}
+.app:has(> #cadTextToolbar)>.ribbon-shell:not(.floating){grid-row:3;min-height:0;min-width:0;z-index:1}
+.app:has(> #cadTextToolbar)>#cadTextToolbar{
+ grid-row:4;position:relative;z-index:2;min-height:42px;height:42px;max-height:42px;
+ border-top:1px solid #596570;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+}
+.app:has(> #cadTextToolbar)>.workspace{grid-row:5;min-height:0;overflow:hidden}
+.app:has(> #cadTextToolbar)>.cmd{grid-row:6;min-height:0;overflow:hidden;justify-content:space-between;padding:4px 10px!important}
+.app:has(> #cadTextToolbar)>.status{grid-row:7;min-height:0;overflow-x:auto;overflow-y:hidden}
+.app:has(> #cadTextToolbar)>#ribbonSizer{
+ top:calc(48px + 29px + var(--ribbon-row-height,var(--ribbon-height,58px)) - 3px)!important;
+ height:6px;z-index:4;pointer-events:auto
+}
+.app.cad-hide-ribbon #ribbonSizer,.app.ribbon-undocked #ribbonSizer{display:none!important}
+.app .cmd .log{display:block!important;min-height:17px;height:17px!important;line-height:16px!important;overflow:hidden}
+.app .cmd .command-row{min-height:35px;display:flex;align-items:center;overflow:hidden}
+.app .cmd .command-row #command,.app .cmd .command-row b,
+.app .cmd .log,.app .status .coords{
+ font-family:"Courier New",Courier,Consolas,Monaco,monospace!important;
+ font-size:12px!important;font-variant-numeric:tabular-nums
+}
+.app .cmd .command-row input{min-width:0;flex:1;height:28px}
+@media(max-width:850px){
+ .app:has(> #cadTextToolbar):not(.cad-focus){
+  grid-template-rows:42px 27px var(--ribbon-row-height,var(--ribbon-height,58px)) 42px minmax(0,1fr) 64px 28px!important
+ }
+ .app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){
+  grid-template-rows:42px 27px 0 42px minmax(0,1fr) 64px 28px!important
+ }
+ .app:has(> #cadTextToolbar)>#ribbonSizer{
+  top:calc(42px + 27px + var(--ribbon-row-height,var(--ribbon-height,58px)) - 3px)!important
+ }
+}
 </style>
 </head>
 <body>
@@ -4826,6 +4872,66 @@ function initPermanentBlockGallery(){
  {id:'Car compact',cat:'Vehicles',w:1.8,h:4,draw:[['rect',.15,0,1.5,4],['rect',.3,1,1.2,2],['line',.3,1.6,1.5,1.6],['line',.3,2.5,1.5,2.5]]},
  {id:'Tree plan 200',cat:'Landscape',w:2,h:2,draw:[['circle',1,1,.95],['circle',1,1,.27],['line',.35,.65,1,1],['line',1,1,1.55,1.55]]}
  ];
+
+ /* Biblioteca nativa: simbología arquitectónica 2D esquemática en metros.
+    Las miniaturas se renderizan con las mismas entidades que se insertan. */
+ const add=(id,cat,w,h,draw)=>entries.push({id,cat,w,h,draw});
+ const door=(name,w,reverse=false)=>add(name,'Openings',w,w,[
+  ['rect',0,-.055,.055,.11],['rect',w-.055,-.055,.055,.11],
+  ['line',reverse?w-.055:.055,0,reverse?w-.055:.055,w-.06],
+  ['arc',reverse?w-.055:.055,0,w-.06,reverse?90:0,reverse?180:90]]);
+ const window2=(name,w,depth=.18,panes=1)=>{const d=[['rect',0,-depth/2,.055,depth],['rect',w-.055,-depth/2,.055,depth],['line',.055,-depth/2,w-.055,-depth/2],['line',.055,depth/2,w-.055,depth/2],['line',.055,0,w-.055,0]];for(let k=1;k<panes;k++)d.push(['rect',k*w/panes-.02,-depth/2,.04,depth]);add(name,'Openings',w,depth,d)};
+ const box=(name,cat,w,h)=>add(name,cat,w,h,[['rect',0,0,w,h],['rect',.08,.08,Math.max(.08,w-.16),Math.max(.08,h-.16)]]);
+ const circular=(name,cat,d)=>add(name,cat,d,d,[['circle',d/2,d/2,d/2],['circle',d/2,d/2,Math.max(.025,d*.12)]]);
+ door('Puerta 070 izquierda',.70);
+ door('Puerta 080 izquierda',.80);
+ door('Puerta 090 derecha',.90,true);
+ door('Puerta 100 izquierda',1);
+ door('Puerta 120 derecha',1.20,true);
+ door('Puerta interior 060',.60);
+ window2('Ventana 060 simple',.60);
+ window2('Ventana 090 simple',.90);
+ window2('Ventana 120 simple',1.20);
+ window2('Ventana 180 doble',1.80,.18,2);
+ window2('Ventana 300 triple',3,.20,3);
+ window2('Ventanal 360 triple',3.60,.20,3);
+ box('Cama individual 090 × 190','Furniture',.90,1.90);
+ box('Cama queen 160 × 200','Furniture',1.60,2);
+ box('Cama king 200 × 200','Furniture',2,2);
+ box('Mesa rectangular 120 × 080','Furniture',1.20,.80);
+ box('Mesa rectangular 240 × 100','Furniture',2.40,1);
+ box('Mesa de centro 110 × 060','Furniture',1.10,.60);
+ circular('Mesa redonda Ø 090','Furniture',.90);
+ circular('Mesa redonda Ø 150','Furniture',1.50);
+ box('Escritorio 140 × 070','Furniture',1.40,.70);
+ box('Escritorio 180 × 080','Furniture',1.80,.80);
+ box('Armario 120 × 060','Furniture',1.20,.60);
+ box('Armario 240 × 060','Furniture',2.40,.60);
+ box('Sofá dos plazas 160','Furniture',1.60,.85);
+ box('Sofá tres plazas 260','Furniture',2.60,.90);
+ box('Sillón individual 090','Furniture',.90,.85);
+ add('Silla comedor 050','Furniture',.50,.50,[['rect',0,0,.5,.5],['line',.07,.40,.43,.40]]);
+ add('Banqueta 040','Furniture',.40,.40,[['circle',.20,.20,.19],['circle',.20,.20,.04]]);
+ add('Inodoro compacto 036 × 065','Sanitary',.36,.65,[['rect',0,0,.36,.15],['ellipse',.18,.39,.16,.25]]);
+ add('Bidet 036 × 060','Sanitary',.36,.60,[['ellipse',.18,.30,.17,.27],['circle',.18,.13,.025]]);
+ add('Lavatorio oval 055','Sanitary',.55,.42,[['rect',0,0,.55,.42],['ellipse',.275,.21,.23,.17],['circle',.275,.04,.025]]);
+ add('Bacha doble 120','Sanitary',1.2,.55,[['rect',0,0,1.2,.55],['ellipse',.32,.28,.23,.20],['ellipse',.88,.28,.23,.20]]);
+ box('Ducha 080 × 080','Sanitary',.80,.80);
+ box('Ducha 090 × 120','Sanitary',.90,1.20);
+ box('Bañera 180 × 080','Sanitary',1.80,.80);
+ box('Receptáculo ducha 100','Sanitary',1,1);
+ add('Pileta cocina simple 060','Sanitary',.60,.50,[['rect',0,0,.60,.50],['rect',.09,.08,.42,.34],['circle',.30,.42,.02]]);
+ add('Pileta cocina doble 110','Sanitary',1.10,.50,[['rect',0,0,1.10,.50],['rect',.06,.08,.45,.34],['rect',.59,.08,.45,.34]]);
+ add('Auto mediano 180 × 440','Vehicles',1.8,4.4,[['rect',.12,0,1.56,4.4],['rect',.28,1.12,1.24,2.25],['line',.28,2.15,1.52,2.15]]);
+ add('Camioneta pickup 200 × 520','Vehicles',2,5.2,[['rect',.12,0,1.76,5.2],['rect',.25,.7,1.50,1.95],['line',.12,2.70,1.88,2.70]]);
+ add('Furgón utilitario 210 × 550','Vehicles',2.10,5.5,[['rect',.10,0,1.90,5.5],['rect',.28,3.20,1.54,1.50],['line',.10,3.05,2,3.05]]);
+ add('Motocicleta 080 × 210','Vehicles',.8,2.1,[['circle',.4,.35,.22],['circle',.4,1.75,.22],['line',.4,.35,.15,1],['line',.15,1,.4,1.75]]);
+ add('Bicicleta 065 × 180','Vehicles',.65,1.8,[['circle',.32,.28,.24],['circle',.32,1.52,.24],['line',.32,.28,.55,.92],['line',.55,.92,.32,1.52]]);
+ for(const [name,d] of [['Árbol chico Ø 150',1.5],['Árbol mediano Ø 300',3],['Árbol grande Ø 500',5],['Arbusto Ø 080',.8],['Arbusto Ø 120',1.2],['Cantero circular Ø 200',2]]){
+  add(name,'Landscape',d,d,[['circle',d/2,d/2,d*.48],['circle',d/2,d/2,d*.12],['line',d*.20,d*.25,d*.75,d*.80],['line',d*.28,d*.77,d*.77,d*.22]]);
+ }
+ box('Jardinera 120 × 040','Landscape',1.2,.4);
+ box('Cantero rectangular 200 × 060','Landscape',2,.6);
  const cats=[...new Set(entries.map(x=>x.cat))];
  let activeCategory=cats[0];
  const catIcons={Openings:'▯',Furniture:'▤',Sanitary:'◉',Vehicles:'▰',Landscape:'♧'};
@@ -4907,8 +5013,8 @@ function initPermanentBlockGallery(){
    renderBlockLibrary();queueLocalBackup()
   }
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
-  state.galleryRepeatedInsert=false;setTool('insertBlock');
-  $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar una copia';
+  setTool('insertBlock');state.galleryRepeatedInsert=true;
+  $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar · Esc para terminar';
   toast('Ready to insert at 1:1 · '+layer.name);
  }
  function showCards(){
