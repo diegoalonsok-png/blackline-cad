@@ -1718,7 +1718,7 @@ function cadWindowDepthEditor(ref,client){
  field.style.left=Math.max(8,Math.min(wrap.clientWidth-110,(a.x+b.x)/2+18))+'px';
  field.style.top=Math.max(8,Math.min(wrap.clientHeight-40,(a.y+b.y)/2-40))+'px';
  const close=()=>{overlay.remove();canvas.focus({preventScroll:true});schedule()};
- const commit=()=>{const value=field.value.trim().replace(',','.');if(!/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(value))return toast('Escribí 0.12 o 0.15');
+ const commit=()=>{const value=field.value.trim().replace(',','.');if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value))return toast('Escribí 0.12 o 0.15');
   const result=cadSetWindowDepth(ref,Number(value));if(!result.ok)return toast(result.reason);
   close();toast('Profundidad de ventana: '+result.depth.toFixed(2)+' m');
  };
@@ -5517,6 +5517,15 @@ function cadExportActiveBlock(){
  $('exportBlockBtn').click();
 }
 function initBlocks(){
+ // Upgrade only legacy definitions that never specified dynamic2d.
+ // Explicit user-disabled dynamic2d:false is preserved.
+ let upgraded=0;
+ for(const def of Object.values(state.blocks||{})){
+  if(def&&!def.parametric&&def.dynamic2d===undefined){
+   cadPrepareDynamicBlock(def);upgraded++;
+  }
+ }
+ if(upgraded)queueLocalBackup();
  renderBlockLibrary();
  $('createBlockBtn').onclick=()=>{
   const selected=state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
