@@ -724,6 +724,52 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:42px 27px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 50px 28px!important}
  .app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){grid-template-rows:42px 27px 0 39px minmax(0,1fr) 50px 28px!important}
 }
+
+/* CAD layout: seven independent rows. A positioned ribbon resize handle must
+   never cover the text toolbar; commands and status keep their own tracks. */
+.app:has(> #cadTextToolbar):not(.cad-focus){
+ grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 42px minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){
+ grid-template-rows:48px 29px 0 42px minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar).cad-focus{
+ grid-template-rows:48px 0 0 0 minmax(0,1fr) 64px 34px!important;
+}
+.app:has(> #cadTextToolbar)>.brandbar{grid-row:1;min-height:0}
+.app:has(> #cadTextToolbar)>.tabbar{grid-row:2;min-height:0}
+.app:has(> #cadTextToolbar)>.ribbon-shell:not(.floating){grid-row:3;min-height:0;min-width:0;z-index:1}
+.app:has(> #cadTextToolbar)>#cadTextToolbar{
+ grid-row:4;position:relative;z-index:2;min-height:42px;height:42px;max-height:42px;
+ border-top:1px solid #596570;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+}
+.app:has(> #cadTextToolbar)>.workspace{grid-row:5;min-height:0;overflow:hidden}
+.app:has(> #cadTextToolbar)>.cmd{grid-row:6;min-height:0;overflow:hidden;justify-content:space-between;padding:4px 10px!important}
+.app:has(> #cadTextToolbar)>.status{grid-row:7;min-height:0;overflow-x:auto;overflow-y:hidden}
+.app:has(> #cadTextToolbar)>#ribbonSizer{
+ top:calc(48px + 29px + var(--ribbon-row-height,var(--ribbon-height,58px)) - 3px)!important;
+ height:6px;z-index:4;pointer-events:auto
+}
+.app.cad-hide-ribbon #ribbonSizer,.app.ribbon-undocked #ribbonSizer{display:none!important}
+.app .cmd .log{display:block!important;min-height:17px;height:17px!important;line-height:16px!important;overflow:hidden}
+.app .cmd .command-row{min-height:35px;display:flex;align-items:center;overflow:hidden}
+.app .cmd .command-row #command,.app .cmd .command-row b,
+.app .cmd .log,.app .status .coords{
+ font-family:"Courier New",Courier,Consolas,Monaco,monospace!important;
+ font-size:12px!important;font-variant-numeric:tabular-nums
+}
+.app .cmd .command-row input{min-width:0;flex:1;height:28px}
+@media(max-width:850px){
+ .app:has(> #cadTextToolbar):not(.cad-focus){
+  grid-template-rows:42px 27px var(--ribbon-row-height,var(--ribbon-height,58px)) 42px minmax(0,1fr) 64px 28px!important
+ }
+ .app:has(> #cadTextToolbar).cad-hide-ribbon:not(.cad-focus){
+  grid-template-rows:42px 27px 0 42px minmax(0,1fr) 64px 28px!important
+ }
+ .app:has(> #cadTextToolbar)>#ribbonSizer{
+  top:calc(42px + 27px + var(--ribbon-row-height,var(--ribbon-height,58px)) - 3px)!important
+ }
+}
 </style>
 </head>
 <body>
