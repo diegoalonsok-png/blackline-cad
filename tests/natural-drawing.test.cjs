@@ -55,7 +55,7 @@ test('ESC cancels LINE without changing completed segments',()=>{
 });
 test('Escape shortcut calls cancel and Space completes active lines',()=>{
  assert.match(html,/if\(ev.key==='Escape'\)\{[^\n]*cancelCadCommand\(\);return/);
- assert.match(html,/if\(\['line','polyline'\]\.includes\(state\.tool\)&&state\.stage\.length\)\{finishStage\(\);return\}spaceDown=true/);
+ assert.match(html,/if\(\['line','polyline','wall2d'\]\.includes\(state\.tool\)&&state\.stage\.length\)\{finishStage\(\);return\}spaceDown=true/);
 });
 test('active command context menu uses same cancel path',()=>{
  assert.match(html,/item\('✕ Cancelar \/ Esc',\(\)=>cancelCadCommand\(\)\)/);
