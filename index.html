@@ -3749,7 +3749,7 @@ document.addEventListener('keydown',ev=>{
 async function download(name,data,mime='application/octet-stream'){
  const blob=data instanceof Blob?data:new Blob([data],{type:mime});
  const filename=String(name||'Dibujo.cadjson').replace(/[\\/:*?"<>|]/g,'_');
- const ext=(filename.match(/\\.[^.]+$/)||['.cadjson'])[0].toLowerCase();
+ const ext=(filename.match(/\.[^.]+$/)||['.cadjson'])[0].toLowerCase();
  const descriptions={'.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
  const mimeTypes={'.dxf':'application/dxf','.cadjson':'application/json','.svg':'image/svg+xml','.pdf':'application/pdf','.png':'image/png','.txt':'text/plain'};
  if(typeof window.showSaveFilePicker==='function'&&window.isSecureContext){
