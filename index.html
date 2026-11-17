@@ -5299,6 +5299,75 @@ function initPermanentBlockGallery(){
  /* Biblioteca nativa: simbología arquitectónica 2D esquemática en metros.
     Las miniaturas se renderizan con las mismas entidades que se insertan. */
  const add=(id,cat,w,h,draw)=>entries.push({id,cat,w,h,draw});
+ // Primer lote piloto de ambientes completos a escala real (metros).
+ // Son referencias únicas, compuestas por geometría vectorial 2D editable.
+ const rc=(x,y,w,h)=>['rect',x,y,w,h],rl=(x,y,a,b)=>['line',x,y,a,b];
+ const roomBase=(w,h,door=.8)=>{
+  const entry=Math.max(.12,(w-door)/2),th=.10;
+  return [
+   rl(0,0,entry,0),rl(entry+door,0,w,0),
+   rl(0,0,0,h),rl(w,0,w,h),rl(0,h,w,h),
+   rl(entry,0,entry,door),['arc',entry,0,door,0,90],
+   rl(0,th,entry,th),rl(entry+door,th,w,th),
+   rl(th,th,th,h-th),rl(w-th,th,w-th,h-th),
+   rl(th,h-th,w-th,h-th)
+  ];
+ };
+ const bath=(name,w,h,kind)=>{
+  const shapes=roomBase(w,h,.70);
+  // Zona sanitaria: inodoro, bacha con grifería y ducha/bañera.
+  shapes.push(rc(w-.60,h-.75,.44,.61),['ellipse',w-.38,h-.43,.18,.25],
+   rc(.17,h-.56,.58,.43),['ellipse',.46,h-.34,.20,.14],['circle',.46,h-.48,.025]);
+  if(kind==='tub')shapes.push(rc(.18,.90,w-.36,.74),rc(.28,1.00,w-.56,.54),['circle',.35,1.27,.026]);
+  else if(kind==='toilette')shapes.push(rc(.20,.70,.48,.32));
+  else shapes.push(rc(.15,.83,w-.30,Math.min(.95,h-1.02)),
+   rl(.15,.83,w-.15,Math.min(1.76,h-.19)),['circle',.38,1.04,.04]);
+  return shapes;
+ };
+ const bedroom=(name,w,h,bed=1.6,suite=false)=>{
+  const shapes=roomBase(w,h,.80),bx=(w-bed)/2;
+  shapes.push(rc(bx,h-2.18,bed,2),rc(bx+.08,h-2.08,bed/2-.12,.48),
+   rc(bx+bed/2+.04,h-2.08,bed/2-.12,.48),
+   rl(bx+.10,h-1.49,bx+bed-.10,h-1.49));
+  shapes.push(rc(.15,h-.56,.43,.42),rc(w-.58,h-.56,.43,.42),
+   rc(w-.73,.20,.58,1.60),rl(w-.73,.73,w-.15,.73),rl(w-.73,1.27,w-.15,1.27));
+  if(suite)shapes.push(rc(.20,.20,.84,.70),['ellipse',.61,.54,.24,.19]);
+  return shapes;
+ };
+ const kitchen=(name,w,h,layout)=>{
+  const shapes=roomBase(w,h,.80),counter=.64;
+  shapes.push(rc(.15,h-counter-.14,w-.30,counter),
+   rc(.25,h-.68,.52,.48),rc(w-.77,h-.67,.48,.46),
+   ['circle',w-.53,h-.47,.10],['circle',w-.53,h-.27,.10],
+   rl(.95,h-.14,.95,h-.78));
+  if(layout==='L'||layout==='U')shapes.push(rc(.15,.77,counter,h-1.55),
+   rl(.53,.82,.53,h-1.04));
+  if(layout==='U')shapes.push(rc(w-.79,.77,counter,h-1.55),rl(w-.44,.82,w-.44,h-1.04));
+  if(layout==='isla')shapes.push(rc(w*.25,h*.39,w*.5,.90),rc(w*.25+.11,h*.39+.10,w*.5-.22,.70));
+  if(layout==='lineal')shapes.push(rc(.18,.95,.65,.65));
+  return shapes;
+ };
+ const living=(name,w,h)=>{
+  const shapes=roomBase(w,h,1.00);
+  shapes.push(rc(.35,h-1.18,2.55,.92),rc(.49,h-1.03,2.25,.65),
+   rc(.42,h-1.13,.18,.75),rc(2.63,h-1.13,.18,.75),
+   rc(1.08,h-2.27,1.15,.64),rc(1.18,h-2.17,.95,.44),
+   rc(w-1.46,1.16,1.05,2.15),rc(w-1.34,1.30,.81,1.84));
+  return shapes;
+ };
+ const whole=(id,w,h,geometry)=>entries.push({id:'Ambiente completo · '+id,cat:'Rooms',w,h,draw:geometry,wholeRoom:true});
+ whole('Baño mínimo 150 x 220',1.50,2.20,bath('Baño mínimo',1.50,2.20,'shower'));
+ whole('Baño estándar 180 x 240',1.80,2.40,bath('Baño estándar',1.80,2.40,'shower'));
+ whole('Toilette 120 x 180',1.20,1.80,bath('Toilette',1.20,1.80,'toilette'));
+ whole('Baño con bañera 220 x 280',2.20,2.80,bath('Baño con bañera',2.20,2.80,'tub'));
+ whole('Dormitorio individual 320 x 350',3.20,3.50,bedroom('Individual',3.20,3.50,.90));
+ whole('Dormitorio matrimonial 400 x 450',4.00,4.50,bedroom('Matrimonial',4,4.50,1.60));
+ whole('Dormitorio en suite 500 x 500',5,5,bedroom('En suite',5,5,2,true));
+ whole('Cocina lineal 300 x 250',3,2.50,kitchen('Lineal',3,2.50,'lineal'));
+ whole('Cocina en L 350 x 300',3.50,3,kitchen('L',3.50,3,'L'));
+ whole('Cocina en U 400 x 350',4,3.50,kitchen('U',4,3.50,'U'));
+ whole('Cocina con isla 500 x 400',5,4,kitchen('Isla',5,4,'isla'));
+ whole('Living-comedor 600 x 500',6,5,living('Living comedor',6,5));
  const door=(name,w,reverse=false)=>add(name,'Openings',w,w,[
   ['rect',0,-.055,.055,.11],['rect',w-.055,-.055,.055,.11],
   ['line',reverse?w-.055:.055,0,reverse?w-.055:.055,w-.06],
@@ -5453,7 +5522,7 @@ function initPermanentBlockGallery(){
  }
  function install(x){
   const factor=U.m/U[state.unit];
-  const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e']}[x.cat];
+  const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e'],Rooms:['BL_ROOMS','#e4c8a1']}[x.cat];
   if(!info)return toast('Unknown block category');
   const key=x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id,already=Boolean(state.blocks[key]);
   let layer=state.layers.find(l=>l.name===info[0]);
@@ -5481,6 +5550,7 @@ function initPermanentBlockGallery(){
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion)}:{})
    }}:null;
    state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})});
+   if(x.wholeRoom){state.blocks[key].dynamic2d=false;state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
    renderBlockLibrary();queueLocalBackup()
   }
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
@@ -5497,7 +5567,7 @@ function initPermanentBlockGallery(){
    if(x.kind)button.dataset.dynamic='true';
    button.setAttribute('aria-label','Insert '+x.id+' at 1:1');
    button.title=x.id+' · ancho '+x.w+' m · marco paramétrico 0,05 m · clic para insertar';
-   button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.kind?'<span style="font-size:9px;display:block;color:#9cdeed">↔ PARAMÉTRICO</span>':'');
+   button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.kind?'<span style="font-size:9px;display:block;color:#9cdeed">↔ PARAMÉTRICO</span>':x.wholeRoom?'<span style="font-size:9px;display:block;color:#9cdeed">AMBIENTE · BLOQUE ÚNICO</span>':'');
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
    button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{install(x);for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
