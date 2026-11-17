@@ -3385,7 +3385,8 @@ canvas.addEventListener('pointerup',ev=>{
  if(d.type==='selection'){if(dist(d.path.at(-1),raw)>0.5)d.path.push(P(raw.x,raw.y));cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
  const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('pointercancel',ev=>{
- const d=state.drag;if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
+ const d=state.drag;if(d?.type==='openingResize'){state.drag=null;canvas.style.cursor='';schedule();return}
+ if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
  if(d?.type==='selection'||d?.type==='selectionStart'||d?.type==='selectionSecond'){state.drag=null;cadSelectionAnchor=null;cadSelectionAnchorShift=false;schedule();return}
  if(d?.type!=='blockGrip')return;
  state.drag=null;canvas.style.cursor='';
