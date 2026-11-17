@@ -3201,7 +3201,32 @@ canvas.addEventListener('pointercancel',ev=>{
   updateAll();
  }else schedule();
 });
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+function editCadTextInline(entity,anchor){
+ if(!entity||entity.type!=='text'||!state.entities.includes(entity))return;
+ if(layerFor(entity).locked||!layerFor(entity).visible){toast('Desbloqueá la capa para editar el texto');return}
+ document.getElementById('cadInlineTextEditor')?.remove();
+ const box=document.createElement('div');box.id='cadInlineTextEditor';box.setAttribute('role','dialog');box.setAttribute('aria-label','Editar texto directamente');
+ box.style.cssText='position:fixed;z-index:100002;min-width:260px;width:min(440px,calc(100vw - 20px));padding:10px;background:#202830;color:#eef4f8;border:1px solid #7fa7bb;border-radius:8px;box-shadow:0 12px 32px #000a;font:12px Arial,sans-serif';
+ const heading=document.createElement('div');heading.textContent='EDITAR TEXTO · Doble clic';heading.style.cssText='font-weight:bold;margin-bottom:7px';
+ const field=document.createElement('textarea');field.value=String(entity.text||'');field.rows=Math.max(2,Math.min(7,field.value.split('\n').length));field.setAttribute('aria-label','Contenido del texto');field.style.cssText='width:100%;box-sizing:border-box;min-height:56px;resize:vertical;background:#111a21;color:#fff;border:1px solid #698596;border-radius:5px;padding:8px;font:15px Arial,sans-serif';
+ const hint=document.createElement('div');hint.textContent='Ctrl+Enter guarda · Esc cancela';hint.style.cssText='margin:7px 0;color:#afc2cc';
+ const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+ const makeButton=(label)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='padding:6px 11px;border:1px solid #728a98;border-radius:5px;background:#35434c;color:white;cursor:pointer';return b};
+ const cancel=makeButton('Cancelar'),save=makeButton('Guardar');save.style.background='#356981';
+ const close=()=>{box.remove();canvas.focus({preventScroll:true})};
+ cancel.addEventListener('click',close);
+ save.addEventListener('click',()=>{
+  if(!state.entities.includes(entity))return close();
+  if(field.value!==String(entity.text||'')){saveHistory();entity.text=field.value;syncTextPanel(entity);updateAll();toast('Texto actualizado');}
+  close();
+ });
+ field.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close()}else if(ev.key==='Enter'&&(ev.ctrlKey||ev.metaKey)){ev.preventDefault();ev.stopPropagation();save.click()}});
+ box.append(heading,field,hint,actions);actions.append(cancel,save);document.body.append(box);
+ box.style.left=Math.max(8,Math.min(anchor.x,window.innerWidth-box.offsetWidth-8))+'px';
+ box.style.top=Math.max(8,Math.min(anchor.y+12,window.innerHeight-box.offsetHeight-8))+'px';
+ field.focus();field.select();
+}
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();editCadTextInline(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
   if(!boxes.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
