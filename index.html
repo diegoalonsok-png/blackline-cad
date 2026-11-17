@@ -3168,7 +3168,7 @@ const CAD2D_TYPED_ALIASES={
  AL:'EXTEND',ALARGA:'EXTEND',ALARGAR:'EXTEND',DF:'OFFSET',DES:'OFFSET',DESFASE:'OFFSET',
  SI:'MIRROR',SIM:'MIRROR',SIMETRIA:'MIRROR',MP:'FILLET',EMP:'FILLET',EMPALME:'FILLET',
  ES:'SCALE',ESCALA:'SCALE',ESCALAR:'SCALE',EI:'STRETCH',ESTIRA:'STRETCH',ESTIRAR:'STRETCH',
- BOR:'ERASE',BORRAR:'ERASE',DP:'EXPLODE',DESCOMP:'EXPLODE',DESCOMPONER:'EXPLODE',
+ B:'ERASE',BOR:'ERASE',BORRAR:'ERASE',DP:'EXPLODE',DESCOMP:'EXPLODE',DESCOMPONER:'EXPLODE',
  UNIR:'JOIN',BQ:'BLOCK',BL:'BLOCK',BLOQUE:'BLOCK',BLOC:'BLOCK',CA:'LAYER',CAPA:'LAYER',CAPAS:'LAYER',
  ACO:'DIM',ACOTAR:'DIM',TXT:'TEXT',TXM:'TEXT',TM:'TEXT',
  ZW:'ZOOM',ZOOMVENTANA:'ZOOM',ZE:'ZOOMEXTENTS',ENCUADRAR:'ZOOMEXTENTS',
@@ -3214,7 +3214,7 @@ const CAD_COMMANDS=[
  ['TRIM','TR / RR / RECORTAR','Recortar con clic o barrido de dos puntos'],['BREAK','BR','Remove part of a straight line between two points'],['LENGTHEN','LEN','Change a LINE length at chosen end'],['PEDIT','PE','Edit polyline vertex geometry'],['EXTEND','EX','Extend to line boundary'],
  ['FILLET','F','Radius fillet'],['CHAMFER','CHA','Equal-distance bevel'],
  ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
- ['EXPLODE','X','Separate polyline into lines'],['ERASE','E','Erase entity'],['SELECTALL','','Seleccionar todos los objetos visibles'],['SELECTINVERT','','Invertir selección'],['DESELECT','','Quitar la selección'],
+ ['EXPLODE','X','Separate polyline into lines'],['ERASE','B / E / BOR','Erase entity'],['SELECTALL','','Seleccionar todos los objetos visibles'],['SELECTINVERT','','Invertir selección'],['DESELECT','','Quitar la selección'],
  ['DIMALIGNED','DAL','Aligned dimension'],
  ['DIMSTYLE','D','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
@@ -3223,7 +3223,7 @@ const CAD_COMMANDS=[
  ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
  ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
  ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
- ['BLOCK','B / BL / BQ','Create reusable block'],['INSERT','','Insert from existing library'],['IMPORTBLOCK','I','Import block from desktop'],
+ ['BLOCK','BL / BQ','Create reusable block'],['INSERT','','Insert from existing library'],['IMPORTBLOCK','I','Import block from desktop'],
  ['WBLOCK','W','Export selected block'],['UNITS','','Change model units'],['SVG','','Export drawing as SVG vector'],['EXPORTMENU','','Open export formats'],
  ['PAN','P','Pan model space'],
  ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
@@ -3503,7 +3503,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){if(window.confirm('Create a new drawing? Save your current work first.')){saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];state.file='Untitled Drawing';state.nextId=1;renderBlockLibrary();updateAll();zoomExtents()}return}
  if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(cmd))return cadEditBlockDefinition(cadActiveBlockRef()?.blockName||$('blockLibrary').value);
- if(cmd==='BLOCK'||cmd==='B')return $('createBlockBtn').click();
+ if(cmd==='BLOCK')return $('createBlockBtn').click();
  if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
  if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
