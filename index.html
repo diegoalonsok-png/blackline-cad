@@ -1566,7 +1566,7 @@ function cadOpeningQuickGrips(ref){
  if(!(width>0))return [];
  const theta=(Number(ref.rotation)||0)*Math.PI/180;
  const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
- return [{action:'mirror',x:p.x-29,y:p.y-35},{action:'swing',x:p.x,y:p.y-35},{action:'rotate',x:p.x+29,y:p.y-35}];
+ return [{action:'mirror',x:p.x-44,y:p.y-35},{action:'swing',x:p.x-15,y:p.y-35},{action:'rotate',x:p.x+14,y:p.y-35},{action:'resize',x:p.x+43,y:p.y-35}];
 }
 function cadOpeningQuickHit(raw){
  for(const id of state.selected){
@@ -1586,6 +1586,52 @@ function cadOpeningQuickApply(grip){
  if(grip.action==='rotate')ref.rotation=((Number(ref.rotation)||0)+90)%360;
  updateAll();toast('Bloque dinámico: '+({mirror:'espejo lateral',swing:'inversión de apertura',rotate:'giro +90°'}[grip.action])+' · Ctrl+Z para deshacer');
 }
+function cadOpeningWidthMeters(ref){
+ const def=state.blocks?.[ref?.blockName];
+ return Number(ref.params?.width??def?.parametric?.defaults?.width)*(Number(ref.scale)||1)*U[state.unit]/1000;
+}
+function cadResizeOpening(ref,meters){
+ const def=state.blocks?.[ref?.blockName],kind=def?.parametric?.kind;
+ if(!['swing-door','double-door','framed-window'].includes(kind)||layerFor(ref).locked)return {ok:false,reason:'Abertura no editable'};
+ const current=Number(ref.params?.width??def.parametric.defaults.width),scale=Number(ref.scale)||1;
+ const target=Number(meters),next=target*1000/U[state.unit]/scale,ratio=next/current;
+ if(!(target>=.20&&target<=20&&Number.isFinite(next)&&next>0&&current>0))return {ok:false,reason:'Ancho inválido: usá entre 0.20 y 20 metros'};
+ if(Math.abs(ratio-1)<1e-9)return {ok:true,width:target,unchanged:true};
+ const snapshot=historySnapshot(),hadWall=state.entities.some(e=>e.autoOpeningRef===ref.id);
+ const params={...def.parametric.defaults,...ref.params,width:next};
+ if(kind==='framed-window'){
+  if(!(Number(params.frameWidth)>0&&Number(params.frameWidth)<next*.2&&Number(params.frameDepth)>0&&Number(params.frameDepth)<next*.6))return {ok:false,reason:'Ancho menor que el marco permitido'};
+ }else{
+  params.frameWidth=Number(params.frameWidth)*ratio;
+  params.frameDepth=Number(params.frameDepth)*ratio;
+ }
+ saveHistory();ref.params=params;
+ const result=relocateOpeningWithBlock(ref,clone(ref.p));
+ if(!result.ok||(hadWall&&!result.cut)){
+  Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();updateAll();
+  return {ok:false,reason:'No se puede actualizar el vano: operación cancelada'};
+ }
+ updateAll();return {ok:true,width:target,cut:result.cut};
+}
+function cadOpeningResizeEditor(ref,client){
+ document.getElementById('cadOpeningResizeEditor')?.remove();
+ const panel=document.createElement('section');panel.id='cadOpeningResizeEditor';panel.setAttribute('role','dialog');
+ panel.setAttribute('aria-label','Introducir ancho real en metros');
+ panel.style.cssText='position:fixed;z-index:100010;width:260px;padding:12px;background:#17232d;color:#eaf5ff;border:1px solid #83d9f4;border-radius:8px;box-shadow:0 12px 36px #000a;font:12px Arial,sans-serif';
+ const title=document.createElement('strong');title.textContent='ANCHO · metros';
+ const input=document.createElement('input');input.type='number';input.step='.01';input.min='.20';input.max='20';
+ input.value=cadOpeningWidthMeters(ref).toFixed(3);input.style.cssText='box-sizing:border-box;width:100%;margin:10px 0;padding:8px;background:#0b1720;color:#fff;border:1px solid #79a8c1;border-radius:5px;font-size:16px';
+ const note=document.createElement('p');note.textContent='0.90 = 90 cm. La puerta escala proporcionalmente; la ventana se estira a lo ancho.';
+ const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+ const button=label=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='padding:6px 10px;border:1px solid #79a8c1;border-radius:5px;background:#294b61;color:white;cursor:pointer';return b};
+ const cancel=button('Cancelar'),apply=button('Aplicar');
+ const close=()=>{panel.remove();canvas.focus({preventScroll:true})};
+ cancel.onclick=close;apply.onclick=()=>{const outcome=cadResizeOpening(ref,Number(input.value));if(!outcome.ok)return toast(outcome.reason);close();toast('Ancho actualizado: '+outcome.width.toFixed(2)+' m')};
+ input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();apply.click()}else if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close()}});
+ actions.append(cancel,apply);panel.append(title,input,note,actions);document.body.append(panel);
+ panel.style.left=Math.max(8,Math.min(client.x,innerWidth-panel.offsetWidth-8))+'px';panel.style.top=Math.max(8,Math.min(client.y+12,innerHeight-panel.offsetHeight-8))+'px';
+ input.focus();input.select();
+}
 function cadDrawOpeningQuickGrips(ref){
  const grips=cadOpeningQuickGrips(ref);if(!grips.length)return;
  ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.4;ctx.textAlign='center';ctx.textBaseline='middle';
@@ -1593,7 +1639,7 @@ function cadDrawOpeningQuickGrips(ref){
   ctx.fillStyle='#112b3c';ctx.strokeStyle='#80e2ff';
   ctx.fillRect(grip.x-10,grip.y-10,20,20);ctx.strokeRect(grip.x-10,grip.y-10,20,20);
   ctx.fillStyle='#80e2ff';ctx.font='bold 16px Arial';
-  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':'↻',grip.x,grip.y+1);
+  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':grip.action==='resize'?'⇔':'↻',grip.x,grip.y+1);
  }
  ctx.restore();
 }
@@ -3229,7 +3275,13 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
   const openingGrip=cadOpeningQuickHit(raw);
-  if(openingGrip){cadOpeningQuickApply(openingGrip);return}
+  if(openingGrip){
+    if(openingGrip.action==='resize'){
+     const ref=state.entities.find(e=>e.id===openingGrip.id);
+     state.drag={type:'openingResize',id:openingGrip.id,start:raw,last:raw,startWidth:cadOpeningWidthMeters(ref)};return;
+    }
+    cadOpeningQuickApply(openingGrip);return;
+   }
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
    const entity=state.entities.find(e=>e.id===wallGrip.id);
@@ -3257,6 +3309,8 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
     state.snapOn?state.grid:0);
    if(shift){d.shift=shift;d.preview=BlacklineWallGrip.shifted(d.original,shift)}
   }
+ }else if(d.type==='openingResize'){
+  canvas.style.cursor='ew-resize';
  }else if(d.type==='blockGrip'){
   const obj=state.entities.find(e=>e.id===d.id);
   if(obj&&obj.type==='blockRef'&&!layerFor(obj).locked){
@@ -3282,6 +3336,14 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
+ if(d.type==='openingResize'){
+  canvas.style.cursor='';const ref=state.entities.find(e=>e.id===d.id);
+  if(!ref)return;
+  if(Math.hypot(raw.x-d.start.x,raw.y-d.start.y)<6){cadOpeningResizeEditor(ref,{x:ev.clientX,y:ev.clientY});return}
+  const theta=(Number(ref.rotation)||0)*Math.PI/180,a=world(d.start),b=world(raw);
+  const width=d.startWidth+((b.x-a.x)*Math.cos(theta)+(b.y-a.y)*Math.sin(theta))*U[state.unit]/1000;
+  const outcome=cadResizeOpening(ref,width);toast(outcome.ok?'Ancho: '+width.toFixed(2)+' m':outcome.reason);return;
+ }
  if(d.type==='wallMiddleGrip'){
   canvas.style.cursor='';
   if(d.preview&&Math.abs(d.shift?.displacement||0)>1e-9){
