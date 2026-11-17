@@ -1846,11 +1846,12 @@ function initTypographyPalette(){
  for(const id of ['textValue','textFont','textHeight','textAngle','textWeight','textItalic','textUnderline','textHighlight','textHighlightColor'])$(id).addEventListener('input',updateFontPreview);
  $('placeTextBtn').onclick=()=>{setTool('text');toast('Click in model space to place text')};
  $('applyTextBtn').onclick=()=>{
-  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='text');
-  if(!selected.length){toast('Select one or more text entities first');return}
-  const next=getTextStyleFromPanel();saveHistory();
-  for(const e of selected)Object.assign(e,next);
-  updateAll();toast('Updated '+selected.length+' text objects');
+  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='text'&&layerFor(e).visible&&!layerFor(e).locked);
+  if(!selected.length){toast('Seleccioná uno o más textos desbloqueados');return}
+  const next=getTextStyleFromPanel();
+  if(!selected.some(e=>Object.entries(next).some(([key,value])=>e[key]!==value)))return toast('El texto ya tiene estas propiedades');
+  saveHistory();for(const e of selected)Object.assign(e,next);
+  updateAll();toast('Texto y formato actualizados · '+selected.length);
  };
  updateFontPreview();
 }
@@ -5765,16 +5766,42 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
  toggle('cadTextBarUnderline','textUnderline',true);toggle('cadTextBarHighlight','textHighlight',true);
  $('cadTextBarShadow').onclick=()=>{const button=$('cadTextBarShadow');button.setAttribute('aria-pressed',String(button.getAttribute('aria-pressed')!=='true'));updateFontPreview()};
  for(const id of ['cadTextBarShadowColor','cadTextBarShadowOffset','cadTextBarPath','cadTextBarRadius','cadTextBarStartAngle','cadTextBarDirection'])$(id).addEventListener('input',updateFontPreview);
- const syncFromPalette=()=>{for(const [bar,palette] of pairs)if($(bar)&&$(palette))$(bar).value=$(palette).value;
+ const syncFromPalette=()=>{
+  for(const [bar,palette] of pairs)if($(bar)&&$(palette))$(bar).value=$(palette).value;
   for(const [bar,palette,active] of [['cadTextBarBold','textWeight','bold'],['cadTextBarItalic','textItalic','italic'],['cadTextBarUnderline','textUnderline',true],['cadTextBarHighlight','textHighlight',true]]){
    const field=$(palette);$(bar).setAttribute('aria-pressed',String(field.type==='checkbox'?field.checked:field.value===active));
   }
  };
+ // All text properties act immediately on the selected text. Text content remains
+ // explicit (Apply / inline editor) so typing a new annotation cannot overwrite one.
+ const selectedText=()=>state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='text'&&layerFor(e).visible&&!layerFor(e).locked);
+ const applyTextFormatting=()=>{
+  const selected=selectedText();if(!selected.length)return;
+  const style=getTextStyleFromPanel();delete style.text;
+  const changed=selected.some(entity=>Object.entries(style).some(([key,value])=>entity[key]!==value));
+  if(!changed)return;
+  saveHistory();for(const entity of selected)Object.assign(entity,style);
+  updateAll();toast('Formato actualizado · '+selected.length+' texto(s)');
+ };
+ const immediateFields=['cadTextBarFont','cadTextBarHeight','cadTextBarAngle','cadTextBarHighlightColor','cadTextBarShadowColor','cadTextBarShadowOffset','cadTextBarPath','cadTextBarRadius','cadTextBarStartAngle','cadTextBarDirection'];
+ for(const id of immediateFields)$(id)?.addEventListener('change',applyTextFormatting);
+ for(const id of ['cadTextBarBold','cadTextBarItalic','cadTextBarUnderline','cadTextBarHighlight','cadTextBarShadow'])$(id)?.addEventListener('click',applyTextFormatting);
+ // Show the actual properties of a newly selected object in the top bar.
+ let lastTextSelection='';
+ const originalUpdateProps=updateProps;
+ updateProps=function(){
+  originalUpdateProps();
+  const selected=selectedText(),key=selected.map(e=>e.id).join(',');
+  if(key===lastTextSelection)return;
+  lastTextSelection=key;
+  if(selected.length===1){syncTextPanel(selected[0]);syncFromPalette()}
+ };
+
  $('cadTextBarPlace').addEventListener('click',()=>{
   if(!$('cadTextBarValue').value.trim())return toast('Escribí un texto antes de colocarlo');
   $('placeTextBtn').click();canvas.focus({preventScroll:true});
  });
- $('cadTextBarApply').addEventListener('click',()=>{$('applyTextBtn').click();});
+ $('cadTextBarApply').addEventListener('click',()=>{$('applyTextBtn').click();syncFromPalette()});
  $('cadTextBarEdit').addEventListener('click',()=>{
   const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='text');
   if(selected.length!==1)return toast('Seleccioná exactamente un texto para editar');
@@ -5785,7 +5812,7 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
  $('cadTextBarImport').addEventListener('click',()=>$('importTextNotes').click());
  $('cadTextBarExport').addEventListener('click',()=>$('exportTextNotes').click());
  $('cadTextBarPalette').addEventListener('click',()=>openCadPaletteByTitle('Text / Typography'));
- $('cadTextBarValue').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();$('cadTextBarPlace').click()}});
+ $('cadTextBarValue').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();if(selectedText().length)$('cadTextBarApply').click();else $('cadTextBarPlace').click()}});
  syncFromPalette();
  })();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
