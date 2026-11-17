@@ -261,7 +261,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .ribbon .group:after{font-size:9px;line-height:12px;bottom:0}
 #ribbonSizer{top:calc(48px + 36px + var(--ribbon-height,88px) - 4px)}
 .panel-title{padding:6px 9px}
-#cadContextMenu{position:fixed;z-index:999;background:#202428;border:1px solid #515962;box-shadow:0 12px 32px #000b;border-radius:7px;min-width:200px;padding:5px;display:none;color:#e4e8eb;font:12px -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
+#cadContextMenu{max-height:calc(100vh - 16px);overflow-y:auto;position:fixed;z-index:999;background:#202428;border:1px solid #515962;box-shadow:0 12px 32px #000b;border-radius:7px;min-width:200px;padding:5px;display:none;color:#e4e8eb;font:12px -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
 #cadContextMenu.open{display:block}
 #cadContextMenu button{display:flex;width:100%;align-items:center;text-align:left;border:0;background:transparent;border-radius:4px;color:inherit;padding:9px 10px;cursor:pointer}
 #cadContextMenu button:hover{background:#353c44}
@@ -692,6 +692,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-text-toolbar button{height:30px;border:1px solid #58616b;border-radius:5px;background:#333b45;color:#f0f4f7;cursor:pointer;padding:3px 9px}
 .cad-text-toolbar button[aria-pressed="true"]{background:#537b95;color:white;border-color:#a1d9f4}
 @media(max-width:720px){.cad-text-toolbar{max-height:105px;overflow:auto}.cad-text-toolbar #cadTextBarValue{flex-basis:100%}}
+.app.cad-clean-screen .workspace>.sidebar,.app.cad-clean-screen #leftDivider,.app.cad-clean-screen #rightDivider,
+.app.cad-clean-screen .ribbon-shell,.app.cad-clean-screen #ribbonSizer,
+.app.cad-clean-screen #cadTextToolbar{display:none!important}
+.app.cad-clean-screen .workspace{grid-template-columns:minmax(0,1fr)!important}
+.app.cad-clean-screen .canvas-wrap{grid-column:1/-1!important}
 /* Keep extra CAD status controls accessible without crowding the drawing. */
 .app .status{overflow-x:auto!important;overflow-y:hidden!important;white-space:nowrap!important;scrollbar-width:thin}
 .app .status button,.app .status .hint,.app .status .coords,.app .status .cad-snap-live{flex-shrink:0}
@@ -3499,6 +3504,13 @@ function cad2dToggleCommandHistory(){
  pre.textContent=state.logs.length?state.logs.slice(-100).join('\n'):'Sin comandos registrados';
  box.append(head,pre);document.body.append(box);close.focus();
 }
+function cad2dToggleCleanScreen(){
+ const app=document.querySelector('.app');
+ const enabled=!app.classList.contains('cad-clean-screen');
+ app.classList.toggle('cad-clean-screen',enabled);
+ resize();schedule();
+ toast(enabled?'Pantalla limpia · Ctrl+0 restaura paneles':'Paneles restaurados');
+}
 function cad2dToggleCommandBar(){
  const bar=document.querySelector('.command-row'),parent=bar?.parentElement;
  if(!bar||!parent)return toast('Barra de comandos no disponible');
@@ -3511,6 +3523,14 @@ document.addEventListener('keydown',ev=>{
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='a'&&!isEditing&&document.activeElement===canvas){ev.preventDefault();selectAllCad();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key==='1'){ev.preventDefault();openCadQuickProperties();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key==='9'){ev.preventDefault();cad2dToggleCommandBar();return}
+ // Mode shortcuts compatible with AutoCAD; do not override editing in text fields.
+ if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&!ev.shiftKey&&!isEditing){
+  const mode={b:['snapOn','snapToggle'],g:['gridOn','gridToggle'],l:['orthoOn','orthoToggle'],f:['osnapOn','osnapToggle']};
+  const key=ev.key.toLowerCase();
+  if(mode[key]){ev.preventDefault();toggle(...mode[key]);return}
+  if(key==='u'){ev.preventDefault();togglePolar();return}
+  if(key==='0'){ev.preventDefault();cad2dToggleCleanScreen();return}
+ }
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='n'){ev.preventDefault();$('command').value='NEW';runCommand();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='o'){ev.preventDefault();openFile();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();saveJSON();return}
@@ -4028,6 +4048,7 @@ function openCadContextMenu(x,y,worldPoint){
  const count=state.selected.length,active=state.tool!=='select'&&state.tool!=='pan';
  const blockTarget=target?.type==='blockRef'?target:cadActiveBlockRef();
  const title=active?'Comando activo · '+state.tool:count?'Selección · '+count+' objeto(s)':'Espacio modelo';
+ const selectedText=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='text'):null;
  const item=(label,action,disabled=false)=>({label,action,disabled});
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
  const actions=active?[
@@ -4035,7 +4056,8 @@ function openCadContextMenu(x,y,worldPoint){
    item('✕ Cancelar / Esc',()=>cancelCadCommand()),
    item('Deshacer último paso',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
    null,
-   command('Recortar · TR','TRIM'),command('Desfase · O','OFFSET'),
+   ...(cad2dLastCommand?[command('Repetir último: '+cad2dLastCommand,cad2dLastCommand)]:[]),
+    command('Recortar · TR','TRIM'),command('Desfase · O','OFFSET'),
    command('Zoom ventana · Z','Z'),
    item('Zoom extensión · ZE',()=>zoomExtents()),
  ]:count?[
@@ -4044,8 +4066,17 @@ function openCadContextMenu(x,y,worldPoint){
    command('Simetría · MI','MIRROR'),command('Desfase · O','OFFSET'),
    null,
    ...(blockTarget?[item('Editar bloque · BEDIT',()=>cadEditBlockDefinition(blockTarget.blockName)),item('Exportar bloque · W',()=>cadExportActiveBlock())]:[]),
-   item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+   ...(selectedText?[item('Editar texto · ED',()=>{syncTextPanel(selectedText);openCadPaletteByTitle('Text / Typography');})]:[]),
+    item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+    command('Seleccionar similares','SELECTSIMILAR'),
+    command('Invertir selección','SELECTINVERT'),
+    command('Copiar a otra capa','COPYTOLAYER'),
+    command('Cambiar de capa','CHANGELAYER'),
+    command('Igualar propiedades · MA','MATCHPROP'),
+    command('Descomponer · X','EXPLODE'),
    item('Copiar al portapapeles · Ctrl+C',()=>copySelectedCadObjects()),
+    item('Cortar al portapapeles · Ctrl+X',()=>cutSelectedCadObjects()),
+    item('Pegar · Ctrl+V',()=>pasteCadObjects(),!cadClipboard.length),
    command('Crear bloque · B','BLOCK'),
    item('Borrar selección · E',()=>eraseSelected()),
    item('Deseleccionar',()=>{state.selected=[];updateProps();schedule()}),
@@ -4056,6 +4087,8 @@ function openCadContextMenu(x,y,worldPoint){
    command('Desfase · O','OFFSET'),command('Recortar · TR','TRIM'),
    null,
    item('Pegar objetos · Ctrl+V',()=>pasteCadObjects(),!cadClipboard.length),
+    command('Seleccionar todo · Ctrl+A','SELECTALL'),
+    command('Agregar texto · T','TEXT'),
    command('Insertar bloque · I','INSERT'),
    command('Capas · LA','LAYER'),
    item('Zoom ventana · Z',()=>setTool('zoomWindow')),
@@ -4063,11 +4096,16 @@ function openCadContextMenu(x,y,worldPoint){
    item('Encuadre · PAN',()=>setTool('pan')),
  ];
  actions.push(null,
+  item('Deshacer · Ctrl+Z',()=>undo(),!state.history.length),
+  item('Rehacer · Ctrl+Y',()=>redo(),!state.future.length),
+  item('Pantalla limpia · Ctrl+0',()=>cad2dToggleCleanScreen()),
+  null,
   item('Ortogonal · F8'+(state.orthoOn?' ✓':''),()=>toggle('orthoOn','orthoToggle')),
   item('OSNAP · F3'+(state.osnapOn?' ✓':''),()=>toggle('osnapOn','osnapToggle')),
   item('Polar · F10'+(state.polarOn?' ✓':''),()=>togglePolar()),
   item('Rastreo OSNAP · F11'+(otrkOn?' ✓':''),()=>toggleOtrack()),
   item('Rejilla · F7'+(state.gridOn?' ✓':''),()=>toggle('gridOn','gridToggle')),
+  item('SNAP · F9'+(state.snapOn?' ✓':''),()=>toggle('snapOn','snapToggle')),
   null,
   item('Historial de comandos · F2',()=>cad2dToggleCommandHistory()),
   item('Ayuda · F1',()=>$('helpBackdrop').classList.add('show'))
