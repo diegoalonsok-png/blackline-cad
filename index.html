@@ -1614,23 +1614,75 @@ function cadResizeOpening(ref,meters){
  updateAll();return {ok:true,width:target,cut:result.cut};
 }
 function cadOpeningResizeEditor(ref,client){
+ // Ephemeral CAD dimension overlay, never an entity and never included in DXF/SVG/PDF.
  document.getElementById('cadOpeningResizeEditor')?.remove();
- const panel=document.createElement('section');panel.id='cadOpeningResizeEditor';panel.setAttribute('role','dialog');
- panel.setAttribute('aria-label','Introducir ancho real en metros');
- panel.style.cssText='position:fixed;z-index:100010;width:260px;padding:12px;background:#17232d;color:#eaf5ff;border:1px solid #83d9f4;border-radius:8px;box-shadow:0 12px 36px #000a;font:12px Arial,sans-serif';
- const title=document.createElement('strong');title.textContent='ANCHO · metros';
- const input=document.createElement('input');input.type='number';input.step='.01';input.min='.20';input.max='20';
- input.value=cadOpeningWidthMeters(ref).toFixed(3);input.style.cssText='box-sizing:border-box;width:100%;margin:10px 0;padding:8px;background:#0b1720;color:#fff;border:1px solid #79a8c1;border-radius:5px;font-size:16px';
- const note=document.createElement('p');note.textContent='0.90 = 90 cm. La puerta escala proporcionalmente; la ventana se estira a lo ancho.';
- const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end';
- const button=label=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='padding:6px 10px;border:1px solid #79a8c1;border-radius:5px;background:#294b61;color:white;cursor:pointer';return b};
- const cancel=button('Cancelar'),apply=button('Aplicar');
- const close=()=>{panel.remove();canvas.focus({preventScroll:true})};
- cancel.onclick=close;apply.onclick=()=>{const outcome=cadResizeOpening(ref,Number(input.value));if(!outcome.ok)return toast(outcome.reason);close();toast('Ancho actualizado: '+outcome.width.toFixed(2)+' m')};
- input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();ev.stopPropagation();apply.click()}else if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close()}});
- actions.append(cancel,apply);panel.append(title,input,note,actions);document.body.append(panel);
- panel.style.left=Math.max(8,Math.min(client.x,innerWidth-panel.offsetWidth-8))+'px';panel.style.top=Math.max(8,Math.min(client.y+12,innerHeight-panel.offsetHeight-8))+'px';
- input.focus();input.select();
+ const def=state.blocks?.[ref.blockName],width=Number(ref.params?.width??def?.parametric?.defaults?.width)*(Number(ref.scale)||1);
+ if(!(width>0))return;
+ const theta=(Number(ref.rotation)||0)*Math.PI/180;
+ const start=screen(ref.p),end=screen(P(ref.p.x+width*Math.cos(theta),ref.p.y+width*Math.sin(theta)));
+ const dx=end.x-start.x,dy=end.y-start.y,len=Math.hypot(dx,dy);
+ if(len<.1)return;
+ const normal=P(dy/len,-dx/len),offset=58;
+ const a=P(start.x+normal.x*offset,start.y+normal.y*offset);
+ const b=P(end.x+normal.x*offset,end.y+normal.y*offset);
+ const mid=P((a.x+b.x)/2,(a.y+b.y)/2),margin=20;
+ const overlay=document.createElement('div');overlay.id='cadOpeningResizeEditor';
+ overlay.setAttribute('role','group');overlay.setAttribute('aria-label','Cota dinámica de ancho, no imprimible');
+ overlay.style.cssText='position:absolute;inset:0;z-index:110;pointer-events:none';
+ const ns='http://www.w3.org/2000/svg';
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('width','100%');svg.setAttribute('height','100%');svg.setAttribute('aria-hidden','true');
+ svg.style.cssText='position:absolute;inset:0;pointer-events:none;overflow:visible';
+ const line=(x1,y1,x2,y2,dashed=false)=>{
+  const el=document.createElementNS(ns,'line');
+  for(const [k,v] of Object.entries({x1,y1,x2,y2}))el.setAttribute(k,String(v));
+  el.setAttribute('stroke','#8be4ff');el.setAttribute('stroke-width','1.3');
+  if(dashed)el.setAttribute('stroke-dasharray','5 4');
+  svg.append(el);
+ };
+ line(start.x,start.y,a.x+normal.x*9,a.y+normal.y*9,true);
+ line(end.x,end.y,b.x+normal.x*9,b.y+normal.y*9,true);
+ // Break line behind editable cota label.
+ const exclusion=Math.min(48,len*.28),ux=dx/len,uy=dy/len;
+ line(a.x,a.y,mid.x-ux*exclusion,mid.y-uy*exclusion);
+ line(mid.x+ux*exclusion,mid.y+uy*exclusion,b.x,b.y);
+ for(const p of [a,b]){
+  const tip=document.createElementNS(ns,'circle');
+  tip.setAttribute('cx',String(p.x));tip.setAttribute('cy',String(p.y));tip.setAttribute('r','3');tip.setAttribute('fill','#8be4ff');svg.append(tip);
+ }
+ overlay.append(svg);
+ const control=document.createElement('button');control.type='button';
+ control.textContent=cadOpeningWidthMeters(ref).toFixed(2)+' m';
+ control.title='Clic para modificar el ancho · medida virtual, no imprimible';
+ control.setAttribute('aria-label','Editar cota dinámica de ancho');
+ control.style.cssText='position:absolute;pointer-events:auto;min-width:78px;height:29px;transform:translate(-50%,-50%);background:#0d3547;border:1px solid #9ee8ff;color:#f1fcff;border-radius:5px;padding:3px 8px;font:600 13px Consolas,monospace;cursor:text';
+ control.style.left=Math.max(margin,Math.min(wrap.clientWidth-margin,mid.x))+'px';
+ control.style.top=Math.max(margin,Math.min(wrap.clientHeight-margin,mid.y))+'px';
+ const close=()=>{overlay.remove();canvas.focus({preventScroll:true});schedule()};
+ const showInput=()=>{
+  if(!overlay.isConnected)return;
+  const input=document.createElement('input');
+  input.type='text';input.inputMode='decimal';input.value=cadOpeningWidthMeters(ref).toFixed(2);
+  input.setAttribute('aria-label','Nuevo ancho en metros, 0.90 equivale a 90 centímetros');
+  input.style.cssText=control.style.cssText+'min-width:96px;width:104px;text-align:center;cursor:text';
+  const commit=()=>{
+   const raw=input.value.trim().replace(',','.');
+   if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Ingresá una cota válida, por ejemplo 0.90');input.focus();return}
+   const result=cadResizeOpening(ref,Number(raw));
+   if(!result.ok){toast(result.reason);input.focus();return}
+   close();toast('Cota aplicada: '+result.width.toFixed(2)+' m'+(result.cut?' · vano actualizado':''));
+  };
+  input.addEventListener('keydown',ev=>{
+   ev.stopPropagation();
+   if(ev.key==='Enter'){ev.preventDefault();commit()}
+   if(ev.key==='Escape'){ev.preventDefault();close()}
+  });
+  input.addEventListener('pointerdown',ev=>ev.stopPropagation());
+  control.replaceWith(input);input.focus();input.select();
+ };
+ control.addEventListener('pointerdown',ev=>ev.stopPropagation());
+ control.addEventListener('click',showInput);
+ overlay.append(control);wrap.append(overlay);
+ toast('Cota virtual · clic sobre el número para editar · no se imprime');
 }
 function cadDrawOpeningQuickGrips(ref){
  const grips=cadOpeningQuickGrips(ref);if(!grips.length)return;
