@@ -3774,7 +3774,7 @@ async function download(name,data,mime='application/octet-stream'){
  toast('Descarga iniciada. Elegí la carpeta desde tu navegador.');
  return true;
 }
-function saveJSON(){let data={format:'CAD2D-2',modelScale:'1:1',blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json');toast('Project saved locally')}
+function saveJSON(){let data={format:'CAD2D-2',modelScale:'1:1',blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};return download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json')}
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
 $('sampleHouseBtn').onclick=async()=>{try{
  const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
@@ -3822,7 +3822,7 @@ function exportDXF(entities=state.entities,filename=state.file,layers=state.laye
     '7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
   }
   data.push(...base,...pos(e.p.x,e.p.y),'40',dxfNum(e.h),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'1',e.text.replace(/\r?\n/g,' '));
- }}data.push('0','ENDSEC','0','EOF');download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf');toast('DXF exported')}$('dxfBtn').onclick=()=>exportDXF();
+ }}data.push('0','ENDSEC','0','EOF');return download(`${filename}.dxf`,data.join('\r\n')+'\r\n','application/dxf')}$('dxfBtn').onclick=()=>exportDXF();
 
 function importSVG(source,name){
  const doc=new DOMParser().parseFromString(source,'image/svg+xml');
