@@ -1723,7 +1723,13 @@ function drawEntity(e,forceColor){if(e.type==='blockRef'){
   return;
  }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.setLineDash([]);ctx.fillStyle=e.color||lay.color;ctx.fill();ctx.restore();return}if(e.type==='text'){if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor);return}
  const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=ctx.measureText(label).width;
- if(e.highlight){ctx.fillStyle=/^#[0-9a-f]{6}$/i.test(e.highlightColor||'')?e.highlightColor:'#fff2a6';ctx.fillRect(-2,-Math.max(7,e.h*state.view.scale)*.95,width+4,Math.max(7,e.h*state.view.scale)*1.2)}
+ if(e.highlight){
+  const size=Math.max(7,e.h*state.view.scale),pad=Math.max(3,size*.14);
+  ctx.save();ctx.setLineDash([]);ctx.globalAlpha=1;
+  ctx.fillStyle=/^#[0-9a-f]{6}$/i.test(e.highlightColor||'')?e.highlightColor:'#fff2a6';
+  ctx.fillRect(-pad,-size*.97,width+pad*2,size*1.25);
+  ctx.restore();
+ }
  ctx.fillStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));
  if(e.textShadow){
   ctx.save();ctx.fillStyle=/^#[0-9a-f]{6}$/i.test(e.textShadowColor||'')?e.textShadowColor:'#333333';
@@ -5783,9 +5789,30 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
   saveHistory();for(const entity of selected)Object.assign(entity,style);
   updateAll();toast('Formato actualizado · '+selected.length+' texto(s)');
  };
- const immediateFields=['cadTextBarFont','cadTextBarHeight','cadTextBarAngle','cadTextBarHighlightColor','cadTextBarShadowColor','cadTextBarShadowOffset','cadTextBarPath','cadTextBarRadius','cadTextBarStartAngle','cadTextBarDirection'];
+ const immediateFields=['cadTextBarFont','cadTextBarHeight','cadTextBarAngle','cadTextBarShadowColor','cadTextBarShadowOffset','cadTextBarPath','cadTextBarRadius','cadTextBarStartAngle','cadTextBarDirection'];
  for(const id of immediateFields)$(id)?.addEventListener('change',applyTextFormatting);
- for(const id of ['cadTextBarBold','cadTextBarItalic','cadTextBarUnderline','cadTextBarHighlight','cadTextBarShadow'])$(id)?.addEventListener('click',applyTextFormatting);
+ for(const id of ['cadTextBarBold','cadTextBarItalic','cadTextBarUnderline','cadTextBarShadow'])$(id)?.addEventListener('click',applyTextFormatting);
+ // Apply highlighting independently from the rest of typography. Changing the
+ // color automatically enables the background (no second click required).
+ const setHighlight=(on,color)=>{
+  const hex=/^#[0-9a-f]{6}$/i.test(color||'')?color:'#fff2a6';
+  $('textHighlight').checked=!!on;$('textHighlightColor').value=hex;
+  $('cadTextBarHighlightColor').value=hex;
+  $('cadTextBarHighlight').setAttribute('aria-pressed',String(!!on));
+  $('cadTextBarHighlight').title=on?'Quitar fondo de texto':'Activar fondo de texto';
+  const selected=selectedText();
+  if(selected.length&&selected.some(e=>!!e.highlight!==!!on||e.highlightColor!==hex)){
+   saveHistory();
+   for(const e of selected){e.highlight=!!on;e.highlightColor=hex}
+   updateAll();toast(on?'Fondo resaltado aplicado · '+selected.length+' texto(s)':'Fondo resaltado desactivado');
+  }
+  updateFontPreview();
+ };
+ $('cadTextBarHighlight').addEventListener('click',()=>setHighlight($('textHighlight').checked,$('cadTextBarHighlightColor').value));
+ const colorHighlight=()=>setHighlight(true,$('cadTextBarHighlightColor').value);
+ $('cadTextBarHighlightColor').addEventListener('input',colorHighlight);
+ $('cadTextBarHighlightColor').addEventListener('change',colorHighlight);
+ $('textHighlightColor').addEventListener('change',()=>setHighlight(true,$('textHighlightColor').value));
  // Show the actual properties of a newly selected object in the top bar.
  let lastTextSelection='';
  const originalUpdateProps=updateProps;
