@@ -42,3 +42,15 @@ test('toolbar exposes shadow and circle controls without changing the drawing',(
  assert.match(html,/function editCadDimensionText/);
  assert.match(html,/editCadDimensionText\(entity\)/);
 });
+
+test('dimension double-click opens complete inline editor with measured reference and restore',()=>{
+ const source=extract('function editCadDimensionText(entity,anchor=null){','function editSelectedCadDimensionText(){');
+ assert.match(source,/cadDimensionTextEditor/);
+ assert.match(source,/input\.value=current/);
+ assert.match(source,/Medida geométrica actual:/);
+ assert.match(source,/Medida automática/);
+ assert.match(source,/saveHistory\(\);entity\.textOverride=override/);
+ assert.match(source,/dimensionTextMode=override===null\?'automatic':'manual'/);
+ assert.doesNotMatch(source,/window\.prompt\(/);
+ assert.match(html,/editCadDimensionText\(entity,\{x:ev\.clientX,y:ev\.clientY\}\)/);
+});
