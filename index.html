@@ -5306,6 +5306,54 @@ function initPermanentBlockGallery(){
  const window2=(name,w,depth=.18,panes=1)=>{const d=[['rect',0,-depth/2,.055,depth],['rect',w-.055,-depth/2,.055,depth],['line',.055,-depth/2,w-.055,-depth/2],['line',.055,depth/2,w-.055,depth/2],['line',.055,0,w-.055,0]];for(let k=1;k<panes;k++)d.push(['rect',k*w/panes-.02,-depth/2,.04,depth]);add(name,'Openings',w,depth,d)};
  const box=(name,cat,w,h)=>add(name,cat,w,h,[['rect',0,0,w,h],['rect',.08,.08,Math.max(.08,w-.16),Math.max(.08,h-.16)]]);
  const circular=(name,cat,d)=>add(name,cat,d,d,[['circle',d/2,d/2,d/2],['circle',d/2,d/2,Math.max(.025,d*.12)]]);
+ // Colección editorial propia de bloques arquitectónicos en planta: dibujo vectorial, no imágenes.
+ const premium=(id,cat,w,h,draw)=>add('Premium · '+id,cat,w,h,draw);
+ premium('Sofá modular 3 cuerpos 260','Furniture',2.60,1.02,[
+  ['rect',0,0,2.60,1.02],['rect',.10,.18,2.40,.70],['rect',.04,.14,.18,.75],['rect',2.38,.14,.18,.75],
+  ['line',.22,.21,.22,.86],['line',.98,.21,.98,.86],['line',1.68,.21,1.68,.86],['line',2.38,.21,2.38,.86],
+  ['line',.24,.13,2.36,.13],['rect',.12,.84,2.36,.12]]);
+ premium('Sofá esquinero L 310','Furniture',3.10,2.20,[
+  ['rect',0,0,3.10,1.00],['rect',0,0,1.03,2.20],['rect',.12,.13,2.82,.70],['rect',.13,.14,.75,1.92],
+  ['line',1.10,.15,1.10,.86],['line',1.92,.15,1.92,.86],['line',.14,1.03,.86,1.03],
+  ['rect',.05,.05,.14,2.10],['rect',.09,.85,2.92,.12]]);
+ premium('Butaca contemporánea 095','Furniture',.95,.94,[
+  ['rect',0,0,.95,.94],['rect',.15,.16,.65,.62],['rect',.04,.16,.13,.67],['rect',.78,.16,.13,.67],
+  ['line',.17,.72,.78,.72],['rect',.09,.81,.77,.09]]);
+ premium('Silla comedor tapizada','Furniture',.52,.58,[
+  ['rect',0,0,.52,.58],['rect',.07,.10,.38,.40],['rect',.03,.46,.46,.08],
+  ['line',.10,.12,.10,.47],['line',.42,.12,.42,.47]]);
+ premium('Mesa comedor 8 plazas 240','Furniture',2.40,1.05,[
+  ['rect',.18,.17,2.04,.72],['rect',.22,.21,1.96,.64],
+  ...[.37,.96,1.55,2.14].flatMap(x=>[['rect',x-.19,0,.38,.14],['rect',x-.19,.91,.38,.14]]),
+  ['rect',0,.34,.14,.36],['rect',2.26,.34,.14,.36]]);
+ premium('Mesa centro oval 125','Furniture',1.25,.65,[
+  ['ellipse',.625,.325,.61,.31],['ellipse',.625,.325,.51,.22],['line',.22,.325,1.03,.325]]);
+ premium('Cama king vestida 200','Furniture',2.00,2.10,[
+  ['rect',0,0,2,2.1],['rect',.07,.08,1.86,.18],['rect',.12,.30,.82,.54],['rect',1.06,.30,.82,.54],
+  ['rect',.09,.87,1.82,1.13],['line',.09,1.13,1.91,1.13],['line',.15,1.90,1.85,1.90]]);
+ premium('Cama individual con mesa luz','Furniture',1.55,1.95,[
+  ['rect',0,0,.98,1.95],['rect',.09,.11,.80,.40],['rect',.08,.55,.82,1.29],['line',.09,.70,.89,.70],
+  ['rect',1.05,.08,.48,.48],['circle',1.29,.32,.10]]);
+ premium('Escritorio ejecutivo 180','Furniture',1.80,.88,[
+  ['rect',0,0,1.80,.88],['rect',.10,.10,1.60,.68],['rect',1.34,.12,.30,.57],
+  ['line',1.34,.30,1.64,.30],['line',1.34,.49,1.64,.49],['circle',.74,.44,.09]]);
+ premium('Isla cocina 240','Furniture',2.40,1.04,[
+  ['rect',0,0,2.40,1.04],['rect',.08,.10,2.24,.84],['rect',.20,.20,.64,.56],
+  ['rect',1.03,.20,.55,.56],['circle',1.81,.38,.12],['circle',2.12,.38,.12],
+  ['circle',1.81,.69,.12],['circle',2.12,.69,.12]]);
+ premium('Bañera exenta oval 175','Sanitary',1.75,.80,[
+  ['ellipse',.875,.40,.86,.39],['ellipse',.875,.40,.71,.28],['circle',1.42,.40,.035],
+  ['line',.23,.40,.37,.40]]);
+ premium('Lavabo doble 140','Sanitary',1.40,.56,[
+  ['rect',0,0,1.40,.56],['ellipse',.37,.30,.24,.20],['ellipse',1.03,.30,.24,.20],
+  ['circle',.37,.07,.026],['circle',1.03,.07,.026]]);
+ premium('Macetero circular 090','Landscape',.90,.90,[
+  ['circle',.45,.45,.44],['circle',.45,.45,.36],['circle',.45,.45,.14],
+  ['line',.45,.45,.23,.23],['line',.45,.45,.70,.24],['line',.45,.45,.70,.70],['line',.45,.45,.20,.70]]);
+ premium('Banco exterior 180','Landscape',1.80,.56,[
+  ['rect',0,0,1.80,.56],['rect',.08,.08,1.64,.40],
+  ...[.31,.62,.93,1.24,1.55].map(x=>['line',x,.08,x,.48]),
+  ['rect',.04,.03,.10,.50],['rect',1.66,.03,.10,.50]]);
  door('Puerta 070 izquierda',.70);
  door('Puerta 080 izquierda',.80);
  door('Puerta 090 derecha',.90,true);
