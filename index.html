@@ -1664,18 +1664,45 @@ function getTextStyleFromPanel(){
   textStartAngle:Number($('cadTextBarStartAngle')?.value)||0,
   textDirection:$('cadTextBarDirection')?.value==='cw'?'cw':'ccw'};
 }
-function editCadDimensionText(entity){
+function editCadDimensionText(entity,anchor=null){
  if(!entity||entity.type!=='dimension')return;
+ document.getElementById('cadDimensionTextEditor')?.remove();
  const auto=dimensionPrimitives({...entity,textOverride:null}).find(part=>part.type==='text')?.text||'';
- const original=entity.textOverride==null?'<>':String(entity.textOverride);
- const input=window.prompt('Texto de cota · <> conserva la medida automática · dejar vacío para restaurar',original);
- if(input===null)return;
- const value=input.trim();
- if(value.length>256)return toast('La cota admite hasta 256 caracteres');
- const newValue=value===''||value==='<>'?null:value;
- if(newValue===entity.textOverride||newValue===null&&entity.textOverride==null)return;
- saveHistory();entity.textOverride=newValue;updateAll();
- toast(newValue===null?'Cota automática restaurada':'Texto de cota actualizado · valor geométrico conservado');
+ const current=dimensionPrimitives(entity).find(part=>part.type==='text')?.text||auto;
+ const panel=document.createElement('section');panel.id='cadDimensionTextEditor';
+ panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Editar texto de cota');
+ panel.style.cssText='position:fixed;z-index:100001;min-width:290px;width:min(410px,calc(100vw - 24px));padding:12px;background:#202830;color:#edf3f6;border:1px solid #8eaaba;border-radius:9px;box-shadow:0 12px 38px #000a;font:12px Arial,sans-serif';
+ const heading=document.createElement('strong');heading.textContent='EDITAR COTA · Texto completo';
+ const note=document.createElement('p');note.style.cssText='color:#c4d4de;margin:7px 0';
+ note.textContent='Medida geométrica actual: '+auto+' · La inscripción puede reflejar la medida verificada en obra.';
+ const input=document.createElement('input');input.type='text';input.maxLength=256;input.value=current;
+ input.setAttribute('aria-label','Texto que aparecerá en la cota');
+ input.style.cssText='display:block;width:100%;box-sizing:border-box;padding:8px;border-radius:5px;background:#121a21;color:white;border:1px solid #688393;font:14px Arial';
+ const help=document.createElement('p');help.style.cssText='font-size:11px;color:#adbeca;margin:6px 0';
+ help.textContent='Escribí cualquier número o texto. Usá <> para incluir la medida automática.';
+ const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end';
+ const button=(label)=>{const el=document.createElement('button');el.type='button';el.textContent=label;el.style.cssText='padding:6px 9px;border:1px solid #728a98;background:#35434c;color:#f5f8fa;border-radius:5px;cursor:pointer';return el};
+ const cancel=button('Cancelar'),autoButton=button('Medida automática'),save=button('Guardar texto');
+ save.style.background='#3b677c';
+ const close=()=>{panel.remove();canvas.focus({preventScroll:true})};
+ const apply=(override)=>{
+  if(!state.entities.includes(entity))return close();
+  if(entity.textOverride===override||entity.textOverride==null&&override===null)return close();
+  saveHistory();entity.textOverride=override;
+  entity.dimensionTextMode=override===null?'automatic':'manual';
+  updateAll();close();toast(override===null?'Cota restaurada a medida geométrica':'Texto de cota actualizado; geometría conservada');
+ };
+ cancel.onclick=close;autoButton.onclick=()=>apply(null);
+ save.onclick=()=>{const value=input.value.trim();apply(!value||value==='<>'?null:value)};
+ input.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();event.stopPropagation();save.click()}if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close()}});
+ panel.append(heading,note,input,help,actions);actions.append(cancel,autoButton,save);
+ document.body.append(panel);
+ const point=anchor||screen(dimensionPrimitives(entity).find(part=>part.type==='text')?.p||entity.p);
+ const bounds=canvas.getBoundingClientRect();
+ let x=anchor?anchor.x:bounds.left+point.x,y=anchor?anchor.y:bounds.top+point.y;
+ panel.style.left=Math.max(8,Math.min(x,innerWidth-420))+'px';
+ panel.style.top=Math.max(8,Math.min(y+16,innerHeight-210))+'px';
+ input.focus();input.select();
 }
 function editSelectedCadDimensionText(){
  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&e.type==='dimension');
@@ -3128,7 +3155,7 @@ canvas.addEventListener('pointercancel',ev=>{
   updateAll();
  }else schedule();
 });
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity);return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();toast('Text selected — edit typography and click Apply');return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
   if(!boxes.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
