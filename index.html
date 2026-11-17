@@ -1550,11 +1550,58 @@ function blockInstanceGeometry(definition,ref){
  }
  return definition.entities;
 }
+function cadOpeningMirrorGeometry(parts,ref){
+ if(!ref.flipOpeningSide)return parts;
+ return parts.map(part=>{const e=clone(part);
+  for(const key of ['a','b','c','p'])if(e[key])e[key].y=-e[key].y;
+  if(e.pts)e.pts=e.pts.map(p=>P(p.x,-p.y));
+  if(e.type==='arc'){const start=e.a0;e.a0=-e.a1;e.a1=-start}
+  return e;
+ });
+}
+function cadOpeningQuickGrips(ref){
+ const def=state.blocks?.[ref.blockName];
+ if(!['swing-door','double-door','framed-window'].includes(def?.parametric?.kind))return [];
+ const width=Number(ref.params?.width??def.parametric.defaults.width)*(Number(ref.scale)||1);
+ if(!(width>0))return [];
+ const theta=(Number(ref.rotation)||0)*Math.PI/180;
+ const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
+ return [{action:'mirror',x:p.x-29,y:p.y-35},{action:'swing',x:p.x,y:p.y-35},{action:'rotate',x:p.x+29,y:p.y-35}];
+}
+function cadOpeningQuickHit(raw){
+ for(const id of state.selected){
+  const ref=state.entities.find(e=>e.id===id);
+  if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
+  for(const grip of cadOpeningQuickGrips(ref))
+   if(Math.hypot(grip.x-raw.x,grip.y-raw.y)<12)return {id,action:grip.action};
+ }
+ return null;
+}
+function cadOpeningQuickApply(grip){
+ const ref=state.entities.find(e=>e.id===grip.id),def=state.blocks?.[ref?.blockName];
+ if(!ref||layerFor(ref).locked||!def?.parametric)return;
+ saveHistory();
+ if(grip.action==='mirror')ref.params={...def.parametric.defaults,...ref.params,mirror:!Boolean(ref.params?.mirror)};
+ if(grip.action==='swing')ref.flipOpeningSide=!Boolean(ref.flipOpeningSide);
+ if(grip.action==='rotate')ref.rotation=((Number(ref.rotation)||0)+90)%360;
+ updateAll();toast('Bloque dinámico: '+({mirror:'espejo lateral',swing:'inversión de apertura',rotate:'giro +90°'}[grip.action])+' · Ctrl+Z para deshacer');
+}
+function cadDrawOpeningQuickGrips(ref){
+ const grips=cadOpeningQuickGrips(ref);if(!grips.length)return;
+ ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.4;ctx.textAlign='center';ctx.textBaseline='middle';
+ for(const grip of grips){
+  ctx.fillStyle='#112b3c';ctx.strokeStyle='#80e2ff';
+  ctx.fillRect(grip.x-10,grip.y-10,20,20);ctx.strokeRect(grip.x-10,grip.y-10,20,20);
+  ctx.fillStyle='#80e2ff';ctx.font='bold 16px Arial';
+  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':'↻',grip.x,grip.y+1);
+ }
+ ctx.restore();
+}
 function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:blockInstanceGeometry(definition,ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
+ return blockInsertionEntities({...definition,entities:cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
 }
 /* Block grip editing: translate the reference rather than exploding its children. */
 function blockGripPoints(ref){
@@ -1671,6 +1718,7 @@ function findSelectedBlockGrip(raw){
  return best;
 }
 function drawBlockGrips(ref){
+ cadDrawOpeningQuickGrips(ref);
  const half=gripSettings.size/2;
  ctx.save();ctx.fillStyle=gripSettings.blockColor;ctx.strokeStyle='#143244';ctx.lineWidth=1;
  for(const vertex of blockGripPoints(ref)){
@@ -3180,6 +3228,8 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
+  const openingGrip=cadOpeningQuickHit(raw);
+  if(openingGrip){cadOpeningQuickApply(openingGrip);return}
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
    const entity=state.entities.find(e=>e.id===wallGrip.id);
