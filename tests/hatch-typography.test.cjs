@@ -20,7 +20,7 @@ test('typography controls and state round trip',()=>{
  assert.match(html,/\$\('textUnderline'\)\.checked=!!e\.underline/);
 });
 test('canvas and print SVG draw underline and highlight',()=>{
- assert.match(html,/if\(e\.highlight\)\{ctx\.fillStyle/);
+ assert.match(html,/if\(e\.highlight\)\{[\s\S]*?ctx\.fillStyle=[^;]+;[\s\S]*?ctx\.fillRect/);
  assert.match(html,/if\(e\.underline\)\{ctx\.beginPath/);
  assert.match(html,/if\(e\.highlight\)svg\.push/);
  assert.match(html,/if\(e\.underline\)svg\.push/);
