@@ -1027,6 +1027,7 @@ function setTool(t){
  const dimensionKinds={dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
+ document.getElementById('cadStretchConfirmEnter')?.remove();
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
 function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'ESCALAR: mové el mouse para ver el tamaño · segundo clic confirma':'ESCALAR: seleccioná objetos y marcá el punto base',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
@@ -2657,7 +2658,7 @@ function finishStage(close=false){
  const s=state.stage,t=state.tool;
  if(t==='stretch'&&state.modifyCandidate?.kind==='stretchWindow'){
   const job=state.modifyCandidate;
-  if(job.phase==='confirm'){job.phase='base';prompt();schedule();toast('STRETCH · elegí un vértice como punto base y luego desplazá');return}
+  if(job.phase==='confirm'){job.phase='base';cadStretchConfirmOverlay();prompt();schedule();toast('STRETCH · elegí un vértice como punto base y luego desplazá');return}
   if(job.phase==='window'){toast('STRETCH · marcá la segunda esquina antes de Enter');return}
   if(job.phase==='base'||job.phase==='target'){toast('STRETCH · indicá el punto '+(job.phase==='base'?'base':'destino')+' o Esc para cancelar');return}
  }
@@ -3722,6 +3723,35 @@ function cadStretchApplyEntity(e,box,delta){
  }
  return n;
 }
+// Explicit confirmation in the crossing-window workflow; also supports keyboard Enter.
+function cadStretchConfirmOverlay(){
+ const job=state.tool==='stretch'&&state.modifyCandidate?.kind==='stretchWindow'?state.modifyCandidate:null;
+ let button=document.getElementById('cadStretchConfirmEnter');
+ if(!job||job.phase!=='confirm'){
+  button?.remove();return;
+ }
+ if(!button){
+  button=document.createElement('button');
+  button.type='button';button.id='cadStretchConfirmEnter';
+  button.textContent='↵ Enter · confirmar zona';
+  button.title='Confirmar selección verde y elegir punto base';
+  button.style.cssText='position:absolute;z-index:80;border:1px solid #51df92;border-radius:7px;background:#123a2e;color:#ecfff4;padding:8px 13px;font:600 13px Arial,sans-serif;box-shadow:0 4px 18px #0009;cursor:pointer';
+  button.addEventListener('click',()=>{if(state.tool==='stretch'&&state.modifyCandidate?.phase==='confirm')finishStage();});
+  wrap.appendChild(button);
+ }
+ const a=screen(job.first),b=screen(P(job.box.maxX,job.box.maxY));
+ button.style.left=Math.max(8,Math.min(wrap.clientWidth-220,Math.max(a.x,b.x)+12))+'px';
+ button.style.top=Math.max(8,Math.min(wrap.clientHeight-42,Math.min(a.y,b.y)))+'px';
+}
+document.addEventListener('keydown',ev=>{
+ if(ev.key!=='Enter'||ev.ctrlKey||ev.metaKey||ev.altKey||state.tool!=='stretch'||state.modifyCandidate?.phase!=='confirm')return;
+ const active=document.activeElement;
+ if(active&&['INPUT','TEXTAREA','SELECT'].includes(active.tagName)&&active!==$('command'))return;
+ if(active===$('command')&&$('command').value.trim())return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(active===$('command'))$('command').value='';
+ finishStage();
+},true);
 function cadStretchAt(p){
  if(state.tool!=='stretch')return;
  const job=state.modifyCandidate?.kind==='stretchWindow'?state.modifyCandidate:null;
@@ -3737,7 +3767,7 @@ function cadStretchAt(p){
    const layer=layerFor(e);return layer.visible&&!layer.locked&&cadStretchApplyEntity(e,box,P(0,0))!==null;
   });
   if(!targets.length)return toast('STRETCH: la ventana no abraza vértices editables');
-  job.box=box;job.ids=targets.map(e=>e.id);job.phase='confirm';state.stage=[];
+  job.box=box;job.ids=targets.map(e=>e.id);job.phase='confirm';state.stage=[];cadStretchConfirmOverlay();
   state.selected=[...job.ids];updateProps();toast('STRETCH · zona verde definida · Enter confirma selección');prompt();schedule();return;
  }
  if(job.phase==='confirm'){
