@@ -989,6 +989,7 @@ function ribbonAction(t){
  if(commandTools[t]){$('command').value=commandTools[t];return runCommand()}
  if(t==='print')return openPrint();if(t==='save')return saveJSON();if(t==='help')return $('helpBackdrop').classList.add('show');if(t==='zoom')return setTool('zoomWindow');if(t==='grid')return toggle('gridOn','gridToggle');setTool(t)}
 function setTool(t){
+ if(cadVertexPlacement){cadVertexPlacement=null;canvas.style.cursor=''}
  cadSelectionAnchor=null;cadSelectionAnchorShift=false;
  otrkAnchors=[];otrkGuide=null;
  if(t==='layout')return switchCadSpace('layout');
@@ -1254,6 +1255,24 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
    const a=state.drag?.type==='zoomWindow'&&state.drag.start||state.stage[0];
    const b=state.drag?.type==='zoomWindow'&&state.drag.last||screen(state.mouse);
    if(a)drawZoomWindow(a,b);
+ }
+ if(state.tool==='select'&&(cadVertexPlacement||state.drag?.type==='vertexMoveStart')){
+  const placement=cadVertexPlacement||{
+   ids:state.drag.ids,base:state.drag.vertex
+  };
+  if(placement?.base){
+   const cursor=state.drag?.type==='vertexMoveStart'?state.drag.last:pointer;
+   const destination=snapPoint(world(cursor));
+   const delta=sub(destination,placement.base);
+   ctx.save();ctx.strokeStyle='#ffcf70';ctx.lineWidth=1.3;ctx.setLineDash([5,4]);
+   const a=screen(placement.base),b=screen(destination);
+   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();
+   const selected=new Set(placement.ids||[]);
+   for(const entity of state.entities){
+    if(!selected.has(entity.id))continue;
+    drawEntity(transformEntity(entity,p=>add(p,delta)),'#ffcf70');
+   }
+  }
  }
  if(state.drag?.type==='transform')drawTransformPreview();
  if(state.drag?.type==='wallMiddleGrip'&&state.drag.preview){drawEntity(state.drag.preview,'#ffcf70')}
@@ -3429,6 +3448,55 @@ function cadApplyWindowSelection(start,end,shift,path){
  cadLastWindowSelectionAt=performance.now();updateProps();schedule();
  toast((crossing?'Ventana verde · cruce':'Ventana azul · contenido')+' · '+ids.length+' objetos');
 }
+/* Click a selected object's vertex, point to the destination, and click to place.
+ * A continuous press-and-drag from the same vertex also commits on release.
+ * Every member of a multi-selection moves by the same delta, never reshapes. */
+let cadVertexPlacement=null;
+function cadMoveVertexAt(raw){
+ const selected=new Set(state.selected);
+ let best=null,bestDist=10;
+ for(let i=state.entities.length-1;i>=0;i--){
+  const entity=state.entities[i],layer=layerFor(entity);
+  if(!selected.has(entity.id)||!layer.visible||layer.locked)continue;
+  for(const vertex of getVertices(entity)){
+   if(!vertex||!Number.isFinite(vertex.x)||!Number.isFinite(vertex.y))continue;
+   const distance=dist(screen(vertex),raw);
+   if(distance<=bestDist){bestDist=distance;best={entity,vertex:P(vertex.x,vertex.y)}}
+  }
+ }
+ return best;
+}
+function cadCommitVertexMove(target){
+ const placement=cadVertexPlacement;
+ if(!placement)return;
+ cadVertexPlacement=null;canvas.style.cursor='';
+ const delta=sub(target,placement.base);
+ if(!Number.isFinite(delta.x)||!Number.isFinite(delta.y)||Math.hypot(delta.x,delta.y)<=1e-10){schedule();return}
+ const targets=new Set(placement.ids);
+ const originals=state.entities.filter(e=>targets.has(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
+ if(!originals.length){schedule();return}
+ saveHistory();
+ const openingMoves=[];
+ state.entities=state.entities.map(e=>{
+  if(!targets.has(e.id)||layerFor(e).locked||!layerFor(e).visible)return e;
+  if(e.type==='blockRef')openingMoves.push({id:e.id,old:P(e.p.x,e.p.y)});
+  return transformEntity(e,p=>add(p,delta));
+ });
+ let rejected=0;
+ for(const m of openingMoves){
+  const block=state.entities.find(e=>e.id===m.id);
+  if(block&&!relocateOpeningWithBlock(block,m.old).ok)rejected++;
+ }
+ updateAll();log('MOVE · vertex placement');
+ toast(rejected?'Movimiento aplicado · '+rejected+' aberturas protegidas no desplazadas':'Objetos desplazados · Ctrl+Z para deshacer');
+}
+function cadCancelVertexMove(){
+ if(!cadVertexPlacement)return false;
+ cadVertexPlacement=null;state.drag=null;canvas.style.cursor='';schedule();toast('Mover: cancelado');return true;
+}
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&cadVertexPlacement){cadCancelVertexMove();}
+},true);
 let lastMiddleClick=null;
 function registerMiddleClick(time,point){
  const last=lastMiddleClick;
@@ -3438,6 +3506,17 @@ function registerMiddleClick(time,point){
 }
 canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
+ if(state.tool==='select'&&cadVertexPlacement){
+  state.drag={type:'vertexMovePlace',start:raw,last:raw};return;
+ }
+ if(state.tool==='select'&&!ev.shiftKey&&!cadSelectionAnchor){
+  const hit=cadMoveVertexAt(raw);
+  if(hit){
+   state.drag={type:'vertexMoveStart',start:raw,last:raw,vertex:hit.vertex,
+    ids:state.selected.filter(id=>{const e=state.entities.find(x=>x.id===id);return e&&layerFor(e).visible&&!layerFor(e).locked})};
+   canvas.style.cursor='grabbing';return;
+  }
+ }
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
   const genericGrip=cadGenericGripHit(raw);
@@ -3474,7 +3553,9 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
   if(cadSelectionAnchor){state.drag.type='selectionSecond';return}
   const e=pick(world(raw));if(!e)state.drag.type='selectionStart';
  } });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='wallMiddleGrip'){
+canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
+  // Preview is drawn below from the source geometry; no entity mutation until confirmation.
+ }else if(d.type==='wallMiddleGrip'){
   if(window.BlacklineWallGrip){
    const shift=BlacklineWallGrip.projectShift(d.original,world(d.start),world(raw),
     state.snapOn?state.grid:0);
@@ -3507,6 +3588,16 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
+ if(d.type==='vertexMoveStart'){
+  const placement={ids:d.ids,base:d.vertex,preview:snapPoint(world(raw))};
+  cadVertexPlacement=placement;
+  if(dist(raw,d.start)>5){cadCommitVertexMove(placement.preview)}
+  else{canvas.style.cursor='crosshair';toast('Mover · elegí destino y hacé clic para colocar');schedule()}
+  return;
+ }
+ if(d.type==='vertexMovePlace'){
+  cadCommitVertexMove(snapPoint(world(raw)));return;
+ }
  if(d.type==='openingResize'){
   canvas.style.cursor='';const ref=state.entities.find(e=>e.id===d.id);
   if(!ref)return;
@@ -3556,6 +3647,7 @@ canvas.addEventListener('pointerup',ev=>{
  if(d.type==='selection'){if(dist(d.path.at(-1),raw)>0.5)d.path.push(P(raw.x,raw.y));cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
  const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('pointercancel',ev=>{
+ if(state.drag?.type==='vertexMoveStart'||state.drag?.type==='vertexMovePlace'){state.drag=null;cadVertexPlacement=null;canvas.style.cursor='';schedule();return}
  const d=state.drag;if(d?.type==='openingResize'){state.drag=null;canvas.style.cursor='';schedule();return}
  if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
  if(d?.type==='selection'||d?.type==='selectionStart'||d?.type==='selectionSecond'){state.drag=null;cadSelectionAnchor=null;cadSelectionAnchorShift=false;schedule();return}
