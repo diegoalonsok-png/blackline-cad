@@ -8,8 +8,9 @@ test('opening actions use real parametric block references',()=>{
  assert.ok(source);
  for(const kind of ['swing-door','double-door','framed-window'])assert.ok(source.includes("'"+kind+"'"));
  for(const action of ['mirror','swing','rotate'])assert.ok(source.includes("action:'"+action+"'"));
- assert.match(source,/cadOpeningQuickHit\(raw\)/);
- assert.match(source,/cadOpeningQuickApply\(openingGrip\)/);
+ assert.match(source,/function cadOpeningQuickHit\(raw\)/);
+ assert.match(source,/function cadOpeningQuickApply\(grip\)/);
+ assert.match(source,/function drawBlockGrips\(ref\)/);
 });
 test('opening grip clicks retain edit history and geometry hierarchy',()=>{
  assert.match(source,/function cadOpeningQuickApply\(grip\)/);
