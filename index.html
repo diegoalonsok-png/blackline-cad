@@ -1996,7 +1996,7 @@ function cadDrawOpeningWallClearances(){
   if(!best||normal<best.normal)best={a,b,tangent,left,right,normal};
  }
  if(!best)return;
- const fmt=x=>(x*U[state.unit]/1000).toFixed(2)+' m';
+ const fmt=x=>Number(x).toFixed(state.precision)+' '+state.unit;
  const first=add(best.a,mul(best.tangent,best.left));
  const second=add(first,mul(best.tangent,span));
  const draw=(start,end,label)=>{
