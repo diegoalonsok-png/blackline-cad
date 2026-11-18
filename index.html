@@ -4915,7 +4915,7 @@ function openCadContextMenu(x,y,worldPoint){
  };
  const actions=active?[
    ...toolOptions(),
-   item('↵ Finalizar / Enter',()=>finishStage()),
+
    item('✕ Cancelar / Esc',()=>cancelCadCommand()),
    item('Deshacer último paso',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo()},!state.stage.length),
    null,
@@ -4959,6 +4959,8 @@ function openCadContextMenu(x,y,worldPoint){
    item('Zoom extensión · ZE',()=>zoomExtents()),
    item('Encuadre · PAN',()=>setTool('pan')),
  ];
+ // Accessible in every contextual menu, not just while a command is active.
+ actions.unshift(item('↵ Enter',()=>cadRightClickEnter()),null);
  actions.push(null,
   item('Deshacer · Ctrl+Z',()=>undo(),!state.history.length),
   item('Rehacer · Ctrl+Y',()=>redo(),!state.future.length),
