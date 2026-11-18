@@ -1187,12 +1187,23 @@ function cadWallCenterline(meta){
 }
 // Rectangular walls use a single closed RECT entity, rather than two LINE faces.
 // Both fragments are closed rectangles, so the reveals/caps remain closed for any thickness.
+function cadWallRectangleGeometry(e){
+ if(e?.type==='rect'&&e.a&&e.b)return {a:e.a,b:e.b};
+ if(e?.type!=='polyline'||!e.closed||e.pts?.length!==4)return null;
+ const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y);
+ const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+ if(maxX-minX<1e-8||maxY-minY<1e-8)return null;
+ const corners=[P(minX,minY),P(maxX,minY),P(maxX,maxY),P(minX,maxY)];
+ if(!corners.every(c=>e.pts.some(p=>dist(c,p)<1e-7)))return null;
+ return {a:P(minX,minY),b:P(maxX,maxY)};
+}
 function cadRectWallCandidate(e,point,openingWidth){
- if(e?.type!=='rect'||!e.a||!e.b||e.autoOpeningRef!==undefined)return null;
+ const geometry=cadWallRectangleGeometry(e);
+ if(!geometry||e.autoOpeningRef!==undefined)return null;
  const lay=layerFor(e);
  if(!lay?.visible||lay.locked)return null;
- const minX=Math.min(e.a.x,e.b.x),maxX=Math.max(e.a.x,e.b.x);
- const minY=Math.min(e.a.y,e.b.y),maxY=Math.max(e.a.y,e.b.y);
+ const minX=Math.min(geometry.a.x,geometry.b.x),maxX=Math.max(geometry.a.x,geometry.b.x);
+ const minY=Math.min(geometry.a.y,geometry.b.y),maxY=Math.max(geometry.a.y,geometry.b.y);
  const dx=maxX-minX,dy=maxY-minY;
  if(!(dx>1e-8&&dy>1e-8))return null;
  // A wall is the elongated dimension of the rectangle. Do not mistake a room for a wall.
@@ -1222,7 +1233,7 @@ function cadCutRectWallForOpening(ref,width){
   const minX=horizontal?lower:rect.minX,maxX=horizontal?upper:rect.maxX;
   const minY=horizontal?rect.minY:lower,maxY=horizontal?rect.maxY:upper;
   const a=P(minX,minY),b=P(maxX,maxY);
-  return {...clone(e),id:state.nextId++,a,b,autoOpeningRef:ref.id,
+  return {...clone(e),type:'rect',id:state.nextId++,a,b,pts:undefined,closed:undefined,autoOpeningRef:ref.id,
    autoOpeningSource:original.id,autoOpeningRole:role,
    autoOpeningOriginal:clone(original),autoOpeningShape:{a:clone(a),b:clone(b)}};
  };
@@ -5887,7 +5898,7 @@ function relocateOpeningWithBlock(ref,previous){
  // A rectangle's original host ID was removed at the first cut. Rebind it
  // to the restored source before computing the new opening.
  const originalRectId=ref.autoOpeningRectId;
- const sourceRect=restored.find(e=>e.type==='rect');
+ const sourceRect=restored.find(e=>!!cadWallRectangleGeometry(e));
  if(sourceRect)ref.autoOpeningRectId=sourceRect.id;
  const count=autoCutWallForOpening(ref,block);
  if(count!==(sourceRect?1:groups.size)){
