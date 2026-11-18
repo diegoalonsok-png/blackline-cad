@@ -5151,8 +5151,8 @@ function insertSelectedBlock(point){
  const factor=Number($('blockScale').value),angle=Number($('blockRotation').value);
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  // Keep the original wall intact if we detect a two-face wall but cannot cut BOTH faces.
- const beforeInsertion=historySnapshot();
  saveHistory();
+ const beforeInsertion=state.history.at(-1);
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
  if(block.dynamic2d){const b=blDynBounds(block);if(b)ref.dynamic={width:b.width,height:b.height}}
  if(block.parametric){
@@ -5178,7 +5178,8 @@ function insertSelectedBlock(point){
   // Roll back the whole insertion (block, partial splits, ID allocation and undo snapshot).
   Object.assign(state,beforeInsertion);
   if(state.history.length)state.history.pop();
-  syncCadHeaderHistoryButtons();updateAll();
+  if(typeof syncCadHeaderHistoryButtons==='function')syncCadHeaderHistoryButtons();
+  updateAll();
   toast('No se pudo abrir el vano en ambas caras del muro. No se insertó la abertura.');
   return;
  }
