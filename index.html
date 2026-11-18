@@ -1154,6 +1154,54 @@ function cadWallCenterline(meta){
  const shift=mul(n,side*Number(meta.thickness)/2);
  return {a:add(a,shift),b:add(b,shift),length:len};
 }
+// Rectangular walls use a single closed RECT entity, rather than two LINE faces.
+// Both fragments are closed rectangles, so the reveals/caps remain closed for any thickness.
+function cadRectWallCandidate(e,point,openingWidth){
+ if(e?.type!=='rect'||!e.a||!e.b||e.autoOpeningRef!==undefined)return null;
+ const lay=layerFor(e);
+ if(!lay?.visible||lay.locked)return null;
+ const minX=Math.min(e.a.x,e.b.x),maxX=Math.max(e.a.x,e.b.x);
+ const minY=Math.min(e.a.y,e.b.y),maxY=Math.max(e.a.y,e.b.y);
+ const dx=maxX-minX,dy=maxY-minY;
+ if(!(dx>1e-8&&dy>1e-8))return null;
+ // A wall is the elongated dimension of the rectangle. Do not mistake a room for a wall.
+ const horizontal=dx>dy*1.5,vertical=dy>dx*1.5;
+ if(!horizontal&&!vertical)return null;
+ const length=horizontal?dx:dy,thickness=horizontal?dy:dx;
+ if(length<=openingWidth+1e-7)return null;
+ const t=horizontal?point.x-minX:point.y-minY;
+ const normal=horizontal?point.y-(minY+maxY)/2:point.x-(minX+maxX)/2;
+ const tolerance=Math.max(.06*1000/U[state.unit],8/Math.max(state.view.scale,.01));
+ if(Math.abs(normal)>thickness/2+tolerance||t<openingWidth/2+1e-7||length-t<openingWidth/2+1e-7)return null;
+ return {entity:e,horizontal,minX,maxX,minY,maxY,length,thickness,t,distance:Math.abs(normal)};
+}
+function cadCutRectWallForOpening(ref,width){
+ const e=state.entities.find(x=>x.id===ref.autoOpeningRectId);
+ if(!e)return 0;
+ const rect=cadRectWallCandidate(e,P(ref.p.x+(rectAxisX(ref.rotation)*width/2),ref.p.y+(rectAxisY(ref.rotation)*width/2)),width);
+ if(!rect)return 0;
+ const horizontal=rect.horizontal;
+ const angle=(((ref.rotation%360)+360)%360);
+ if(horizontal?Math.abs(Math.sin(angle*Math.PI/180))>1e-5:Math.abs(Math.cos(angle*Math.PI/180))>1e-5)return 0;
+ const start=horizontal?ref.p.x:ref.p.y,end=start+width;
+ const lo=horizontal?rect.minX:rect.minY,hi=horizontal?rect.maxX:rect.maxY;
+ if(start<=lo+1e-7||end>=hi-1e-7)return 0;
+ const original=clone(e);
+ const piece=(lower,upper,role)=>{
+  const minX=horizontal?lower:rect.minX,maxX=horizontal?upper:rect.maxX;
+  const minY=horizontal?rect.minY:lower,maxY=horizontal?rect.maxY:upper;
+  const a=P(minX,minY),b=P(maxX,maxY);
+  return {...clone(e),id:state.nextId++,a,b,autoOpeningRef:ref.id,
+   autoOpeningSource:original.id,autoOpeningRole:role,
+   autoOpeningOriginal:clone(original),autoOpeningShape:{a:clone(a),b:clone(b)}};
+ };
+ const fragments=[piece(lo,start,'first'),piece(end,hi,'second')];
+ state.entities=state.entities.filter(x=>x.id!==e.id);
+ state.entities.push(...fragments);
+ return 1;
+}
+function rectAxisX(degrees){return Math.cos(degrees*Math.PI/180)}
+function rectAxisY(degrees){return Math.sin(degrees*Math.PI/180)}
 function cadAlignOpeningToWall(ref,block,clickPoint){
  if(!autoOpeningEnabled||!block?.parametric||!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return false;
  const openingWidth=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
@@ -1172,10 +1220,21 @@ function cadAlignOpeningToWall(ref,block,clickPoint){
   if(t*line.length<half+1e-7||(1-t)*line.length<half+1e-7)continue;
   best={distance:d,center,u,thickness:entity.wall2d.thickness};
  }
+ // Rectangular wall candidates also work when drawn with RECT on any unlocked layer.
+ for(const entity of state.entities){
+  const candidate=cadRectWallCandidate(entity,clickPoint,openingWidth);
+  if(!candidate||best&&candidate.distance>=best.distance)continue;
+  const center=candidate.horizontal?P(clickPoint.x,(candidate.minY+candidate.maxY)/2):
+   P((candidate.minX+candidate.maxX)/2,clickPoint.y);
+  best={distance:candidate.distance,center,u:candidate.horizontal?P(1,0):P(0,1),
+   thickness:candidate.thickness,rectId:entity.id};
+ }
  if(!best)return false;
  ref.p=add(best.center,mul(best.u,-openingWidth/2));
  ref.rotation=Math.atan2(best.u.y,best.u.x)*180/Math.PI;
  ref.wallThickness=best.thickness;
+ if(best.rectId)ref.autoOpeningRectId=best.rectId;
+ else delete ref.autoOpeningRectId;
  return true;
 }
 let autoWallJoinEnabled=true;
@@ -5060,6 +5119,7 @@ function autoCutWallForOpening(ref,block){
  if(!autoOpeningEnabled||!window.BlacklineAutoOpening||!block?.parametric)return 0;
  if(!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return 0;
  const width=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
+ if(ref.autoOpeningRectId)return cadCutRectWallForOpening(ref,width);
  const wallLines=state.entities.filter(e=>{
   if(e.type!=='line'||!e.id||e.autoOpeningRef!==undefined)return false;
   const l=layerFor(e);
@@ -5222,7 +5282,7 @@ function insertSelectedBlock(point){
  const aligned=cadAlignOpeningToWall(ref,block,point);
  state.entities.push(ref);
  const cutCount=openingOverlapsAnother(ref,block)?0:autoCutWallForOpening(ref,block);
- if(aligned&&autoOpeningEnabled&&cutCount<2){
+ if(aligned&&autoOpeningEnabled&&cutCount<(ref.autoOpeningRectId?1:2)){
   // No door/window should visually cover a solid wall when its opening failed.
   // Roll back the whole insertion (block, partial splits, ID allocation and undo snapshot).
   Object.assign(state,beforeInsertion);
