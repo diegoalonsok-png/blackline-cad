@@ -1008,7 +1008,7 @@ function setTool(t){
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  state.tool=t;state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule()}
-function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'ESCALAR: mové el mouse para ver el tamaño · segundo clic confirma':'ESCALAR: seleccioná objetos y marcá el punto base',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',stretch:'STRETCH: select entities then choose vertex and new position',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
+function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'ESCALAR: mové el mouse para ver el tamaño · segundo clic confirma':'ESCALAR: seleccioná objetos y marcá el punto base',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus()}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -1312,6 +1312,27 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
    if(lasso){ctx.beginPath();ctx.moveTo(a.x,a.y);for(const pt of d.path)ctx.lineTo(pt.x,pt.y);ctx.closePath();ctx.fill();ctx.stroke()}
    else{ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y);ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)}
    ctx.restore();
+  }
+ }
+ if(state.tool==='stretch'&&state.modifyCandidate?.kind==='stretchWindow'){
+  const job=state.modifyCandidate;
+  if(job.phase==='window'){
+   const a=screen(job.first),b=screen(state.mouse),x=Math.min(a.x,b.x),y=Math.min(a.y,b.y);
+   ctx.save();ctx.fillStyle='rgba(43,216,115,.20)';ctx.strokeStyle='#42e787';
+   ctx.lineWidth=1.4;ctx.setLineDash([7,4]);ctx.fillRect(x,y,Math.abs(a.x-b.x),Math.abs(a.y-b.y));
+   ctx.strokeRect(x,y,Math.abs(a.x-b.x),Math.abs(a.y-b.y));ctx.restore();
+  }else if(job.box){
+   const b=job.box,a=screen(P(b.minX,b.maxY)),c=screen(P(b.maxX,b.minY));
+   ctx.save();ctx.strokeStyle='#42e787';ctx.lineWidth=1;ctx.setLineDash([5,4]);
+   ctx.strokeRect(a.x,a.y,c.x-a.x,c.y-a.y);ctx.restore();
+   if(job.phase==='target'&&job.base){
+    const delta=sub(state.mouse,job.base);
+    for(const e of state.entities){
+     if(!job.ids.includes(e.id))continue;
+     const preview=cadStretchApplyEntity(e,job.box,delta);
+     if(preview)drawEntity(preview,'#73f5ad');
+    }
+   }
   }
  }
  if(state.tool==='zoomWindow'){
@@ -3602,44 +3623,81 @@ function cadTransferLayer(copyOnly){
 }
 /* STRETCH endpoint / polyline vertex: select objects, choose reference grip,
    then destination. Only vertices near the chosen grip move, others stay fixed. */
+// STRETCH crossing window: two corners, base point, displacement/target.
+// Only vertices inside the green crossing window move; outside vertices stay fixed.
+function cadStretchWindowBounds(a,b){
+ return {minX:Math.min(a.x,b.x),maxX:Math.max(a.x,b.x),minY:Math.min(a.y,b.y),maxY:Math.max(a.y,b.y)};
+}
+function cadStretchInside(p,box){
+ const eps=1e-8;
+ return p.x>=box.minX-eps&&p.x<=box.maxX+eps&&p.y>=box.minY-eps&&p.y<=box.maxY+eps;
+}
+function cadStretchApplyEntity(e,box,delta){
+ if(!['line','polyline','rect','circle','ellipse','arc','blockRef','text'].includes(e.type))return null;
+ const inside=p=>cadStretchInside(p,box),shift=p=>inside(p)?add(p,delta):clone(p);
+ const n=clone(e);
+ if(e.type==='line'){
+  if(!inside(e.a)&&!inside(e.b))return null;
+  n.a=shift(e.a);n.b=shift(e.b);
+  if(e.wall2d){
+   // Keep a two-face AEC wall's reference endpoints coherent.
+   n.wall2d=clone(e.wall2d);
+   if(n.wall2d.guideA&&inside(e.a))n.wall2d.guideA=add(n.wall2d.guideA,delta);
+   if(n.wall2d.guideB&&inside(e.b))n.wall2d.guideB=add(n.wall2d.guideB,delta);
+  }
+ }else if(e.type==='polyline'){
+  if(!e.pts?.some(inside))return null;
+  n.pts=e.pts.map(shift);
+ }else if(e.type==='rect'){
+  const x0=Math.min(e.a.x,e.b.x),x1=Math.max(e.a.x,e.b.x),y0=Math.min(e.a.y,e.b.y),y1=Math.max(e.a.y,e.b.y);
+  const pts=[P(x0,y0),P(x1,y0),P(x1,y1),P(x0,y1)];
+  if(!pts.some(inside))return null;
+  const moved=pts.map(shift);
+  // A displaced rectangle may become a trapezoid; preserve its resulting closed boundary.
+  n.type='polyline';n.pts=moved;n.closed=true;delete n.a;delete n.b;
+ }else{
+  const bounds=boundsEntity(e);
+  if(!bounds||bounds.minX<box.minX||bounds.maxX>box.maxX||bounds.minY<box.minY||bounds.maxY>box.maxY)return null;
+  return transformEntity(e,p=>add(p,delta));
+ }
+ return n;
+}
 function cadStretchAt(p){
- const selected=validEditSelection().filter(e=>['line','polyline','rect'].includes(e.type));
- if(!selected.length)return toast('STRETCH: select editable lines, polylines or rectangles first');
- if(!state.modifyCandidate||state.modifyCandidate.kind!=='stretch'){
-  const available=[];
-  for(const e of selected){
-   const vertices=e.type==='rect'?
-    [P(e.a.x,e.a.y),P(e.b.x,e.a.y),P(e.b.x,e.b.y),P(e.a.x,e.b.y)]:
-    e.type==='line'?[e.a,e.b]:e.pts||[];
-   for(const vertex of vertices)available.push({point:vertex,id:e.id});
-  }
-  const nearest=available.sort((x,y)=>dist(x.point,p)-dist(y.point,p))[0];
-  if(!nearest||dist(nearest.point,p)>Math.max(14/state.view.scale,1e-7))return toast('STRETCH: click a selected endpoint / vertex grip');
-  state.modifyCandidate={kind:'stretch',base:clone(nearest.point),ids:selected.map(e=>e.id)};
-  state.stage=[clone(nearest.point)];prompt();schedule();
-  toast('STRETCH: choose new position for selected coincident vertices');
-  return;
+ if(state.tool!=='stretch')return;
+ const job=state.modifyCandidate?.kind==='stretchWindow'?state.modifyCandidate:null;
+ if(!job){
+  state.modifyCandidate={kind:'stretchWindow',phase:'window',first:clone(p)};
+  state.stage=[clone(p)];
+  toast('STRETCH · segunda esquina de la ventana verde');prompt();schedule();return;
  }
- const base=state.modifyCandidate.base,delta=sub(p,base),tol=Math.max(1e-7,5/state.view.scale);
- if(Math.hypot(delta.x,delta.y)<1e-10){state.modifyCandidate=null;state.stage=[];return toast('STRETCH: zero displacement')}
- const eligible=new Set(state.modifyCandidate.ids);
- const replacements=new Map();
+ if(job.phase==='window'){
+  const box=cadStretchWindowBounds(job.first,p);
+  if(box.maxX-box.minX<1e-8||box.maxY-box.minY<1e-8)return toast('STRETCH: definí una zona con ancho y alto');
+  const targets=state.entities.filter(e=>{
+   const layer=layerFor(e);return layer.visible&&!layer.locked&&cadStretchApplyEntity(e,box,P(0,0))!==null;
+  });
+  if(!targets.length)return toast('STRETCH: la ventana no abraza vértices editables');
+  job.box=box;job.ids=targets.map(e=>e.id);job.phase='base';state.stage=[];
+  state.selected=[...job.ids];updateProps();toast('STRETCH · '+targets.length+' objeto(s) · elegí punto base');prompt();schedule();return;
+ }
+ if(job.phase==='base'){
+  job.base=clone(p);job.phase='target';state.stage=[clone(p)];
+  toast('STRETCH · clic destino o escribí distancia y Enter');prompt();schedule();return;
+ }
+ if(job.phase!=='target')return;
+ const delta=sub(p,job.base);
+ if(Math.hypot(delta.x,delta.y)<=1e-10)return toast('STRETCH: desplazamiento cero');
+ const ids=new Set(job.ids),patch=new Map();
  for(const e of state.entities){
-  if(!eligible.has(e.id))continue;
-  const shift=v=>dist(v,base)<=tol?add(v,delta):clone(v);
-  if(e.type==='line'){
-   const n=clone(e);n.a=shift(e.a);n.b=shift(e.b);replacements.set(e.id,n);
-  }else if(e.type==='polyline'){
-   const n=clone(e);n.pts=e.pts.map(shift);replacements.set(e.id,n);
-  }else if(e.type==='rect'){
-   // Preserve all four rectangle edges, even after moving just one corner.
-   const pts=[P(e.a.x,e.a.y),P(e.b.x,e.a.y),P(e.b.x,e.b.y),P(e.a.x,e.b.y)].map(shift);
-   const n=clone(e);n.type='polyline';n.pts=pts;n.closed=true;delete n.a;delete n.b;replacements.set(e.id,n);
-  }
+  if(!ids.has(e.id))continue;
+  const output=cadStretchApplyEntity(e,job.box,delta);
+  if(output)patch.set(e.id,output);
  }
- saveHistory();state.entities=state.entities.map(e=>replacements.get(e.id)||e);
- state.modifyCandidate=null;state.stage=[];updateAll();
- toast('STRETCH: grip updated · '+replacements.size+' selected objects checked');log('STRETCH');
+ if(!patch.size)return toast('STRETCH: no hay vértices para modificar');
+ saveHistory();
+ state.entities=state.entities.map(e=>patch.get(e.id)||e);
+ state.modifyCandidate=null;state.stage=[];state.selected=[...patch.keys()];state.tool='select';
+ updateAll();prompt();toast('STRETCH aplicado · '+patch.size+' objetos · Ctrl+Z deshace');log('STRETCH');
 }
 function cadPolarArray(){
  const sources=validEditSelection();
@@ -4605,6 +4663,17 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
   }
  }
 if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO'||upper==='DESHACER')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE'||upper==='CERRAR')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}
+ // STRETCH: distance + Enter in the mouse-indicated direction from the base point.
+ if(state.tool==='stretch'&&state.modifyCandidate?.phase==='target'){
+  const raw=value.trim().replace(',','.');
+  if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){
+   const length=Number(raw),base=state.modifyCandidate.base,heading=sub(state.mouse,base);
+   const magnitude=Math.hypot(heading.x,heading.y);
+   if(!(length>0))return toast('STRETCH: distancia positiva requerida');
+   const dir=magnitude>1e-9?mul(heading,1/magnitude):P(1,0);
+   return cadStretchAt(add(base,mul(dir,length)));
+  }
+ }
  // Numeric radius for CIRCLE, and direct distance for LINE / PLINE.
  if(state.tool==='circle'&&state.stage.length===1){
   const radius=Number(value.trim().replace(',','.'));
