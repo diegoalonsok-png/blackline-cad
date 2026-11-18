@@ -701,6 +701,27 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .app .status{overflow-x:auto!important;overflow-y:hidden!important;white-space:nowrap!important;scrollbar-width:thin}
 .app .status button,.app .status .hint,.app .status .coords,.app .status .cad-snap-live{flex-shrink:0}
 .app .status #cadStatusManual{font-weight:700;border-color:#6089a4!important}
+/* Horizontal toolbar scroll thumbs stay visually hidden until used.
+   Keep wheel, trackpad, hover and drag scrolling fully operable. */
+#cadTextToolbar,
+.ribbon-shell>.ribbon{
+ scrollbar-color:transparent transparent!important;
+}
+#cadTextToolbar:hover,#cadTextToolbar:focus-within,
+.ribbon-shell>.ribbon:hover,.ribbon-shell>.ribbon:focus-within{
+ scrollbar-color:#788794 transparent!important;
+}
+#cadTextToolbar::-webkit-scrollbar-thumb,
+.ribbon-shell>.ribbon::-webkit-scrollbar-thumb{
+ background:transparent!important;
+}
+#cadTextToolbar:hover::-webkit-scrollbar-thumb,
+#cadTextToolbar:focus-within::-webkit-scrollbar-thumb,
+.ribbon-shell>.ribbon:hover::-webkit-scrollbar-thumb,
+.ribbon-shell>.ribbon:focus-within::-webkit-scrollbar-thumb{
+ background:#788794!important;
+ border-radius:8px;
+}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261113">
 <link rel="stylesheet" href="blackline-modern.css?v=20261116-premium-v3">
