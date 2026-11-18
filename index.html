@@ -5095,6 +5095,37 @@ function autoCutWallForOpening(ref,block){
   });
   generated.push(makePart(edit.first,'first'),makePart(edit.second,'second'));
  }
+ // Close the wall thickness at BOTH jambs, so the opening is not left
+ // as four open-ended wall strokes. These caps belong to the opening and
+ // are regenerated whenever its width or position changes.
+ const byGroup=new Map();
+ for(const edit of edits){
+  const wall=wallLines.find(e=>e.id===edit.id);
+  const group=wall?.wall2d?.group;
+  if(!group)continue;
+  if(!byGroup.has(group))byGroup.set(group,[]);
+  byGroup.get(group).push(edit);
+ }
+ const axis=P(Math.cos(ref.rotation*Math.PI/180),Math.sin(ref.rotation*Math.PI/180));
+ const project=p=>(p.x-ref.p.x)*axis.x+(p.y-ref.p.y)*axis.y;
+ for(const pair of byGroup.values()){
+  if(pair.length!==2)continue;
+  const ends=pair.map(e=>{
+   const candidates=[e.first.b,e.second.a];
+   return {left:candidates.reduce((a,b)=>Math.abs(project(a))<=Math.abs(project(b))?a:b),
+    right:candidates.reduce((a,b)=>Math.abs(project(a)-width)<=Math.abs(project(b)-width)?a:b)};
+  });
+  const wall=wallLines.find(e=>e.id===pair[0].id);
+  if(!wall||dist(ends[0].left,ends[1].left)<1e-9)continue;
+  const createJamb=(a,b,side)=>({
+   id:state.nextId++,type:'line',a:P(a.x,a.y),b:P(b.x,b.y),
+   layer:wall.layer,width:wall.width,
+   autoOpeningJambRef:ref.id,autoOpeningJambSide:side,
+   autoOpeningJambGroup:wall.wall2d?.group
+  });
+  generated.push(createJamb(ends[0].left,ends[1].left,'start'));
+  generated.push(createJamb(ends[0].right,ends[1].right,'end'));
+ }
  state.entities=state.entities.filter(e=>!removed.has(e.id));
  state.entities.push(...generated);
  return edits.length;
@@ -5151,10 +5182,17 @@ function relocateOpeningWithBlock(ref,previous){
  }
  // Restore exactly the original wall lines we cut on insertion, then re-cut
  // for the block's new position. Undo is one operation: the drag's saveHistory.
+ const previousEntities=state.entities,previousNextId=state.nextId;
  const owned=new Set(fragments.map(e=>e.id));
- state.entities=state.entities.filter(e=>!owned.has(e.id));
+ state.entities=state.entities.filter(e=>!owned.has(e.id)&&e.autoOpeningJambRef!==ref.id);
  state.entities.push(...restored);
  const count=autoCutWallForOpening(ref,block);
+ if(count!==groups.size){
+  state.entities=previousEntities;
+  state.nextId=previousNextId;
+  ref.p=P(previous.x,previous.y);
+  return {ok:false,cut:0,reason:'No se pudo reconstruir todo el vano'};
+ }
  return {ok:true,cut:count};
 }
 function insertSelectedBlock(point){
