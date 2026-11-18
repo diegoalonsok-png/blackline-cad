@@ -1944,7 +1944,9 @@ function drawWallMiddleGrip(e){
  ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.restore();
 }
 // Transient non-printable clearances from moving AEC openings to both wall ends.
+let cadOpeningClearanceHits=[];
 function cadDrawOpeningWallClearances(){
+ cadOpeningClearanceHits=[];
  const d=state.drag,placement=cadVertexPlacement;
  let ref=null,point=null;
  if(d?.type==='blockGrip'&&!d.axis){
@@ -1956,6 +1958,10 @@ function cadDrawOpeningWallClearances(){
    const cursor=d?.type==='vertexMoveStart'?snapPoint(world(d.last||d.start)):snapPoint(state.mouse);
    point=add(ref.p,sub(cursor,source.base));
   }
+ }
+ if(!ref&&state.tool==='select'&&state.selected.length===1&&!d&&!placement){
+  ref=state.entities.find(e=>e.id===state.selected[0]&&e.type==='blockRef');
+  point=ref?.p;
  }
  if(!ref||!point)return;
  const def=state.blocks?.[ref.blockName];
@@ -1993,24 +1999,60 @@ function cadDrawOpeningWallClearances(){
   const begin=signed-span/2,end=signed+span/2;
   const left=begin,right=length-end;
   if(left<0||right<0)continue;
-  if(!best||normal<best.normal)best={a,b,tangent,left,right,normal};
+  if(!best||normal<best.normal)best={a,b,tangent,left,right,normal,refId:ref.id,span};
  }
  if(!best)return;
  const fmt=x=>Number(x).toFixed(state.precision)+' '+state.unit;
  const first=add(best.a,mul(best.tangent,best.left));
  const second=add(first,mul(best.tangent,span));
- const draw=(start,end,label)=>{
+ const draw=(start,end,label,side)=>{
   const p=screen(start),q=screen(end),x=(p.x+q.x)/2,y=(p.y+q.y)/2-19;
   ctx.beginPath();ctx.moveTo(p.x,p.y-12);ctx.lineTo(q.x,q.y-12);ctx.stroke();
   for(const tip of [p,q]){ctx.beginPath();ctx.moveTo(tip.x,tip.y-19);ctx.lineTo(tip.x,tip.y-5);ctx.stroke()}
   const w=Math.max(62,ctx.measureText(label).width+14);
+  cadOpeningClearanceHits.push({x:x-w/2,y:y-11,w,h:21,side,wall:best,refId:ref.id});
   ctx.fillStyle='#17252c';ctx.fillRect(x-w/2,y-11,w,21);
   ctx.fillStyle='#fff2c3';ctx.fillText(label,x,y+4);
  };
  ctx.save();ctx.strokeStyle='#ffcf70';ctx.lineWidth=1.2;ctx.setLineDash([]);
  ctx.font='12px Consolas,monospace';ctx.textAlign='center';
- draw(best.a,first,fmt(best.left));draw(second,best.b,fmt(best.right));
+ draw(best.a,first,fmt(best.left),'left');draw(second,best.b,fmt(best.right),'right');
  ctx.restore();
+}
+function cadEditOpeningClearance(hit){
+ const ref=state.entities.find(e=>e.id===hit.refId&&e.type==='blockRef');
+ if(!ref||layerFor(ref).locked||!layerFor(ref).visible)return;
+ const wall=hit.wall,span=wall.span;
+ if(!(span>0))return;
+ document.getElementById('cadClearanceInput')?.remove();
+ const field=document.createElement('input');field.id='cadClearanceInput';
+ field.type='text';field.inputMode='decimal';field.value=Number(wall[hit.side]).toFixed(state.precision);
+ field.setAttribute('aria-label','Distancia desde '+(hit.side==='left'?'inicio':'final')+' del muro, en '+state.unit);
+ field.style.cssText='position:absolute;z-index:120;width:95px;height:28px;text-align:center;background:#123348;color:#fff5cb;border:1px solid #8de0fa;border-radius:5px;font:13px Consolas,monospace;pointer-events:auto';
+ field.style.left=Math.max(4,Math.min(wrap.clientWidth-105,hit.x+hit.w/2-48))+'px';
+ field.style.top=Math.max(4,Math.min(wrap.clientHeight-34,hit.y-4))+'px';
+ const close=()=>{field.remove();canvas.focus({preventScroll:true});schedule()};
+ const commit=()=>{
+  const raw=field.value.trim().replace(',','.');
+  if(!/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(raw)){toast('Ingresá una distancia positiva, por ejemplo 5.20');field.focus();return}
+  const wanted=Number(raw),total=Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y);
+  if(!Number.isFinite(wanted)||wanted<0||wanted+span>total+1e-8){toast('La distancia excede la longitud disponible del muro');field.focus();return}
+  const before=clone(ref.p),oldLeft=wall.left;
+  const delta=hit.side==='left'?wanted-oldLeft:wall.right-wanted;
+  if(Math.abs(delta)<1e-9){close();return}
+  const snapshot=historySnapshot();
+  saveHistory();
+  ref.p=add(ref.p,mul(wall.tangent,delta));
+  const result=relocateOpeningWithBlock(ref,before);
+  if(!result.ok||(state.entities.some(e=>e.autoOpeningRef===ref.id)&&!result.cut)){
+   Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();
+   updateAll();toast(result.reason||'No se pudo reconstruir el vano; movimiento cancelado');close();return;
+  }
+  updateAll();close();toast('Distancia ajustada: '+wanted.toFixed(state.precision)+' '+state.unit+' · Ctrl+Z para deshacer');
+ };
+ field.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();commit()}else if(ev.key==='Escape'){ev.preventDefault();close()}});
+ field.addEventListener('pointerdown',ev=>ev.stopPropagation());
+ wrap.append(field);field.focus();field.select();
 }
 function drawWallDragMeasurement(){
  const d=state.drag;if(d?.type!=='wallMiddleGrip'||!d.preview||!window.BlacklineWallGrip)return;
@@ -3608,7 +3650,12 @@ function registerMiddleClick(time,point){
  lastMiddleClick=isDouble?null:{time,point:P(point.x,point.y)};
  return isDouble;
 }
-canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
+canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
+ if(ev.button===0&&state.tool==='select'&&!state.drag){
+  const mark=cadOpeningClearanceHits.find(h=>ev.offsetX>=h.x&&ev.offsetX<=h.x+h.w&&ev.offsetY>=h.y&&ev.offsetY<=h.y+h.h);
+  if(mark){ev.preventDefault();cadEditOpeningClearance(mark);return}
+ }
+ canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
  if(state.tool==='select'&&cadVertexPlacement){
   state.drag={type:'vertexMovePlace',start:raw,last:raw};return;
@@ -5342,10 +5389,16 @@ function relocateOpeningWithBlock(ref,previous){
  const owned=new Set(fragments.map(e=>e.id));
  state.entities=state.entities.filter(e=>!owned.has(e.id)&&e.autoOpeningJambRef!==ref.id);
  state.entities.push(...restored);
+ // A rectangle's original host ID was removed at the first cut. Rebind it
+ // to the restored source before computing the new opening.
+ const originalRectId=ref.autoOpeningRectId;
+ const sourceRect=restored.find(e=>e.type==='rect');
+ if(sourceRect)ref.autoOpeningRectId=sourceRect.id;
  const count=autoCutWallForOpening(ref,block);
- if(count!==groups.size){
+ if(count!==(sourceRect?1:groups.size)){
   state.entities=previousEntities;
   state.nextId=previousNextId;
+  ref.autoOpeningRectId=originalRectId;
   ref.p=P(previous.x,previous.y);
   return {ok:false,cut:0,reason:'No se pudo reconstruir todo el vano'};
  }
