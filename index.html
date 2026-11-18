@@ -2087,7 +2087,7 @@ function cadOpeningNumericDrag(firstKey){
  const signed=(cursor.x-base.x)*u.x+(cursor.y-base.y)*u.y;
  const commit=()=>{
   const raw=field.value.trim().replace(',','.');
-  if(!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(raw)){toast('Ingresá una distancia: 5.20');field.focus();return}
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Ingresá una distancia: 5.20');field.focus();return}
   const length=Number(raw);
   if(!Number.isFinite(length)){toast('Distancia inválida');return}
   const direction=raw.startsWith('-')?-1:raw.startsWith('+')?1:(signed<0?-1:1);
