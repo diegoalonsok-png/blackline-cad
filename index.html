@@ -1922,6 +1922,9 @@ function findSelectedBlockGrip(raw){
  return best;
 }
 function drawBlockGrips(ref){
+ // Insertion point remains the only geometry grip. Doors/windows additionally
+ // show their original parametric action buttons, not child-geometry grips.
+ cadDrawOpeningQuickGrips(ref);
  const vertex=ref?.p;
  if(!vertex)return;
  const p=screen(vertex);
@@ -3492,8 +3495,16 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  }
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
-  // Block references expose only the insertion-point grip while selected.
-  // Auxiliary resizing / mirror actions remain available in properties.
+  const openingGrip=cadOpeningQuickHit(raw);
+  if(openingGrip){
+   const ref=state.entities.find(e=>e.id===openingGrip.id);
+   if(openingGrip.action==='depth'){cadWindowDepthEditor(ref,{x:ev.clientX,y:ev.clientY});return}
+   if(openingGrip.action==='resize'){
+    state.drag={type:'openingResize',id:openingGrip.id,start:raw,last:raw,startWidth:cadOpeningWidthMeters(ref)};
+    return;
+   }
+   cadOpeningQuickApply(openingGrip);return;
+  }
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
    const entity=state.entities.find(e=>e.id===wallGrip.id);
