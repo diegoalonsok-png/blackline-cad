@@ -157,3 +157,37 @@ test('parametric wall never cuts just one of its two faces',()=>{
  assert.equal(app.state.entities.filter(e=>e.layer==='walls').length,2);
  assert.equal(app.state.history.length,0,'failed opening must not leave an undo entry');
 });
+
+test('parametric door closes both exposed wall jambs at the opening edges',()=>{
+ const app=start();
+ const meta={group:'wall-jamb',thickness:.18,justify:'center',guideA:P(-2,.09),guideB:P(5,.09)};
+ app.state.entities[0].wall2d={...copy(meta),face:0};
+ app.state.entities[1].wall2d={...copy(meta),face:1};
+ app.insertSelectedBlock(P(0,.09));
+ const ref=app.state.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref);
+ const jambs=app.state.entities.filter(e=>e.autoOpeningJambRef===ref.id);
+ assert.equal(jambs.length,2,'two end caps close wall thickness');
+ assert.deepEqual(new Set(jambs.map(e=>e.autoOpeningJambSide)),new Set(['start','end']));
+ for(const jamb of jambs){
+  approx(Math.abs(jamb.a.y-jamb.b.y),.18);
+  approx(jamb.a.x,jamb.b.x);
+ }
+});
+test('moving a parametric door rebuilds the two jambs at its new opening edges',()=>{
+ const app=start();
+ const meta={group:'wall-jamb',thickness:.18,justify:'center',guideA:P(-2,.09),guideB:P(5,.09)};
+ app.state.entities[0].wall2d={...copy(meta),face:0};
+ app.state.entities[1].wall2d={...copy(meta),face:1};
+ app.insertSelectedBlock(P(0,.09));
+ const ref=app.state.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref);
+ const before=app.state.entities.filter(e=>e.autoOpeningJambRef===ref.id).map(e=>e.id);
+ const moved=app.move(ref,1,0);
+ assert.equal(moved.ok,true);
+ const after=app.state.entities.filter(e=>e.autoOpeningJambRef===ref.id);
+ assert.equal(after.length,2);
+ assert.equal(after.some(e=>before.includes(e.id)),false,'stale jambs removed');
+ const x=after.map(e=>e.a.x).sort((a,b)=>a-b);
+ approx(x[0],1);approx(x[1],1.9);
+});
