@@ -1062,7 +1062,7 @@ function cadWallEditableGroups(exclude){
 function cadWallJoinNewFaces(newFaces){
  const groups=cadWallEditableGroups(newFaces[0].wall2d.group);
  const meta=newFaces[0].wall2d;
- const joins=[],tol=Math.max(1e-7,Math.min(meta.thickness*.45,.05*1000/U[state.unit]));
+ const joins=[],tol=Math.max(1e-7,Math.min(meta.thickness*.65,Math.max(.06*1000/U[state.unit],10/Math.max(state.view.scale,.01))));
  const tipOf=(e,which)=>e[which],guideTip=(e,which)=>e.wall2d?.['guide'+(which==='a'?'A':'B')];
  const nearSegment=(p,a,b)=>{
   const v=sub(b,a),den=v.x*v.x+v.y*v.y;
@@ -1076,12 +1076,18 @@ function cadWallJoinNewFaces(newFaces){
   const isCorner=(x,y)=>dist(meta[x],host[y])<=tol;
   let best=null;
   for(const x of ['guideA','guideB'])for(const y of ['guideA','guideB']){
-   const p=meta[x],q=host[y],delta=dist(p,q);
-   if(delta>tol||best&&delta>=best.delta)continue;
+   const p=meta[x],q=host[y];
    const va=sub(meta.guideB,meta.guideA),vb=sub(host.guideB,host.guideA);
    const cross=Math.abs(va.x*vb.y-va.y*vb.x)/(Math.hypot(va.x,va.y)*Math.hypot(vb.x,vb.y));
    if(cross<.04)continue;
-   best={x:x==='guideA'?'a':'b',y:y==='guideA'?'a':'b',delta};
+   // Allow a small offset between wall guides, but only if their projected
+   // intersection is near BOTH actual endpoints: prevents false long-range joins.
+   const intersection=unrestrictedIntersection(meta.guideA,meta.guideB,host.guideA,host.guideB);
+   if(!intersection)continue;
+   const limit=Math.max(tol,Math.min(meta.thickness,host.thickness)*.7);
+   const near=Math.max(dist(intersection,p),dist(intersection,q));
+   if(near>limit||best&&near>=best.delta)continue;
+   best={x:x==='guideA'?'a':'b',y:y==='guideA'?'a':'b',delta:near};
   }
   if(best){
    let chosen=null;
@@ -1118,10 +1124,13 @@ function cadWallJoinNewFaces(newFaces){
     const inside=tip==='a'?sub(face.b,face.a):sub(face.a,face.b);
     const ilen=Math.hypot(inside.x,inside.y)||1;
     // Join the nearer host face on the approaching side, not the far face.
+    // The guide endpoint may land at the host centerline (halfway through
+    // the host thickness), so its nearest face lies BEHIND the endpoint.
+    // Choose the face with the shortest signed travel, not only forward hits.
     const approach=intersections.map(q=>({q,s:((q.x-face[tip].x)*inside.x+(q.y-face[tip].y)*inside.y)/ilen}))
-      .filter(v=>v.s>=-1e-8).sort((a,b)=>a.s-b.s);
+      .sort((a,b)=>Math.abs(a.s)-Math.abs(b.s));
     const target=approach[0]?.q;
-    const max=Math.max(meta.thickness,host.thickness)*2;
+    const max=Math.max(meta.thickness,host.thickness)*1.5;
     if(!target||dist(target,face[tip])>max){possible=false;break}
     faceTargets.push(target);
    }
