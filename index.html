@@ -3718,7 +3718,17 @@ function editCadTextInline(entity,anchor){
  box.style.top=Math.max(8,Math.min(anchor.y+12,window.innerHeight-box.offsetHeight-8))+'px';
  field.focus();field.select();
 }
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();editCadTextInline(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{ev.preventDefault();openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)))});
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();editCadTextInline(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});canvas.addEventListener('contextmenu',ev=>{
+ ev.preventDefault();
+ // CAD convention: right-click in model space is the same as Enter.
+ // Only the standard keyboard Enter behavior is reused; no synthetic geometry clicks.
+ const tag=document.activeElement?.tagName;
+ if(document.activeElement===$('command')&&$('command').value.trim()){runCommand();return}
+ if(['INPUT','TEXTAREA','SELECT'].includes(tag))document.activeElement.blur();
+ if(state.tool==='select'&&cad2dLastCommand){
+  $('command').value=cad2dLastCommand;runCommand();
+ }else finishStage();
+});
 function boundsEntity(e){if(e.type==='blockRef'){
   const boxes=blockChildren(e).map(boundsEntity).filter(Boolean);
   if(!boxes.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
