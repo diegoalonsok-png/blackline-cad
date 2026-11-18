@@ -1376,7 +1376,7 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
    : !inViewport(e,w,h))continue;
   drawEntity(e);
   if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }if(state.stage.length)previewEntity();
+ }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();
  if(cadPrimitiveGripPlacement){
   const candidate=cadPrimitiveGripTransform(cadPrimitiveGripPlacement.original,cadPrimitiveGripPlacement.grip,snapPoint(state.mouse));
   if(candidate)drawEntity(candidate,'#ffce78');
@@ -2031,6 +2031,66 @@ function initGripSettings(){
  show();
 }
 function gripHitRadius(){return Math.max(10,Math.ceil(gripSettings.size/2)+4)}
+// WALL flip grip: flip LEFT/RIGHT justification around the original guide.
+function cadWallFlipCandidates(){
+ const groups=new Map();
+ for(const e of state.entities){
+  if(e.type!=='line'||!e.wall2d||e.autoOpeningRef!==undefined)continue;
+  const layer=layerFor(e);
+  if(!layer.visible||layer.locked)continue;
+  const key=e.wall2d.group;
+  if(!groups.has(key))groups.set(key,[]);
+  groups.get(key).push(e);
+ }
+ const output=[];
+ for(const [group,faces] of groups){
+  if(faces.length!==2||!faces.some(e=>e.wall2d.face===0)||!faces.some(e=>e.wall2d.face===1))continue;
+  if(!faces.some(e=>state.selected.includes(e.id)))continue;
+  const meta=faces[0].wall2d,v=sub(meta.guideB,meta.guideA),length=Math.hypot(v.x,v.y);
+  if(!(length>1e-8))continue;
+  const mid=mul(add(meta.guideA,meta.guideB),.5);
+  const normal=P(-v.y/length,v.x/length);
+  // Locate the action grip away from the wall-face midpoint grips.
+  const gap=Math.max(Number(meta.thickness)*.75,24/Math.max(state.view.scale,.01));
+  output.push({group,faces,meta,point:add(mid,mul(normal,gap))});
+ }
+ return output;
+}
+function cadDrawWallFlipGrips(){
+ ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.5;
+ for(const grip of cadWallFlipCandidates()){
+  const p=screen(grip.point);
+  ctx.fillStyle='#173747';ctx.strokeStyle='#87eaff';
+  ctx.beginPath();ctx.arc(p.x,p.y,11,0,2*Math.PI);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#e6fcff';ctx.font='bold 14px Arial,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('⇄',p.x,p.y+1);
+ }
+ ctx.restore();
+}
+function cadWallFlipHit(raw){
+ return cadWallFlipCandidates().find(g=>dist(screen(g.point),raw)<=13)||null;
+}
+function cadWallFlipJustification(grip){
+ const current=grip.meta.justify||'center';
+ const next=current==='left'?'right':current==='right'?'left':'left';
+ const group=grip.group;
+ const faces=state.entities.filter(e=>e.type==='line'&&e.wall2d?.group===group&&e.autoOpeningRef===undefined);
+ if(faces.length!==2||faces.some(e=>layerFor(e).locked))return toast('WALL: el grupo no está disponible para invertir');
+ // Avoid silently breaking an attached opening; it needs host-aware regeneration.
+ const attached=state.entities.some(e=>e.autoOpeningJambGroup===group||e.autoOpeningOriginal?.wall2d?.group===group);
+ if(attached)return toast('WALL: no se puede invertir con aberturas asociadas sin reconstruir sus vanos');
+ const a=grip.meta.guideA,b=grip.meta.guideB;
+ const rebuilt=cadWallFaces(a,b,Number(grip.meta.thickness),next);
+ if(!rebuilt)return toast('WALL: geometría inválida');
+ saveHistory();
+ for(const face of faces){
+  const part=rebuilt[face.wall2d.face];
+  face.a=clone(part.a);face.b=clone(part.b);
+  face.wall2d.justify=next;
+ }
+ updateAll();
+ toast('WALL · justificación '+(next==='left'?'izquierda':'derecha')+' · Ctrl+Z para deshacer');
+}
 function findWallMiddleGrip(raw){
  if(!window.BlacklineWallGrip)return null;
  let best=null,limit=gripHitRadius();
@@ -4119,6 +4179,8 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   state.drag={type:'vertexMovePlace',start:raw,last:raw};return;
  }
  if(state.tool==='select'&&!ev.shiftKey&&!cadSelectionAnchor){
+  const flip=cadWallFlipHit(raw);
+  if(flip){ev.preventDefault();cadWallFlipJustification(flip);return}
   const primitive=cadPrimitiveGripHit(raw);
   if(primitive){state.drag={type:'primitiveGripStart',start:raw,last:raw,job:primitive};canvas.style.cursor='crosshair';return}
   const hit=cadMoveVertexAt(raw);
