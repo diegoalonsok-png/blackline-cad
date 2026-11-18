@@ -1294,8 +1294,12 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
    ? !BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
    : !inViewport(e,w,h))continue;
   drawEntity(e);
-  if(e.type==='line'&&state.selected.includes(e.id))drawWallMiddleGrip(e);
+  if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(state.stage.length)previewEntity();
+ if(cadPrimitiveGripPlacement){
+  const candidate=cadPrimitiveGripTransform(cadPrimitiveGripPlacement.original,cadPrimitiveGripPlacement.grip,snapPoint(state.mouse));
+  if(candidate)drawEntity(candidate,'#ffce78');
+ }
  if(state.tool==='select'&&(cadSelectionAnchor||state.drag?.type==='selection')){
   const d=state.drag?.type==='selection'?state.drag:null;
   const a=d?.start||cadSelectionAnchor,b=d?.last||pointer;
@@ -3669,6 +3673,114 @@ function cadApplyWindowSelection(start,end,shift,path){
  * A continuous press-and-drag from the same vertex also commits on release.
  * Every member of a multi-selection moves by the same delta, never reshapes. */
 let cadVertexPlacement=null;
+
+/* AutoCAD-style grips for primitive entities. Blocks keep one insertion grip. */
+let cadPrimitiveGripPlacement=null;
+function cadPrimitiveGrips(e){
+ if(!e||!['line','rect','polyline','circle'].includes(e.type))return [];
+ const m=(a,b)=>P((a.x+b.x)/2,(a.y+b.y)/2),g=[];
+ if(e.type==='line'){
+  g.push({p:e.a,kind:'vertex',index:0},{p:e.b,kind:'vertex',index:1},{p:m(e.a,e.b),kind:'move'});
+ }else if(e.type==='polyline'){
+  const pts=e.pts||[];
+  pts.forEach((p,i)=>g.push({p,kind:'vertex',index:i}));
+  for(let i=0;i<pts.length-(e.closed?0:1);i++){
+   const j=(i+1)%pts.length;
+   g.push({p:m(pts[i],pts[j]),kind:'segment',index:i,other:j});
+  }
+ }else if(e.type==='rect'){
+  const x0=Math.min(e.a.x,e.b.x),x1=Math.max(e.a.x,e.b.x);
+  const y0=Math.min(e.a.y,e.b.y),y1=Math.max(e.a.y,e.b.y);
+  [P(x0,y0),P(x1,y0),P(x1,y1),P(x0,y1)].forEach((p,i)=>g.push({p,kind:'corner',index:i}));
+  [P((x0+x1)/2,y0),P(x1,(y0+y1)/2),P((x0+x1)/2,y1),P(x0,(y0+y1)/2)]
+   .forEach((p,i)=>g.push({p,kind:'side',index:i}));
+ }else if(e.type==='circle'){
+  g.push({p:e.c,kind:'center'});
+  for(let i=0;i<4;i++){
+   const a=i*Math.PI/2;
+   g.push({p:P(e.c.x+e.r*Math.cos(a),e.c.y+e.r*Math.sin(a)),kind:'radius',index:i});
+  }
+ }
+ return g;
+}
+function cadPrimitiveGripHit(raw){
+ let found=null,limit=Math.max(7,gripSettings.size*.8);
+ for(const id of state.selected){
+  const e=state.entities.find(obj=>obj.id===id);
+  if(!e||!layerFor(e).visible||layerFor(e).locked)continue;
+  for(const grip of cadPrimitiveGrips(e)){
+   const d=dist(screen(grip.p),raw);
+   if(d<limit){limit=d;found={id,grip,original:clone(e)}}
+  }
+ }
+ return found;
+}
+function cadPrimitiveGripTransform(origin,grip,destination){
+ const e=clone(origin),delta=sub(destination,grip.p);
+ if(e.type==='line'){
+  if(grip.kind==='move'){e.a=add(e.a,delta);e.b=add(e.b,delta)}
+  else e[grip.index===0?'a':'b']=P(destination.x,destination.y);
+ }else if(e.type==='polyline'){
+  if(grip.kind==='segment'){
+   e.pts[grip.index]=add(e.pts[grip.index],delta);
+   e.pts[grip.other]=add(e.pts[grip.other],delta);
+  }else e.pts[grip.index]=P(destination.x,destination.y);
+ }else if(e.type==='rect'){
+  const x0=Math.min(e.a.x,e.b.x),x1=Math.max(e.a.x,e.b.x);
+  const y0=Math.min(e.a.y,e.b.y),y1=Math.max(e.a.y,e.b.y);
+  let lx=x0,hx=x1,ly=y0,hy=y1;
+  if(grip.kind==='corner'){
+   if(grip.index===0||grip.index===3)lx=destination.x;else hx=destination.x;
+   if(grip.index===0||grip.index===1)ly=destination.y;else hy=destination.y;
+  }else{
+   if(grip.index===0)ly=destination.y;
+   if(grip.index===1)hx=destination.x;
+   if(grip.index===2)hy=destination.y;
+   if(grip.index===3)lx=destination.x;
+  }
+  if(Math.abs(hx-lx)<1e-8||Math.abs(hy-ly)<1e-8)return null;
+  e.a=P(lx,ly);e.b=P(hx,hy);
+ }else if(e.type==='circle'){
+  if(grip.kind==='center')e.c=P(destination.x,destination.y);
+  else{
+   const axes=[P(1,0),P(0,1),P(-1,0),P(0,-1)];
+   const axis=axes[grip.index],radius=(destination.x-e.c.x)*axis.x+(destination.y-e.c.y)*axis.y;
+   if(!(radius>1e-8))return null;
+   e.r=radius;
+  }
+ }
+ return e;
+}
+function cadPrimitiveGripCommit(job,dest){
+ const e=state.entities.find(x=>x.id===job.id);
+ if(!e||layerFor(e).locked)return false;
+ const result=cadPrimitiveGripTransform(job.original,job.grip,dest);
+ if(!result)return false;
+ if(JSON.stringify(result)===JSON.stringify(job.original))return false;
+ saveHistory();
+ const i=state.entities.findIndex(x=>x.id===job.id);
+ state.entities[i]=result;updateAll();return true;
+}
+function cadDrawPrimitiveGrips(e){
+ const grips=cadPrimitiveGrips(e);if(!grips.length)return;
+ ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.3;
+ for(const grip of grips){
+  const p=screen(grip.p),h=Math.max(3,gripSettings.size*.38);
+  ctx.strokeStyle='#123848';ctx.fillStyle=grip.kind==='segment'?'#75dff7':'#ffce78';
+  if(grip.kind==='segment'){
+   // Short centered bar, visibly different from editable polyline vertices.
+   ctx.fillRect(p.x-h*1.5,p.y-2,h*3,4);ctx.strokeRect(p.x-h*1.5,p.y-2,h*3,4);
+  }else{
+   ctx.fillRect(p.x-h,p.y-h,2*h,2*h);ctx.strokeRect(p.x-h,p.y-h,2*h,2*h);
+  }
+ }
+ ctx.restore();
+}
+function cadPrimitiveGripCancel(){
+ if(!cadPrimitiveGripPlacement)return false;
+ cadPrimitiveGripPlacement=null;state.drag=null;canvas.style.cursor='';schedule();return true;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&cadPrimitiveGripPlacement){e.preventDefault();cadPrimitiveGripCancel()}},true);
 function cadMoveVertexAt(raw){
  const selected=new Set(state.selected);
  let best=null,bestDist=10;
@@ -3728,10 +3840,15 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
  }
  canvas.setPointerCapture(ev.pointerId);canvas.focus({preventScroll:true});const raw=P(ev.offsetX,ev.offsetY);if(ev.button===1||spaceDown||state.tool==='pan'){state.drag={type:'pan',middle:ev.button===1,start:raw,last:raw,origin:P(state.view.ox,state.view.oy)};return}if(ev.button!==0)return;
  if(state.tool==='zoomWindow'){state.drag={type:'zoomWindow',start:raw,last:raw};return}
+ if(state.tool==='select'&&cadPrimitiveGripPlacement){
+  state.drag={type:'primitiveGripPlace',start:raw,last:raw};return;
+ }
  if(state.tool==='select'&&cadVertexPlacement){
   state.drag={type:'vertexMovePlace',start:raw,last:raw};return;
  }
  if(state.tool==='select'&&!ev.shiftKey&&!cadSelectionAnchor){
+  const primitive=cadPrimitiveGripHit(raw);
+  if(primitive){state.drag={type:'primitiveGripStart',start:raw,last:raw,job:primitive};canvas.style.cursor='crosshair';return}
   const hit=cadMoveVertexAt(raw);
   if(hit){
    state.drag={type:'vertexMoveStart',start:raw,last:raw,vertex:hit.vertex,
@@ -3807,6 +3924,16 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
+ if(d.type==='primitiveGripStart'){
+  if(dist(raw,d.start)>5){cadPrimitiveGripCommit(d.job,snapPoint(world(raw)));schedule()}
+  else{cadPrimitiveGripPlacement=d.job;canvas.style.cursor='crosshair';schedule();toast('Grip activo · mové el mouse, clic para confirmar o Esc para cancelar')}
+  return;
+ }
+ if(d.type==='primitiveGripPlace'){
+  const job=cadPrimitiveGripPlacement;cadPrimitiveGripPlacement=null;canvas.style.cursor='';
+  if(job)cadPrimitiveGripCommit(job,snapPoint(world(raw)));
+  schedule();return;
+ }
  if(d.type==='vertexMoveStart'){
   const placement={ids:d.ids,base:d.vertex,preview:snapPoint(world(raw))};
   cadVertexPlacement=placement;
@@ -3874,6 +4001,7 @@ canvas.addEventListener('pointerup',ev=>{
  if(d.type==='selection'){if(dist(d.path.at(-1),raw)>0.5)d.path.push(P(raw.x,raw.y));cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
  const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
 canvas.addEventListener('pointercancel',ev=>{
+ if(state.drag?.type==='primitiveGripStart'||state.drag?.type==='primitiveGripPlace'){state.drag=null;cadPrimitiveGripPlacement=null;canvas.style.cursor='';schedule();return}
  if(state.drag?.type==='vertexMoveStart'||state.drag?.type==='vertexMovePlace'){state.drag=null;cadVertexPlacement=null;canvas.style.cursor='';schedule();return}
  const d=state.drag;if(d?.type==='openingResize'){state.drag=null;canvas.style.cursor='';schedule();return}
  if(d?.type==='wallMiddleGrip'){state.drag=null;canvas.style.cursor='';schedule();return}
