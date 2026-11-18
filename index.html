@@ -2964,6 +2964,7 @@ function cadHatchCreate(boundaries){
   }
  }
  if(!created.length)return toast('HATCH: no se pudo generar');
+ if(created.length>12000)return toast('HATCH: demasiadas líneas; aumentá el espaciado');
  saveHistory();for(const entity of created){entity.id=state.nextId++;state.entities.push(entity)}
  state.selected=[];state.tool='select';state.stage=[];updateAll();log('HATCH');
  toast(style==='solid'?'Relleno sólido aplicado':'HATCH creado · '+created.length+' segmentos');
