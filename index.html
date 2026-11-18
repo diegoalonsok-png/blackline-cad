@@ -5149,6 +5149,8 @@ function insertSelectedBlock(point){
  const block=selectedBlock();if(!block)return toast('Choose a block first');
  const factor=Number($('blockScale').value),angle=Number($('blockRotation').value);
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
+ // Keep the original wall intact if we detect a two-face wall but cannot cut BOTH faces.
+ const beforeInsertion=historySnapshot();
  saveHistory();
  const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
  if(block.dynamic2d){const b=blDynBounds(block);if(b)ref.dynamic={width:b.width,height:b.height}}
@@ -5170,6 +5172,15 @@ function insertSelectedBlock(point){
  const aligned=cadAlignOpeningToWall(ref,block,point);
  state.entities.push(ref);
  const cutCount=openingOverlapsAnother(ref,block)?0:autoCutWallForOpening(ref,block);
+ if(aligned&&autoOpeningEnabled&&cutCount<2){
+  // No door/window should visually cover a solid wall when its opening failed.
+  // Roll back the whole insertion (block, partial splits, ID allocation and undo snapshot).
+  Object.assign(state,beforeInsertion);
+  if(state.history.length)state.history.pop();
+  syncCadHeaderHistoryButtons();updateAll();
+  toast('No se pudo abrir el vano en ambas caras del muro. No se insertó la abertura.');
+  return;
+ }
  const repeat=Boolean(state.galleryRepeatedInsert);
  state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
