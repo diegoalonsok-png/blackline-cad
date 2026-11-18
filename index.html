@@ -1342,7 +1342,7 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
   ctx.fillStyle='#ffe15a';ctx.fillRect(a.x-3,a.y-3,6,6);ctx.restore();
  }
- drawOtrackGuides();drawWallDragMeasurement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
+ drawOtrackGuides();drawWallDragMeasurement();cadDrawOpeningWallClearances();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
@@ -1942,6 +1942,75 @@ function drawWallMiddleGrip(e){
  const half=gripSettings.size/2;
  ctx.save();ctx.fillStyle=gripSettings.wallColor;ctx.strokeStyle='#172734';ctx.lineWidth=1.5;
  ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.restore();
+}
+// Transient non-printable clearances from moving AEC openings to both wall ends.
+function cadDrawOpeningWallClearances(){
+ const d=state.drag,placement=cadVertexPlacement;
+ let ref=null,point=null;
+ if(d?.type==='blockGrip'&&!d.axis){
+  ref=state.entities.find(e=>e.id===d.id&&e.type==='blockRef');point=ref?.p;
+ }else if((d?.type==='vertexMoveStart'||placement)&&state.tool==='select'){
+  const source=d?.type==='vertexMoveStart'?d:placement;
+  ref=state.entities.find(e=>source?.ids?.includes(e.id)&&e.type==='blockRef');
+  if(ref){
+   const cursor=d?.type==='vertexMoveStart'?snapPoint(world(d.last||d.start)):snapPoint(state.mouse);
+   point=add(ref.p,sub(cursor,source.base));
+  }
+ }
+ if(!ref||!point)return;
+ const def=state.blocks?.[ref.blockName];
+ if(!['swing-door','double-door','framed-window'].includes(def?.parametric?.kind))return;
+ const span=Number(ref.params?.width??def.parametric.defaults.width)*(Number(ref.scale)||1);
+ if(!(span>0))return;
+ const theta=(Number(ref.rotation)||0)*Math.PI/180,u=P(Math.cos(theta),Math.sin(theta));
+ const midpoint=add(point,mul(u,span/2));
+ let best=null;
+ const candidates=[];
+ for(const e of state.entities){
+  if(e.type==='rect'){
+   const original=e.autoOpeningOriginal?.type==='rect'?e.autoOpeningOriginal:e;
+   if(!candidates.some(c=>c.source===original.id))candidates.push({source:original.id,entity:original});
+  }else if(e.type==='line'&&e.wall2d){
+   const center=cadWallCenterline(e.wall2d);
+   if(center)candidates.push({source:e.wall2d.group,entity:{type:'axis',a:center.a,b:center.b,thickness:e.wall2d.thickness}});
+  }
+ }
+ for(const candidate of candidates){
+  const e=candidate.entity;
+  let a,b,thickness;
+  if(e.type==='rect'){
+   const minX=Math.min(e.a.x,e.b.x),maxX=Math.max(e.a.x,e.b.x),minY=Math.min(e.a.y,e.b.y),maxY=Math.max(e.a.y,e.b.y);
+   const horizontal=(maxX-minX)>(maxY-minY);
+   a=horizontal?P(minX,(minY+maxY)/2):P((minX+maxX)/2,minY);
+   b=horizontal?P(maxX,(minY+maxY)/2):P((minX+maxX)/2,maxY);
+   thickness=horizontal?maxY-minY:maxX-minX;
+  }else{a=e.a;b=e.b;thickness=e.thickness}
+  const v=sub(b,a),length=Math.hypot(v.x,v.y);
+  if(!(length>span)||Math.abs((v.x*u.y-v.y*u.x)/length)>1e-3)continue;
+  const tangent=mul(v,1/length),signed=(midpoint.x-a.x)*tangent.x+(midpoint.y-a.y)*tangent.y;
+  const normal=Math.abs((midpoint.x-a.x)*(-tangent.y)+(midpoint.y-a.y)*tangent.x);
+  if(normal>thickness/2+Math.max(.1*1000/U[state.unit],12/state.view.scale))continue;
+  const begin=signed-span/2,end=signed+span/2;
+  const left=begin,right=length-end;
+  if(left<0||right<0)continue;
+  if(!best||normal<best.normal)best={a,b,tangent,left,right,normal};
+ }
+ if(!best)return;
+ const fmt=x=>(x*U[state.unit]/1000).toFixed(2)+' m';
+ const first=add(best.a,mul(best.tangent,best.left));
+ const second=add(first,mul(best.tangent,span));
+ const draw=(start,end,label)=>{
+  const p=screen(start),q=screen(end),x=(p.x+q.x)/2,y=(p.y+q.y)/2-19;
+  ctx.beginPath();ctx.moveTo(p.x,p.y-12);ctx.lineTo(q.x,q.y-12);ctx.stroke();
+  for(const tip of [p,q]){ctx.beginPath();ctx.moveTo(tip.x,tip.y-19);ctx.lineTo(tip.x,tip.y-5);ctx.stroke()}
+  const w=Math.max(62,ctx.measureText(label).width+14);
+  ctx.fillStyle='#17252c';ctx.fillRect(x-w/2,y-11,w,21);
+  ctx.fillStyle='#fff2c3';ctx.fillText(label,x,y+4);
+ };
+ ctx.save();ctx.strokeStyle='#ffcf70';ctx.lineWidth=1.2;ctx.setLineDash([]);
+ ctx.font='12px Consolas,monospace';ctx.textAlign='center';
+ draw(best.a,first,fmt(best.left));draw(second,best.b,fmt(best.right));
+ ctx.restore();
 }
 function drawWallDragMeasurement(){
  const d=state.drag;if(d?.type!=='wallMiddleGrip'||!d.preview||!window.BlacklineWallGrip)return;
