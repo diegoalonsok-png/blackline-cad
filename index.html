@@ -1283,7 +1283,7 @@ function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
   ctx.fillStyle='#ffe15a';ctx.fillRect(a.x-3,a.y-3,6,6);ctx.restore();
  }
- drawOtrackGuides();drawWallDragMeasurement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
+ drawOtrackGuides();drawWallDragMeasurement();cadDrawOpeningWallClearances();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
@@ -1883,6 +1883,80 @@ function drawWallMiddleGrip(e){
  const half=gripSettings.size/2;
  ctx.save();ctx.fillStyle=gripSettings.wallColor;ctx.strokeStyle='#172734';ctx.lineWidth=1.5;
  ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.restore();
+}
+/* AutoCAD Architecture-like temporary opening clearances.
+ * The authoritative wall endpoints are read from the linked 2D wall metadata;
+ * these guide dimensions never create CAD entities or enter print/export. */
+function cadOpeningWallClearances(ref,point=ref?.p,widthOverride=null){
+ if(!ref||ref.type!=='blockRef'||!point)return null;
+ const def=state.blocks?.[ref.blockName],kind=def?.parametric?.kind;
+ if(!['swing-door','double-door','framed-window'].includes(kind))return null;
+ const wall=state.entities.find(e=>e.autoOpeningRef===ref.id&&e.wall2d?.guideA&&e.wall2d?.guideB);
+ if(!wall)return null;
+ const line=cadWallCenterline(wall.wall2d);
+ if(!line)return null;
+ const width=widthOverride??Number(ref.params?.width??def.parametric.defaults?.width)*(Number(ref.scale)||1);
+ if(!Number.isFinite(width)||width<=0)return null;
+ const angle=(Number(ref.rotation)||0)*Math.PI/180,unit=P(Math.cos(angle),Math.sin(angle));
+ const along=q=>(q.x-point.x)*unit.x+(q.y-point.y)*unit.y;
+ const ends=[along(line.a),along(line.b)].sort((a,b)=>a-b);
+ const left=-ends[0],right=ends[1]-width;
+ if(![left,right].every(Number.isFinite))return null;
+ return {left,right,width,origin:point,direction:unit,
+  leftEnd:P(point.x+unit.x*ends[0],point.y+unit.y*ends[0]),
+  rightEnd:P(point.x+unit.x*ends[1],point.y+unit.y*ends[1])};
+}
+function cadDrawOpeningWallClearances(){
+ if(state.tool!=='select')return;
+ const d=state.drag,placement=cadVertexPlacement;
+ const ids=d?.type==='vertexMoveStart'?d.ids:placement?.ids;
+ const movingIds=ids?new Set(ids):null;
+ const refs=state.entities.filter(e=>e.type==='blockRef'&&
+   (movingIds?movingIds.has(e.id):state.selected.includes(e.id))&&layerFor(e).visible);
+ // One set of dimension callouts at a time, avoiding overlapping labels.
+ if(refs.length!==1)return;
+ const ref=refs[0];
+ let point=ref.p,width=null;
+ if(d?.type==='vertexMoveStart'||placement){
+  const move=d?.type==='vertexMoveStart'?{base:d.vertex,last:d.last}: {base:placement.base,last:pointer};
+  const delta=sub(snapPoint(world(move.last)),move.base);
+  point=P(ref.p.x+delta.x,ref.p.y+delta.y);
+ }else if(d?.type==='blockGrip'&&d.id===ref.id){
+  point=P(ref.p.x,ref.p.y);
+ }else if(d?.type==='openingResize'&&d.id===ref.id){
+  const theta=(Number(ref.rotation)||0)*Math.PI/180,a=world(d.start),b=world(d.last);
+  width=(d.startWidth+((b.x-a.x)*Math.cos(theta)+(b.y-a.y)*Math.sin(theta))*U[state.unit]/1000)*1000/U[state.unit];
+ }
+ const measure=cadOpeningWallClearances(ref,point,width);
+ if(!measure)return;
+ const p0=screen(measure.origin);
+ const p1=screen(P(point.x+measure.direction.x*measure.width,point.y+measure.direction.y*measure.width));
+ const left=screen(measure.leftEnd),right=screen(measure.rightEnd);
+ const offset=P(-measure.direction.y*29,measure.direction.x*29);
+ const pairs=[
+  {from:left,to:p0,value:measure.left,label:'Esquina izq.'},
+  {from:p1,to:right,value:measure.right,label:'Esquina der.'}
+ ];
+ ctx.save();ctx.lineWidth=1.15;ctx.font='12px Consolas,monospace';
+ for(const item of pairs){
+  const a=P(item.from.x+offset.x,item.from.y-offset.y),
+   b=P(item.to.x+offset.x,item.to.y-offset.y);
+  if(Math.hypot(a.x-b.x)<14&&Math.abs(a.y-b.y)<14)continue;
+  const valid=item.value>=-1e-8;
+  ctx.strokeStyle=valid?'#8ce3f0':'#ff9b83';
+  ctx.fillStyle=ctx.strokeStyle;ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(item.from.x,item.from.y);ctx.lineTo(a.x,a.y);
+  ctx.moveTo(item.to.x,item.to.y);ctx.lineTo(b.x,b.y);
+  ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.setLineDash([]);
+  const mid=P((a.x+b.x)/2,(a.y+b.y)/2);
+  const label=item.label+' '+units(item.value)+' '+state.unit;
+  const w=ctx.measureText(label).width+12;
+  ctx.fillStyle='#172731';ctx.fillRect(mid.x-w/2,mid.y-19,w,20);
+  ctx.strokeStyle=valid?'#8ce3f0':'#ff9b83';ctx.strokeRect(mid.x-w/2,mid.y-19,w,20);
+  ctx.fillStyle=valid?'#d6f5ff':'#ffb5a7';
+  ctx.fillText(label,mid.x-w/2+6,mid.y-5);
+ }
+ ctx.restore();
 }
 function drawWallDragMeasurement(){
  const d=state.drag;if(d?.type!=='wallMiddleGrip'||!d.preview||!window.BlacklineWallGrip)return;
