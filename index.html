@@ -1835,30 +1835,9 @@ function blockChildren(ref){
 }
 /* Block grip editing: translate the reference rather than exploding its children. */
 function blockGripPoints(ref){
- if(ref.type!=='blockRef')return [];
- if(blDynHandles(ref).length)return [ref.p,...blDynHandles(ref).map(h=>h.point)];
- const points=[ref.p],seen=new Set(),unique=[];
- for(const entity of blockChildren(ref)){
-  if(entity.type==='line'||entity.type==='dimension')points.push(entity.a,entity.b);
-  else if(entity.type==='rect'&&entity.a&&entity.b)
-   points.push(entity.a,entity.b,P(entity.a.x,entity.b.y),P(entity.b.x,entity.a.y));
-  else if(entity.type==='polyline'&&entity.pts)points.push(...entity.pts);
-  else if(entity.type==='text')points.push(entity.p);
-  else if((entity.type==='circle'||entity.type==='arc')&&entity.c){
-   points.push(entity.c);
-   if(Number.isFinite(entity.r)){
-    if(entity.type==='circle')for(const angle of [0,Math.PI/2,Math.PI,3*Math.PI/2])points.push(P(entity.c.x+entity.r*Math.cos(angle),entity.c.y+entity.r*Math.sin(angle)));
-    else for(const angle of [entity.a0,entity.a1])points.push(P(entity.c.x+entity.r*Math.cos(angle),entity.c.y+entity.r*Math.sin(angle)));
-   }
-  }
-  else if(entity.type==='ellipse'&&entity.c)points.push(entity.c);
- }
- for(const p of points){
-  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
-  const key=p.x.toFixed(8)+','+p.y.toFixed(8);
-  if(!seen.has(key)){seen.add(key);unique.push(P(p.x,p.y));if(unique.length>=160)break}
- }
- return unique;
+ // A block reference is one grouped object: a single insertion-point grip.
+ // Width/height, rotation and mirroring remain editable in block properties.
+ return ref?.type==='blockRef'&&ref.p?[ref.p]:[];
 }
 function isEditableWall(e){
  if(!e||e.type!=='line'||e.autoOpeningRef!==undefined)return false;
@@ -1937,32 +1916,25 @@ function findSelectedBlockGrip(raw){
  for(const id of state.selected){
   const e=state.entities.find(entity=>entity.id===id);
   if(!e||e.type!=='blockRef'||!layerFor(e).visible||layerFor(e).locked)continue;
-  for(const vertex of blockGripPoints(e)){
-   const d=dist(raw,screen(vertex));
-   if(d<limit){limit=d;best={id,vertex}}
-  }
-  for(const handle of blDynHandles(e)){
-   const d=dist(raw,screen(handle.point));if(d<limit){limit=d;best={id,vertex:handle.point,axis:handle.axis}}
-  }
+  const d=dist(raw,screen(e.p));
+  if(d<limit){limit=d;best={id,vertex:e.p}}
  }
  return best;
 }
 function drawBlockGrips(ref){
- cadDrawOpeningQuickGrips(ref);
- cadDrawGenericBlockGrips(ref);
+ const vertex=ref?.p;
+ if(!vertex)return;
+ const p=screen(vertex);
+ if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;
  const half=gripSettings.size/2;
- ctx.save();ctx.fillStyle=gripSettings.blockColor;ctx.strokeStyle='#143244';ctx.lineWidth=1;
- for(const vertex of blockGripPoints(ref)){
-  const p=screen(vertex);
-  if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;
-  ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);
- }
+ ctx.save();
+ ctx.setLineDash([]);
+ ctx.fillStyle=gripSettings.blockColor;
+ ctx.strokeStyle='#143244';
+ ctx.lineWidth=1;
+ ctx.fillRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);
+ ctx.strokeRect(p.x-half,p.y-half,gripSettings.size,gripSettings.size);
  ctx.restore();
- if(blDynHandles(ref).length){
-  ctx.save();ctx.fillStyle='#ffdc5f';ctx.strokeStyle='#513b0e';ctx.lineWidth=1.5;
-  for(const h of blDynHandles(ref)){const p=screen(h.point),a=gripSettings.size/2+2;ctx.beginPath();ctx.moveTo(p.x,p.y-a);ctx.lineTo(p.x+a,p.y);ctx.lineTo(p.x,p.y+a);ctx.lineTo(p.x-a,p.y);ctx.closePath();ctx.fill();ctx.stroke()}
-  ctx.restore();
- }
 }
 function blockGripTargetPoint(d,raw){
  const origin=world(raw),startWorld=world(d.start);
@@ -1996,7 +1968,7 @@ function flattenCADEntities(entities){return entities.flatMap(e=>{
 function drawEntity(e,forceColor){if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
-  if(state.selected.includes(e.id)){
+  if(state.selected.includes(e.id)&&!forceColor){
    drawBlockGrips(e);
   }
   return;
@@ -3519,19 +3491,8 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;canvas.setPoi
  }
  if(state.tool==='select'&&cadSelectionAnchor){state.drag={type:'selectionSecond',start:raw,last:raw,shift:ev.shiftKey};return}
  if(state.tool==='select'&&!ev.shiftKey){
-  const genericGrip=cadGenericGripHit(raw);
-  if(genericGrip){cadGenericBlockAction(genericGrip);return}
-  const openingGrip=cadOpeningQuickHit(raw);
-  if(openingGrip){
-    if(openingGrip.action==='depth'){
-     const ref=state.entities.find(e=>e.id===openingGrip.id);cadWindowDepthEditor(ref,{x:ev.clientX,y:ev.clientY});return;
-    }
-    if(openingGrip.action==='resize'){
-     const ref=state.entities.find(e=>e.id===openingGrip.id);
-     state.drag={type:'openingResize',id:openingGrip.id,start:raw,last:raw,startWidth:cadOpeningWidthMeters(ref)};return;
-    }
-    cadOpeningQuickApply(openingGrip);return;
-   }
+  // Block references expose only the insertion-point grip while selected.
+  // Auxiliary resizing / mirror actions remain available in properties.
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
    const entity=state.entities.find(e=>e.id===wallGrip.id);
