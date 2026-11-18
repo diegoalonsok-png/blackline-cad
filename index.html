@@ -2034,7 +2034,7 @@ function cadEditOpeningClearance(hit){
  const close=()=>{field.remove();canvas.focus({preventScroll:true});schedule()};
  const commit=()=>{
   const raw=field.value.trim().replace(',','.');
-  if(!/^(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(raw)){toast('Ingresá una distancia positiva, por ejemplo 5.20');field.focus();return}
+  if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Ingresá una distancia positiva, por ejemplo 5.20');field.focus();return}
   const wanted=Number(raw),total=Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y);
   if(!Number.isFinite(wanted)||wanted<0||wanted+span>total+1e-8){toast('La distancia excede la longitud disponible del muro');field.focus();return}
   const before=clone(ref.p),oldLeft=wall.left;
