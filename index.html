@@ -2079,7 +2079,7 @@ function cadOpeningNumericDrag(firstKey){
  const cancel=()=>{label.remove();schedule()};
  const commit=()=>{
   const raw=label.value.trim().replace(',','.');
-  if(!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(raw)){toast('Ingresá una distancia, por ejemplo 5.20');label.focus();return}
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Ingresá una distancia, por ejemplo 5.20');label.focus();return}
   const distance=Number(raw);
   if(!Number.isFinite(distance)){cancel();return}
   const original=P(d.original.x,d.original.y),theta=Number(ref.rotation||0)*Math.PI/180;
