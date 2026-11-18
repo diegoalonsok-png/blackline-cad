@@ -35,10 +35,10 @@ test('opening insertion is atomic if both wall faces cannot be opened',()=>{
  assert.match(main,/No se pudo abrir el vano en ambas caras/);
 });
 
-test('only insertion-point grip is drawn on a selected block',()=>{
+test('blocks keep one geometry grip while openings restore their parametric action controls',()=>{
  assert.match(main,/function blockGripPoints\(ref\)\{[\s\S]*?return ref\?\.type==='blockRef'&&ref\.p\?\[ref\.p\]:\[\];/);
  const code=main.slice(main.indexOf('function drawBlockGrips(ref){'),main.indexOf('function blockGripTargetPoint(d,raw){'));
- assert.ok(!code.includes('cadDrawOpeningQuickGrips('));
+ assert.ok(code.includes('cadDrawOpeningQuickGrips(ref)'));
  assert.ok(!code.includes('cadDrawGenericBlockGrips('));
  assert.ok(!code.includes('blDynHandles('));
 });
