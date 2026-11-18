@@ -2034,11 +2034,15 @@ function cadEditOpeningClearance(hit){
  const close=()=>{field.remove();canvas.focus({preventScroll:true});schedule()};
  const commit=()=>{
   const raw=field.value.trim().replace(',','.');
-  if(!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Ingresá una distancia positiva, por ejemplo 5.20');field.focus();return}
-  const wanted=Number(raw),total=Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y);
-  if(!Number.isFinite(wanted)||wanted<0||wanted+span>total+1e-8){toast('La distancia excede la longitud disponible del muro');field.focus();return}
+  // Absolute edge-to-wall distance: 5.20; relative movement: +0.50 / -0.50.
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw)){toast('Distancia: 5.20 · Desplazar: +0.50 o -0.50');field.focus();return}
+  const relative=/^[+-]/.test(raw),amount=Number(raw);
   const before=clone(ref.p),oldLeft=wall.left;
-  const delta=hit.side==='left'?wanted-oldLeft:wall.right-wanted;
+  const delta=relative?amount*(hit.side==='left'?1:-1):
+   (hit.side==='left'?amount-oldLeft:wall.right-amount);
+  const wanted=hit.side==='left'?oldLeft+delta:wall.right-delta;
+  const total=Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y);
+  if(!Number.isFinite(wanted)||wanted<0||wanted+span>total+1e-8){toast('La posición excede los límites del muro');field.focus();return}
   if(Math.abs(delta)<1e-9){close();return}
   const snapshot=historySnapshot();
   saveHistory();
@@ -2054,6 +2058,58 @@ function cadEditOpeningClearance(hit){
  field.addEventListener('pointerdown',ev=>ev.stopPropagation());
  wrap.append(field);field.focus();field.select();
 }
+// Precise direct-distance move of the selected door/window during a grip drag.
+// Press a number, Enter; the opening follows the wall axis and keeps its width.
+function cadOpeningNumericDrag(firstKey){
+ const d=state.drag;
+ if(d?.type!=='blockGrip'||d.axis)return;
+ const ref=state.entities.find(e=>e.id===d.id&&e.type==='blockRef');
+ const def=state.blocks?.[ref?.blockName];
+ if(!ref||!['swing-door','double-door','framed-window'].includes(def?.parametric?.kind))return;
+ const existing=document.getElementById('cadOpeningMoveInput');
+ if(existing)return;
+ const label=document.createElement('input');
+ label.id='cadOpeningMoveInput';label.type='text';label.inputMode='decimal';
+ label.value=firstKey;label.placeholder='Desplazar, ej. 5.20';
+ label.setAttribute('aria-label','Distancia de desplazamiento de la abertura, en '+state.unit);
+ const pos=screen(ref.p);
+ label.style.cssText='position:absolute;z-index:130;width:145px;height:33px;text-align:center;background:#152d3a;color:#fff4c5;border:1px solid #8bd8ed;border-radius:5px;font:14px Consolas,monospace';
+ label.style.left=Math.max(5,Math.min(wrap.clientWidth-155,pos.x+20))+'px';
+ label.style.top=Math.max(5,Math.min(wrap.clientHeight-40,pos.y-44))+'px';
+ const cancel=()=>{label.remove();schedule()};
+ const commit=()=>{
+  const raw=label.value.trim().replace(',','.');
+  if(!/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$/.test(raw)){toast('Ingresá una distancia, por ejemplo 5.20');label.focus();return}
+  const distance=Number(raw);
+  if(!Number.isFinite(distance)){cancel();return}
+  const original=P(d.original.x,d.original.y),theta=Number(ref.rotation||0)*Math.PI/180;
+  const axis=P(Math.cos(theta),Math.sin(theta));
+  const movement=sub(ref.p,original),signed=movement.x*axis.x+movement.y*axis.y;
+  const direction=raw.startsWith('-')?-1:raw.startsWith('+')?1:(signed<0?-1:1);
+  const desired=add(original,mul(axis,Math.abs(distance)*direction));
+  const hadOpening=state.entities.some(e=>e.autoOpeningRef===ref.id);
+  const snap=historySnapshot();
+  if(!d.moved)saveHistory();
+  ref.p=desired;
+  const outcome=relocateOpeningWithBlock(ref,original);
+  if(!outcome.ok||(hadOpening&&!outcome.cut)){
+   Object.assign(state,snap);if(!d.moved&&state.history.length)state.history.pop();
+   syncCadHeaderHistoryButtons();state.drag=null;cancel();updateAll();
+   toast(outcome.reason||'No se pudo mover la abertura sin perder el vano');return;
+  }
+  state.drag=null;label.remove();updateAll();
+  toast('Desplazamiento aplicado: '+(Math.abs(distance)*direction).toFixed(state.precision)+' '+state.unit);
+ };
+ label.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();commit()}else if(ev.key==='Escape'){ev.preventDefault();cancel()}});
+ label.addEventListener('pointerdown',ev=>ev.stopPropagation());
+ wrap.append(label);label.focus();label.setSelectionRange(label.value.length,label.value.length);
+}
+document.addEventListener('keydown',ev=>{
+ if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName))return;
+ if(state.drag?.type==='blockGrip'&&!state.drag.axis&&/^[0-9.+-]$/.test(ev.key)){
+  ev.preventDefault();ev.stopImmediatePropagation();cadOpeningNumericDrag(ev.key);
+ }
+},true);
 function drawWallDragMeasurement(){
  const d=state.drag;if(d?.type!=='wallMiddleGrip'||!d.preview||!window.BlacklineWallGrip)return;
  const candidate=d.preview,point=screen(BlacklineWallGrip.midpoint(candidate)),n=BlacklineWallGrip.normal(candidate);
