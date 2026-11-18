@@ -153,6 +153,7 @@ test('parametric wall never cuts just one of its two faces',()=>{
  app.state.entities[1].a.x=-.2;
  app.insertSelectedBlock(P(0,.09));
  const ref=app.state.entities.find(e=>e.type==='blockRef');
- assert.ok(ref);assert.equal(owned(app.state,ref.id).length,0);
+ assert.equal(ref,undefined,'abort the insertion instead of leaving a door on an uncut wall');
  assert.equal(app.state.entities.filter(e=>e.layer==='walls').length,2);
+ assert.equal(app.state.history.length,0,'failed opening must not leave an undo entry');
 });

@@ -4,15 +4,15 @@ const test=require('node:test');
 const fs=require('node:fs');
 const path=require('node:path');
 const main=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-test('door and window dynamic sizing grip is visible and selectable',()=>{
- assert.match(main,/action:'resize'/);
- assert.match(main,/grip\.action==='resize'\?'⇔'/);
- assert.match(main,/type:'openingResize'/);
- assert.match(main,/cadOpeningResizeEditor\(ref/);
+test('door and window keep adjustable metric dimensions without multiple drawing grips',()=>{
+ assert.match(main,/function cadOpeningResizeEditor\(ref,client\)/);
+ assert.match(main,/function cadResizeOpening\(ref,meters\)/);
+ assert.match(main,/function blockGripPoints\(ref\)/);
+ assert.match(main,/return ref\?\.type==='blockRef'&&ref\.p\?\[ref\.p\]:\[\]/);
 });
 test('metric input converts 0.90 metres to model units',()=>{
  assert.match(main,/target\*1000\/U\[state\.unit\]\/scale/);
- assert.match(main,/0\.90 = 90 cm/);
+ assert.match(main,/const target=Number\(meters\),next=target\*1000\/U\[state\.unit\]\/scale/);
  assert.match(main,/input\.type='text'/);
 });
 test('doors resize proportionally and window retains frame cross section',()=>{
