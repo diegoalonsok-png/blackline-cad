@@ -5233,7 +5233,7 @@ function insertSelectedBlock(point){
   return;
  }
  const repeat=Boolean(state.galleryRepeatedInsert);
- state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=repeat?[]:[ref.id];
+ state.stage=[];state.tool=repeat?'insertBlock':'select';state.selected=[]; // No permanent grips after insertion; selecting the block reveals edit grips.
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
  updateAll();toast('Bloque insertado · X '+units(ref.p.x)+', Y '+units(ref.p.y)
  +(cutCount?' · vano automático en '+cutCount+' caras de muro':aligned?' · ATENCIÓN: muro detectado pero no se pudo abrir el vano':'')
@@ -5483,6 +5483,15 @@ function initPermanentBlockGallery(){
  whole('Cocina en U 400 x 350',4,3.50,kitchen('U',4,3.50,'U'));
  whole('Cocina con isla 500 x 400',5,4,kitchen('Isla',5,4,'isla'));
  whole('Living-comedor 600 x 500',6,5,living('Living comedor',6,5));
+ // Additional 1:1 complete-room architectural references; inserted as one block.
+ whole('Baño accesible 240 x 260',2.40,2.60,bath('Accesible',2.40,2.60,'shower'));
+ whole('Baño doble 300 x 320',3,3.20,bath('Doble',3,3.20,'tub'));
+ whole('Dormitorio juvenil 350 x 400',3.50,4,bedroom('Juvenil',3.50,4,1.10));
+ whole('Dormitorio principal 500 x 600',5,6,bedroom('Principal',5,6,2,true));
+ whole('Cocina comedor 600 x 450',6,4.50,kitchen('Comedor',6,4.50,'isla'));
+ whole('Living amplio 750 x 550',7.50,5.50,living('Living amplio',7.50,5.50));
+ whole('Estudio 350 x 400',3.50,4,roomBase(3.50,4,.80).concat([rc(.25,3.20,1.80,.65),rc(2.40,1.20,.60,1.80),rc(.60,1.20,.80,.80)]));
+ whole('Lavadero 250 x 300',2.50,3,roomBase(2.50,3,.80).concat([rc(.18,2.18,.65,.65),rc(.93,2.18,.65,.65),rc(1.72,.30,.62,1.45),rc(.18,.85,.64,.70)]));
  const door=(name,w,reverse=false)=>add(name,'Openings',w,w,[
   ['rect',0,-.055,.055,.11],['rect',w-.055,-.055,.055,.11],
   ['line',reverse?w-.055:.055,0,reverse?w-.055:.055,w-.06],
@@ -5665,7 +5674,7 @@ function initPermanentBlockGallery(){
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion)}:{})
    }}:null;
    state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})});
-   if(x.wholeRoom){state.blocks[key].dynamic2d=false;state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
+   if(x.wholeRoom){state.blocks[key].dynamic2d=blDynEligible(state.blocks[key]);state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
    renderBlockLibrary();queueLocalBackup()
   }
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
