@@ -20,8 +20,8 @@ function fixture(){
  `)(state,dynamicGripSource);
  return {state,...funcs};
 }
-test('blocks present distinct geometry grips',()=>{const x=fixture();assert.equal(x.blockGripPoints(x.state.entities[0]).length,4)});
-test('selected grips can be hit at model vertices',()=>{const x=fixture();const grip=x.findSelectedBlockGrip({x:1100,y:-2100});assert.equal(grip.id,23);assert.deepEqual(grip.vertex,{x:11,y:21})});
+test('grouped block exposes only its insertion-point grip',()=>{const x=fixture();assert.deepEqual(x.blockGripPoints(x.state.entities[0]),[{x:10,y:20}])});
+test('insertion grip is draggable; child geometry vertices are not separate grips',()=>{const x=fixture();const grip=x.findSelectedBlockGrip({x:1000,y:-2000});assert.equal(grip.id,23);assert.deepEqual(grip.vertex,{x:10,y:20});assert.equal(x.findSelectedBlockGrip({x:1100,y:-2100}),null)});
 test('screen deltas map to model coordinates (inverted canvas Y)',()=>{const x=fixture(),p=x.blockGripTargetPoint({start:{x:1100,y:-2100},vertex:{x:11,y:21}},{x:1300,y:-2000});assert.deepEqual(p,{x:13,y:20})});
 test('grid snap operates on grabbed vertex',()=>{const x=fixture();x.state.snapOn=true;const p=x.blockGripTargetPoint({start:{x:1100,y:-2100},vertex:{x:11,y:21}},{x:1234,y:-2063});assert.ok(Math.abs(p.x-12.3)<1e-10);assert.ok(Math.abs(p.y-20.6)<1e-10)});
-test('locked layers cannot start grip drag',()=>{const x=fixture();x.state.entities[0].layer='locked';assert.equal(x.findSelectedBlockGrip({x:1100,y:-2100}),null);});
+test('locked layers cannot start grip drag',()=>{const x=fixture();x.state.entities[0].layer='locked';assert.equal(x.findSelectedBlockGrip({x:1000,y:-2000}),null);});
