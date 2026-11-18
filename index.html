@@ -1233,6 +1233,38 @@ function cadCutRectWallForOpening(ref,width){
 }
 function rectAxisX(degrees){return Math.cos(degrees*Math.PI/180)}
 function rectAxisY(degrees){return Math.sin(degrees*Math.PI/180)}
+// Detect two ordinary parallel lines as a wall without relying on layer names.
+function cadWallLikeLinePair(point,width){
+ const maxThick=.80*1000/U[state.unit],minThick=.055*1000/U[state.unit];
+ const nearby=state.entities.filter(e=>{
+  if(e.type!=='line'||e.autoOpeningRef!==undefined||e.autoOpeningJambRef!==undefined)return false;
+  const l=layerFor(e);if(!l.visible||l.locked)return false;
+  return segmentDist(point,e.a,e.b)<=maxThick+.24*1000/U[state.unit];
+ });
+ let best=null;
+ for(let i=0;i<nearby.length;i++){
+  const a=nearby[i],av=sub(a.b,a.a),al=Math.hypot(av.x,av.y);
+  if(al<=width+.001)continue;
+  const u=mul(av,1/al),n=P(-u.y,u.x);
+  for(let j=i+1;j<nearby.length;j++){
+   const b=nearby[j],bv=sub(b.b,b.a),bl=Math.hypot(bv.x,bv.y);
+   if(bl<=width+.001||Math.abs((av.x*bv.y-av.y*bv.x)/(al*bl))>.008)continue;
+   const perp=Math.abs((b.a.x-a.a.x)*n.x+(b.a.y-a.a.y)*n.y);
+   if(perp<minThick||perp>maxThick)continue;
+   const b0=(b.a.x-a.a.x)*u.x+(b.a.y-a.a.y)*u.y;
+   const b1=(b.b.x-a.a.x)*u.x+(b.b.y-a.a.y)*u.y;
+   const lo=Math.max(0,Math.min(b0,b1)),hi=Math.min(al,Math.max(b0,b1));
+   if(hi-lo<width+.002)continue;
+   const along=(point.x-a.a.x)*u.x+(point.y-a.a.y)*u.y;
+   if(along-width/2<lo+1e-7||along+width/2>hi-1e-7)continue;
+   const center=add(a.a,add(mul(u,along),mul(n,((b.a.x-a.a.x)*n.x+(b.a.y-a.a.y)*n.y)/2)));
+   const distance=dist(center,point);
+   if(distance>perp/2+.25*1000/U[state.unit])continue;
+   if(!best||distance<best.distance)best={ids:[a.id,b.id],center,u,thickness:perp,distance};
+  }
+ }
+ return best;
+}
 function cadAlignOpeningToWall(ref,block,clickPoint){
  if(!autoOpeningEnabled||!block?.parametric||!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return false;
  const openingWidth=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
@@ -1251,6 +1283,11 @@ function cadAlignOpeningToWall(ref,block,clickPoint){
   if(t*line.length<half+1e-7||(1-t)*line.length<half+1e-7)continue;
   best={distance:d,center,u,thickness:entity.wall2d.thickness};
  }
+ // Pair of plain parallel lines is also a legitimate wall host.
+ const paired=cadWallLikeLinePair(clickPoint,openingWidth);
+ if(paired&&(!best||paired.distance<best.distance)){
+  best={...paired,pairIds:paired.ids};
+ }
  // Rectangular wall candidates also work when drawn with RECT on any unlocked layer.
  for(const entity of state.entities){
   const candidate=cadRectWallCandidate(entity,clickPoint,openingWidth);
@@ -1266,6 +1303,8 @@ function cadAlignOpeningToWall(ref,block,clickPoint){
  ref.wallThickness=best.thickness;
  if(best.rectId)ref.autoOpeningRectId=best.rectId;
  else delete ref.autoOpeningRectId;
+ if(best.pairIds)ref.autoOpeningPairIds=best.pairIds;
+ else delete ref.autoOpeningPairIds;
  return true;
 }
 let autoWallJoinEnabled=true;
@@ -5720,15 +5759,17 @@ function autoCutWallForOpening(ref,block){
  const wallLines=state.entities.filter(e=>{
   if(e.type!=='line'||!e.id||e.autoOpeningRef!==undefined)return false;
   const l=layerFor(e);
-  return l.visible&&!l.locked&&(explicitWallLayerName(l.id)||explicitWallLayerName(l.name));
+  return l.visible&&!l.locked&&(ref.autoOpeningPairIds?.includes(e.id)||explicitWallLayerName(l.id)||explicitWallLayerName(l.name));
  });
  // Only cut correctly aligned wall lines crossing the whole opening.
  // The tolerable perpendicular distance is narrow, measured in drawing units.
  const maxOffset=ref.wallThickness
   ?Math.max(ref.wallThickness/2+(.03*1000/U[state.unit]),.22*ref.scale)
   :Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
- const edits=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
- if(ref.wallThickness){
+ const planned=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
+ const edits=ref.autoOpeningPairIds?planned.filter(e=>ref.autoOpeningPairIds.includes(e.id)):planned;
+ if(ref.autoOpeningPairIds&&edits.length!==2)return 0;
+ if(ref.wallThickness&&!ref.autoOpeningPairIds){
   // A parametric wall opening must cut BOTH faces atomically.
   const groups=new Map();
   for(const e of edits){
@@ -5758,7 +5799,7 @@ function autoCutWallForOpening(ref,block){
  const byGroup=new Map();
  for(const edit of edits){
   const wall=wallLines.find(e=>e.id===edit.id);
-  const group=wall?.wall2d?.group;
+  const group=wall?.wall2d?.group||(ref.autoOpeningPairIds?.includes(edit.id)?'paired-'+ref.id:null);
   if(!group)continue;
   if(!byGroup.has(group))byGroup.set(group,[]);
   byGroup.get(group).push(edit);
@@ -5778,7 +5819,7 @@ function autoCutWallForOpening(ref,block){
    id:state.nextId++,type:'line',a:P(a.x,a.y),b:P(b.x,b.y),
    layer:wall.layer,width:wall.width,
    autoOpeningJambRef:ref.id,autoOpeningJambSide:side,
-   autoOpeningJambGroup:wall.wall2d?.group
+   autoOpeningJambGroup:wall.wall2d?.group||('paired-'+ref.id)
   });
   generated.push(createJamb(ends[0].left,ends[1].left,'start'));
   generated.push(createJamb(ends[0].right,ends[1].right,'end'));
