@@ -1,5 +1,14 @@
 # CAD2D — 2D drafting web prototype
 
+**Blackline CAD (CAD2D)** is a browser-based 2D drafting application for architectural plans and technical drawing.
+
+- **Official website / aplicación CAD 2D online:** https://blackline-cad.org/
+- **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
+- **Features:** 2D linework, layers, snapping, dimensions, PDF/SVG/PNG export and DXF editing (see documented limitations below)
+- **License:** Proprietary, all rights reserved. Public source visibility does not grant reuse rights; see [LICENSE](LICENSE).
+
+**Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye herramientas de dibujo, capas, cotas y exportación DXF, PDF, SVG y PNG con las limitaciones indicadas más abajo.
+
 A self-contained, dependency-free, English-language CAD workspace. Dark ribbon interface inspired by conventional CAD UI patterns and scholarly dark UI design.
 
 ## Run
