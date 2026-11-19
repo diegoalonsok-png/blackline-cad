@@ -18,6 +18,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 /* =================== 1. CINTA =================== */
 const I={
  muro:'<path d="M2 8h20M2 16h20"/><path d="M5 8v8M9 8v8M13 8v8M17 8v8M21 8v8" stroke-dasharray="1.5 1.5"/>',
+ vano:'<path d="M2 9h6v6H2M22 9h-6v6h6"/><path d="M8 9v6M16 9v6" stroke-dasharray="2 1.6"/>',
  puerta:'<path d="M3 21h4M17 21h4M7 21V7"/><path d="M7 7a14 14 0 0 1 14 14" stroke-dasharray="2 1.6"/>',
  ventana:'<path d="M2 9h20M2 15h20M4 9v6M20 9v6M4 12h16"/>',
  galeria:'<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><path d="M17 14v6M14 17h6"/>',
@@ -69,7 +70,7 @@ function setLinetype(lt){
  CORE.toast('Tipo de línea '+({CONTINUOUS:'continua',DASHED:'discontinua',DOTTED:'punteada',CENTER:'eje'}[lt])+' en '+list.length+' objeto(s)');
 }
 const add=(tab,group,items)=>CORE.ribbon.add(tab,group,items.map(([id,label,icon,fn])=>({id,label,icon:I[icon]||I[id],run:fn})));
-add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
+add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqVano','Vano','vano',run('VANO')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
 add('arq','GALERÍA',[['arqGaleria','Galería','galeria',run('GALERIA')],['arqBano','Baños','bano',run('BANO')],['arqCocina','Cocinas','cocina',run('COCINA')],['arqEscalera','Escaleras','escalera',run('ESCALERA')],['arqMuebles','Mobiliario','mobiliario',run('MOBILIARIO')]]);
 add('arq','LOCALES',[['arqLocal','Local + m²','local',run('LOCAL')],['arqContar','Contar bloques','contar',run('CONTARBLOQUES')]]);
 add('draw','MÁS DIBUJO',[['drSpline','Spline','spline',run('SPLINE')],['drDonut','Arandela','arandela',run('ARANDELA')],['drXline','Línea const.','xline',run('LINEACONST')],['drRay','Semirrecta','ray',run('SEMIRRECTA')],['drNube','Nube rev.','nube',run('NUBEREV')],['drDiv','Dividir','dividir',run('DIVIDIR')],['drMed','Graduar','graduar',run('GRADUAR')],['drCentro','Marca centro','centro',run('MARCACENTRO')],['drEje','Línea eje','eje',run('LINEACENTRO')]]);
@@ -79,6 +80,7 @@ add('annotate','TIPO DE LÍNEA',[['ltCont','Continua','lt_cont',()=>setLinetype(
 add('view','CAPAS',[['vwIso','Aislar capa','capaiso',run('CAPAISO')],['vwUniso','Restaurar capas','capauniso',run('CAPAUNISO')],['vwOff','Apagar capa','capades',run('CAPADES')],['vwOn','Encender todas','capaact',run('CAPAACT')],['vwLock','Bloquear capa','capabloq',run('CAPABLOQ')]]);
 add('view','OBJETOS',[['vwAislar','Aislar objetos','aislar',run('AISLAR')],['vwMostrar','Mostrar todo','mostrar',run('MOSTRARTODO')],['vwZo','Zoom objeto','zo',run('ZO')],['vwEstado','Estado','estado',run('ESTADO')],['vwCal','Calculadora','cal',run('CAL')],['vwBuscar','Buscar texto','buscar',run('BUSCAR')],['vwAudit','Auditar','auditar',run('AUDITAR')]]);
 add('output','VENTANAS',[['ouMview','Nueva ventana','mview',run('VENTANA')]]);
+EXT.commands.VANO=EXT.commands.HUECO=EXT.commands.OPENING=()=>{if(!window.CAD2D_INSERT_LIBRARY_BLOCK?.('Vano / hueco en muro'))CORE.toast('Vano no disponible');else CORE.toast('VANO: clic sobre un muro · después estirá desde las pinzas o escribí el ancho')};
 // Pestaña ARQUITECTURA
 (function addTab(){
  const tabs=[...document.querySelectorAll('.tab')];if(!tabs.length||document.querySelector('.tab[data-tab="arq"]'))return;
