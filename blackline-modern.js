@@ -273,7 +273,6 @@ requestAnimationFrame(requestResize);
  'use strict';
  const command=document.getElementById('command');
  const app=document.querySelector('.app');
- const canvas=document.getElementById('canvas');
  const canvasWrap=document.getElementById('canvasWrap');
  if(!command||!app||!canvasWrap)return;
  document.addEventListener('keydown',event=>{
@@ -281,10 +280,12 @@ requestAnimationFrame(requestResize);
      event.key.length!==1)return;
   const target=event.target;
   if(!(target instanceof Element))return;
-  if(target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="textbox"],[role="dialog"],dialog'))return;
+  if(target.closest('input,textarea,select,button,a,[contenteditable=""],[contenteditable="true"],[role="textbox"],[role="dialog"],dialog,[role="button"],[role="menuitem"]'))return;
   if(!app.contains(target)&&target!==document.body&&target!==document.documentElement)return;
   // Numeric keys during geometry placement are processed by the CAD direct-distance handler.
-  const draw=canvasWrap.contains(target)&&/^[0-9.,+\-]$/.test(event.key);
+  const drawingTool=app.querySelector('.tool.active')?.dataset.tool||'';
+  const draw=canvasWrap.contains(target)&&/^[0-9.,+\-]$/.test(event.key)&&
+    ['line','polyline','circle','arc','wall2d','offset','lengthen','move','copy','rotate','scale','stretch'].includes(drawingTool);
   if(draw)return;
   // Exclude punctuation-only keys outside the canvas: they often have UI-specific meanings.
   if(!canvasWrap.contains(target)&&!/[\p{L}\p{N}_]/u.test(event.key))return;
