@@ -257,8 +257,8 @@ requestAnimationFrame(requestResize);
   const a=app.getBoundingClientRect(),r=shell.getBoundingClientRect();
   if(shell.classList.contains('floating')||app.classList.contains('ribbon-undocked'))return;
   // The sizer is absolutely positioned against .app; derive its actual row, not a fragile CSS sum.
-  handle.style.setProperty('top',Math.round(r.bottom-a.top+1)+'px','important');
-  handle.style.setProperty('height','8px','important');
+  handle.style.setProperty('top',Math.round(r.bottom-a.top-3)+'px','important');
+  handle.style.setProperty('height','6px','important');
  }
  const observer=new ResizeObserver(align);observer.observe(shell);observer.observe(app);
  window.addEventListener('resize',align);
