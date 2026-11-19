@@ -28,7 +28,16 @@ const PLANS={
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg (cuando el conversor esté operativo)','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
 
-let status={plan:'beta',trialEndsAt:null,email:null,source:'local'};
+/* Prueba por persona: 90 días desde el primer uso en este navegador (sin registrarse).
+   Con cuenta, manda la fecha del servidor. Es una indicación local, no un control de pago. */
+const TRIAL_DAYS=90,FIRST_KEY='cad2d-guest-first-use-v1';
+function firstUse(){
+ let t=null;try{t=Number(localStorage.getItem(FIRST_KEY))}catch(e){}
+ if(!Number.isFinite(t)||t<Date.UTC(2020,0,1)||t>Date.now()){t=Date.now();try{localStorage.setItem(FIRST_KEY,String(t))}catch(e){}}
+ return t;
+}
+const localTrialEnd=new Date(firstUse()+TRIAL_DAYS*864e5).toISOString();
+let status={plan:!enforce?'beta':Date.parse(localTrialEnd)>Date.now()?'trial':'free',trialEndsAt:enforce?localTrialEnd:null,email:null,source:'local'};
 const trialDays=()=>{
  if(!status.trialEndsAt)return null;
  return Math.ceil((new Date(status.trialEndsAt).getTime()-Date.now())/864e5);
@@ -44,7 +53,13 @@ async function refresh(){
   const r=await fetch(urls.status,{credentials:'include',headers:{accept:'application/json'}});
   if(!r.ok)throw Error('HTTP '+r.status);
   const j=await r.json();
-  status={plan:['free','pro','studio','trial'].includes(j.plan)?j.plan:'free',trialEndsAt:j.trialEndsAt||null,email:j.email||null,source:'server'};
+  let plan=['free','pro','studio','trial'].includes(j.plan)?j.plan:'free',ends=j.trialEndsAt||null;
+  // Sin suscripción paga: vale la prueba más larga entre la de la cuenta y la de este navegador.
+  if(plan==='free'||plan==='trial'){
+   const best=[ends,localTrialEnd].filter(Boolean).sort().pop();
+   if(Date.parse(best)>Date.now()){plan='trial';ends=best}else{plan='free';ends=best}
+  }
+  status={plan,trialEndsAt:ends,email:j.email||null,source:'server'};
  }catch(e){
   // Si el servidor no responde, NO se bloquea al usuario (fail-open): mejor perder un cobro que un dibujo.
   status={...status,source:'offline'};
@@ -72,11 +87,11 @@ css.textContent=`#cadPlanDlg{position:fixed;inset:0;z-index:9300;background:rgba
 @media (max-width:640px){#cadPlanDlg .cols{grid-template-columns:1fr}}`;
 document.head.append(css);
 function featureList(p){return '<ul>'+PLANS[p].features.filter(f=>FEATURE_LABEL[f]).map(f=>'<li>'+FEATURE_LABEL[f]+'</li>').join('')+'</ul>'}
-function showPlans(reason){
+function showPlans(reason,notice){
  document.getElementById('cadPlanDlg')?.remove();
  const d=document.createElement('div');d.id='cadPlanDlg';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');
  const cur=status.plan,days=trialDays();
- const head=reason?'<p style="color:#ffd27f">'+reason+' requiere el plan Pro.</p>':'';
+ const head=(notice?'<p style="color:#ffd27f;font-size:13px">'+notice+'</p>':'')+(reason?'<p style="color:#ffd27f">'+reason+' requiere el plan Pro.</p>':'');
  const state=!enforce?'<p>Estás usando la <b>beta abierta</b>: todas las funciones están habilitadas sin cargo. Cuando se active la suscripción, tus dibujos y exportaciones seguirán siendo tuyos; el plan gratuito conserva el dibujo, DXF y PDF A4.</p>'
   :cur==='trial'?'<p>Período de prueba: <b>'+Math.max(0,days??0)+' días</b> restantes.</p>':'<p>Plan actual: <b>'+(PLANS[cur]?.label||cur)+'</b>'+(status.email?' · '+status.email:'')+'</p>';
  d.innerHTML='<div class="box"><b style="font-size:14px">CAD2D · PLANES</b>'+head+state+'<div class="cols">'+
@@ -96,8 +111,19 @@ function paintBadge(){
  const host=document.querySelector('.brand, header, .topbar')||document.body;
  if(!b){b=document.createElement('button');b.type='button';b.id='cadPlanBadge';b.onclick=()=>showPlans();host.append(b)}
  const days=trialDays();
- b.textContent=!enforce||status.plan==='beta'?'BETA ABIERTA':status.plan==='trial'?'PRUEBA · '+Math.max(0,days??0)+' d':(PLANS[status.plan]?.label||'Gratis').toUpperCase();
+ const inTrial=status.plan==='trial'&&(days??0)>0;
+ b.hidden=!enforce||status.plan==='beta'||inTrial;           // durante la prueba no se menciona el cobro
+ b.textContent=status.plan==='pro'||status.plan==='studio'?(PLANS[status.plan].label).toUpperCase():'PASAR A PRO';
  b.title='Planes y suscripción (comando PLAN)';
+ maybeTrialEnded();
+}
+/* Al terminar los 90 días: un aviso amable, como mucho una vez por semana. Nunca bloquea el dibujo. */
+function maybeTrialEnded(){
+ if(!enforce||status.plan!=='free'||!status.trialEndsAt||Date.parse(status.trialEndsAt)>Date.now())return;
+ const KEY='cad2d-trial-ended-notice';let last=0;try{last=Number(localStorage.getItem(KEY))||0}catch(e){}
+ if(Date.now()-last<7*864e5||document.getElementById('cadPlanDlg'))return;
+ try{localStorage.setItem(KEY,String(Date.now()))}catch(e){}
+ setTimeout(()=>showPlans(null,'Terminaron tus 3 meses con todas las funciones. Podés seguir dibujando gratis con lo básico, o pasarte a Pro para conservar todo.'),1500);
 }
 window.CAD2D_PLAN=Object.freeze({can,refresh,showPlans,upsell,plans:PLANS,get status(){return {...status}},enforced:enforce});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{paintBadge();refresh()});else{paintBadge();refresh()}

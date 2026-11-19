@@ -198,7 +198,7 @@ const authConfig=window.CAD2D_AUTH_CONFIG||{};
 const loginUrl=typeof authConfig.loginUrl==='string'&&/^https:\/\//.test(authConfig.loginUrl)?authConfig.loginUrl:'';
 const authStatusUrl=typeof authConfig.statusUrl==='string'&&/^https:\/\//.test(authConfig.statusUrl)?authConfig.statusUrl:'';
 const enforce=authConfig.enforce===true&&!!loginUrl&&!!authStatusUrl;
-$('cadAccountButton').textContent=daysLeft>0?'Guest · '+daysLeft+'d':'Guest · Beta';
+$('cadAccountButton').textContent='Cuenta';
 const authLayer=doc.createElement('div');authLayer.className='cad-auth-backdrop';authLayer.hidden=true;
 authLayer.innerHTML='<div class="cad-auth-card" role="dialog" aria-modal="true" aria-labelledby="cadAuthTitle"><div class="cad-auth-overline">CAD2D · ACCOUNT</div><h2 id="cadAuthTitle">Work freely before registration</h2><p id="cadAuthDescription"></p><div class="cad-auth-status" id="cadAuthStatus" aria-live="polite"></div><div class="cad-auth-actions"><button type="button" class="primary" id="cadAuthRegister">Create account / Sign in</button><button type="button" id="cadAuthDismiss">Continue drawing</button></div><p class="cad-auth-note">Your drawings remain stored in your browser unless you export them. This prototype does not upload or synchronize projects.</p></div>';
 doc.body.appendChild(authLayer);
@@ -219,7 +219,7 @@ authDismiss.addEventListener('click',()=>{if(!locked)authLayer.hidden=true});
 authRegister.addEventListener('click',()=>{if(loginUrl)window.location.assign(loginUrl)});
 $('cadAccountButton').addEventListener('click',()=>showAuth(false));
 async function checkAuthentication(){
- if(!enforce||daysLeft>0)return;
+ return; // Los planes los maneja cad-plan.js; nunca se bloquea el CAD entero.
  try{
   const response=await fetch(authStatusUrl,{method:'GET',credentials:'include',cache:'no-store',headers:{'Accept':'application/json'}});
   if(!response.ok)throw Error('auth-check-unavailable');
