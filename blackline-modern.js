@@ -266,36 +266,3 @@ requestAnimationFrame(requestResize);
 })();
 
 
-/* Route typing from the drawing viewport and toolbars into the CAD command line.
-   Keep actual text editors and geometry's direct-distance entry untouched. */
-(()=>{
- 'use strict';
- const command=document.getElementById('command');
- const app=document.querySelector('.app');
- const canvasWrap=document.getElementById('canvasWrap');
- if(!command||!app||!canvasWrap)return;
- document.addEventListener('keydown',event=>{
-  if(event.defaultPrevented||event.isComposing||event.ctrlKey||event.metaKey||
-     event.altKey||event.key.length!==1||event.key===' ')return;
-  const target=event.target;
-  if(!(target instanceof Element))return;
-  // Real editing widgets must keep typing. A toolbar button is NOT a text editor.
-  if(target.closest('input,textarea,select,[contenteditable],[role="textbox"],[role="dialog"],dialog'))return;
-  if(!app.contains(target)&&target!==document.body&&target!==document.documentElement)return;
-  if(document.querySelector('dialog[open],[role="dialog"]:not([hidden])'))return;
-  // While a command expects a numeric dimension, preserve its direct-input handler.
-  const tool=app.querySelector('.tool.active')?.dataset.tool||'';
-  const enteringDistance=canvasWrap.contains(target)&&/^[0-9.,+\\-]$/.test(event.key)&&
-    ['line','polyline','circle','arc','wall2d','offset','lengthen','move','copy','rotate','scale','stretch'].includes(tool);
-  if(enteringDistance)return;
-  if(!/[\\p{L}\\p{N}_.,+\\-]/u.test(event.key))return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  const existing=command.value;
-  command.focus({preventScroll:true});
-  // Do not overwrite characters already entered: PL must remain PL until Enter.
-  command.value=existing+event.key;
-  command.setSelectionRange(command.value.length,command.value.length);
-  command.dispatchEvent(new Event('input',{bubbles:true}));
- },true);
-})();
