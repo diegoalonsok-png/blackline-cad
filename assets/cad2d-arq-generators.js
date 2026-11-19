@@ -486,6 +486,28 @@ one('veh-camion','Camión con caja (planta)',VEH,2.50,8.50,(b,W,D)=>{b.rrect(.05
 one('veh-colectivo','Colectivo (planta)',VEH,2.55,12.0,(b,W,D)=>{b.rrect(0,0,W,D,.30);b.line(.10,D-1.6,W-.10,D-1.6);const rows=Math.floor((D-3)/.80);for(let i=0;i<rows;i++){const y=.6+i*.80;b.rect(.15,y,.45,.45);b.rect(.65,y,.45,.45);b.rect(W-1.10,y,.45,.45);b.rect(W-.60,y,.45,.45)}b.rect(.15,D-1.40,.60,.60)},{wMin:2.4,wMax:2.6,dMin:8,dMax:14,family:'auto'});
 one('veh-pickup','Pickup (planta)',VEH,1.90,5.30,(b,W,D)=>{b.rrect(0,0,W,D,.25);b.rrect(.12,D*.40,W-.24,D*.30,.15);b.rect(.10,.12,W-.20,D*.36);b.line(.10,D*.48,W-.10,D*.48)},{wMin:1.8,wMax:2.1,dMin:4.8,dMax:5.8,family:'auto'});
 
+/* ===== MOTOS Y MAQUINARIA DE OBRA (planta, dibujo propio) ===== */
+const OBRA='Obra y maquinaria';
+one('veh-moto-calle','Moto de calle (planta)',VEH,.80,2.05,(b,W,D)=>{b.rrect(W/2-.07,0,.14,.55,.06);b.rrect(W/2-.07,D-.55,.14,.55,.06);b.rrect(W/2-.18,.55,.36,D-1.1,.14);b.ellipse(W/2,D*.42,.16,.28);b.line(0,D*.78,W,D*.78);b.circle(0,D*.78,.04);b.circle(W,D*.78,.04);b.rect(W/2-.10,D*.62,.20,.10)},{wMin:.70,wMax:.95,dMin:1.8,dMax:2.3,family:'moto'});
+one('veh-scooter','Scooter (planta)',VEH,.70,1.85,(b,W,D)=>{b.rrect(W/2-.06,0,.12,.40,.05);b.rrect(W/2-.06,D-.40,.12,.40,.05);b.rrect(W/2-.22,.35,.44,D*.55,.16);b.rect(W/2-.15,D*.62,.30,.12);b.line(.03,D*.82,W-.03,D*.82)},{family:'moto'});
+one('obra-retro','Retroexcavadora (planta)',OBRA,2.40,7.20,(b,W,D)=>{b.rect(0,1.6,W,D-3.2);b.rect(.35,D*.45,1.0,1.1);b.rect(-.1,D-1.6,W+.2,.45);b.poly([[W/2-.15,1.6],[W/2-.15,.5],[W/2-.45,0],[W/2+.45,0],[W/2+.15,.5],[W/2+.15,1.6]],false);for(const y of [1.8,D-2.6])for(const x of [-.25,W-.05])b.rect(x,y,.30,.90)},{wMin:2.2,wMax:2.6,dMin:6,dMax:8.5,family:'maquina'});
+one('obra-hormigonera','Camión hormigonero (planta)',OBRA,2.50,9.00,(b,W,D)=>{b.rrect(.05,D-2.2,W-.10,2.2,.2);b.ellipse(W/2,(D-2.4)/2,W/2-.1,(D-2.6)/2);for(let i=1;i<6;i++){const y=.3+i*(D-3)/6;b.line(.35,y,W-.35,y+.4)}for(const y of [.5,1.7,D-1.9])for(const x of [-.06,W-.04])b.rect(x,y,.10,.70)},{wMin:2.3,wMax:2.6,dMin:7,dMax:10.5,family:'maquina'});
+one('obra-grua','Grúa torre (planta)',OBRA,2.00,40.0,(b,W,D)=>{b.rect(0,10,W,W);b.line(0,10,W,10+W);b.line(W,10,0,10+W);b.rect(W*.25,0,W*.5,D);for(let y=0;y<D;y+=1.5)b.line(W*.25,y,W*.75,y+1.5);b.rect(-.6,1.0,W+1.2,4.0);b.circle(W/2,10+W/2,D*.98,{dashed:true})},{wMin:1.6,wMax:2.4,dMin:20,dMax:70,family:'maquina'});
+one('obra-contenedor','Volquete / contenedor',OBRA,1.80,3.80,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.15,.25,W-.3,D-.5);b.line(.15,.25,W-.15,D-.25,{dashed:true});b.line(W-.15,.25,.15,D-.25,{dashed:true})},{wMin:1.4,wMax:2.4,dMin:2.5,dMax:6});
+one('obra-andamio','Andamio (planta)',OBRA,3.00,1.10,(b,W,D)=>{const n=Math.max(1,Math.round(W/1.5));b.rect(0,0,W,D);for(let i=0;i<=n;i++){const x=i*W/n;b.rect(x-.03,-.03,.06,.06);b.rect(x-.03,D-.03,.06,.06)}for(let i=0;i<n;i++)b.line(i*W/n,0,(i+1)*W/n,D,{dashed:true})},{wMin:1.5,wMax:12,dMin:.7,dMax:1.5});
+one('obra-obrador','Obrador / casilla',OBRA,2.40,6.00,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.08,.08,W-.16,D-.16);b.line(.08,D*.55,W-.08,D*.55);b.arc(W-.08,D*.55-.90,.80,90,180,{dashed:true});b.rect(.3,D-.75,1.0,.55);b.text(.3,D*.25,'OBRADOR',.22)},{wMin:2,wMax:3,dMin:3,dMax:12});
+
+/* ===== MÁS MOBILIARIO DE DORMITORIO Y ESTAR ===== */
+one('dor-mesa-luz','Mesa de luz',DOR,.45,.40,(b,W,D)=>{b.rect(0,0,W,D);b.circle(W/2,D/2,Math.min(W,D)*.22);b.circle(W/2,D/2,Math.min(W,D)*.08)},{wMin:.35,wMax:.65,dMin:.30,dMax:.55});
+one('dor-comoda','Cómoda',DOR,1.20,.50,(b,W,D)=>{b.rect(0,0,W,D);b.line(0,.06,W,.06);const n=Math.max(2,Math.round(W/.40));for(let i=1;i<n;i++)b.line(i*W/n,.06,i*W/n,D)},{wMin:.6,wMax:2.4,dMin:.4,dMax:.6});
+one('dor-vestidor','Vestidor en L',DOR,2.40,1.80,(b,W,D)=>{b.rect(0,D-.60,W,.60);b.rect(0,0,.60,D-.60);b.line(.05,D-.30,W-.05,D-.30,{dashed:true});b.line(.30,.05,.30,D-.65,{dashed:true})},{wMin:1.6,wMax:4,dMin:1.2,dMax:3,family:'placard'});
+one('mob-sofa-L','Sofá en L',MOB,2.80,2.00,(b,W,D)=>{b.poly([[0,0],[W,0],[W,.92],[.92,.92],[.92,D],[0,D]],true);b.rect(.18,.18,W-.36,.56);b.rect(.18,.74,.56,D-.92);b.rect(0,0,W,.18);b.rect(0,0,.18,D);b.line(.92+(W-.92)/2,.18,.92+(W-.92)/2,.74)},{wMin:2.2,wMax:4,dMin:1.6,dMax:3,family:'sofa'});
+one('mob-mesa-cafe-red','Mesa de café redonda + 2 sillas',MOB,1.60,.80,(b,W,D)=>{b.circle(W/2,D/2,.35);b.at(.20,D/2,90,F.silla);b.at(W-.20,D/2,-90,F.silla)},{family:'mesa'});
+one('mob-piano','Piano de pared',MOB,1.50,.60,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.05,D-.25,W-.10,.20);for(let i=1;i<12;i++)b.line(.05+i*(W-.10)/12,D-.25,.05+i*(W-.10)/12,D-.05);b.rect(W/2-.30,-.45,.60,.35)},{wMin:1.4,wMax:1.6});
+one('mob-mesa-ping','Mesa de ping-pong',MOB,1.53,2.74,(b,W,D)=>{b.rect(0,0,W,D);b.line(0,D/2,W,D/2,{width:.25});b.line(W/2,0,W/2,D)},{wMin:1.53,wMax:1.53,dMin:2.74,dMax:2.74});
+one('mob-hamaca','Reposera / hamaca',EXT,.70,1.90,(b,W,D)=>{b.rrect(0,0,W,D,.08);b.rect(.06,D*.62,W-.12,D*.34);for(let i=1;i<6;i++)b.line(.06,i*D*.62/6,W-.06,i*D*.62/6)},{wMin:.6,wMax:.8,dMin:1.6,dMax:2.1});
+one('mob-banco-plaza','Banco de plaza',EXT,1.80,.60,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<5;i++)b.line(0,i*D/5,W,i*D/5);b.rect(.10,-.05,.08,D+.10);b.rect(W-.18,-.05,.08,D+.10)},{wMin:1,wMax:3});
+
 /* ---------- API ---------- */
 function build(id,W,D){
  const d=LIB.find(x=>x.id===id);if(!d)throw Error('Bloque inexistente: '+id);

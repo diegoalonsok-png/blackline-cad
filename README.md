@@ -260,15 +260,16 @@ JavaScript syntax verified. Logic tests passed for fast vs slow and near vs dist
 
 ## Galería arquitectónica, bloques dinámicos y comandos nuevos (18 nov 2026)
 
-**Galería grande (`GALERIA`, `BANO`, `COCINA`, `ESCALERA` o el botón ⤢ de la paleta *GALERÍA ARQ*).** 99 bloques paramétricos de geometría propia, en planta y a escala 1:1:
+**Galería grande (`GALERIA`, `BANO`, `COCINA`, `ESCALERA` o el botón ⤢ de la paleta *GALERÍA ARQ*).** 147 bloques paramétricos de geometría propia, en 15 categorías, en planta y a escala 1:1:
 
 | Categoría | Bloques |
 | --- | --- |
 | Baños completos (13) | toilette, toilette esquinero, baño mínimo, con ducha y bidet, con bañera, completo bañera + bidet, en suite doble bacha, principal (bañera + ducha + doble bacha), accesible con giro Ø1,50, compartimentado, con bañera esquinera, de servicio, sanitario público con cabinas y mingitorios |
 | Cocinas completas (12) | kitchenette, lineal, paralela, en L, en L con desayunador, en U, con isla, con península, cocina-comedor, integrada con isla y banquetas, lavadero, cocina + lavadero |
-| Sueltos (74) | sanitarios, equipos de cocina (anafes de 2/4/5 hornallas, bachas, heladeras, lavavajillas, mesadas, alacenas, campana, lavarropas…), escaleras (recta, L, U, caracol, rampa 8 %), mobiliario, dormitorio, exterior y vegetación, vehículos, equipos |
+| Sueltos (122) | sanitarios, equipos de cocina (anafes de 2/4/5 hornallas, bachas, heladeras, lavavajillas, mesadas, alacenas, campana, lavarropas…), escaleras (recta, L, U, caracol, rampa 8 %), mobiliario (sofá en L, piano, ping-pong…), dormitorio (mesa de luz, cómoda, vestidor), exterior y vegetación, vehículos (motos, scooter, colectivo, pickup), equipos, alzados, personas, oficina, símbolos |
+| Obra y maquinaria (6) | retroexcavadora, camión hormigonero, grúa torre con radio de giro, volquete, andamio modulado, obrador |
 
-Un clic en la miniatura y otro en el plano. El bloque va a una capa propia (`A-SANITARIOS`, `A-EQUIPAMIENTO`, `A-MOBILIARIO`, `A-ESCALERAS`, `A-VEGETACION`, `A-VEHICULOS`, `A-INSTALACIONES`) y después se restaura la capa activa.
+Un clic en la miniatura y otro en el plano. El bloque va a una capa propia (`A-SANITARIOS`, `A-EQUIPAMIENTO`, `A-MOBILIARIO`, `A-ESCALERAS`, `A-VEGETACION`, `A-VEHICULOS`, `A-INSTALACIONES`, `A-OBRA`…) y después se restaura la capa activa.
 
 **Bloques dinámicos con pinzamientos.** Al seleccionar un bloque de la galería aparecen:
 
