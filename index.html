@@ -827,6 +827,44 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .brandbar button.cad-drawing-name:focus-visible{outline:2px solid #d9b674;outline-offset:2px}
 </style>
 <script defer src="assets/cad-ui-language.js?v=20261119-en-classic"></script>
+<script>
+/* Blackline CAD — single global keyboard-to-command dispatcher.
+   Capture on window BEFORE CAD drawing listeners, so keys do not disappear
+   when the model canvas, a toolbar button or the page body holds focus. */
+(function(){
+ 'use strict';
+ function editable(node){
+  return node instanceof Element && !!node.closest(
+   'input,textarea,select,[contenteditable],[role="textbox"],[role="combobox"]'
+  );
+ }
+ function modalOpen(){
+  return !!document.querySelector('dialog[open],[role="dialog"]:not([hidden])');
+ }
+ window.addEventListener('keydown',function(ev){
+  if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
+     ev.key.length!==1 || ev.key===' ' || modalOpen())return;
+  const target=ev.target;
+  if(editable(target))return;
+  const app=document.querySelector('.app');
+  const command=document.getElementById('command');
+  if(!app||!command||command.disabled||command.closest('[hidden]'))return;
+  if(target instanceof Element && !app.contains(target) &&
+     target!==document.body && target!==document.documentElement)return;
+  // Only ordinary printable input: preserve function keys, browser shortcuts,
+  // Enter, Escape and CAD's Space action.
+  if(!/[\\p{L}\\p{N}_.,+\\-]/u.test(ev.key))return;
+  ev.preventDefault();
+  ev.stopImmediatePropagation();
+  const start=command.value.length, insert=ev.key;
+  command.focus({preventScroll:true});
+  // Standard append semantics: PL stays PL; distances such as 5.25 remain intact.
+  command.value=command.value+insert;
+  command.setSelectionRange(start+insert.length,start+insert.length);
+  command.dispatchEvent(new Event('input',{bubbles:true}));
+ },true);
+})();
+</script>
 </head>
 <body>
 <div class="app">
@@ -5322,40 +5360,6 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
-// Keyboard input follows AutoCAD: type anywhere in the CAD workspace to enter COMMAND.
- // Installed once in the core viewer (not in an auxiliary theme script).
-document.addEventListener('keydown',ev=>{
- if(ev.defaultPrevented||ev.isComposing||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1)return;
- const target=ev.target;
- if(!(target instanceof Element))return;
- // Leave text fields, content editors and dialogs alone.
- if(target.closest('input,textarea,select,[contenteditable],[role="textbox"],[role="dialog"],dialog'))return;
- if(!document.querySelector('.app')?.contains(target)&&target!==document.body&&target!==document.documentElement)return;
- if(document.querySelector('dialog[open],[role="dialog"]:not([hidden])'))return;
- // Direct numerical distance entry is handled by the existing next listener.
- const distanceInput=(['line','polyline','wall2d','circle'].includes(state.tool)&&state.stage.length)||
-   state.tool==='offset'||state.tool==='lengthen';
- if(distanceInput&&/^[0-9.,]$/.test(ev.key))return;
- if(!/[\p{L}\p{N}_.,+\-]/u.test(ev.key))return;
- ev.preventDefault();
- ev.stopImmediatePropagation();
- const command=$('command');
- const text=command.value+ev.key;
- command.focus({preventScroll:true});
- command.value=text;
- command.setSelectionRange(text.length,text.length);
- command.dispatchEvent(new Event('input',{bubbles:true}));
-},true);
-// Type a number immediately after choosing the first point, without clicking the command bar.
-document.addEventListener('keydown',ev=>{
- if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||!(['line','polyline','wall2d','circle'].includes(state.tool)&&state.stage.length||state.tool==='offset'||state.tool==='lengthen'))return;
- const active=document.activeElement;
- if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
- if(/^[0-9]$/.test(ev.key)||ev.key==='.'||ev.key===','){
-  ev.preventDefault();ev.stopImmediatePropagation();
-  $('command').focus();$('command').value=ev.key; $('command').setAttribute('placeholder',state.tool==='offset'?'OFFSET: distancia + Enter':'Distancia / Distance · Enter para dibujar');
- }
-},true);
 /* A user-initiated save should open the computer's native file chooser when supported.
  * All bytes stay local; legacy browsers use the standard download fallback.
  * Never claim a completed save after the user cancels or an I/O error occurs. */
@@ -7570,7 +7574,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261113"></script>
-<script src="blackline-modern.js?v=20261119-command-focus-v4"></script>
+<script src="blackline-modern.js?v=20261119-command-capture-v5"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261116-olimpiadas-v2"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261116-featured4"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261116-frame1"></script>
