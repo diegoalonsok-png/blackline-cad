@@ -18,6 +18,11 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 /* =================== 1. CINTA =================== */
 const I={
  muro:'<path d="M2 8h20M2 16h20"/><path d="M5 8v8M9 8v8M13 8v8M17 8v8M21 8v8" stroke-dasharray="1.5 1.5"/>',
+ regla:'<path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
+ angulo:'<path d="M4 20h16M4 20 16 6"/><path d="M10 20a6 6 0 0 0-2-4.5"/>',
+ areaM:'<path d="M4 4h16v16H4z" stroke-dasharray="2 1.6"/><path d="M8 12h8M12 8v8"/>',
+ listar:'<path d="M5 6h14M5 12h14M5 18h9"/>',
+ idpt:'<path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="3"/>',
  vano:'<path d="M2 9h6v6H2M22 9h-6v6h6"/><path d="M8 9v6M16 9v6" stroke-dasharray="2 1.6"/>',
  puerta:'<path d="M3 21h4M17 21h4M7 21V7"/><path d="M7 7a14 14 0 0 1 14 14" stroke-dasharray="2 1.6"/>',
  ventana:'<path d="M2 9h20M2 15h20M4 9v6M20 9v6M4 12h16"/>',
@@ -70,6 +75,8 @@ function setLinetype(lt){
  CORE.toast('Tipo de línea '+({CONTINUOUS:'continua',DASHED:'discontinua',DOTTED:'punteada',CENTER:'eje'}[lt])+' en '+list.length+' objeto(s)');
 }
 const add=(tab,group,items)=>CORE.ribbon.add(tab,group,items.map(([id,label,icon,fn])=>({id,label,icon:I[icon]||I[id],run:fn})));
+add('home','MEDIR',[['msDist','Distancia · DI','regla',run('DIST')],['msAng','Ángulo','angulo',run('ANGLE')],['msArea','Área · AA','areaM',run('AREA')],['msList','Listar · LI','listar',run('LIST')],['msId','Coordenada · ID','idpt',run('ID')]]);
+EXT.commands.MEASUREGEOM=EXT.commands.MEA=EXT.commands.MEDIR=()=>CORE.command('DIST');
 add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqVano','Vano','vano',run('VANO')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
 add('arq','GALERÍA',[['arqGaleria','Galería','galeria',run('GALERIA')],['arqBano','Baños','bano',run('BANO')],['arqCocina','Cocinas','cocina',run('COCINA')],['arqEscalera','Escaleras','escalera',run('ESCALERA')],['arqMuebles','Mobiliario','mobiliario',run('MOBILIARIO')]]);
 add('arq','LOCALES',[['arqLocal','Local + m²','local',run('LOCAL')],['arqContar','Contar bloques','contar',run('CONTARBLOQUES')]]);
@@ -81,6 +88,23 @@ add('view','CAPAS',[['vwIso','Aislar capa','capaiso',run('CAPAISO')],['vwUniso',
 add('view','OBJETOS',[['vwAislar','Aislar objetos','aislar',run('AISLAR')],['vwMostrar','Mostrar todo','mostrar',run('MOSTRARTODO')],['vwZo','Zoom objeto','zo',run('ZO')],['vwEstado','Estado','estado',run('ESTADO')],['vwCal','Calculadora','cal',run('CAL')],['vwBuscar','Buscar texto','buscar',run('BUSCAR')],['vwAudit','Auditar','auditar',run('AUDITAR')]]);
 add('output','VENTANAS',[['ouMview','Nueva ventana','mview',run('VENTANA')]]);
 EXT.commands.VANO=EXT.commands.HUECO=EXT.commands.OPENING=()=>{if(!window.CAD2D_INSERT_LIBRARY_BLOCK?.('Vano / hueco en muro'))CORE.toast('Vano no disponible');else CORE.toast('VANO: clic sobre un muro · después estirá desde las pinzas o escribí el ancho')};
+
+/* ANGLE · ÁNGULO: vértice, primer brazo, segundo brazo (3 clics, con referencias a objetos). Esc cancela. */
+(function(){
+ let pts=null;const cv=CORE.canvas;
+ const end=msg=>{pts=null;cv.style.cursor='';if(msg)CORE.toast(msg);CORE.schedule()};
+ EXT.commands.ANGLE=EXT.commands.ANGULO=EXT.commands.ANG=()=>{CORE.setTool('select');pts=[];CORE.toast('ÁNGULO: clic en el vértice')};
+ cv.addEventListener('pointerdown',e=>{
+  if(!pts||e.button!==0)return;e.preventDefault();e.stopImmediatePropagation();
+  const w=CORE.world({x:e.offsetX,y:e.offsetY}),sp=CORE.snapPoint?CORE.snapPoint(w):w;pts.push(sp&&sp.x!==undefined?{x:sp.x,y:sp.y}:w);
+  if(pts.length===1)return CORE.toast('ÁNGULO: clic en el primer brazo');
+  if(pts.length===2)return CORE.toast('ÁNGULO: clic en el segundo brazo');
+  const [v,a,b]=pts,a1=Math.atan2(a.y-v.y,a.x-v.x),a2=Math.atan2(b.y-v.y,b.x-v.x);
+  let d=Math.abs(a2-a1)*180/Math.PI;if(d>180)d=360-d;
+  CORE.log('ÁNGULO = '+d.toFixed(2)+'° · complemento '+(360-d).toFixed(2)+'°');end('Ángulo: '+d.toFixed(2)+'°');
+ },true);
+ document.addEventListener('keydown',e=>{if(pts&&e.key==='Escape')end('Ángulo cancelado')},true);
+})();
 // Pestaña ARQUITECTURA
 (function addTab(){
  const tabs=[...document.querySelectorAll('.tab')];if(!tabs.length||document.querySelector('.tab[data-tab="arq"]'))return;
