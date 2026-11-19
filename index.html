@@ -5175,12 +5175,13 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(cadZoomOptionPending&&['W','VENTANA'].includes(value.toUpperCase())){cadZoomOptionPending=false;return setTool('zoomWindow')}
  if(value&&!['Z','ZOOM','ZW','ZOOMVENTANA'].includes(value.toUpperCase()))cadZoomOptionPending=false;
  if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}
+ const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
  if(state.tool==='wall2d'&&cadWallOptionPending){
   const pending=cadWallOptionPending;
   if(pending==='justify'){
    const sides={L:'left',LEFT:'left',IZQUIERDA:'left',C:'center',CENTER:'center',CENTRO:'center',R:'right',RIGHT:'right',DERECHA:'right'};
-   if(sides[upper]){$('cadWallJustification').value=sides[upper];cadWallOptionPending=null;prompt();schedule();return;}
+   if(sides[rawOption]){$('cadWallJustification').value=sides[rawOption];cadWallOptionPending=null;prompt();schedule();return;}
   }else if(pending==='thickness'){
    const metres=Number(value.replace(',','.'));
    if(/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.replace(',','.'))&&cadWallQuickSetThickness(value)){
@@ -5189,10 +5190,10 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
   }
   cadWallOptionPending=null;
  }
- if(state.tool==='wall2d'&&['J','JUSTIFY','JUSTIFICATION','JUSTIFICACION'].includes(upper)){
+ if(state.tool==='wall2d'&&['J','JUSTIFY','JUSTIFICATION','JUSTIFICACION'].includes(rawOption)){
   cadWallOptionPending='justify';prompt();return;
  }
- if(state.tool==='wall2d'&&['T','THICKNESS','ESPESOR'].includes(upper)){
+ if(state.tool==='wall2d'&&['T','THICKNESS','ESPESOR'].includes(rawOption)){
   cadWallOptionPending='thickness';prompt();return;
  }
  if(['HATCHEDIT','-HATCHEDIT','EDITARSOMBREADO','EDITARHATCH','HE'].includes(upper))return cadHatchEdit();
@@ -5259,7 +5260,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
    $('offsetDistance').value=String(d);prompt();toast('OFFSET '+d+' '+state.unit+' · '+(state.modifyCandidate?'Hacé clic en el lado':'Seleccioná el objeto y luego el lado'));return;
   }
  }
-if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upper==='U'||upper==='UNDO'||upper==='DESHACER')return undoDrawingVertex();if(upper==='C'||upper==='CLOSE'||upper==='CERRAR')return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}
+if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(['U','UNDO','DESHACER'].includes(rawOption))return undoDrawingVertex();if(state.tool!=='wall2d'&&['C','CLOSE','CERRAR'].includes(rawOption))return closeDrawing();}let p=parseCoordinate(value);if(p){handlePoint(p,false);schedule();return}
  // STRETCH: distance + Enter in the mouse-indicated direction from the base point.
  if(state.tool==='stretch'&&state.modifyCandidate?.phase==='target'){
   const raw=value.trim().replace(',','.');
