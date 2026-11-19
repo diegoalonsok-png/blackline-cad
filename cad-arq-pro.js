@@ -582,6 +582,7 @@ EXT.context.push(info=>{
    (Repetir último, Entrada reciente, Galería…) en lugar de un Enter silencioso.
    Con comando activo se mantiene el comportamiento actual (Enter / confirmar). */
 CORE.canvas.addEventListener('contextmenu',ev=>{
+ if(ev.shiftKey||ev.ctrlKey)return; // Shift/Ctrl + clic derecho: menú de referencias a objetos
  const st=S();if(st.tool!=='select'||st.stage.length||pick.active)return;
  const cmd=document.getElementById('command');if(cmd&&cmd.value.trim())return;
  const w=CORE.world(P(ev.offsetX,ev.offsetY));if(CORE.pick(w))return; // el núcleo abre el menú de objeto

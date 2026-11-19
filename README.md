@@ -287,7 +287,11 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 
 **Modelo de pago futuro.** `cad-plan.js` muestra el estado (**BETA ABIERTA** mientras no haya servidor) y `billing/` contiene un Worker de Cloudflare + D1 + Stripe, no desplegado, con acceso por enlace al correo, prueba de 90 días, webhooks firmados y portal de facturación. El dibujo, abrir y exportar DXF nunca se bloquean. Ver `billing/README.md`.
 
-**Verificación.** Las 178 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
+**Más órdenes 2D (segunda tanda).** Capas: `CAPAISO`/`LAYISO`, `CAPAUNISO`, `CAPADES`/`LAYOFF`, `CAPAACT`/`LAYON`, `CAPABLOQ`/`LAYLCK`, `CAPADESBLOQ`, `CAPAACTUAL`/`LAYMCUR`, `CAPACAMBIAR`/`LAYMCH`, `CAPAFUSION`/`LAYMRG`, `CAPABORRAR`/`LAYDEL` y `PORCAPA`/`SETBYLAYER`. Cotas en serie: `ACOCONT`/`DIMCONTINUE` y `ACOLINEABASE`/`DIMBASELINE`. Dibujo: `SPLINE` (curva por puntos de ajuste, guardada como polilínea), `ARANDELA`/`DONUT`, `MARCACENTRO`/`CENTERMARK`, `LINEACENTRO`/`CENTERLINE` y `MATRIZCAMINO`/`ARRAYPATH`. Vista y consulta: `ZO`, `CAL` (calculadora con lista blanca de funciones), `BUSCAR`/`FIND` con reemplazo, `ESTADO`/`STATUS` y `AUDITAR`/`AUDIT`. Alias: `MLINE` abre el muro paramétrico. **Shift + clic derecho** abre el menú de referencias a objetos. Todo está en `cad-autocad-plus.js`.
+
+**Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
+
+**Verificación.** Las 184 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
 
 ## Independencia, propiedad intelectual y compatibilidad
 

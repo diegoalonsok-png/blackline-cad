@@ -2,7 +2,7 @@
  * PLANTILLA NO DESPLEGADA. Ver billing/README.md antes de publicar.
  *
  * Variables (wrangler secret put …): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SESSION_SECRET, RESEND_API_KEY
- * Variables (wrangler.toml [vars]):    APP_ORIGIN, API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY,
+ * Variables (wrangler.toml [vars]):    APP_ORIGIN, API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, STRIPE_TAX ('1' = IVA automático),
  *                                      TRIAL_DAYS (90), MAIL_FROM, COOKIE_DOMAIN
  * Base de datos D1 enlazada como DB (schema.sql).
  *
@@ -150,9 +150,14 @@ export default {
     const price={pro:env.PRICE_PRO_MONTHLY,'pro-yearly':env.PRICE_PRO_YEARLY,studio:env.PRICE_STUDIO_MONTHLY}[plan];
     if(!price)return cors(env,req,json({error:'plan inválido'},400));
     const user=await env.DB.prepare('SELECT email,stripe_customer_id FROM users WHERE id=?').bind(userId).first();
-    const session=await stripe(env,'checkout/sessions',{mode:'subscription',client_reference_id:userId,
-     ...(user.stripe_customer_id?{customer:user.stripe_customer_id}:{customer_email:user.email}),
-     line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',
+    // Métodos de pago dinámicos: tarjeta, PayPal, SEPA, Apple/Google Pay… se activan desde el Dashboard
+    // (Configuración → Métodos de pago) sin tocar este código (a propósito no se fija una lista de métodos).
+    const tax=env.STRIPE_TAX==='1';
+    const session=await stripe(env,'checkout/sessions',{mode:'subscription',client_reference_id:userId,locale:'es',
+     ...(user.stripe_customer_id?{customer:user.stripe_customer_id,customer_update:{address:'auto',name:'auto'}}:{customer_email:user.email}),
+     line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',billing_address_collection:'required',
+     ...(tax?{automatic_tax:{enabled:'true'},tax_id_collection:{enabled:'true'}}:{}),
+     subscription_data:{metadata:{user_id:userId}},
      success_url:env.APP_ORIGIN+'/blackline-cad/?pago=ok',cancel_url:env.APP_ORIGIN+'/blackline-cad/?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
    }

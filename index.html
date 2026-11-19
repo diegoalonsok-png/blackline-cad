@@ -7156,6 +7156,10 @@ window.CAD2D_CORE=Object.freeze({
  command:text=>{$('command').value=String(text);runCommand()},
  lastCommand:()=>cad2dLastCommand,
  openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
+ osnap:Object.freeze({types:()=>CAD_OSNAP_TYPES.slice(),has:mode=>cadActiveOsnaps.has(mode),
+  toggle:mode=>{if(!CAD_OSNAP_TYPES.includes(mode))return;cadActiveOsnaps.has(mode)?cadActiveOsnaps.delete(mode):cadActiveOsnaps.add(mode);saveCadOsnapModes();schedule()},
+  set:list=>{cadActiveOsnaps=new Set(list.filter(m=>CAD_OSNAP_TYPES.includes(m)));saveCadOsnapModes();schedule()},
+  get on(){return state.osnapOn}}),
  commandHistory:()=>cad2dCommandHistory.slice(),
  nextId:()=>state.nextId++
 });
@@ -7345,4 +7349,5 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-plan.js?v=20261118"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261118"></script>
 <script src="cad-arq-pro.js?v=20261118"></script>
+<script src="cad-autocad-plus.js?v=20261118"></script>
 </body></html>

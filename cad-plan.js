@@ -22,9 +22,9 @@ const enforce=cfg.enforce===true&&!!urls.status;
 /* Matriz de planes. Las funciones básicas de dibujo NUNCA se bloquean: el usuario siempre
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
- free:{label:'Gratis',price:'US$ 0',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'US$ 9 / mes · US$ 90 / año',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
- studio:{label:'Estudio',price:'US$ 29 / mes · 5 usuarios',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
+ free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
+ pro:{label:'Pro',price:'9 € / mes · 90 € / año (IVA incl.)',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
+ studio:{label:'Estudio',price:'29 € / mes · 5 usuarios (IVA incl.)',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de DWG (cuando el conversor esté operativo)','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
 

@@ -21,10 +21,37 @@ Principios:
 ## Planes sugeridos (editables en `cad-plan.js` y en Stripe)
 
 - **Gratis:** dibujo 2D completo, capas, cotas, DXF/SVG/PNG, PDF A4 y la galería básica.
-- **Pro (US$ 9 por mes o US$ 90 por año):** bloques Pro de la galería, ploteo A0–A3, proyectos ilimitados, DWG cuando exista el conversor, nube y sin marca de agua.
-- **Estudio (US$ 29 por mes, 5 usuarios):** todo lo de Pro, más equipo y bibliotecas compartidas.
+- **Pro (9 € por mes o 90 € por año, IVA incluido):** bloques Pro de la galería, ploteo A0–A3, proyectos ilimitados, DWG cuando exista el conversor, nube y sin marca de agua.
+- **Estudio (29 € por mes, 5 usuarios):** todo lo de Pro, más equipo y bibliotecas compartidas.
 
-Los precios son una propuesta inicial. Validalos con tus usuarios antes de publicar.
+Para que el precio sea **con IVA incluido**, creá los precios en Stripe con *Incluir impuestos en el precio* (`tax_behavior=inclusive`). Si no, Stripe suma el IVA encima.
+
+## Cuenta de Stripe: diagnóstico (18 nov 2026)
+
+La cuenta conectada (`acct_…U61u`, país **ES**, moneda **EUR**, con **N26** vinculada e identidad verificada) **no está lista para CAD2D**:
+
+1. **No puede cobrar ni transferir pagos** (`charges_enabled=false`, `payouts_enabled=false`, estado *en revisión*). Tiene vencido un formulario de **verificación del modelo de negocio** y una **apelación** pendiente por un rechazo previo.
+2. **La creó Buy Me a Coffee** como cuenta conectada, con la descripción "creador que recibe pagos por buymeacoffee.com". En los resúmenes de tarjeta los clientes verían `BUYMEACOFFEE.COM`. Conviene no mezclar el negocio de software con esa cuenta.
+
+**Recomendación:** crear una **cuenta nueva de Stripe propia para CAD2D** en dashboard.stripe.com (menú de la cuenta → *Nueva cuenta*). Configurala así:
+
+- País España, persona física (o la sociedad, si la creás).
+- Nombre comercial **CAD2D**.
+- Descripción: *software de dibujo 2D en línea por suscripción*.
+- Sitio web: la URL de GitHub Pages o tu dominio.
+- Descriptor de los resúmenes de tarjeta: `CAD2D`.
+- Cuenta bancaria: la misma N26, que es un IBAN español en EUR.
+
+Después:
+
+- Conectá la cuenta nueva al conector de Stripe de Claude con permisos de **modo de prueba**. Desde ahí se pueden crear los productos y precios y probar todo el circuito sin dinero real.
+- **PayPal:** con una cuenta española, Stripe procesa PayPal dentro de Checkout. Se activa en *Configuración → Métodos de pago → PayPal* y, para suscripciones, hay que pedir los *pagos recurrentes* de PayPal. El código no fija métodos de pago, así que PayPal, tarjeta, SEPA, Apple Pay y Google Pay aparecen solos cuando los activás.
+- **IVA:** activá Stripe Tax con la dirección de origen en España y la variable `STRIPE_TAX=1`. Para vender a consumidores de otros países de la UE suele ser necesario el régimen de ventanilla única (OSS).
+
+Antes de cobrar, consultá con un gestor:
+
+- Para vender como persona física en España normalmente hay que darse de alta como autónomo y facturar.
+- Si vivís en Argentina, también importa dónde tributás.
 
 ## Puesta en marcha (cuando decidas cobrar)
 
@@ -44,6 +71,6 @@ Los precios son una propuesta inicial. Validalos con tus usuarios antes de publi
 
 ## Antes de cobrar (no técnico)
 
-- Términos y condiciones, política de privacidad y de reembolsos.
-- Facturación en Argentina: definí si facturás como monotributista o con una empresa. Stripe no opera directamente con cuentas argentinas. Las alternativas habituales son una LLC en EE. UU. con Stripe, o Mercado Pago / Paddle / Lemon Squeezy como comerciante registrado. El Worker está escrito para Stripe, pero la lógica de planes no depende del proveedor. Consultá con tu contador antes de elegir.
-- No soy abogado ni contador: estas notas son técnicas, no asesoramiento legal o fiscal.
+- Términos y condiciones, política de privacidad (RGPD) y de reembolsos o desistimiento (14 días en la UE para consumidores, salvo renuncia expresa al empezar a usar el servicio).
+- Alta fiscal en España y emisión de facturas. Stripe Invoicing o una herramienta compatible con VERI*FACTU pueden automatizarlas.
+- No soy abogado ni gestor: estas notas son técnicas, no asesoramiento legal o fiscal.
