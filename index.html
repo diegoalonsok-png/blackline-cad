@@ -847,8 +847,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
   return [...document.querySelectorAll('dialog[open],[role="dialog"]:not([hidden])')].some(node=>{
    const style=window.getComputedStyle(node);
    if(style.display==='none'||style.visibility==='hidden'||node.getAttribute('aria-hidden')==='true')return false;
-   return node.matches('dialog[open]')||node.getAttribute('aria-modal')==='true'||
-    (focused&&focused!==document.body&&node.contains(focused));
+   // Only genuinely modal dialogs intercept model-space keyboard entry.
+   return node.matches('dialog[open]')||node.getAttribute('aria-modal')==='true';
   });
  }
  window.addEventListener('keydown',function(ev){
