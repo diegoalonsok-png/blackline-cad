@@ -828,6 +828,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
+<script defer src="assets/cad-ui-glossary.js?v=20261119-1711"></script>
 <script defer src="assets/cad-ui-language.js?v=20261119-1711"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
@@ -4938,8 +4939,9 @@ if(cad2dLanguageSelect){
  cad2dLanguageSelect.addEventListener('change',()=>{
   cad2dAliasLanguage=cad2dLanguageSelect.value==='en'?'en':'es';
   try{localStorage.setItem('cad2d-alias-language',cad2dAliasLanguage)}catch(e){}
-  window.BlacklineUILanguage?.setLanguage(cad2dAliasLanguage);
-  toast(cad2dAliasLanguage==='es'?'Interfaz y comandos: Español':'Interface and commands: English');
+  // Recargar aplica el idioma a toda la interfaz (el dibujo se recupera de la copia local).
+  try{queueLocalBackup?.()}catch(e){}
+  setTimeout(()=>location.reload(),150);
  });
 }
 function cad2dNormalizeCommand(value){
