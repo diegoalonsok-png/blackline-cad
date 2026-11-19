@@ -12,7 +12,7 @@
  var DOMINIO='blackline-cad.org';
  var DWG_ACTIVO=false;
  var DWG_ENDPOINT='';
- var CUENTAS_ACTIVAS=false;
+ var CUENTAS_ACTIVAS=true;
 
  var host=location.hostname;
  if(!(host===DOMINIO||host==='www.'+DOMINIO))return;
