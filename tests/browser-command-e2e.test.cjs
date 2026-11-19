@@ -68,6 +68,7 @@ test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance
   };
   await call('Runtime.enable');
   await call('Page.enable');
+  await call('Page.bringToFront');
   await call('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   let ready=false;
   for(let i=0;i<80;i++){
@@ -91,8 +92,15 @@ test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance
    await call('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});
   };
   await evaluate("document.getElementById('cadCanvas').focus()");
+  const environment=await evaluate("(()=>({focus:document.activeElement?.id,dialogs:[...document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])')].map(e=>({id:e.id,display:getComputedStyle(e).display,hidden:e.hidden})),canvas:document.getElementById('cadCanvas').tagName,command:document.getElementById('command').disabled}))()");
+  console.log('CAD keyboard environment: '+JSON.stringify(environment));
   await type('pl');
-  assert.equal((await evaluate("document.getElementById('command').value")).toUpperCase(),'PL');
+  const entered=await evaluate("document.getElementById('command').value");
+  if(entered.toUpperCase()!=='PL'){
+   const diagnose=await evaluate("(()=>({focus:document.activeElement?.id,command:document.getElementById('command').value,tool:window.CAD2D_CORE.state.tool}))()");
+   console.log('CAD typing diagnostic: '+JSON.stringify(diagnose));
+  }
+  assert.equal(entered.toUpperCase(),'PL');
   await key('Enter');
   assert.equal(await evaluate("window.CAD2D_CORE.state.tool"),'polyline');
   await key('Escape');
