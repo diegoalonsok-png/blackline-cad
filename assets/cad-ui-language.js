@@ -49,7 +49,21 @@
  ['MURO: primer punto','WALL: first point'],['MURO: siguiente punto','WALL: next point'],
  ['Enter finaliza','Enter to finish'],['espesor','thickness']
  ];
+ const G=root.CAD2D_UI_GLOSSARY||{phrases:[],words:{}};
+ for(const pr of G.phrases)pairs.push(pr);
  const toEn=new Map(pairs.map(([es,en])=>[es,en])),toEs=new Map(pairs.map(([es,en])=>[en,es]));
+ const WORDS=G.words||{},SPANISH=/[áéíóúñÁÉÍÓÚÑ¿¡]|\b(de|del|con|para|por|sin|y|la|las|el|los|una?)\b/i;
+ const prefixes=G.phrases.filter(([es])=>/ $/.test(es));
+ // Fallback: palabra por palabra solo si el texto parece español (nombres de bloques, categorías…).
+ function wordwise(text){
+  // Solo textos cortos (nombres, etiquetas): una oración traducida palabra por palabra queda mal.
+  if(text.trim().split(/\s+/).length>7)return text;
+  // Nunca tocar tokens sueltos cortos (EN, Y, X, A…): son siglas, ejes o idiomas.
+  if(!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,}/.test(text))return text;
+  if(!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/.test(text)||!text.split(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/).some(w=>WORDS[w.toLowerCase()]))return text;
+  for(const [es,en] of prefixes)if(text.startsWith(es))text=en+text.slice(es.length);
+  return text.replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g,w=>{if(w.length<3&&w===w.toUpperCase())return w;const t=WORDS[w.toLowerCase()];if(!t)return w;return w[0]===w[0].toUpperCase()&&w[0]!==w[0].toLowerCase()?(w===w.toUpperCase()&&w.length>1?t.toUpperCase():t[0].toUpperCase()+t.slice(1)):t});
+ }
  let current='en';
  function translate(value,language=current){
   const input=String(value||'');
@@ -60,10 +74,15 @@
   if(table.has(core))return a+table.get(core)+b;
   // Compound menu rows preserve shortcut notation and counts.
   const match=/^(.+?)(\s·\s.+)$/.exec(core);
-  if(match&&table.has(match[1]))return a+table.get(match[1])+match[2]+b;
+  if(match&&table.has(match[1])&&language==='es')return a+table.get(match[1])+match[2]+b;
   const start=/^(.+?)(\s·\s)(.+)$/.exec(core);
   if(start&&table.has(start[1])&&table.has(start[3]))
     return a+table.get(start[1])+start[2]+table.get(start[3])+b;
+  // "Baños completos (13)" y similares: traducir sin el contador.
+  const count=/^(.+?)(\s*\(\d+\))$/.exec(core);
+  if(count&&table.has(count[1]))return a+table.get(count[1])+count[2]+b;
+  if(language!=='es'){const wrap=/^(Insert |Move )(.+?)( at 1:1| command group)$/.exec(core);if(wrap){const inner=table.get(wrap[2])||wordwise(wrap[2]);if(inner!==wrap[2])return a+wrap[1]+inner+wrap[3]+b}}
+  if(language!=='es'){const w=core.split(/(\s·\s)/).map(part=>/^\s·\s$/.test(part)?part:(table.get(part)||wordwise(part))).join('');if(w!==core)return a+w+b}
   return input;
  }
  function skipped(node){
@@ -89,21 +108,25 @@
   document.documentElement.lang=current;
   const selector=document.getElementById('cadAliasLanguage');
   if(selector)selector.value=current;
-  const app=document.querySelector('.app');
-  if(app)walk(app);
+  walk(document.body);
  }
  function init(){
   let value='en';
   try{value=localStorage.getItem('cad2d-alias-language')==='es'?'es':'en'}catch(_){}
   setLanguage(value);
-  const app=document.querySelector('.app');
-  if(app&&typeof MutationObserver==='function'){
+  if(typeof MutationObserver==='function'){
+   let busy=false;
    const observer=new MutationObserver(changes=>{
-    for(const change of changes){
-     for(const node of change.addedNodes)if(node.nodeType===1)walk(node);
-    }
+    if(busy||current==='es')return;busy=true;
+    try{
+     for(const change of changes){
+      if(change.type==='characterData'){const n=change.target;if(!skipped(n)){const next=translate(n.nodeValue);if(next!==n.nodeValue)n.nodeValue=next}}
+      else if(change.type==='attributes'){const el=change.target,old=el.getAttribute(change.attributeName);if(old&&!el.closest('[data-no-cad-translate],#cadCanvas')){const next=translate(old);if(next!==old)el.setAttribute(change.attributeName,next)}}
+      else for(const node of change.addedNodes){if(node.nodeType===1)walk(node);else if(node.nodeType===3&&!skipped(node)){const next=translate(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next}}
+     }
+    }finally{busy=false}
    });
-   observer.observe(app,{childList:true,subtree:true});
+   observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['title','aria-label','placeholder']});
   }
  }
  root.BlacklineUILanguage=Object.freeze({setLanguage,translate,getLanguage:()=>current});
