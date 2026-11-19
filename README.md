@@ -295,9 +295,32 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 
 **Propiedad intelectual.** Los textos públicos y los comentarios del código ya no usan "AutoCAD" para describir el producto. La marca aparece solo en el aviso de independencia y en menciones técnicas de compatibilidad. No se usan iconos, código, bloques ni manuales de terceros.
 
+**Muros con cotas virtuales.** Al seleccionar un muro paramétrico aparecen su **largo** y su **espesor** como cotas temporales: se ven solo en pantalla y no se imprimen ni se exportan.
+- Clic en la cota de largo para escribir un nuevo largo (se mantiene el extremo inicial), o en la de espesor para escribir uno nuevo.
+- Los pinzamientos ▶ de las puntas estiran el muro en pasos de 5 cm (Shift: 1 cm).
+- Los muros conectados en esa esquina acompañan el movimiento; las uniones en L y en T se rehacen solas.
+- Todo se deshace con Ctrl+Z.
+- Por ahora no se pueden editar así los muros que ya tienen una puerta o ventana colocada.
+
+**Ventanas gráficas en Layout (`VENTANA` / `MVIEW`).** Se pueden poner varias ventanas en la misma hoja, cada una con su escala (Ajustar, 1:20 … 1:1000) y su encuadre:
+- Encuadre: centrada en la vista actual del modelo o en la selección, con marco opcional.
+- Se crean arrastrando un rectángulo sobre la hoja, se mueven arrastrándolas y cambian de tamaño desde su esquina inferior derecha.
+- Salen iguales en la vista previa, en el SVG y en el PDF vectorial, y se guardan con el proyecto.
+- Sin ventanas, la hoja funciona como antes.
+
+**Cinta completa.**
+- Pestaña nueva **Arquitectura**: muro, puertas y ventanas, galería, baños, cocinas, escaleras, mobiliario, local + m² y contar bloques.
+- Grupos nuevos en las demás pestañas:
+  - Dibujo: spline, arandela, línea de construcción, semirrecta, nube de revisión, dividir, graduar, marca de centro, eje.
+  - Modificar: matriz sobre camino, agrupar, desagrupar, al frente, al fondo, por capa.
+  - Anotar: cota continua, cota de línea base y **tipo de línea** (continua, discontinua, punteada, eje).
+  - Vista: capas y objetos.
+  - Salida: ventanas.
+- Los 26 botones que mostraban la flecha de selección ahora tienen icono propio. Ningún botón de la cinta queda sin dibujo.
+
 **Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
 
-**Verificación.** Las 184 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
+**Verificación.** Las 188 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
 
 ## Independencia, propiedad intelectual y compatibilidad
 

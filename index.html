@@ -1033,6 +1033,7 @@ function updateBlacklineToolStatus(){
 }
 
 function ribbonAction(t){
+ const ext=window.CAD2D_EXTENSIONS?.ribbon?.[t];if(typeof ext==='function'){try{ext()}catch(error){toast(String(error?.message||error))}return}
  if(t==='blockgallery')return openBlacklineBlockPalette();
  if(t==='overkill')return cadOverkill();if(t==='selectsimilar')return cadSelectSimilar();
  if(t==='copytolayer')return cadTransferLayer(true);if(t==='changelayer')return cadTransferLayer(false);
@@ -5473,7 +5474,19 @@ function cadPrintPreflight(o){
 function cadLocalPrintDate(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function colorOutput(e,o){return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
 function escXML(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
-function makeSVG(o){const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of flattenCADEntities(state.entities)){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.05,e.width??layerFor(e).width??.25),attr=`fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'){
+function makeSVG(o){
+ if(o.viewports?.length&&!o.__vp){
+  // Hoja con varias ventanas gráficas: la página (márgenes, rótulo) sin geometría y una
+  // sub-SVG recortada por cada ventana, con su propio centro y escala.
+  const page=makeSVG({...o,__vp:true,__noEntities:true});
+  const inner=o.viewports.map((v,i)=>{
+   let s=makeSVG({...o,__vp:true,viewports:null,w:v.w,h:v.h,margin:0,cx:v.cx,cy:v.cy,factor:v.factor,title:'none'});
+   s=s.replace(/^<svg[^>]*>/,`<svg x="${v.x}" y="${v.y}" width="${v.w}" height="${v.h}" viewBox="0 0 ${v.w} ${v.h}" overflow="hidden">`)
+    .replace('<rect width="100%" height="100%" fill="white"/>','').replace(/id="drawing"/g,'id="cadvp'+i+'"').replace(/url\(#drawing\)/g,'url(#cadvp'+i+')');
+   return s+(v.frame!==false?`<rect x="${v.x}" y="${v.y}" width="${v.w}" height="${v.h}" fill="none" stroke="#000" stroke-width=".25"/>`:'');
+  }).join('');
+  return page.replace(/<\/svg>\s*$/,inner+'</svg>');
+ }const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of (o.__noEntities?[]:flattenCADEntities(state.entities))){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.05,e.width??layerFor(e).width??.25),attr=`fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'){
   for(const segment of cadHatchPatternPrimitives(e,6000))svg.push('<path '+attr+' d="M '+point(segment.a)+' L '+point(segment.b)+'"/>');
  }else if(e.type==='hatch')svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="'+c+'" stroke="none"/>');else if(e.type==='line')svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(e.b)}"/>`);else if(e.type==='rect'){let a=px(e.a),b=px(e.b);svg.push(`<rect ${attr} x="${num(Math.min(a[0],b[0]))}" y="${num(Math.min(a[1],b[1]))}" width="${num(Math.abs(a[0]-b[0]))}" height="${num(Math.abs(a[1]-b[1]))}"/>`)}else if(e.type==='polyline')svg.push(`<polyline ${attr} points="${e.pts.map(xy).join(' ')}${e.closed?' '+xy(e.pts[0]):''}"/>`);else if(e.type==='circle'){let a=px(e.c);svg.push(`<circle ${attr} cx="${num(a[0])}" cy="${num(a[1])}" r="${num(e.r*o.factor)}"/>`)}else if(e.type==='ellipse'){let a=px(e.c);svg.push(`<ellipse ${attr} cx="${num(a[0])}" cy="${num(a[1])}" rx="${num(e.rx*o.factor)}" ry="${num(e.ry*o.factor)}" transform="rotate(${num(-(e.rotation||0)*180/Math.PI)} ${num(a[0])} ${num(a[1])})"/>`)}else if(e.type==='arc'){let sweep=arcSweep(e.a0,e.a1),start=add(e.c,P(e.r*Math.cos(e.a0),e.r*Math.sin(e.a0))),end=add(e.c,P(e.r*Math.cos(e.a0+sweep),e.r*Math.sin(e.a0+sweep)));svg.push(`<path ${attr} d="M ${point(start)} A ${num(e.r*o.factor)} ${num(e.r*o.factor)} 0 ${sweep>Math.PI?1:0} 0 ${point(end)}"/>`)}else if(e.type==='text'){
  let a=px(e.p),rotate=Number(e.rotation)||0,fs=Math.max(.001,e.h*o.factor),width=(e.text||'').length*fs*.61;
@@ -5494,7 +5507,7 @@ const CAD_LAYOUT_KEY='cad2d-layout1-settings';
 function collectLayoutState(){
  return {paper:$('layoutPaper').value,orientation:$('layoutOrientation').value,
   scale:$('layoutScale').value,margin:Number($('layoutMargin').value),
-  style:$('layoutStyle').value,title:$('layoutTitleBlock').checked};
+  style:$('layoutStyle').value,title:$('layoutTitleBlock').checked,viewports:clone(cadLayoutViewports)};
 }
 function applyLayoutState(v){
  if(!v||typeof v!=='object')return;
@@ -5502,6 +5515,7 @@ function applyLayoutState(v){
  option('layoutPaper',v.paper);option('layoutOrientation',v.orientation);option('layoutScale',v.scale);option('layoutStyle',v.style);
  if(Number.isFinite(Number(v.margin)))$('layoutMargin').value=Math.max(0,Math.min(100,Number(v.margin)));
  if(typeof v.title==='boolean')$('layoutTitleBlock').checked=v.title;
+ cadLayoutViewports=Array.isArray(v.viewports)?v.viewports.filter(x=>x&&[x.x,x.y,x.w,x.h].every(Number.isFinite)).slice(0,24):[];
 }
 function syncLayoutToPlot(){
  const v=collectLayoutState();
@@ -5509,7 +5523,18 @@ function syncLayoutToPlot(){
  $('plotScale').value=v.scale;$('plotMargin').value=String(v.margin);
  $('plotStyle').value=v.style;$('titleBlock').value=v.title?'simple':'none';
 }
-function layoutPlotOptions(){syncLayoutToPlot();return plotOptions()}
+let cadLayoutViewports=[];
+/* Ventanas gráficas (MVIEW): rectángulos en mm de hoja, cada uno con centro de modelo y escala 1:N
+   o 'fit'. Sin ventanas, la hoja usa la vista única de siempre. */
+function cadViewportsResolved(){
+ return cadLayoutViewports.filter(v=>v&&v.w>3&&v.h>3).map(v=>{
+  let factor,cx=Number(v.cx),cy=Number(v.cy);
+  if(v.scale==='fit'||!Number.isFinite(cx)){const b=getBounds(),dx=Math.max(.001,b.maxX-b.minX),dy=Math.max(.001,b.maxY-b.minY);if(v.scale==='fit')factor=Math.min(v.w/dx,v.h/dy)*.92;if(!Number.isFinite(cx)){cx=(b.minX+b.maxX)/2;cy=(b.minY+b.maxY)/2}}
+  if(v.scale!=='fit')factor=U[state.unit]/Math.max(1e-6,Number(v.scale)||100);
+  return {...v,cx,cy,factor};
+ });
+}
+function layoutPlotOptions(){syncLayoutToPlot();const o=plotOptions();const vps=cadViewportsResolved();if(vps.length)o.viewports=vps;return o}
 function renderLayoutWorkspace(){
  if(cadActiveSpace!=='layout')return;
  try{
@@ -5596,7 +5621,18 @@ function bezierEllipse(c,rx,ry,start=0,end=TAU,rotation=0){
  }
  return result.join('\n');
 }
-for(const e of flattenCADEntities(state.entities)){if(!layerFor(e).visible)continue;const hex=colorOutput(e,o),rgb=o.style==='mono'?[0,0,0]:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);contents.push(`${rgb.map(fmt).join(' ')} RG`,`${rgb.map(fmt).join(' ')} rg`,`${fmt(Math.max(.1,e.width||.25))} w`);if(e.type==='line')contents.push(`${move(e.a)} ${line(e.b)} S`);else if(e.type==='polyline')contents.push(`${move(e.pts[0])} ${e.pts.slice(1).map(line).join(' ')} ${e.closed?'h ':''}S`);else if(e.type==='rect'){let p1=e.a,p2=P(e.b.x,e.a.y),p3=e.b,p4=P(e.a.x,e.b.y);contents.push(`${move(p1)} ${line(p2)} ${line(p3)} ${line(p4)} h S`)}else if(e.type==='circle'||e.type==='ellipse'||e.type==='arc'){let c=pos(e.c),rx=(e.type==='ellipse'?e.rx:e.r)*o.factor,ry=(e.type==='ellipse'?e.ry:e.r)*o.factor;if(e.type==='arc'){let start=-e.a0,end=-(e.a0+arcSweep(e.a0,e.a1)),sweep=end-start;let steps=Math.max(1,Math.ceil(Math.abs(sweep)/(Math.PI/2))),seg=sweep/steps;let result=[];for(let i=0;i<steps;i++){let a=start+i*seg,b=a+seg,k=4/3*Math.tan(seg/4);let p0=P(c.x+rx*Math.cos(a),c.y+ry*Math.sin(a)),p1=P(c.x+rx*(Math.cos(a)-k*Math.sin(a)),c.y+ry*(Math.sin(a)+k*Math.cos(a))),p2=P(c.x+rx*(Math.cos(b)+k*Math.sin(b)),c.y+ry*(Math.sin(b)-k*Math.cos(b))),p3=P(c.x+rx*Math.cos(b),c.y+ry*Math.sin(b));if(i===0)result.push(`${fmt(p0.x)} ${fmt(p0.y)} m`);result.push(`${fmt(p1.x)} ${fmt(p1.y)} ${fmt(p2.x)} ${fmt(p2.y)} ${fmt(p3.x)} ${fmt(p3.y)} c`)}contents.push(result.join('\n')+' S')}else contents.push(bezierEllipse(c,rx,ry,0,TAU,e.type==='ellipse'?-(e.rotation||0):0)+' S')}else if(e.type==='text'){let p=pos(e.p),face=safeCADFont(e.fontFamily||'Arial'),serif=face==='Georgia'||face==='Times New Roman',mono=face==='Courier New'||face==='monospace',index=serif?3:mono?5:1,fi=index+(e.bold?1:0);let a=-(e.rotation||0)*Math.PI/180,c=Math.cos(a),sin=Math.sin(a);contents.push(`BT /F${fi} ${fmt(Math.max(1,e.h*o.factor))} Tf ${fmt(c)} ${fmt(-sin)} ${fmt(sin)} ${fmt(-c)} ${fmt(p.x)} ${fmt(p.y)} Tm (${esc(e.text)}) Tj ET`)}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),m=pos(mul(add(p1,p2),.5));contents.push(`${move(e.a)} ${line(p1)} ${move(e.b)} ${line(p2)} ${move(p1)} ${line(p2)} S`,`BT /F1 3 Tf 1 0 0 -1 ${fmt(m.x)} ${fmt(m.y-2)} Tm (${esc(units(L)+' '+state.unit)}) Tj ET`)}}
+const cadPdfDrawEntities=()=>{for(const e of flattenCADEntities(state.entities)){if(!layerFor(e).visible)continue;const hex=colorOutput(e,o),rgb=o.style==='mono'?[0,0,0]:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255);contents.push(`${rgb.map(fmt).join(' ')} RG`,`${rgb.map(fmt).join(' ')} rg`,`${fmt(Math.max(.1,e.width||.25))} w`);if(e.type==='line')contents.push(`${move(e.a)} ${line(e.b)} S`);else if(e.type==='polyline')contents.push(`${move(e.pts[0])} ${e.pts.slice(1).map(line).join(' ')} ${e.closed?'h ':''}S`);else if(e.type==='rect'){let p1=e.a,p2=P(e.b.x,e.a.y),p3=e.b,p4=P(e.a.x,e.b.y);contents.push(`${move(p1)} ${line(p2)} ${line(p3)} ${line(p4)} h S`)}else if(e.type==='circle'||e.type==='ellipse'||e.type==='arc'){let c=pos(e.c),rx=(e.type==='ellipse'?e.rx:e.r)*o.factor,ry=(e.type==='ellipse'?e.ry:e.r)*o.factor;if(e.type==='arc'){let start=-e.a0,end=-(e.a0+arcSweep(e.a0,e.a1)),sweep=end-start;let steps=Math.max(1,Math.ceil(Math.abs(sweep)/(Math.PI/2))),seg=sweep/steps;let result=[];for(let i=0;i<steps;i++){let a=start+i*seg,b=a+seg,k=4/3*Math.tan(seg/4);let p0=P(c.x+rx*Math.cos(a),c.y+ry*Math.sin(a)),p1=P(c.x+rx*(Math.cos(a)-k*Math.sin(a)),c.y+ry*(Math.sin(a)+k*Math.cos(a))),p2=P(c.x+rx*(Math.cos(b)+k*Math.sin(b)),c.y+ry*(Math.sin(b)-k*Math.cos(b))),p3=P(c.x+rx*Math.cos(b),c.y+ry*Math.sin(b));if(i===0)result.push(`${fmt(p0.x)} ${fmt(p0.y)} m`);result.push(`${fmt(p1.x)} ${fmt(p1.y)} ${fmt(p2.x)} ${fmt(p2.y)} ${fmt(p3.x)} ${fmt(p3.y)} c`)}contents.push(result.join('\n')+' S')}else contents.push(bezierEllipse(c,rx,ry,0,TAU,e.type==='ellipse'?-(e.rotation||0):0)+' S')}else if(e.type==='text'){let p=pos(e.p),face=safeCADFont(e.fontFamily||'Arial'),serif=face==='Georgia'||face==='Times New Roman',mono=face==='Courier New'||face==='monospace',index=serif?3:mono?5:1,fi=index+(e.bold?1:0);let a=-(e.rotation||0)*Math.PI/180,c=Math.cos(a),sin=Math.sin(a);contents.push(`BT /F${fi} ${fmt(Math.max(1,e.h*o.factor))} Tf ${fmt(c)} ${fmt(-sin)} ${fmt(sin)} ${fmt(-c)} ${fmt(p.x)} ${fmt(p.y)} Tm (${esc(e.text)}) Tj ET`)}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),m=pos(mul(add(p1,p2),.5));contents.push(`${move(e.a)} ${line(p1)} ${move(e.b)} ${line(p2)} ${move(p1)} ${line(p2)} S`,`BT /F1 3 Tf 1 0 0 -1 ${fmt(m.x)} ${fmt(m.y-2)} Tm (${esc(units(L)+' '+state.unit)}) Tj ET`)}}};
+if(o.viewports?.length){
+ // Ventanas gráficas: cada una recorta su rectángulo de hoja y usa su propio centro/escala.
+ const saved={w:o.w,h:o.h,cx:o.cx,cy:o.cy,factor:o.factor};
+ contents.push('Q','q',`${fmt(toPt)} 0 0 ${fmt(-toPt)} 0 ${fmt(saved.h*toPt)} cm`);
+ for(const v of o.viewports){
+  Object.assign(o,{w:2*v.x+v.w,h:2*v.y+v.h,cx:v.cx,cy:v.cy,factor:v.factor});
+  contents.push('q',`${fmt(v.x)} ${fmt(v.y)} ${fmt(v.w)} ${fmt(v.h)} re W n`);cadPdfDrawEntities();contents.push('Q');
+  if(v.frame!==false)contents.push('0 0 0 RG .25 w',`${fmt(v.x)} ${fmt(v.y)} ${fmt(v.w)} ${fmt(v.h)} re S`);
+ }
+ Object.assign(o,saved);
+}else cadPdfDrawEntities();
 contents.push('Q');
 if(o.title==='simple'){
  const x=o.w-85,y=o.h-o.margin-29,raw=String(state.file),title=raw.length>32?raw.slice(0,29)+'...':raw;
@@ -7185,7 +7221,17 @@ initCadColorPopover();
 /* CAD2D extension bridge (Nov 2026). Narrow, documented surface for add-on modules
    (cad-arq-pro.js). Extensions register commands, context-menu items and canvas overlays;
    they never replace core functions. */
-window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[]};
+window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};
+/* Cinta extensible: los módulos agregan grupos con id, rótulo, icono SVG y acción. */
+function cad2dAddRibbonGroup(tab,group,items){
+ if(!ribbonTabs[tab])ribbonTabs[tab]=[];
+ const reg=window.CAD2D_EXTENSIONS.ribbon=window.CAD2D_EXTENSIONS.ribbon||{};
+ const ids=[];
+ for(const it of items){if(!it?.id)continue;toolDefs[it.id]=[it.label||it.id,it.id];if(it.icon)icons[it.id]=it.icon;reg[it.id]=it.run;ids.push(it.id)}
+ const existing=ribbonTabs[tab].find(g=>g[0]===group);
+ if(existing){for(const id of ids)if(!existing.includes(id))existing.push(id)}else ribbonTabs[tab].push([group,...ids]);
+}
+
 function cad2dRunExtensionCommand(cmd,raw){
  const reg=window.CAD2D_EXTENSIONS,key=String(cmd||'').toUpperCase(),fn=reg?.commands?.[key];
  if(typeof fn!=='function')return false;
@@ -7216,6 +7262,9 @@ window.CAD2D_CORE=Object.freeze({
  explicitWallLayerName,eraseSelected,copySelectedCadObjects,pasteCadObjects,
  command:text=>{$('command').value=String(text);runCommand()},
  lastCommand:()=>cad2dLastCommand,
+ wall:Object.freeze({faces:(a,b,w,j)=>cadWallFaces(a,b,w,j),join:faces=>cadWallJoinNewFaces(faces),centerline:meta=>cadWallCenterline(meta)}),
+ layout:Object.freeze({get viewports(){return cadLayoutViewports},set viewports(v){cadLayoutViewports=Array.isArray(v)?v:[]},render:()=>renderLayoutWorkspace(),switchTo:space=>switchCadSpace(space),get active(){return cadActiveSpace},options:()=>layoutPlotOptions(),svg:o=>makeSVG(o),pdf:o=>makePDF(o)}),
+ ribbon:Object.freeze({add:(tab,group,items)=>cad2dAddRibbonGroup(tab,group,items),rebuild:()=>buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home')}),
  openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
  osnap:Object.freeze({types:()=>CAD_OSNAP_TYPES.slice(),has:mode=>cadActiveOsnaps.has(mode),
   toggle:mode=>{if(!CAD_OSNAP_TYPES.includes(mode))return;cadActiveOsnaps.has(mode)?cadActiveOsnaps.delete(mode):cadActiveOsnaps.add(mode);saveCadOsnapModes();schedule()},
@@ -7411,4 +7460,5 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="assets/cad2d-arq-generators.js?v=20261118"></script>
 <script src="cad-arq-pro.js?v=20261118"></script>
 <script src="cad-autocad-plus.js?v=20261118"></script>
+<script src="cad-arq-tools.js?v=20261118"></script>
 </body></html>

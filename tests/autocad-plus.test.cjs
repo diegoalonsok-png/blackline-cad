@@ -50,3 +50,27 @@ test('unión en T: la cara del muro anfitrión se interrumpe entre las caras del
  const parts=api.cadLineWithoutGaps(ents[1],gaps.get(2));
  assert.equal(parts.length,2);assert.ok(Math.abs(parts[0].b.x-2.9)<1e-9&&Math.abs(parts[1].a.x-3.1)<1e-9);
 });
+test('ventanas gráficas: Layout guarda las ventanas y SVG/PDF las recortan por separado',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ assert.match(html,/viewports:clone\(cadLayoutViewports\)/);
+ assert.match(html,/cadLayoutViewports=Array\.isArray\(v\.viewports\)/);
+ assert.match(html,/if\(o\.viewports\?\.length&&!o\.__vp\)\{/);
+ assert.match(html,/const cadPdfDrawEntities=\(\)=>\{/);
+ assert.match(html,/re W n`\);cadPdfDrawEntities\(\);contents\.push\('Q'\)/);
+});
+test('cinta extensible: pestaña Arquitectura, tipos de línea y ningún botón sin icono',()=>{
+ const t=fs.readFileSync(path.join(__dirname,'..','cad-arq-tools.js'),'utf8');
+ assert.match(t,/b\.dataset\.tab='arq'/);
+ for(const lt of ['DOTTED','DASHED','CENTER'])assert.ok(t.includes("setLinetype('"+lt+"')"),lt);
+ const ids=[...t.matchAll(/\['([a-zA-Z]{4,})','[^']+','([a-z_]{2,})'/g)];const icons=new Set([...t.matchAll(/^ ([a-z_]+):'</gm)].map(m=>m[1]));
+ assert.ok(ids.length>40);for(const [,id,icon] of ids)assert.ok(icons.has(icon),id+' sin icono '+icon);
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ for(const k of ['polygon','hatch','breakLine','lengthen','pedit','matchprop','pasteclip','copyclip','cutclip','units','properties','selectall','block','insert','purge','open','dxf','pdf','list','regen','layout','layers','exportmenu'])assert.match(html,new RegExp('\\n '+k+":'<"),k);
+});
+test('muros: cotas virtuales solo en pantalla y estiramiento que arrastra muros conectados',()=>{
+ const t=fs.readFileSync(path.join(__dirname,'..','cad-arq-tools.js'),'utf8');
+ assert.match(t,/EXT\.overlays\.push\(ctx=>\{\n wallHits=\[\]/);
+ assert.doesNotMatch(t,/type:'dimension'/,'las cotas virtuales no crean entidades');
+ assert.match(t,/Muros conectados en una esquina movida: su punta acompaña/);
+ assert.match(t,/rejoinAll\(changed\)/);
+});
