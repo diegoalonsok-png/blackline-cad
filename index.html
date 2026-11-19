@@ -5322,11 +5322,29 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
-// Full CAD command typing directly from the drawing area, without clicking the bottom field.
+// Keyboard input follows AutoCAD: type anywhere in the CAD workspace to enter COMMAND.
+ // Installed once in the core viewer (not in an auxiliary theme script).
 document.addEventListener('keydown',ev=>{
- if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1||!/[a-zA-Z]/.test(ev.key))return;
- const active=document.activeElement;if(!active||active!==canvas)return;
- ev.preventDefault();$('command').focus();$('command').value=ev.key.toUpperCase();
+ if(ev.defaultPrevented||ev.isComposing||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1)return;
+ const target=ev.target;
+ if(!(target instanceof Element))return;
+ // Leave text fields, content editors and dialogs alone.
+ if(target.closest('input,textarea,select,[contenteditable],[role="textbox"],[role="dialog"],dialog'))return;
+ if(!document.querySelector('.app')?.contains(target)&&target!==document.body&&target!==document.documentElement)return;
+ if(document.querySelector('dialog[open],[role="dialog"]:not([hidden])'))return;
+ // Direct numerical distance entry is handled by the existing next listener.
+ const distanceInput=(['line','polyline','circle'].includes(state.tool)&&state.stage.length)||
+   state.tool==='offset'||state.tool==='lengthen';
+ if(distanceInput&&/^[0-9.,]$/.test(ev.key))return;
+ if(!/[\\p{L}\\p{N}_.,+\\-]/u.test(ev.key))return;
+ ev.preventDefault();
+ ev.stopImmediatePropagation();
+ const command=$('command');
+ const text=command.value+ev.key;
+ command.focus({preventScroll:true});
+ command.value=text;
+ command.setSelectionRange(text.length,text.length);
+ command.dispatchEvent(new Event('input',{bubbles:true}));
 },true);
 // Type a number immediately after choosing the first point, without clicking the command bar.
 document.addEventListener('keydown',ev=>{
@@ -7552,7 +7570,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261113"></script>
-<script src="blackline-modern.js?v=20261119-command-focus-v2"></script>
+<script src="blackline-modern.js?v=20261119-command-focus-v3"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261116-olimpiadas-v2"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261116-featured4"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261116-frame1"></script>
