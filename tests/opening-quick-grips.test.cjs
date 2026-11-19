@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const test=require('node:test');
 const fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-const source=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+const source=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m=>m[1]).find(s=>s.includes('function cadOpeningQuickApply(grip)'));
 test('opening actions use real parametric block references',()=>{
  assert.ok(source);
  for(const kind of ['swing-door','double-door','framed-window'])assert.ok(source.includes("'"+kind+"'"));
