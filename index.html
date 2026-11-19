@@ -4940,6 +4940,7 @@ if(cad2dLanguageSelect){
   cad2dAliasLanguage=cad2dLanguageSelect.value==='en'?'en':'es';
   try{localStorage.setItem('cad2d-alias-language',cad2dAliasLanguage)}catch(e){}
   // Recargar aplica el idioma a toda la interfaz (el dibujo se recupera de la copia local).
+  window.BlacklineUILanguage?.setLanguage(cad2dAliasLanguage);
   try{queueLocalBackup?.()}catch(e){}
   setTimeout(()=>location.reload(),150);
  });
