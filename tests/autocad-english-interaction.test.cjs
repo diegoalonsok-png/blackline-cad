@@ -37,3 +37,9 @@ test('UI bilingual glossary changes known interface terms without external trans
  assert.equal(api.translate('Manual de comandos','en'),'Manual de comandos');
  assert.equal(api.translate('Architectural drawing user data','en'),'Architectural drawing user data');
 });
+
+test('English CAD typing and classic repeat shortcut do not have a special HATCH trap',()=>{
+ assert.doesNotMatch(html,/ev\.key\.toUpperCase\(\)==='H'&&/);
+ assert.match(html,/ev\.key\.toLowerCase\(\)==='j'/);
+ assert.match(html,/if\(cad2dLastCommand\)\{\$\('command'\)\.value=cad2dLastCommand;runCommand\(\)\}/);
+});
