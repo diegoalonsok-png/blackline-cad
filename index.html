@@ -841,7 +841,15 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
   );
  }
  function modalOpen(){
-  return !!document.querySelector('dialog[open],[role="dialog"]:not([hidden])');
+  // Nonmodal role=dialog panels may be mounted permanently. Do not let them
+  // disable command typing throughout the CAD viewport.
+  const focused=document.activeElement;
+  return [...document.querySelectorAll('dialog[open],[role="dialog"]:not([hidden])')].some(node=>{
+   const style=window.getComputedStyle(node);
+   if(style.display==='none'||style.visibility==='hidden'||node.getAttribute('aria-hidden')==='true')return false;
+   return node.matches('dialog[open]')||node.getAttribute('aria-modal')==='true'||
+    (focused&&focused!==document.body&&node.contains(focused));
+  });
  }
  window.addEventListener('keydown',function(ev){
   if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
