@@ -6,7 +6,7 @@
  *   contenedor de Cloudflare (plan Workers Paid) u otro servidor con el mismo Dockerfile.
  * - DWG_ENDPOINT: dirección del conversor si NO está en api.DOMINIO (otro proveedor).
  * - CUENTAS_ACTIVAS: true cuando billing/ esté publicado.
- * - COBRO_DESDE: desde esa fecha (UTC) las funciones Pro piden suscripción o prueba vigente.
+ * - COBRO_ACTIVO: false = beta abierta para todos; true = 90 días de prueba por persona y después Pro.
  */
 (function(){
  'use strict';
@@ -14,9 +14,9 @@
  var DWG_ACTIVO=false;
  var DWG_ENDPOINT='';
  var CUENTAS_ACTIVAS=true;
- // Fecha en que las funciones Pro empiezan a pedir suscripción (hasta entonces: beta abierta).
- // Cada usuario tiene además 90 días de prueba desde que crea su cuenta.
- var COBRO_DESDE='2027-02-19';
+ // Cada persona tiene 90 días con todo habilitado desde su primer uso (con o sin cuenta).
+ // Después, las funciones Pro piden suscripción; el dibujo básico nunca se bloquea.
+ var COBRO_ACTIVO=true;
 
  var host=location.hostname;
  if(!(host===DOMINIO||host==='www.'+DOMINIO))return;
@@ -26,6 +26,6 @@
   statusUrl:'https://api.'+DOMINIO+'/api/status',
   checkoutUrl:'https://api.'+DOMINIO+'/api/checkout',
   portalUrl:'https://api.'+DOMINIO+'/api/portal',
-  enforce:Date.now()>=Date.parse(COBRO_DESDE+'T00:00:00Z')
+  enforce:COBRO_ACTIVO
  };
 })();
