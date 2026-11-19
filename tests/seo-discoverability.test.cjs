@@ -18,7 +18,7 @@ test('Blackline CAD sitemap lists only files that exist with matching canonicals
  const sitemap=fs.readFileSync('sitemap.xml','utf8');
  const urls=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1]);
  assert.equal(urls.length,paths.length);
- assert.equal(new Set(urls).size,3);
+ assert.equal(new Set(urls).size,urls.length);
  for(const url of urls){
   assert(url.startsWith(base));
   const page=url===base?'index.html':url.slice(base.length);
