@@ -59,7 +59,7 @@ phrases:[
  ['Matriz camino','Path array'],['Agrupar','Group'],['Desagrupar','Ungroup'],['Al frente','Bring to front'],['Al fondo','Send to back'],['Continua','Continuous'],['Discontinua','Dashed'],['Punteada','Dotted'],['Eje','Center'],
  ['Restaurar capas','Restore layers'],['Encender todas','Turn all on'],['Aislar objetos','Isolate objects'],['Zoom objeto','Zoom object'],['Estado','Status'],['Calculadora','Calculator'],
  ['Baños completos','Complete bathrooms'],['Cocinas completas','Complete kitchens'],['Sanitarios','Sanitary fixtures'],['Cocina · equipos','Kitchen appliances'],['Dormitorio','Bedroom'],['Exterior','Outdoor'],
- ['Vehículos','Vehicles'],['Equipos','Equipment'],['Alzados','Elevations'],['Personas','People'],['Oficina','Office'],['Símbolos','Symbols'],['Obra y maquinaria','Construction site'],
+ ['Vehículos','Vehicles'],['Equipos','Equipment'],['Alzados','Elevations'],['Personas','People'],['Oficina','Office'],['Símbolos','Symbols'],['Obra y maquinaria','Construction site'],['Cortes y vistas','Sections & elevations'],
  ['clic para insertar','click to insert'],['dinámico','dynamic'],['Planta de ','Plan · '],['PASAR A PRO','GO PRO'],['Cuenta','Account'],
  ['CAD2D · PLANES','BLACKLINE CAD · PLANS'],['Gratis','Free'],['Pasar a Pro','Go Pro'],['Ingresar / crear cuenta','Sign in / create account'],['Administrar suscripción','Manage subscription'],
  ['Dibujo 2D completo, capas, cotas','Full 2D drafting, layers, dimensions'],['Galería básica de bloques','Basic block gallery'],
@@ -87,6 +87,8 @@ phrases:[
  ['Wall opening · ancho 1 m · marco paramétrico 0,05 m · clic para insertar','Wall opening · width 1 m · click to insert'],
  ['Layers · LA','Layers · LA'],['Open Layer manager · LA','Open Layer manager · LA'],
  ['Todos','All'],['Todo','All'],['Ninguno','None'],
+ ['Mesada con bajo mesada y alacena','Kitchen counter with base and wall cabinets'],['Norte · rosa de los vientos','North · compass rose'],['Eje de replanteo con cota','Setting-out grid line'],['Indicación de corte A-A','Section marker A-A'],['Número de puerta / local','Door / room tag'],['Cota de nivel (corte)','Level mark (section)'],['Cota de nivel (planta)','Level mark (plan)'],['Banderín de eje (letra)','Grid bubble (letter)'],['Banderín de eje (número)','Grid bubble (number)'],
+ ['vista lateral','side view'],['vista frontal','front view'],['corte longitudinal','long section'],['corte transversal','cross section'],['vista lateral (corte)','side section'],
  ['Comando cancelado','Command cancelled'],['Seleccionado','Selected'],['Distancia','Distance'],['Área','Area'],['Coordenada','Coordinate']
 ],
 words:{
@@ -112,5 +114,5 @@ words:{
  'sillón':'armchair','simple':'single','sin':'without','sobre':'on','sofá':'sofa','suspendido':'wall-hung','símbolo':'symbol','símbolos':'symbols','tablero':'panel','termotanque':'water heater','texto':'text','tipo':'type',
  'torre':'tower','tramo':'flight','triple':'triple','un':'a','una':'a','vano':'opening','vehículos':'vehicles','ventana':'window','ventanal':'large window','vestidor':'walk-in closet','vidrio':'glass','volquete':'skip',
  'vuelta':'turn','y':'and','zonas':'zones','árbol':'tree','ángulo':'angle','área':'area','conífera':'conifer','caducifolio':'deciduous','quincho':'barbecue area','hamaca':'hammock','pasadizo':'walkway','plato':'tray',
- 'paramétrico':'parametric','paramétrica':'parametric','dinámico':'dynamic','minimo':'minimal','compartimentado':'compartmented','bacha':'sink','huellas':'treads','visibles':'visible','disponibles':'available','esquemáticos':'schematic','cabinas':'stalls','bidet':'bidet','tv':'TV','king':'king','queen':'queen','oval':'oval','suite':'suite','galley':'galley','kitchenette':'kitchenette','pickup':'pickup','scooter':'scooter','gráfica':'graphic','escala gráfica':'scale bar'
+ 'paramétrico':'parametric','paramétrica':'parametric','dinámico':'dynamic','minimo':'minimal','compartimentado':'compartmented','bacha':'sink','huellas':'treads','visibles':'visible','disponibles':'available','esquemáticos':'schematic','cabinas':'stalls','bidet':'bidet','vista':'view','lateral':'side','frontal':'front','corte':'section','transversal':'cross','longitudinal':'longitudinal','banderín':'grid bubble','letra':'letter','número':'number','replanteo':'setting-out','indicación':'marker','llamada':'callout','detalle':'detail','espejo':'mirror','mampara':'glass screen','resultados':'results','dinámicos':'dynamic','galería':'gallery','tv':'TV','king':'king','queen':'queen','oval':'oval','suite':'suite','galley':'galley','kitchenette':'kitchenette','pickup':'pickup','scooter':'scooter','gráfica':'graphic','escala gráfica':'scale bar'
 }};
