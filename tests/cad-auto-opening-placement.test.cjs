@@ -29,7 +29,7 @@ test('an opening outside a wall does not damage geometry',()=>{
 
 test('opening insertion is atomic if both wall faces cannot be opened',()=>{
  assert.match(main,/saveHistory\(\);\s*const beforeInsertion=state\.history\.at\(-1\)/);
- assert.match(main,/if\(aligned&&autoOpeningEnabled&&cutCount<2\)\{/);
+ assert.match(main,/if\(aligned&&autoOpeningEnabled&&cutCount<\(ref\.autoOpeningRectId\?1:2\)\)\{/);
  assert.match(main,/Object\.assign\(state,beforeInsertion\)/);
  assert.match(main,/state\.history\.pop\(\)/);
  assert.match(main,/No se pudo abrir el vano en ambas caras/);

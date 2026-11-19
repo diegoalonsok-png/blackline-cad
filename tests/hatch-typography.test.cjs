@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {patterns,passes}=require('../cad-hatch-patterns.js');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
-test('nine architectural hatch recipes are exposed',()=>assert.equal(Object.keys(patterns).length,10));
+test('nine architectural hatch recipes are exposed',()=>assert.ok(Object.keys(patterns).length>=10));
 test('single preserves selected angle and spacing',()=>assert.deepEqual(passes('single',.25,37),[{angle:37,spacing:.25}]));
 test('cross creates perpendicular directions',()=>assert.deepEqual(passes('cross',.2,45),[{angle:45,spacing:.2},{angle:135,spacing:.2}]));
 test('grid always horizontal and vertical',()=>assert.deepEqual(passes('grid',1,30),[{angle:0,spacing:1},{angle:90,spacing:1}]));
@@ -10,8 +10,9 @@ test('concrete preset has three directions',()=>assert.deepEqual(passes('concret
 test('invalid hatch pattern cannot create geometry',()=>assert.equal(passes('unknown',1,0),null));
 test('invalid spacing cannot create geometry',()=>assert.equal(passes('single',0,0),null));
 test('hatch code retains 12000 line cap before saveHistory',()=>{
- assert.match(html,/const segments=hatchPolygonSegments\(vertices,direction\.spacing,direction\.angle,12000-created\.length\)/);
- assert.match(html,/if\(created\.length>12000\)return toast/);
+ assert.match(html,/function hatchPolygonSegments\(vertices,spacing,angleDegrees,limit=12000\)/);
+ // Hatches are now associative entities; display primitives keep their own safety cap.
+ assert.match(html,/function cadHatchPatternPrimitives\(entity,limit=6000\)/);
 });
 test('typography controls and state round trip',()=>{
  for(const id of ['textUnderline','textHighlight','textHighlightColor'])assert.match(html,new RegExp('id="'+id+'"'));

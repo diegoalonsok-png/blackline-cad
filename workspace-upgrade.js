@@ -187,8 +187,8 @@ if(ribbon){
  decorateRibbon();
 }
 
-/* Browser-local 90-day guest indication. Never mistake it for secure account enforcement. */
-const TRIAL_DAYS=90;
+/* Browser-local 4-month (120-day) guest indication. Never mistake it for secure account enforcement. */
+const TRIAL_DAYS=120;
 const firstKey='cad2d-guest-first-use-v1';
 let first=read(firstKey,null);
 if(typeof first!=='number'||first>Date.now()||first<Date.UTC(2020,0,1)){first=Date.now();store(firstKey,first)}
@@ -206,8 +206,8 @@ const authDescription=$('cadAuthDescription'),authStatus=$('cadAuthStatus'),auth
 let locked=false;
 function showAuth(isLocked=false){
  locked=isLocked;authLayer.hidden=false;
- const note=daysLeft>0?'Your 90-day guest period has '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining. You can keep drawing without an account.':
-  'Your 90-day guest period has elapsed.';
+ const note=daysLeft>0?'Your 4-month free period has '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining. You can keep drawing without an account.':
+  'Your 4-month free period has elapsed.';
  authDescription.textContent=note+(isLocked?' Registration is now required to continue using the hosted service.':loginUrl?' You may create your account now.':' Account registration will be enabled once the secure service is deployed. Until then, CAD2D remains usable as a public beta.');
  authRegister.hidden=!loginUrl;
  authDismiss.hidden=isLocked;

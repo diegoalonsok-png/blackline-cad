@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+node_modules/
+wrangler.toml
+wrangler.jsonc
+.dev.vars

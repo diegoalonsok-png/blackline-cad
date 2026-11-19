@@ -47,7 +47,7 @@ DXF files with missing/unsupported `$INSUNITS` require explicit user unit select
 
 The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, but binary geometry cannot be decoded by the static frontend. `backend/dwg_service.py` provides an **optional, not-yet-deployed** FastAPI adapter to a separately installed ODA File Converter. The website's `DWG_CONVERTER_ENDPOINT` variable stays blank until the converter has been licensed, secured, deployed and tested. Even when operational, the current DXF import path cannot guarantee the preservation of advanced blocks, layouts, xrefs, hatches or proxy objects. Direct DWG open is therefore **not working yet**. Test on representative files before launching commercially.
 
-## AutoCAD-style interaction improvements (November 2026)
+## Desktop-CAD interaction improvements (November 2026)
 
 - `Z` / `ZOOM` followed by Enter enters zoom options: `-` to zoom out, `+` to zoom in, `E` for extents, `W` for a rectangular window, and `P` for the previous viewport.
 - Numeric zoom factors such as `2x`, `0.5x`, or `2` work after entering ZOOM. `ZP` / `ZOOMPREVIOUS` restores an earlier viewport. Up to 30 previous viewport states are retained for the current session.
@@ -121,7 +121,7 @@ A static site is cheap to distribute, but bandwidth, server-side file conversion
 - **CAD selection rectangles:** drag left-to-right to select objects whose bounding boxes lie fully inside the window; drag right-to-left for crossing selection (overlapping bounding boxes). Hold Shift to add to the selection. This is a bounding-box approximation, not yet precise segment/polygon clipping.
 - Syntax and isolated geometric smoke tests verified an intersection at x=4 on a 10-unit line, no unintended changes when no crossing was found, and parallel-line rejection. Full browser interaction/regression tests still required.
 
-## CAD-style LINE / PLINE / reusable blocks (2026-11-12)
+## LINE / PLINE / reusable blocks (2026-11-12)
 
 **LINE (L):** choose sequential points; each click or typed coordinate creates a separate LINE segment. A rubber-band preview shows only the next segment. Enter or double-click finishes. Use **U** during the command to remove the last segment, and **C** (Close) after three points to draw the final closing segment. **PLINE (PL):** points are staged into one editable polyline. Enter finishes as an open polyline; **C** closes after three vertices; **U** removes the last pending vertex. Esc cancels the pending command. Absolute `X,Y`, relative `@DX,DY`, and angular `@DIST<ANGLE` in degrees work in model-space coordinates, not scaled screen pixels.
 
@@ -189,7 +189,7 @@ CAD2D now has **MODEL**, **LAYOUT 1**, and **PLOT / PDF** tabs at the base of mo
 
 LAYOUT controls share the existing `plotOptions`, `makeSVG` and `makePDF` machinery so model entities are not copied or scaled in the source model. The physical PDF page size is in millimeters; fixed print scale is computed from model units. Layout settings are saved in `.cadjson` project files and IndexedDB recovery snapshots, and in browser-local preferences. Command aliases: `LAYOUT`, `PSPACE`, `PAPERSPACE`, `MSPACE`. This is the first **single-sheet paper-space workspace**, not yet AutoCAD-style multiple named layouts with movable viewport boundaries, multiple model viewports or full paper-space annotation entities. Preview and PDF are not yet externally verified in an interactive browser or CAD desktop application.
 
-## Professional UI and AutoCAD-style commands (November 2026)
+## Professional UI and CAD commands (November 2026)
 
 The desktop CAD2D UI has refreshed ribbon, tab, palettes, sidebar, input and status styling with subdued drafting-blue accents, consistent borders, clearer active controls and a searchable command launcher in the top brand bar. The command finder searches by CAD command name, alias and description; clicking a result submits that command. It only advertises a subset with implemented behavior.
 
@@ -257,6 +257,76 @@ Keep GitHub Pages as the free development/QA environment. After confirming CAD e
 - **PEDIT / PE**: select one unlocked polyline, choose vertex index (1-based), then move, insert a vertex after the chosen vertex, or delete a vertex. Moving/inserting accepts a click or exact X,Y typed in the command bar. Minimum vertex counts prevent invalid polylines. This is a subset of classic PEDIT, not full width/spline/curve fit editing.
 
 JavaScript syntax verified. Logic tests passed for fast vs slow and near vs distant middle-button clicks, active vs idle command cursor state, LENGTHEN positive/negative/total length (with invalid values rejected), and PEDIT moving/inserting/deleting vertices (with invalid index rejected). Full in-browser UI and physical mouse double-click behavior have not yet been verified.
+
+## Galería arquitectónica, bloques dinámicos y comandos nuevos (18 nov 2026)
+
+**Galería grande (`GALERIA`, `BANO`, `COCINA`, `ESCALERA` o el botón ⤢ de la paleta *GALERÍA ARQ*).** 147 bloques paramétricos de geometría propia, en 15 categorías, en planta y a escala 1:1:
+
+| Categoría | Bloques |
+| --- | --- |
+| Baños completos (13) | toilette, toilette esquinero, baño mínimo, con ducha y bidet, con bañera, completo bañera + bidet, en suite doble bacha, principal (bañera + ducha + doble bacha), accesible con giro Ø1,50, compartimentado, con bañera esquinera, de servicio, sanitario público con cabinas y mingitorios |
+| Cocinas completas (12) | kitchenette, lineal, paralela, en L, en L con desayunador, en U, con isla, con península, cocina-comedor, integrada con isla y banquetas, lavadero, cocina + lavadero |
+| Sueltos (122) | sanitarios, equipos de cocina (anafes de 2/4/5 hornallas, bachas, heladeras, lavavajillas, mesadas, alacenas, campana, lavarropas…), escaleras (recta, L, U, caracol, rampa 8 %), mobiliario (sofá en L, piano, ping-pong…), dormitorio (mesa de luz, cómoda, vestidor), exterior y vegetación, vehículos (motos, scooter, colectivo, pickup), equipos, alzados, personas, oficina, símbolos |
+| Obra y maquinaria (6) | retroexcavadora, camión hormigonero, grúa torre con radio de giro, volquete, andamio modulado, obrador |
+
+Un clic en la miniatura y otro en el plano. El bloque va a una capa propia (`A-SANITARIOS`, `A-EQUIPAMIENTO`, `A-MOBILIARIO`, `A-ESCALERAS`, `A-VEGETACION`, `A-VEHICULOS`, `A-INSTALACIONES`, `A-OBRA`…) y después se restaura la capa activa.
+
+**Bloques dinámicos con pinzamientos.** Al seleccionar un bloque de la galería aparecen:
+
+- **▶ ancho** y **▲ profundidad**, en pasos de 5 cm (Shift: 1 cm) y dentro del rango válido de cada bloque.
+- **▼ variantes** de la misma familia, por ejemplo cambiar un baño con ducha por uno con bañera conservando la medida.
+
+La geometría **se regenera**: los artefactos se reubican contra los muros y no se deforman (un inodoro sigue midiendo 40 × 70 cm). Cada tamaño queda como una definición `ARQ · nombre · ancho×prof`. Todo es deshacible con Ctrl+Z. También funciona con `ARQPARAM`, con la fila *Ancho/Prof.* de la paleta o con el clic derecho.
+
+**Clic derecho.** Sin comando ni selección, abre el menú por defecto: Repetir, Entrada reciente y Galería. Sobre un objeto agrega Aislar, Ocultar, orden de dibujo, Agrupar/Desagrupar, Contar bloques, Dividir/Graduar, Local + m² y Nube; en bloques ARQ suma Dimensiones, Variante y Restablecer. Con un comando activo sigue funcionando como Enter. Para volver al comportamiento anterior en vacío (siempre Enter), ejecutá `localStorage.setItem('cad2d-rightclick-enter','1')` en la consola del navegador.
+
+**Comandos nuevos** (alias en español e inglés; los objetos ocultos con AISLAR u OCULTAR se siguen incluyendo al exportar DXF o PDF): `AISLAR`/`ISOLATEOBJECTS`, `OCULTAR`/`HIDEOBJECTS`, `MOSTRARTODO`/`UNISOLATEOBJECTS`, `ALFRENTE`/`ALFONDO`/`DRAWORDER`, `GRUPO`/`GROUP`, `DESAGRUPAR`/`UNGROUP`, `CONTARBLOQUES`/`BCOUNT` (exporta CSV), `DIVIDIR`/`DIVIDE`, `GRADUAR`/`MEASURE`, `NUBEREV`/`REVCLOUD`, `LINEACONST`/`XLINE`, `SEMIRRECTA`/`RAY`, `LOCAL`/`ROOMTAG` (nombre + m²) y `PLAN`.
+
+**Arquitectura.** El núcleo (`index.html`) expone un puente acotado, `window.CAD2D_CORE` y `window.CAD2D_EXTENSIONS`, para registrar comandos, ítems del menú contextual y dibujos superpuestos sin reescribir funciones del núcleo. Los módulos nuevos son `assets/cad2d-arq-generators.js` (generadores en metros, que también se pueden probar en Node), `cad-arq-pro.js` (paleta, galería, pinzamientos y comandos) y `cad-plan.js` (planes).
+
+**Corrección.** Al insertar una puerta o ventana entre dos líneas paralelas, ya no puede tomar como cara del muro una línea de otra capa (por ejemplo, eléctrica): las dos caras deben compartir capa.
+
+**Modelo de pago futuro.** `cad-plan.js` muestra el estado (**BETA ABIERTA** mientras no haya servidor) y `billing/` contiene un Worker de Cloudflare + D1 + Stripe, no desplegado, con acceso por enlace al correo, prueba de 90 días, webhooks firmados y portal de facturación. El dibujo, abrir y exportar DXF nunca se bloquean. Ver `billing/README.md`.
+
+**Más órdenes 2D (segunda tanda).** Capas: `CAPAISO`/`LAYISO`, `CAPAUNISO`, `CAPADES`/`LAYOFF`, `CAPAACT`/`LAYON`, `CAPABLOQ`/`LAYLCK`, `CAPADESBLOQ`, `CAPAACTUAL`/`LAYMCUR`, `CAPACAMBIAR`/`LAYMCH`, `CAPAFUSION`/`LAYMRG`, `CAPABORRAR`/`LAYDEL` y `PORCAPA`/`SETBYLAYER`. Cotas en serie: `ACOCONT`/`DIMCONTINUE` y `ACOLINEABASE`/`DIMBASELINE`. Dibujo: `SPLINE` (curva por puntos de ajuste, guardada como polilínea), `ARANDELA`/`DONUT`, `MARCACENTRO`/`CENTERMARK`, `LINEACENTRO`/`CENTERLINE` y `MATRIZCAMINO`/`ARRAYPATH`. Vista y consulta: `ZO`, `CAL` (calculadora con lista blanca de funciones), `BUSCAR`/`FIND` con reemplazo, `ESTADO`/`STATUS` y `AUDITAR`/`AUDIT`. Alias: `MLINE` abre el muro paramétrico. **Shift + clic derecho** abre el menú de referencias a objetos. Todo está en `cad-autocad-plus.js`.
+
+**Muros: uniones en T limpias.** Cuando un tabique llega a un muro existente, sus caras topan siempre contra la cara del lado del local, aunque el punto se haya marcado en el eje o en la cara exterior. Antes podía atravesar el muro. La cara del muro anfitrión se interrumpe entre las dos caras del tabique, al dibujar y al exportar (DXF, SVG, PDF). El hueco se recalcula cada vez a partir de la geometría, así que sigue siendo correcto si se mueven los muros.
+
+**Clic derecho con un comando activo.** Abre el menú del comando: Enter, Cancelar, Deshacer vértice, opciones, Entrada reciente y Referencias a objetos. Para volver al comportamiento anterior (clic derecho = Enter) ejecutá `localStorage.setItem('cad2d-rightclick-enter','1')`.
+
+**Propiedad intelectual.** Los textos públicos y los comentarios del código ya no usan "AutoCAD" para describir el producto. La marca aparece solo en el aviso de independencia y en menciones técnicas de compatibilidad. No se usan iconos, código, bloques ni manuales de terceros.
+
+**Muros con cotas virtuales.** Al seleccionar un muro paramétrico aparecen su **largo** y su **espesor** como cotas temporales: se ven solo en pantalla y no se imprimen ni se exportan.
+- Clic en la cota de largo para escribir un nuevo largo (se mantiene el extremo inicial), o en la de espesor para escribir uno nuevo.
+- Los pinzamientos ▶ de las puntas estiran el muro en pasos de 5 cm (Shift: 1 cm).
+- Los muros conectados en esa esquina acompañan el movimiento; las uniones en L y en T se rehacen solas.
+- Todo se deshace con Ctrl+Z.
+- Por ahora no se pueden editar así los muros que ya tienen una puerta o ventana colocada.
+
+**Ventanas gráficas en Layout (`VENTANA` / `MVIEW`).** Se pueden poner varias ventanas en la misma hoja, cada una con su escala (Ajustar, 1:20 … 1:1000) y su encuadre:
+- Encuadre: centrada en la vista actual del modelo o en la selección, con marco opcional.
+- Se crean arrastrando un rectángulo sobre la hoja, se mueven arrastrándolas y cambian de tamaño desde su esquina inferior derecha.
+- Salen iguales en la vista previa, en el SVG y en el PDF vectorial, y se guardan con el proyecto.
+- Sin ventanas, la hoja funciona como antes.
+
+**Cinta completa.**
+- Pestaña nueva **Arquitectura**: muro, puertas y ventanas, galería, baños, cocinas, escaleras, mobiliario, local + m² y contar bloques.
+- Grupos nuevos en las demás pestañas:
+  - Dibujo: spline, arandela, línea de construcción, semirrecta, nube de revisión, dividir, graduar, marca de centro, eje.
+  - Modificar: matriz sobre camino, agrupar, desagrupar, al frente, al fondo, por capa.
+  - Anotar: cota continua, cota de línea base y **tipo de línea** (continua, discontinua, punteada, eje).
+  - Vista: capas y objetos.
+  - Salida: ventanas.
+- Los 26 botones que mostraban la flecha de selección ahora tienen icono propio. Ningún botón de la cinta queda sin dibujo.
+
+**Cloudflare y archivos .dwg.** Ver `CLOUDFLARE.md`.
+- `cad2d-config.js` concentra la configuración del despliegue: dominio, conversor y cuentas. En GitHub Pages queda vacío.
+- `dwg-converter/` convierte DWG a DXF en un contenedor de Cloudflare con GNU LibreDWG, como programa aparte en el servidor. Así LibreDWG no se distribuye a los usuarios y el código de CAD2D puede seguir siendo propietario.
+- Al elegir un .dwg, CAD2D pide permiso, lo envía, lo convierte y lo borra sin guardar copias.
+
+**Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
+
+**Verificación.** Las 189 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
 
 ## Independencia, propiedad intelectual y compatibilidad
 

@@ -1,0 +1,26 @@
+Blackline CAD / CAD2D
+Copyright (c) 2025-2026 Diego Kurilo. Todos los derechos reservados.
+
+Este software, su código fuente, su diseño de interfaz, sus iconos, su
+biblioteca de bloques y su documentación son obra original protegida por la
+Ley 11.723 de Propiedad Intelectual (Argentina) y por los tratados
+internacionales aplicables (Convenio de Berna).
+
+No se concede ninguna licencia de uso, copia, modificación, distribución,
+sublicencia ni venta del código fuente. El hecho de que el código sea
+visible en un navegador o en un repositorio no implica permiso para
+reutilizarlo.
+
+Los usuarios pueden usar la aplicación web publicada en blackline-cad.org de
+acuerdo con los Términos de uso (legal.html). Los dibujos que cada usuario
+crea son de su exclusiva propiedad.
+
+Componentes de terceros:
+- El conversor DWG opcional (carpeta dwg-converter/) ejecuta LibreDWG
+  (GNU GPL v3, https://www.gnu.org/software/libredwg/) como programa
+  independiente en un servidor. LibreDWG no se incluye en la aplicación web.
+
+Autodesk, AutoCAD y DWG son marcas de Autodesk, Inc. Blackline CAD no está
+afiliado, patrocinado ni respaldado por Autodesk, Inc.
+
+Contacto: contacto@blackline-cad.org

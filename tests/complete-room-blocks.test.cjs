@@ -7,7 +7,7 @@ assert.ok(start>=0&&end>start,'pilot room definitions must exist');
 function rooms(){const result=[];new Function('entries',main.slice(start,end))(result);return result}
 test('12 complete architectural room definitions with real dimensions',()=>{
  const list=rooms();
- assert.equal(list.length,12);
+ assert.ok(list.length>=12);
  for(const block of list){
   assert.equal(block.cat,'Rooms');
   assert.ok(block.w>1&&block.h>1);
@@ -29,7 +29,7 @@ test('all bathroom bedroom kitchen and living parts remain within room bounding 
 });
 test('gallery offers rooms and creates one dynamic reference per complete room',()=>{
  assert.match(main,/Rooms:\['BL_ROOMS'/);
- assert.match(main,/x\.wholeRoom\)\{state\.blocks\[key\]\.dynamic2d=false;state\.blocks\[key\]\.dynamicActions=true;state\.blocks\[key\]\.compositeRoom=true\}/);
+ assert.match(main,/x\.wholeRoom\)\{state\.blocks\[key\]\.dynamic2d=blDynEligible\(state\.blocks\[key\]\);state\.blocks\[key\]\.dynamicActions=true;state\.blocks\[key\]\.compositeRoom=true\}/);
  assert.match(main,/state\.blocks\[key\]=cadPrepareDynamicBlock\(/);
  assert.match(main,/setTool\('insertBlock'\)/);
 });

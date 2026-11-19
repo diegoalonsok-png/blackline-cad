@@ -1,0 +1,16 @@
+// Copiar como wrangler.jsonc dentro de dwg-converter/ y publicar con `npx wrangler deploy`.
+// Requiere el plan Workers Paid de Cloudflare (Containers) y Docker donde se ejecute wrangler.
+{
+  "name": "cad2d-dwg",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-18",
+  "vars": {
+    "APP_ORIGIN": "https://blackline-cad.org,https://www.blackline-cad.org,https://diegoalonsok-png.github.io",
+    "MAX_PER_MINUTE": "6",
+    "CONTAINER_INSTANCES": "2"
+  },
+  "containers": [{ "class_name": "DwgConverter", "image": "./Dockerfile", "max_instances": 3 }],
+  "durable_objects": { "bindings": [{ "class_name": "DwgConverter", "name": "DWG_CONVERTER" }] },
+  "exports": { "DwgConverter": { "type": "durable-object", "storage": "sqlite" } },
+  "routes": [{ "pattern": "api.blackline-cad.org/api/convert/*", "zone_name": "blackline-cad.org" }]
+}
