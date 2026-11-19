@@ -855,7 +855,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  }
  window.addEventListener('keydown',function(ev){
   if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
-     ev.key.length!==1 || ev.key===' ' || modalOpen() || window.CAD2D_GRIP_TYPING)return;
+     ev.key.length!==1 || ev.key===' ' || modalOpen() || window.CAD2D_GRIP_TYPING || window.CAD2D_OPENING_TYPING)return;
   const target=ev.target;
   if(editable(target))return;
   const app=document.querySelector('.app');
@@ -2475,6 +2475,7 @@ document.addEventListener('keydown',ev=>{
   if(cadOpeningNumericDrag(ev.key)){ev.preventDefault();ev.stopImmediatePropagation()}
  }
 },true);
+Object.defineProperty(window,'CAD2D_OPENING_TYPING',{configurable:true,get:()=>!!(state.drag?.type==='blockGrip'&&!state.drag.axis||cadVertexPlacement)});
 // Dynamic input for moving doors/windows: visible as soon as the grip is active.
 function cadDrawOpeningDisplacement(){
  const placement=cadVertexPlacement,d=state.drag;
