@@ -26,7 +26,7 @@ test('typing PL in the model space fills COMMAND continuously without a click',(
  const window={addEventListener:(event,listener,capture)=>{if(event==='keydown'&&capture)listeners.push(listener)},
   getComputedStyle:()=>({display:'block',visibility:'visible'})};
  const document={querySelector:selector=>selector==='.app'?app:null,
-  querySelectorAll:()=>[{getAttribute:()=>null,matches:()=>false,contains:()=>false}],
+  querySelectorAll:()=>[{getAttribute:key=>key==='aria-modal'?'true':null,matches:()=>false,contains:()=>false}],
   getElementById:id=>id==='command'?command:null,body:{},documentElement:{},activeElement:canvas};
  vm.runInNewContext(keyboard,{window,document,Element:MockElement,Event:class Event{}});
  assert.equal(listeners.length,1);
