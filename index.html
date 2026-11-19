@@ -2766,7 +2766,8 @@ function drawOtrackGuides(){
 const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
 let cadActiveOsnaps=new Set(['END','POINT','MID','CENTER','INT','QUAD']); // Keep existing defaults; extra OSNAP modes are opt-in.
 try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if(Array.isArray(saved))cadActiveOsnaps=new Set(saved.filter(x=>CAD_OSNAP_TYPES.includes(x)))}catch(e){}
-function cadOsnapEnabled(kind){return cadActiveOsnaps.has(kind)}
+let cadOneShotOsnap=null; // Shift+right-click, for only the next drawing point
+function cadOsnapEnabled(kind){return cadOneShotOsnap?kind===cadOneShotOsnap:cadActiveOsnaps.has(kind)}
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
 function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
 
@@ -2781,7 +2782,7 @@ function snapPoint(p){
     if(delta<=7*Math.PI/180)q=P(a.x+r*Math.cos(nearest),a.y+r*Math.sin(nearest));
    }
   }
- if(state.osnapOn){
+ if(state.osnapOn||cadOneShotOsnap){
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
   for(const e of state.entities){
@@ -4563,7 +4564,10 @@ canvas.addEventListener('pointerup',ev=>{
   schedule();return;
  }
  if(d.type==='selection'){if(dist(d.path.at(-1),raw)>0.5)d.path.push(P(raw.x,raw.y));cadApplyWindowSelection(d.start,raw,d.shift,d.path);return}
- const w=world(raw);handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift)});
+ const w=world(raw);
+ handlePoint(['offset','trim','trimScissor','extend','erase','select','breakLine','lengthen','fillet','chamfer'].includes(state.tool)||(state.tool==='scale'&&state.stage.length)?w:snapPoint(w),d.shift);
+ if(cadOneShotOsnap){cadOneShotOsnap=null;prompt();schedule()}
+});
 canvas.addEventListener('pointercancel',ev=>{
  if(state.drag?.type==='primitiveGripStart'||state.drag?.type==='primitiveGripPlace'){state.drag=null;cadPrimitiveGripPlacement=null;canvas.style.cursor='';schedule();return}
  if(state.drag?.type==='vertexMoveStart'||state.drag?.type==='vertexMovePlace'){state.drag=null;cadVertexPlacement=null;canvas.style.cursor='';schedule();return}
@@ -4614,12 +4618,42 @@ function cadRightClickEnter(){
   command.value=cad2dLastCommand;runCommand();
  }else finishStage();
 }
+function openCadSnapOverrideMenu(x,y){
+ const menu=$('cadContextMenu');
+ menu.setAttribute('role','menu');
+ menu.replaceChildren();
+ const heading=document.createElement('div');heading.className='context-title';
+ heading.textContent=cad2dAliasLanguage==='es'?'Referencia puntual · Shift + clic derecho':'One-time object snap · Shift + right-click';
+ menu.append(heading);
+ const choices=[['END','Endpoint','Extremo'],['MID','Midpoint','Punto medio'],['CENTER','Center','Centro'],
+  ['INT','Intersection','Intersección'],['PERP','Perpendicular','Perpendicular'],
+  ['TAN','Tangent','Tangente'],['NEAREST','Nearest','Cercano'],['QUAD','Quadrant','Cuadrante'],['POINT','Node','Nodo']];
+ for(const [kind,en,es] of choices){
+  const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');
+  button.textContent=cad2dAliasLanguage==='es'?es:en;
+  button.addEventListener('click',()=>{
+   cadOneShotOsnap=kind;menu.classList.remove('open');
+   toast('OSNAP '+kind+' · '+(cad2dAliasLanguage==='es'?'próximo punto':'next point'));
+   canvas.focus({preventScroll:true});schedule();
+  });
+  menu.append(button);
+ }
+ menu.classList.add('open');menu.style.left='0px';menu.style.top='0px';
+ const bounds=menu.getBoundingClientRect();
+ menu.style.left=Math.max(4,Math.min(x,window.innerWidth-bounds.width-6))+'px';
+ menu.style.top=Math.max(4,Math.min(y,window.innerHeight-bounds.height-6))+'px';
+}
 canvas.addEventListener('contextmenu',ev=>{
  ev.preventDefault();
  $('cadContextMenu')?.classList.remove('open');
+ // Classic CAD gesture: Shift+right-click opens transient OSNAP choices.
+ if(ev.shiftKey){openCadSnapOverrideMenu(ev.clientX,ev.clientY);return}
+ const point=world(P(ev.offsetX,ev.offsetY));
+ // Ctrl+right-click exposes the full menu, even during an active command.
+ if(ev.ctrlKey){openCadContextMenu(ev.clientX,ev.clientY,point);return}
  if(state.tool==='select'){
-  const target=pick(world(P(ev.offsetX,ev.offsetY)));
-  if(target){openCadContextMenu(ev.clientX,ev.clientY,world(P(ev.offsetX,ev.offsetY)));return;}
+  const target=pick(point);
+  if(target||state.selected.length){openCadContextMenu(ev.clientX,ev.clientY,point);return}
  }
  cadRightClickEnter();
 });
@@ -5218,7 +5252,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
   $('command').value=cad2dCommandHistory[cad2dHistoryCursor]||'';
   $('command').setSelectionRange($('command').value.length,$('command').value.length);return;
  }
- if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cadZoomOptionPending=false;$('command').value='';$('command').blur();if(state.tool==='polyline'&&state.stage.length>=2)finishStage();else setTool('select');toast('Comando terminado / Command ended')}
+ if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cadZoomOptionPending=false;$('command').value='';$('command').blur();cancelCadCommand();toast(cad2dAliasLanguage==='es'?'Comando cancelado':'Command cancelled')}
 });
 
 function cad2dToggleCommandHistory(){
