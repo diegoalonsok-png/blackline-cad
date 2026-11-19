@@ -123,7 +123,7 @@ function maybeTrialEnded(){
  const KEY='cad2d-trial-ended-notice';let last=0;try{last=Number(localStorage.getItem(KEY))||0}catch(e){}
  if(Date.now()-last<7*864e5||document.getElementById('cadPlanDlg'))return;
  try{localStorage.setItem(KEY,String(Date.now()))}catch(e){}
- setTimeout(()=>showPlans(null,'Terminaron tus 3 meses con todas las funciones. Podés seguir dibujando gratis con lo básico, o pasarte a Pro para conservar todo.'),1500);
+ setTimeout(()=>showPlans(null,'¿Te está sirviendo Blackline CAD? Ya llevás 3 meses usándolo con todo incluido. Podés seguir dibujando gratis con lo básico, o conservar todo por 12,99 € al año (poco más de 1 € por mes) y ayudar a que siga creciendo.'),1500);
 }
 window.CAD2D_PLAN=Object.freeze({can,refresh,showPlans,upsell,plans:PLANS,get status(){return {...status}},enforced:enforce});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{paintBadge();refresh()});else{paintBadge();refresh()}
