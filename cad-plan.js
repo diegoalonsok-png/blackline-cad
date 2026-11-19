@@ -23,8 +23,8 @@ const enforce=cfg.enforce===true&&!!urls.status;
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'9 € / mes · 90 € / año (IVA incl.)',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
- studio:{label:'Estudio',price:'29 € / mes · 5 usuarios (IVA incl.)',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
+ pro:{label:'Pro',price:'1,59 € / mes · 12,99 € / año (ahorrás 32 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
+ studio:{label:'Estudio',price:'4,99 € / mes · 49,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de DWG (cuando el conversor esté operativo)','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
 

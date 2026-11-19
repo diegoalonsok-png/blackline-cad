@@ -3,7 +3,7 @@
  *
  * Variables (wrangler secret put …): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SESSION_SECRET, RESEND_API_KEY
  * Variables (wrangler.toml [vars]):    APP_ORIGIN, API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, STRIPE_TAX ('1' = IVA automático),
- *                                      TRIAL_DAYS (90), MAIL_FROM, COOKIE_DOMAIN
+ *                                      TRIAL_DAYS (120 = 4 meses), MAIL_FROM, COOKIE_DOMAIN
  * Base de datos D1 enlazada como DB (schema.sql).
  *
  * Endpoints
@@ -113,7 +113,7 @@ export default {
     await env.DB.prepare('UPDATE login_tokens SET used=1 WHERE token_hash=?').bind(h).run();
     let user=await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(row.email).first();
     if(!user){
-     const id=crypto.randomUUID(),trial=now()+86400*Number(env.TRIAL_DAYS||90);
+     const id=crypto.randomUUID(),trial=now()+86400*Number(env.TRIAL_DAYS||120);
      await env.DB.prepare('INSERT INTO users(id,email,created_at,trial_ends_at) VALUES(?,?,?,?)').bind(id,row.email,now(),trial).run();user={id};
     }
     return new Response(null,{status:302,headers:{location:env.APP_ORIGIN+'/blackline-cad/','set-cookie':cookie(env,await makeSession(env,user.id),60*60*24*30)}});

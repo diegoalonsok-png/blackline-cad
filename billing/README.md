@@ -18,13 +18,21 @@ Principios:
 - **Si el servidor no responde, no se bloquea a nadie.** Es mejor perder un cobro que impedir que alguien abra un dibujo.
 - **Ninguna clave secreta va al frontend.** `STRIPE_SECRET_KEY` vive solo como secreto del Worker. Hay una prueba que falla si aparece una clave `sk_` en el cliente.
 
-## Planes sugeridos (editables en `cad-plan.js` y en Stripe)
+## Precios (editables en `cad-plan.js` y en Stripe)
 
-- **Gratis:** dibujo 2D completo, capas, cotas, DXF/SVG/PNG, PDF A4 y la galería básica.
-- **Pro (9 € por mes o 90 € por año, IVA incluido):** bloques Pro de la galería, ploteo A0–A3, proyectos ilimitados, DWG cuando exista el conversor, nube y sin marca de agua.
-- **Estudio (29 € por mes, 5 usuarios):** todo lo de Pro, más equipo y bibliotecas compartidas.
+Período gratuito: **4 meses (120 días)** desde el alta (`TRIAL_DAYS=120`).
 
-Para que el precio sea **con IVA incluido**, creá los precios en Stripe con *Incluir impuestos en el precio* (`tax_behavior=inclusive`). Si no, Stripe suma el IVA encima.
+| Plan | Precio (IVA incluido) | Te queda por cobro* |
+| --- | --- | --- |
+| Gratis | 0 € (dibujo, DXF, SVG, PNG, PDF A4, galería básica) | — |
+| Pro mensual | **1,59 €** | ≈ 1,02 € |
+| Pro anual | **12,99 €** (32 % menos que 12 meses) | ≈ 10,13 € |
+| Estudio mensual (5 usuarios) | 4,99 € | ≈ 3,74 € |
+| Estudio anual (5 usuarios) | 49,99 € | ≈ 39,71 € |
+
+\* Estimación con IVA español del 21 %, tarjeta del EEE (1,5 % + 0,25 €), Billing 0,7 % y Stripe Tax 0,5 %. Con tarjetas de fuera del EEE la comisión es mayor (3,15 % + 0,25 €, más 2 % si hay conversión de moneda). El precio mensual se fijó en 1,59 € para que, tras comisiones e IVA, quede aproximadamente 1 € neto.
+
+Al crear los precios en Stripe, marcá *Incluir impuestos en el precio* (`tax_behavior=inclusive`) para que el cliente pague exactamente esos importes. Con tickets tan chicos conviene **destacar el plan anual**: la comisión fija de 0,25 € se paga una vez por año en lugar de doce.
 
 ## Cuenta de Stripe: diagnóstico (18 nov 2026)
 
