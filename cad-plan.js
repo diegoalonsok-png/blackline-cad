@@ -26,7 +26,7 @@ const PLANS={
  pro:{label:'Pro',price:'1,59 € / mes · 12,99 € / año (ahorrás 32 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
  studio:{label:'Estudio',price:'4,99 € / mes · 49,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
 };
-const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de DWG (cuando el conversor esté operativo)','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
+const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg (cuando el conversor esté operativo)','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
 
 let status={plan:'beta',trialEndsAt:null,email:null,source:'local'};
 const trialDays=()=>{

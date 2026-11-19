@@ -5,7 +5,7 @@
  const normalizeSize=n=>Number.isFinite(Number(n))?Math.max(5,Math.min(60,Math.round(Number(n)))):DEFAULT_SIZE;
  const selectorTools=new Set(['erase','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop','stretch']);
  const selectorMode=(tool,candidate)=>tool==='offset'?!candidate:selectorTools.has(tool);
- // AutoCAD cursor: idle = crosshair + pickbox, point input = crosshair,
+ // CAD cursor: idle = crosshair + pickbox, point input = crosshair,
  // entity selection = pickbox only. Geometry and snaps are unaffected.
  const mode=(tool,candidate,drag)=>{
   if(drag==='pan')return 'pan';

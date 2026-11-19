@@ -1,4 +1,4 @@
-# Barra CAD tipo AutoCAD — auditoría de herramientas (16 de noviembre de 2026)
+# Barra de herramientas CAD — auditoría de herramientas (16 de noviembre de 2026)
 
 Las capturas muestran las áreas **Draw / Dibujo**, **Modify / Modificar** y la barra inferior de precisión. Se debe reproducir el **comportamiento funcional**, no limitarse a copiar sus iconos.
 
@@ -27,4 +27,4 @@ Las capturas muestran las áreas **Draw / Dibujo**, **Modify / Modificar** y la 
 
 Pruebas geométricas disponibles en `tests/object-tracking.test.cjs` (8 casos reproducibles). Comprobación adicional en aislamiento de adquisición, proyección, límites de zoom y ausencia de persistencia: 11/11.
 
-La implementación actual es **OTRACK ortogonal básico**; el rastreo angular adquirido, la espera configurable para adquirir un punto, el borrado manual de anclas y la intersección extendida con líneas polares quedan para una segunda fase. La prueba manual del lienzo en navegador, impresión y exportación aún debe completarse, por lo cual no se declara equivalencia plena con AutoCAD.
+La implementación actual es **OTRACK ortogonal básico**; el rastreo angular adquirido, la espera configurable para adquirir un punto, el borrado manual de anclas y la intersección extendida con líneas polares quedan para una segunda fase. La prueba manual del lienzo en navegador, impresión y exportación aún debe completarse, por lo cual no se declara equivalencia plena con programas CAD comerciales.

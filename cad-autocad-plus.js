@@ -281,10 +281,24 @@ function osnapMenu(x,y){
  const away=e=>{if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',away,true)}};setTimeout(()=>document.addEventListener('pointerdown',away,true),0);
 }
 CORE.canvas.addEventListener('contextmenu',ev=>{if(!ev.shiftKey&&!ev.ctrlKey)return;ev.preventDefault();ev.stopImmediatePropagation();osnapMenu(ev.clientX,ev.clientY)},true);
+/* Clic derecho con un comando activo: menú del comando (Enter, Cancelar, opciones, entrada reciente,
+   referencias a objetos), como en los CAD de escritorio. Con la preferencia 'cad2d-rightclick-enter'=1
+   se conserva el comportamiento anterior (clic derecho = Enter). En selectores de puntos = terminar. */
+CORE.canvas.addEventListener('contextmenu',ev=>{
+ if(ev.shiftKey||ev.ctrlKey)return;
+ if(pk.on){ev.preventDefault();ev.stopImmediatePropagation();const done=pk.done,pts=pk.pts.slice(),mode=pk.mode;endPick();if(mode==='multi'&&done)done(pts,true);return}
+ const st=S();const active=(st.tool!=='select'&&st.tool!=='pan')||st.stage.length;if(!active)return;
+ let legacy=false;try{legacy=localStorage.getItem('cad2d-rightclick-enter')==='1'}catch(e){}
+ if(legacy)return;
+ ev.preventDefault();ev.stopImmediatePropagation();CORE.openContextMenu(ev.clientX,ev.clientY,CORE.world(P(ev.offsetX,ev.offsetY)));
+},true);
 
 /* ---------- Menú contextual ---------- */
 EXT.context.push(({item,active,count})=>{
- if(active)return [];
+ if(active){
+  const recent=[...new Set(CORE.commandHistory().slice().reverse())].filter(x=>!/^[0-9.,@<+\-]/.test(x)).slice(0,5);
+  return {top:[],bottom:[item('Referencias a objetos… · Shift+clic derecho',()=>{const r=CORE.canvas.getBoundingClientRect();osnapMenu(r.left+r.width/2,r.top+r.height/2)}),...recent.map(r=>item('↻ Entrada reciente: '+r,()=>CORE.command(r)))]};
+ }
  const out=[],s=sel();
  if(count){
   out.push(item('Capa: aislar · CAPAISO',()=>C.CAPAISO()),item('Capa: desactivar · CAPADES',()=>C.CAPADES()),item('Capa: hacer actual · CAPAACTUAL',()=>C.CAPAACTUAL()),item('Zoom a objeto · ZO',()=>C.ZO()),item('Color y línea por capa · PORCAPA',()=>C.PORCAPA()));

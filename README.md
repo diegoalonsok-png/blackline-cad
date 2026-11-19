@@ -47,7 +47,7 @@ DXF files with missing/unsupported `$INSUNITS` require explicit user unit select
 
 The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, but binary geometry cannot be decoded by the static frontend. `backend/dwg_service.py` provides an **optional, not-yet-deployed** FastAPI adapter to a separately installed ODA File Converter. The website's `DWG_CONVERTER_ENDPOINT` variable stays blank until the converter has been licensed, secured, deployed and tested. Even when operational, the current DXF import path cannot guarantee the preservation of advanced blocks, layouts, xrefs, hatches or proxy objects. Direct DWG open is therefore **not working yet**. Test on representative files before launching commercially.
 
-## AutoCAD-style interaction improvements (November 2026)
+## Desktop-CAD interaction improvements (November 2026)
 
 - `Z` / `ZOOM` followed by Enter enters zoom options: `-` to zoom out, `+` to zoom in, `E` for extents, `W` for a rectangular window, and `P` for the previous viewport.
 - Numeric zoom factors such as `2x`, `0.5x`, or `2` work after entering ZOOM. `ZP` / `ZOOMPREVIOUS` restores an earlier viewport. Up to 30 previous viewport states are retained for the current session.
@@ -121,7 +121,7 @@ A static site is cheap to distribute, but bandwidth, server-side file conversion
 - **CAD selection rectangles:** drag left-to-right to select objects whose bounding boxes lie fully inside the window; drag right-to-left for crossing selection (overlapping bounding boxes). Hold Shift to add to the selection. This is a bounding-box approximation, not yet precise segment/polygon clipping.
 - Syntax and isolated geometric smoke tests verified an intersection at x=4 on a 10-unit line, no unintended changes when no crossing was found, and parallel-line rejection. Full browser interaction/regression tests still required.
 
-## CAD-style LINE / PLINE / reusable blocks (2026-11-12)
+## LINE / PLINE / reusable blocks (2026-11-12)
 
 **LINE (L):** choose sequential points; each click or typed coordinate creates a separate LINE segment. A rubber-band preview shows only the next segment. Enter or double-click finishes. Use **U** during the command to remove the last segment, and **C** (Close) after three points to draw the final closing segment. **PLINE (PL):** points are staged into one editable polyline. Enter finishes as an open polyline; **C** closes after three vertices; **U** removes the last pending vertex. Esc cancels the pending command. Absolute `X,Y`, relative `@DX,DY`, and angular `@DIST<ANGLE` in degrees work in model-space coordinates, not scaled screen pixels.
 
@@ -189,7 +189,7 @@ CAD2D now has **MODEL**, **LAYOUT 1**, and **PLOT / PDF** tabs at the base of mo
 
 LAYOUT controls share the existing `plotOptions`, `makeSVG` and `makePDF` machinery so model entities are not copied or scaled in the source model. The physical PDF page size is in millimeters; fixed print scale is computed from model units. Layout settings are saved in `.cadjson` project files and IndexedDB recovery snapshots, and in browser-local preferences. Command aliases: `LAYOUT`, `PSPACE`, `PAPERSPACE`, `MSPACE`. This is the first **single-sheet paper-space workspace**, not yet AutoCAD-style multiple named layouts with movable viewport boundaries, multiple model viewports or full paper-space annotation entities. Preview and PDF are not yet externally verified in an interactive browser or CAD desktop application.
 
-## Professional UI and AutoCAD-style commands (November 2026)
+## Professional UI and CAD commands (November 2026)
 
 The desktop CAD2D UI has refreshed ribbon, tab, palettes, sidebar, input and status styling with subdued drafting-blue accents, consistent borders, clearer active controls and a searchable command launcher in the top brand bar. The command finder searches by CAD command name, alias and description; clicking a result submits that command. It only advertises a subset with implemented behavior.
 
@@ -288,6 +288,12 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 **Modelo de pago futuro.** `cad-plan.js` muestra el estado (**BETA ABIERTA** mientras no haya servidor) y `billing/` contiene un Worker de Cloudflare + D1 + Stripe, no desplegado, con acceso por enlace al correo, prueba de 90 días, webhooks firmados y portal de facturación. El dibujo, abrir y exportar DXF nunca se bloquean. Ver `billing/README.md`.
 
 **Más órdenes 2D (segunda tanda).** Capas: `CAPAISO`/`LAYISO`, `CAPAUNISO`, `CAPADES`/`LAYOFF`, `CAPAACT`/`LAYON`, `CAPABLOQ`/`LAYLCK`, `CAPADESBLOQ`, `CAPAACTUAL`/`LAYMCUR`, `CAPACAMBIAR`/`LAYMCH`, `CAPAFUSION`/`LAYMRG`, `CAPABORRAR`/`LAYDEL` y `PORCAPA`/`SETBYLAYER`. Cotas en serie: `ACOCONT`/`DIMCONTINUE` y `ACOLINEABASE`/`DIMBASELINE`. Dibujo: `SPLINE` (curva por puntos de ajuste, guardada como polilínea), `ARANDELA`/`DONUT`, `MARCACENTRO`/`CENTERMARK`, `LINEACENTRO`/`CENTERLINE` y `MATRIZCAMINO`/`ARRAYPATH`. Vista y consulta: `ZO`, `CAL` (calculadora con lista blanca de funciones), `BUSCAR`/`FIND` con reemplazo, `ESTADO`/`STATUS` y `AUDITAR`/`AUDIT`. Alias: `MLINE` abre el muro paramétrico. **Shift + clic derecho** abre el menú de referencias a objetos. Todo está en `cad-autocad-plus.js`.
+
+**Muros: uniones en T limpias.** Cuando un tabique llega a un muro existente, sus caras topan siempre contra la cara del lado del local, aunque el punto se haya marcado en el eje o en la cara exterior. Antes podía atravesar el muro. La cara del muro anfitrión se interrumpe entre las dos caras del tabique, al dibujar y al exportar (DXF, SVG, PDF). El hueco se recalcula cada vez a partir de la geometría, así que sigue siendo correcto si se mueven los muros.
+
+**Clic derecho con un comando activo.** Abre el menú del comando: Enter, Cancelar, Deshacer vértice, opciones, Entrada reciente y Referencias a objetos. Para volver al comportamiento anterior (clic derecho = Enter) ejecutá `localStorage.setItem('cad2d-rightclick-enter','1')`.
+
+**Propiedad intelectual.** Los textos públicos y los comentarios del código ya no usan "AutoCAD" para describir el producto. La marca aparece solo en el aviso de independencia y en menciones técnicas de compatibilidad. No se usan iconos, código, bloques ni manuales de terceros.
 
 **Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
 

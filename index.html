@@ -308,7 +308,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #displaySettings select{width:100%;font-size:10px;padding:5px;min-width:0}
 
 
-/* Layer manager: selectable AutoCAD-like lineweights, no sideways overflow */
+/* Layer manager: selectable desktop-CAD lineweights, no sideways overflow */
 .workspace .layer-row{grid-template-columns:17px 17px 19px minmax(0,1fr) 50px 17px;column-gap:3px;padding:5px 3px}
 .layer-row .layer-weight{min-width:0;width:50px;height:23px;border:1px solid #373f47;border-radius:4px;background:#1a1f24;color:#bec8d1;font:10px -apple-system,"Helvetica Neue",Arial,sans-serif;padding:2px 0;cursor:pointer}
 .layer-row .layer-name{min-width:0}
@@ -359,7 +359,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #dimensionPalette .smallrow button{flex:1 1 110px}
 
 
-/* Compact AutoCAD-like ribbon and native docking grip. */
+/* Compact CAD ribbon and native docking grip. */
 .app{grid-template-rows:39px 28px var(--ribbon-row-height,var(--ribbon-height,68px)) minmax(0,1fr) 72px 27px}
 .brandbar{padding:0 10px;gap:8px}
 .brand{font-size:15px}
@@ -1145,12 +1145,12 @@ function cadWallJoinNewFaces(newFaces){
     if(!intersections.length){possible=false;break}
     const inside=tip==='a'?sub(face.b,face.a):sub(face.a,face.b);
     const ilen=Math.hypot(inside.x,inside.y)||1;
-    // Join the nearer host face on the approaching side, not the far face.
-    // The guide endpoint may land at the host centerline (halfway through
-    // the host thickness), so its nearest face lies BEHIND the endpoint.
-    // Choose the face with the shortest signed travel, not only forward hits.
+    // The host face on the ROOM side is the one closest to the new wall's own
+    // body, i.e. the largest signed travel along "inside". This holds whether the
+    // endpoint was snapped to the host centerline, to either face, or short of it;
+    // the far (outer) face would make the new wall pierce through the host.
     const approach=intersections.map(q=>({q,s:((q.x-face[tip].x)*inside.x+(q.y-face[tip].y)*inside.y)/ilen}))
-      .sort((a,b)=>Math.abs(a.s)-Math.abs(b.s));
+      .sort((a,b)=>b.s-a.s);
     const target=approach[0]?.q;
     const max=Math.max(meta.thickness,host.thickness)*1.5;
     if(!target||dist(target,face[tip])>max){possible=false;break}
@@ -1369,7 +1369,7 @@ function inViewport(e,w,h){
  const sc=state.view.scale,ox=state.view.ox,oy=state.view.oy,pad=30;
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
-function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+function draw(){drawPending=false;cadTGapCache=cadComputeWallTGaps();let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  for(const e of state.entities.filter(entity=>entity.type==='hatch')){if(layerFor(e).visible&&!e.cadHidden)drawEntity(e)}
  for(const e of state.entities){
   if(e.type==='hatch'||!layerFor(e).visible||e.cadHidden)continue;
@@ -2396,12 +2396,42 @@ function cadCircularTextGlyphs(e){
  }
  return result;
 }
-function flattenCADEntities(entities){return entities.flatMap(e=>{
+/* Limpieza visual de uniones en T: la cara del muro anfitrión se interrumpe entre las
+   dos caras del tabique que llega. Se calcula en cada dibujo/exportación a partir de la
+   geometría actual (no se guarda nada), así que sigue correcta si se mueven los muros. */
+function cadComputeWallTGaps(entities=state.entities){
+ const faces=entities.filter(e=>e.type==='line'&&e.wall2d&&!e.cadHidden&&layerFor(e).visible);
+ if(faces.length<4)return null;
+ const groups=new Map();for(const f of faces){if(!groups.has(f.wall2d.group))groups.set(f.wall2d.group,[]);groups.get(f.wall2d.group).push(f)}
+ const tips=[];for(const g of groups.values()){if(g.length!==2)continue;for(const k of ['a','b'])tips.push({group:g[0].wall2d.group,p:[g[0][k],g[1][k]]})}
+ const tol=Math.max(1e-6,.002*1000/U[state.unit]),gaps=new Map();
+ for(const h of faces){
+  const vx=h.b.x-h.a.x,vy=h.b.y-h.a.y,L2=vx*vx+vy*vy;if(L2<1e-12)continue;const L=Math.sqrt(L2);
+  for(const tip of tips){
+   if(tip.group===h.wall2d.group)continue;
+   const ts=[];
+   for(const q of tip.p){const t=((q.x-h.a.x)*vx+(q.y-h.a.y)*vy)/L2,d=Math.abs((q.x-h.a.x)*vy-(q.y-h.a.y)*vx)/L;if(d>tol||t<=1e-6||t>=1-1e-6)break;ts.push(t)}
+   if(ts.length!==2)continue;
+   if(!gaps.has(h.id))gaps.set(h.id,[]);gaps.get(h.id).push([Math.min(...ts),Math.max(...ts)]);
+  }
+ }
+ return gaps.size?gaps:null;
+}
+function cadLineWithoutGaps(e,ranges){
+ const sorted=ranges.slice().sort((a,b)=>a[0]-b[0]),out=[];let t=0;
+ const at=u=>P(e.a.x+(e.b.x-e.a.x)*u,e.a.y+(e.b.y-e.a.y)*u);
+ for(const [t0,t1] of sorted){if(t0>t+1e-9)out.push({...e,a:at(t),b:at(t0)});t=Math.max(t,t1)}
+ if(t<1-1e-9)out.push({...e,a:at(t),b:at(1)});
+ return out;
+}
+let cadTGapCache=null;
+function flattenCADEntities(entities){const tGaps=cadComputeWallTGaps(entities);return entities.flatMap(e=>{
+ if(tGaps&&e.type==='line'&&tGaps.has(e.id))return cadLineWithoutGaps(e,tGaps.get(e.id));
  const base=e.type==='blockRef'?blockChildren(e).flatMap(x=>x.type==='dimension'?dimensionPrimitives(x):[x]):e.type==='dimension'?dimensionPrimitives(e):[e];
  return base.flatMap(cadCircularTextGlyphs);
 })}
 
-function drawEntity(e,forceColor){if(e.type==='blockRef'){
+function drawEntity(e,forceColor){if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(state.selected.includes(e.id)&&!forceColor){
@@ -4055,7 +4085,7 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
   state.modifyCandidate=null;prompt();return
  }
  if(t==='insertBlock'){insertSelectedBlock(p);return}createAt(p)}
-// AutoCAD-style two-click blue/green selection plus freehand crossing/window lasso.
+// Desktop-CAD two-click blue/green selection plus freehand crossing/window lasso.
 let cadSelectionAnchor=null,cadSelectionAnchorShift=false,cadLastWindowSelectionAt=0;
 function cadSelectionBox(e){
  const bb=boundsEntity(e);if(!bb)return null;
@@ -4104,7 +4134,7 @@ function cadApplyWindowSelection(start,end,shift,path){
  * Every member of a multi-selection moves by the same delta, never reshapes. */
 let cadVertexPlacement=null;
 
-/* AutoCAD-style grips for primitive entities. Blocks keep one insertion grip. */
+/* CAD grips for primitive entities. Blocks keep one insertion grip. */
 let cadPrimitiveGripPlacement=null;
 function cadPrimitiveGrips(e){
  if(!e||!['line','rect','polyline','circle'].includes(e.type))return [];
@@ -4641,11 +4671,11 @@ const CAD2D_TYPED_ALIASES={
   RECTANG:'RECTANGLE',SOMBREA:'HATCH',DESPLAZA:'MOVE',COPIA:'COPY',RECORTA:'TRIM',
   GIRA:'ROTATE',DESCOMP:'EXPLODE',BORRA:'ERASE',IP:'MATCHPROP',IN:'INSERT',
   RG:'REGEN',ACOTA:'DIM',EMPALMA:'FILLET',SIMETRIA2D:'MIRROR',
-  // MEASUREGEOM agrupa varias mediciones en AutoCAD: no aliasarlo engañosamente a DIST.
+  // MEASUREGEOM agrupa varias mediciones en otros CAD: no aliasarlo engañosamente a DIST.
   // MTEXT requiere un editor multilínea real: TXM no acredita la función completa.
 };
 /* Keyboard alias profiles. Canonical English command names always work in either mode.
- * Prefix _ forces the English profile, as in AutoCAD's _LINE / _TRIM convention.
+ * Prefix _ forces the English profile, as in the common desktop-CAD _LINE / _TRIM convention.
  * Ambiguous Spanish REC is assigned to RECTANGLE; use RR for TRIM. */
 const CAD2D_LANGUAGE_ALIASES={
  // Keep conflicting abbreviations language-specific; canonical commands always work.
@@ -5019,14 +5049,14 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
    toast('CIRCLE · radio '+radius+' '+state.unit);return;
   }
  }
- // AutoCAD-style direct distance entry: point + mouse direction + length + Enter.
+ // Direct distance entry: point + mouse direction + length + Enter.
  if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){
   const numeric=value.replace(',','.');
   if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(numeric)){
    const length=Number(numeric),origin=state.stage.at(-1);let delta=sub(state.mouse,origin);let magnitude=Math.hypot(delta.x,delta.y);
    if(magnitude<1e-9){delta=P(1,0);magnitude=1;}
    if(!Number.isFinite(length)||length<=0)return toast('Longitud / Length must be positive');
-   // If the cursor has not moved, default to +X (AutoCAD-compatible predictable axis).
+   // If the cursor has not moved, default to +X (predictable axis).
    const dest=add(origin,mul(delta,length/magnitude));
    handlePoint(dest,false);schedule();toast('Segmento / Segment: '+length+' '+state.unit);return;
   }
@@ -5121,7 +5151,7 @@ document.addEventListener('keydown',ev=>{
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='a'&&!isEditing&&document.activeElement===canvas){ev.preventDefault();selectAllCad();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key==='1'){ev.preventDefault();openCadQuickProperties();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key==='9'){ev.preventDefault();cad2dToggleCommandBar();return}
- // Mode shortcuts compatible with AutoCAD; do not override editing in text fields.
+ // Conventional CAD mode shortcuts; do not override editing in text fields.
  if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&!ev.shiftKey&&!isEditing){
   const mode={b:['snapOn','snapToggle'],g:['gridOn','gridToggle'],l:['orthoOn','orthoToggle'],f:['osnapOn','osnapToggle']};
   const key=ev.key.toLowerCase();

@@ -38,3 +38,15 @@ test('el cobro usa métodos de pago dinámicos (PayPal desde el Dashboard) y nun
  assert.doesNotMatch(w,/payment_method_types/);assert.match(w,/locale:'es'/);
  for(const f of ['cad-plan.js','cad-arq-pro.js','cad-autocad-plus.js','index.html'])assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),/sk_(live|test)_[A-Za-z0-9]/);
 });
+test('unión en T: la cara del muro anfitrión se interrumpe entre las caras del tabique',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ const a=html.indexOf('function cadComputeWallTGaps('),b=html.indexOf('let cadTGapCache=null;',a);
+ const P=(x,y)=>({x,y});
+ const api=new Function('P','U','state','layerFor',html.slice(a,b)+';return {cadComputeWallTGaps,cadLineWithoutGaps}')(P,{m:1000},{unit:'m'},()=>({visible:true}));
+ const f=(id,g,face,x0,y0,x1,y1)=>({id,type:'line',a:P(x0,y0),b:P(x1,y1),wall2d:{group:g,face}});
+ const ents=[f(1,'h',0,0,-.1,6,-.1),f(2,'h',1,0,.1,6,.1),f(3,'t',0,2.9,.1,2.9,4),f(4,'t',1,3.1,.1,3.1,4)];
+ const gaps=api.cadComputeWallTGaps(ents);
+ assert.ok(gaps.has(2)&&!gaps.has(1),'solo la cara interior se interrumpe');
+ const parts=api.cadLineWithoutGaps(ents[1],gaps.get(2));
+ assert.equal(parts.length,2);assert.ok(Math.abs(parts[0].b.x-2.9)<1e-9&&Math.abs(parts[1].a.x-3.1)<1e-9);
+});
