@@ -248,3 +248,5 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 @media (prefers-reduced-motion:reduce){
  .app.blackline-modern .ribbon .tool,.app.blackline-modern .brandbar .mark{transition:none!important;transform:none!important}
 }
+/* Celular y tablet vertical: el área de dibujo ocupa todo el ancho (gana a las reglas de paneles ocultos) */
+@media(max-width:850px){.app .workspace:has(>#canvasWrap){grid-template-columns:minmax(0,1fr)!important}.app .workspace:has(>#canvasWrap)>.sidebar,.app .workspace:has(>#canvasWrap)>#leftDivider,.app .workspace:has(>#canvasWrap)>#rightDivider{display:none!important}}
