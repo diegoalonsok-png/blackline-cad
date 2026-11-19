@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const main=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const start=main.indexOf(' // Primer lote piloto de ambientes completos');
-const end=main.indexOf(' const door=(name,w,reverse=false)=>add',start);
+const end=main.indexOf(' const door=(name,w,reverse=false)=>entries.push',start);
 assert.ok(start>=0&&end>start,'pilot room definitions must exist');
 function rooms(){const result=[];new Function('entries',main.slice(start,end))(result);return result}
 test('12 complete architectural room definitions with real dimensions',()=>{
