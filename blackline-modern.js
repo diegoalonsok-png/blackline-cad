@@ -206,11 +206,12 @@ requestAnimationFrame(requestResize);
  menu.setAttribute('role','menu');menu.setAttribute('aria-label','Archivo CAD2D');
  menu.hidden=true;
  const actions=[
-  ['file-new','Nuevo dibujo','file-plus'],
-  ['file-open','Abrir archivo','folder-open'],
-  ['file-save','Guardar proyecto','save'],
-  ['file-dxf','Guardar DXF','download'],
-  ['file-print','Imprimir / Exportar PDF','printer']
+  ['file-new','New drawing','file-plus','Ctrl+N'],
+  ['file-open','Open…','folder-open','Ctrl+O'],
+  ['file-save','Save','save','Ctrl+S'],
+  ['file-saveas','Save As…','save',"Ctrl+Shift+S"],
+  ['file-dxf','Export DXF','download',''],
+  ['file-print','Plot / Export PDF…','printer','Ctrl+P']
  ];
  const icons={
   'file-plus':'<path d="M4 3h11l5 5v13H4zM15 3v5h5M12 12v7m-3.5-3.5h7"/>',
@@ -219,10 +220,10 @@ requestAnimationFrame(requestResize);
   download:'<path d="M5 3h14v18H5zM12 7v10m-4-4 4 4 4-4"/>',
   printer:'<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>'
  };
- const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='CAD2D · ARCHIVO';menu.append(title);
- for(const [id,label,icon] of actions){
+ const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='BLACKLINE CAD · FILE';menu.append(title);
+ for(const [id,label,icon,keys] of actions){
   const button=document.createElement('button');button.type='button';button.dataset.blFileAction=id;button.setAttribute('role','menuitem');
-  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+icons[icon]+'</svg><span></span>';
+  button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">'+icons[icon]+'</svg><span></span><kbd style="margin-left:auto;padding-left:18px;opacity:.55;font:11px ui-monospace,monospace;background:none;border:0">'+keys+'</kbd>';
   button.querySelector('span').textContent=label;
   menu.append(button);
  }
@@ -238,7 +239,8 @@ requestAnimationFrame(requestResize);
   const key=b.dataset.blFileAction;close();
   if(key==='file-new')runCommand('NEW');
   if(key==='file-open')document.getElementById('openBtn')?.click();
-  if(key==='file-save')document.getElementById('saveProjectBtn')?.click();
+  if(key==='file-save')runCommand('SAVE');
+  if(key==='file-saveas')runCommand('SAVEAS');
   if(key==='file-dxf')document.getElementById('dxfBtn')?.click();
   if(key==='file-print')document.getElementById('pdfBtn')?.click();
  });

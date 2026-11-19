@@ -4903,7 +4903,11 @@ const CAD2D_LANGUAGE_ALIASES={
   M:'MOVE',CO:'COPY',RO:'ROTATE',SC:'SCALE',MI:'MIRROR',O:'OFFSET',
   TR:'TRIM',EX:'EXTEND',F:'FILLET',CHA:'CHAMFER',S:'STRETCH',X:'EXPLODE',
   J:'JOIN',H:'HATCH',HE:'HATCHEDIT',LA:'LAYER',MA:'MATCHPROP',
-  BAP:'BREAKATPOINT',AL:'ALIGN',QS:'QSELECT',RE:'REGEN',Z:'ZOOM',P:'PAN'
+  BAP:'BREAKATPOINT',AL:'ALIGN',QS:'QSELECT',RE:'REGEN',Z:'ZOOM',P:'PAN',
+  DLI:'DIMLINEAR',DAL:'DIMALIGNED',DAN:'DIMANGULAR',DCO:'DIMCONTINUE',DBA:'DIMBASELINE',DRA:'DIMRADIUS',DDI:'DIMDIAMETER',
+  DI:'DIST',MT:'TEXT',T:'TEXT',DT:'TEXT',BR:'BREAK',LEN:'LENGTHEN',PE:'PEDIT',POL:'POLYGON',DO:'DONUT',
+  SPL:'SPLINE',XL:'XLINE',I:'INSERT',AA:'AREA',PR:'PROPERTIES',CH:'PROPERTIES',UN:'UNITS',PU:'PURGE',ST:'STYLE',
+  DIV:'DIVIDE',ME:'MEASURE',ID:'ID',OS:'OSNAP',REVC:'REVCLOUD',W:'WBLOCK',G:'GROUP',MV:'MVIEW',LT:'TIPOLINEA'
  },
  es:{
   B:'ERASE',BOR:'ERASE',D:'MOVE',DESPL:'MOVE',LI:'LINE',AR:'ARC',ES:'SCALE',GI:'ROTATE',
@@ -5348,7 +5352,24 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(['U
  if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;
+/* CAD: lo que se escribe con el foco en el dibujo va a la línea de comandos (L ⏎, 500 ⏎, @100,0 ⏎…).
+   Enter con la línea vacía y sin comando activo repite el último comando. */
+document.addEventListener('keydown',ev=>{
+ if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.isComposing)return;
+ const a=document.activeElement,cmd=$('command');
+ if(!cmd||a===cmd||a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable))return;
+ if(document.querySelector('.modal-backdrop.show,#cadPlanDlg,[role="dialog"][aria-modal="true"]:not([hidden])'))return;
+ if(ev.key==='Enter'){
+  if(state.tool==='select'&&!state.stage.length&&cad2dLastCommand){ev.preventDefault();cmd.value=cad2dLastCommand;runCommand()}
+  return;
+ }
+ if(ev.key.length!==1||ev.key===' ')return;
+ ev.preventDefault();
+ if(document.querySelector('.command-row')?.style.display==='none')cad2dToggleCommandBar();
+ cmd.focus();cmd.value+=ev.key;cmd.dispatchEvent(new Event('input',{bubbles:true}));
+ cmd.setSelectionRange(cmd.value.length,cmd.value.length);
+});$('command').addEventListener('keydown',ev=>{
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&!ev.shiftKey){
   if(!cad2dCommandHistory.length)return;
@@ -5407,7 +5428,7 @@ document.addEventListener('keydown',ev=>{
  }
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='n'){ev.preventDefault();$('command').value='NEW';runCommand();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='o'){ev.preventDefault();openFile();return}
- if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();saveJSON();return}
+ if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();if(ev.shiftKey)saveAsJSON();else saveJSON();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='p'){ev.preventDefault();openPrint();return}
  if((ev.ctrlKey||ev.metaKey)&&!isEditing){
   const key=ev.key.toLowerCase();
