@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261119-1711">
-<link rel="stylesheet" href="blackline-modern.css?v=20261119-1711">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261119-1930">
+<link rel="stylesheet" href="blackline-modern.css?v=20261119-1930">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261119-1711"></script>
-<script defer src="assets/cad-ui-language.js?v=20261119-1711"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261119-1930"></script>
+<script defer src="assets/cad-ui-language.js?v=20261119-1930"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261119-1711"></script>
-<script src="cad-grip-settings.js?v=20261119-1711"></script>
-<script src="cad-cursor-mode.js?v=20261119-1711"></script>
+<script src="cad2d-config.js?v=20261119-1930"></script>
+<script src="cad-grip-settings.js?v=20261119-1930"></script>
+<script src="cad-cursor-mode.js?v=20261119-1930"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -1822,8 +1822,14 @@ function dimensionPrimitives(e){
  line(aa,bb);
  const direction=mul(sub(bb,aa),1/(dist(aa,bb)||1));
  tip(aa,direction);tip(bb,mul(direction,-1));
- const center=mul(add(aa,bb),.5);
- text(format(measure),add(center,mul(n,height*1.5)));
+ const center=mul(add(aa,bb),.5),label=format(measure);
+ // Texto alineado con la línea de cota (como AutoCAD): legible de abajo o desde la derecha.
+ let deg=Math.atan2(direction.y,direction.x)*180/Math.PI;
+ if(deg>90.001)deg-=180;else if(deg<=-89.999)deg+=180;
+ const r=deg*Math.PI/180,along=P(Math.cos(r),Math.sin(r)),up=P(-Math.sin(r),Math.cos(r));
+ const shown=e.textOverride==null?label:String(e.textOverride).replace(/<>/g,label),w=shown.length*height*.62;
+ const pos=add(add(center,mul(along,-w/2)),mul(up,height*.45));
+ text(label,pos);items.at(-1).rotation=Math.abs(deg)<1e-6?0:deg;
  return items;
 }
 /* Block references are one model entity, expanded only for screen/plot interchange.
@@ -5827,7 +5833,7 @@ function makeSVG(o){
  svg.push(`<text fill="${c}" font-family="${escXML(safeCADFont(e.fontFamily||'Arial'))}" font-weight="${e.bold?'bold':'normal'}" font-style="${e.italic?'italic':'normal'}" font-size="${num(fs)}" x="0" y="0">${escXML(e.text)}</text>`);
  if(e.underline)svg.push(`<path d="M 0 ${num(fs*.12)} H ${num(width)}" stroke="${c}" stroke-width="${num(Math.max(.15,fs*.05))}"/>`);
  svg.push('</g>');
-}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),mid=mul(add(p1,p2),.5);svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(p1)} M ${point(e.b)} L ${point(p2)} M ${point(p1)} L ${point(p2)}"/><text x="${num(px(mid)[0])}" y="${num(px(mid)[1]-2)}" text-anchor="middle" font-size="3" fill="${c}" font-family="Arial">${num(L)} ${state.unit}</text>`)}}svg.push('</g>');if(o.title==='simple'){const tx=o.w-85,ty=o.h-o.margin-29;svg.push(`<rect x="${tx}" y="${ty}" width="85" height="29" fill="white" stroke="#222" stroke-width=".3"/><path d="M ${tx} ${ty+11} H ${tx+85} M ${tx+56} ${ty+11} V ${ty+29}" stroke="#222" stroke-width=".3"/><text x="${tx+3}" y="${ty+7}" font-size="4" font-family="Arial">${escXML(String(state.file).length>32?String(state.file).slice(0,29)+'...':state.file)}</text><text x="${tx+3}" y="${ty+17}" font-size="3" font-family="Arial">CAD2D</text><text x="${tx+3}" y="${ty+24}" font-size="2.7" font-family="Arial">${cadLocalPrintDate()}</text><text x="${tx+58}" y="${ty+20}" font-size="3" font-family="Arial">${$('plotScale').value==='fit'?'FIT':'1:'+($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value)}</text>`) }svg.push('</svg>');return svg.join('')}
+}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),mid=mul(add(p1,p2),.5);let dg=Math.atan2(vy,vx)*180/Math.PI;if(dg>90.001)dg-=180;else if(dg<=-89.999)dg+=180;const mx=num(px(mid)[0]),my=num(px(mid)[1]);svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(p1)} M ${point(e.b)} L ${point(p2)} M ${point(p1)} L ${point(p2)}"/><text transform="rotate(${num(-dg)} ${mx} ${my})" x="${mx}" y="${num(my-1)}" text-anchor="middle" font-size="3" fill="${c}" font-family="Arial">${num(L)} ${state.unit}</text>`)}}svg.push('</g>');if(o.title==='simple'){const tx=o.w-85,ty=o.h-o.margin-29;svg.push(`<rect x="${tx}" y="${ty}" width="85" height="29" fill="white" stroke="#222" stroke-width=".3"/><path d="M ${tx} ${ty+11} H ${tx+85} M ${tx+56} ${ty+11} V ${ty+29}" stroke="#222" stroke-width=".3"/><text x="${tx+3}" y="${ty+7}" font-size="4" font-family="Arial">${escXML(String(state.file).length>32?String(state.file).slice(0,29)+'...':state.file)}</text><text x="${tx+3}" y="${ty+17}" font-size="3" font-family="Arial">CAD2D</text><text x="${tx+3}" y="${ty+24}" font-size="2.7" font-family="Arial">${cadLocalPrintDate()}</text><text x="${tx+58}" y="${ty+20}" font-size="3" font-family="Arial">${$('plotScale').value==='fit'?'FIT':'1:'+($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value)}</text>`) }svg.push('</svg>');return svg.join('')}
 
 let cadActiveSpace='model';
 const CAD_LAYOUT_KEY='cad2d-layout1-settings';
@@ -7772,25 +7778,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261119-1711"></script>
-<script src="blackline-modern.js?v=20261119-1711"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261119-1711"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261119-1711"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261119-1711"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261119-1711"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261119-1711"></script>
-<script src="cad-osnap-math.js?v=20261119-1711"></script>
-<script src="cad-scale-math.js?v=20261119-1711"></script>
-<script src="cad-object-tracking.js?v=20261119-1711"></script>
-<script src="cad-auto-opening.js?v=20261119-1711"></script>
-<script src="cad-wall-join.js?v=20261119-1711"></script>
-<script src="cad-wall-grip.js?v=20261119-1711"></script>
-<script src="cad-hatch-patterns.js?v=20261119-1711"></script>
-<script src="cad-performance.js?v=20261119-1711"></script>
-<script src="cad-plan.js?v=20261119-1711"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261119-1711"></script>
-<script src="cad-arq-pro.js?v=20261119-1711"></script>
-<script src="cad-autocad-plus.js?v=20261119-1711"></script>
-<script src="cad-touch.js?v=20261119-1711"></script>
-<script src="cad-arq-tools.js?v=20261119-1711"></script>
+<script src="workspace-upgrade.js?v=20261119-1930"></script>
+<script src="blackline-modern.js?v=20261119-1930"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261119-1930"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261119-1930"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261119-1930"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261119-1930"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261119-1930"></script>
+<script src="cad-osnap-math.js?v=20261119-1930"></script>
+<script src="cad-scale-math.js?v=20261119-1930"></script>
+<script src="cad-object-tracking.js?v=20261119-1930"></script>
+<script src="cad-auto-opening.js?v=20261119-1930"></script>
+<script src="cad-wall-join.js?v=20261119-1930"></script>
+<script src="cad-wall-grip.js?v=20261119-1930"></script>
+<script src="cad-hatch-patterns.js?v=20261119-1930"></script>
+<script src="cad-performance.js?v=20261119-1930"></script>
+<script src="cad-plan.js?v=20261119-1930"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261119-1930"></script>
+<script src="cad-arq-pro.js?v=20261119-1930"></script>
+<script src="cad-autocad-plus.js?v=20261119-1930"></script>
+<script src="cad-touch.js?v=20261119-1930"></script>
+<script src="cad-arq-tools.js?v=20261119-1930"></script>
 </body></html>
