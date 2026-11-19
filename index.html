@@ -2859,7 +2859,8 @@ function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=
 
 function snapPoint(p){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;
- if(state.orthoOn&&state.stage.length){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
+ // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en AutoCAD).
+ if(state.orthoOn&&state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
   else if(state.polarOn&&state.stage.length&&['line','polyline','rect','polygon','dimension','move','copy'].includes(state.tool)){
    const a=state.stage[state.stage.length-1],vx=q.x-a.x,vy=q.y-a.y,r=Math.hypot(vx,vy);
    if(r>1e-10){
