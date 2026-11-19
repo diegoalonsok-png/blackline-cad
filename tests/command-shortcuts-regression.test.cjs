@@ -4,7 +4,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {test}=require('node:test');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
-function script(){const m=[...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)].find(m=>m[1].includes('const CAD2D_TYPED_ALIASES='));assert.ok(m,'script principal con alias CAD');return m[1]}
+function script(){const m=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].find(m=>m[1].includes('const CAD2D_TYPED_ALIASES='));assert.ok(m,'script principal con alias CAD');return m[1]}
 const main=script();
 const aliasSection=main.match(/const CAD2D_TYPED_ALIASES=\{([\s\S]*?)\n\};/);
 assert.ok(aliasSection,'registro de alias');
