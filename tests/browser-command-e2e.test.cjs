@@ -92,7 +92,7 @@ test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance
    await call('Input.dispatchMouseEvent',{type:'mouseReleased',x,y,button:'left',clickCount:1});
   };
   await evaluate("document.getElementById('cadCanvas').focus()");
-  const environment=await evaluate("(()=>({focus:document.activeElement?.id,dialogs:[...document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])')].map(e=>({id:e.id,display:getComputedStyle(e).display,hidden:e.hidden})),canvas:document.getElementById('cadCanvas').tagName,command:document.getElementById('command').disabled}))()");
+  const environment=await evaluate("(()=>({focus:document.activeElement?.id,dialogs:[...document.querySelectorAll('dialog[open],[role=dialog]:not([hidden])')].map(e=>({id:e.id,display:getComputedStyle(e).display,hidden:e.hidden,ariaModal:e.getAttribute('aria-modal'),containsCanvas:e.contains(document.getElementById('cadCanvas'))})),canvas:document.getElementById('cadCanvas').tagName,command:document.getElementById('command').disabled}))()");
   console.log('CAD keyboard environment: '+JSON.stringify(environment));
   await type('pl');
   const entered=await evaluate("document.getElementById('command').value");
@@ -131,6 +131,6 @@ test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance
   assert.ok(wall!==null&&Math.abs(wall-5)<1e-5,'WALL 5 + Enter creates 5 meters, got '+wall);
  }finally{
   ws?.close();browser.kill('SIGKILL');await new Promise(resolve=>server.close(resolve));
-  fs.rmSync(temp,{recursive:true,force:true});
+  try{fs.rmSync(temp,{recursive:true,force:true,maxRetries:10,retryDelay:100})}catch(error){console.warn('Chrome test cleanup: '+error.message)}
  }
 });
