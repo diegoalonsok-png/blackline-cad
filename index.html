@@ -1094,7 +1094,7 @@ function updateBlacklineToolStatus(){
   tabbar.append(node);
  }
  const cmd=state.tool||'select';
- const key=state.activeRibbonTool||cmd;
+ const key=cmd; // Report the actual engine command, never a stale ribbon selection.
  const name=(toolDefs[key]&&toolDefs[key][0])||key;
  const idle=cmd==='select'||cmd==='pan';
  node.dataset.idle=String(idle);
@@ -1130,12 +1130,18 @@ function cadUpdateCommandContext(message){
  if(!name){node.textContent='';node.hidden=true;input.placeholder='Command: PL · LINE · WALL · SAVE';return;}
  let help=message||'';
  if(state.tool==='wall2d'){
-  help=cadWallOptionPending==='justify'?'[L] Left · [C] Center · [R] Right':
-   cadWallOptionPending==='thickness'?'Thickness in metres (e.g. 0.20)':
-   state.stage.length?'Next point / length · [J] Justify · [T] Thickness · [U] Undo · Enter finish':
-    'First point · [J] Justify · [T] Thickness';
+  help=cadWallOptionPending==='justify'?'Justification [Left/Center/Right] <Left>:':
+   cadWallOptionPending==='thickness'?'Thickness in metres <0.20>:':
+   state.stage.length?'Specify next point or distance [Justify/Thickness/Undo] <Enter to finish>:':
+    'Specify first point [Justify/Thickness]:';
  }else if(state.tool==='line'||state.tool==='polyline'){
-  help=state.stage.length?'Next point / distance · [U] Undo · [C] Close · Enter finish':'Specify first point';
+  help=state.stage.length?'Specify next point or distance [Undo/Close] <Enter to finish>:':'Specify first point:';
+ }else if(state.tool==='zoomWindow'){
+  help=state.stage.length?'Specify opposite corner:':'Specify window corner [Extents/Previous/Window]:';
+ }else if(state.tool==='offset'){
+  help=state.modifyCandidate?'Specify side to offset:':'Specify offset distance or select object:';
+ }else if(state.tool==='circle'){
+  help=state.stage.length?'Specify radius or [Diameter]:':'Specify center point:';
  }
  node.hidden=false;node.textContent=name+' · '+help;node.title='Active command: '+name+'\n'+help;
  input.placeholder=state.stage.length?'Distance, coordinate or option…':'Command, coordinate or option…';
@@ -1159,8 +1165,8 @@ function setTool(t){
  if(dimensionKinds[t]){$('dimMode').value=dimensionKinds[t];t='dimension'}
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  document.getElementById('cadStretchConfirmEnter')?.remove();
- state.tool=t;cadWallOptionPending=null;if(t==='wall2d')$('cadWallJustification').value='left';state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
- if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select')log('Command: '+cadCommandName(t))}
+ state.tool=t;cadWallOptionPending=null;$('command').value='';if(t==='wall2d')$('cadWallJustification').value='left';state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
+ if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select'){cad2dLastCommand=cadCommandName(t);log('Command: '+cadCommandName(t))}}
 function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer punto / Click first point',polyline:state.stage.length?'Mover cursor → escribir longitud → Enter · Esc cancelar':'Elegí el primer vértice / Click first vertex',polygon:state.stage.length?'Specify polygon radius / first vertex':'Specify polygon center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'Specify opposite corner':'Specify first corner',circle:state.stage.length?'Specify radius point':'Specify center',arc:`Specify ${['center','start','end'][state.stage.length]||'end'} point`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'Specify destination point':'Select objects, then specify base point',copy:state.stage.length?'Specify destination point':'Select objects, then specify base point',rotate:state.stage.length?'Specify rotation reference point':'Select objects, then choose pivot',scale:state.stage.length?'ESCALAR: mové el mouse para ver el tamaño · segundo clic confirma':'ESCALAR: seleccioná objetos y marcá el punto base',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready')}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -2973,7 +2979,7 @@ function finishStage(close=false){
   if(dist(first,last)>1e-10){saveHistory();newEntity({type:'line',a:clone(last),b:clone(first)})}
  }
  state.stage=[];state.drag=null;
- if(t==='line'||t==='polyline'||t==='wall2d')state.tool='select';
+ if(t==='line'||t==='polyline'||t==='wall2d'){state.tool='select';state.activeRibbonTool='select';}
  buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');
  prompt();schedule();
 }
@@ -5199,7 +5205,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(['CTRLZ','CTRL+Z','DESHACER','UNDO'].includes(upper)){if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)return undoDrawingVertex();return undo();}
  value=upper;
  // Remember only recognized action names; numeric parameters never replace the last command.
- if(/^[A-Z_]+$/.test(upper)&&!['U','UNDO','REDO','NEW','OPEN','QSAVE'].includes(upper))cad2dLastCommand=upper;
+ // Last command is set by a successfully activated tool, not by arbitrary text.
  if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
  if(['OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'].includes(upper))return clearOtrackAnchors();
  if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper)){
@@ -5278,6 +5284,8 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
   const numeric=value.replace(',','.');
   if(/^[+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(numeric)){
    const length=Number(numeric),origin=state.stage.at(-1);let delta=sub(state.mouse,origin);let magnitude=Math.hypot(delta.x,delta.y);
+   // OSNAP can snap to the starting point while the mouse has moved. Keep its real bearing.
+   if(magnitude<1e-9){delta=sub(world(pointer),origin);magnitude=Math.hypot(delta.x,delta.y);}
    if(magnitude<1e-9){delta=P(1,0);magnitude=1;}
    if(!Number.isFinite(length)||length<=0)return toast('Longitud / Length must be positive');
    // If the cursor has not moved, default to +X (predictable axis).
@@ -5331,7 +5339,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
  if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
- if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
+ if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&!ev.shiftKey){
   if(!cad2dCommandHistory.length)return;
   ev.preventDefault();ev.stopPropagation();
