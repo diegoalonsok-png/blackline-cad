@@ -5336,7 +5336,7 @@ document.addEventListener('keydown',ev=>{
  const distanceInput=(['line','polyline','circle'].includes(state.tool)&&state.stage.length)||
    state.tool==='offset'||state.tool==='lengthen';
  if(distanceInput&&/^[0-9.,]$/.test(ev.key))return;
- if(!/[\\p{L}\\p{N}_.,+\\-]/u.test(ev.key))return;
+ if(!/[\p{L}\p{N}_.,+\-]/u.test(ev.key))return;
  ev.preventDefault();
  ev.stopImmediatePropagation();
  const command=$('command');
@@ -7570,7 +7570,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261113"></script>
-<script src="blackline-modern.js?v=20261119-command-focus-v3"></script>
+<script src="blackline-modern.js?v=20261119-command-focus-v4"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261116-olimpiadas-v2"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261116-featured4"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261116-frame1"></script>
