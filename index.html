@@ -853,7 +853,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
      target!==document.body && target!==document.documentElement)return;
   // Only ordinary printable input: preserve function keys, browser shortcuts,
   // Enter, Escape and CAD's Space action.
-  if(!/[\\p{L}\\p{N}_.,+\\-]/u.test(ev.key))return;
+  if(!/[\p{L}\p{N}_.,+\-]/u.test(ev.key))return;
   ev.preventDefault();
   ev.stopImmediatePropagation();
   const start=command.value.length, insert=ev.key;
