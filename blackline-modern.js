@@ -264,3 +264,38 @@ requestAnimationFrame(requestResize);
  window.addEventListener('resize',align);
  requestAnimationFrame(align);
 })();
+
+
+/* CAD command-line focus routing: printable typing in the workspace goes to
+   COMMAND without requiring a click. Keep shortcuts, modal editors, and
+   numeric direct-distance entry owned by the CAD engine. */
+(()=>{
+ 'use strict';
+ const command=document.getElementById('command');
+ const app=document.querySelector('.app');
+ const canvas=document.getElementById('canvas');
+ const canvasWrap=document.getElementById('canvasWrap');
+ if(!command||!app||!canvasWrap)return;
+ document.addEventListener('keydown',event=>{
+  if(event.defaultPrevented||event.isComposing||event.ctrlKey||event.metaKey||event.altKey||
+     event.key.length!==1)return;
+  const target=event.target;
+  if(!(target instanceof Element))return;
+  if(target.closest('input,textarea,select,[contenteditable=""],[contenteditable="true"],[role="textbox"],[role="dialog"],dialog'))return;
+  if(!app.contains(target)&&target!==document.body&&target!==document.documentElement)return;
+  // Numeric keys during geometry placement are processed by the CAD direct-distance handler.
+  const draw=canvasWrap.contains(target)&&/^[0-9.,+\-]$/.test(event.key);
+  if(draw)return;
+  // Exclude punctuation-only keys outside the canvas: they often have UI-specific meanings.
+  if(!canvasWrap.contains(target)&&!/[\p{L}\p{N}_]/u.test(event.key))return;
+  // If a non-command overlay is open, respect its own keyboard interaction.
+  if(document.querySelector('[role="dialog"]:not([hidden]),dialog[open]'))return;
+  const current=command.value;
+  const next=event.key;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  command.focus({preventScroll:true});
+  command.value=current+next;
+  command.dispatchEvent(new Event('input',{bubbles:true}));
+ },true);
+})();
