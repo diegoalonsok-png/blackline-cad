@@ -11,8 +11,8 @@ COOKIE_DOMAIN = "blackline-cad.org"                     # app en blackline-cad.o
 TRIAL_DAYS = "90"
 STRIPE_TAX = "0"                                     # 0: con Managed Payments, Stripe ya es el vendedor y gestiona el IVA
 MAIL_FROM = "CAD2D <acceso@blackline-cad.org>"
-PRICE_PRO_MONTHLY = "price_1UdWXqDRUE2reABAHniRmfHw"   # Blackline CAD Pro 1,59 €/mes (entorno de prueba)
-PRICE_PRO_YEARLY = "price_1UdWYdDRUE2reABAPWeKFW5K"    # Blackline CAD Pro 12,99 €/año (entorno de prueba)
+PRICE_PRO_MONTHLY = "price_1UdX22DY9yzl20JEdPDjQo3X"   # 1,59 €/mes (modo activo; prueba: price_1UdWXqDRUE2reABAHniRmfHw)
+PRICE_PRO_YEARLY = "price_1UdX22DY9yzl20JE1Gzk27li"    # 12,99 €/año (modo activo; prueba: price_1UdWYdDRUE2reABAPWeKFW5K)
 PRICE_STUDIO_MONTHLY = ""                            # sin plan Studio por ahora
 
 [[d1_databases]]
