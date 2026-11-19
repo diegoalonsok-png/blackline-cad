@@ -296,8 +296,17 @@ CORE.canvas.addEventListener('contextmenu',ev=>{
 /* ---------- Menú contextual ---------- */
 EXT.context.push(({item,active,count})=>{
  if(active){
+  const t=S().tool,n=S().stage.length,opt=(label,key)=>item(label+' ['+key+']',()=>CORE.command(key));
+  const OPTS={
+   line:n?[opt('Undo','U'),opt('Close','C')]:[],polyline:n?[opt('Undo','U'),opt('Close','C')]:[],
+   wall2d:[opt('Thickness','T'),opt('Justify','J'),...(n?[opt('Undo','U')]:[])],
+   circle:n===1?[opt('Diameter','D'),opt('Radius','R')]:[],rect:n===1?[opt('Dimensions','D')]:[],
+   arc:n?[]:[opt('Center','C')],fillet:[opt('Radius','R')],chamfer:[opt('Distance','D')],
+   zoomWindow:[opt('Extents','E'),opt('Previous','P'),opt('Zoom out','-'),opt('Zoom in','+')]
+  };
+  const extra=OPTS[t]||[];
   const recent=[...new Set(CORE.commandHistory().slice().reverse())].filter(x=>!/^[0-9.,@<+\-]/.test(x)).slice(0,5);
-  return {top:[],bottom:[item('Referencias a objetos… · Shift+clic derecho',()=>{const r=CORE.canvas.getBoundingClientRect();osnapMenu(r.left+r.width/2,r.top+r.height/2)}),...recent.map(r=>item('↻ Entrada reciente: '+r,()=>CORE.command(r)))]};
+  return {top:extra,bottom:[item('Referencias a objetos… · Shift+clic derecho',()=>{const r=CORE.canvas.getBoundingClientRect();osnapMenu(r.left+r.width/2,r.top+r.height/2)}),...recent.map(r=>item('↻ Entrada reciente: '+r,()=>CORE.command(r)))]};
  }
  const out=[],s=sel();
  if(count){
