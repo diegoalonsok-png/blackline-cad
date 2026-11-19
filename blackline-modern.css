@@ -248,3 +248,10 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 @media (prefers-reduced-motion:reduce){
  .app.blackline-modern .ribbon .tool,.app.blackline-modern .brandbar .mark{transition:none!important;transform:none!important}
 }
+/* Celular y tablet vertical: el área de dibujo ocupa todo el ancho (gana a las reglas de paneles ocultos) */
+@media(max-width:850px){.app .workspace:has(>#canvasWrap){grid-template-columns:minmax(0,1fr)!important}.app .workspace:has(>#canvasWrap)>.sidebar,.app .workspace:has(>#canvasWrap)>#leftDivider,.app .workspace:has(>#canvasWrap)>#rightDivider{display:none!important}}
+/* Tirador de altura de la cinta: invisible hasta pasar el mouse y siempre por debajo de las ventanas emergentes */
+.app #ribbonSizer{z-index:5!important;background:transparent!important}
+.app #ribbonSizer::after{opacity:0;transition:opacity .15s}
+.app #ribbonSizer:hover,.app #ribbonSizer.resizing{background:#7fa8bb36!important}
+.app #ribbonSizer:hover::after,.app #ribbonSizer.resizing::after{opacity:1}
