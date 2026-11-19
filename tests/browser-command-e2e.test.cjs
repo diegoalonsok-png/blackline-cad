@@ -32,12 +32,14 @@ test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const url='http://127.0.0.1:'+server.address().port+'/';
  const browser=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
-  '--remote-allow-origins=*','--remote-debugging-port=0','--user-data-dir='+temp,'about:blank'],{stdio:'ignore'});
+  '--remote-allow-origins=*','--remote-debugging-port=0','--user-data-dir='+temp,'about:blank'],{stdio:['ignore','ignore','pipe']});
+ let browserErrors='';browser.stderr.on('data',chunk=>{browserErrors+=chunk.toString().slice(-2000)});
+ console.log('Browser binary: '+chrome);
  let ws=null;
  try{
   const portFile=path.join(temp,'DevToolsActivePort');
-  for(let i=0;i<100&&!fs.existsSync(portFile);i++)await sleep(100);
-  assert.ok(fs.existsSync(portFile),'headless Chrome started');
+  for(let i=0;i<200&&!fs.existsSync(portFile);i++)await sleep(100);
+  assert.ok(fs.existsSync(portFile),'headless Chrome started; exit='+browser.exitCode+'; stderr='+browserErrors.slice(-2400));
   const port=fs.readFileSync(portFile,'utf8').split('\n')[0];
   const res=await fetch('http://127.0.0.1:'+port+'/json/new?'+encodeURIComponent(url),{method:'PUT'});
   assert.equal(res.ok,true,'Chrome DevTools target created');
