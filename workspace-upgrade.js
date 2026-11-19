@@ -187,8 +187,8 @@ if(ribbon){
  decorateRibbon();
 }
 
-/* Browser-local 4-month (120-day) guest indication. Never mistake it for secure account enforcement. */
-const TRIAL_DAYS=120;
+/* Browser-local 3-month (90-day) guest indication. Never mistake it for secure account enforcement. */
+const TRIAL_DAYS=90;
 const firstKey='cad2d-guest-first-use-v1';
 let first=read(firstKey,null);
 if(typeof first!=='number'||first>Date.now()||first<Date.UTC(2020,0,1)){first=Date.now();store(firstKey,first)}

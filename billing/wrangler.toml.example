@@ -8,12 +8,12 @@ APP_ORIGIN = "https://blackline-cad.org"               # origen exacto de la app
 APP_PATH = "/"                                       # "/blackline-cad/" si se sigue usando GitHub Pages
 API_ORIGIN = "https://api.blackline-cad.org"           # dominio del Worker
 COOKIE_DOMAIN = "blackline-cad.org"                     # app en blackline-cad.org y API en api.blackline-cad.org
-TRIAL_DAYS = "120"
-STRIPE_TAX = "1"                                     # IVA automático con Stripe Tax (requiere configurarlo en el Dashboard)
+TRIAL_DAYS = "90"
+STRIPE_TAX = "0"                                     # 0: con Managed Payments, Stripe ya es el vendedor y gestiona el IVA
 MAIL_FROM = "CAD2D <acceso@blackline-cad.org>"
-PRICE_PRO_MONTHLY = "price_xxx"
-PRICE_PRO_YEARLY = "price_xxx"
-PRICE_STUDIO_MONTHLY = "price_xxx"
+PRICE_PRO_MONTHLY = "price_1UdWXqDRUE2reABAHniRmfHw"   # Blackline CAD Pro 1,59 €/mes (entorno de prueba)
+PRICE_PRO_YEARLY = "price_1UdWYdDRUE2reABAPWeKFW5K"    # Blackline CAD Pro 12,99 €/año (entorno de prueba)
+PRICE_STUDIO_MONTHLY = ""                            # sin plan Studio por ahora
 
 [[d1_databases]]
 binding = "DB"
