@@ -78,7 +78,7 @@ test('DWG: conversión en servidor configurable, con consentimiento y sin LibreD
  const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
  assert.match(html,/const DWG_CONVERTER_ENDPOINT=typeof window\.CAD2D_DWG_ENDPOINT==='string'/);
  assert.match(html,/lo convierte a DXF y lo borra inmediatamente/);
- assert.ok(html.indexOf('cad2d-config.js')<html.indexOf('<script>\n'),'la configuración se carga antes del núcleo');
+ assert.ok(html.indexOf('cad2d-config.js')<html.indexOf('const CAD2D_TYPED_ALIASES='),'la configuración se carga antes del núcleo CAD');
  assert.doesNotMatch(html,/libredwg/i,'LibreDWG no se distribuye en el frontend');
  const cfg=fs.readFileSync(path.join(__dirname,'..','cad2d-config.js'),'utf8');assert.match(cfg,/var DWG_ACTIVO=false;/);assert.match(cfg,/var CUENTAS_ACTIVAS=false;/);assert.doesNotMatch(cfg,/sk_(live|test)_/);
  const srv=fs.readFileSync(path.join(__dirname,'..','dwg-converter','server.py'),'utf8');
