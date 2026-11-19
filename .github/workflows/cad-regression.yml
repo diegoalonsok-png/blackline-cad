@@ -26,9 +26,17 @@ jobs:
           const fs = require('node:fs');
           const vm = require('node:vm');
           const html = fs.readFileSync('index.html','utf8');
-          const inline = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x => x[1]).filter(x => x.trim());
-          for(const [index, source] of inline.entries()) new vm.Script(source, {filename: 'inline-' + index + '.js'});
-          console.log('Validated', inline.length, 'inline scripts');
+          const inline = [...html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+            .filter(x => x[2].trim());
+          for(const [index, match] of inline.entries()){
+            const attributes = match[1] || '';
+            if(/\btype=["']application\/ld\+json["']/i.test(attributes)){
+              JSON.parse(match[2]);
+              continue;
+            }
+            new vm.Script(match[2], {filename: 'inline-' + index + '.js'});
+          }
+          console.log('Validated', inline.length, 'inline scripts and structured-data blocks');
           NODE
       - name: Run CAD geometry regression tests
         run: node --test tests/*.test.cjs
