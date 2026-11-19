@@ -36,7 +36,7 @@ test('Additional block loader leaves existing palettes intact and adds only on s
  assert.match(loader,/FACTOR=\{m:1,cm:100,mm:1000,in:/);
  assert.match(loader,/new Set\(catalog\.blocks\.map\(x=>x\.category\)\)/);
  assert.equal((html.match(/assets\/cad2d-architecture-pack\.js/g)||[]).length,1);
- assert.match(html,/<script defer src="assets\/cad2d-architecture-pack\.js\?v=20261118-v1"><\/script>/);
+ assert.match(html,/<script defer src="assets\/cad2d-architecture-pack\.js\?v=[^"]+"><\/script>/);
  assert.match(html,/assets\/dxf-block-collection\.js/);
  assert.match(html,/assets\/dxf-featured-blocks\.js/);
  assert.match(html,/assets\/cad2d-curated-library\.js/);
