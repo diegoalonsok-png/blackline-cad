@@ -6193,7 +6193,7 @@ function autoCutWallForOpening(ref,block){
  const wallLines=state.entities.filter(e=>{
   if(e.type!=='line'||!e.id||e.autoOpeningRef!==undefined)return false;
   const l=layerFor(e);
-  return l.visible&&!l.locked&&(ref.autoOpeningPairIds?.includes(e.id)||explicitWallLayerName(l.id)||explicitWallLayerName(l.name));
+  return l.visible&&!l.locked&&(!!e.wall2d||ref.autoOpeningPairIds?.includes(e.id)||explicitWallLayerName(l.id)||explicitWallLayerName(l.name));
  });
  // Only cut correctly aligned wall lines crossing the whole opening.
  // The tolerable perpendicular distance is narrow, measured in drawing units.
@@ -6630,11 +6630,11 @@ function initPermanentBlockGallery(){
  whole('Living amplio 750 x 550',7.50,5.50,living('Living amplio',7.50,5.50));
  whole('Estudio 350 x 400',3.50,4,roomBase(3.50,4,.80).concat([rc(.25,3.20,1.80,.65),rc(2.40,1.20,.60,1.80),rc(.60,1.20,.80,.80)]));
  whole('Lavadero 250 x 300',2.50,3,roomBase(2.50,3,.80).concat([rc(.18,2.18,.65,.65),rc(.93,2.18,.65,.65),rc(1.72,.30,.62,1.45),rc(.18,.85,.64,.70)]));
- const door=(name,w,reverse=false)=>add(name,'Openings',w,w,[
+ const door=(name,w,reverse=false)=>entries.push({id:name,cat:'Openings',w,h:w,kind:'swing-door',reverse,draw:[
   ['rect',0,-.055,.055,.11],['rect',w-.055,-.055,.055,.11],
   ['line',reverse?w-.055:.055,0,reverse?w-.055:.055,w-.06],
-  ['arc',reverse?w-.055:.055,0,w-.06,reverse?90:0,reverse?180:90]]);
- const window2=(name,w,depth=.18,panes=1)=>{const d=[['rect',0,-depth/2,.055,depth],['rect',w-.055,-depth/2,.055,depth],['line',.055,-depth/2,w-.055,-depth/2],['line',.055,depth/2,w-.055,depth/2],['line',.055,0,w-.055,0]];for(let k=1;k<panes;k++)d.push(['rect',k*w/panes-.02,-depth/2,.04,depth]);add(name,'Openings',w,depth,d)};
+  ['arc',reverse?w-.055:.055,0,w-.06,reverse?90:0,reverse?180:90]]});
+ const window2=(name,w,depth=.18,panes=1)=>{const d=[['rect',0,-depth/2,.055,depth],['rect',w-.055,-depth/2,.055,depth],['line',.055,-depth/2,w-.055,-depth/2],['line',.055,depth/2,w-.055,depth/2],['line',.055,0,w-.055,0]];for(let k=1;k<panes;k++)d.push(['rect',k*w/panes-.02,-depth/2,.04,depth]);entries.push({id:name,cat:'Openings',w,h:depth,kind:'framed-window',mullion:panes>1,draw:d})};
  const box=(name,cat,w,h)=>add(name,cat,w,h,[['rect',0,0,w,h],['rect',.08,.08,Math.max(.08,w-.16),Math.max(.08,h-.16)]]);
  const circular=(name,cat,d)=>add(name,cat,d,d,[['circle',d/2,d/2,d/2],['circle',d/2,d/2,Math.max(.025,d*.12)]]);
  // Colección editorial propia de bloques arquitectónicos en planta: dibujo vectorial, no imágenes.
@@ -6808,7 +6808,7 @@ function initPermanentBlockGallery(){
   if(!already){
    const param=x.kind?{kind:x.kind,defaults:{
     width:x.w*factor,frameWidth:.05*factor,frameDepth:(x.kind==='framed-window'?.12:.12)*factor,
-    ...(x.kind==='swing-door'?{mirror:false}:{}),
+    ...(x.kind==='swing-door'?{mirror:Boolean(x.reverse)}:{}),
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion)}:{})
    }}:null;
    state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})});
