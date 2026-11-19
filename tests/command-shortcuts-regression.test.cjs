@@ -14,9 +14,11 @@ test('H resuelve HATCH y no PLINE en el buscador y la barra',()=>{
  assert.match(main,/H:'hatch',HATCH:'hatch'/);
  assert.match(main,/let cmd=cad2dNormalizeCommand\(value\);if\(aliases\[cmd\]\)/);
 });
-test('H en el lienzo activa HATCH inmediatamente, sin insertar PLINE',()=>{
- assert.match(main,/ev\.key\.toUpperCase\(\)==='H'[^\n]*runCommand\(\)/);
- assert.match(main,/if\(t==='hatch'\&\&state\.selected\.length\)return hatchSelected\(\)/);
+test('H en el lienzo escribe el alias estándar; Enter inicia HATCH, no PLINE',()=>{
+ assert.doesNotMatch(main,/ev\.key\.toUpperCase\(\)==='H'[^\n]*runCommand\(\)/);
+ assert.match(main,/ev\.preventDefault\(\);\$\('command'\)\.focus\(\);\$\('command'\)\.value=ev\.key\.toUpperCase\(\)/);
+ assert.equal(typed('H'),'HATCH');
+ assert.match(main,/if\(t==='hatch'&&state\.selected\.length\)return hatchSelected\(\)/);
  assert.match(main,/if\(t==='hatch'\)return cadHatchAtPoint\(p\)/);
 });
 test('PL sigue siendo polilínea y L sigue siendo línea',()=>{
