@@ -855,7 +855,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  }
  window.addEventListener('keydown',function(ev){
   if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
-     ev.key.length!==1 || ev.key===' ' || modalOpen())return;
+     ev.key.length!==1 || ev.key===' ' || modalOpen() || window.CAD2D_GRIP_TYPING)return;
   const target=ev.target;
   if(editable(target))return;
   const app=document.querySelector('.app');

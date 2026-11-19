@@ -48,7 +48,8 @@ function ensureDefinition(item,W,D){
   const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities(ents)});
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
   def.dynamic2d=false;def.dynamicActions=true;
-  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit};
+  const bb=LIB.bounds(built.entities);
+  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
   st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
  }
  return name;
@@ -257,15 +258,21 @@ function worldToLocal(ref,q){
  let lx=dx*Math.cos(-t)-dy*Math.sin(-t);const ly=dx*Math.sin(-t)+dy*Math.cos(-t);
  if(ref.flipBlockX)lx=-lx;return P(lx/k,ly/k);
 }
+function extOf(a){
+ if(!a.ext){const bb=LIB.bounds(LIB.build(a.id,a.w,a.d).entities);a.ext=bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:{x0:0,y0:0,x1:a.w,y1:a.d}}
+ const e=a.ext;return {x0:Math.min(0,e.x0),y0:Math.min(0,e.y0),x1:Math.max(a.w,e.x1),y1:Math.max(a.d,e.y1)};
+}
 function gripsFor(ref){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return [];
- const g=[];
- if(item.wMax>item.wMin)g.push({kind:'w',local:P(a.w,a.d/2)});
- if(item.dMax>item.dMin&&!item.lockAspect)g.push({kind:'d',local:P(a.w/2,a.d)});
- if(familyOf(item).length>1)g.push({kind:'v',local:P(a.w,0)});
+ const g=[],e=extOf(a);
+ // Pinzas sobre el borde real del dibujo, para que no queden dentro ni lejos del bloque.
+ if(item.wMax>item.wMin)g.push({kind:'w',local:P(e.x1,(e.y0+e.y1)/2)});
+ if(item.dMax>item.dMin&&!item.lockAspect)g.push({kind:'d',local:P((e.x0+e.x1)/2,e.y1)});
+ if(familyOf(item).length>1)g.push({kind:'v',local:P(e.x1,e.y0)});
  return g.map(x=>({...x,world:localToWorld(ref,x.local.x,x.local.y),screen:CORE.screen(localToWorld(ref,x.local.x,x.local.y))}));
 }
 let gripDrag=null;
+Object.defineProperty(window,'CAD2D_GRIP_TYPING',{get:()=>!!gripDrag,configurable:true});
 function drawTriangle(ctx,p,dir,active){
  ctx.save();ctx.translate(p.x,p.y);ctx.rotate(dir);ctx.beginPath();ctx.moveTo(9,0);ctx.lineTo(-6,-7);ctx.lineTo(-6,7);ctx.closePath();
  ctx.fillStyle=active?'#ff5f8f':'#37d6ff';ctx.strokeStyle='#06131b';ctx.lineWidth=1.2;ctx.fill();ctx.stroke();ctx.restore();
@@ -282,10 +289,10 @@ EXT.overlays.push(ctx=>{
   drawTriangle(ctx,scr,dir,gripDrag&&gripDrag.kind===g.kind);
  }
  if(gripDrag){
-  const W=gripDrag.W,D=gripDrag.D;
-  const corners=[[0,0],[W,0],[W,D],[0,D]].map(([x,y])=>CORE.screen(localToWorld(ref,x,y)));
+  const W=gripDrag.W,D=gripDrag.D,e=extOf(a),X1=e.x1+(W-a.w),Y1=e.y1+(D-a.d);
+  const corners=[[e.x0,e.y0],[X1,e.y0],[X1,Y1],[e.x0,Y1]].map(([x,y])=>CORE.screen(localToWorld(ref,x,y)));
   ctx.save();ctx.setLineDash([6,4]);ctx.strokeStyle='#ff5f8f';ctx.lineWidth=1.4;ctx.beginPath();corners.forEach((c,i)=>i?ctx.lineTo(c.x,c.y):ctx.moveTo(c.x,c.y));ctx.closePath();ctx.stroke();
-  const label=cm(W)+' × '+cm(D)+' cm';const at=CORE.screen(localToWorld(ref,W,D));
+  const label=(gripDrag.typed?gripDrag.typed+' m ⏎ · ':'')+cm(W)+' × '+cm(D)+' cm';const at=CORE.screen(localToWorld(ref,X1,Y1));
   ctx.setLineDash([]);ctx.font='bold 12px Arial';const tw=ctx.measureText(label).width;
   ctx.fillStyle='rgba(6,19,27,.9)';ctx.fillRect(at.x+10,at.y-24,tw+12,20);ctx.fillStyle='#ffd3e0';ctx.fillText(label,at.x+16,at.y-10);
   ctx.restore();
@@ -347,12 +354,22 @@ function onPointerMove(ev){
  ev.stopImmediatePropagation();
  const ref=S().entities.find(e=>e.id===gripDrag.id),a=arqOf(ref),item=a&&byId(a.id);if(!item){gripDrag=null;return}
  const q=worldToLocal(ref,CORE.snapPoint(CORE.world(P(ev.offsetX,ev.offsetY))));
- if(gripDrag.kind==='w'){gripDrag.W=Math.max(item.wMin,Math.min(item.wMax,snapMeters(q.x,ev.shiftKey)));if(item.lockAspect)gripDrag.D=gripDrag.W}
- else gripDrag.D=Math.max(item.dMin,Math.min(item.dMax,snapMeters(q.y,ev.shiftKey)));
+ const e=extOf(a);
+ if(gripDrag.kind==='w'){gripDrag.W=Math.max(item.wMin,Math.min(item.wMax,snapMeters(q.x-(e.x1-a.w),ev.shiftKey)));if(item.lockAspect)gripDrag.D=gripDrag.W}
+ else gripDrag.D=Math.max(item.dMin,Math.min(item.dMax,snapMeters(q.y-(e.y1-a.d),ev.shiftKey)));
  CORE.schedule();
 }
+window.addEventListener('keydown',ev=>{
+ if(!gripDrag)return;
+ if(/^[0-9.,]$/.test(ev.key)){gripDrag.typed=(gripDrag.typed||'')+(ev.key===','?'.':ev.key);ev.preventDefault();ev.stopImmediatePropagation();CORE.schedule();return}
+ if(ev.key==='Backspace'&&gripDrag.typed){gripDrag.typed=gripDrag.typed.slice(0,-1);ev.preventDefault();ev.stopImmediatePropagation();CORE.schedule();return}
+ if(ev.key==='Enter'&&gripDrag.typed){ev.preventDefault();ev.stopImmediatePropagation();const g=gripDrag,v=Number(g.typed);gripDrag=null;
+  const ref=S().entities.find(e=>e.id===g.id);if(ref&&v>0)resizeRef(ref,g.kind==='w'?v:g.W,g.kind==='d'?v:g.D);CORE.schedule();return}
+ if(ev.key==='Escape'){gripDrag=null;CORE.schedule()}
+},true);
 function onPointerUp(ev){
  if(gripDrag){
+  if(gripDrag.typed)return;
   ev.stopImmediatePropagation();
   const g=gripDrag;gripDrag=null;const ref=S().entities.find(e=>e.id===g.id);
   if(ref)resizeRef(ref,g.W,g.D);CORE.schedule();return;
@@ -596,5 +613,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.length});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
