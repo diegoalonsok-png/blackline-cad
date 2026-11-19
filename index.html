@@ -5333,7 +5333,7 @@ document.addEventListener('keydown',ev=>{
  if(!document.querySelector('.app')?.contains(target)&&target!==document.body&&target!==document.documentElement)return;
  if(document.querySelector('dialog[open],[role="dialog"]:not([hidden])'))return;
  // Direct numerical distance entry is handled by the existing next listener.
- const distanceInput=(['line','polyline','circle'].includes(state.tool)&&state.stage.length)||
+ const distanceInput=(['line','polyline','wall2d','circle'].includes(state.tool)&&state.stage.length)||
    state.tool==='offset'||state.tool==='lengthen';
  if(distanceInput&&/^[0-9.,]$/.test(ev.key))return;
  if(!/[\p{L}\p{N}_.,+\-]/u.test(ev.key))return;
@@ -5348,7 +5348,7 @@ document.addEventListener('keydown',ev=>{
 },true);
 // Type a number immediately after choosing the first point, without clicking the command bar.
 document.addEventListener('keydown',ev=>{
- if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||!(['line','polyline','circle'].includes(state.tool)&&state.stage.length||state.tool==='offset'||state.tool==='lengthen'))return;
+ if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||!(['line','polyline','wall2d','circle'].includes(state.tool)&&state.stage.length||state.tool==='offset'||state.tool==='lengthen'))return;
  const active=document.activeElement;
  if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable))return;
  if(/^[0-9]$/.test(ev.key)||ev.key==='.'||ev.key===','){
