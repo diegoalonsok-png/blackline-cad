@@ -4,6 +4,7 @@
 
 - **Official website / aplicación CAD 2D online:** https://blackline-cad.org/
 - **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
+- **CAD 2D online guide / guía de dibujo técnico:** https://blackline-cad.org/guia-cad-2d-online.html
 - **Features:** 2D linework, layers, snapping, dimensions, PDF/SVG/PNG export and DXF editing (see documented limitations below)
 - **License:** Proprietary, all rights reserved. Public source visibility does not grant reuse rights; see [LICENSE](LICENSE).
 
