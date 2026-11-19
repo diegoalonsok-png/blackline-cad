@@ -4,13 +4,13 @@ main = "worker.js"
 compatibility_date = "2026-11-01"
 
 [vars]
-APP_ORIGIN = "https://tu-dominio.org"               # origen exacto de la app (sin barra final)
+APP_ORIGIN = "https://blackline-cad.org"               # origen exacto de la app (sin barra final)
 APP_PATH = "/"                                       # "/blackline-cad/" si se sigue usando GitHub Pages
-API_ORIGIN = "https://api.tu-dominio.com"           # dominio del Worker
-COOKIE_DOMAIN = "tu-dominio.org"                     # app en tu-dominio.org y API en api.tu-dominio.org
+API_ORIGIN = "https://api.blackline-cad.org"           # dominio del Worker
+COOKIE_DOMAIN = "blackline-cad.org"                     # app en blackline-cad.org y API en api.blackline-cad.org
 TRIAL_DAYS = "120"
 STRIPE_TAX = "1"                                     # IVA automático con Stripe Tax (requiere configurarlo en el Dashboard)
-MAIL_FROM = "CAD2D <acceso@tu-dominio.com>"
+MAIL_FROM = "CAD2D <acceso@blackline-cad.org>"
 PRICE_PRO_MONTHLY = "price_xxx"
 PRICE_PRO_YEARLY = "price_xxx"
 PRICE_STUDIO_MONTHLY = "price_xxx"

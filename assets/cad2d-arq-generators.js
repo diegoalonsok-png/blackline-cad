@@ -404,6 +404,88 @@ one('eq-condensadora','Condensadora exterior',EQ,.85,.35,(b,W,D)=>{b.rect(0,0,W,
 one('eq-tablero','Tablero eléctrico',EQ,.40,.12,(b,W,D)=>{b.rect(0,0,W,D);b.line(0,0,W,D)});
 one('eq-chimenea','Hogar / chimenea',EQ,1.20,.60,(b,W,D)=>{b.rect(0,0,W,D);b.poly([[.20,D],[.30,.15],[W-.30,.15],[W-.20,D]],false);b.rect(-.10,-.15,W+.20,.15)},{wMin:.8,wMax:2.0});
 
+/* ===== ALZADOS: PUERTAS, VENTANAS, ÁRBOLES Y PERSONAS (dibujo propio) ===== */
+const ALZ='Alzados';
+// Puertas en alzado: W = ancho de vano, D = altura (piso en y=0).
+function puertaAlz(b,W,D,tipo){
+ b.line(-.10,0,W+.10,0);b.rect(0,0,W,D);const m=.05;b.rect(m,0,W-2*m,D-m);
+ if(tipo==='tablero'){const pw=W-2*m-.16,ph=(D-m-.30)/2;b.rect(m+.08,.12,pw,ph);b.rect(m+.08,.18+ph,pw,ph)}
+ if(tipo==='vidrio'){b.rect(m+.10,D*.35,W-2*m-.20,D*.55);for(let i=1;i<4;i++)b.line(m+.10+i*.06,D*.35+D*.55-.02,m+.10+i*.06+.12,D*.35+D*.55-.14)}
+ if(tipo==='doble'){b.line(W/2,0,W/2,D-m);b.circle(W/2-.08,D*.48,.025);b.circle(W/2+.08,D*.48,.025);return}
+ if(tipo==='corrediza'){b.line(W/2,0,W/2,D-m);b.line(W*.2,D*.5,W*.35,D*.5);b.line(W*.35,D*.5,W*.31,D*.52);b.line(W*.35,D*.5,W*.31,D*.48);return}
+ b.circle(W-m-.08,D*.48,.03);b.line(W-m-.08,D*.48,W-m-.20,D*.48);
+ b.line(m,0,W-m,D-m,{dashed:true});b.line(W-m,0,m,D-m,{dashed:true}); // convención de abertura en alzado
+}
+one('alz-puerta-placa','Puerta placa (alzado)',ALZ,.80,2.05,(b,W,D)=>puertaAlz(b,W,D,'placa'),{wMin:.60,wMax:1.20,dMin:1.90,dMax:2.60,family:'alz-puerta'});
+one('alz-puerta-tablero','Puerta de tableros (alzado)',ALZ,.85,2.05,(b,W,D)=>puertaAlz(b,W,D,'tablero'),{wMin:.70,wMax:1.10,dMin:1.90,dMax:2.60,family:'alz-puerta'});
+one('alz-puerta-vidrio','Puerta con vidrio (alzado)',ALZ,.90,2.10,(b,W,D)=>puertaAlz(b,W,D,'vidrio'),{wMin:.70,wMax:1.20,dMin:1.90,dMax:2.60,family:'alz-puerta'});
+one('alz-puerta-doble','Puerta doble (alzado)',ALZ,1.60,2.20,(b,W,D)=>puertaAlz(b,W,D,'doble'),{wMin:1.20,wMax:2.40,dMin:2.00,dMax:3.00,family:'alz-puerta'});
+one('alz-puerta-corrediza','Puerta corrediza (alzado)',ALZ,1.80,2.10,(b,W,D)=>puertaAlz(b,W,D,'corrediza'),{wMin:1.20,wMax:3.60,dMin:2.00,dMax:2.80,family:'alz-puerta'});
+function ventanaAlz(b,W,D,tipo){
+ b.rect(0,0,W,D);const m=.05;b.rect(m,m,W-2*m,D-2*m);b.line(-.04,0,W+.04,0);b.line(-.04,-.03,W+.04,-.03);
+ if(tipo==='corrediza'){b.line(W/2,m,W/2,D-m);b.line(W*.25-.08,D/2,W*.25+.08,D/2);b.line(W*.75-.08,D/2,W*.75+.08,D/2)}
+ if(tipo==='banderola'){b.line(m,D*.72,W-m,D*.72);b.line(m,D-m,W/2,D*.72+.02,{dashed:true});b.line(W-m,D-m,W/2,D*.72+.02,{dashed:true})}
+ if(tipo==='pano')for(let i=1;i<3;i++)b.line(m,m+i*(D-2*m)/3,W-m,m+i*(D-2*m)/3);
+}
+one('alz-ventana-corrediza','Ventana corrediza (alzado)',ALZ,1.50,1.10,(b,W,D)=>ventanaAlz(b,W,D,'corrediza'),{wMin:.80,wMax:3.00,dMin:.60,dMax:1.80,family:'alz-ventana'});
+one('alz-ventana-banderola','Ventana con banderola (alzado)',ALZ,1.20,1.40,(b,W,D)=>ventanaAlz(b,W,D,'banderola'),{wMin:.60,wMax:2.40,dMin:.90,dMax:2.20,family:'alz-ventana'});
+one('alz-ventana-pano','Paño fijo (alzado)',ALZ,1.00,1.50,(b,W,D)=>ventanaAlz(b,W,D,'pano'),{wMin:.40,wMax:3.00,dMin:.40,dMax:2.60,family:'alz-ventana'});
+// Árboles en alzado: W = diámetro de copa, D = altura total.
+one('alz-arbol-copa','Árbol de copa redonda (alzado)',ALZ,4.0,6.0,(b,W,D)=>{
+ const tr=Math.max(.15,W*.05),ch=D*.62,cy=D-ch/2,pts=[],n=22;b.poly([[W/2-tr,0],[W/2-tr*.7,D-ch*.85],[W/2+tr*.7,D-ch*.85],[W/2+tr,0]],false);
+ for(let i=0;i<=n;i++){const a=i/n*2*Math.PI,r=1+((i%2)?-.08:.06);pts.push([W/2+W/2*r*Math.cos(a),cy+ch/2*r*Math.sin(a)])}b.poly(pts,true);
+ b.line(W/2,D-ch*.85,W/2-W*.18,cy);b.line(W/2,D-ch*.75,W/2+W*.2,cy+ch*.1);b.line(-.3,0,W+.3,0)},{wMin:1.5,wMax:12,dMin:2.5,dMax:20,family:'alz-arbol'});
+one('alz-arbol-conico','Conífera (alzado)',ALZ,3.0,7.0,(b,W,D)=>{
+ const tr=Math.max(.12,W*.05);b.rect(W/2-tr,0,2*tr,D*.18);const L=4;for(let i=0;i<L;i++){const y0=D*.15+i*(D*.8/L)*.9,w=W*(1-i*.2);b.poly([[W/2-w/2,y0],[W/2,y0+D*.85/L*1.5],[W/2+w/2,y0]],true)}b.line(-.3,0,W+.3,0)},{wMin:1,wMax:8,dMin:2,dMax:25,family:'alz-arbol'});
+one('alz-palmera','Palmera (alzado)',ALZ,4.0,8.0,(b,W,D)=>{
+ const top=D*.80,cx=W/2;b.poly([[cx-.16,0],[cx-.09,top],[cx+.09,top],[cx+.16,0]],false);for(let i=1;i<12;i++){const y=i*top/12;b.line(cx-.15+i*.005,y,cx+.15-i*.005,y+.04)}
+ const frond=(ang,len)=>{const c=Math.cos(ang),sn=Math.sin(ang),pts=[];for(let t=0;t<=12;t++){const u=t/12;pts.push([cx+sn*len*u,top+len*((.25+.65*c)*u-(.85-.35*c)*u*u)])}return pts};
+ for(let k=0;k<9;k++){const ang=(-84+k*21)*Math.PI/180,len=Math.min(W*.55,D*.35)*(k%2?.85:1),pts=frond(ang,len);b.poly(pts,false);for(let t=3;t<12;t+=2){const [x,y]=pts[t];b.line(x,y,x+Math.sin(ang)*.12,y-.20)}}
+ b.line(-.3,0,W+.3,0)},{wMin:2,wMax:10,dMin:3,dMax:20,family:'alz-arbol'});
+one('alz-arbusto','Arbusto (alzado)',ALZ,1.4,1.2,(b,W,D)=>{
+ const n=Math.max(3,Math.round(W/.32)),pts=[[W,0],[0,0]];for(let i=0;i<n;i++)for(let t=0;t<=8;t++){const u=(i+t/8)/n,x=u*W,crown=D*(.55+.45*Math.sin(Math.PI*u)),bump=Math.sin(Math.PI*t/8)*W/n*.45;pts.push([x,Math.min(D,crown-W/n*.45+bump)])}
+ b.poly(pts,true);b.line(W*.3,0,W*.38,D*.35);b.line(W*.6,0,W*.55,D*.4)},{wMin:.4,wMax:4,dMin:.4,dMax:3,family:'alz-arbol'});
+function personaAlz(b,H,{falda=false,esc=1}={}){
+ const k=H/1.75,head=.11*k;b.circle(0,H-head,head);
+ const sh=.21*k,hip=.16*k,yS=H-2.1*head-.04*k,yH=H*.53;
+ if(falda)b.poly([[-sh,yS],[sh,yS],[hip*.9,yH],[hip*1.6,H*.30],[-hip*1.6,H*.30],[-hip*.9,yH]],true);
+ else b.poly([[-sh,yS],[sh,yS],[hip,yH],[-hip,yH]],true);
+ b.line(-sh,yS,-sh-.06*k,H*.40);b.line(sh,yS,sh+.06*k,H*.40);
+ b.line(-hip*.55,falda?H*.30:yH,-hip*.6,0);b.line(hip*.55,falda?H*.30:yH,hip*.6,0);
+}
+one('alz-persona-1','Persona de pie (alzado)',ALZ,.60,1.75,(b,W,D)=>b.at(W/2,0,0,x=>personaAlz(x,D)),{dMin:1.50,dMax:1.95,family:'persona',wMin:.6,wMax:.6});
+one('alz-persona-2','Persona con falda (alzado)',ALZ,.60,1.68,(b,W,D)=>b.at(W/2,0,0,x=>personaAlz(x,D,{falda:true})),{dMin:1.50,dMax:1.90,family:'persona',wMin:.6,wMax:.6});
+one('alz-persona-nino','Niño (alzado)',ALZ,.45,1.20,(b,W,D)=>b.at(W/2,0,0,x=>personaAlz(x,D)),{dMin:.90,dMax:1.45,family:'persona',wMin:.45,wMax:.45});
+
+/* ===== PERSONAS EN PLANTA ===== */
+const PER='Personas';
+const perPlanta=(b,x,y,a=0)=>b.at(x,y,a,q=>{q.ellipse(0,0,.26,.13);q.circle(0,.02,.10);q.line(-.06,.13,0,.20);q.line(.06,.13,0,.20)});
+one('per-planta','Persona (planta)',PER,.55,.40,(b,W,D)=>perPlanta(b,W/2,D/2),{family:'persona-pl'});
+one('per-grupo','Grupo de personas (planta)',PER,1.60,1.20,(b)=>{perPlanta(b,.35,.35,20);perPlanta(b,1.15,.40,-30);perPlanta(b,.80,.90,180)},{family:'persona-pl'});
+one('per-silla-ruedas','Silla de ruedas (planta)',PER,.70,1.10,(b,W,D)=>{b.rect(.12,.30,W-.24,.50);b.rect(0,.25,.06,.62);b.rect(W-.06,.25,.06,.62);b.rect(.15,.80,W-.30,.08);b.circle(.18,.12,.07);b.circle(W-.18,.12,.07);perPlanta(b,W/2,.62)},{family:'persona-pl'});
+
+/* ===== OFICINA ===== */
+const OFI='Oficina';
+const puesto=(b,x,y,a)=>b.at(x,y,a,q=>{q.rect(0,0,1.40,.70);q.rect(.50,.45,.40,.05);q.at(.70,-.30,180,s=>{s.circle(0,0,.25);s.rect(-.20,-.30,.40,.08)})});
+one('ofi-puesto','Puesto de trabajo',OFI,1.40,1.20,(b)=>puesto(b,0,.50,0),{family:'ofi-puesto'});
+one('ofi-puestos-4','Bloque 4 puestos enfrentados',OFI,2.80,2.60,(b)=>{puesto(b,0,.60,0);puesto(b,1.40,.60,0);puesto(b,1.40,2.00,180);puesto(b,2.80,2.00,180);b.line(0,1.30,2.80,1.30)},{family:'ofi-puesto'});
+one('ofi-reuniones','Sala de reuniones 8',OFI,3.20,2.20,(b,W,D)=>{b.rrect(.50,.55,W-1.0,D-1.10,.35);const n=Math.max(2,Math.floor((W-1.0)/.65));for(let i=0;i<n;i++){const x=.50+(i+.5)*(W-1.0)/n;b.at(x,.30,180,F.silla);b.at(x,D-.30,0,F.silla)}b.at(.25,D/2,90,F.silla);b.at(W-.25,D/2,-90,F.silla)},{wMin:2.4,wMax:6,dMin:2,dMax:3,family:'ofi-sala'});
+one('ofi-recepcion','Mostrador de recepción',OFI,2.40,1.60,(b,W,D)=>{b.poly([[0,D],[0,D-.70],[W-.70,D-.70],[W-.70,0],[W,0],[W,D]],true);b.line(.05,D-.62,W-.78,D-.62,{dashed:true});b.at(W/2-.35,D-1.10,180,F.silla)},{wMin:1.6,wMax:4,dMin:1.2,dMax:2.4});
+one('ofi-archivo','Archivero / biblioteca',OFI,.90,.50,(b,W,D)=>{b.rect(0,0,W,D);const n=Math.max(1,Math.round(W/.45));for(let i=1;i<n;i++)b.line(i*W/n,0,i*W/n,D);b.line(0,.06,W,.06)},{wMin:.45,wMax:3.6,dMin:.40,dMax:.60});
+
+/* ===== SÍMBOLOS ===== */
+const SIM='Símbolos';
+one('sim-norte','Norte',SIM,1.20,1.20,(b,W)=>{const r=W/2;b.circle(r,r,r*.8);b.poly([[r,r+r*.95],[r-r*.28,r-r*.55],[r,r-r*.25],[r+r*.28,r-r*.55]],true);b.line(r,r-r*.25,r,r+r*.95);b.text(r-r*.13,r+r*.98,'N',r*.32)},{wMin:.4,wMax:4,lockAspect:true,family:'norte'});
+one('sim-norte-flecha','Norte (flecha)',SIM,.60,1.20,(b,W,D)=>{b.poly([[W/2,D*.85],[0,D*.15],[W/2,D*.35],[W,D*.15]],true);b.line(W/2,D*.35,W/2,D*.85);b.text(W/2-W*.15,D*.88,'N',W*.4)},{wMin:.3,wMax:2,dMin:.6,dMax:4,family:'norte'});
+one('sim-corte','Indicador de corte',SIM,.80,.80,(b,W)=>{const r=W/2;b.circle(r,r,r*.6);b.line(r-r*.6,r,r+r*.6,r);b.poly([[r+r*.6,r],[r,r+r*.95],[r-r*.6,r]],false);b.text(r-r*.15,r-r*.45,'A',r*.35)},{wMin:.3,wMax:2,lockAspect:true});
+one('sim-nivel','Nivel de piso ±0,00',SIM,1.20,.40,(b,W,D)=>{b.poly([[0,0],[.20,D*.6],[-.20,D*.6]],true);b.line(-.30,0,W,0);b.text(.30,D*.2,'±0,00',D*.45)},{wMin:.8,wMax:3,dMin:.25,dMax:1});
+one('sim-escala','Escala gráfica 0–5 m',SIM,5.0,.50,(b,W,D)=>{for(let i=0;i<5;i++){b.rect(i*W/5,0,W/5,D*.3);if(i%2===0)for(let k=1;k<4;k++)b.line(i*W/5+k*W/20,0,i*W/5+k*W/20,D*.3)}for(let i=0;i<=5;i++)b.text(i*W/5-.06,D*.45,String(Math.round(i*W/5)),D*.3)},{wMin:1,wMax:50,dMin:.3,dMax:2});
+
+/* ===== MÁS VEHÍCULOS (planta) ===== */
+one('veh-camion','Camión con caja (planta)',VEH,2.50,8.50,(b,W,D)=>{b.rrect(.05,D-2.20,W-.10,2.20,.20);b.rect(.25,D-1.60,W-.50,.80);b.rect(0,0,W,D-2.35);b.line(0,D-2.35,W,D-2.35);for(const y of [.6,1.9,D-1.7])for(const x of [-.06,W-.04])b.rect(x,y,.10,.60)},{wMin:2.2,wMax:2.6,dMin:6,dMax:12,family:'auto'});
+one('veh-colectivo','Colectivo (planta)',VEH,2.55,12.0,(b,W,D)=>{b.rrect(0,0,W,D,.30);b.line(.10,D-1.6,W-.10,D-1.6);const rows=Math.floor((D-3)/.80);for(let i=0;i<rows;i++){const y=.6+i*.80;b.rect(.15,y,.45,.45);b.rect(.65,y,.45,.45);b.rect(W-1.10,y,.45,.45);b.rect(W-.60,y,.45,.45)}b.rect(.15,D-1.40,.60,.60)},{wMin:2.4,wMax:2.6,dMin:8,dMax:14,family:'auto'});
+one('veh-pickup','Pickup (planta)',VEH,1.90,5.30,(b,W,D)=>{b.rrect(0,0,W,D,.25);b.rrect(.12,D*.40,W-.24,D*.30,.15);b.rect(.10,.12,W-.20,D*.36);b.line(.10,D*.48,W-.10,D*.48)},{wMin:1.8,wMax:2.1,dMin:4.8,dMax:5.8,family:'auto'});
+
 /* ---------- API ---------- */
 function build(id,W,D){
  const d=LIB.find(x=>x.id===id);if(!d)throw Error('Bloque inexistente: '+id);

@@ -67,11 +67,11 @@ Antes de cobrar, consultá con un gestor:
 2. Base de datos: `wrangler d1 create cad2d` y luego `wrangler d1 execute cad2d --file=billing/schema.sql`.
 3. Copiá `wrangler.toml.example` como `wrangler.toml` y completá los orígenes, los precios y el id de D1.
 4. Cargá los secretos: `wrangler secret put STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `SESSION_SECRET` (64 o más caracteres aleatorios) y `RESEND_API_KEY` (correo del enlace de acceso).
-5. Publicá con `wrangler deploy`. En Stripe, agregá el webhook `https://api.tu-dominio.com/api/stripe-webhook` con los eventos `checkout.session.completed` y `customer.subscription.*`.
+5. Publicá con `wrangler deploy`. En Stripe, agregá el webhook `https://api.blackline-cad.org/api/stripe-webhook` con los eventos `checkout.session.completed` y `customer.subscription.*`.
 6. En `index.html`, **antes** de `workspace-upgrade.js`, agregá:
 
    ```html
-   <script>window.CAD2D_AUTH_CONFIG={loginUrl:'https://api.tu-dominio.com/auth/login',statusUrl:'https://api.tu-dominio.com/api/status',checkoutUrl:'https://api.tu-dominio.com/api/checkout',portalUrl:'https://api.tu-dominio.com/api/portal',enforce:true};</script>
+   <script>window.CAD2D_AUTH_CONFIG={loginUrl:'https://api.blackline-cad.org/auth/login',statusUrl:'https://api.tu-dominio.com/api/status',checkoutUrl:'https://api.tu-dominio.com/api/checkout',portalUrl:'https://api.tu-dominio.com/api/portal',enforce:true};</script>
    ```
 
 7. Probá todo en modo de prueba de Stripe (tarjeta 4242 4242 4242 4242): alta, prueba, pago, cancelación, pago vencido y webhook repetido.

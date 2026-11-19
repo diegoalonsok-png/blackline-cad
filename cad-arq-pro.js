@@ -27,7 +27,8 @@ const LAYERS={
  'Cocinas completas':['A-EQUIPAMIENTO','#ffd27f'],'Cocina · equipos':['A-EQUIPAMIENTO','#ffd27f'],
  'Mobiliario':['A-MOBILIARIO','#c7a4ff'],'Dormitorio':['A-MOBILIARIO','#c7a4ff'],
  'Escaleras':['A-ESCALERAS','#e6e6e6'],'Exterior':['A-VEGETACION','#8fd18f'],
- 'Vehículos':['A-VEHICULOS','#b7c0c7'],'Equipos':['A-INSTALACIONES','#ff9f7f']
+ 'Vehículos':['A-VEHICULOS','#b7c0c7'],'Equipos':['A-INSTALACIONES','#ff9f7f'],
+ 'Alzados':['A-ALZADOS','#9fd6e6'],'Personas':['A-PERSONAS','#d9c6a5'],'Oficina':['A-MOBILIARIO','#c7a4ff'],'Símbolos':['A-SIMBOLOS','#f2f2f2']
 };
 function ensureLayer(cat){
  const [name,color]=LAYERS[cat]||['A-MOBILIARIO','#c7a4ff'];
@@ -219,7 +220,7 @@ function applySizeRow(){
 function buildModal(){
  if($('arqModal'))return;
  const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-label','Galería arquitectónica');
- m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES PARAMÉTRICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
+ m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
  <div class="arq-tools"><input type="search" id="arqModalSearch" placeholder="Buscar en toda la galería…" aria-label="Buscar en la galería"><div class="arq-chips" id="arqModalChips" role="group" aria-label="Categorías"></div></div>
  <div class="arq-grid" id="arqModalGrid"></div></div>`;
  document.body.append(m);
