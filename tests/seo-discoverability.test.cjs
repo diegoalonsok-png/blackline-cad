@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const base='https://blackline-cad.org/';
-const paths=['index.html','manual-comandos.html','legal.html'];
+const paths=['index.html','manual-comandos.html','legal.html','guia-cad-2d-online.html'];
 test('Blackline CAD public pages have canonical, description, and crawlable metadata',()=>{
  for(const path of paths){
   const html=fs.readFileSync(path,'utf8');
@@ -17,7 +17,7 @@ test('Blackline CAD public pages have canonical, description, and crawlable meta
 test('Blackline CAD sitemap lists only files that exist with matching canonicals',()=>{
  const sitemap=fs.readFileSync('sitemap.xml','utf8');
  const urls=[...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1]);
- assert.equal(urls.length,3);
+ assert.equal(urls.length,paths.length);
  assert.equal(new Set(urls).size,3);
  for(const url of urls){
   assert(url.startsWith(base));
@@ -38,4 +38,18 @@ test('Structured app metadata describes product without asserting unsupported fe
  assert.equal(item.name,'Blackline CAD');
  assert.equal(item.applicationCategory,'DesignApplication');
  assert(!('offers' in item),'Pricing must not be invented');
+});
+
+test('Technical guide supports real CAD workflows and honest format limitations',()=>{
+ const html=fs.readFileSync('guia-cad-2d-online.html','utf8');
+ const head=html.split(/<\/head>/i)[0];
+ assert(head.includes('https://blackline-cad.org/guia-cad-2d-online.html'));
+ for(const term of ['DXF','DWG','capas','unidades','PDF'])assert(html.includes(term),'Guide is missing: '+term);
+ assert(html.includes('manual-comandos.html'),'Guide lacks link to manual');
+ assert(html.includes('href="./"'),'Guide lacks navigation to the working editor');
+ const match=html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+ assert(match,'TechArticle JSON-LD missing');
+ const doc=JSON.parse(match[1]);
+ assert.equal(doc['@type'],'TechArticle');
+ assert.equal(doc.mainEntityOfPage,'https://blackline-cad.org/guia-cad-2d-online.html');
 });
