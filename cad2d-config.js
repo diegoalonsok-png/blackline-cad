@@ -20,7 +20,7 @@
  if(CUENTAS_ACTIVAS)window.CAD2D_AUTH_CONFIG={
   loginUrl:'https://api.'+DOMINIO+'/auth/login',
   statusUrl:'https://api.'+DOMINIO+'/api/status',
-  checkoutUrl:'', // pagos en pausa: se reactiva al elegir la plataforma de cobro (Polar/Paddle/Mercado Pago)
+  checkoutUrl:'https://api.'+DOMINIO+'/api/checkout',
   portalUrl:'https://api.'+DOMINIO+'/api/portal',
   enforce:false
  };
