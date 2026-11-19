@@ -870,7 +870,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 </head>
 <body>
 <div class="app">
- <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim smallhide" id="saveProjectBtn">Save Project</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
+ <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><button id="cadTextBarShadow" type="button" aria-pressed="false" title="Sombra detrás del texto">Sombra</button><input id="cadTextBarShadowColor" type="color" value="#333333" title="Color de sombra"><label>Despl. <input id="cadTextBarShadowOffset" type="number" min="0" max="10" step="0.01" value="0.04" style="width:65px"></label><span class="cad-text-divider"></span><label>Forma <select id="cadTextBarPath"><option value="straight">Recto</option><option value="circle">Circular</option></select></label><label>Radio <input id="cadTextBarRadius" type="number" min="0.01" step="0.1" value="2" style="width:65px"></label><label>Inicio ° <input id="cadTextBarStartAngle" type="number" step="15" value="0" style="width:65px"></label><label>Sentido <select id="cadTextBarDirection"><option value="ccw">Antihorario</option><option value="cw">Horario</option></select></label><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -4934,7 +4934,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
 });
 const CAD_COMMANDS=[
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
- ['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
+ ['SAVE','QSAVE','Guardar proyecto editable'],['SAVEAS','','Guardar una copia con otro nombre'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
  ['BREAKATPOINT','BAP','Partir línea en un punto, sin eliminar tramo'],['ALIGN','ALN','Alinear objetos por dos pares de puntos sin escalar'],['LIST','LI','Mostrar geometría y propiedades de la selección'],['QSELECT','QS','Selección rápida por tipo y capa'],['REGEN','RE','Redibujar la vista'],
  ['ZOOM','Z','Z Enter · - aleja · + acerca · E extensión · P anterior · 2x factor · W ventana'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['ZOOMPREVIOUS','ZP','Volver a la vista anterior'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
  ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
@@ -5314,7 +5314,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
 
  if(cmd==='REGENERAR'||cmd==='REDIBUJAR')return schedule();
  if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
- if(cmd==='QSAVE'||cmd==='SAVEAS')return saveJSON();
+ if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){
   if(!window.confirm('Crear un dibujo nuevo? Guardá primero el trabajo actual.'))return;
@@ -5330,7 +5330,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&!ev.shiftKey){
   if(!cad2dCommandHistory.length)return;
@@ -5440,7 +5440,54 @@ async function download(name,data,mime='application/octet-stream'){
  toast('Descarga iniciada. Elegí la carpeta desde tu navegador.');
  return true;
 }
-function saveJSON(){let data={format:'CAD2D-2',filename:state.file,modelScale:'1:1',blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};return download(`${state.file}.cadjson`,JSON.stringify(data,null,2),'application/json')}
+// SAVE keeps the same file handle during this browser session; SAVEAS creates a new copy.
+let cadProjectSaveHandle=null;
+function cadProjectSnapshot(filename){
+ return {format:'CAD2D-2',filename,modelScale:'1:1',blocks:state.blocks,
+  dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,
+  layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,
+  precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};
+}
+async function saveJSON(forceNew=false){
+ const canPick=typeof window.showSaveFilePicker==='function'&&window.isSecureContext;
+ let name=state.file;
+ // A browser without file-handle support downloads files instead of silently overwriting.
+ // Offer a distinct name for Save As there.
+ if(forceNew&&!canPick){
+  const requested=window.prompt('Save As · nombre del proyecto:',state.file);
+  if(requested===null)return false;
+  if(!requested.trim())return toast('Escribí un nombre para guardar');
+  name=cadCleanDrawingName(requested);
+ }
+ const payload=JSON.stringify(cadProjectSnapshot(name),null,2);
+ if(canPick){
+  try{
+   const handle=forceNew||!cadProjectSaveHandle
+    ?await window.showSaveFilePicker({suggestedName:name+'.cadjson',types:[{
+      description:'Proyecto editable Blackline CAD',accept:{'application/json':['.cadjson']}
+     }]})
+    :cadProjectSaveHandle;
+   const writable=await handle.createWritable();
+   await writable.write(payload);await writable.close();
+   cadProjectSaveHandle=handle;
+   cadSetDrawingName(handle.name);
+   queueLocalBackup();
+   log('SAVE: '+handle.name);
+   toast('Proyecto guardado: '+handle.name);
+   return true;
+  }catch(error){
+   if(error?.name==='AbortError')return false;
+   console.error('[CAD2D SAVE]',error);
+   toast('SAVE: no se pudo guardar · '+(error?.message||'error'));
+   return false;
+  }
+ }
+ const result=await download(name+'.cadjson',payload,'application/json');
+ if(result&&forceNew){cadSetDrawingName(name);queueLocalBackup()}
+ return result;
+}
+function saveAsJSON(){return saveJSON(true)}
+
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
 $('sampleHouseBtn').onclick=async()=>{try{
  const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
@@ -5448,7 +5495,7 @@ $('sampleHouseBtn').onclick=async()=>{try{
  importDXF(await response.text(),'sample-house.dxf');
  toast('Sample house loaded — inspect WALLS, DOORS, WINDOWS and FURNITURE layers');
 }catch(e){alert('Unable to open sample house: '+e.message)}};
-$('saveProjectBtn').onclick=saveJSON;/* Enable only after a real HTTPS DWG converter has been deployed and tested. */
+$('saveProjectBtn').onclick=()=>saveJSON();$('saveAsBtn').onclick=saveAsJSON;/* Enable only after a real HTTPS DWG converter has been deployed and tested. */
 // Se configura en cad2d-config.js (window.CAD2D_DWG_ENDPOINT). Vacío = DWG desactivado.
 const DWG_CONVERTER_ENDPOINT=typeof window.CAD2D_DWG_ENDPOINT==='string'?window.CAD2D_DWG_ENDPOINT.trim():'';
 /* DWG binary header inspection is diagnostic only. Never claim it parses CAD geometry. */
