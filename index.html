@@ -5296,6 +5296,10 @@ document.addEventListener('keydown',ev=>{
   if(key==='u'){ev.preventDefault();togglePolar();return}
   if(key==='0'){ev.preventDefault();cad2dToggleCleanScreen();return}
  }
+ if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='j'){
+  ev.preventDefault();if(cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}
+  return;
+ }
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='n'){ev.preventDefault();$('command').value='NEW';runCommand();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='o'){ev.preventDefault();openFile();return}
  if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==='s'){ev.preventDefault();saveJSON();return}
@@ -5322,7 +5326,6 @@ document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrev
 document.addEventListener('keydown',ev=>{
  if(ev.defaultPrevented||ev.ctrlKey||ev.metaKey||ev.altKey||ev.key.length!==1||!/[a-zA-Z]/.test(ev.key))return;
  const active=document.activeElement;if(!active||active!==canvas)return;
- if(ev.key.toUpperCase()==='H'&&!ev.repeat){ev.preventDefault();ev.stopImmediatePropagation();$('command').value='HATCH';runCommand();canvas.focus({preventScroll:true});return}
  ev.preventDefault();$('command').focus();$('command').value=ev.key.toUpperCase();
 },true);
 // Type a number immediately after choosing the first point, without clicking the command bar.
