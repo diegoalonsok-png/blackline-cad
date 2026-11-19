@@ -37,8 +37,8 @@ test('teclas de función están cableadas sin pasar por órdenes geométricas',(
 });
 
 test('idioma de alias: colisiones intencionales B D LI AR',()=>{
- assert.match(main,/en:\{B:'BLOCK',E:'ERASE',D:'DIMSTYLE',LI:'LIST',AR:'ARRAY'/);
- assert.match(main,/es:\{B:'ERASE',BOR:'ERASE',D:'MOVE',DESPL:'MOVE',LI:'LINE',AR:'ARC'/);
+ assert.match(main,/en:\{\s*B:'BLOCK',E:'ERASE',D:'DIMSTYLE',LI:'LIST',AR:'ARRAY'/);
+ assert.match(main,/es:\{\s*B:'ERASE',BOR:'ERASE',D:'MOVE',DESPL:'MOVE',LI:'LINE',AR:'ARC'/);
  assert.match(main,/const profile=forceEnglish\?'en':cad2dAliasLanguage/);
  assert.match(main,/typed\.startsWith\('_'\)/);
 });

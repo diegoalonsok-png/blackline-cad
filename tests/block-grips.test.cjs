@@ -9,6 +9,7 @@ const dynamicGripSource=html.slice(html.indexOf('function blDynBounds(def){'),ht
 function fixture(){
  const state={entities:[{id:23,type:'blockRef',blockName:'Puerta',p:{x:10,y:20},rotation:90,scale:1.5,params:{width:.9},layer:'openings'}],selected:[23],snapOn:false,grid:.1,view:{scale:100},blocks:{Puerta:{name:'Puerta',entities:[],dynamic2d:false}}};
  const funcs=new Function('state','dynamicGripSource',`
+ const document={addEventListener(){},activeElement:null},addEventListener=()=>{};
  const P=(x,y)=>({x,y}),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),
  screen=p=>P(p.x*state.view.scale,-p.y*state.view.scale),
  world=p=>P(p.x/state.view.scale,-p.y/state.view.scale),

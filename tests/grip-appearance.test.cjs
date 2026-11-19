@@ -35,7 +35,7 @@ test('preferences module loads before main startup code',()=>{
  assert.ok(html.indexOf('src="cad-grip-settings.js')<html.indexOf('<script>\n/* Diagnostic:'));
 });
 test('preferences do not mutate CAD geometry or saved project payload',()=>{
- const begin=html.indexOf('function initGripSettings(){'),end=html.indexOf('function findWallMiddleGrip(',begin);
+ const begin=html.indexOf('function initGripSettings(){'),end=html.indexOf('\nfunction ',begin+10);
  const source=html.slice(begin,end);
  assert.doesNotMatch(source,/state\.entities\s*=|state\.entities\.push|saveHistory\(/);
  assert.doesNotMatch(source,/state\.layers\s*=/);

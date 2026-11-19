@@ -258,6 +258,37 @@ Keep GitHub Pages as the free development/QA environment. After confirming CAD e
 
 JavaScript syntax verified. Logic tests passed for fast vs slow and near vs distant middle-button clicks, active vs idle command cursor state, LENGTHEN positive/negative/total length (with invalid values rejected), and PEDIT moving/inserting/deleting vertices (with invalid index rejected). Full in-browser UI and physical mouse double-click behavior have not yet been verified.
 
+## Galería arquitectónica, bloques dinámicos y comandos nuevos (18 nov 2026)
+
+**Galería grande (`GALERIA`, `BANO`, `COCINA`, `ESCALERA` o el botón ⤢ de la paleta *GALERÍA ARQ*).** 99 bloques paramétricos de geometría propia, en planta y a escala 1:1:
+
+| Categoría | Bloques |
+| --- | --- |
+| Baños completos (13) | toilette, toilette esquinero, baño mínimo, con ducha y bidet, con bañera, completo bañera + bidet, en suite doble bacha, principal (bañera + ducha + doble bacha), accesible con giro Ø1,50, compartimentado, con bañera esquinera, de servicio, sanitario público con cabinas y mingitorios |
+| Cocinas completas (12) | kitchenette, lineal, paralela, en L, en L con desayunador, en U, con isla, con península, cocina-comedor, integrada con isla y banquetas, lavadero, cocina + lavadero |
+| Sueltos (74) | sanitarios, equipos de cocina (anafes de 2/4/5 hornallas, bachas, heladeras, lavavajillas, mesadas, alacenas, campana, lavarropas…), escaleras (recta, L, U, caracol, rampa 8 %), mobiliario, dormitorio, exterior y vegetación, vehículos, equipos |
+
+Un clic en la miniatura y otro en el plano. El bloque va a una capa propia (`A-SANITARIOS`, `A-EQUIPAMIENTO`, `A-MOBILIARIO`, `A-ESCALERAS`, `A-VEGETACION`, `A-VEHICULOS`, `A-INSTALACIONES`) y después se restaura la capa activa.
+
+**Bloques dinámicos con pinzamientos.** Al seleccionar un bloque de la galería aparecen:
+
+- **▶ ancho** y **▲ profundidad**, en pasos de 5 cm (Shift: 1 cm) y dentro del rango válido de cada bloque.
+- **▼ variantes** de la misma familia, por ejemplo cambiar un baño con ducha por uno con bañera conservando la medida.
+
+La geometría **se regenera**: los artefactos se reubican contra los muros y no se deforman (un inodoro sigue midiendo 40 × 70 cm). Cada tamaño queda como una definición `ARQ · nombre · ancho×prof`. Todo es deshacible con Ctrl+Z. También funciona con `ARQPARAM`, con la fila *Ancho/Prof.* de la paleta o con el clic derecho.
+
+**Clic derecho.** Sin comando ni selección, abre el menú por defecto: Repetir, Entrada reciente y Galería. Sobre un objeto agrega Aislar, Ocultar, orden de dibujo, Agrupar/Desagrupar, Contar bloques, Dividir/Graduar, Local + m² y Nube; en bloques ARQ suma Dimensiones, Variante y Restablecer. Con un comando activo sigue funcionando como Enter. Para volver al comportamiento anterior en vacío (siempre Enter), ejecutá `localStorage.setItem('cad2d-rightclick-enter','1')` en la consola del navegador.
+
+**Comandos nuevos** (alias en español e inglés; los objetos ocultos con AISLAR u OCULTAR se siguen incluyendo al exportar DXF o PDF): `AISLAR`/`ISOLATEOBJECTS`, `OCULTAR`/`HIDEOBJECTS`, `MOSTRARTODO`/`UNISOLATEOBJECTS`, `ALFRENTE`/`ALFONDO`/`DRAWORDER`, `GRUPO`/`GROUP`, `DESAGRUPAR`/`UNGROUP`, `CONTARBLOQUES`/`BCOUNT` (exporta CSV), `DIVIDIR`/`DIVIDE`, `GRADUAR`/`MEASURE`, `NUBEREV`/`REVCLOUD`, `LINEACONST`/`XLINE`, `SEMIRRECTA`/`RAY`, `LOCAL`/`ROOMTAG` (nombre + m²) y `PLAN`.
+
+**Arquitectura.** El núcleo (`index.html`) expone un puente acotado, `window.CAD2D_CORE` y `window.CAD2D_EXTENSIONS`, para registrar comandos, ítems del menú contextual y dibujos superpuestos sin reescribir funciones del núcleo. Los módulos nuevos son `assets/cad2d-arq-generators.js` (generadores en metros, que también se pueden probar en Node), `cad-arq-pro.js` (paleta, galería, pinzamientos y comandos) y `cad-plan.js` (planes).
+
+**Corrección.** Al insertar una puerta o ventana entre dos líneas paralelas, ya no puede tomar como cara del muro una línea de otra capa (por ejemplo, eléctrica): las dos caras deben compartir capa.
+
+**Modelo de pago futuro.** `cad-plan.js` muestra el estado (**BETA ABIERTA** mientras no haya servidor) y `billing/` contiene un Worker de Cloudflare + D1 + Stripe, no desplegado, con acceso por enlace al correo, prueba de 90 días, webhooks firmados y portal de facturación. El dibujo, abrir y exportar DXF nunca se bloquean. Ver `billing/README.md`.
+
+**Verificación.** Las 178 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
+
 ## Independencia, propiedad intelectual y compatibilidad
 
 Blackline CAD es una aplicación independiente; no está afiliada, patrocinada ni respaldada por Autodesk, Inc. Las marcas Autodesk y AutoCAD pertenecen a sus titulares y se mencionan únicamente cuando es necesario describir la interoperabilidad.

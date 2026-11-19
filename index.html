@@ -1259,6 +1259,8 @@ function cadWallLikeLinePair(point,width){
   const u=mul(av,1/al),n=P(-u.y,u.x);
   for(let j=i+1;j<nearby.length;j++){
    const b=nearby[j],bv=sub(b.b,b.a),bl=Math.hypot(bv.x,bv.y);
+   // Both faces of one wall share a layer: never pair a wall face with an unrelated parallel line (electric, furniture).
+   if(a.layer!==b.layer)continue;
    if(bl<=width+.001||Math.abs((av.x*bv.y-av.y*bv.x)/(al*bl))>.008)continue;
    const perp=Math.abs((b.a.x-a.a.x)*n.x+(b.a.y-a.a.y)*n.y);
    if(perp<minThick||perp>maxThick)continue;
@@ -1368,15 +1370,15 @@ function inViewport(e,w,h){
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
 function draw(){drawPending=false;let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
- for(const e of state.entities.filter(entity=>entity.type==='hatch')){if(layerFor(e).visible)drawEntity(e)}
+ for(const e of state.entities.filter(entity=>entity.type==='hatch')){if(layerFor(e).visible&&!e.cadHidden)drawEntity(e)}
  for(const e of state.entities){
-  if(e.type==='hatch'||!layerFor(e).visible)continue;
+  if(e.type==='hatch'||!layerFor(e).visible||e.cadHidden)continue;
   if(fastView
    ? !BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
    : !inViewport(e,w,h))continue;
   drawEntity(e);
   if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();
+ }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();
  if(cadPrimitiveGripPlacement){
   const candidate=cadPrimitiveGripTransform(cadPrimitiveGripPlacement.original,cadPrimitiveGripPlacement.grip,snapPoint(state.mouse));
   if(candidate)drawEntity(candidate,'#ffce78');
@@ -2719,7 +2721,7 @@ function snapPoint(p){
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return blockChildren(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
-function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
+function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
   if(!s.length){s.push(P(p.x,p.y));prompt();schedule();return}
@@ -5074,7 +5076,7 @@ if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){if(upp
  if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
  if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
  if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='SAVE')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;$('command').addEventListener('keydown',ev=>{
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&$('command').value.trim()&&/^[\p{L}_-][\p{L}\p{N}_-]*$/u.test($('command').value.trim())){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&!ev.shiftKey){
   if(!cad2dCommandHistory.length)return;
@@ -5789,6 +5791,7 @@ function openCadContextMenu(x,y,worldPoint){
   item('Historial de comandos · F2',()=>cad2dToggleCommandHistory()),
   item('Ayuda · F1',()=>$('helpBackdrop').classList.add('show'))
  );
+ cad2dExtendContextMenu(actions,{active,count,target,blockTarget,worldPoint,item});
  menu.replaceChildren();
  const heading=document.createElement('div');heading.className='context-title';heading.textContent='CAD2D · '+title;
  menu.append(heading);
@@ -7118,6 +7121,44 @@ initCadStatusMenus();
 initCadExportPopover();
 initCadQuickProperties();
 initCadColorPopover();
+/* CAD2D extension bridge (Nov 2026). Narrow, documented surface for add-on modules
+   (cad-arq-pro.js). Extensions register commands, context-menu items and canvas overlays;
+   they never replace core functions. */
+window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[]};
+function cad2dRunExtensionCommand(cmd,raw){
+ const reg=window.CAD2D_EXTENSIONS,key=String(cmd||'').toUpperCase(),fn=reg?.commands?.[key];
+ if(typeof fn!=='function')return false;
+ try{fn(raw,key)}catch(error){console.error('[CAD2D ext]',key,error);toast(key+': '+(error?.message||error))}
+ return true;
+}
+function cad2dExtendContextMenu(actions,info){
+ for(const provider of window.CAD2D_EXTENSIONS?.context||[]){
+  try{
+   const extra=provider(info);
+   // Array → al final. {top,bottom} → 'top' va después de "Enter", 'bottom' al final.
+   const top=Array.isArray(extra)?[]:(extra?.top||[]),bottom=Array.isArray(extra)?extra:(extra?.bottom||[]);
+   if(top.length){const at=actions[1]===null?2:1;actions.splice(at,0,...top,null)}
+   if(bottom.length)actions.push(null,...bottom);
+  }catch(error){console.error('[CAD2D ext menu]',error)}
+ }
+}
+function cad2dDrawExtensions(){
+ for(const overlay of window.CAD2D_EXTENSIONS?.overlays||[]){
+  ctx.save();try{overlay(ctx)}catch(error){console.error('[CAD2D ext overlay]',error)}ctx.restore();
+ }
+}
+window.CAD2D_CORE=Object.freeze({
+ get state(){return state},get canvas(){return canvas},get ctx(){return ctx},U,
+ P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
+ saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
+ normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
+ explicitWallLayerName,eraseSelected,copySelectedCadObjects,pasteCadObjects,
+ command:text=>{$('command').value=String(text);runCommand()},
+ lastCommand:()=>cad2dLastCommand,
+ openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
+ commandHistory:()=>cad2dCommandHistory.slice(),
+ nextId:()=>state.nextId++
+});
 // Public, narrowly scoped bridge for independently loaded DXF block collections.
 window.BlacklineBlockAPI=Object.freeze({
  unit:()=>state.unit,
@@ -7301,4 +7342,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-wall-grip.js?v=20261116"></script>
 <script src="cad-hatch-patterns.js?v=20261116"></script>
 <script src="cad-performance.js?v=20261116"></script>
+<script src="cad-plan.js?v=20261118"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261118"></script>
+<script src="cad-arq-pro.js?v=20261118"></script>
 </body></html>

@@ -31,6 +31,7 @@ function start(options={}){
  const U={m:1000,cm:10,mm:1};
  const add=(a,b)=>P(a.x+b.x,a.y+b.y),sub=(a,b)=>P(a.x-b.x,a.y-b.y),mul=(a,n)=>P(a.x*n,a.y*n);
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+ const segmentDist=(p,a,b)=>{const vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(!l)return dist(p,a);const t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))};
  const explicitWallLayerName=name=>/^(WALLS?|MUROS?)$/i.test(name);
  const ensureArchitecturalLayer=()=> 'openings';
  const selectedBlock=()=>door;
@@ -88,9 +89,9 @@ test('manually changed wall fragments block relocation and keep prior hole',()=>
  const app=start();app.insertSelectedBlock(P(0,0));
  const ref=app.state.entities.find(e=>e.type==='blockRef');
  owned(app.state,ref.id)[0].b.x=.42;
- const snapshot=copy(app.state.entities);
+ const snapshot=copy(app.state.entities),startX=ref.p.x;
  const outcome=app.move(ref,1,0);
- assert.equal(outcome.ok,false);approx(ref.p.x,0);
+ assert.equal(outcome.ok,false);approx(ref.p.x,startX);
  assert.deepEqual(app.state.entities,snapshot);
 });
 test('two overlapping doors do not cut the same wall a second time',()=>{
@@ -103,9 +104,9 @@ test('two overlapping doors do not cut the same wall a second time',()=>{
 test('drag move refuses overlap and restores old hole',()=>{
  const app=start();app.insertSelectedBlock(P(0,0));app.insertSelectedBlock(P(2,0));
  const first=app.state.entities.filter(e=>e.type==='blockRef')[0];
- const snapshot=copy(app.state.entities);
+ const snapshot=copy(app.state.entities),startX=first.p.x;
  const outcome=app.move(first,2.2,0);
- assert.equal(outcome.ok,false);approx(first.p.x,0);
+ assert.equal(outcome.ok,false);approx(first.p.x,startX);
  assert.deepEqual(app.state.entities,snapshot);
 });
 test('existing walls on locked layer cannot be cut',()=>{

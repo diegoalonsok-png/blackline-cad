@@ -1,0 +1,19 @@
+# Copiar como wrangler.toml. Los secretos NUNCA van acá: usar `wrangler secret put NOMBRE`.
+name = "cad2d-billing"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+APP_ORIGIN = "https://diegoalonsok-png.github.io"   # origen exacto de la app (sin barra final)
+API_ORIGIN = "https://api.tu-dominio.com"           # dominio del Worker
+COOKIE_DOMAIN = ""                                   # vacío si app y API están en dominios distintos
+TRIAL_DAYS = "90"
+MAIL_FROM = "CAD2D <acceso@tu-dominio.com>"
+PRICE_PRO_MONTHLY = "price_xxx"
+PRICE_PRO_YEARLY = "price_xxx"
+PRICE_STUDIO_MONTHLY = "price_xxx"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cad2d"
+database_id = "reemplazar-con-el-id-de-d1"
