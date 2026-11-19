@@ -2,7 +2,7 @@
  * PLANTILLA NO DESPLEGADA. Ver billing/README.md antes de publicar.
  *
  * Variables (wrangler secret put …): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SESSION_SECRET, RESEND_API_KEY
- * Variables (wrangler.toml [vars]):    APP_ORIGIN, API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, STRIPE_TAX ('1' = IVA automático),
+ * Variables (wrangler.toml [vars]):    APP_ORIGIN, APP_PATH ('/' en Cloudflare Pages), API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, STRIPE_TAX ('1' = IVA automático),
  *                                      TRIAL_DAYS (120 = 4 meses), MAIL_FROM, COOKIE_DOMAIN
  * Base de datos D1 enlazada como DB (schema.sql).
  *
@@ -116,7 +116,7 @@ export default {
      const id=crypto.randomUUID(),trial=now()+86400*Number(env.TRIAL_DAYS||120);
      await env.DB.prepare('INSERT INTO users(id,email,created_at,trial_ends_at) VALUES(?,?,?,?)').bind(id,row.email,now(),trial).run();user={id};
     }
-    return new Response(null,{status:302,headers:{location:env.APP_ORIGIN+'/blackline-cad/','set-cookie':cookie(env,await makeSession(env,user.id),60*60*24*30)}});
+    return new Response(null,{status:302,headers:{location:env.APP_ORIGIN+(env.APP_PATH||'/'),'set-cookie':cookie(env,await makeSession(env,user.id),60*60*24*30)}});
    }
    if(path==='/auth/logout'&&req.method==='POST')return cors(env,req,json({ok:true},200,{'set-cookie':cookie(env,'',0)}));
    if(path==='/api/stripe-webhook'&&req.method==='POST'){
@@ -158,13 +158,13 @@ export default {
      line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',billing_address_collection:'required',
      ...(tax?{automatic_tax:{enabled:'true'},tax_id_collection:{enabled:'true'}}:{}),
      subscription_data:{metadata:{user_id:userId}},
-     success_url:env.APP_ORIGIN+'/blackline-cad/?pago=ok',cancel_url:env.APP_ORIGIN+'/blackline-cad/?pago=cancelado'});
+     success_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',cancel_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
    }
    if(path==='/api/portal'&&req.method==='POST'){
     const user=await env.DB.prepare('SELECT stripe_customer_id FROM users WHERE id=?').bind(userId).first();
     if(!user?.stripe_customer_id)return cors(env,req,json({error:'sin suscripción'},400));
-    const portal=await stripe(env,'billing_portal/sessions',{customer:user.stripe_customer_id,return_url:env.APP_ORIGIN+'/blackline-cad/'});
+    const portal=await stripe(env,'billing_portal/sessions',{customer:user.stripe_customer_id,return_url:env.APP_ORIGIN+(env.APP_PATH||'/')});
     return cors(env,req,json({url:portal.url}));
    }
    return cors(env,req,json({error:'no encontrado'},404));

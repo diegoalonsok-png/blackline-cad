@@ -74,3 +74,13 @@ test('muros: cotas virtuales solo en pantalla y estiramiento que arrastra muros 
  assert.match(t,/Muros conectados en una esquina movida: su punta acompaña/);
  assert.match(t,/rejoinAll\(changed\)/);
 });
+test('DWG: conversión en servidor configurable, con consentimiento y sin LibreDWG en el navegador',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
+ assert.match(html,/const DWG_CONVERTER_ENDPOINT=typeof window\.CAD2D_DWG_ENDPOINT==='string'/);
+ assert.match(html,/lo convierte a DXF y lo borra inmediatamente/);
+ assert.ok(html.indexOf('cad2d-config.js')<html.indexOf('<script>\n'),'la configuración se carga antes del núcleo');
+ assert.doesNotMatch(html,/libredwg/i,'LibreDWG no se distribuye en el frontend');
+ const cfg=fs.readFileSync(path.join(__dirname,'..','cad2d-config.js'),'utf8');assert.match(cfg,/var DOMINIO='';/);assert.doesNotMatch(cfg,/sk_(live|test)_/);
+ const srv=fs.readFileSync(path.join(__dirname,'..','dwg-converter','server.py'),'utf8');
+ assert.match(srv,/TemporaryDirectory/);assert.match(srv,/b"AC10"/);assert.match(srv,/MAX_BYTES/);
+});

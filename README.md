@@ -318,9 +318,14 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
   - Salida: ventanas.
 - Los 26 botones que mostraban la flecha de selección ahora tienen icono propio. Ningún botón de la cinta queda sin dibujo.
 
+**Cloudflare y archivos .dwg.** Ver `CLOUDFLARE.md`.
+- `cad2d-config.js` concentra la configuración del despliegue: dominio, conversor y cuentas. En GitHub Pages queda vacío.
+- `dwg-converter/` convierte DWG a DXF en un contenedor de Cloudflare con GNU LibreDWG, como programa aparte en el servidor. Así LibreDWG no se distribuye a los usuarios y el código de CAD2D puede seguir siendo propietario.
+- Al elegir un .dwg, CAD2D pide permiso, lo envía, lo convierte y lo borra sin guardar copias.
+
 **Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
 
-**Verificación.** Las 188 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
+**Verificación.** Las 189 pruebas de `node --test tests/*.test.cjs` pasan, incluidas las 24 que fallaban por cambios previos del núcleo. Además se hicieron pruebas en Chrome sin interfaz: inserción, estiramiento de ancho y profundidad, Ctrl+Z, los 80 alias nuevos, menú contextual, AISLAR, GRUPO, DIV, LOCAL y NUBEREV. Pendiente: probar a mano en tabletas o pantallas táctiles, y el intercambio DXF de los bloques ARQ con programas CAD de escritorio.
 
 ## Independencia, propiedad intelectual y compatibilidad
 

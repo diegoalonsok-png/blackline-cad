@@ -859,6 +859,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 </section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
+<script src="cad2d-config.js?v=20261118"></script>
 <script src="cad-grip-settings.js?v=20261116"></script>
 <script src="cad-cursor-mode.js?v=20261116"></script>
 <script>
@@ -5270,7 +5271,8 @@ $('sampleHouseBtn').onclick=async()=>{try{
  toast('Sample house loaded — inspect WALLS, DOORS, WINDOWS and FURNITURE layers');
 }catch(e){alert('Unable to open sample house: '+e.message)}};
 $('saveProjectBtn').onclick=saveJSON;/* Enable only after a real HTTPS DWG converter has been deployed and tested. */
-const DWG_CONVERTER_ENDPOINT='';
+// Se configura en cad2d-config.js (window.CAD2D_DWG_ENDPOINT). Vacío = DWG desactivado.
+const DWG_CONVERTER_ENDPOINT=typeof window.CAD2D_DWG_ENDPOINT==='string'?window.CAD2D_DWG_ENDPOINT.trim():'';
 /* DWG binary header inspection is diagnostic only. Never claim it parses CAD geometry. */
 async function inspectDWGHeader(file){
  const hex=bytes=>Array.from(bytes).map(v=>v.toString(16).padStart(2,'0')).join(' ');
@@ -5286,7 +5288,7 @@ async function inspectDWGHeader(file){
 async function convertDWGAutomatically(file){
  if(!DWG_CONVERTER_ENDPOINT){const info=await inspectDWGHeader(file);$('dwgInspection').textContent=info.message;throw Error(info.message+' The drawing was not imported. CAD2D can currently open ASCII DXF and basic SVG. Original DWG unchanged.')}
  if(!/^https:\/\//i.test(DWG_CONVERTER_ENDPOINT))throw Error('DWG endpoint requires HTTPS.');
- if(!window.confirm('CAD2D will upload the DWG to a conversion server and import the resulting DXF. Continue?'))return;
+ if(!window.confirm('Para abrir el archivo .dwg, CAD2D lo envía cifrado a su servicio de conversión, lo convierte a DXF y lo borra inmediatamente: no se guarda ninguna copia. ¿Continuar?'))return;
  const form=new FormData();form.append('file',file,file.name);
  const response=await fetch(DWG_CONVERTER_ENDPOINT,{method:'POST',body:form,cache:'no-store'});
  if(!response.ok)throw Error('DWG service failed: HTTP '+response.status);
