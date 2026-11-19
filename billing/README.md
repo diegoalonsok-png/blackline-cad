@@ -20,7 +20,7 @@ Principios:
 
 ## Precios (editables en `cad-plan.js` y en Stripe)
 
-Período gratuito: **4 meses (120 días)** desde el alta (`TRIAL_DAYS=120`).
+Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). Precios en Stripe (entorno de prueba, cuenta Blackline CAD con Managed Payments): mensual `price_1UdWXqDRUE2reABAHniRmfHw` (1,59 €), anual `price_1UdWYdDRUE2reABAPWeKFW5K` (12,99 €). Al pasar a modo activo, Stripe genera IDs nuevos: reemplazarlos en `wrangler.toml`.
 
 | Plan | Precio (IVA incluido) | Te queda por cobro* |
 | --- | --- | --- |
