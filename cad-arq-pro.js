@@ -558,10 +558,10 @@ reg(['RAY','SEMIRRECTA','RAYO'],()=>startPick(2,'SEMIRRECTA · origen y direcci�
 },'repeat'));
 // Etiqueta de local: nombre + superficie en m² al centro del contorno
 reg(['ROOMTAG','LOCAL','SUPERFICIE','ETIQUETALOCAL','ETIQUETA'],()=>{
- const s=selected().filter(e=>areaOf(e)!==null);if(!s.length)return CORE.toast('LOCAL: seleccioná rectángulos, polilíneas cerradas o círculos');
+ const s=selected().filter(e=>areaOf(e)!==null);if(!s.length){if(window.cadRoomTool)return window.cadRoomTool();return CORE.toast('LOCAL: seleccioná rectángulos, polilíneas cerradas o círculos')}
  const name=ask('LOCAL · nombre del ambiente','ESTAR');if(name===null)return;
  const k=f(),toM2=1/(k*k),h=.15*k;CORE.saveHistory();
- for(const e of s){const c=centroid(e),m2=areaOf(e)*toM2,label=(name||'LOCAL').toUpperCase(),sup=m2.toFixed(2).replace('.',',')+' m²';
+ for(const e of s){const c=centroid(e),m2=areaOf(e)*toM2,label=(name||'LOCAL').toUpperCase(),sup=m2.toFixed(2).replace('.',',')+' m²';if(e.type==='polyline'&&e.closed)e.roomName=(name||'LOCAL').trim().slice(0,40);
   newEntity({type:'text',p:P(c.x-label.length*h*.33,c.y+h*.3),text:label,h,fontFamily:'Arial',rotation:0,bold:true,layer:e.layer});
   newEntity({type:'text',p:P(c.x-sup.length*h*.25,c.y-h*1.1),text:sup,h:h*.75,fontFamily:'Arial',rotation:0,layer:e.layer});}
  CORE.updateAll();CORE.toast('LOCAL: '+s.length+' etiqueta(s) con superficie');
