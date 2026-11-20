@@ -68,9 +68,12 @@ async function refresh(){
  paintBadge();resumePendingCheckout();return status;
 }
 const PENDING_KEY='cad2d-pending-checkout';
+const PRICE_EUR={pro:3.99,'pro-yearly':29.99,studio:9.99,'studio-yearly':89.99};
+const track=(n,p)=>{try{window.cad2dTrack?.(n,p)}catch(e){}};
 async function go(kind,plan='pro'){
  const url=urls[kind];if(!url){toast(L('El cobro todavía no está activado: la beta es gratuita.','Payments are not active yet: the beta is free.'));return}
- if(kind==='login'){location.assign(url);return}
+ if(kind==='login'){track('login_start');location.assign(url);return}
+ if(kind==='checkout'){track('begin_checkout',{currency:'EUR',value:PRICE_EUR[plan]||0,items:[{item_id:plan,item_name:plan}]});try{sessionStorage.setItem('cad2d-last-plan',plan)}catch(e){}}
  try{
   const r=await fetch(url,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({plan,returnUrl:location.href})});
   // Sin sesión: se recuerda el plan elegido, se inicia sesión con el enlace por mail y la compra sigue sola al volver.
@@ -88,6 +91,7 @@ function resumePendingCheckout(){
 function paymentReturn(){
  const q=new URLSearchParams(location.search).get('pago');if(!q)return;
  history.replaceState(null,'',location.pathname+location.hash);
+ if(q==='ok'){let plan='pro';try{plan=sessionStorage.getItem('cad2d-last-plan')||'pro'}catch(e){}track('purchase',{currency:'EUR',value:PRICE_EUR[plan]||0,transaction_id:'cad2d-'+Date.now(),items:[{item_id:plan,item_name:plan}]})}
  setTimeout(()=>toast(q==='ok'?L('¡Gracias! Tu plan ya está activo.','Thank you! Your plan is now active.'):L('Pago cancelado. Podés seguir usando CAD2D.','Payment cancelled. You can keep using CAD2D.')),900);
 }
 function L(es,en){let lang='en';try{lang=localStorage.getItem('cad2d-alias-language')||document.documentElement.lang||'en'}catch(e){}return /^es/i.test(lang)?es:en}
@@ -121,6 +125,7 @@ document.head.append(css);
 function featureList(p){return '<ul>'+PLANS[p].features.filter(f=>FEATURE_LABEL[f]).map(f=>'<li>'+FEATURE_LABEL[f]+'</li>').join('')+'</ul>'}
 function showPlans(reason,notice){
  document.getElementById('cadPlanDlg')?.remove();
+ track('view_plans',{reason:reason?String(reason).slice(0,60):'manual'});
  const d=document.createElement('div');d.id='cadPlanDlg';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');
  const cur=status.plan,days=trialDays();
  const head=(notice?'<p class="note">'+notice+'</p>':'')+(reason?'<p class="note">'+reason+L(' es parte del plan Pro.',' is part of the Pro plan.')+'</p>':'');
