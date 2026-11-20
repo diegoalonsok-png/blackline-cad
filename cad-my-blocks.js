@@ -83,12 +83,13 @@ function dimStyleFromSelection(){
  if(!/^[\p{L}\p{N} _.-]+$/u.test(name))return CORE.toast('El nombre tiene caracteres no permitidos');
  if(st.dimStyles[name]&&!window.confirm('Reemplazar el estilo de cota '+name+'?'))return;
  CORE.saveHistory();st.dimStyles[name]=style;st.activeDimStyle=name;
+ try{const L=JSON.parse(localStorage.getItem('cad2d-my-dimstyles')||'{}')||{};L[name]=style;localStorage.setItem('cad2d-my-dimstyles',JSON.stringify(L))}catch(e){}
  CORE.dimStyles.render();CORE.dimStyles.apply(style);CORE.dimStyles.backup();
  CORE.toast('Estilo de cota «'+name+'» creado y activo · las próximas cotas lo usan');
 }
 
 /* ---------- Arrastre desde el dibujo hasta una paleta ---------- */
-const dimPalette=el=>el?.closest?.('.panel')?.querySelector?.('#dimStyleLibrary')?el.closest('.panel'):null;
+const dimPalette=el=>el?.closest?.('#cadDimStylePalette')||(el?.closest?.('.panel')?.querySelector?.('#dimStyleLibrary')?el.closest('.panel'):null);
 const blockPalette=el=>el?.closest?.('#arqPanel,#cadBlockBrowser,#blacklineBlockGallery,#arqModal')||(el?.closest?.('.panel')?.querySelector?.('#blockLibrary')?el.closest('.panel'):null);
 let drag=null,ghost=null;
 function showGhost(x,y,text){

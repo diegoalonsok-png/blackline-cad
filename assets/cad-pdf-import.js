@@ -15,12 +15,15 @@ async function extract(page){
  const L=await pdfjs(),OPS=L.OPS,ops=await page.getOperatorList(),vp=page.getViewport({scale:1});
  let ctm=[1,0,0,1,0,0];const stack=[],paths=[],mc=[];let pending=[];
  const curLayer=()=>{for(let j=mc.length-1;j>=0;j--)if(mc[j])return mc[j];return null};
- const flush=keep=>{if(keep)for(const p of pending)if(p.pts.length>1){p.layer=curLayer();paths.push(p)}pending=[]};
+ let stroke='#ffffff';const hex=v=>{if(typeof v==='string')return v.startsWith('#')?v:'#'+v;const n=x=>Math.max(0,Math.min(255,Math.round(x<=1&&x>=0&&!Number.isInteger(x)?x*255:x))).toString(16).padStart(2,'0');return '#'+n(v[0])+n(v[1])+n(v[2])};
+ const flush=keep=>{if(keep)for(const p of pending)if(p.pts.length>1){p.layer=curLayer();p.color=stroke;paths.push(p)}pending=[]};
  for(let i=0;i<ops.fnArray.length;i++){
   const fn=ops.fnArray[i],a=ops.argsArray[i];
   if(fn===OPS.beginMarkedContentProps){const id=a?.[0]==='OC'?(a[1]?.id||(typeof a[1]==='string'?a[1]:null)):null;mc.push(id)}
   else if(fn===OPS.beginMarkedContent)mc.push(null);
   else if(fn===OPS.endMarkedContent)mc.pop();
+  else if(fn===OPS.setStrokeRGBColor){try{stroke=hex(a.length===1?a[0]:a)}catch(e){}}
+  else if(fn===OPS.setStrokeGray){const g=Math.round((a[0]<=1?a[0]*255:a[0]));stroke=hex([g,g,g])}
   else if(fn===OPS.save)stack.push(ctm.slice());
   else if(fn===OPS.restore)ctm=stack.pop()||[1,0,0,1,0,0];
   else if(fn===OPS.transform)ctm=mul(ctm,a);
@@ -102,7 +105,7 @@ async function importPdf(file){
  C.saveHistory();const ids=[],base=S.layerId,made=new Map(),palette=['#e5e5e5','#ff6b6b','#ffd166','#06d6a0','#4cc9f0','#b388ff','#f78c6b','#9ad1d4'];
  const layerOf=id=>{if(!opt.layers||!id)return base;const name=lname(id);if(!name)return base;if(made.has(name))return made.get(name);
   let l=S.layers.find(x=>x.name.toUpperCase()===name.toUpperCase());
-  if(!l){l={id:'pdf_'+Date.now().toString(36)+'_'+made.size,name,color:palette[made.size%palette.length],visible:true,locked:false};S.layers.push(l)}
+  if(!l){const col=g.paths.find(q=>q.layer===id&&q.color)?.color;l={id:'pdf_'+Date.now().toString(36)+'_'+made.size,name,color:/^#[0-9a-f]{6}$/i.test(col||'')&&!/^#(000000|ffffff)$/i.test(col)?col:palette[made.size%palette.length],visible:true,locked:false};S.layers.push(l)}
   made.set(name,l.id);return l.id};
  for(const p of g.paths){
   const pts=p.pts.filter((q,i,a)=>!i||Math.hypot(q[0]-a[i-1][0],q[1]-a[i-1][1])>1e-3).map(q=>Q(q[0],q[1]));
