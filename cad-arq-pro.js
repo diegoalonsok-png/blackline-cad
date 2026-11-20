@@ -309,7 +309,7 @@ function snapMeters(v,fine){const step=fine?.01:.05;return Math.round(v/step)*st
 function resizeRef(ref,W,D){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return;
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- const w=Math.max(item.wMin,Math.min(item.wMax,W)),d=item.lockAspect?w:Math.max(item.dMin,Math.min(item.dMax,D));
+ const w=Math.max(item.wMin,Math.min(item.wMax,W)),d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
  if(Math.abs(w-a.w)<1e-6&&Math.abs(d-a.d)<1e-6)return CORE.toast('Sin cambios · rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm');
  CORE.saveHistory();
  ref.blockName=ensureDefinition(item,w,d);delete ref.dynamic;
@@ -357,7 +357,7 @@ function onPointerMove(ev){
  const ref=S().entities.find(e=>e.id===gripDrag.id),a=arqOf(ref),item=a&&byId(a.id);if(!item){gripDrag=null;return}
  const q=worldToLocal(ref,CORE.snapPoint(CORE.world(P(ev.offsetX,ev.offsetY))));
  const e=extOf(a);
- if(gripDrag.kind==='w'){gripDrag.W=Math.max(item.wMin,Math.min(item.wMax,snapMeters(q.x-(e.x1-a.w),ev.shiftKey)));if(item.lockAspect)gripDrag.D=gripDrag.W}
+ if(gripDrag.kind==='w'){gripDrag.W=Math.max(item.wMin,Math.min(item.wMax,snapMeters(q.x-(e.x1-a.w),ev.shiftKey)));if(item.lockAspect)gripDrag.D=gripDrag.W*(item.d/item.w)}
  else gripDrag.D=Math.max(item.dMin,Math.min(item.dMax,snapMeters(q.y-(e.y1-a.d),ev.shiftKey)));
  CORE.schedule();
 }

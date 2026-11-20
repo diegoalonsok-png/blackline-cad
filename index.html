@@ -766,8 +766,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1420">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1420">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1430">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1430">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -851,8 +851,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1420"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1420"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-1430"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-1430"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -900,7 +900,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1420"></script>
+<script src="assets/cad-analytics.js?v=20261120-1430"></script>
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0c1216"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
@@ -966,9 +966,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1420"></script>
-<script src="cad-grip-settings.js?v=20261120-1420"></script>
-<script src="cad-cursor-mode.js?v=20261120-1420"></script>
+<script src="cad2d-config.js?v=20261120-1430"></script>
+<script src="cad-grip-settings.js?v=20261120-1430"></script>
+<script src="cad-cursor-mode.js?v=20261120-1430"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -9383,26 +9383,26 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1420"></script>
-<script src="blackline-modern.js?v=20261120-1420"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1420"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1420"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1420"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1420"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1420"></script>
-<script src="cad-osnap-math.js?v=20261120-1420"></script>
-<script src="cad-scale-math.js?v=20261120-1420"></script>
-<script src="cad-object-tracking.js?v=20261120-1420"></script>
-<script src="cad-auto-opening.js?v=20261120-1420"></script>
-<script src="cad-wall-join.js?v=20261120-1420"></script>
-<script src="cad-wall-grip.js?v=20261120-1420"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1420"></script>
-<script src="cad-performance.js?v=20261120-1420"></script>
-<script src="cad-plan.js?v=20261120-1420"></script><script src="cad-cloud.js?v=20261120-1420"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1420"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1420"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1420"></script>
-<script src="cad-arq-pro.js?v=20261120-1420"></script>
-<script src="cad-autocad-plus.js?v=20261120-1420"></script>
-<script src="cad-touch.js?v=20261120-1420"></script><script src="cad-quickbar.js?v=20261120-1420"></script><script src="cad-cmd-resize.js?v=20261120-1420"></script><script src="cad-buy-guide.js?v=20261120-1420"></script>
-<script src="cad-arq-tools.js?v=20261120-1420"></script><script src="cad-block-browser.js?v=20261120-1420"></script>
+<script src="workspace-upgrade.js?v=20261120-1430"></script>
+<script src="blackline-modern.js?v=20261120-1430"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-1430"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-1430"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1430"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-1430"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1430"></script>
+<script src="cad-osnap-math.js?v=20261120-1430"></script>
+<script src="cad-scale-math.js?v=20261120-1430"></script>
+<script src="cad-object-tracking.js?v=20261120-1430"></script>
+<script src="cad-auto-opening.js?v=20261120-1430"></script>
+<script src="cad-wall-join.js?v=20261120-1430"></script>
+<script src="cad-wall-grip.js?v=20261120-1430"></script>
+<script src="cad-hatch-patterns.js?v=20261120-1430"></script>
+<script src="cad-performance.js?v=20261120-1430"></script>
+<script src="cad-plan.js?v=20261120-1430"></script><script src="cad-cloud.js?v=20261120-1430"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1430"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1430"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1430"></script>
+<script src="cad-arq-pro.js?v=20261120-1430"></script>
+<script src="cad-autocad-plus.js?v=20261120-1430"></script>
+<script src="cad-touch.js?v=20261120-1430"></script><script src="cad-quickbar.js?v=20261120-1430"></script><script src="cad-cmd-resize.js?v=20261120-1430"></script><script src="cad-buy-guide.js?v=20261120-1430"></script>
+<script src="cad-arq-tools.js?v=20261120-1430"></script><script src="cad-block-browser.js?v=20261120-1430"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
