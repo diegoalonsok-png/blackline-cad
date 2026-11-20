@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const grip=require('../cad-grip-settings.js');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 test('default grip appearance has safe contrasting colors',()=>{
- assert.deepEqual(grip.normalize(),{size:10,blockColor:'#8fe3fc',wallColor:'#ffcb69'});
+ assert.deepEqual(grip.normalize(),{size:10,blockColor:'#8fe3fc',wallColor:'#ffcb69',vertexColor:'#ffce78',segmentColor:'#75dff7',snapColor:'#ffe15a',hoverDim:true});
 });
 test('size is clamped to pixel range',()=>{
  assert.equal(grip.normalize({size:999}).size,22);
