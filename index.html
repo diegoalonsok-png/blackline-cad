@@ -2231,7 +2231,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,layer:ref.layer,width:ref.lineweight??e.width}));
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:ref.layer,width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)}));
 }
 /* Block grip editing: translate the reference rather than exploding its children. */
 function blockGripPoints(ref){
@@ -5780,7 +5780,7 @@ async function cadOpenTestHouse(){try{
  toast('Abriendo casa de prueba…');
  const response=await fetch('./examples/casa-de-prueba.dxf',{cache:'force-cache'});
  if(!response.ok)throw Error('HTTP '+response.status);
- importDXF(await response.text(),'Casa_prueba_1-1.dxf');
+ importDXF(await cadDxfDecode(await response.arrayBuffer()),'Casa_prueba_1-1.dxf');
  state.ltscale=state.ltscale||1;zoomExtents();updateAll();
  log('CASA DE PRUEBA · modelo 1:1 en metros. Probá DIST, DIM, MOVE, COPY, HATCH, BLOCKS.');
  toast('Casa de prueba 1:1 · metros — jugá con el CAD: medí, acotá, mové, sombreá');
@@ -5887,7 +5887,16 @@ async function cadImportFile(f){
   state.selected=ids;updateAll();toast('Imported '+f.name+' · '+ids.length+' text lines');log('IMPORT '+f.name);
  }catch(err){console.error(err);toast('Import failed: '+(err?.message||err))}
 }
-async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+// DXF anteriores a 2007 vienen en la página de códigos de Windows ($DWGCODEPAGE, p. ej. ANSI_1252): «baño», «ñ», «°».
+async function cadDxfDecode(buf){
+ const bytes=new Uint8Array(buf);
+ try{return new TextDecoder('utf-8',{fatal:true}).decode(bytes)}catch(e){}
+ const head=new TextDecoder('latin1').decode(bytes.subarray(0,Math.min(bytes.length,200000)));
+ const m=head.match(/\$DWGCODEPAGE\s*\r?\n\s*3\s*\r?\n\s*ANSI_(\d+)/i);
+ const cp=m?'windows-'+m[1]:'windows-1252';
+ try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
+}
+async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -6133,9 +6142,24 @@ function importDXF(text,name){
   }
   return out;
  }
+
+ // INSERT de primer nivel → referencia de bloque CAD2D (se mantiene como bloque, no se explota).
+ const importedBlocks={},defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
+ function cadDxfBlockRef(def,o,lname,common,sub){
+  if(o.cols>1||o.rows>1)return null;
+  let A=[Math.cos(o.rot)*o.sx,Math.sin(o.rot)*o.sx,-Math.sin(o.rot)*o.sy,Math.cos(o.rot)*o.sy],ix=o.ix,iy=o.iy;
+  if(o.ext<0){A=[-A[0],A[1],-A[2],A[3]];ix=-ix}
+  let flip=false;if(A[0]*A[3]-A[1]*A[2]<0){A=[-A[0],-A[1],A[2],A[3]];flip=true}
+  const sc=Math.hypot(A[0],A[1]);if(!(sc>0)||Math.abs(A[0]-A[3])>1e-6*sc||Math.abs(A[1]+A[2])>1e-6*sc)return null;
+  const name=defName(def.name);
+  if(!importedBlocks[name]){const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:lname,color:undefined,linetype:sub.linetype,width:sub.width},1,list);if(!list.length)return null;importedBlocks[name]={name,entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'}}
+  const ref={type:'blockRef',blockName:name,p:P(ix,iy),scale:+sc.toPrecision(10),rotation:Math.atan2(A[1],A[0])*180/Math.PI,layer:lname,lineweight:common.width};
+  if(flip)ref.flipBlockX=true;if(common.color)ref.color=common.color;
+  return ref;
+ }
  // --- Walk records, expanding INSERT and DIMENSION blocks ---
  let expanded=0;
- function walk(recs,m,ctx,depth){
+ function walk(recs,m,ctx,depth,out){
   for(let idx=0;idx<recs.length;idx++){
    const [type,record]=recs[idx];
    if(type==='VERTEX'||type==='SEQEND')continue;
@@ -6153,22 +6177,23 @@ function importDXF(text,name){
      const def=blocksDef.get(str(2,''));if(!def){note(type);continue}
      if(depth>12)continue;
      const sub={layer:lname,color:common.color||(indexColor===0?ctx?.color:undefined)||layer.color,linetype:common.linetype,width:common.width};
-     if(type==='DIMENSION'){walk(def.recs,m,sub,depth+1);expanded++;continue}
+     if(type==='DIMENSION'){walk(def.recs,m,sub,depth+1,out);expanded++;continue}
      const ix=get(10),iy=get(20),sx=get(41,1)||1,sy=get(42,1)||1,rot=get(50,0)*Math.PI/180,ext=get(230,1);
+     if(depth===0&&!out){const ref=cadDxfBlockRef(def,{ix,iy,sx,sy,rot,ext,cols:get(70,1),rows:get(71,1)},lname,common,sub);if(ref){entities.push({...ref,id:entities.length+1});expanded++;continue}}
      const cols=Math.max(1,get(70,1)),rows=Math.max(1,get(71,1)),cs=get(44,0),rs=get(45,0);
      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
       const ox=c*cs,oy=r*rs,tx=ix+ox*Math.cos(rot)-oy*Math.sin(rot),ty=iy+ox*Math.sin(rot)+oy*Math.cos(rot);
       let L=[Math.cos(rot)*sx,Math.sin(rot)*sx,-Math.sin(rot)*sy,Math.cos(rot)*sy,tx,ty];
       L=mul2(L,[1,0,0,1,-def.base.x,-def.base.y]);
       if(ext<0)L=mul2([-1,0,0,1,0,0],L);
-      walk(def.recs,mul2(m,L),sub,depth+1);
+      walk(def.recs,mul2(m,L),sub,depth+1,out);
      }
      expanded++;continue;
     }
     let ent=readRecord(type,record,recs,idx);
     if(ent===undefined){if(!silent.has(type))note(type);continue}
     if(!ent)continue;
-    for(const one of[].concat(ent)){const w=xform({...common,...one},m);if(one.width&&one.type==='hatch')w.width=one.width;entities.push({...w,id:entities.length+1})}
+    for(const one of[].concat(ent)){const w=xform({...common,...one},m);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
    }catch(error){note(type);console.warn('Skipped DXF entity',type,error)}
   }
  }
@@ -6186,6 +6211,7 @@ function importDXF(text,name){
  state.unit=from;state.grid=from==='m'?1:from==='mm'?100:10;
  state.layers=[...layers.values()];
  suggestWallLayerFromDXF(state.layers);
+ state.blocks=importedBlocks;
  state.entities=entities;state.nextId=entities.length+1;state.layerId=state.layers[0].id;state.selected=[];
  state.file=name.replace(/\.dxf$/i,'');$('filename').textContent=state.file+'.dxf';
  $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
