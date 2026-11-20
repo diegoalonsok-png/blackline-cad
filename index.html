@@ -6236,8 +6236,9 @@ async function convertDWGAutomatically(file){
  const form=new FormData();form.append('file',file,file.name);
  toast('Convirtiendo '+file.name+' a DXF…');
  let response;
+ const slowT=setTimeout(()=>toast('El conversor de DWG se está iniciando (pasa si estuvo un rato sin uso): puede tardar hasta un minuto. Las siguientes aperturas son inmediatas.'),6000);
  try{response=await fetch(DWG_CONVERTER_ENDPOINT,{method:'POST',body:form,cache:'no-store'})}
- catch(err){throw Error('El conversor de DWG no está disponible en este momento. Mientras tanto, en AutoCAD usá Guardar como → DXF y abrí ese archivo. El DWG original no se modificó.')}
+ catch(err){throw Error('El conversor de DWG no está disponible en este momento. Mientras tanto, en AutoCAD usá Guardar como → DXF y abrí ese archivo. El DWG original no se modificó.')}finally{clearTimeout(slowT)}
  if(!response.ok){const msg=(await response.text().catch(()=>'')).slice(0,200);throw Error('No se pudo convertir el DWG ('+response.status+(msg?': '+msg:'')+'). Probá guardarlo como DXF desde AutoCAD. El original no se modificó.')}
  const dxf=await response.text();
  if(!/\bSECTION\b/.test(dxf.slice(0,10000)))throw Error('DWG converter response is not recognized ASCII DXF');
@@ -9584,7 +9585,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-wall-grip.js?v=20261120-1850"></script>
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
 <script src="cad-performance.js?v=20261120-1850"></script>
-<script src="assets/cad-pdf-import.js?v=20261120-1850"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
+<script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script><script src="cad-my-blocks.js?v=20261120-1850"></script>
 <script src="cad-arq-pro.js?v=20261120-1900"></script>
 <script src="cad-autocad-plus.js?v=20261120-1850"></script>
