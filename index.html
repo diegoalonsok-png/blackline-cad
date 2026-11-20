@@ -290,6 +290,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-grip-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:5px 8px;font-size:12px}
 .cad-grip-row input[type=color]{width:34px;height:22px;border:1px solid #4a5d6a;border-radius:4px;background:none;padding:0;cursor:pointer}
 .cad-grip-size{display:flex;align-items:center;gap:6px}.cad-grip-size input{width:90px}.cad-grip-size b{font-size:11px;min-width:34px;text-align:right}
+.cad-layout-add{min-width:28px;font-weight:700}
 #cadOptChips{display:inline-flex;gap:4px;flex-wrap:nowrap;margin:0 6px;overflow:hidden;max-width:46%}
 #cadOptChips button{all:unset;cursor:pointer;font:600 11px/1 ui-monospace,Menlo,Consolas,monospace;padding:4px 7px;border-radius:5px;border:1px solid #3d5361;color:#cfe0ea;background:#16222b;white-space:nowrap}
 #cadOptChips button b{color:#f0c674}
@@ -765,8 +766,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1315">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1315">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1330">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1330">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -850,8 +851,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1315"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1315"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-1330"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-1330"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -899,7 +900,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1315"></script>
+<script src="assets/cad-analytics.js?v=20261120-1330"></script>
 </head>
 <body>
 <div class="app">
@@ -929,11 +930,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
   <label>Margin mm<input id="layoutMargin" type="number" min="0" max="100" step="1" value="10"></label>
   <label title="Color del papel de la lámina: se ve en pantalla y sale en el PDF y la impresión">Paper color<input id="layoutPaperColor" type="color" value="#ffffff"></label>
   <label>Style<select id="layoutStyle"><option value="mono" selected>Black & white</option><option value="color">Color</option></select></label>
-  <label class="layout-title-switch"><input id="layoutTitleBlock" type="checkbox" checked>Title block</label>
+  <label class="layout-title-switch"><input id="layoutTitleBlock" type="checkbox" checked>Title block</label><label>Rótulo<select id="layoutTitleType"><option value="arq" selected>Arquitectura</option><option value="simple">Simple</option></select></label><button class="btn" type="button" id="layoutTitleEdit" title="Completar los datos del rótulo">Datos del rótulo…</button>
   <button class="btn primary" type="button" id="layoutDownloadPdf">Export PDF</button>
   <button class="btn" type="button" id="layoutOpenPlot">More settings</button>
  </div>
- <div class="cad-layout-paperboard"><div class="cad-layout-page" id="cadLayoutPage" role="img" aria-label="Printable layout sheet"></div></div>
+ <div class="cad-layout-paperboard"><div class="cad-layout-page" id="cadLayoutPage" data-no-cad-translate role="img" aria-label="Printable layout sheet"></div></div>
  <div class="cad-layout-footer" id="cadLayoutStatus" aria-live="polite">Set sheet dimensions, then export a vector PDF at actual size.</div>
  </section><div class="canvas-overlay"><b>TOP</b> · 2D MODEL SPACE <span id="canvasUnits">· m</span><br><span id="toolPrompt">Select objects or choose a drawing tool</span></div><section id="cadWallQuick" class="cad-wall-quick" aria-label="Opciones rápidas de muro" hidden>
   <div class="cad-wall-quick-title">WALL · Muro</div>
@@ -956,7 +957,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on" title="Activar o desactivar grilla">GRID</button><button class="cad-status-arrow" data-status-menu="grid" aria-label="Opciones de grilla">▾</button><button id="snapToggle" title="Ajustar a grilla">SNAP</button><button class="cad-status-arrow" data-status-menu="snap" aria-label="Opciones de snap de grilla">▾</button><button id="orthoToggle" title="Movimiento ortogonal">ORTHO</button><button class="cad-status-arrow" data-status-menu="ortho" aria-label="Opciones ortogonales">▾</button><button id="polarToggle" title="Rastreo polar de ángulos (F10)" aria-pressed="false">POLAR</button><button class="cad-status-arrow" data-status-menu="polar" aria-label="Opciones de rastreo polar">▾</button><button id="osnapToggle" class="on" title="Activar o desactivar referencias a objetos">OSNAP</button><button type="button" id="cadGripMenuBtn" class="cad-grip-menu-btn" data-status-menu="grips" title="Pinzas y referencias: color y tamaño de vértices, color de los snaps">◆ GRIPS ▾</button><button id="otrackToggle" title="Rastreo de referencia a objetos · F11 (no se imprime)" aria-pressed="false">OTRACK</button><button class="cad-status-arrow" data-status-menu="otrack" aria-label="Opciones de rastreo OTRACK">▾</button><button class="cad-status-arrow" data-status-menu="osnap" aria-label="Configurar referencias a objetos">▾</button><span class="cad-snap-live" id="cadSnapLive" title="Referencia a objetos detectada">OSNAP · —</span><button id="cadSaveDxfStatus" title="Guardar dibujo DXF editable">↓ DXF</button><button id="cadPropertiesButton" title="Propiedades de objetos seleccionados: color, espesor y línea">▤ PROPIEDADES</button><button id="cadColorButton" title="Colores del espacio de trabajo / Colors">◉ COLORES</button><button id="measureBtn">DIST</button><button class="cad-status-arrow" data-status-menu="measure" aria-label="Opciones de medición">▾</button><button id="cadStatusPan" title="Desplazar vista · PAN">PAN</button><button id="cadStatusZoom" title="Encuadrar todo · ZOOM">ZOOM</button><button id="cadStatusScissor" title="Tijera, cortar entre dos clics · TS">✂ TIJERA</button><button id="cadStatusLayer" title="Abrir administrador de capas · LA">CAPAS</button><button id="cadStatusUnits" title="Configurar unidades del dibujo · UNITS">UNITS</button><button id="cadStatusLayout" title="Abrir presentación de impresión · LAYOUT">LAYOUT</button><button id="cadStatusUndo" title="Deshacer última edición · Ctrl+Z">↶</button><button id="cadStatusRedo" title="Rehacer edición · Ctrl+Y">↷</button><button id="cadStatusManual" title="Manual de comandos de CAD2D">? MANUAL</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><button class="cad-status-arrow" data-status-menu="scale" aria-label="Opciones de unidades y escala">▾</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
 </div>
 <div id="cadExportPopover" class="cad-export-popover" hidden role="dialog" aria-label="Exportar dibujo"></div><div id="cadQuickProperties" class="cad-quick-properties" hidden aria-label="Propiedades de objetos CAD"></div><div id="cadColorPopover" class="cad-colors-popover" hidden aria-label="Ajustes de colores de CAD"></div><div id="cadStatusMenu" class="cad-status-menu" role="menu" hidden></div><div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
-<div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
+<div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option><option value="arq">Rótulo de arquitectura</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
 <div class="modal-backdrop" id="helpBackdrop"><div class="modal"><div class="modal-head"><h2>CAD2D — Quick start</h2><button class="btn" id="closeHelp">✕ Close</button></div><div class="shortcuts"><div><h3>Drawing</h3><p>Click Line and click two points; repeat; Enter finishes.</p><p>Polyline connects points; Enter or double click finishes.</p><p>Circle: center then radius point.</p><p>Text: click the insertion point, type text in the prompt.</p><p>Coordinates can be entered in the command line.</p></div><div><h3>Editing and navigation</h3><p>Select with a click or drag left to right for a BLUE enclosed window; drag right to left for a GREEN crossing window. Use Shift to add objects. Borrar / Erase or Delete removes selected entities.</p><p>Hold Shift to select multiple entities.</p><p>Use Move, Copy, Rotate, Scale and Mirror on selected entities.</p><p>Mouse wheel zooms, middle mouse pans.</p><p>Space + left drag pans; Esc cancels.</p></div><div><h3>Output</h3><p>Export DXF R2000 (AC1015).</p><p>Import standard ASCII DXF entities (basic 2D types).</p><p>Save/Open native project JSON to preserve editing state.</p><p>Vector PDF at ISO, US or custom page size.</p></div><div><h3>Accuracy</h3><p>Coordinates are stored numerically, not in pixels.</p><p>Unit selection converts existing geometry to preserve physical size.</p><p>SNAP follows the selected grid spacing.</p><p>OSNAP recognizes endpoints, midpoints and centers.</p></div></div><section aria-label="Acerca de CAD2D" style="margin-top:16px;border-top:1px solid #39424b;padding-top:12px">
 <h3 style="margin:0 0 6px">Acerca de CAD2D · Independencia y licencias</h3>
 <p class="help">CAD2D es un software de dibujo técnico independiente. No está afiliado, patrocinado ni respaldado por Autodesk, Inc. Autodesk y AutoCAD son marcas de sus respectivos titulares; cualquier referencia a ellas tiene exclusivamente fines descriptivos de compatibilidad.</p>
@@ -964,9 +965,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1315"></script>
-<script src="cad-grip-settings.js?v=20261120-1315"></script>
-<script src="cad-cursor-mode.js?v=20261120-1315"></script>
+<script src="cad2d-config.js?v=20261120-1330"></script>
+<script src="cad-grip-settings.js?v=20261120-1330"></script>
+<script src="cad-cursor-mode.js?v=20261120-1330"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -5950,7 +5951,7 @@ function cadProjectSnapshot(filename){
  return {format:'CAD2D-2',filename,modelScale:'1:1',blocks:state.blocks,
   dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:cadBlockEdit?cadBlockEdit.entities:state.entities,
   layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,
-  precision:state.precision,nextId:state.nextId,ltscale:state.ltscale||1,layout:collectLayoutState()};
+  precision:state.precision,nextId:state.nextId,ltscale:state.ltscale||1,layout:collectLayoutState(),layouts:cadLayoutsSnapshot()};
 }
 async function saveJSON(forceNew=false){
  const canPick=typeof window.showSaveFilePicker==='function'&&window.isSecureContext;
@@ -6124,7 +6125,7 @@ async function cadDxfDecode(buf){
  const cp=m?'windows-'+m[1]:'windows-1252';
  try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
 }
-async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -6497,6 +6498,7 @@ async function cadInsertDxfPlan(url,label){
  canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);
 }
 window.cadInsertDxfPlan=cadInsertDxfPlan;
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['NUEVALAMINA','LAYOUTNEW','LAYOUT+','LAMINA'])X.commands[k]=()=>cadAddLayout();for(const k of['ROTULO','TITLEBLOCK','DATOSROTULO'])X.commands[k]=()=>cadEditTitleFields()}
 const paperSizes={A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],A0:[841,1189],LETTER:[215.9,279.4],LEGAL:[215.9,355.6],ARCHD:[609.6,914.4],'ARCH E':[914.4,1219.2]};
 function plotOptions(){let size=$('paper').value,dim=size==='CUSTOM'?[Number($('paperW').value)||420,Number($('paperH').value)||297]:paperSizes[size].slice();if($('orientation').value==='landscape')dim.sort((a,b)=>b-a);else dim.sort((a,b)=>a-b);let w=dim[0],h=dim[1],margin=Math.max(0,Number($('plotMargin').value)||0),b=getBounds(),dx=Math.max(.001,b.maxX-b.minX),dy=Math.max(.001,b.maxY-b.minY),areaW=Math.max(1,w-2*margin),areaH=Math.max(1,h-2*margin),factor=$('plotScale').value==='fit'?Math.min(areaW/dx,areaH/dy)*.92:U[state.unit]/Number($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value);if(!Number.isFinite(factor)||factor<=0)factor=1;let cx=(b.minX+b.maxX)/2,cy=(b.minY+b.maxY)/2;return{w,h,margin,b,factor,cx,cy,style:$('plotStyle').value,title:$('titleBlock').value,paperColor:cadPaperColor()}}
 // Independent print preflight: same printable limits for Layout, SVG, and PDF.
@@ -6554,15 +6556,88 @@ function makeSVG(o){
  svg.push(`<text fill="${c}" font-family="${escXML(safeCADFont(e.fontFamily||'Arial'))}" font-weight="${e.bold?'bold':'normal'}" font-style="${e.italic?'italic':'normal'}" font-size="${num(fs)}" x="0" y="0">${escXML(e.text)}</text>`);
  if(e.underline)svg.push(`<path d="M 0 ${num(fs*.12)} H ${num(width)}" stroke="${c}" stroke-width="${num(Math.max(.15,fs*.05))}"/>`);
  svg.push('</g>');
-}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),mid=mul(add(p1,p2),.5);let dg=Math.atan2(vy,vx)*180/Math.PI;if(dg>90.001)dg-=180;else if(dg<=-89.999)dg+=180;const mx=num(px(mid)[0]),my=num(px(mid)[1]);svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(p1)} M ${point(e.b)} L ${point(p2)} M ${point(p1)} L ${point(p2)}"/><text transform="rotate(${num(-dg)} ${mx} ${my})" x="${mx}" y="${num(my-1)}" text-anchor="middle" font-size="3" fill="${c}" font-family="Arial">${num(L)} ${state.unit}</text>`)}}svg.push('</g>');if(o.title==='simple'){const tx=o.w-85,ty=o.h-o.margin-29;svg.push(`<rect x="${tx}" y="${ty}" width="85" height="29" fill="${/^#[0-9a-f]{6}$/i.test(o.paperColor||'')?o.paperColor:'white'}" stroke="#222" stroke-width=".3"/><path d="M ${tx} ${ty+11} H ${tx+85} M ${tx+56} ${ty+11} V ${ty+29}" stroke="#222" stroke-width=".3"/><text x="${tx+3}" y="${ty+7}" font-size="4" font-family="Arial">${escXML(String(state.file).length>32?String(state.file).slice(0,29)+'...':state.file)}</text><text x="${tx+3}" y="${ty+17}" font-size="3" font-family="Arial">CAD2D</text><text x="${tx+3}" y="${ty+24}" font-size="2.7" font-family="Arial">${cadLocalPrintDate()}</text><text x="${tx+58}" y="${ty+20}" font-size="3" font-family="Arial">${$('plotScale').value==='fit'?'FIT':'1:'+($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value)}</text>`) }svg.push('</svg>');return svg.join('')}
+}else if(e.type==='dimension'){let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1,nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny,p1=add(e.a,P(nx*off,ny*off)),p2=add(e.b,P(nx*off,ny*off)),mid=mul(add(p1,p2),.5);let dg=Math.atan2(vy,vx)*180/Math.PI;if(dg>90.001)dg-=180;else if(dg<=-89.999)dg+=180;const mx=num(px(mid)[0]),my=num(px(mid)[1]);svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(p1)} M ${point(e.b)} L ${point(p2)} M ${point(p1)} L ${point(p2)}"/><text transform="rotate(${num(-dg)} ${mx} ${my})" x="${mx}" y="${num(my-1)}" text-anchor="middle" font-size="3" fill="${c}" font-family="Arial">${num(L)} ${state.unit}</text>`)}}svg.push('</g>');if(o.title==='simple'){const tx=o.w-85,ty=o.h-o.margin-29;svg.push(`<rect x="${tx}" y="${ty}" width="85" height="29" fill="${/^#[0-9a-f]{6}$/i.test(o.paperColor||'')?o.paperColor:'white'}" stroke="#222" stroke-width=".3"/><path d="M ${tx} ${ty+11} H ${tx+85} M ${tx+56} ${ty+11} V ${ty+29}" stroke="#222" stroke-width=".3"/><text x="${tx+3}" y="${ty+7}" font-size="4" font-family="Arial">${escXML(String(state.file).length>32?String(state.file).slice(0,29)+'...':state.file)}</text><text x="${tx+3}" y="${ty+17}" font-size="3" font-family="Arial">CAD2D</text><text x="${tx+3}" y="${ty+24}" font-size="2.7" font-family="Arial">${cadLocalPrintDate()}</text><text x="${tx+58}" y="${ty+20}" font-size="3" font-family="Arial">${$('plotScale').value==='fit'?'FIT':'1:'+($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value)}</text>`) }if(o.title==='arq'){const T=cadTitleBlockParts(o),pc=/^#[0-9a-f]{6}$/i.test(o.paperColor||'')?o.paperColor:'white';for(const b of T.rects)svg.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="${pc}" stroke="#222" stroke-width=".35"/>`);svg.push('<path d="'+T.lines.map(l=>`M ${l[0]} ${l[1]} L ${l[2]} ${l[3]}`).join(' ')+'" stroke="#222" stroke-width=".2"/>');for(const t of T.texts)svg.push(`<text x="${t.x}" y="${t.y}" font-size="${t.size}" font-family="Arial"${t.bold?' font-weight="bold" fill="#555"':''}${t.align==='end'?' text-anchor="end" fill="#888"':''}>${escXML(t.text)}</text>`)}svg.push('</svg>');return svg.join('')}
 
 let cadActiveSpace='model';
 const CAD_LAYOUT_KEY='cad2d-layout1-settings';
 function cadPaperColor(){const v=$('layoutPaperColor')?.value||'#ffffff';return /^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():'#ffffff'}
+/* ---------- Varias láminas (Layout 1, 2, 3…) y rótulo de arquitectura ---------- */
+let cadTitleFields={};
+let cadLayouts=[{name:'Layout 1',state:null}],cadLayoutIdx=0;
+const CAD_LAYOUTS_KEY='cad2d-layouts';
+function cadLayoutsSnapshot(){try{cadLayouts[cadLayoutIdx].state=collectLayoutState()}catch(e){}return {index:cadLayoutIdx,list:cadLayouts.map(l=>({name:l.name,state:l.state}))}}
+function cadLayoutsPersist(){try{localStorage.setItem(CAD_LAYOUTS_KEY,JSON.stringify(cadLayoutsSnapshot()))}catch(e){}}
+function cadLayoutsLoad(v){
+ if(!v||!Array.isArray(v.list)||!v.list.length)return false;
+ cadLayouts=v.list.slice(0,20).map((l,i)=>({name:String(l?.name||('Layout '+(i+1))).slice(0,30),state:l?.state&&typeof l.state==='object'?l.state:null}));
+ cadLayoutIdx=Math.min(Math.max(0,Number(v.index)|0),cadLayouts.length-1);
+ if(cadLayouts[cadLayoutIdx].state)applyLayoutState(cadLayouts[cadLayoutIdx].state);
+ renderLayoutTabs();return true;
+}
+function cadSwitchLayout(i){
+ if(i<0||i>=cadLayouts.length)return;
+ cadLayouts[cadLayoutIdx].state=collectLayoutState();cadLayoutIdx=i;
+ const st=cadLayouts[i].state;if(st)applyLayoutState(st);else cadLayoutViewports=[];
+ cadLayoutsPersist();renderLayoutTabs();switchCadSpace('layout');renderLayoutWorkspace();
+ try{window.dispatchEvent(new Event('cad2d-layout-changed'))}catch(e){}
+}
+function cadAddLayout(){
+ cadLayouts[cadLayoutIdx].state=collectLayoutState();
+ const base={...clone(cadLayouts[cadLayoutIdx].state),viewports:[],titleFields:{...(cadLayouts[cadLayoutIdx].state.titleFields||{}),plano:'',lamina:''}};
+ let n=cadLayouts.length+1;while(cadLayouts.some(l=>l.name==='Layout '+n))n++;
+ cadLayouts.push({name:'Layout '+n,state:base});cadSwitchLayout(cadLayouts.length-1);
+ toast('Nueva lámina «Layout '+n+'» · doble clic en la pestaña para renombrarla');
+}
+function cadRenameLayout(i){
+ const v=window.prompt('Nombre de la lámina',cadLayouts[i].name);if(v===null)return;
+ const name=v.trim().slice(0,30);if(!name)return;cadLayouts[i].name=name;cadLayoutsPersist();renderLayoutTabs();
+}
+function cadDeleteLayout(i){
+ if(cadLayouts.length<2)return toast('Tiene que quedar al menos una lámina');
+ if(!window.confirm('¿Borrar la lámina «'+cadLayouts[i].name+'»? El dibujo del modelo no se toca.'))return;
+ cadLayouts[cadLayoutIdx].state=collectLayoutState();cadLayouts.splice(i,1);
+ const next=Math.min(i,cadLayouts.length-1);cadLayoutIdx=-1;cadLayoutIdx=next;
+ const st=cadLayouts[next].state;if(st)applyLayoutState(st);cadLayoutsPersist();renderLayoutTabs();renderLayoutWorkspace();
+ try{window.dispatchEvent(new Event('cad2d-layout-changed'))}catch(e){}
+}
+function renderLayoutTabs(){
+ const bar=$('cadSpaceTabs'),main=$('paperSpaceTab'),plot=$('cadPlotShortcut');if(!bar||!main)return;
+ bar.querySelectorAll('.cad-layout-extra').forEach(x=>x.remove());
+ const label=(el,name)=>{el.replaceChildren();const sp=document.createElement('span');sp.setAttribute('data-no-cad-translate','');sp.textContent=name.toUpperCase();el.append(sp)};
+ cadLayouts.forEach((l,i)=>{
+  let b;if(i===cadLayoutIdx){b=main;b.title='Lámina activa · doble clic: renombrar · clic derecho: borrar'}
+  else{b=document.createElement('button');b.type='button';b.className='cad-space-tab cad-layout-extra';b.title='Ir a esta lámina · doble clic: renombrar · clic derecho: borrar';b.onclick=()=>cadSwitchLayout(i)}
+  label(b,l.name);b.ondblclick=()=>cadRenameLayout(i);b.oncontextmenu=e=>{e.preventDefault();cadDeleteLayout(i)};bar.insertBefore(b,plot);
+ });
+ const add=document.createElement('button');add.type='button';add.className='cad-space-tab cad-layout-extra cad-layout-add';add.textContent='+';add.title='Nueva lámina (NUEVALAMINA)';add.onclick=cadAddLayout;bar.insertBefore(add,plot);
+}
+function cadEditTitleFields(){
+ document.getElementById('cadTitleDlg')?.remove();
+ const F=[['obra','Obra / proyecto'],['plano','Plano (contenido)'],['ubicacion','Ubicación'],['comitente','Comitente'],['profesional','Profesional'],['matricula','Matrícula'],['lamina','Lámina N°'],['escala','Escala (vacío = automática)'],['fecha','Fecha (vacío = hoy)']];
+ const d=document.createElement('div');d.id='cadTitleDlg';d.className='modal-backdrop show';
+ d.innerHTML='<div class="modal" style="max-width:460px"><div class="modal-head"><h2>Datos del rótulo · '+escapeHTML(cadLayouts[cadLayoutIdx].name)+'</h2><button class="btn" data-x>✕</button></div><div style="display:grid;gap:8px;padding:6px 2px">'+
+  F.map(([k,l])=>'<label style="display:grid;grid-template-columns:150px 1fr;align-items:center;gap:8px;font-size:12px">'+l+'<input data-k="'+k+'" maxlength="80" value="'+escapeHTML(cadTitleFields[k]||'')+'"></label>').join('')+
+  '</div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button class="btn" data-x>Cancelar</button><button class="btn primary" data-ok>Guardar</button></div></div>';
+ document.body.append(d);
+ d.addEventListener('click',e=>{if(e.target===d||e.target.closest('[data-x]'))d.remove();if(e.target.closest('[data-ok]')){d.querySelectorAll('[data-k]').forEach(i=>{const v=i.value.trim();if(v)cadTitleFields[i.dataset.k]=v.slice(0,80);else delete cadTitleFields[i.dataset.k]});d.remove();cadLayoutsPersist();try{localStorage.setItem(CAD_LAYOUT_KEY,JSON.stringify(collectLayoutState()))}catch(e){}renderLayoutWorkspace();queueLocalBackup?.();toast('Rótulo actualizado')}});
+}
+// Rótulo de arquitectura (dibujo original): celdas con etiqueta pequeña y valor. Coordenadas en mm de hoja.
+function cadTitleBlockParts(o){
+ const W=Math.max(120,Math.min(190,o.w*.42)),H=W*.30,x=o.w-o.margin-W,y=o.h-o.margin-H,f=cadTitleFields;
+ const scaleAuto=o.viewports?.length>1?'INDICADAS':o.viewports?.length===1?(o.viewports[0].scale==='fit'?'S/E':'1:'+o.viewports[0].scale):($('plotScale').value==='fit'?'S/E':'1:'+($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value));
+ const r=[H*.30,H*.25,H*.25,H*.20],rows=[[['OBRA / PROYECTO',f.obra||state.file,1]],[['PLANO',f.plano||'',.72],['LÁMINA N°',f.lamina||String(cadLayoutIdx+1),.28]],[['UBICACIÓN',f.ubicacion||'',.5],['ESCALA',f.escala||scaleAuto,.22],['FECHA',f.fecha||cadLocalPrintDate(),.28]],[['PROFESIONAL'+(f.matricula?' · MAT. '+f.matricula:''),f.profesional||'',.55],['COMITENTE',f.comitente||'',.45]]];
+ const rects=[{x,y,w:W,h:H}],lines=[],texts=[];let yy=y;
+ rows.forEach((row,ri)=>{const h=r[ri];if(ri)lines.push([x,yy,x+W,yy]);let xx=x;row.forEach(([lab,val,fr],ci)=>{const w=W*fr;if(ci)lines.push([xx,yy,xx,yy+h]);
+  texts.push({x:xx+1.6,y:yy+H*.075,size:H*.05,text:lab,bold:true});
+  const vs=Math.min(h*.42,H*.10);let v=String(val||'');const maxc=Math.max(4,Math.floor((w-3)/(vs*.56)));if(v.length>maxc)v=v.slice(0,maxc-1)+'…';
+  texts.push({x:xx+1.6,y:yy+h-h*.22,size:vs,text:v});xx+=w});yy+=h});
+ texts.push({x:x+W-1.5,y:y+H*.075,size:H*.04,text:'BLACKLINE CAD',align:'end'});
+ return {rects,lines,texts,box:{x,y,w:W,h:H}};
+}
 function collectLayoutState(){
  return {paper:$('layoutPaper').value,paperW:Number($('layoutPaperW').value)||600,paperH:Number($('layoutPaperH').value)||400,orientation:$('layoutOrientation').value,
   scale:$('layoutScale').value,margin:Number($('layoutMargin').value),
-  style:$('layoutStyle').value,title:$('layoutTitleBlock').checked,paperColor:cadPaperColor(),viewports:clone(cadLayoutViewports)};
+  style:$('layoutStyle').value,title:$('layoutTitleBlock').checked,titleType:$('layoutTitleType').value,titleFields:clone(cadTitleFields),paperColor:cadPaperColor(),viewports:clone(cadLayoutViewports)};
 }
 function applyLayoutState(v){
  if(!v||typeof v!=='object')return;
@@ -6570,6 +6645,8 @@ function applyLayoutState(v){
  option('layoutPaper',v.paper);option('layoutOrientation',v.orientation);option('layoutScale',v.scale);option('layoutStyle',v.style);
  if(Number.isFinite(Number(v.margin)))$('layoutMargin').value=Math.max(0,Math.min(100,Number(v.margin)));
  if(typeof v.title==='boolean')$('layoutTitleBlock').checked=v.title;
+ if(v.titleType==='arq'||v.titleType==='simple')$('layoutTitleType').value=v.titleType;
+ cadTitleFields=v.titleFields&&typeof v.titleFields==='object'?Object.fromEntries(Object.entries(v.titleFields).filter(([k,x])=>typeof x==='string').map(([k,x])=>[k,x.slice(0,80)])):{};
  if(/^#[0-9a-f]{6}$/i.test(v.paperColor||''))$('layoutPaperColor').value=v.paperColor;
  if(Number(v.paperW)>=50)$('layoutPaperW').value=v.paperW;if(Number(v.paperH)>=50)$('layoutPaperH').value=v.paperH;$('layoutCustomBox').hidden=$('layoutPaper').value!=='CUSTOM';
  cadLayoutViewports=Array.isArray(v.viewports)?v.viewports.filter(x=>x&&[x.x,x.y,x.w,x.h].every(Number.isFinite)).slice(0,24):[];
@@ -6579,7 +6656,7 @@ function syncLayoutToPlot(){
  $('paper').value=v.paper;$('orientation').value=v.orientation;
  if(v.paper==='CUSTOM'){$('paperW').value=Math.max(50,Math.min(5000,v.paperW));$('paperH').value=Math.max(50,Math.min(5000,v.paperH))}
  $('plotScale').value=v.scale;$('plotMargin').value=String(v.margin);
- $('plotStyle').value=v.style;$('titleBlock').value=v.title?'simple':'none';
+ $('plotStyle').value=v.style;$('titleBlock').value=v.title?(v.titleType||'arq'):'none';
 }
 let cadLayoutViewports=[];
 /* Ventanas gráficas (MVIEW): rectángulos en mm de hoja, cada uno con centro de modelo y escala 1:N
@@ -6618,13 +6695,15 @@ function switchCadSpace(space){
 }
 function initLayoutWorkspace(){
  try{applyLayoutState(JSON.parse(localStorage.getItem(CAD_LAYOUT_KEY)||'null'))}catch(error){}
- for(const id of ['layoutPaper','layoutPaperW','layoutPaperH','layoutOrientation','layoutScale','layoutMargin','layoutStyle','layoutTitleBlock','layoutPaperColor'])
-  $(id).addEventListener('change',()=>{$('layoutCustomBox').hidden=$('layoutPaper').value!=='CUSTOM';try{localStorage.setItem(CAD_LAYOUT_KEY,JSON.stringify(collectLayoutState()))}catch(error){}renderLayoutWorkspace()});
+ try{cadLayoutsLoad(JSON.parse(localStorage.getItem(CAD_LAYOUTS_KEY)||'null'))}catch(error){}
+ renderLayoutTabs();$('layoutTitleEdit').onclick=cadEditTitleFields;
+ for(const id of ['layoutPaper','layoutPaperW','layoutPaperH','layoutOrientation','layoutScale','layoutMargin','layoutStyle','layoutTitleBlock','layoutPaperColor','layoutTitleType'])
+  $(id).addEventListener('change',()=>{$('layoutCustomBox').hidden=$('layoutPaper').value!=='CUSTOM';try{localStorage.setItem(CAD_LAYOUT_KEY,JSON.stringify(collectLayoutState()))}catch(error){}cadLayoutsPersist();renderLayoutWorkspace()});
  $('modelSpaceTab').onclick=()=>switchCadSpace('model');
  $('paperSpaceTab').onclick=()=>switchCadSpace('layout');
  $('cadPlotShortcut').onclick=()=>openPrint();
  $('layoutOpenPlot').onclick=()=>{syncLayoutToPlot();openPrint()};
- $('layoutDownloadPdf').onclick=()=>downloadCadPdf(layoutPlotOptions(),state.file+'-Layout1.pdf');
+ $('layoutDownloadPdf').onclick=()=>downloadCadPdf(layoutPlotOptions(),state.file+'-'+String(cadLayouts[cadLayoutIdx]?.name||'Layout 1').replace(/[^\w\- áéíóúñÁÉÍÓÚÑ]/g,'').trim().replace(/\s+/g,'_')+'.pdf');
  window.addEventListener('resize',()=>{if(cadActiveSpace==='layout')renderLayoutWorkspace()});
 }
 
@@ -6719,6 +6798,7 @@ if(o.title==='simple'){
   `BT /F1 3 Tf 1 0 0 -1 ${fmt(x+58)} ${fmt(y+20)} Tm (${esc(scaleLabel)}) Tj ET`,
  'Q');
 }
+if(o.title==='arq'){const T=cadTitleBlockParts(o);contents.push('q',`${fmt(toPt)} 0 0 ${fmt(-toPt)} 0 ${fmt(o.h*toPt)} cm`,'0 0 0 RG .3 w');for(const b of T.rects)contents.push(`${fmt(b.x)} ${fmt(b.y)} ${fmt(b.w)} ${fmt(b.h)} re S`);contents.push('.18 w');for(const l of T.lines)contents.push(`${fmt(l[0])} ${fmt(l[1])} m ${fmt(l[2])} ${fmt(l[3])} l S`);for(const t of T.texts){const g=t.bold?'.33':t.align==='end'?'.5':'0';const tx=t.align==='end'?t.x-t.text.length*t.size*.55:t.x;contents.push(`${g} ${g} ${g} rg`,`BT /F1 ${fmt(t.size)} Tf 1 0 0 -1 ${fmt(tx)} ${fmt(t.y)} Tm (${esc(t.text)}) Tj ET`)}contents.push('Q')}
 const content=contents.join('\n')+'\n',encoder=new TextEncoder(),bytes=[],offsets=[0];const push=s=>{const a=encoder.encode(s);for(let i=0;i<a.length;i++)bytes.push(a[i])};push('%PDF-1.4\n%CAD2D\n');function obj(n,body){offsets[n]=bytes.length;push(`${n} 0 obj\n${body}\nendobj\n`)}obj(1,'<< /Type /Catalog /Pages 2 0 R >>');obj(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');obj(3,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${fmt(o.w*toPt)} ${fmt(o.h*toPt)}] /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R /F4 8 0 R /F5 9 0 R /F6 10 0 R >> >> /Contents 4 0 R >>`);obj(4,`<< /Length ${encoder.encode(content).length} >>\nstream\n${content}endstream`);obj(5,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');obj(6,'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');obj(7,'<< /Type /Font /Subtype /Type1 /BaseFont /Times-Roman /Encoding /WinAnsiEncoding >>');obj(8,'<< /Type /Font /Subtype /Type1 /BaseFont /Times-Bold /Encoding /WinAnsiEncoding >>');obj(9,'<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>');obj(10,'<< /Type /Font /Subtype /Type1 /BaseFont /Courier-Bold /Encoding /WinAnsiEncoding >>');let start=bytes.length;push('xref\n0 11\n0000000000 65535 f \n');for(let i=1;i<=10;i++)push(`${String(offsets[i]).padStart(10,'0')} 00000 n \n`);push(`trailer\n<< /Size 11 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`);return new Blob([new Uint8Array(bytes)],{type:'application/pdf'})}
 $('cadPrintPrinter').onclick=()=>cadPrintToPrinter();
 $('downloadPdf').onclick=()=>downloadCadPdf(plotOptions(),state.file+'.pdf');
@@ -6757,7 +6837,7 @@ function backupPayload(){
  return {format:'CAD2D-2',entities:clone(cadBlockEdit?cadBlockEdit.entities:state.entities),layers:clone(state.layers),
  blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,unit:state.unit,grid:state.grid,
  precision:state.precision,nextId:state.nextId,layerId:state.layerId,
- file:state.file,layout:collectLayoutState(),savedAt:new Date().toISOString(),modelScale:'1:1'};
+ file:state.file,layout:collectLayoutState(),layouts:cadLayoutsSnapshot(),savedAt:new Date().toISOString(),modelScale:'1:1'};
 }
 function backupStatus(message){const el=$('backupStatus');if(el)el.textContent=message}
 async function persistLocalBackup(){
@@ -6798,7 +6878,7 @@ async function restoreLocalBackup(silent){
   state.unit=U[snap.unit]?snap.unit:'m';state.grid=Number(snap.grid)||1;
   state.precision=Number(snap.precision??2);state.nextId=Number(snap.nextId)||1;
   state.layerId=state.layers.some(l=>l.id===snap.layerId)?snap.layerId:(state.layers[0]?.id||'0');
-  state.file=snap.file||'Recovered drawing';if(snap.layout)applyLayoutState(snap.layout);state.history=[];state.future=[];state.selected=[];state.stage=[];
+  state.file=snap.file||'Recovered drawing';if(snap.layout)applyLayoutState(snap.layout);if(!cadLayoutsLoad(snap.layouts)){cadLayouts=[{name:'Layout 1',state:snap.layout||null}];cadLayoutIdx=0;renderLayoutTabs()}state.history=[];state.future=[];state.selected=[];state.stage=[];
   $('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=String(state.precision);
   $('canvasUnits').textContent='· '+state.unit;
   renderBlockLibrary();updateAll();zoomExtents();toast('Local backup restored');
@@ -8749,25 +8829,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1315"></script>
-<script src="blackline-modern.js?v=20261120-1315"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1315"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1315"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1315"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1315"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1315"></script>
-<script src="cad-osnap-math.js?v=20261120-1315"></script>
-<script src="cad-scale-math.js?v=20261120-1315"></script>
-<script src="cad-object-tracking.js?v=20261120-1315"></script>
-<script src="cad-auto-opening.js?v=20261120-1315"></script>
-<script src="cad-wall-join.js?v=20261120-1315"></script>
-<script src="cad-wall-grip.js?v=20261120-1315"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1315"></script>
-<script src="cad-performance.js?v=20261120-1315"></script>
-<script src="cad-plan.js?v=20261120-1315"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1315"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1315"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1315"></script>
-<script src="cad-arq-pro.js?v=20261120-1315"></script>
-<script src="cad-autocad-plus.js?v=20261120-1315"></script>
-<script src="cad-touch.js?v=20261120-1315"></script><script src="cad-quickbar.js?v=20261120-1315"></script><script src="cad-cmd-resize.js?v=20261120-1315"></script><script src="cad-buy-guide.js?v=20261120-1315"></script>
-<script src="cad-arq-tools.js?v=20261120-1315"></script><script src="cad-block-browser.js?v=20261120-1315"></script>
+<script src="workspace-upgrade.js?v=20261120-1330"></script>
+<script src="blackline-modern.js?v=20261120-1330"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-1330"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-1330"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1330"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-1330"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1330"></script>
+<script src="cad-osnap-math.js?v=20261120-1330"></script>
+<script src="cad-scale-math.js?v=20261120-1330"></script>
+<script src="cad-object-tracking.js?v=20261120-1330"></script>
+<script src="cad-auto-opening.js?v=20261120-1330"></script>
+<script src="cad-wall-join.js?v=20261120-1330"></script>
+<script src="cad-wall-grip.js?v=20261120-1330"></script>
+<script src="cad-hatch-patterns.js?v=20261120-1330"></script>
+<script src="cad-performance.js?v=20261120-1330"></script>
+<script src="cad-plan.js?v=20261120-1330"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1330"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1330"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1330"></script>
+<script src="cad-arq-pro.js?v=20261120-1330"></script>
+<script src="cad-autocad-plus.js?v=20261120-1330"></script>
+<script src="cad-touch.js?v=20261120-1330"></script><script src="cad-quickbar.js?v=20261120-1330"></script><script src="cad-cmd-resize.js?v=20261120-1330"></script><script src="cad-buy-guide.js?v=20261120-1330"></script>
+<script src="cad-arq-tools.js?v=20261120-1330"></script><script src="cad-block-browser.js?v=20261120-1330"></script>
 </body></html>
