@@ -208,6 +208,7 @@ requestAnimationFrame(requestResize);
  const actions=[
   ['file-new','New drawing','file-plus','Ctrl+N'],
   ['file-open','Open…','folder-open','Ctrl+O'],
+  ['file-import','Import image / Excel / TXT…','folder-open',''],
   ['file-save','Save','save','Ctrl+S'],
   ['file-saveas','Save As…','save',"Ctrl+Shift+S"],
   ['file-dxf','Export DXF','download',''],
@@ -246,6 +247,7 @@ requestAnimationFrame(requestResize);
   const key=b.dataset.blFileAction;close();
   if(key==='file-new')runCommand('NEW');
   if(key==='file-open')document.getElementById('openBtn')?.click();
+  if(key==='file-import')document.getElementById('fileInput')?.click();
   if(key==='file-save')runCommand('SAVE');
   if(key==='file-saveas')runCommand('SAVEAS');
   if(key==='file-dxf')document.getElementById('dxfBtn')?.click();
