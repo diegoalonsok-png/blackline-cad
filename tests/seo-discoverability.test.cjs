@@ -2,7 +2,7 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const base='https://blackline-cad.org/';
-const paths=['index.html','manual-comandos.html','legal.html','guia-cad-2d-online.html','plano-casa-cad-2d-online.html'];
+const paths=['index.html','manual-comandos.html','legal.html','guia-cad-2d-online.html','plano-casa-cad-2d-online.html','cad-2d-educacion.html'];
 test('Blackline CAD public pages have canonical, description, and crawlable metadata',()=>{
  for(const path of paths){
   const html=fs.readFileSync(path,'utf8');
