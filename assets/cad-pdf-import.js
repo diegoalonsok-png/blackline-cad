@@ -19,7 +19,7 @@ async function extract(page){
  const flush=keep=>{if(keep)for(const p of pending)if(p.pts.length>1){p.layer=curLayer();p.color=stroke;paths.push(p)}pending=[]};
  for(let i=0;i<ops.fnArray.length;i++){
   const fn=ops.fnArray[i],a=ops.argsArray[i];
-  if(fn===OPS.beginMarkedContentProps){const id=a?.[0]==='OC'?(a[1]?.id||(typeof a[1]==='string'?a[1]:null)):null;mc.push(id)}
+  if(fn===OPS.beginMarkedContentProps){const v=a?.[1];const id=a?.[0]==='OC'?(v?.id||(Array.isArray(v?.ids)?v.ids[0]:null)||(typeof v==='string'?v:null)):null;mc.push(id)}
   else if(fn===OPS.beginMarkedContent)mc.push(null);
   else if(fn===OPS.endMarkedContent)mc.pop();
   else if(fn===OPS.setStrokeRGBColor){try{stroke=hex(a.length===1?a[0]:a)}catch(e){}}

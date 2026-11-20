@@ -21,7 +21,7 @@ export class DwgConverter extends DurableObject {
     const container = this.ctx.container;
     if (!container.running) container.start();
     const port = container.getTcpPort(8080);
-    for (let i = 0; i < 40; i++) {            // espera a que el servicio responda (arranque en frío)
+    for (let i = 0; i < 100; i++) {           // espera a que el servicio responda (arranque en frío: hasta ~50 s)
       try { const r = await port.fetch('http://container/health'); if (r.ok) break; } catch (e) {}
       await new Promise(r => setTimeout(r, 500));
     }
