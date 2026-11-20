@@ -9151,8 +9151,11 @@ function initCadDimStylePalette(){
   let st;if(b.dataset.p){const pr=PRESETS.find(x=>x[0]===b.dataset.p)[1],f=k();st={...pr,textHeight:pr.textHeight*f,arrow:pr.arrow*f,extOffset:pr.extOffset*f,extBeyond:pr.extBeyond*f,suffix:'',tolerance:0,color:''};current=b.dataset.p;state.activeDimStyle=''}
   else{st=validateDimStyle(state.dimStyles[b.dataset.s]);current=b.dataset.s;state.activeDimStyle=b.dataset.s}
   writeForm(st);push();paint();
-  const sel=state.entities.filter(x=>state.selected.includes(x.id)&&x.type==='dimension');if(sel.length){applySel(true)}
-  toast('Estilo de cota: '+current+(sel.length?' · aplicado a '+sel.length+' cota(s)':' · se usa en las cotas nuevas'));
+  const sel=state.entities.filter(x=>state.selected.includes(x.id)&&x.type==='dimension');
+  if(sel.length){applySel(true);return toast('Estilo de cota: '+current+' · aplicado a '+sel.length+' cota(s)')}
+  // Como la paleta de herramientas de AutoCAD: clic en un estilo = empezar a acotar con él (dos puntos cualesquiera y la posición).
+  state.selected=[];setTool('dimension');
+  toast('Acotar con «'+current+'»: marcá el primer punto, el segundo y dónde va la línea de cota (en cualquier lugar, no hace falta un objeto) · Esc termina');
  });
  const applySel=quiet=>{const targets=state.entities.filter(x=>state.selected.includes(x.id)&&x.type==='dimension');if(!targets.length){if(!quiet)toast('Seleccioná cotas primero');return}
   saveHistory();const st=validateDimStyle(fromForm());for(const t of targets){t.style=clone(st);t.dimStyleName=state.activeDimStyle||current||''}updateAll();if(!quiet)toast('Estilo aplicado a '+targets.length+' cota(s)')};
