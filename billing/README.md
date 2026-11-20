@@ -22,7 +22,7 @@ Principios:
 
 > **20 nov 2026: Pro pasa a 3,99 €/mes y 29,99 €/año** (IVA incluido). Precios nuevos creados en Stripe y cargados en el Worker `cad2d-billing`: `PRICE_PRO_MONTHLY` = `price_1UdvJLDY9yzl20JEloIXAm7X` (3,99 €/mes), `PRICE_PRO_YEARLY` = `price_1UdvQBDY9yzl20JEmqGHOe5O` (29,99 €/año, predeterminado). Los anteriores (1,59 €, 12,99 €, 22,99 €) quedan archivados.
 
-Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). El plan Estudio todavía no se vende (no hay botón ni `PRICE_STUDIO_MONTHLY`); sus importes son de referencia.
+Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). Plan Estudio (producto «Blackline CAD Estudio»): `PRICE_STUDIO_MONTHLY` = `price_1UdvZpDY9yzl20JEHAjWcfqZ` (9,99 €/mes), `PRICE_STUDIO_YEARLY` = `price_1UdvaKDY9yzl20JEFEt5AG1S` (89,99 €/año). El titular invita hasta 4 correos desde el cuadro de planes (`/api/team`); esas cuentas tienen Pro mientras la suscripción del titular esté vigente. La tabla `team_members` la crea el Worker si falta.
 
 | Plan | Precio (IVA incluido) | Te queda por cobro* |
 | --- | --- | --- |
