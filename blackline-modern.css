@@ -255,3 +255,32 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app #ribbonSizer::after{opacity:0;transition:opacity .15s}
 .app #ribbonSizer:hover,.app #ribbonSizer.resizing{background:#7fa8bb36!important}
 .app #ribbonSizer:hover::after,.app #ribbonSizer.resizing::after{opacity:1}
+
+/* Tema claro: contraste legible en galería, biblioteca y botones (nov 2026). */
+.app.blackline-modern.bl-light .arq-card{color:#1f2b33;background:#fff!important;border-color:#c9d3da!important}
+.app.blackline-modern.bl-light .arq-card .arq-name{color:#16212a}
+.app.blackline-modern.bl-light .arq-card .arq-meta{color:#21708a}
+.app.blackline-modern.bl-light .arq-card[aria-pressed=true]{outline-color:#2b7ea1}
+.app.blackline-modern.bl-light .arq-chips button,
+.app.blackline-modern.bl-light .btn.slim,
+.app.blackline-modern.bl-light .panel .btn,
+.app.blackline-modern.bl-light .sidebar .btn{background:#eef2f5!important;color:#16212a!important;border-color:#c3ced6!important}
+.app.blackline-modern.bl-light .panel .btn:hover,
+.app.blackline-modern.bl-light .sidebar .btn:hover{background:#dde6ec!important}
+.app.blackline-modern.bl-light .panel-title,
+.app.blackline-modern.bl-light .panel-title span,
+.app.blackline-modern.bl-light .sidebar h2,
+.app.blackline-modern.bl-light .sidebar h3{color:#16212a!important}
+.app.blackline-modern.bl-light .tool,.app.blackline-modern.bl-light .tool span,.app.blackline-modern.bl-light #ribbon .tool,.app.blackline-modern.bl-light #ribbon .tool span{color:#eef3f6!important}
+.app.blackline-modern.bl-light .status .btn,
+.app.blackline-modern.bl-light .status button{color:#16212a}
+.app.blackline-modern.bl-light .finder-symbol{color:#2b3a44}
+.app.blackline-modern.bl-light .cad-group-handle{color:#5a6a75}
+
+.app.blackline-modern.bl-light .sidebar .panel .panel-title,
+.app.blackline-modern.bl-light #blacklineBlockGallery .panel-title{background:#e1e8ed!important;color:#16212a!important}
+.app.blackline-modern.bl-light #blacklineBlockGallery .btn,
+.app.blackline-modern.bl-light #blCategories .btn,
+.app.blackline-modern.bl-light #blacklineBlockGallery #blCards .btn,.app.blackline-modern.bl-light #blacklineBlockGallery #blCategories .btn{background:#ffffff!important;color:#16212a!important;border:1px solid #c3ced6!important}
+.app.blackline-modern.bl-light #blCategories .btn[aria-pressed=true],
+.app.blackline-modern.bl-light #blCategories .btn.active{background:#d5e6ef!important}

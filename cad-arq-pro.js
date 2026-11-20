@@ -103,9 +103,9 @@ function svgFor(item,W,D,{height=96,pad=.08}={}){
    let sweep=e.a1-e.a0;while(sweep<=0)sweep+=Math.PI*2;
    const s0=P(e.c.x+e.r*Math.cos(e.a0),e.c.y+e.r*Math.sin(e.a0)),s1=P(e.c.x+e.r*Math.cos(e.a1),e.c.y+e.r*Math.sin(e.a1));
    body+=`<path d="M${pt(s0)} A${e.r} ${e.r} 0 ${sweep>Math.PI?1:0} 0 ${pt(s1)}"${a}/>`;
-  }else if(e.type==='text')body+=`<text x="${e.p.x}" y="${-e.p.y}" font-size="${e.h}" fill="#9fb4c2" stroke="none" font-family="Arial" transform="rotate(${-(e.rotation||0)} ${e.p.x} ${-e.p.y})">${esc(e.text)}</text>`;
+  }else if(e.type==='text')body+=`<text x="${e.p.x}" y="${-e.p.y}" font-size="${e.h}" fill="currentColor" fill-opacity=".75" stroke="none" font-family="Arial" transform="rotate(${-(e.rotation||0)} ${e.p.x} ${-e.p.y})">${esc(e.text)}</text>`;
  }
- return `<svg xmlns="${NS}" viewBox="${(b.minX-p).toFixed(4)} ${(-b.maxY-p).toFixed(4)} ${(w+2*p).toFixed(4)} ${(h+2*p).toFixed(4)}" style="display:block;width:100%;height:${height}px" role="img" aria-label="Planta de ${esc(item.name)}"><g fill="none" stroke="#dce9f2" stroke-width="${sw.toFixed(4)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">${body}</g></svg>`;
+ return `<svg xmlns="${NS}" viewBox="${(b.minX-p).toFixed(4)} ${(-b.maxY-p).toFixed(4)} ${(w+2*p).toFixed(4)} ${(h+2*p).toFixed(4)}" style="display:block;width:100%;height:${height}px" role="img" aria-label="Planta de ${esc(item.name)}"><g fill="none" stroke="currentColor" stroke-width="${sw.toFixed(4)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">${body}</g></svg>`;
 }
 const thumbCache=new Map();
 function thumb(item,height){
@@ -123,7 +123,7 @@ css.textContent=`
 #arqPanel .arq-chips button,#arqModal .arq-chips button{font-size:10px;padding:3px 7px;border-radius:10px}
 #arqPanel .arq-chips button[aria-pressed=true],#arqModal .arq-chips button[aria-pressed=true]{background:#385263;border-color:#91bfd5}
 #arqPanel .arq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:340px;overflow-y:auto}
-.arq-card{position:relative;padding:4px!important;min-width:0;white-space:normal!important;text-align:left;display:flex!important;flex-direction:column;gap:2px;height:auto!important}
+.arq-card{color:#dce9f2;position:relative;padding:4px!important;min-width:0;white-space:normal!important;text-align:left;display:flex!important;flex-direction:column;gap:2px;height:auto!important}
 .arq-card .arq-name{font-size:10px;line-height:1.25;color:#e5eef7}
 .arq-card .arq-meta{font-size:9px;color:#9cdeed}
 .arq-card .arq-pro{position:absolute;top:4px;right:4px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:6px;background:#c79a3a;color:#111}
