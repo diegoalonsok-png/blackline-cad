@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261119-2100">
-<link rel="stylesheet" href="blackline-modern.css?v=20261119-2100">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261119-2230">
+<link rel="stylesheet" href="blackline-modern.css?v=20261119-2230">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261119-2100"></script>
-<script defer src="assets/cad-ui-language.js?v=20261119-2100"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261119-2230"></script>
+<script defer src="assets/cad-ui-language.js?v=20261119-2230"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261119-2100"></script>
-<script src="cad-grip-settings.js?v=20261119-2100"></script>
-<script src="cad-cursor-mode.js?v=20261119-2100"></script>
+<script src="cad2d-config.js?v=20261119-2230"></script>
+<script src="cad-grip-settings.js?v=20261119-2230"></script>
+<script src="cad-cursor-mode.js?v=20261119-2230"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -2616,6 +2616,21 @@ function flattenCADEntities(entities){const tGaps=cadComputeWallTGaps(entities);
  return base.flatMap(cadCircularTextGlyphs);
 })}
 
+// Tipos de línea visibles en pantalla. Patrones en metros reales (como acad.lin a escala de arquitectura),
+// multiplicados por la escala del objeto (ltscale) y la global (LTSCALE).
+const CAD2D_LT_PATTERNS={DASHED:[.12,.06],HIDDEN:[.06,.03],CENTER:[.24,.04,.04,.04],DOTTED:[0,.05],DOT:[0,.05],DASHDOT:[.12,.04,0,.04],PHANTOM:[.24,.04,.04,.04,.04,.04]};
+function cadLinetypeDash(e,lay){
+ let lt=String(e.linetype||'BYLAYER').toUpperCase();if(lt==='BYLAYER'||lt==='BYBLOCK')lt=String(lay?.linetype||'CONTINUOUS').toUpperCase();
+ const pat=CAD2D_LT_PATTERNS[lt];if(!pat)return null;
+ const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*state.view.scale;
+ const px=pat.map(v=>v===0?.01:Math.max(1.5,v*k));
+ return px.reduce((a,b)=>a+b,0)<4?null:px;
+}
+function cadSvgDash(e,factor){
+ let lt=String(e.linetype||'BYLAYER').toUpperCase();if(lt==='BYLAYER'||lt==='BYBLOCK')lt=String(layerFor(e)?.linetype||'CONTINUOUS').toUpperCase();
+ const pat=CAD2D_LT_PATTERNS[lt];if(!pat)return '';const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*factor;
+ return ` stroke-dasharray="${pat.map(v=>v===0?.01:Math.max(.3,v*k)).map(v=>Number(v.toFixed(3))).join(' ')}"`;
+}
 function drawEntity(e,forceColor){if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
@@ -2623,7 +2638,7 @@ function drawEntity(e,forceColor){if(e.type==='line'&&cadTGapCache?.has(e.id)&&!
    drawBlockGrips(e);
   }
   return;
- }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
+ }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
   ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();ctx.setLineDash([]);
   if(!e.hatchStyle||e.hatchStyle==='solid'){ctx.fillStyle=e.color||lay.color;ctx.fill()}
   else{
@@ -5196,7 +5211,7 @@ function cadZoomStep(direction){
  toast(direction==='out'?'ZOOM −: dibujo alejado':'ZOOM +: dibujo ampliado');
  log('ZOOM '+(direction==='out'?'OUT':'IN')+' '+previous.toFixed(3)+' → '+state.view.scale.toFixed(3));
 }
-let cad2dOpt=null,cad2dTypedValue=null,cad2dArcCenter=false;
+let cad2dLtscalePending=false,cad2dOpt=null,cad2dTypedValue=null,cad2dArcCenter=false;
 function cad2dArc3(A,B,C,layer){const d=2*(A.x*(B.y-C.y)+B.x*(C.y-A.y)+C.x*(A.y-B.y));if(Math.abs(d)<1e-12)return {type:'line',a:A,b:C,layer};
  const ux=((A.x*A.x+A.y*A.y)*(B.y-C.y)+(B.x*B.x+B.y*B.y)*(C.y-A.y)+(C.x*C.x+C.y*C.y)*(A.y-B.y))/d,uy=((A.x*A.x+A.y*A.y)*(C.x-B.x)+(B.x*B.x+B.y*B.y)*(A.x-C.x)+(C.x*C.x+C.y*C.y)*(B.x-A.x))/d,c=P(ux,uy);
  const n2=x=>((x%(2*Math.PI))+2*Math.PI)%(2*Math.PI),t1=ang(c,A),t2=ang(c,B),t3=ang(c,C),ccw=n2(t2-t1)<n2(t3-t1);
@@ -5204,6 +5219,8 @@ function cad2dArc3(A,B,C,layer){const d=2*(A.x*(B.y-C.y)+B.x*(C.y-A.y)+C.x*(A.y-
 const cad2dCommandHistory=[];
 let cad2dHistoryCursor=0;
 function runCommand(){let value=$('command').value.trim();$('command').value='';
+ if(cad2dLtscalePending){cad2dLtscalePending=false;if(value){const v=Number(value.replace(',','.'));if(v>0){state.ltscale=v;updateAll();toast('LTSCALE = '+v);log('LTSCALE '+v)}else toast('LTSCALE: valor inválido')}return}
+ if(/^(LTSCALE|LTS|ESCALATL)$/i.test(value)){cad2dLtscalePending=true;$('command').placeholder='LTSCALE · Enter new linetype scale factor <'+(state.ltscale||1)+'>';toast('LTSCALE · factor global de tipo de línea <'+(state.ltscale||1)+'>');return}
  if(value&&value!==cad2dCommandHistory.at(-1)&&!/^[0-9.,+\-]+$/.test(value)){
   cad2dCommandHistory.push(value);if(cad2dCommandHistory.length>80)cad2dCommandHistory.shift();
  }
@@ -5555,7 +5572,7 @@ function cadProjectSnapshot(filename){
  return {format:'CAD2D-2',filename,modelScale:'1:1',blocks:state.blocks,
   dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,
   layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,
-  precision:state.precision,nextId:state.nextId,layout:collectLayoutState()};
+  precision:state.precision,nextId:state.nextId,ltscale:state.ltscale||1,layout:collectLayoutState()};
 }
 async function saveJSON(forceNew=false){
  const canPick=typeof window.showSaveFilePicker==='function'&&window.isSecureContext;
@@ -5637,7 +5654,7 @@ async function convertDWGAutomatically(file){
  importDXF(dxf,file.name.replace(/\.dwg$/i,'.dxf'));
  log('DWG converted via external service; verify layers, unsupported entities and 1:1 units.');
 }
-async function loadDrawingFile(f){if(!f)return;try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+async function loadDrawingFile(f){if(!f)return;try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -5646,7 +5663,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const LW=[0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211];
  const lw=w=>{const v=Math.round((Number(w)||.25)*100);return String(LW.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a))};
  const LT={CONTINUOUS:['Solid line',[]],DASHED:['Dashed __ __ __',[.5,-.25]],HIDDEN:['Hidden _ _ _',[.25,-.125]],CENTER:['Center ____ _ ____',[1.25,-.25,.25,-.25]],DOT:['Dot . . .',[0,-.25]],PHANTOM:['Phantom ____ _ _ ____',[1.25,-.25,.25,-.25,.25,-.25]],DASHDOT:['Dash dot __ . __',[.5,-.25,0,-.25]]};
- const ltName=n=>{const u=String(n||'').toUpperCase();return u==='BYLAYER'||u==='BYBLOCK'?u:LT[u]?u:'CONTINUOUS'};
+ const ltName=n=>{let u=String(n||'').toUpperCase();if(u==='DOTTED')u='DOT';return u==='BYLAYER'||u==='BYBLOCK'?u:LT[u]?u:'CONTINUOUS'};
  const ltLayer=n=>{const u=ltName(n);return u==='BYLAYER'||u==='BYBLOCK'?'CONTINUOUS':u};
  const hex=c=>{const v=parseInt(String(c||'').replace('#',''),16);return Number.isFinite(v)?String(v&0xffffff):null};
  const layerList=layers.some(l=>l.name==='0')?layers:[{name:'0',color:'#ffffff',visible:true,width:.25},...layers];
@@ -5677,7 +5694,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))continue;
   if(e.type==='hatch'){if(!(e.pts?.length>2))continue;ents.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2','SOLID','70','1','71','0','91','1','92','2','72','0','73','1','93',String(e.pts.length),...e.pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]),'97','0','75','0','76','1','98','0')}
   else if(e.type==='line'||e.type==='dimension')ents.push(...head('LINE',e,lay),'100','AcDbLine',...pos(e.a.x,e.a.y),'11',dxfNum(e.b.x),'21',dxfNum(e.b.y),'31','0');
-  else if(e.type==='polyline'||e.type==='rect'){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;ents.push(...head('LWPOLYLINE',e,lay),'100','AcDbPolyline','90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),'43','0',...pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]))}
+  else if(e.type==='polyline'||e.type==='rect'){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;ents.push(...head('LWPOLYLINE',e,lay),'100','AcDbPolyline','90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),'43',dxfNum(e.pwidth||0),...pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]))}
   else if(e.type==='circle'){if(!(e.r>0))continue;ents.push(...head('CIRCLE',e,lay),'100','AcDbCircle',...pos(e.c.x,e.c.y),'40',dxfNum(e.r))}
   else if(e.type==='arc'){if(!(e.r>0))continue;ents.push(...head('ARC',e,lay),'100','AcDbCircle',...pos(e.c.x,e.c.y),'40',dxfNum(e.r),'100','AcDbArc','50',dxfNum(((e.a0*180/Math.PI)%360+360)%360),'51',dxfNum(((e.a1*180/Math.PI)%360+360)%360))}
   else if(e.type==='ellipse'){const major=Math.max(e.rx,e.ry),minor=Math.min(e.rx,e.ry),rotation=(e.rotation||0)+(e.ry>e.rx?Math.PI/2:0);if(!(major>0&&minor>0))continue;ents.push(...head('ELLIPSE',e,lay),'100','AcDbEllipse',...pos(e.c.x,e.c.y),'11',dxfNum(major*Math.cos(rotation)),'21',dxfNum(major*Math.sin(rotation)),'31','0','40',dxfNum(minor/major),'41','0','42',dxfNum(TAU))}
@@ -5689,7 +5706,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   }
  }}
  const objects=['0','DICTIONARY','5',root,'330','0','100','AcDbDictionary','281','1','3','ACAD_GROUP','350',grp,'0','DICTIONARY','5',grp,'330',root,'100','AcDbDictionary','281','1'];
- const header=['9','$ACADVER','1','AC1015','9','$DWGCODEPAGE','3','ANSI_1252','9','$INSUNITS','70',String(({mm:4,cm:5,m:6,in:1,ft:2})[state.unit]||6),'9','$MEASUREMENT','70','1','9','$HANDSEED','5',(next+1).toString(16).toUpperCase()];
+ const header=['9','$ACADVER','1','AC1015','9','$DWGCODEPAGE','3','ANSI_1252','9','$INSUNITS','70',String(({mm:4,cm:5,m:6,in:1,ft:2})[state.unit]||6),'9','$MEASUREMENT','70','1','9','$LTSCALE','40',dxfNum(state.ltscale||1),'9','$HANDSEED','5',(next+1).toString(16).toUpperCase()];
  const data=['0','SECTION','2','HEADER',...header,'0','ENDSEC','0','SECTION','2','CLASSES','0','ENDSEC','0','SECTION','2','TABLES',...tables,'0','ENDSEC','0','SECTION','2','BLOCKS',...blocks,'0','ENDSEC','0','SECTION','2','ENTITIES',...ents,'0','ENDSEC','0','SECTION','2','OBJECTS',...objects,'0','ENDSEC','0','EOF'];
  return data.join('\r\n')+'\r\n';
 }
@@ -5798,7 +5815,7 @@ function importDXF(text,name){
     let points=[],lastX=null,hasBulge=false;
     for(const [c,v]of record){if(c===10){lastX=Number(v)}else if(c===20&&lastX!==null){points.push(P(lastX,Number(v)));lastX=null}else if(c===42&&Math.abs(Number(v))>1e-10)hasBulge=true}
     if(hasBulge)unsupported.set('LWPOLYLINE bulge arcs',(unsupported.get('LWPOLYLINE bulge arcs')||0)+1);
-    if(points.length>=2)entity={type:'polyline',pts:points,closed:Boolean(get(70)&1)};
+    if(points.length>=2){entity={type:'polyline',pts:points,closed:Boolean(get(70)&1)};const pw=get(43,0);if(pw>0)entity.pwidth=pw}
    }else if(type==='ELLIPSE'){let rx=Math.hypot(get(11),get(21)),ratio=get(40,1);if(rx>0)entity={type:'ellipse',c:P(get(10),get(20)),rx,ry:rx*ratio,rotation:Math.atan2(get(21),get(11))}}
    if(entity)entities.push({...common,...entity,id:entities.length+1});
    else unsupported.set(type,(unsupported.get(type)||0)+1);
@@ -5870,7 +5887,7 @@ function makeSVG(o){
    return s+(v.frame!==false?`<rect x="${v.x}" y="${v.y}" width="${v.w}" height="${v.h}" fill="none" stroke="#000" stroke-width=".25"/>`:'');
   }).join('');
   return page.replace(/<\/svg>\s*$/,inner+'</svg>');
- }const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of (o.__noEntities?[]:flattenCADEntities(state.entities))){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.05,e.width??layerFor(e).width??.25),attr=`fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'){
+ }const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of (o.__noEntities?[]:flattenCADEntities(state.entities))){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.05,e.width??layerFor(e).width??.25),attr=`fill="none" stroke="${c}" stroke-width="${(e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))?Math.max(sw,e.pwidth*o.factor):sw}" stroke-linecap="round" stroke-linejoin="round"${cadSvgDash(e,o.factor)}`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'){
   for(const segment of cadHatchPatternPrimitives(e,6000))svg.push('<path '+attr+' d="M '+point(segment.a)+' L '+point(segment.b)+'"/>');
  }else if(e.type==='hatch')svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="'+c+'" stroke="none"/>');else if(e.type==='line')svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(e.b)}"/>`);else if(e.type==='rect'){let a=px(e.a),b=px(e.b);svg.push(`<rect ${attr} x="${num(Math.min(a[0],b[0]))}" y="${num(Math.min(a[1],b[1]))}" width="${num(Math.abs(a[0]-b[0]))}" height="${num(Math.abs(a[1]-b[1]))}"/>`)}else if(e.type==='polyline')svg.push(`<polyline ${attr} points="${e.pts.map(xy).join(' ')}${e.closed?' '+xy(e.pts[0]):''}"/>`);else if(e.type==='circle'){let a=px(e.c);svg.push(`<circle ${attr} cx="${num(a[0])}" cy="${num(a[1])}" r="${num(e.r*o.factor)}"/>`)}else if(e.type==='ellipse'){let a=px(e.c);svg.push(`<ellipse ${attr} cx="${num(a[0])}" cy="${num(a[1])}" rx="${num(e.rx*o.factor)}" ry="${num(e.ry*o.factor)}" transform="rotate(${num(-(e.rotation||0)*180/Math.PI)} ${num(a[0])} ${num(a[1])})"/>`)}else if(e.type==='arc'){let sweep=arcSweep(e.a0,e.a1),start=add(e.c,P(e.r*Math.cos(e.a0),e.r*Math.sin(e.a0))),end=add(e.c,P(e.r*Math.cos(e.a0+sweep),e.r*Math.sin(e.a0+sweep)));svg.push(`<path ${attr} d="M ${point(start)} A ${num(e.r*o.factor)} ${num(e.r*o.factor)} 0 ${sweep>Math.PI?1:0} 0 ${point(end)}"/>`)}else if(e.type==='text'){
  let a=px(e.p),rotate=Number(e.rotation)||0,fs=Math.max(.001,e.h*o.factor),width=(e.text||'').length*fs*.61;
@@ -6215,6 +6232,8 @@ function openCadContextMenu(x,y,worldPoint){
    command('Zoom ventana · Z','Z'),
    item('Zoom extensión · ZE',()=>zoomExtents()),
  ]:count?[
+   item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+   null,
    command('Mover · M','MOVE'),command('Copiar · CO','COPY'),
    command('Girar · RO','ROTATE'),command('Escalar · SC','SCALE'),
    command('Simetría · MI','MIRROR'),command('Desfase · O','OFFSET'),
@@ -6222,7 +6241,6 @@ function openCadContextMenu(x,y,worldPoint){
    ...(blockTarget?[item('Editar bloque · BEDIT',()=>cadEditBlockDefinition(blockTarget.blockName)),item('Exportar bloque · W',()=>cadExportActiveBlock())]:[]),
    ...(selectedText?[item('Editar texto · ED',()=>{syncTextPanel(selectedText);openCadPaletteByTitle('Text / Typography');})]:[]),
     ...(selectedDimension?[item('Editar texto de cota · DEDIT',()=>editCadDimensionText(selectedDimension))]:[]),
-    item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
     command('Seleccionar similares','SELECTSIMILAR'),
     command('Invertir selección','SELECTINVERT'),
     command('Copiar a otra capa','COPYTOLAYER'),
@@ -7493,7 +7511,8 @@ function refreshCadQuickProperties(){
  const first=selected[0];
  if(first){
   $('cadPropsColor').value=first.color||layerFor(first).color||'#ffffff';
-  $('cadPropsWeight').value=String(first.width??layerFor(first).width??.25);
+  {const w=Number(first.width??layerFor(first).width??.25),opts=[...$('cadPropsWeight').options].map(o=>Number(o.value));$('cadPropsWeight').value=String(opts.reduce((a,b)=>Math.abs(b-w)<Math.abs(a-w)?b:a))}
+  $('cadPropsLtscale').value=String(first.ltscale||1);$('cadPropsPwidth').value=String(first.pwidth||0);
   $('cadPropsLinetype').value=first.linetype||'BYLAYER';
   $('cadPropsLayer').value=first.layer||state.layerId;
  }
@@ -7539,7 +7558,7 @@ function initCadExportPopover(){
 
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
- panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="CENTER">Eje / Center</option></select></label><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Seleccioná una o varias líneas y aplicá las propiedades. Ctrl+Z deshace los cambios.</div>';
+ panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea / Linetype scale <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><label>Ancho de polilínea / Polyline width <input type="number" id="cadPropsPwidth" min="0" step="0.01" value="0" title="Ancho global en unidades del dibujo (PEDIT W)"></label><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Seleccioná una o varias líneas y aplicá las propiedades. Ctrl+Z deshace los cambios.</div>';
  const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false')};
  $('cadPropsClose').onclick=close;
  button.setAttribute('aria-expanded','false');
@@ -7547,8 +7566,9 @@ function initCadQuickProperties(){
  $('cadPropsApply').onclick=()=>{
   const selected=validEditSelection();if(!selected.length)return toast('Seleccioná líneas u objetos primero');
   const color=$('cadPropsColor').value,weight=Number($('cadPropsWeight').value),linetype=$('cadPropsLinetype').value,layer=$('cadPropsLayer').value;
-  if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<=0||!state.layers.some(l=>l.id===layer))return toast('Propiedades inválidas');
-  saveHistory();for(const e of selected){e.color=color;e.width=weight;e.linetype=linetype;e.layer=layer}
+  const ltscale=Number($('cadPropsLtscale').value)||1,pwidth=Math.max(0,Number($('cadPropsPwidth').value)||0);
+  if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<0||!state.layers.some(l=>l.id===layer))return toast('Propiedades inválidas');
+  saveHistory();for(const e of selected){e.color=color;e.width=weight;e.linetype=linetype;e.layer=layer;if(ltscale!==1)e.ltscale=ltscale;else delete e.ltscale;if(['polyline','rect'].includes(e.type)){if(pwidth>0)e.pwidth=pwidth;else delete e.pwidth}}
   updateAll();toast('Propiedades aplicadas a '+selected.length+' objeto(s)');
  };
  $('cadPropsByLayer').onclick=()=>{
@@ -7864,25 +7884,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261119-2100"></script>
-<script src="blackline-modern.js?v=20261119-2100"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261119-2100"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261119-2100"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261119-2100"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261119-2100"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261119-2100"></script>
-<script src="cad-osnap-math.js?v=20261119-2100"></script>
-<script src="cad-scale-math.js?v=20261119-2100"></script>
-<script src="cad-object-tracking.js?v=20261119-2100"></script>
-<script src="cad-auto-opening.js?v=20261119-2100"></script>
-<script src="cad-wall-join.js?v=20261119-2100"></script>
-<script src="cad-wall-grip.js?v=20261119-2100"></script>
-<script src="cad-hatch-patterns.js?v=20261119-2100"></script>
-<script src="cad-performance.js?v=20261119-2100"></script>
-<script src="cad-plan.js?v=20261119-2100"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261119-2100"></script>
-<script src="cad-arq-pro.js?v=20261119-2100"></script>
-<script src="cad-autocad-plus.js?v=20261119-2100"></script>
-<script src="cad-touch.js?v=20261119-2100"></script>
-<script src="cad-arq-tools.js?v=20261119-2100"></script>
+<script src="workspace-upgrade.js?v=20261119-2230"></script>
+<script src="blackline-modern.js?v=20261119-2230"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261119-2230"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261119-2230"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261119-2230"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261119-2230"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261119-2230"></script>
+<script src="cad-osnap-math.js?v=20261119-2230"></script>
+<script src="cad-scale-math.js?v=20261119-2230"></script>
+<script src="cad-object-tracking.js?v=20261119-2230"></script>
+<script src="cad-auto-opening.js?v=20261119-2230"></script>
+<script src="cad-wall-join.js?v=20261119-2230"></script>
+<script src="cad-wall-grip.js?v=20261119-2230"></script>
+<script src="cad-hatch-patterns.js?v=20261119-2230"></script>
+<script src="cad-performance.js?v=20261119-2230"></script>
+<script src="cad-plan.js?v=20261119-2230"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261119-2230"></script>
+<script src="cad-arq-pro.js?v=20261119-2230"></script>
+<script src="cad-autocad-plus.js?v=20261119-2230"></script>
+<script src="cad-touch.js?v=20261119-2230"></script>
+<script src="cad-arq-tools.js?v=20261119-2230"></script>
 </body></html>
