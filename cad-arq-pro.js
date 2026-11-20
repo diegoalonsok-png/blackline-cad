@@ -145,9 +145,10 @@ css.textContent=`
 #arqModal .arq-grip{position:absolute;z-index:3;background:transparent}
 #arqModal .arq-grip.e{top:12px;right:-4px;width:10px;bottom:12px;cursor:ew-resize}#arqModal .arq-grip.w{top:12px;left:-4px;width:10px;bottom:12px;cursor:ew-resize}
 #arqModal .arq-grip.s{left:12px;right:12px;bottom:-4px;height:10px;cursor:ns-resize}#arqModal .arq-grip.n{left:12px;right:12px;top:-4px;height:8px;cursor:ns-resize}
-#arqModal .arq-grip.se,#arqModal .arq-grip.sw,#arqModal .arq-grip.ne,#arqModal .arq-grip.nw{width:16px;height:16px;background:#9adff3;border:2px solid #141c24;border-radius:4px}
+#arqModal .arq-grip.se,#arqModal .arq-grip.sw,#arqModal .arq-grip.ne,#arqModal .arq-grip.nw{width:18px;height:18px;background:transparent;border:0}
 #arqModal .arq-grip.se{right:-7px;bottom:-7px;cursor:nwse-resize}#arqModal .arq-grip.sw{left:-7px;bottom:-7px;cursor:nesw-resize}#arqModal .arq-grip.ne{right:-7px;top:-7px;cursor:nesw-resize}#arqModal .arq-grip.nw{left:-7px;top:-7px;cursor:nwse-resize}
-#arqModal .arq-grip.e:hover,#arqModal .arq-grip.w:hover,#arqModal .arq-grip.s:hover,#arqModal .arq-grip.n:hover{background:#9adff355}
+#arqModal .arq-grip.e:hover,#arqModal .arq-grip.w:hover,#arqModal .arq-grip.s:hover,#arqModal .arq-grip.n:hover{background:linear-gradient(currentColor,currentColor) center/2px 60% no-repeat;color:#9adff3aa}#arqModal .arq-grip.s:hover,#arqModal .arq-grip.n:hover{background-size:60% 2px}
+#arqModal .arq-box{border-radius:16px}#arqModal .arq-box header{border-radius:16px 16px 0 0}#arqModal .arq-box:hover{border-color:#6f93a6}
 #arqModal .arq-sizes{display:flex;gap:4px}#arqModal .arq-sizes .btn{padding:3px 8px;font-size:11px}
 #arqModal .arq-box.compact .arq-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}#arqModal .arq-box.compact .arq-tools{padding-bottom:4px}#arqModal .arq-box.compact header{flex-wrap:wrap;gap:6px}#arqModal .arq-box.compact header h2{font-size:12px;flex:1 1 100%;margin:0}
 #arqModal .arq-grid{flex:1;overflow:auto;padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-content:start}
