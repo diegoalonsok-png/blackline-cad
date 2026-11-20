@@ -4572,16 +4572,34 @@ function cadGripTypedDest(job){
  const v=Number(cadGripTyped);if(!cadGripTyped||!(v>0))return null;
  const e=job.original,g=job.grip;
  if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=snapPoint(state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=snapPoint(state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
  const m=snapPoint(state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
 }
+function cadGripNeighbours(e,g){
+ if(e.type!=='polyline'||g.kind!=='vertex')return [];const p=e.pts,i=g.index,n=p.length,out=[];
+ if(i>0)out.push(p[i-1]);else if(e.closed)out.push(p[n-1]);
+ if(i<n-1)out.push(p[i+1]);else if(e.closed)out.push(p[0]);
+ return out;
+}
 function cadGripLabel(job,candidate,dest){
- const e=job.original,g=job.grip;let text;
- if(e.type==='line'&&g.kind!=='move'){const L0=dist(e.a,e.b),L1=dist(candidate.a,candidate.b),dl=L1-L0,ang=((Math.atan2(candidate.b.y-candidate.a.y,candidate.b.x-candidate.a.x)*180/Math.PI)+360)%360;
-  text='Length '+units(L1)+' '+state.unit+'  ·  '+(dl>=0?'+':'−')+units(Math.abs(dl))+' '+state.unit+'  ·  '+ang.toFixed(1)+'°';}
- else{const d=dist(g.p,dest);text='Move '+units(d)+' '+state.unit;}
- if(cadGripTyped)text=cadGripTyped+' ⏎  ·  '+text;
- const p=screen(dest);ctx.save();ctx.font='13px Arial';const w=ctx.measureText(text).width;
- ctx.fillStyle='#1b2530f0';ctx.fillRect(p.x+16,p.y-34,w+14,22);ctx.strokeStyle='#ffce78';ctx.strokeRect(p.x+16,p.y-34,w+14,22);ctx.fillStyle='#fff2d6';ctx.fillText(text,p.x+23,p.y-18);ctx.restore();
+ const e=job.original,g=job.grip,es=cad2dAliasLanguage==='es',u=' '+state.unit,sg=v=>(v>=0?'+':'−')+units(Math.abs(v));
+ let main,sub2='';
+ if(e.type==='line'&&g.kind!=='move'){const L0=dist(e.a,e.b),L1=dist(candidate.a,candidate.b),ang=((Math.atan2(candidate.b.y-candidate.a.y,candidate.b.x-candidate.a.x)*180/Math.PI)+360)%360;
+  main=(es?'Largo ':'Length ')+units(L1)+u;sub2=(es?'Estirado ':'Stretched ')+sg(L1-L0)+u+'  ·  '+ang.toFixed(1)+'°';}
+ else if(e.type==='polyline'&&g.kind==='vertex'){
+  const nb=cadGripNeighbours(e,g);
+  if(nb.length===1){const L0=dist(nb[0],g.p),L1=dist(nb[0],dest);main=(es?'Tramo ':'Segment ')+units(L1)+u;sub2=(es?'Estirado ':'Stretched ')+sg(L1-L0)+u}
+  else{const parts=nb.map((q,k)=>(k?'B ':'A ')+units(dist(q,dest))+' ('+sg(dist(q,dest)-dist(q,g.p))+')');main=parts.join('  ·  ')+u;sub2=(es?'Desplazado ':'Moved ')+units(dist(g.p,dest))+u}
+ }
+ else{main=(es?'Desplazado ':'Moved ')+units(dist(g.p,dest))+u}
+ const hint=cadGripTyped?cadGripTyped+' ⏎':(es?'escribí un número + Enter':'type a number + Enter');
+ const p=screen(dest);ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.font='700 15px Inter,Arial,sans-serif';const w1=ctx.measureText(main).width;ctx.font='500 11px Inter,Arial,sans-serif';const w2=ctx.measureText(sub2+'   '+hint).width;
+ const W=Math.max(w1,w2)+20,H=sub2||hint?42:26,x=Math.min(canvas.width/dpr-W-6,p.x+18),y=Math.max(6,p.y-H-14);
+ ctx.fillStyle='rgba(22,16,6,.94)';ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,W,H,8):ctx.rect(x,y,W,H);ctx.fill();ctx.strokeStyle='#ff9f1c';ctx.lineWidth=1.4;ctx.stroke();
+ ctx.fillStyle='#ffd08a';ctx.font='700 15px Inter,Arial,sans-serif';ctx.fillText(main,x+10,y+18);
+ ctx.font='500 11px Inter,Arial,sans-serif';ctx.fillStyle='#e9dcc7';ctx.fillText(sub2,x+10,y+34);ctx.fillStyle=cadGripTyped?'#ffd08a':'#a99d88';ctx.fillText(hint,x+10+ctx.measureText(sub2+'   ').width,y+34);
+ ctx.restore();
 }
 window.addEventListener('keydown',ev=>{
  if(!cadPrimitiveGripPlacement)return;
@@ -4767,7 +4785,7 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   if(cadSelectionAnchor){state.drag.type='selectionSecond';return}
   const e=pick(world(raw));if(!e)state.drag.type='selectionStart';
  } });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
+canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
   if(window.BlacklineWallGrip){
@@ -4809,7 +4827,7 @@ canvas.addEventListener('pointerup',ev=>{
  }
  if(d.type==='primitiveGripPlace'){
   const job=cadPrimitiveGripPlacement;cadPrimitiveGripPlacement=null;canvas.style.cursor='';
-  if(job)cadPrimitiveGripCommit(job,snapPoint(world(raw)));
+  if(job){const typed=cadGripTypedDest(job);cadGripTyped='';cadPrimitiveGripCommit(job,typed||snapPoint(world(raw)))}
   schedule();return;
  }
  if(d.type==='vertexMoveStart'){
