@@ -30,5 +30,29 @@
   next.push({x:point.x,y:point.y});
   return next.slice(-max);
  }
- return Object.freeze({project,acquire});
+ // Rastreo como AutoCAD: rayos desde cada punto adquirido a 0/90/180/270° (y a los ángulos polares si POLAR está activo).
+ // Devuelve el punto sobre el rayo más cercano al cursor, o la intersección de dos rayos de puntos distintos.
+ function projectRays(pointer,anchors,scale,tolerancePixels=10,angles=[0,90]){
+  if(!valid(pointer)||!Array.isArray(anchors)||!(scale>0))return null;
+  const limit=tolerancePixels/scale,dirs=[];
+  for(const deg of angles){const a=deg*Math.PI/180;dirs.push([Math.cos(a),Math.sin(a)]);}
+  const hits=[];
+  for(const anchor of anchors){if(!valid(anchor))continue;
+   for(const [ux,uy] of dirs){
+    const vx=pointer.x-anchor.x,vy=pointer.y-anchor.y,t=vx*ux+vy*uy,d=Math.abs(-vx*uy+vy*ux);
+    if(d<limit&&Math.abs(t)>limit*.5){const s=t>=0?1:-1;hits.push({anchor,ux:ux*s,uy:uy*s,d,t:Math.abs(t),point:{x:anchor.x+ux*t,y:anchor.y+uy*t}})}
+   }}
+  if(!hits.length)return null;
+  hits.sort((a,b)=>a.d-b.d);
+  const best=hits[0];
+  for(const h of hits.slice(1)){
+   if(h.anchor===best.anchor)continue;
+   const den=best.ux*h.uy-best.uy*h.ux;if(Math.abs(den)<1e-9)continue;
+   const dx=h.anchor.x-best.anchor.x,dy=h.anchor.y-best.anchor.y,s=(dx*h.uy-dy*h.ux)/den;
+   const ip={x:best.anchor.x+best.ux*s,y:best.anchor.y+best.uy*s};
+   if(Math.hypot(ip.x-pointer.x,ip.y-pointer.y)<limit*1.6)return {point:ip,rays:[best,h],intersection:true};
+  }
+  return {point:best.point,rays:[best],intersection:false};
+ }
+ return Object.freeze({project,acquire,projectRays});
 });
