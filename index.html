@@ -53,7 +53,7 @@ html,body{font:12px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,
 .field input:focus,.field select:focus{outline:1px solid #8eb2c6;outline-offset:0}
 .layer-row{border-bottom:1px solid #222a32;padding:7px 3px}
 .layer-row.current{background:#252e37;border-radius:5px}
-.canvas-wrap{background:#0d1116}
+.canvas-wrap{background:#0d1116}.canvas-wrap.cad-block-editing{box-shadow:inset 0 0 0 3px #d4a748}
 .canvas-overlay{background:#141a21db;border:1px solid #2a3440;border-radius:6px;padding:6px 10px;color:#a5b3be}
 .canvas-overlay b{color:#dce4eb}
 .view-tools button{background:#202730dc;border:1px solid #3a4652;border-radius:6px;color:#c4d0d9}
@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0330">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0330">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0400">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0400">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0330"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0330"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0400"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0400"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261120-0330"></script>
-<script src="cad-grip-settings.js?v=20261120-0330"></script>
-<script src="cad-cursor-mode.js?v=20261120-0330"></script>
+<script src="cad2d-config.js?v=20261120-0400"></script>
+<script src="cad-grip-settings.js?v=20261120-0400"></script>
+<script src="cad-cursor-mode.js?v=20261120-0400"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -5455,6 +5455,8 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
   saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
   cadSetDrawingName(suggested);state.nextId=1;renderBlockLibrary();updateAll();zoomExtents();return
  }
+ if(['BSAVE','BCLOSE','GUARDARBLOQUE'].includes(cmd)){if(!cadBlockEdit)return toast('No block is being edited');return cadBlockEditClose(true)}
+ if(['BCANCEL','BDISCARD'].includes(cmd))return cadBlockEditClose(false);
  if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(cmd))return cadEditBlockDefinition(cadActiveBlockRef()?.blockName||$('blockLibrary').value);
  if(cmd==='BLOCK')return $('createBlockBtn').click();
  if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
@@ -5592,7 +5594,7 @@ async function download(name,data,mime='application/octet-stream'){
 let cadProjectSaveHandle=null;
 function cadProjectSnapshot(filename){
  return {format:'CAD2D-2',filename,modelScale:'1:1',blocks:state.blocks,
-  dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:state.entities,
+  dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,entities:cadBlockEdit?cadBlockEdit.entities:state.entities,
   layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,
   precision:state.precision,nextId:state.nextId,ltscale:state.ltscale||1,layout:collectLayoutState()};
 }
@@ -5640,7 +5642,7 @@ async function saveJSON(forceNew=false){
  return result;
 }
 const CAD2D_DXF_PROJECT_MARK='CAD2D-PROJECT-JSON';
-function cadDxfWithProject(name){return buildDXFText(state.entities,name,state.layers)+CAD2D_DXF_PROJECT_MARK+'\n'+JSON.stringify(cadProjectSnapshot(name))+'\n'}
+function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.entities:state.entities,name,state.layers)+CAD2D_DXF_PROJECT_MARK+'\n'+JSON.stringify(cadProjectSnapshot(name))+'\n'}
 // Guardado automático como SAVETIME de AutoCAD: cada N minutos (5 por defecto) si hubo cambios.
 // Si el dibujo ya se guardó en un archivo (Save), se reescribe ese mismo .dxf; si no, copia en el navegador.
 let cad2dSaveMinutes=5,cad2dLastAutoSig='',cad2dLastAutoTime=Date.now();
@@ -6135,7 +6137,7 @@ function backupTransaction(mode,action){
  });
 }
 function backupPayload(){
- return {format:'CAD2D-2',entities:clone(state.entities),layers:clone(state.layers),
+ return {format:'CAD2D-2',entities:clone(cadBlockEdit?cadBlockEdit.entities:state.entities),layers:clone(state.layers),
  blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,unit:state.unit,grid:state.grid,
  precision:state.precision,nextId:state.nextId,layerId:state.layerId,
  file:state.file,layout:collectLayoutState(),savedAt:new Date().toISOString(),modelScale:'1:1'};
@@ -6198,41 +6200,52 @@ let cad2dLastCommand='';
 function cad2dExecuteContextCommand(name){
  $('command').value=name;runCommand();canvas.focus({preventScroll:true});
 }
+// Editor de bloques visual (como BEDIT de AutoCAD): el dibujo muestra solo el bloque, se edita con
+// las herramientas normales y "Guardar bloque" actualiza todas sus copias. Sin código.
+let cadBlockEdit=null;
 function cadEditBlockDefinition(name){
  const def=state.blocks?.[name];
  if(!def)return toast('EDITAR BLOQUE: seleccioná una referencia en el dibujo o elegí una definición');
+ if(cadBlockEdit)return toast('Ya estás editando el bloque '+cadBlockEdit.name);
  if(def.parametric){
   const ref=state.entities.find(e=>e.type==='blockRef'&&e.blockName===name);
   if(ref){state.selected=[ref.id];updateProps();$('blSelectedBlockEditor')?.scrollIntoView({block:'nearest'});}
   return toast('Bloque paramétrico: editá sus parámetros en Propiedades');
  }
- document.getElementById('cadBlockDefEditor')?.remove();
- const overlay=document.createElement('div');overlay.id='cadBlockDefEditor';
- overlay.style.cssText='position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:16px';
- const panel=document.createElement('section');panel.style.cssText='width:min(780px,96vw);max-height:92vh;padding:16px;background:#1e2930;color:#e8f4fa;border:1px solid #6a8794;border-radius:12px;display:flex;flex-direction:column;gap:10px';
- const heading=document.createElement('h3');heading.style.margin='0';heading.textContent='EDITAR BLOQUE · '+name;
- const hint=document.createElement('p');hint.textContent='Editor de definición: editá las entidades 2D en JSON. Guardar modifica todas las inserciones; Cancelar conserva el dibujo. Antes de editar, guardá una copia del proyecto.';hint.style.margin='0';
- const area=document.createElement('textarea');area.value=JSON.stringify(def.entities,null,2);area.spellcheck=false;area.setAttribute('aria-label','Entidades JSON de la definición de bloque');
- area.style.cssText='min-height:220px;height:50vh;resize:vertical;background:#10181d;color:#d8eef8;border:1px solid #668293;border-radius:6px;padding:12px;font:12px/1.5 monospace;width:100%;box-sizing:border-box';
- const status=document.createElement('p');status.style.cssText='color:#f7ca88;margin:0';status.setAttribute('aria-live','polite');
- const actions=document.createElement('div');actions.style.cssText='display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap';
- const cancel=document.createElement('button');cancel.className='btn';cancel.textContent='Cancelar';cancel.onclick=()=>overlay.remove();
- const exportCopy=document.createElement('button');exportCopy.className='btn';exportCopy.textContent='Exportar copia';
- exportCopy.onclick=()=>{const old=$('blockLibrary').value;$('blockLibrary').value=name;$('exportBlockBtn').click();$('blockLibrary').value=old};
- const save=document.createElement('button');save.className='btn primary';save.textContent='Guardar definición';
- save.onclick=()=>{
-  try{
-   const parsed=JSON.parse(area.value);
-   const entities=normalizeBlockEntities(parsed);
-   saveHistory();def.entities=entities;
-   updateAll();renderBlockLibrary();queueLocalBackup();overlay.remove();
-   toast('Bloque actualizado: '+name+' · '+entities.length+' entidades (Ctrl+Z para deshacer)');
-  }catch(err){status.textContent='No se modificó el bloque: '+err.message;}
- };
- actions.append(cancel,exportCopy,save);panel.append(heading,hint,area,status,actions);overlay.append(panel);document.body.append(overlay);
- overlay.addEventListener('pointerdown',ev=>{if(ev.target===overlay)overlay.remove()});
- overlay.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.stopPropagation();ev.preventDefault();overlay.remove()}});
- area.focus();
+ const copies=state.entities.filter(e=>e.type==='blockRef'&&e.blockName===name).length;
+ cadBlockEdit={name,copies,entities:state.entities,history:state.history,future:state.future,view:{...state.view},selected:state.selected.slice()};
+ state.entities=clone(def.entities).map(e=>({...e,id:state.nextId++}));
+ state.history=[];state.future=[];state.selected=[];setTool('select');
+ const bar=document.createElement('div');bar.id='cadBlockEditBar';
+ bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
+ bar.querySelector('b').textContent=name;bar.querySelector('i').textContent=copies===1?'1 copy in the drawing':copies+' copies in the drawing';
+ bar.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:45;display:flex;gap:10px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;background:#2a2112;border:1.5px solid #d4a748;color:#f3e3bf;box-shadow:0 10px 26px #0009;font:13px system-ui,sans-serif;white-space:nowrap';
+ bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
+ for(const ev of ['pointerdown','wheel'])bar.addEventListener(ev,e=>e.stopPropagation());
+ wrap.append(bar);wrap.classList.add('cad-block-editing');
+ zoomExtents();updateAll();log('BEDIT '+name);
+ toast('Block editor: edit with any tool, then “Save block” (or type BSAVE). Esc does not close it.');
+}
+function cadBlockEditClose(save){
+ const job=cadBlockEdit;if(!job)return;
+ let entities=null,dropped=0;
+ if(save){
+  const usable=state.entities.filter(e=>['line','polyline','rect','circle','arc','ellipse','text','dimension'].includes(e.type));
+  dropped=state.entities.length-usable.length;
+  if(!usable.length)return toast('The block cannot be empty: draw something or close without saving');
+  try{entities=normalizeBlockEntities(clone(usable).map(e=>{delete e.id;return e}))}catch(err){return toast('Block not saved: '+err.message)}
+ }
+ state.entities=job.entities;state.history=job.history;state.future=job.future;Object.assign(state.view,job.view);state.selected=job.selected;
+ cadBlockEdit=null;document.getElementById('cadBlockEditBar')?.remove();wrap.classList.remove('cad-block-editing');
+ if(save){
+  const def=state.blocks[job.name];saveHistory();def.entities=entities;
+  // Un bloque dinámico editado a mano pasa a ser propio: ya no se regenera al estirarlo.
+  if(def.arq){delete def.arq;def.custom=true}
+  renderBlockLibrary();queueLocalBackup();
+  toast('Block saved: '+job.name+' · '+job.copies+(job.copies===1?' copy updated':' copies updated')+(dropped?' · '+dropped+' unsupported object(s) left out':'')+' · Ctrl+Z undoes');
+  log('BSAVE '+job.name);
+ }else toast('Block editor closed without changes');
+ updateAll();
 }
 function openCadContextMenu(x,y,worldPoint){
  const menu=$('cadContextMenu');menu.setAttribute('role','menu');
@@ -8003,25 +8016,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0330"></script>
-<script src="blackline-modern.js?v=20261120-0330"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0330"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0330"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0330"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0330"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0330"></script>
-<script src="cad-osnap-math.js?v=20261120-0330"></script>
-<script src="cad-scale-math.js?v=20261120-0330"></script>
-<script src="cad-object-tracking.js?v=20261120-0330"></script>
-<script src="cad-auto-opening.js?v=20261120-0330"></script>
-<script src="cad-wall-join.js?v=20261120-0330"></script>
-<script src="cad-wall-grip.js?v=20261120-0330"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0330"></script>
-<script src="cad-performance.js?v=20261120-0330"></script>
-<script src="cad-plan.js?v=20261120-0330"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0330"></script>
-<script src="cad-arq-pro.js?v=20261120-0330"></script>
-<script src="cad-autocad-plus.js?v=20261120-0330"></script>
-<script src="cad-touch.js?v=20261120-0330"></script><script src="cad-quickbar.js?v=20261120-0330"></script><script src="cad-buy-guide.js?v=20261120-0330"></script>
-<script src="cad-arq-tools.js?v=20261120-0330"></script><script src="cad-block-browser.js?v=20261120-0330"></script>
+<script src="workspace-upgrade.js?v=20261120-0400"></script>
+<script src="blackline-modern.js?v=20261120-0400"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0400"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0400"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0400"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0400"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0400"></script>
+<script src="cad-osnap-math.js?v=20261120-0400"></script>
+<script src="cad-scale-math.js?v=20261120-0400"></script>
+<script src="cad-object-tracking.js?v=20261120-0400"></script>
+<script src="cad-auto-opening.js?v=20261120-0400"></script>
+<script src="cad-wall-join.js?v=20261120-0400"></script>
+<script src="cad-wall-grip.js?v=20261120-0400"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0400"></script>
+<script src="cad-performance.js?v=20261120-0400"></script>
+<script src="cad-plan.js?v=20261120-0400"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0400"></script>
+<script src="cad-arq-pro.js?v=20261120-0400"></script>
+<script src="cad-autocad-plus.js?v=20261120-0400"></script>
+<script src="cad-touch.js?v=20261120-0400"></script><script src="cad-quickbar.js?v=20261120-0400"></script><script src="cad-buy-guide.js?v=20261120-0400"></script>
+<script src="cad-arq-tools.js?v=20261120-0400"></script><script src="cad-block-browser.js?v=20261120-0400"></script>
 </body></html>
