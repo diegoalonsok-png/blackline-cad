@@ -766,8 +766,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1040">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1040">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1100">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1100">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -851,8 +851,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1040"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1040"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-1100"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-1100"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -900,7 +900,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1040"></script>
+<script src="assets/cad-analytics.js?v=20261120-1100"></script>
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0c1216"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
@@ -966,9 +966,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1040"></script>
-<script src="cad-grip-settings.js?v=20261120-1040"></script>
-<script src="cad-cursor-mode.js?v=20261120-1040"></script>
+<script src="cad2d-config.js?v=20261120-1100"></script>
+<script src="cad-grip-settings.js?v=20261120-1100"></script>
+<script src="cad-cursor-mode.js?v=20261120-1100"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -1549,8 +1549,59 @@ function applyAutoWallJoin(entity){
  }
  return plan.line;
 }
+/* Cotas asociativas: cada extremo de la cota queda ligado al vértice del objeto acotado.
+   Si el objeto se estira, la cota se actualiza; si se mueve entero, la cota lo acompaña. */
+function cadAssocVertices(e){
+ if(!e)return [];
+ if(e.type==='rect')return [e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)];
+ if(e.type==='line')return [e.a,e.b];
+ if(e.type==='polyline')return e.pts||[];
+ if(e.type==='arc')return [P(e.c.x+e.r*Math.cos(e.a0),e.c.y+e.r*Math.sin(e.a0)),P(e.c.x+e.r*Math.cos(e.a1),e.c.y+e.r*Math.sin(e.a1)),e.c];
+ if(e.type==='circle'||e.type==='ellipse')return [e.c];
+ if(e.type==='blockRef')return [e.p];
+ return [];
+}
+function cadFindAssoc(pt,skipId){
+ if(!pt)return null;const tol=1e-7*Math.max(1,Math.abs(pt.x),Math.abs(pt.y));
+ for(let k=state.entities.length-1;k>=0;k--){const e=state.entities[k];if(e.id===skipId||e.type==='dimension'||e.type==='text'||e.type==='hatch'||e.type==='image')continue;
+  const vs=cadAssocVertices(e);for(let i=0;i<vs.length;i++){const v=vs[i];if(v&&Math.abs(v.x-pt.x)<=tol&&Math.abs(v.y-pt.y)<=tol)return {id:e.id,i}}}
+ return null;
+}
+function cadAssociateDim(d){
+ if(d?.type!=='dimension')return false;delete d.assoc;
+ if(!d.a||!d.b||['angular','radius','diameter','leader'].includes(d.mode))return false;
+ const A=cadFindAssoc(d.a,d.id),B=cadFindAssoc(d.b,d.id);
+ if(A||B){d.assoc={owner:d.id,...(A?{a:A}:{}),...(B?{b:B}:{})};return true}
+ return false;
+}
+function cadSyncAssocDims(){
+ let byId=null;
+ for(const d of state.entities){
+  if(d.type!=='dimension'||!d.assoc)continue;
+  // Copia de una cota (COPY, MATRIZ, pegar): se reasocia con lo que tenga debajo.
+  if(d.assoc.owner!==d.id){cadAssociateDim(d);continue}
+  byId=byId||new Map(state.entities.map(e=>[e.id,e]));
+  const at=k=>{const r=d.assoc[k];if(!r)return null;const v=cadAssocVertices(byId.get(r.id))[r.i];if(!v||!Number.isFinite(v.x)||!Number.isFinite(v.y)){delete d.assoc[k];return null}return v};
+  const na=at('a'),nb=at('b');
+  if(!d.assoc.a&&!d.assoc.b){delete d.assoc;continue}
+  const da=na?P(na.x-d.a.x,na.y-d.a.y):P(0,0),db=nb?P(nb.x-d.b.x,nb.y-d.b.y):P(0,0);
+  if(!da.x&&!da.y&&!db.x&&!db.y)continue;
+  const rigid=!!(na&&nb)&&Math.abs(da.x-db.x)<1e-9&&Math.abs(da.y-db.y)<1e-9;
+  if(na)d.a=P(na.x,na.y);if(nb)d.b=P(nb.x,nb.y);
+  if(rigid&&d.p)d.p=P(d.p.x+da.x,d.p.y+da.y);
+ }
+}
+function cadDimAssocCommand(mode){
+ const sel=state.entities.filter(e=>e.type==='dimension'&&state.selected.includes(e.id)),list=sel.length?sel:state.entities.filter(e=>e.type==='dimension');
+ if(!list.length)return toast('No hay cotas para '+(mode==='off'?'desasociar':'asociar'));
+ saveHistory();let n=0;
+ for(const d of list){if(mode==='off'){if(d.assoc){delete d.assoc;n++}}else if(cadAssociateDim(d))n++}
+ updateAll();toast(mode==='off'?n+' cota(s) desasociadas: ya no siguen al objeto':n+' de '+list.length+' cota(s) asociadas a los objetos');
+}
+window.cadDimAssocCommand=cadDimAssocCommand;
 function newEntity(e){if(typeof cad2dCmdOpt!=='undefined')cad2dCmdOpt.done=true;e.id=state.nextId++;e.layer=e.layer||state.layerId;const layer=layerFor(e);e.width=e.width??layer.width??state.lineWidth;
  e=applyAutoWallJoin(e);
+ if(e.type==='dimension'&&typeof cadAssociateDim==='function')cadAssociateDim(e);
  state.entities.push(e);updateAll()}
 function cadCleanDrawingName(value){
  const name=String(value||'').trim().replace(/\.(?:dxf|dwg|cadjson|json|svg)$/i,'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim();
@@ -1610,7 +1661,7 @@ function cadDrawMeasureTag(){
  ctx.fillStyle='#e9dcc7';ctx.font='500 11px Inter,Arial,sans-serif';ctx.fillText(info.sub,cx,y+36);
  ctx.restore();
 }
-function draw(){drawPending=false;cadTGapCache=cadComputeWallTGaps();let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+function draw(){drawPending=false;try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}cadTGapCache=cadComputeWallTGaps();let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  for(const e of state.entities.filter(entity=>entity.type==='hatch')){if(layerFor(e).visible&&!e.cadHidden)drawEntity(e)}
  for(const e of state.entities){
   if(e.type==='hatch'||!layerFor(e).visible||e.cadHidden)continue;
@@ -5343,7 +5394,7 @@ const CAD_COMMANDS=[
  ['ZOOM','Z','Z Enter · - aleja · + acerca · E extensión · P anterior · 2x factor · W ventana'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['ZOOMPREVIOUS','ZP','Volver a la vista anterior'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
  ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
  ['ARC','A','Center and arc endpoints'],['ELLIPSE','EL','Ellipse'],['HATCH','H / SB / SOM','Relleno: H siempre activa HATCH; idioma ES o EN'],
- ['TABLE','','Insert editable table'],['TEXT','T','Insert single-line annotation'],['MTEXT','MT','Multiline text box: two corners, then type (Enter = new line)'],['ATTDEF','ATT','Define a block attribute (tag, prompt, default value)'],['ATTEDIT','ATE','Edit the attribute values of a block'],['ATTEXT','EXTRAERATRIB','Export all block attributes to CSV'],
+ ['TABLE','','Insert editable table'],['TEXT','T','Insert single-line annotation'],['MTEXT','MT','Multiline text box: two corners, then type (Enter = new line)'],['ATTDEF','ATT','Define a block attribute (tag, prompt, default value)'],['DIMREASSOCIATE','ASOCIARCOTA','Link dimensions to the measured objects (they follow when stretched)'],['DIMDISASSOCIATE','DDA','Unlink dimensions from objects'],['ATTEDIT','ATE','Edit the attribute values of a block'],['ATTEXT','EXTRAERATRIB','Export all block attributes to CSV'],
  ['MOVE','M / DESPL / D (ES)','Move selected entities'],['COPY','CO / CP','Duplicate selected entities'],
  ['ROTATE','RO','Rotate selected objects'],['SCALE','SC','Scale selected objects'],
  ['MIRROR','MI','Mirror entities'],['OFFSET','O / DF','Parallel line or circle · distance + Enter'],
@@ -6631,6 +6682,7 @@ function cadMTextCommand(){
  canvas.addEventListener('pointerdown',onDown,true);canvas.addEventListener('pointermove',onMove,true);document.addEventListener('keydown',onKey,true);
 }
 window.cadMTextCommand=cadMTextCommand;
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['DIMREASSOCIATE','DIMREASSOC','ASOCIARCOTA','ASOCIARCOTAS'])X.commands[k]=()=>cadDimAssocCommand('on');for(const k of['DIMDISASSOCIATE','DDA','DESASOCIARCOTA','DESASOCIARCOTAS'])X.commands[k]=()=>cadDimAssocCommand('off');}
 /* ATTDEF: define un atributo (etiqueta, mensaje, valor por defecto) que se incluye al crear el bloque.
    ATTEDIT edita los valores de una referencia; ATTEXT exporta todos los atributos a CSV. */
 function cadAttDefCommand(){
@@ -9122,26 +9174,26 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1040"></script>
-<script src="blackline-modern.js?v=20261120-1040"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1040"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1040"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1040"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1040"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1040"></script>
-<script src="cad-osnap-math.js?v=20261120-1040"></script>
-<script src="cad-scale-math.js?v=20261120-1040"></script>
-<script src="cad-object-tracking.js?v=20261120-1040"></script>
-<script src="cad-auto-opening.js?v=20261120-1040"></script>
-<script src="cad-wall-join.js?v=20261120-1040"></script>
-<script src="cad-wall-grip.js?v=20261120-1040"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1040"></script>
-<script src="cad-performance.js?v=20261120-1040"></script>
-<script src="cad-plan.js?v=20261120-1040"></script><script src="cad-cloud.js?v=20261120-1040"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1040"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1040"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1040"></script>
-<script src="cad-arq-pro.js?v=20261120-1040"></script>
-<script src="cad-autocad-plus.js?v=20261120-1040"></script>
-<script src="cad-touch.js?v=20261120-1040"></script><script src="cad-quickbar.js?v=20261120-1040"></script><script src="cad-cmd-resize.js?v=20261120-1040"></script><script src="cad-buy-guide.js?v=20261120-1040"></script>
-<script src="cad-arq-tools.js?v=20261120-1040"></script><script src="cad-block-browser.js?v=20261120-1040"></script>
+<script src="workspace-upgrade.js?v=20261120-1100"></script>
+<script src="blackline-modern.js?v=20261120-1100"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-1100"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-1100"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1100"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-1100"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1100"></script>
+<script src="cad-osnap-math.js?v=20261120-1100"></script>
+<script src="cad-scale-math.js?v=20261120-1100"></script>
+<script src="cad-object-tracking.js?v=20261120-1100"></script>
+<script src="cad-auto-opening.js?v=20261120-1100"></script>
+<script src="cad-wall-join.js?v=20261120-1100"></script>
+<script src="cad-wall-grip.js?v=20261120-1100"></script>
+<script src="cad-hatch-patterns.js?v=20261120-1100"></script>
+<script src="cad-performance.js?v=20261120-1100"></script>
+<script src="cad-plan.js?v=20261120-1100"></script><script src="cad-cloud.js?v=20261120-1100"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1100"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1100"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1100"></script>
+<script src="cad-arq-pro.js?v=20261120-1100"></script>
+<script src="cad-autocad-plus.js?v=20261120-1100"></script>
+<script src="cad-touch.js?v=20261120-1100"></script><script src="cad-quickbar.js?v=20261120-1100"></script><script src="cad-cmd-resize.js?v=20261120-1100"></script><script src="cad-buy-guide.js?v=20261120-1100"></script>
+<script src="cad-arq-tools.js?v=20261120-1100"></script><script src="cad-block-browser.js?v=20261120-1100"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
