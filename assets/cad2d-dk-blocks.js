@@ -9,13 +9,20 @@
   if(LIB.library.some(x=>x.id===it.id))continue;
   const plans={'dk-planta-baja':'examples/plantas/vivienda-planta-baja.dxf','dk-planta-alta':'examples/plantas/vivienda-planta-alta.dxf'};
   LIB.library.push({id:it.id,name:it.name,cat:it.c,family:it.id,...(plans[it.id]?{dxfPlan:plans[it.id]}:{}),w:it.w,d:it.d,wMin:it.w*.25,wMax:it.w*6,dMin:it.d*.25,dMax:it.d*6,author:'Blackline',
+   // Puertas y carpinterías escalan parejo (la hoja y su arco siguen siendo un cuarto de círculo).
+   ...(it.c==='Carpinterías'?{lockAspect:true,wMin:it.w*.5,wMax:it.w*2.5}:{}),
    gen(b,W,D){const sx=W/it.w,sy=D/it.d,X=v=>v*sx,Y=v=>v*sy,r=Math.min(sx,sy);
     for(const e of it.e){const k=e[0];
      if(k==='L')b.line(X(e[1]),Y(e[2]),X(e[3]),Y(e[4]));
      else if(k==='P'){const a=e[2],pts=[];for(let i=0;i<a.length;i+=2)pts.push([X(a[i]),Y(a[i+1])]);b.poly(pts,!!e[1])}
      else if(k==='H'){const a=e[1],pts=[];for(let i=0;i<a.length;i+=2)pts.push(b.tp(X(a[i]),Y(a[i+1])));b.push({type:'hatch',pts,hatchStyle:'solid'})}
      else if(k==='C')b.circle(X(e[1]),Y(e[2]),e[3]*r);
-     else if(k==='A')b.arc(X(e[1]),Y(e[2]),e[3]*r,e[4],e[5]);
+     else if(k==='A'){
+      // Con escala pareja, arco real; si el bloque se estira distinto en X e Y, el arco se vuelve
+      // una curva estirada que acompaña al resto del dibujo (antes quedaba desfasado).
+      if(Math.abs(sx-sy)<1e-6*Math.max(sx,sy))b.arc(X(e[1]),Y(e[2]),e[3]*r,e[4],e[5]);
+      else{let a0=e[4],a1=e[5];if(a1<=a0)a1+=360;const n=Math.max(6,Math.ceil((a1-a0)/10)),pts=[];for(let i=0;i<=n;i++){const t=(a0+(a1-a0)*i/n)*Math.PI/180;pts.push([X(e[1]+e[3]*Math.cos(t)),Y(e[2]+e[3]*Math.sin(t))])}b.poly(pts,false)}
+     }
      else if(k==='T')b.push({type:'text',p:b.tp(X(e[1]),Y(e[2])),h:e[3]*sy,rotation:e[4]||0,text:e[5],fontFamily:'Arial'});
     }}});
  }
