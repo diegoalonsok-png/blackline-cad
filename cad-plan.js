@@ -138,11 +138,12 @@ function showPlans(reason,notice){
   '</div><div class="foot">'+
   (urls.login&&!status.email?'<button class="btn" data-go="login">'+L('Ingresar / crear cuenta','Sign in / create account')+'</button>':'')+
   (urls.portal&&status.email&&isPro?'<button class="btn" data-go="portal">'+L('Administrar suscripción','Manage subscription')+'</button>':'')+
+  (window.CAD2D_BUY_GUIDE?'<button class="btn" data-go="guide">'+L('▶ Cómo funciona · 1 min','▶ How it works · 1 min')+'</button>':'')+
   '<button class="btn" data-go="close">'+L('Seguir con el plan gratis','Keep using the free plan')+'</button></div></div>';
  if(isPro)d.querySelectorAll('.opt').forEach(b=>b.disabled=true);
  document.body.append(d);
  const onKey=e=>{if(e.key==='Escape'){d.remove();document.removeEventListener('keydown',onKey,true)}};document.addEventListener('keydown',onKey,true);
- d.addEventListener('click',e=>{const t=e.target.closest('[data-go]'),g=t?.dataset.go;if(!g&&e.target!==d)return;if(!g||g==='close'){d.remove();return}go(g,t.dataset.plan||'pro')});
+ d.addEventListener('click',e=>{const t=e.target.closest('[data-go]'),g=t?.dataset.go;if(!g&&e.target!==d)return;if(!g||g==='close'){d.remove();return}if(g==='guide'){d.remove();window.CAD2D_BUY_GUIDE?.open();return}go(g,t.dataset.plan||'pro')});
 }
 function upsell(reason){showPlans(reason)}
 function paintBadge(){
