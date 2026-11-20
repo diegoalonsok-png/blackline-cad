@@ -1,7 +1,7 @@
 /* CAD2D · Worker de entrada al conversor DWG (Cloudflare Containers).
  * POST https://dwg.<dominio>/api/convert/dwg  (multipart con campo "file")  →  DXF ASCII
  * - Solo acepta pedidos desde APP_ORIGIN (CORS) y archivos .dwg de hasta 25 MB.
- * - Límite simple por IP para evitar abusos.
+ * - Límite simple por IP para evitar abusos y tope mensual de conversiones (MAX_PER_MONTH).
  * - El contenedor convierte y borra el archivo; nada se guarda.
  */
 import { DurableObject } from 'cloudflare:workers';
@@ -9,6 +9,15 @@ import { DurableObject } from 'cloudflare:workers';
 // Cada instancia del contenedor vive detrás de un Durable Object (API documentada de Cloudflare Containers).
 export class DwgConverter extends DurableObject {
   async fetch(request) {
+    // Instancia 'cupo': solo cuenta conversiones del mes (no arranca ningún contenedor).
+    if (new URL(request.url).pathname === '/quota') {
+      const limit = Number(new URL(request.url).searchParams.get('limit')) || 1000;
+      const month = new Date().toISOString().slice(0, 7);
+      const used = (await this.ctx.storage.get('m:' + month)) || 0;
+      if (used >= limit) return Response.json({ ok: false, used, limit, month });
+      await this.ctx.storage.put('m:' + month, used + 1);
+      return Response.json({ ok: true, used: used + 1, limit, month });
+    }
     const container = this.ctx.container;
     if (!container.running) container.start();
     const port = container.getTcpPort(8080);
@@ -57,6 +66,12 @@ export default {
     if (!file || typeof file === 'string' || !/\.dwg$/i.test(file.name || ''))
       return cors(env, req, new Response('se esperaba un archivo .dwg', { status: 415 }));
     if (file.size > MAX) return cors(env, req, new Response('el archivo supera 25 MB', { status: 413 }));
+    // Tope mensual propio (MAX_PER_MONTH): al llegar, el conversor se pausa hasta el mes siguiente.
+    const quota = await env.DWG_CONVERTER.getByName('cupo-mensual')
+      .fetch(new Request('http://do/quota?limit=' + Number(env.MAX_PER_MONTH || 1000), { method: 'POST' }))
+      .then(r => r.json()).catch(() => ({ ok: true }));
+    if (!quota.ok)
+      return cors(env, req, new Response('se alcanzó el límite mensual de conversiones DWG; guardá el plano como DXF desde AutoCAD y abrilo en CAD2D', { status: 429 }));
     const body = await file.arrayBuffer();
     const slot = 'conversor-' + Math.floor(Math.random() * Number(env.CONTAINER_INSTANCES || 2));
     const res = await env.DWG_CONVERTER.getByName(slot).fetch(new Request('http://do/convert', { method: 'POST', body }));

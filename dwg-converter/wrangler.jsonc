@@ -11,6 +11,7 @@
   "vars": {
     "APP_ORIGIN": "https://blackline-cad.org,https://www.blackline-cad.org",
     "MAX_PER_MINUTE": "6",
+    "MAX_PER_MONTH": "1000",
     "CONTAINER_INSTANCES": "2"
   },
   "containers": [
