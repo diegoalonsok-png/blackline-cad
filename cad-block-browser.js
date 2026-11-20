@@ -12,6 +12,7 @@
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
+  dk:{en:'Diego Kurilo blocks',es:'Bloques Diego Kurilo',item:it=>/^dk-|^doc-/.test(it.id)},
   plan:{en:'Plans',es:'Plantas',cats:c=>!['Cortes y vistas','Alzados','Símbolos','Documentación'].includes(c)},
   section:{en:'Sections & elevations',es:'Cortes y vistas',cats:c=>c==='Cortes y vistas'||c==='Alzados'},
   symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'},
@@ -61,7 +62,7 @@
 
  let el=null,armedId=null;
  const items=()=>LIB.library;
- const inView=it=>{const f=VIEWS[st.view]?.cats;return !f||f(it.cat)};
+ const inView=it=>{const v=VIEWS[st.view];if(v?.item)return v.item(it);const f=v?.cats;return !f||f(it.cat)};
  const cm=v=>Math.round(v*100);
  function filtered(){
   const q=st.q.trim().toLowerCase();
