@@ -72,6 +72,7 @@ const I={
  regen:'<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
  paletas:'<rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="6" rx="1"/>',
  limpiar:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+ xref:'<rect x="3" y="3" width="12" height="12" rx="1" stroke-dasharray="2 2"/><rect x="9" y="9" width="12" height="12" rx="1"/><path d="M12 12l6 6M18 13v5h-5"/>',
  auditar:'<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 5-5"/>'
 };
 function setLinetype(lt){
@@ -85,6 +86,7 @@ add('home','MEDIR',[['msDist','Distancia · DI','regla',run('DIST')],['msAng','�
 EXT.commands.MEASUREGEOM=EXT.commands.MEA=EXT.commands.MEDIR=()=>CORE.command('DIST');
 add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqVano','Vano','vano',run('VANO')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
 add('arq','GALERÍA',[['arqGaleria','Galería','galeria',run('GALERIA')],['arqBano','Baños','bano',run('BANO')],['arqCocina','Cocinas','cocina',run('COCINA')],['arqEscalera','Escaleras','escalera',run('ESCALERA')],['arqMuebles','Mobiliario','mobiliario',run('MOBILIARIO')]]);
+add('output','REFERENCIAS',[['outXref','Vincular plano · REFX','xref',run('REFX')],['outXreload','Recargar referencias · XRECARGAR','regen',run('XRECARGAR')]]);
 add('view','PANTALLA',[['viewRegen','Regenerar · RE','regen',run('REGEN')],['viewAudit','Auditar dibujo · AUDIT','auditar',run('AUDIT')],['viewShowPal','Mostrar paletas · Ctrl+1','paletas',run('MOSTRARPALETAS')],['viewClean','Limpiar pantalla · Ctrl+0','limpiar',run('CLEANSCREEN')]]);
 add('annotate','TEXTO',[['annMtext','Texto multilínea · MT','mtext',run('MTEXT')]]);
 add('annotate','ATRIBUTOS',[['annAttdef','Definir atributo · ATT','attdef',run('ATTDEF')],['annAttedit','Editar atributos','attdef',run('ATTEDIT')],['annAttext','Exportar atributos','attext',run('ATTEXT')]]);
