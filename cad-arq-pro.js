@@ -66,6 +66,7 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 /* ---------- Inserción ---------- */
 let pendingInsert=null,lastItem=null;
 function armInsert(item,W,D){
+ if(item.dxfPlan&&window.cadInsertDxfPlan){if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);return window.cadInsertDxfPlan(item.dxfPlan,item.name)}
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
  const name=ensureDefinition(item,W??item.w,D??item.d),st=S();
  const layer=ensureLayer(item.cat);
