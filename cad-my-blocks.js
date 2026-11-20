@@ -58,17 +58,44 @@ function selectionGeometry(){
   return o});
  return {ents:out,w:Math.max(1e-6,x1-x0),d:Math.max(1e-6,y1-y0),name:sel.length===1&&sel[0].type==='blockRef'?sel[0].blockName:''};
 }
+/* Nombre automático y legible: Puerta01, Baño05, Arbol02… según el nombre del bloque, su capa y sus textos;
+   si no hay pistas, por la forma (hoja de puerta = arco de 90° con radio ≈ ancho). */
+const KINDS=[
+ [/puert|door|\bpta\b|hoja/i,'Puerta'],[/ventan|window|\bvent\b|carpinter/i,'Ventana'],
+ [/ba[ñn]o|inodor|\bwc\b|toilet|bidet|lavator|ba[ñn]era|ducha|bath|shower|sanit|mingit|urinal/i,'Baño'],
+ [/cocin|kitchen|anafe|horno|heladera|fridge|bacha|mesada|lavaplat/i,'Cocina'],
+ [/\bcama|\bbed\b|cucheta/i,'Cama'],[/mesa|table|escritorio|desk/i,'Mesa'],[/sill[aó]n|sof[aá]|couch|sofa/i,'Sillon'],[/silla|chair|banqueta|stool/i,'Silla'],
+ [/[aá]rbol|tree|planta|plant|veget|arbust|palm/i,'Arbol'],[/\bauto|\bcar\b|vehic|camion|truck|moto/i,'Auto'],
+ [/persona|people|person|human|hombre|mujer|figura/i,'Persona'],[/escaler|stair/i,'Escalera'],[/placard|armari|closet|ropero|mueble/i,'Mueble'],
+ [/norte|north|flecha/i,'Norte'],[/r[oó]tulo|title|car[aá]tula/i,'Rotulo']];
+function autoName(g){
+ const st=S(),sel=st.entities.filter(e=>st.selected.includes(e.id));
+ const hint=[g.name,...sel.map(e=>CORE.state.layers.find(l=>l.id===e.layer)?.name||''),...g.ents.filter(e=>e.type==='text').map(e=>e.text)].join(' ');
+ let base=(KINDS.find(([re])=>re.test(hint))||[])[1];
+ if(!base){const big=Math.max(g.w,g.d),arcs=g.ents.filter(e=>{if(e.type!=='arc')return false;let sw=(e.a1-e.a0)*180/Math.PI;while(sw<=0)sw+=360;return sw>70&&sw<110&&e.r>=.4*big&&g.ents.some(l=>l.type==='line'&&Math.abs(Math.hypot(l.b.x-l.a.x,l.b.y-l.a.y)-e.r)<.12*e.r)});if(arcs.length)base='Puerta'}
+ base=base||'Bloque';
+ const re=new RegExp('^'+base+'(\\d+)$','i');let n=0;for(const r of load()){const m=re.exec(r.name);if(m)n=Math.max(n,+m[1])}
+ return base+String(n+1).padStart(2,'0');
+}
 function addSelectionToMyBlocks(){
  const g=selectionGeometry();
  if(!g)return CORE.toast('Seleccioná un bloque o los objetos que querés guardar en Mis bloques');
- const name=(window.prompt('Nombre del bloque para «Mis bloques»:',g.name||'Bloque '+(load().length+1))||'').trim().slice(0,80);
- if(!name)return;
+ const name=autoName(g);
  const rec={id:'mine-'+Date.now().toString(36),name,w:g.w,d:g.d,ents:g.ents};
  if(JSON.stringify(rec).length>400000)return CORE.toast('El bloque es demasiado grande para guardarlo en Mis bloques');
  const list=load();list.push(rec);if(!save(list))return;
  register(rec);window.CAD2D_ARQ_REFRESH?.();
- CORE.toast('«'+name+'» guardado en Mis bloques · aparece en la galería y en el explorador de bloques');
+ CORE.toast('«'+name+'» guardado en Mis bloques · clic derecho sobre el bloque en la galería para renombrarlo o borrarlo');
 }
+function renameMyBlock(id,name){const list=load(),r=list.find(x=>x.id===id);if(!r)return;r.name=name;save(list);const e=LIB.library.find(x=>x.id===id);if(e)e.name=name;window.CAD2D_ARQ_REFRESH?.()}
+document.addEventListener?.('contextmenu',ev=>{
+ const card=ev.target.closest?.('.arq-card[data-arq^="mine-"]');if(!card)return;ev.preventDefault();
+ const id=card.dataset.arq,r=load().find(x=>x.id===id);if(!r)return;
+ const v=window.prompt('Renombrar «'+r.name+'» (dejalo vacío para borrar el bloque):',r.name);if(v===null)return;
+ const name=v.trim().slice(0,80);
+ if(!name){if(window.confirm('¿Borrar «'+r.name+'» de Mis bloques?')){removeMyBlock(id);CORE.toast('Bloque borrado')}return}
+ renameMyBlock(id,name);CORE.toast('Renombrado: '+name);
+},true);
 function removeMyBlock(id){const list=load().filter(r=>r.id!==id);save(list);const i=LIB.library.findIndex(x=>x.id===id);if(i>=0)LIB.library.splice(i,1);window.CAD2D_ARQ_REFRESH?.()}
 
 /* ---------- Estilo de cota desde una cota del dibujo ---------- */
