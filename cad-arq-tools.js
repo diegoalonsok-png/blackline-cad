@@ -89,21 +89,42 @@ add('view','OBJETOS',[['vwAislar','Aislar objetos','aislar',run('AISLAR')],['vwM
 add('output','VENTANAS',[['ouMview','Nueva ventana','mview',run('VENTANA')]]);
 EXT.commands.VANO=EXT.commands.HUECO=EXT.commands.OPENING=()=>{if(!window.CAD2D_INSERT_LIBRARY_BLOCK?.('Vano / hueco en muro'))CORE.toast('Vano no disponible');else CORE.toast('VANO: clic sobre un muro · después estirá desde las pinzas o escribí el ancho')};
 
-/* ANGLE · ÁNGULO: vértice, primer brazo, segundo brazo (3 clics, con referencias a objetos). Esc cancela. */
+/* ANGLE · ÁNGULO como MEASUREGEOM de AutoCAD: lado A (clic en una línea), lado B (clic en otra línea).
+   Si el primer clic no toca una línea, se usa el modo vértice: vértice, brazo 1, brazo 2. Esc cancela. */
 (function(){
- let pts=null;const cv=CORE.canvas;
- const end=msg=>{pts=null;cv.style.cursor='';if(msg)CORE.toast(msg);CORE.schedule()};
- EXT.commands.ANGLE=EXT.commands.ANGULO=EXT.commands.ANG=()=>{CORE.setTool('select');pts=[];CORE.toast('ÁNGULO: clic en el vértice')};
+ let job=null;const cv=CORE.canvas;
+ const end=msg=>{job=null;cv.style.cursor='';if(msg)CORE.toast(msg);CORE.schedule()};
+ const segOf=(e,w)=>{
+  if(!e)return null;
+  if(e.type==='line'||e.type==='dimension')return [e.a,e.b];
+  let pts=e.type==='rect'?[e.a,{x:e.b.x,y:e.a.y},e.b,{x:e.a.x,y:e.b.y}]:e.type==='polyline'?e.pts:null;if(!pts||pts.length<2)return null;
+  const closed=e.type==='rect'||e.closed;let best=null,bd=Infinity;
+  for(let i=0;i<pts.length-(closed?0:1);i++){const A=pts[i],B=pts[(i+1)%pts.length],vx=B.x-A.x,vy=B.y-A.y,L=vx*vx+vy*vy||1;
+   const t=Math.max(0,Math.min(1,((w.x-A.x)*vx+(w.y-A.y)*vy)/L)),d=Math.hypot(A.x+vx*t-w.x,A.y+vy*t-w.y);if(d<bd){bd=d;best=[A,B]}}
+  return best;
+ };
+ const report=d=>{const acute=Math.min(d,180-d),obtuse=180-acute;CORE.log('ANGLE = '+acute.toFixed(2)+'° · suplemento '+obtuse.toFixed(2)+'°');end('Ángulo / Angle: '+acute.toFixed(2)+'° (suplemento '+obtuse.toFixed(2)+'°)')};
+ EXT.commands.ANGLE=EXT.commands.ANGULO=EXT.commands.ANG=()=>{CORE.setTool('select');job={mode:null,pts:[],segs:[]};CORE.toast('ANGLE · Select first line (side A) or click a vertex')};
  cv.addEventListener('pointerdown',e=>{
-  if(!pts||e.button!==0)return;e.preventDefault();e.stopImmediatePropagation();
-  const w=CORE.world({x:e.offsetX,y:e.offsetY}),sp=CORE.snapPoint?CORE.snapPoint(w):w;pts.push(sp&&sp.x!==undefined?{x:sp.x,y:sp.y}:w);
-  if(pts.length===1)return CORE.toast('ÁNGULO: clic en el primer brazo');
-  if(pts.length===2)return CORE.toast('ÁNGULO: clic en el segundo brazo');
-  const [v,a,b]=pts,a1=Math.atan2(a.y-v.y,a.x-v.x),a2=Math.atan2(b.y-v.y,b.x-v.x);
-  let d=Math.abs(a2-a1)*180/Math.PI;if(d>180)d=360-d;
-  CORE.log('ÁNGULO = '+d.toFixed(2)+'° · complemento '+(360-d).toFixed(2)+'°');end('Ángulo: '+d.toFixed(2)+'°');
+  if(!job||e.button!==0)return;e.preventDefault();e.stopImmediatePropagation();
+  const w=CORE.world({x:e.offsetX,y:e.offsetY});
+  if(job.mode!=='vertex'){
+   const seg=segOf(CORE.pick(w),w);
+   if(seg){job.mode='lines';job.segs.push(seg);
+    if(job.segs.length===1)return CORE.toast('ANGLE · Select second line (side B)');
+    const [[a,b],[c,d]]=job.segs,a1=Math.atan2(b.y-a.y,b.x-a.x),a2=Math.atan2(d.y-c.y,d.x-c.x);
+    let deg=Math.abs(a2-a1)*180/Math.PI%360;if(deg>180)deg=360-deg;return report(deg);
+   }
+   if(job.mode==='lines')return CORE.toast('ANGLE · Select a line (side B)');
+   job.mode='vertex';
+  }
+  const sp=CORE.snapPoint?CORE.snapPoint(w):w;job.pts.push(sp&&sp.x!==undefined?{x:sp.x,y:sp.y}:w);
+  if(job.pts.length===1)return CORE.toast('ANGLE · Specify first arm');
+  if(job.pts.length===2)return CORE.toast('ANGLE · Specify second arm');
+  const [v,a,b]=job.pts,a1=Math.atan2(a.y-v.y,a.x-v.x),a2=Math.atan2(b.y-v.y,b.x-v.x);
+  let d=Math.abs(a2-a1)*180/Math.PI;if(d>180)d=360-d;CORE.log('ANGLE = '+d.toFixed(2)+'° · '+(360-d).toFixed(2)+'°');end('Ángulo / Angle: '+d.toFixed(2)+'°');
  },true);
- document.addEventListener('keydown',e=>{if(pts&&e.key==='Escape')end('Ángulo cancelado')},true);
+ document.addEventListener('keydown',e=>{if(job&&e.key==='Escape')end('Ángulo cancelado / Angle cancelled')},true);
 })();
 // Pestaña ARQUITECTURA
 (function addTab(){
