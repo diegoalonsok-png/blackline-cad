@@ -344,6 +344,7 @@ function drawRubber(){
  Object.assign(r.style,{left:Math.min(vpDrag.x0,vpDrag.x)*m.k+'px',top:Math.min(vpDrag.y0,vpDrag.y)*m.k+'px',width:Math.abs(vpDrag.x-vpDrag.x0)*m.k+'px',height:Math.abs(vpDrag.y-vpDrag.y0)*m.k+'px'});
 }
 // El panel aparece al entrar en LAYOUT.
+window.addEventListener('cad2d-layout-changed',()=>{if(CORE.layout.active==='layout')renderVpPanel()});
 new MutationObserver(()=>{if(CORE.layout.active==='layout')renderVpPanel()}).observe($('cadLayoutWorkspace')||document.body,{attributes:true,attributeFilter:['hidden']});
 Object.assign(EXT.commands,{
  MVIEW:()=>{CORE.layout.switchTo('layout');vpCreate=true;renderVpPanel();CORE.toast('VENTANA: arrastrá un rectángulo sobre la hoja')},
