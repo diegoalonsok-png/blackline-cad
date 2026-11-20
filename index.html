@@ -2313,12 +2313,21 @@ function cadDrawOpeningQuickGrips(ref){
 /* Velocidad: la geometría de cada referencia se calcula una vez y se reutiliza en cada cuadro
    (pan, zoom, cursor) hasta que cambia la referencia, su definición o el dibujo (updateAll). */
 let cadDrawEpoch=0;const cadChildCache=new WeakMap();
+// Firma del contenido de cada definición de bloque: se calcula una vez por redibujo y por definición (no por
+// referencia), así las referencias no se recalculan en cada cambio del dibujo salvo que su bloque cambie.
+const cadDefSigCache=new WeakMap();
+function cadDefSig(def){
+ if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
+ let sig;try{sig=(def.entities?.length||0)+'|'+JSON.stringify(def.entities)+'|'+JSON.stringify(def.base||null)}catch(e){sig=String(Math.random())}
+ cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
+}
 function cadBlockChildrenCached(ref){
  const def=state.blocks?.[ref.blockName];
  let sig;try{sig=JSON.stringify(ref)}catch(e){return blockChildren(ref)}
- const c=cadChildCache.get(ref);
- if(c&&c.sig===sig&&c.def===def&&c.ents===def?.entities&&c.n===def?.entities?.length&&c.epoch===cadDrawEpoch)return c.out;
- const out=blockChildren(ref);cadChildCache.set(ref,{sig,def,ents:def?.entities,n:def?.entities?.length,epoch:cadDrawEpoch,out});return out;
+ const c=cadChildCache.get(ref),dsig=cadDefSig(def);
+ if(c&&c.sig===sig&&c.def===def&&c.dsig===dsig&&(c.nested===0||c.epoch===cadDrawEpoch))return c.out;
+ const out=blockChildren(ref),nested=def?.entities?.some?.(x=>x.type==='blockRef')?1:0;
+ cadChildCache.set(ref,{sig,def,dsig,nested,epoch:cadDrawEpoch,out});return out;
 }
 function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
@@ -2915,10 +2924,41 @@ function cadScreenColor(c){
  if(v){if(v.l>.82)out='#1d2125';else if(v.l>.55){const k=.55/v.l*.8;out='#'+[v.r,v.g,v.b].map(x=>Math.round(x*k*255).toString(16).padStart(2,'0')).join('')}}
  cadScreenColorCache.set(key,out);return out;
 }
+/* Dibujo rápido de referencias de bloque: las líneas, polilíneas, arcos y círculos simples del bloque se juntan en
+   un Path2D en coordenadas del dibujo, uno por color y grosor, y se trazan de una vez con la transformación de la vista.
+   Se rearma solo si cambia el bloque o el dibujo (no al hacer zoom o desplazar). */
+const cadRefPathCache=new WeakMap();let cadRefStyle={epoch:-1,sig:''};
+function cadRefStyleSig(){if(cadRefStyle.epoch!==cadDrawEpoch){let sig;try{sig=JSON.stringify(state.layers.map(l=>[l.id,l.visible,l.color,l.width,l.linetype]))+'|'+cadScreenColor('#ffffff')+cadScreenColor('#000000')+'|'+(state.ltscale||1)}catch(e){sig=String(cadDrawEpoch)}cadRefStyle={epoch:cadDrawEpoch,sig}}return cadRefStyle.sig}
+function cadDrawRefFast(e){
+ const kids=cadBlockChildrenCached(e),ss=cadRefStyleSig();let c=cadRefPathCache.get(e);
+ if(!c||c.kids!==kids||c.ss!==ss){
+  const groups=new Map(),rest=[];
+  for(const k of kids){const lay=layerFor(k);if(!lay.visible)continue;
+   const simple=['line','polyline','arc','circle','rect'].includes(k.type)&&!(k.pwidth>0)&&!cadLinetypeDash(k,lay);
+   if(!simple){rest.push(k);continue}
+   const col=cadScreenColor(k.color||lay.color),w=Math.max(.75,(k.width??lay.width??.25)*3),key=col+'|'+w;
+   let g=groups.get(key);if(!g){g={col,w,path:new Path2D()};groups.set(key,g)}const P2=g.path;
+   if(k.type==='line'){P2.moveTo(k.a.x,k.a.y);P2.lineTo(k.b.x,k.b.y)}
+   else if(k.type==='polyline'){if(!k.pts?.length)continue;P2.moveTo(k.pts[0].x,k.pts[0].y);for(let i=1;i<k.pts.length;i++)P2.lineTo(k.pts[i].x,k.pts[i].y);if(k.closed)P2.closePath()}
+   else if(k.type==='rect'){P2.rect(Math.min(k.a.x,k.b.x),Math.min(k.a.y,k.b.y),Math.abs(k.b.x-k.a.x),Math.abs(k.b.y-k.a.y))}
+   else if(k.type==='circle'){P2.moveTo(k.c.x+Math.abs(k.r),k.c.y);P2.arc(k.c.x,k.c.y,Math.abs(k.r),0,TAU)}
+   else if(k.type==='arc'){const sw=arcSweep(k.a0,k.a1);P2.moveTo(k.c.x+Math.abs(k.r)*Math.cos(k.a0),k.c.y+Math.abs(k.r)*Math.sin(k.a0));P2.arc(k.c.x,k.c.y,Math.abs(k.r),k.a0,k.a0+sw,false)}
+  }
+  c={kids,ss,groups:[...groups.values()],rest};cadRefPathCache.set(e,c);
+ }
+ if(c.groups.length){
+  const o=screen(P(0,0)),ux=screen(P(1,0)),uy=screen(P(0,1)),sc=Math.hypot(ux.x-o.x,ux.y-o.y)||1;
+  ctx.save();ctx.transform(ux.x-o.x,ux.y-o.y,uy.x-o.x,uy.y-o.y,o.x,o.y);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
+  for(const g of c.groups){ctx.strokeStyle=g.col;ctx.lineWidth=g.w/sc;ctx.stroke(g.path)}
+  ctx.restore();
+ }
+ for(const k of c.rest)drawEntity(k,null);
+}
 function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,forceColor);if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   const fade=e.xref&&!forceColor&&!state.selected.includes(e.id);if(fade){ctx.save();ctx.globalAlpha*=cadXrefFade}
-  for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
+  if(!forceColor&&!state.selected.includes(e.id))cadDrawRefFast(e);
+  else for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(fade)ctx.restore();
   if(state.selected.includes(e.id)&&!forceColor){
    drawBlockGrips(e);

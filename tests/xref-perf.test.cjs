@@ -15,5 +15,6 @@ test('block children are cached per reference and invalidated by edits',()=>{
  const ref={type:'blockRef',blockName:'B',p:{x:0,y:0}};
  api.get(ref);api.get(ref);assert.equal(calls,1,'second frame reuses geometry');
  ref.p={x:1,y:0};api.get(ref);assert.equal(calls,2,'moving the reference recomputes');
- api.bump();api.get(ref);assert.equal(calls,3,'any drawing edit recomputes');
+ api.bump();api.get(ref);assert.equal(calls,2,'an unrelated drawing edit keeps the cached geometry');
+ state.blocks.B.entities.push({type:'circle'});api.bump();api.get(ref);assert.equal(calls,3,'editing the block definition recomputes');
 });
