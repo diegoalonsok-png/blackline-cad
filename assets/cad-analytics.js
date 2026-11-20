@@ -5,7 +5,7 @@
  * hasta que la persona acepta en el aviso; en el resto del mundo se miden por defecto. */
 (function(){
  'use strict';
- var GA_ID='';
+ var GA_ID='G-4C16S8207W';
  var DOMINIO='blackline-cad.org';
  var host=location.hostname;
  if(!GA_ID||!(host===DOMINIO||host==='www.'+DOMINIO))return;
