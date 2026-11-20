@@ -5,7 +5,7 @@ const L=require('../assets/cad2d-arq-generators.js');
 const html=fs.readFileSync(path.join(__dirname,'..','index.html'),'utf8');
 const ext=fs.readFileSync(path.join(__dirname,'..','cad-arq-pro.js'),'utf8');
 const finite=e=>JSON.stringify(e).match(/-?\d+(\.\d+)?(e[-+]?\d+)?/g).every(n=>Number.isFinite(Number(n)));
-const coreTypes=new Set(['line','polyline','rect','circle','arc','ellipse','text']);
+const coreTypes=new Set(['hatch','line','polyline','rect','circle','arc','ellipse','text']);
 
 test('galería grande: al menos 12 baños completos, 12 cocinas completas y 90 bloques',()=>{
  assert.ok(L.library.length>=90);

@@ -659,7 +659,7 @@ function bounds(entities){
  const t=p=>{if(!p)return;minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y)};
  for(const e of entities){
   if(e.type==='line'||e.type==='rect'){t(e.a);t(e.b)}
-  else if(e.type==='polyline')e.pts.forEach(t);
+  else if(e.type==='polyline'||e.type==='hatch')(e.pts||[]).forEach(t);
   else if(e.type==='text')t(e.p);
   else if(e.c){const rx=e.rx||e.r,ry=e.ry||e.r;t({x:e.c.x-rx,y:e.c.y-ry});t({x:e.c.x+rx,y:e.c.y+ry})}
  }
@@ -708,6 +708,65 @@ one('vm-planta-maceta','Planta en maceta · vista frontal',VM,.60,1.20,(b,W,D)=>
 one('vm-mesa-jardin-sombrilla','Mesa de jardín con sombrilla · vista frontal',VM,2.00,2.40,(b,W,D)=>{piso(b,W);const c=W/2;b.rect(c-.45,.70,.90,.03);b.line(c-.40,0,c-.35,.70);b.line(c+.40,0,c+.35,.70);b.rect(c-.02,0,.04,D-.25);b.poly([[0,D-.45],[c,D-.05],[W,D-.45]],true);b.poly(bz([[0,D-.45],[c*.5,D-.52],[c,D-.45]]),false);b.poly(bz([[c,D-.45],[c*1.5,D-.52],[W,D-.45]]),false);
  for(const x of[c-.75,c+.75]){const s=x<c?-1:1;b.rect(x-.20,.43,.40,.04);b.line(x-.16,0,x-.16,.43);b.line(x+.16,0,x+.16,.43);b.line(x+s*.18,.47,x+s*.20,.90)}},vmOpt('vm-jardin',1.6,2.6,2,2.8));
 one('vm-perchero','Perchero de pie · vista frontal',VM,.45,1.80,(b,W,D)=>{piso(b,W);const c=W/2;b.line(c-.22,0,c,.12);b.line(c+.22,0,c,.12);b.rect(c-.015,.12,.03,D-.12);for(const s of[-1,1]){b.poly(bz([[c,D-.15],[c+s*.12,D-.10],[c+s*.18,D-.02]]),false);b.poly(bz([[c,D-.40],[c+s*.10,D-.36],[c+s*.15,D-.28]]),false)}},vmOpt('vm-perchero',.35,.6,1.5,2));
+/* ---------- Personas en vista: siluetas originales (paradas, caminando, sentadas) ---------- */
+// Figura por esqueleto: cada miembro es una cápsula rellena (siluetas limpias, sin líneas cruzadas).
+const capsule=(A,B,ra,rb,n=6)=>{const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1e-6,ux=dx/L,uy=dy/L,nx=-uy,ny=ux,pts=[];
+ const a0=Math.atan2(ny,nx);for(let i=0;i<=n;i++){const a=a0-Math.PI*i/n;pts.push([B[0]+Math.cos(a)*rb,B[1]+Math.sin(a)*rb])}
+ for(let i=0;i<=n;i++){const a=a0+Math.PI-Math.PI*i/n;pts.push([A[0]+Math.cos(a)*ra,A[1]+Math.sin(a)*ra])}return pts};
+const solid=(b,pts)=>b.push({type:'hatch',pts:pts.map(p=>b.tp(p[0],p[1])),hatchStyle:'solid'});
+function figura(b,j,o={}){
+ // j: puntos [x,y] — head, neck, sh (hombro), el, wr, el2, wr2, hip, kn, an, kn2, an2, toe, toe2
+ const S=o.s||1,T=p=>[p[0]*S+(o.x||0),p[1]*S];
+ const limb=(a,c,ra,rb)=>solid(b,capsule(T(a),T(c),ra*S,rb*S));
+ // brazo y pierna del fondo primero
+ if(j.kn2){limb(j.hip,j.kn2,.075,.058);limb(j.kn2,j.an2,.056,.04);if(j.toe2)limb(j.an2,j.toe2,.035,.03)}
+ if(j.el2){limb(j.sh,j.el2,.045,.038);limb(j.el2,j.wr2,.036,.028)}
+ // torso
+ const tw=o.front?.18:.11,hw=o.front?.16:.12;
+ solid(b,[[j.sh[0]-tw,j.sh[1]+.02],[j.sh[0]+tw,j.sh[1]+.02],[j.hip[0]+hw,j.hip[1]-.02],[j.hip[0]-hw,j.hip[1]-.02]].map(T));
+ if(o.skirt)solid(b,[[j.hip[0]-hw,j.hip[1]+.05],[j.hip[0]+hw,j.hip[1]+.05],[j.hip[0]+hw+.10,j.hip[1]-.42],[j.hip[0]-hw-.10,j.hip[1]-.42]].map(T));
+ limb(j.neck,j.sh,.05,.06);b.circle(...T(j.head),.105*S);solid(b,capsule(T([j.head[0],j.head[1]-.02]),T([j.head[0],j.head[1]+.02]),.1*S,.1*S,8));
+ limb(j.hip,j.kn,.08,.06);limb(j.kn,j.an,.058,.042);if(j.toe)limb(j.an,j.toe,.037,.03);
+ if(j.el){limb(j.sh,j.el,.048,.04);limb(j.el,j.wr,.038,.03)}
+}
+const PV='Personas';
+const P_={
+ paradoLat:{head:[.02,1.62],neck:[0,1.50],sh:[0,1.40],el:[.01,1.12],wr:[.04,.86],hip:[0,.95],kn:[.01,.50],an:[0,.08],toe:[.17,.03]},
+ camina1:{head:[.05,1.61],neck:[.03,1.49],sh:[.02,1.40],el:[.12,1.15],wr:[.22,.95],el2:[-.10,1.16],wr2:[-.20,.95],hip:[0,.93],kn:[.17,.53],an:[.25,.09],toe:[.41,.06],kn2:[-.04,.52],an2:[-.25,.14],toe2:[-.12,.03]},
+ camina2:{head:[.05,1.62],neck:[.03,1.50],sh:[.02,1.41],el:[.04,1.13],wr:[.09,.88],el2:[-.03,1.13],wr2:[-.05,.88],hip:[0,.95],kn:[.08,.51],an:[.02,.08],toe:[.19,.03],kn2:[-.02,.55],an2:[-.18,.22],toe2:[-.10,.10]},
+ corre:{head:[.14,1.55],neck:[.11,1.44],sh:[.09,1.35],el:[.22,1.15],wr:[.36,1.25],el2:[-.10,1.18],wr2:[-.12,.98],hip:[0,.90],kn:[.30,.68],an:[.24,.28],toe:[.40,.24],kn2:[-.10,.50],an2:[-.36,.36],toe2:[-.42,.22]},
+ sentadoLat:{head:[.04,1.27],neck:[.02,1.15],sh:[.01,1.06],el:[.06,.82],wr:[.30,.72],hip:[0,.50],kn:[.44,.52],an:[.44,.08],toe:[.60,.03]},
+ sentadoRelax:{head:[-.12,1.20],neck:[-.10,1.09],sh:[-.08,1.00],el:[-.02,.78],wr:[.22,.70],hip:[0,.45],kn:[.45,.55],an:[.62,.12],toe:[.76,.12],kn2:[.42,.52],an2:[.50,.08],toe2:[.64,.03]},
+ escritorio:{head:[.10,1.26],neck:[.07,1.15],sh:[.05,1.06],el:[.20,.86],wr:[.44,.76],hip:[0,.50],kn:[.44,.52],an:[.40,.08],toe:[.56,.03]}
+};
+const F_={
+ paradoFre:{head:[0,1.63],neck:[0,1.51],sh:[0,1.42],hip:[0,.95]},
+};
+const persLat=(id,name,pose,w,d,extra={})=>one(id,name,PV,w,d,(b,W,D)=>{const s=D/1.75;const xs=Object.values(P_[pose]).map(p=>p[0]);const x0=-Math.min(...xs)*s+.12*s;figura(b,P_[pose],{s,x:x0});if(extra.chair){const c=extra.chair;b.rect(x0-.22*s,.43*s,.52*s,.04*s);b.line(x0-.20*s,0,x0-.20*s,.43*s);b.line(x0+.26*s,0,x0+.26*s,.43*s);if(c==='back'){b.line(x0-.21*s,.47*s,x0-.24*s,.92*s)}}if(extra.desk){b.rect(x0+.30*s,.72*s,.80*s,.03*s);b.line(x0+1.06*s,0,x0+1.06*s,.72*s)}},{family:'pers-vista',wMin:w*.5,wMax:w*1.4,dMin:d*.5,dMax:d*1.3});
+persLat('pv-parado-lat','Persona parada · vista lateral','paradoLat',.50,1.75);
+persLat('pv-camina-1','Persona caminando · paso largo','camina1',.80,1.75);
+persLat('pv-camina-2','Persona caminando · paso corto','camina2',.55,1.75);
+persLat('pv-corre','Persona corriendo','corre',1.00,1.70);
+persLat('pv-sentado-silla','Persona sentada en silla · vista lateral','sentadoLat',.85,1.30,{chair:'back'});
+persLat('pv-sentado-relax','Persona sentada relajada · vista lateral','sentadoRelax',1.05,1.25,{chair:'back'});
+persLat('pv-sentado-escritorio','Persona trabajando en escritorio · vista lateral','escritorio',1.40,1.30,{chair:'back',desk:true});
+// Vistas frontales (simétricas)
+const frontal=(b,s,o)=>{const L=(a,c,ra,rb)=>solid(b,capsule([a[0]*s+o.x,a[1]*s],[c[0]*s+o.x,c[1]*s],ra*s,rb*s));
+ const sit=o.sit;const hip=sit?.50:.95;
+ // piernas
+ for(const k of[-1,1]){if(sit){L([.09*k,hip],[.12*k,.50],.08,.065);L([.12*k,.48],[.12*k,.08],.06,.045)}else if(!o.skirt){L([.09*k,hip],[.10*k,.50],.085,.06);L([.10*k,.50],[.10*k,.08],.058,.042)}else{L([.07*k,.55],[.08*k,.08],.05,.04)}
+  solid(b,capsule([.10*k*s+o.x+.02*k*s,.04*s],[.10*k*s+o.x+.05*k*s,.04*s],.035*s,.035*s))}
+ const top=hip+.47;
+ solid(b,[[-.20,top],[.20,top],[.16,hip-.02],[-.16,hip-.02]].map(p=>[p[0]*s+o.x,p[1]*s]));
+ if(o.skirt)solid(b,[[-.16,hip+.05],[.16,hip+.05],[.25,hip-.42],[-.25,hip-.42]].map(p=>[p[0]*s+o.x,p[1]*s]));
+ for(const k of[-1,1]){L([.20*k,top-.02],[.25*k,top-.30],.05,.042);if(o.armsIn)L([.25*k,top-.30],[.08*k,top-.38],.04,.03);else L([.25*k,top-.30],[.27*k,top-.56],.04,.03)}
+ L([0,top],[0,top+.08],.05,.05);b.circle(o.x,(top+.20)*s,.105*s);solid(b,capsule([o.x,(top+.18)*s],[o.x,(top+.22)*s],.1*s,.1*s,8));
+};
+one('pv-parado-fre','Persona parada · vista frontal',PV,.60,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:W/2})},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.9,dMax:2.1});
+one('pv-parada-falda-fre','Persona con falda · vista frontal',PV,.60,1.70,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:W/2,skirt:true})},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.9,dMax:2.1});
+one('pv-brazos-cruzados-fre','Persona con manos adelante · vista frontal',PV,.60,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:W/2,armsIn:true})},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.9,dMax:2.1});
+one('pv-sentado-fre','Persona sentada · vista frontal',PV,.60,1.30,(b,W,D)=>{const s=D/1.30;frontal(b,s,{x:W/2,sit:true});b.rect(W/2-.24*s,.43*s,.48*s,.04*s)},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.8,dMax:1.6});
+one('pv-grupo-fre','Grupo de tres personas · vista frontal',PV,1.70,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:.32*s});frontal(b,s*.96,{x:.85*s,skirt:true});frontal(b,s*.62,{x:1.35*s})},{family:'pers-vista',wMin:1.2,wMax:2.4,dMin:1.2,dMax:2.1});
 const api={library:LIB,build,bounds,categories:[...new Set(LIB.map(x=>x.cat))],Builder,F};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.CAD2D_ARQ_LIBRARY=api;
