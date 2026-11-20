@@ -273,6 +273,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .panel-title{padding:6px 9px}
 #cadContextMenu{max-height:calc(100vh - 16px);overflow-y:auto;position:fixed;z-index:999;background:#202428;border:1px solid #515962;box-shadow:0 12px 32px #000b;border-radius:7px;min-width:200px;padding:5px;display:none;color:#e4e8eb;font:12px -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
 #cadContextMenu.open{display:block}
+#testHouseBtn{border-color:#d3b47a;color:#f3dcae}
 #cadContextMenu button{display:flex;width:100%;align-items:center;text-align:left;border:0;background:transparent;border-radius:4px;color:inherit;padding:9px 10px;cursor:pointer}
 #cadContextMenu button:hover{background:#353c44}
 #cadContextMenu button:disabled{opacity:.4;cursor:default}
@@ -743,8 +744,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0700">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0700">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0900">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0900">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +829,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0700"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0700"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0900"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0900"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -877,10 +878,11 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
+<script src="assets/cad-analytics.js?v=20261120-0900"></script>
 </head>
 <body>
 <div class="app">
- <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
+ <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide cad-test-house" id="testHouseBtn" title="Abrir una casa completa de prueba a escala 1:1 (metros) para practicar: medir, acotar, mover, sombrear">🏠 Casa de prueba</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><button id="cadTextBarShadow" type="button" aria-pressed="false" title="Sombra detrás del texto">Sombra</button><input id="cadTextBarShadowColor" type="color" value="#333333" title="Color de sombra"><label>Despl. <input id="cadTextBarShadowOffset" type="number" min="0" max="10" step="0.01" value="0.04" style="width:65px"></label><span class="cad-text-divider"></span><label>Forma <select id="cadTextBarPath"><option value="straight">Recto</option><option value="circle">Circular</option></select></label><label>Radio <input id="cadTextBarRadius" type="number" min="0.01" step="0.1" value="2" style="width:65px"></label><label>Inicio ° <input id="cadTextBarStartAngle" type="number" step="15" value="0" style="width:65px"></label><label>Sentido <select id="cadTextBarDirection"><option value="ccw">Antihorario</option><option value="cw">Horario</option></select></label><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -940,9 +942,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-0700"></script>
-<script src="cad-grip-settings.js?v=20261120-0700"></script>
-<script src="cad-cursor-mode.js?v=20261120-0700"></script>
+<script src="cad2d-config.js?v=20261120-0900"></script>
+<script src="cad-grip-settings.js?v=20261120-0900"></script>
+<script src="cad-cursor-mode.js?v=20261120-0900"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -958,7 +960,7 @@ window.addEventListener('unhandledrejection',function(event){
 });
 (()=>{'use strict';
 const $=id=>document.getElementById(id), TAU=Math.PI*2, U={mm:1,cm:10,m:1000,in:25.4,ft:304.8};
-const icons={select:'<path d="m5 3 13 10-7 1-3 6z"/>',line:'<path d="M3 20 21 4"/><circle cx="3" cy="20" r="2"/><circle cx="21" cy="4" r="2"/>',polyline:'<path d="M2 19 8 9 14 15 22 3"/>',rect:'<rect x="3" y="4" width="18" height="16"/>',circle:'<circle cx="12" cy="12" r="9"/>',arc:'<path d="M4 19 A12 12 0 0 1 20 5"/>',ellipse:'<ellipse cx="12" cy="12" rx="10" ry="6"/>',text:'<path d="M3 5h18M12 5v15M8 20h8"/>',dimension:'<path d="M3 4v16M21 4v16M3 12h18m-13-3-4 3 4 3m8-6 4 3-4 3"/>',move:'<path d="M12 2v20M2 12h20m-6-6 6 6-6 6M6 6 0 12l6 6"/>',copy:'<rect x="3" y="3" width="13" height="13"/><path d="M8 20h12V8"/>',rotate:'<path d="M3 12a9 9 0 1 0 3-7M3 3v7h7"/>',scale:'<rect x="3" y="12" width="9" height="9"/><path d="M9 3h12v12M10 14 21 3"/>',mirror:'<path d="M12 2v20M9 5 3 12l6 7M15 5l6 7-6 7"/>',offset:'<path d="M3 20 20 4M7 22 22 8"/>',trim:'<path d="m5 5 14 14M19 5 5 19"/><circle cx="8" cy="8" r="2"/>',chamfer:'<path d="M3 19h10l8-8V3M13 19l8-8"/>',fillet:'<path d="M3 20h9a9 9 0 0 0 9-9V3M13 19A9 9 0 0 0 20 12"/>',erase:'<path d="m4 15 10-11 7 7-9 10H7z"/>',distance:'<path d="M3 17 18 2l4 4L7 21zM13 7l3 3M9 11l3 3"/>',zoom:'<circle cx="10" cy="10" r="7"/><path d="m15 15 7 7M10 6v8m-4-4h8"/>',grid:'<path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18"/>',print:'<path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v8H6z"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v7h10V3M7 21v-8h10v8"/>',undo:'<path d="M9 5 3 11l6 6M3 11h12a6 6 0 1 1 0 12"/>',redo:'<path d="m15 5 6 6-6 6m6-6H9a6 6 0 1 0 0 12"/>',layer:'<path d="M3 7 12 2l9 5-9 5zM3 12l9 5 9-5M3 17l9 5 9-5"/>',help:'<circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 1 1 4 3c-1 1-1 2-1 3m0 3v1"/>',pan:'<path d="M12 2v20M2 12h20m-7-7 4 7-4 7M9 5l-4 7 4 7"/>'};
+const icons={select:'<path d="m5 3 13 10-7 1-3 6z"/>',line:'<path d="M3 20 21 4"/><circle cx="3" cy="20" r="2"/><circle cx="21" cy="4" r="2"/>',polyline:'<path d="M2 19 8 9 14 15 22 3"/>',rect:'<rect x="3" y="4" width="18" height="16"/>',circle:'<circle cx="12" cy="12" r="9"/>',arc:'<path d="M4 19 A12 12 0 0 1 20 5"/>',ellipse:'<ellipse cx="12" cy="12" rx="10" ry="6"/>',text:'<path d="M3 5h18M12 5v15M8 20h8"/>',dimension:'<path d="M3 4v16M21 4v16M3 12h18m-13-3-4 3 4 3m8-6 4 3-4 3"/>',move:'<path d="M12 2v20M2 12h20m-6-6 6 6-6 6M6 6 0 12l6 6"/>',copy:'<rect x="3" y="3" width="13" height="13"/><path d="M8 20h12V8"/>',rotate:'<path d="M3 12a9 9 0 1 0 3-7M3 3v7h7"/>',scale:'<rect x="3" y="12" width="9" height="9"/><path d="M9 3h12v12M10 14 21 3"/>',mirror:'<path d="M12 2v20M9 5 3 12l6 7M15 5l6 7-6 7"/>',offset:'<path d="M3 20 20 4M7 22 22 8"/>',trim:'<path d="m5 5 14 14M19 5 5 19"/><circle cx="8" cy="8" r="2"/>',chamfer:'<path d="M3 19h10l8-8V3M13 19l8-8"/>',fillet:'<path d="M3 20h9a9 9 0 0 0 9-9V3M13 19A9 9 0 0 0 20 12"/>',erase:'<path d="m4 15 10-11 7 7-9 10H7z"/>',distance:'<rect x="2.5" y="6" width="12" height="12" rx="3"/><circle cx="8.5" cy="12" r="2.3"/><path d="M14.5 14.5H22v3.5h-7.5M17 14.5v1.6M19.5 14.5v1.6"/>',zoom:'<circle cx="10" cy="10" r="7"/><path d="m15 15 7 7M10 6v8m-4-4h8"/>',grid:'<path d="M3 3h18v18H3zM9 3v18M15 3v18M3 9h18M3 15h18"/>',print:'<path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v8H6z"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v7h10V3M7 21v-8h10v8"/>',undo:'<path d="M9 5 3 11l6 6M3 11h12a6 6 0 1 1 0 12"/>',redo:'<path d="m15 5 6 6-6 6m6-6H9a6 6 0 1 0 0 12"/>',layer:'<path d="M3 7 12 2l9 5-9 5zM3 12l9 5 9-5M3 17l9 5 9-5"/>',help:'<circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 1 1 4 3c-1 1-1 2-1 3m0 3v1"/>',pan:'<path d="M12 2v20M2 12h20m-7-7 4 7-4 7M9 5l-4 7 4 7"/>'};
 Object.assign(icons,{extend:'<path d="M3 20 21 2M3 12h16M15 8l4 4-4 4"/>',join:'<path d="M3 19 9 12 14 12 21 4M10 9v6"/>',explode:'<path d="M12 12 3 3M12 12 21 3M12 12 4 21M12 12 21 21"/>',array:'<rect x="3" y="3" width="6" height="6"/><rect x="14" y="3" width="6" height="6"/><rect x="3" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/>',reverse:'<path d="M3 7h18l-5-5M21 17H3l5 5"/>',color:'<circle cx="12" cy="12" r="9"/><path d="M6 18 18 6M6 7h2M16 17h2"/>'});
 const toolDefs={layout:['Layout','print'],select:['Select','select'],line:['Line','line'],polyline:['Polyline','polyline'],polygon:['Polygon','polygon'],hatch:['Hatch','hatch'],table:['Table','table'],rect:['Rectangle','rect'],circle:['Circle','circle'],arc:['Arc','arc'],ellipse:['Ellipse','ellipse'],text:['Text','text'],dimension:['Dimension','dimension'],dimHorizontal:['Horizontal','dimension'],dimVertical:['Vertical','dimension'],dimAngular:['Angular','dimension'],dimRadius:['Radius','dimension'],dimDiameter:['Diameter','dimension'],dimOrdinateX:['Ordinate X','dimension'],dimOrdinateY:['Ordinate Y','dimension'],dimLeader:['Leader','dimension'],move:['Move','move'],copy:['Copy','copy'],rotate:['Rotate','rotate'],scale:['Scale','scale'],mirror:['Mirror','mirror'],offset:['Offset','offset'],trim:['Trim','trim'],chamfer:['Chamfer','chamfer'],fillet:['Fillet','fillet'],erase:['Erase','erase'],extend:['Extend','extend'],breakLine:['Break','trim'],trimScissor:['Tijera · 2 puntos','trim'],lengthen:['Lengthen','extend'],peditMove:['Move vertex','polyline'],peditInsert:['Insert vertex','polyline'],join:['Join','join'],explode:['Explode','explode'],array:['Array','array'],reverse:['Reverse','reverse'],color:['Color','color'],distance:['Measure','distance'],area:['Area','distance'],id:['ID point','distance'],matchprop:['Match Prop.','color'],pan:['Pan','pan']};
 const ribbonTabs={home:[['DRAW','line','polyline','polygon','rect','circle','arc','ellipse','text'],['MODIFY','select','move','copy','offset','trim','trimScissor','fillet','chamfer','color'],['ANNOTATE','dimension','distance'],['OUTPUT','print','save','help']],draw:[['CREATE','line','polyline','polygon','rect','circle','arc','ellipse','hatch','text'],['PRECISION','distance','area','id','grid']],modify:[['TRANSFORM','select','move','copy','rotate','scale','mirror'],['EDIT','offset','trim','trimScissor','extend','breakLine','lengthen','chamfer','fillet','erase'],['OBJECTS','join','explode','peditMove','peditInsert','array','reverse','matchprop','color']],annotate:[['DIMENSIONS','dimension','dimHorizontal','dimVertical','dimAngular','dimRadius','dimDiameter','dimOrdinateX','dimOrdinateY','dimLeader'],['LABELS','text','table','distance','area']],view:[['NAVIGATE','select','pan','zoom','grid']],output:[['FILES','save','print','help'],['PAPER SPACE','layout']]};
@@ -1059,7 +1061,7 @@ Object.assign(icons,{
  dimOrdinateY:'<path d="M4 3v18M4 18h17M11 3v15m-3-3 3 3 3-3"/><text x="15" y="10" fill="currentColor" stroke="none" font-size="5">Y</text>',
  dimLeader:'<path d="M3 20 12 11h9M3 20l2-6 4 4-6 2"/><path d="M13 7h8M13 4h5"/>',
  table:'<rect x="3" y="4" width="18" height="16"/><path d="M3 10h18M3 15h18M10 4v16M16 4v16"/>',
- distance:'<path d="M4 6v12M20 6v12M4 12h16M7 9l-3 3 3 3m10-6 3 3-3 3"/>',
+ distance:'<rect x="2.5" y="6" width="12" height="12" rx="3"/><circle cx="8.5" cy="12" r="2.3"/><path d="M14.5 14.5H22v3.5h-7.5M17 14.5v1.6M19.5 14.5v1.6"/>',
  area:'<path d="m4 17 4-12 12 4-3 11Z"/><path d="M8 5v12h9M7 17l10-8" stroke-dasharray="2 2"/>',
  dimstyle:'<path d="M3 18h18M5 4v16M19 4v16M7 12h10"/><path d="M9 9 7 12l2 3m6-6 2 3-2 3"/>',
  textstyle:'<path d="M4 5h16M12 5v15M7 20h10M17 3l4 4"/>',
@@ -1177,7 +1179,7 @@ function setTool(t){
  document.getElementById('cadStretchConfirmEnter')?.remove();
  state.tool=t;cadWallOptionPending=null;$('command').value='';if(t==='wall2d')$('cadWallJustification').value='left';state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select'){cad2dLastCommand=cadCommandName(t);log('Command: '+cadCommandName(t))}}
-function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'LINE · Specify next point or [Undo/Close] · type a length + Enter':'LINE · Specify first point',polyline:state.stage.length?'PLINE · Specify next point or [Undo/Close] · type a length + Enter':'PLINE · Specify start point',polygon:state.stage.length?'POLYGON · Specify radius (type a value or click)':'POLYGON · Enter number of sides <'+$('polygonSides').value+'> or specify center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'RECTANG · Specify other corner or [Dimensions] · @length,width':'RECTANG · Specify first corner point',circle:state.stage.length?'CIRCLE · Specify radius or [Diameter]':'CIRCLE · Specify center point',arc:cad2dArcCenter?`ARC · Specify ${['center','start','end'][state.stage.length]||'end'} point`:`ARC · ${['Specify start point or [Center]','Specify second point','Specify end point'][state.stage.length]||'Specify end point'}`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'Specify second measurement point':'Specify first measurement point',move:state.stage.length?'MOVE · Specify second point or type a distance':'MOVE · Select objects, then specify base point',copy:state.stage.length?'COPY · Specify second point or type a distance':'COPY · Select objects, then specify base point',rotate:state.stage.length?'ROTATE · Specify rotation angle (type degrees or click)':'ROTATE · Select objects, then specify base point',scale:state.stage.length?'SCALE · Specify scale factor (type a value or click)':'SCALE · Select objects, then specify base point',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready')}
+function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'LINE · Specify next point or [Undo/Close] · type a length + Enter':'LINE · Specify first point',polyline:state.stage.length?'PLINE · Specify next point or [Undo/Close] · type a length + Enter':'PLINE · Specify start point',polygon:state.stage.length?'POLYGON · Specify radius (type a value or click)':'POLYGON · Enter number of sides <'+$('polygonSides').value+'> or specify center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'RECTANG · Specify other corner or [Dimensions] · @length,width':'RECTANG · Specify first corner point',circle:state.stage.length?'CIRCLE · Specify radius or [Diameter]':'CIRCLE · Specify center point',arc:cad2dArcCenter?`ARC · Specify ${['center','start','end'][state.stage.length]||'end'} point`:`ARC · ${['Specify start point or [Center]','Specify second point','Specify end point'][state.stage.length]||'Specify end point'}`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'MEDIR · segundo punto':(state.measureResult?'DIST = '+cadMeasureInfo(state.measureResult.a,state.measureResult.b).main+' · clic para medir otra':'MEDIR · primer punto'),move:state.stage.length?'MOVE · Specify second point or type a distance':'MOVE · Select objects, then specify base point',copy:state.stage.length?'COPY · Specify second point or type a distance':'COPY · Select objects, then specify base point',rotate:state.stage.length?'ROTATE · Specify rotation angle (type degrees or click)':'ROTATE · Select objects, then specify base point',scale:state.stage.length?'SCALE · Specify scale factor (type a value or click)':'SCALE · Select objects, then specify base point',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready')}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -1191,7 +1193,7 @@ function cadDimLayerId(){
 }
 function ensureArchitecturalLayer(kind){const id=kind==='walls'?'walls':'openings',name=kind==='walls'?'WALLS':'OPENINGS';const existing=state.layers.find(l=>l.id===id||l.name.toUpperCase()===name);if(existing)return existing.id;state.layers.push({id,name,color:kind==='walls'?'#ff3333':'#e0ba83',visible:true,locked:false,width:kind==='walls'?.30:.05,linetype:'CONTINUOUS'});return id}
 function explicitWallLayerName(name){return /^(WALLS?|MUROS?|A[-_ ]?WALL|A[-_ ]?MURO|PAREDES?|MAMPOSTERIA|MAMPOSTERÍA)$/i.test(String(name||'').trim())}
-function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallLayerName(l.name)){l.color='#ff3333';l.width=.30}}}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
+function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallLayerName(l.name)){l.width=Math.max(l.width||0,.30)}}}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
 function historySnapshot(){return {entities:clone(state.entities),layers:clone(state.layers),blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId}}function syncCadHeaderHistoryButtons(){const u=$('cadHeaderUndo'),r=$('cadHeaderRedo');if(u)u.disabled=!state.history.length;if(r)r.disabled=!state.future.length}
 function saveHistory(){state.history.push(historySnapshot());if(state.history.length>75)state.history.shift();state.future=[];syncCadHeaderHistoryButtons()}
 function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
@@ -1550,6 +1552,32 @@ function inViewport(e,w,h){
  const sc=state.view.scale,ox=state.view.ox,oy=state.view.oy,pad=30;
  return (ox+b.maxX*sc>=-pad)&&(ox+b.minX*sc<=w+pad)&&(oy-b.minY*sc>=-pad)&&(oy-b.maxY*sc<=h+pad);
 }
+// MEASURE / DIST: etiqueta de color junto a la medida + mismo valor en la línea de comandos.
+function cadMeasureInfo(a,b){
+ const d=dist(a,b),deg=((ang(a,b)*180/Math.PI)%360+360)%360,u=state.unit;
+ const main=`${units(d)} ${u}`,sub=`∠ ${deg.toFixed(1)}° · ΔX ${units(Math.abs(b.x-a.x))} · ΔY ${units(Math.abs(b.y-a.y))}`;
+ return{d,deg,main,sub,line:`DIST = ${main} · Ángulo ${deg.toFixed(2)}° · ΔX ${units(b.x-a.x)} · ΔY ${units(b.y-a.y)} ${u}`};
+}
+function cadDrawMeasureTag(){
+ if(state.tool!=='distance'){state.measureResult=null;return}
+ let a,b;if(state.stage.length===1){a=state.stage[0];b=state.mouse}else if(state.measureResult){a=state.measureResult.a;b=state.measureResult.b}
+ if(!a||!b||dist(a,b)<1e-12)return;
+ const info=cadMeasureInfo(a,b),A=screen(a),B=screen(b),accent='#ff9f1c';
+ ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
+ ctx.strokeStyle=accent;ctx.lineWidth=1.6;ctx.setLineDash([7,4]);ctx.beginPath();ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.stroke();ctx.setLineDash([]);
+ const L=Math.hypot(B.x-A.x,B.y-A.y)||1,nx=-(B.y-A.y)/L,ny=(B.x-A.x)/L;
+ for(const Q of[A,B]){ctx.beginPath();ctx.moveTo(Q.x-nx*7,Q.y-ny*7);ctx.lineTo(Q.x+nx*7,Q.y+ny*7);ctx.stroke();ctx.fillStyle=accent;ctx.beginPath();ctx.arc(Q.x,Q.y,3,0,Math.PI*2);ctx.fill()}
+ ctx.font='700 17px Inter,Arial,sans-serif';const w1=ctx.measureText(info.main).width;ctx.font='500 11px Inter,Arial,sans-serif';const w2=ctx.measureText(info.sub).width;
+ const W=Math.max(w1,w2)+22,H=44,side=ny>0?-1:1;
+ const off=Math.abs(nx)*W/2+Math.abs(ny)*H/2+12;let cx=(A.x+B.x)/2+nx*off*side,cy=(A.y+B.y)/2+ny*off*side;
+ const vw=canvas.width/dpr,vh=canvas.height/dpr;cx=Math.min(vw-W/2-6,Math.max(W/2+6,cx));cy=Math.min(vh-H/2-6,Math.max(H/2+6,cy));
+ const x=cx-W/2,y=cy-H/2;
+ ctx.shadowColor='rgba(0,0,0,.45)';ctx.shadowBlur=10;ctx.fillStyle='rgba(22,16,6,.94)';ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,W,H,9):ctx.rect(x,y,W,H);ctx.fill();ctx.shadowBlur=0;
+ ctx.strokeStyle=accent;ctx.lineWidth=1.5;ctx.stroke();ctx.fillStyle=accent;ctx.fillRect(x,y+8,3,H-16);
+ ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.fillStyle='#ffd08a';ctx.font='700 17px Inter,Arial,sans-serif';ctx.fillText(info.main,cx,y+21);
+ ctx.fillStyle='#e9dcc7';ctx.font='500 11px Inter,Arial,sans-serif';ctx.fillText(info.sub,cx,y+36);
+ ctx.restore();
+}
 function draw(){drawPending=false;cadTGapCache=cadComputeWallTGaps();let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  for(const e of state.entities.filter(entity=>entity.type==='hatch')){if(layerFor(e).visible&&!e.cadHidden)drawEntity(e)}
  for(const e of state.entities){
@@ -1559,7 +1587,7 @@ function draw(){drawPending=false;cadTGapCache=cadComputeWallTGaps();let w=canva
    : !inViewport(e,w,h))continue;
   drawEntity(e);
   if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();
+ }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||snapPoint(state.mouse);
   const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
@@ -2640,9 +2668,16 @@ function flattenCADEntities(entities){const tGaps=cadComputeWallTGaps(entities);
 // Tipos de línea visibles en pantalla. Patrones en metros reales (como acad.lin a escala de arquitectura),
 // multiplicados por la escala del objeto (ltscale) y la global (LTSCALE).
 const CAD2D_LT_PATTERNS={DASHED:[.12,.06],HIDDEN:[.06,.03],CENTER:[.24,.04,.04,.04],DOTTED:[0,.05],DOT:[0,.05],DASHDOT:[.12,.04,0,.04],PHANTOM:[.24,.04,.04,.04,.04,.04]};
+// Nombres DXF/ISO habituales (ACAD_ISO10W100, CENTER2, DASHEDX2…) → patrón CAD2D.
+function cadLinetypeAlias(lt){
+ lt=String(lt||'').toUpperCase();const iso=lt.match(/ISO0?(\d+)W/);
+ if(iso){const n=+iso[1];return n===2||n===3||n===6?'DASHED':n===7?'DOTTED':n===8||n===9?'PHANTOM':'DASHDOT'}
+ const base=lt.replace(/(X2|2)$/,'');
+ return {DASHDOT:'DASHDOT',BORDER:'DASHDOT',DIVIDE:'PHANTOM',CENTER:'CENTER',DASHED:'DASHED',HIDDEN:'HIDDEN',DOT:'DOT',PHANTOM:'PHANTOM',EJE:'CENTER',TRAZOS:'DASHED',PUNTOS:'DOTTED'}[base]||(/DASH|TRAZ/.test(base)?'DASHED':/DOT|PUNT/.test(base)?'DOTTED':/CENT|EJE/.test(base)?'CENTER':'')
+}
 function cadLinetypeDash(e,lay){
  let lt=String(e.linetype||'BYLAYER').toUpperCase();if(lt==='BYLAYER'||lt==='BYBLOCK')lt=String(lay?.linetype||'CONTINUOUS').toUpperCase();
- const pat=CAD2D_LT_PATTERNS[lt];if(!pat)return null;
+ const pat=CAD2D_LT_PATTERNS[lt]||CAD2D_LT_PATTERNS[cadLinetypeAlias(lt)];if(!pat)return null;
  const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*state.view.scale;
  const px=pat.map(v=>v===0?.01:Math.max(1.5,v*k));
  return px.reduce((a,b)=>a+b,0)<4?null:px;
@@ -2661,7 +2696,7 @@ function cadGradientBands(e,n){
 }
 function cadSvgDash(e,factor){
  let lt=String(e.linetype||'BYLAYER').toUpperCase();if(lt==='BYLAYER'||lt==='BYBLOCK')lt=String(layerFor(e)?.linetype||'CONTINUOUS').toUpperCase();
- const pat=CAD2D_LT_PATTERNS[lt];if(!pat)return '';const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*factor;
+ const pat=CAD2D_LT_PATTERNS[lt]||CAD2D_LT_PATTERNS[cadLinetypeAlias(lt)];if(!pat)return '';const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*factor;
  return ` stroke-dasharray="${pat.map(v=>v===0?.01:Math.max(.3,v*k)).map(v=>Number(v.toFixed(3))).join(' ')}"`;
 }
 // Imágenes importadas (PNG/JPG/WebP/GIF): se dibujan dentro del rectángulo a–b, en escala real del dibujo.
@@ -3059,7 +3094,7 @@ if(t==='polyline'){
   done({type:'dimension',a:s[0],b:s[1],p:s[2],mode,style:readDimensionStyle(),layer:cadDimLayerId()});s.length=0;
  }
  prompt();schedule();return
-}if(t==='distance'){s.push(p);if(s.length===2){let d=dist(s[0],s[1]);log(`Distance: ${units(d)} ${state.unit}; Angle: ${(ang(s[0],s[1])*180/Math.PI).toFixed(2)}°`);toast(`Distance ${units(d)} ${state.unit}`);s.length=0}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
+}if(t==='distance'){s.push(p);if(s.length===1)state.measureResult=null;if(s.length===2){const r=cadMeasureInfo(s[0],s[1]);state.measureResult={a:s[0],b:s[1]};log(r.line);toast(r.main);s.length=0;draw()}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
 function cancelCadCommand(){
  cadSelectionAnchor=null;cadSelectionAnchorShift=false;
  cadZoomOptionPending=false;
@@ -5741,6 +5776,18 @@ setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveM
 function saveAsJSON(){return saveJSON(true)}
 
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
+async function cadOpenTestHouse(){try{
+ toast('Abriendo casa de prueba…');
+ const response=await fetch('./examples/casa-de-prueba.dxf',{cache:'force-cache'});
+ if(!response.ok)throw Error('HTTP '+response.status);
+ importDXF(await response.text(),'Casa_prueba_1-1.dxf');
+ state.ltscale=state.ltscale||1;zoomExtents();updateAll();
+ log('CASA DE PRUEBA · modelo 1:1 en metros. Probá DIST, DIM, MOVE, COPY, HATCH, BLOCKS.');
+ toast('Casa de prueba 1:1 · metros — jugá con el CAD: medí, acotá, mové, sombreá');
+}catch(e){alert('No se pudo abrir la casa de prueba: '+e.message)}}
+window.cadOpenTestHouse=cadOpenTestHouse;
+$('testHouseBtn').onclick=cadOpenTestHouse;
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CASAPRUEBA','CASA','TESTHOUSE','DEMOHOUSE'])X.commands[k]=cadOpenTestHouse}
 $('sampleHouseBtn').onclick=async()=>{try{
  const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
  if(!response.ok)throw Error('Sample drawing could not be downloaded (HTTP '+response.status+')');
@@ -5959,14 +6006,16 @@ function importDXF(text,name){
  const raw=text.replace(/\r/g,'').split('\n'),pairs=[];
  for(let i=0;i<raw.length-1;i+=2){const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
  let section='',table='',unitCode=0,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0;
- const aci=['#000000','#ff0000','#ffff00','#00ff00','#00ffff','#0000ff','#ff00ff','#ffffff'];
- const aciHex=n=>aci[Math.abs(n)]||'#c7cbd0';
+ const ACI_HEX='000000ff0000ffff0000ff0000ffff0000ffff00ffffffff808080c0c0c0ff0000ff7f7fa50000a552527f00007f3f3f4c00004c2626260000261313ff3f00ff9f7fa52900a567527f1f007f4f3f4c13004c2f26260900261713ff7f00ffbf7fa55200a57c527f3f007f5f3f4c26004c3926261300261c13ffbf00ffdf7fa57c00a591527f5f007f6f3f4c39004c4226261c00262113ffff00ffff7fa5a500a5a5527f7f007f7f3f4c4c004c4c26262600262613bfff00dfff7f7ca50091a5525f7f006f7f3f394c00424c261c26002126137fff00bfff7f52a5007ca5523f7f005f7f3f264c00394c261326001c26133fff009fff7f29a50067a5521f7f004f7f3f134c002f4c2609260017261300ff007fff7f00a50052a552007f003f7f3f004c00264c2600260013261300ff3f7fff9f00a52952a567007f1f3f7f4f004c13264c2f00260913581700ff7f7fffbf00a55252a57c007f3f3f7f5f004c26264c3900261313581c00ffbf7fffdf00a57c52a591007f5f3f7f6f004c39264c4200261c13585800ffff7fffff00a5a552a5a5007f7f3f7f7f004c4c264c4c00262613585800bfff7fdfff007ca55291a5005f7f3f6f7f00394c26427e001c26135858007fff7fbfff0052a5527ca5003f7f3f5f7f00264c26397e001326131c58003fff7f9fff0029a55267a5001f7f3f4f7f00134c262f7e0009261317580000ff7f7fff0000a55252a500007f3f3f7f00004c26267e0000261313583f00ff9f7fff2900a56752a51f007f4f3f7f13004c2f267e0900261713587f00ffbf7fff5200a57c52a53f007f5f3f7f26004c39267e1300261c1358bf00ffdf7fff7c00a59152a55f007f6f3f7f39004c42264c1c0026581358ff00ffff7fffa500a5a552a57f007f7f3f7f4c004c4c264c260026581358ff00bfff7fdfa5007ca552917f005f7f3f6f4c00394c264226001c581358ff007fff7fbfa50052a5527c7f003f7f3f5f4c00264c263926001358131cff003fff7f9fa50029a552677f001f7f3f4f4c00134c262f260009581317000000656565666666999999ccccccffffff';
+ const aciHex=n=>{n=Math.abs(Math.round(n));return n>=1&&n<=255?'#'+ACI_HEX.substr(n*6,6):'#c7cbd0'};
  const toHex=v=>Number.isFinite(v)?'#'+(v&0xffffff).toString(16).padStart(6,'0'):'';
  const fields=record=>({
   get:(code,def=0)=>{let v=record.find(q=>q[0]===code);return v?Number(v[1]):def},
   str:(code,def='')=>record.find(q=>q[0]===code)?.[1]??def
  });
  const getLayer=(name)=>{if(!layers.has(name))layers.set(name,{id:name,name,color:'#c6cbd1',visible:true,locked:false,width:.25,linetype:'CONTINUOUS'});return layers.get(name)};
+ // --- Parse sections: tables, block definitions and model-space records ---
+ const blocksDef=new Map(),modelRecs=[];let curBlock=null;
  for(let i=0;i<pairs.length;){
   const [code,val]=pairs[i];
   if(code===0&&val==='SECTION'){section=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';table='';i+=2;continue}
@@ -5984,29 +6033,147 @@ function importDXF(text,name){
    Object.assign(layer,{color:Number.isFinite(trueColor)?toHex(trueColor):aciHex(colorIndex),visible:colorIndex>=0&&!Boolean(flags&1),locked:Boolean(flags&4),width:weight>0?weight/100:.25,linetype:str(6,'CONTINUOUS')});
    continue;
   }
-  if(section==='BLOCKS'&&type==='BLOCK'){blockCount++;continue}
-  if(section!=='ENTITIES')continue;
-  const layerName=str(8,'0'),layer=getLayer(layerName);
-  const objectWeight=get(370,-1), objectColor=get(420,NaN),indexColor=get(62,256);
-  const common={layer:layerName,width:objectWeight>0?objectWeight/100:layer.width,linetype:str(6,'BYLAYER')};
-  if(Number.isFinite(objectColor))common.color=toHex(objectColor);
-  else if(indexColor>0&&indexColor<256)common.color=aciHex(indexColor);
-  let entity=null;
-  try{
-   if(type==='LINE')entity={type:'line',a:P(get(10),get(20)),b:P(get(11),get(21))};
-   else if(type==='CIRCLE'&&get(40)>0)entity={type:'circle',c:P(get(10),get(20)),r:get(40)};
-   else if(type==='ARC'&&get(40)>0)entity={type:'arc',c:P(get(10),get(20)),r:get(40),a0:get(50)*Math.PI/180,a1:get(51)*Math.PI/180};
-   else if(type==='TEXT'||type==='MTEXT')entity={type:'text',p:P(get(10),get(20)),h:get(40,.25),rotation:get(50,0),fontFamily:str(7,'').toUpperCase().includes('MONO')?'Courier New':str(7,'').toUpperCase().includes('SERIF')?'Times New Roman':'Arial',text:record.filter(q=>q[0]===1||q[0]===3).map(q=>q[1]).join('')};
-   else if(type==='LWPOLYLINE'){
-    let points=[],lastX=null,hasBulge=false;
-    for(const [c,v]of record){if(c===10){lastX=Number(v)}else if(c===20&&lastX!==null){points.push(P(lastX,Number(v)));lastX=null}else if(c===42&&Math.abs(Number(v))>1e-10)hasBulge=true}
-    if(hasBulge)unsupported.set('LWPOLYLINE bulge arcs',(unsupported.get('LWPOLYLINE bulge arcs')||0)+1);
-    if(points.length>=2){entity={type:'polyline',pts:points,closed:Boolean(get(70)&1)};const pw=get(43,0);if(pw>0)entity.pwidth=pw}
-   }else if(type==='ELLIPSE'){let rx=Math.hypot(get(11),get(21)),ratio=get(40,1);if(rx>0)entity={type:'ellipse',c:P(get(10),get(20)),rx,ry:rx*ratio,rotation:Math.atan2(get(21),get(11))}}
-   if(entity)entities.push({...common,...entity,id:entities.length+1});
-   else unsupported.set(type,(unsupported.get(type)||0)+1);
-  }catch(error){unsupported.set(type,(unsupported.get(type)||0)+1);console.warn('Skipped DXF entity',type,error)}
+  if(section==='BLOCKS'){
+   if(type==='BLOCK'){blockCount++;curBlock={name:str(2,''),base:P(get(10),get(20)),recs:[]};blocksDef.set(curBlock.name,curBlock);continue}
+   if(type==='ENDBLK'){curBlock=null;continue}
+   if(curBlock)curBlock.recs.push([type,record]);
+   continue;
+  }
+  if(section==='ENTITIES')modelRecs.push([type,record]);
  }
+ // --- Geometry helpers (affine matrix [a,b,c,d,e,f]: x'=a x+c y+e, y'=b x+d y+f) ---
+ const ID=[1,0,0,1,0,0];
+ const mul2=(m,n)=>[m[0]*n[0]+m[2]*n[1],m[1]*n[0]+m[3]*n[1],m[0]*n[2]+m[2]*n[3],m[1]*n[2]+m[3]*n[3],m[0]*n[4]+m[2]*n[5]+m[4],m[1]*n[4]+m[3]*n[5]+m[5]];
+ const tp=(m,p)=>P(m[0]*p.x+m[2]*p.y+m[4],m[1]*p.x+m[3]*p.y+m[5]);
+ const tv=(m,x,y)=>P(m[0]*x+m[2]*y,m[1]*x+m[3]*y);
+ const isId=m=>m.every((v,k)=>Math.abs(v-ID[k])<1e-12);
+ const arcPts=(c,r,a0,sweep)=>{const n=Math.max(6,Math.ceil(Math.abs(sweep)/(Math.PI/24)));return Array.from({length:n+1},(_,k)=>P(c.x+r*Math.cos(a0+sweep*k/n),c.y+r*Math.sin(a0+sweep*k/n)))};
+ const bulgePts=(p1,p2,b)=>{const d=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(d<1e-12||Math.abs(b)<1e-10)return[p2];const th=4*Math.atan(b),r=d*(1+b*b)/(4*Math.abs(b)),ux=(p2.x-p1.x)/d,uy=(p2.y-p1.y)/d,h=d/2*(1-b*b)/(2*b),c=P((p1.x+p2.x)/2-uy*h,(p1.y+p2.y)/2+ux*h);return arcPts(c,r,Math.atan2(p1.y-c.y,p1.x-c.x),th).slice(1)};
+ const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];out.push(...bulgePts(a.p,b.p,a.b||0))}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
+ const cleanMText=s=>s.replace(/\\P/g,' ').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
+ const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
+ const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
+ const silent=new Set(['POINT','VIEWPORT','ATTDEF','SEQEND','VERTEX','ACAD_PROXY_ENTITY','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
+ const note=t=>unsupported.set(t,(unsupported.get(t)||0)+1);
+ // --- Read one record in block-local coordinates ---
+ function readRecord(type,record,recs,idx){
+  const {get,str}=fields(record);
+  if(type==='LINE')return{type:'line',a:P(get(10),get(20)),b:P(get(11),get(21))};
+  if(type==='CIRCLE'&&get(40)>0)return{type:'circle',c:P(get(10),get(20)),r:get(40)};
+  if(type==='ARC'&&get(40)>0)return{type:'arc',c:P(get(10),get(20)),r:get(40),a0:get(50)*Math.PI/180,a1:get(51)*Math.PI/180};
+  if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'){
+   if(type==='ATTRIB'&&(get(70)&1))return null;
+   const raw=record.filter(q=>q[0]===3).map(q=>q[1]).join('')+(str(1,''));
+   const text=type==='MTEXT'?cleanMText(raw):raw.replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[uUoO]/g,'');
+   if(!text)return null;
+   let h=get(40,.25)||.25,p=P(get(10),get(20)),rot=get(50,0);
+   if(type==='MTEXT'){const dx=get(11,NaN),dy=get(21,0);if(Number.isFinite(dx))rot=Math.atan2(dy,dx)*180/Math.PI;const at=get(71,1),w=text.length*h*.62,cx=((at-1)%3)/2,cy=Math.floor((at-1)/3),r=rot*Math.PI/180;const ox=-w*cx,oy=cy===0?-h:cy===1?-h/2:0;p=P(p.x+ox*Math.cos(r)-oy*Math.sin(r),p.y+ox*Math.sin(r)+oy*Math.cos(r))}
+   else{const hj=get(72,0),vj=get(73,0);if((hj||vj)&&hj!==5&&hj!==3){const q=P(get(11,p.x),get(21,p.y)),w=text.length*h*.62,f=hj===1||hj===4?.5:hj===2?1:0,r=rot*Math.PI/180,oy=vj===3?-h:vj===2?-h/2:0;p=P(q.x-w*f*Math.cos(r)-oy*Math.sin(r),q.y-w*f*Math.sin(r)+oy*Math.cos(r))}}
+   const font=str(7,'').toUpperCase();
+   return{type:'text',p,h,rotation:rot,fontFamily:font.includes('MONO')?'Courier New':font.includes('SERIF')?'Times New Roman':'Arial',text};
+  }
+  if(type==='LWPOLYLINE'){
+   const verts=[];let lastX=null;
+   for(const [c,v]of record){if(c===10)lastX=Number(v);else if(c===20&&lastX!==null){verts.push({p:P(lastX,Number(v)),b:0});lastX=null}else if(c===42&&verts.length)verts.at(-1).b=Number(v)}
+   if(verts.length<2)return null;const closed=Boolean(get(70)&1),e={type:'polyline',pts:vertsToPts(verts,closed),closed};const pw=get(43,0);if(pw>0)e.pwidth=pw;return e;
+  }
+  if(type==='POLYLINE'){
+   const verts=[];for(let k=idx+1;k<recs.length&&recs[k][0]==='VERTEX';k++){const f=fields(recs[k][1]);if(f.get(70)&16)continue;verts.push({p:P(f.get(10),f.get(20)),b:f.get(42,0)})}
+   if(verts.length<2)return null;const closed=Boolean(get(70)&1);return{type:'polyline',pts:vertsToPts(verts,closed),closed};
+  }
+  if(type==='ELLIPSE'){const mx=get(11),my=get(21),rx=Math.hypot(mx,my);if(!(rx>0))return null;const s0=get(41,0),s1=get(42,Math.PI*2),c=P(get(10),get(20)),ry=rx*get(40,1),rot=Math.atan2(my,mx);
+   if(Math.abs(s1-s0-Math.PI*2)<1e-6)return{type:'ellipse',c,rx,ry,rotation:rot};
+   let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=Math.max(8,Math.ceil(sw/(Math.PI/24)));return{type:'polyline',closed:false,pts:Array.from({length:n+1},(_,k)=>{const t=s0+sw*k/n,x=rx*Math.cos(t),y=ry*Math.sin(t);return P(c.x+x*Math.cos(rot)-y*Math.sin(rot),c.y+x*Math.sin(rot)+y*Math.cos(rot))})}}
+  if(type==='SPLINE'){const fit=[],ctl=[];let lx=null,lc=0;for(const [c,v]of record){if(c===10||c===11){lx=Number(v);lc=c}else if((c===20&&lc===10)||(c===21&&lc===11)){(lc===11?fit:ctl).push(P(lx,Number(v)))}}const pts=fit.length>=2?fit:ctl;return pts.length>=2?{type:'polyline',pts,closed:Boolean(get(70)&1)}:null}
+  if(type==='SOLID'||type==='TRACE'){const q=[P(get(10),get(20)),P(get(11),get(21)),P(get(13,get(12)),get(23,get(22))),P(get(12),get(22))];return{type:'hatch',pts:q,hatchStyle:'solid',width:.05}}
+  if(type==='HATCH')return readHatch(record);
+  return undefined;
+ }
+ function readHatch(record){
+  const {get,str}=fields(record),solid=get(70)===1;
+  let k=record.findIndex(q=>q[0]===91);if(k<0)return null;const nPaths=Number(record[k][1]);k++;
+  const paths=[],num=()=>Number(record[k++]?.[1]),peek=()=>record[k]?.[0];
+  for(let pi=0;pi<nPaths&&k<record.length;pi++){
+   while(k<record.length&&peek()!==92)k++;const flags=num(),pts=[];
+   if(flags&2){const hasB=num();num();const nv=num();const verts=[];
+    for(let v=0;v<nv&&k<record.length;v++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();let b=0;if(hasB&&peek()===42)b=num();verts.push({p:P(x,y),b})}
+    if(verts.length>=3)paths.push({pts:vertsToPts(verts,true),outer:Boolean(flags&1)});
+   }else{
+    const ne=num();
+    for(let ei=0;ei<ne&&k<record.length;ei++){
+     while(k<record.length&&peek()!==72)k++;const et=num();
+     if(et===1){const x1=num(),y1=num(),x2=num(),y2=num();if(!pts.length)pts.push(P(x1,y1));pts.push(P(x2,y2))}
+     else if(et===2){const cx=num(),cy=num(),r=num(),a0=num()*Math.PI/180,a1=num()*Math.PI/180,ccw=num();let sw=a1-a0;if(sw<=0)sw+=Math.PI*2;const arc=ccw?arcPts(P(cx,cy),r,a0,sw):arcPts(P(cx,cy),r,-a0,-sw);pts.push(...(pts.length?arc.slice(1):arc))}
+     else if(et===3){const cx=num(),cy=num(),mx=num(),my=num(),ra=num(),s0=num()*Math.PI/180,s1=num()*Math.PI/180,ccw=num();const rx=Math.hypot(mx,my),ry=rx*ra,rot=Math.atan2(my,mx);let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=24;for(let j=pts.length?1:0;j<=n;j++){let t=s0+sw*j/n;if(!ccw)t=-t;const x=rx*Math.cos(t),y=ry*Math.sin(t);pts.push(P(cx+x*Math.cos(rot)-y*Math.sin(rot),cy+x*Math.sin(rot)+y*Math.cos(rot)))}}
+     else if(et===4){k++;k++;k++;const nk=num(),nc=num();k+=nk;for(let j=0;j<nc;j++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();if(peek()===42)k++;if(j||!pts.length)pts.push(P(x,y))}if(peek()===97){const nf=num();for(let j=0;j<nf;j++){k+=2}if(peek()===12)k+=4}}
+    }
+    if(pts.length>=3)paths.push({pts,outer:Boolean(flags&1)});
+   }
+   while(k<record.length&&peek()!==97)k++;if(peek()===97){const ns=num();k+=ns}
+  }
+  if(!paths.length)return null;
+  const name=str(2,'SOLID'),style=solid?'solid':patFor(name);
+  let angle=get(52,0),spacing=3.175*(get(41,1)||1);
+  const li=record.findIndex(q=>q[0]===53);
+  if(li>=0&&!solid){const la=Number(record[li][1])*Math.PI/180,o=record.slice(li),ox=Number(o.find(q=>q[0]===45)?.[1]||0),oy=Number(o.find(q=>q[0]===46)?.[1]||0),perp=Math.abs(-ox*Math.sin(la)+oy*Math.cos(la));if(perp>1e-9)spacing=perp;if(style==='single')angle=Number(record[li][1])}
+  return paths.map(p=>({type:'hatch',pts:p.pts,hatchStyle:style,hatchSpacing:+spacing.toPrecision(4),hatchAngle:style==='single'?angle:angle,width:.05}));
+ }
+ // --- Transform one entity by matrix m ---
+ function xform(e,m){
+  if(isId(m))return e;
+  const det=m[0]*m[3]-m[1]*m[2],sx=Math.hypot(m[0],m[1]),sy=Math.hypot(m[2],m[3]),uni=Math.abs(sx-sy)<1e-6*Math.max(sx,sy),s=Math.sqrt(Math.abs(det)),rotDeg=Math.atan2(m[1],m[0])*180/Math.PI;
+  const out={...e};
+  switch(e.type){
+   case 'line':out.a=tp(m,e.a);out.b=tp(m,e.b);return out;
+   case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
+   case 'circle':if(uni){out.c=tp(m,e.c);out.r=e.r*s;return out}return{...e,type:'polyline',closed:true,pts:arcPts(e.c,e.r,0,Math.PI*2).slice(1).map(p=>tp(m,p))};
+   case 'arc':{let sw=e.a1-e.a0;while(sw<=0)sw+=Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}
+   case 'ellipse':{const mj=tv(m,Math.cos(e.rotation),Math.sin(e.rotation));return{...e,c:tp(m,e.c),rx:e.rx*Math.hypot(mj.x,mj.y),ry:e.ry*s*s/Math.max(1e-12,Math.hypot(mj.x,mj.y)),rotation:Math.atan2(mj.y,mj.x)}}
+   case 'text':return{...e,p:tp(m,e.p),h:e.h*sy,rotation:(e.rotation||0)+rotDeg};
+  }
+  return out;
+ }
+ // --- Walk records, expanding INSERT and DIMENSION blocks ---
+ let expanded=0;
+ function walk(recs,m,ctx,depth){
+  for(let idx=0;idx<recs.length;idx++){
+   const [type,record]=recs[idx];
+   if(type==='VERTEX'||type==='SEQEND')continue;
+   const {get,str}=fields(record);
+   let lname=str(8,'0');if(lname==='0'&&ctx)lname=ctx.layer;
+   const layer=getLayer(lname),objectWeight=get(370,-1),objectColor=get(420,NaN),indexColor=get(62,256);
+   const common={layer:lname,width:objectWeight>0?objectWeight/100:(ctx&&objectWeight===-2?ctx.width:layer.width),linetype:str(6,'BYLAYER')};
+   if(common.linetype==='BYBLOCK')common.linetype=ctx?.linetype||'BYLAYER';
+   if(Number.isFinite(objectColor))common.color=toHex(objectColor);
+   else if(indexColor>0&&indexColor<256)common.color=aciHex(indexColor);
+   else if(indexColor===0&&ctx?.color)common.color=ctx.color;
+   if(get(60,0)&1)continue;
+   try{
+    if(type==='INSERT'||type==='DIMENSION'){
+     const def=blocksDef.get(str(2,''));if(!def){note(type);continue}
+     if(depth>12)continue;
+     const sub={layer:lname,color:common.color||(indexColor===0?ctx?.color:undefined)||layer.color,linetype:common.linetype,width:common.width};
+     if(type==='DIMENSION'){walk(def.recs,m,sub,depth+1);expanded++;continue}
+     const ix=get(10),iy=get(20),sx=get(41,1)||1,sy=get(42,1)||1,rot=get(50,0)*Math.PI/180,ext=get(230,1);
+     const cols=Math.max(1,get(70,1)),rows=Math.max(1,get(71,1)),cs=get(44,0),rs=get(45,0);
+     for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const ox=c*cs,oy=r*rs,tx=ix+ox*Math.cos(rot)-oy*Math.sin(rot),ty=iy+ox*Math.sin(rot)+oy*Math.cos(rot);
+      let L=[Math.cos(rot)*sx,Math.sin(rot)*sx,-Math.sin(rot)*sy,Math.cos(rot)*sy,tx,ty];
+      L=mul2(L,[1,0,0,1,-def.base.x,-def.base.y]);
+      if(ext<0)L=mul2([-1,0,0,1,0,0],L);
+      walk(def.recs,mul2(m,L),sub,depth+1);
+     }
+     expanded++;continue;
+    }
+    let ent=readRecord(type,record,recs,idx);
+    if(ent===undefined){if(!silent.has(type))note(type);continue}
+    if(!ent)continue;
+    for(const one of[].concat(ent)){const w=xform({...common,...one},m);if(one.width&&one.type==='hatch')w.width=one.width;entities.push({...w,id:entities.length+1})}
+   }catch(error){note(type);console.warn('Skipped DXF entity',type,error)}
+  }
+ }
+ walk(modelRecs,ID,null,0);
+ blockCount=0;
  if(!entities.length)throw Error('No supported 2D entities found. DXF blocks, spline curves and layout entities may require a more complete CAD import engine.');
  const unitMap={1:'in',2:'ft',4:'mm',5:'cm',6:'m'};
  let from=unitMap[unitCode];if(!from){
@@ -8266,25 +8433,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0700"></script>
-<script src="blackline-modern.js?v=20261120-0700"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0700"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0700"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0700"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0700"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0700"></script>
-<script src="cad-osnap-math.js?v=20261120-0700"></script>
-<script src="cad-scale-math.js?v=20261120-0700"></script>
-<script src="cad-object-tracking.js?v=20261120-0700"></script>
-<script src="cad-auto-opening.js?v=20261120-0700"></script>
-<script src="cad-wall-join.js?v=20261120-0700"></script>
-<script src="cad-wall-grip.js?v=20261120-0700"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0700"></script>
-<script src="cad-performance.js?v=20261120-0700"></script>
-<script src="cad-plan.js?v=20261120-0700"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0700"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-0700"></script>
-<script src="cad-arq-pro.js?v=20261120-0700"></script>
-<script src="cad-autocad-plus.js?v=20261120-0700"></script>
-<script src="cad-touch.js?v=20261120-0700"></script><script src="cad-quickbar.js?v=20261120-0700"></script><script src="cad-buy-guide.js?v=20261120-0700"></script>
-<script src="cad-arq-tools.js?v=20261120-0700"></script><script src="cad-block-browser.js?v=20261120-0700"></script>
+<script src="workspace-upgrade.js?v=20261120-0900"></script>
+<script src="blackline-modern.js?v=20261120-0900"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0900"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0900"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0900"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0900"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0900"></script>
+<script src="cad-osnap-math.js?v=20261120-0900"></script>
+<script src="cad-scale-math.js?v=20261120-0900"></script>
+<script src="cad-object-tracking.js?v=20261120-0900"></script>
+<script src="cad-auto-opening.js?v=20261120-0900"></script>
+<script src="cad-wall-join.js?v=20261120-0900"></script>
+<script src="cad-wall-grip.js?v=20261120-0900"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0900"></script>
+<script src="cad-performance.js?v=20261120-0900"></script>
+<script src="cad-plan.js?v=20261120-0900"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0900"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-0900"></script>
+<script src="cad-arq-pro.js?v=20261120-0900"></script>
+<script src="cad-autocad-plus.js?v=20261120-0900"></script>
+<script src="cad-touch.js?v=20261120-0900"></script><script src="cad-quickbar.js?v=20261120-0900"></script><script src="cad-buy-guide.js?v=20261120-0900"></script>
+<script src="cad-arq-tools.js?v=20261120-0900"></script><script src="cad-block-browser.js?v=20261120-0900"></script>
 </body></html>
