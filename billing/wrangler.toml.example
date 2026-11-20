@@ -19,3 +19,18 @@ PRICE_STUDIO_MONTHLY = ""                            # sin plan Studio por ahora
 binding = "DB"
 database_name = "cad2d"
 database_id = "reemplazar-con-el-id-de-d1"
+
+# Límites por IP (protección contra abuso; wrangler 4.36+). Si se omiten, el Worker igual funciona.
+[[ratelimits]]
+name = "AUTH_LIMITER"      # pedidos de enlace de acceso por IP
+namespace_id = "1001"
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+[[ratelimits]]
+name = "API_LIMITER"       # llamadas a /api/* por IP
+namespace_id = "1002"
+  [ratelimits.simple]
+  limit = 120
+  period = 60
