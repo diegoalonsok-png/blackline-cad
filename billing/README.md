@@ -20,13 +20,15 @@ Principios:
 
 ## Precios (editables en `cad-plan.js` y en Stripe)
 
+> **20 nov 2026: Pro pasa a 3,99 €/mes y 29,99 €/año.** Hay que crear esos dos precios nuevos en Stripe (cuenta Blackline CAD, IVA incluido) y reemplazar `PRICE_PRO_MONTHLY` y `PRICE_PRO_YEARLY` en las variables del Worker `cad2d-billing`. Los IDs de abajo son los de 1,59 € y 12,99 €.
+
 Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). Precios en Stripe (entorno de prueba, cuenta Blackline CAD con Managed Payments): mensual `price_1UdWXqDRUE2reABAHniRmfHw` (1,59 €), anual `price_1UdWYdDRUE2reABAPWeKFW5K` (12,99 €). Modo activo: mensual `price_1UdX22DY9yzl20JEdPDjQo3X`, anual `price_1UdX22DY9yzl20JE1Gzk27li`.
 
 | Plan | Precio (IVA incluido) | Te queda por cobro* |
 | --- | --- | --- |
 | Gratis | 0 € (dibujo, DXF, SVG, PNG, PDF A4, galería básica) | — |
-| Pro mensual | **1,59 €** | ≈ 1,02 € |
-| Pro anual | **12,99 €** (32 % menos que 12 meses) | ≈ 10,13 € |
+| Pro mensual | **3,99 €** | ≈ 2,94 € |
+| Pro anual | **29,99 €** (37 % menos que 12 meses) | ≈ 23,73 € |
 | Estudio mensual (5 usuarios) | 4,99 € | ≈ 3,74 € |
 | Estudio anual (5 usuarios) | 49,99 € | ≈ 39,71 € |
 
