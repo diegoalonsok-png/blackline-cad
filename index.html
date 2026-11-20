@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0430">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0430">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0500">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0500">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0430"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0430"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0500"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0500"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261120-0430"></script>
-<script src="cad-grip-settings.js?v=20261120-0430"></script>
-<script src="cad-cursor-mode.js?v=20261120-0430"></script>
+<script src="cad2d-config.js?v=20261120-0500"></script>
+<script src="cad-grip-settings.js?v=20261120-0500"></script>
+<script src="cad-cursor-mode.js?v=20261120-0500"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -1554,8 +1554,9 @@ function draw(){drawPending=false;cadTGapCache=cadComputeWallTGaps();let w=canva
   if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();
  if(cadPrimitiveGripPlacement){
-  const candidate=cadPrimitiveGripTransform(cadPrimitiveGripPlacement.original,cadPrimitiveGripPlacement.grip,snapPoint(state.mouse));
-  if(candidate)drawEntity(candidate,'#ffce78');
+  const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||snapPoint(state.mouse);
+  const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
+  if(candidate){drawEntity(candidate,'#ffce78');cadGripLabel(job,candidate,dest)}
  }
  if(state.tool==='select'&&(cadSelectionAnchor||state.drag?.type==='selection')){
   const d=state.drag?.type==='selection'?state.drag:null;
@@ -2477,7 +2478,7 @@ document.addEventListener('keydown',ev=>{
   if(cadOpeningNumericDrag(ev.key)){ev.preventDefault();ev.stopImmediatePropagation()}
  }
 },true);
-if(typeof window!=='undefined')Object.defineProperty(window,'CAD2D_OPENING_TYPING',{configurable:true,get:()=>!!(state.drag?.type==='blockGrip'&&!state.drag.axis||cadVertexPlacement)});
+if(typeof window!=='undefined')Object.defineProperty(window,'CAD2D_OPENING_TYPING',{configurable:true,get:()=>!!(state.drag?.type==='blockGrip'&&!state.drag.axis||cadVertexPlacement||cadPrimitiveGripPlacement)});
 // Dynamic input for moving doors/windows: visible as soon as the grip is active.
 function cadDrawOpeningDisplacement(){
  const placement=cadVertexPlacement,d=state.drag;
@@ -2863,7 +2864,18 @@ let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
 try{otrkOn=localStorage.getItem('cad2d-otrack')==='true'}catch(e){}
 function trackingEligible(){
- return otrkOn&&state.osnapOn&&!(state.orthoOn&&state.stage.length)&&['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','insertBlock'].includes(state.tool);
+ return otrkOn&&state.osnapOn&&['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','insertBlock'].includes(state.tool);
+}
+let cadOtrkHoverTimer=null,cadOtrkHoverPt=null;
+function cadOtrackHover(pt){
+ if(cadOtrkHoverPt&&Math.hypot(cadOtrkHoverPt.x-pt.x,cadOtrkHoverPt.y-pt.y)<1e-9)return;
+ cadOtrkHoverPt=P(pt.x,pt.y);clearTimeout(cadOtrkHoverTimer);
+ cadOtrkHoverTimer=setTimeout(()=>{
+  if(!trackingEligible()||!snapIndicator||Math.hypot(snapIndicator.point.x-pt.x,snapIndicator.point.y-pt.y)>1e-9)return;
+  const has=otrkAnchors.some(a=>Math.hypot(a.x-pt.x,a.y-pt.y)<1e-9);
+  otrkAnchors=has?otrkAnchors.filter(a=>Math.hypot(a.x-pt.x,a.y-pt.y)>=1e-9):BlacklineTrackingMath.acquire(otrkAnchors,pt,7);
+  schedule();
+ },420);
 }
 function clearOtrackAnchors(announce=true){
  otrkAnchors=[];otrkGuide=null;
@@ -2871,7 +2883,7 @@ function clearOtrackAnchors(announce=true){
  schedule();
 }
 function toggleOtrack(){
- otrkOn=!otrkOn;clearOtrackAnchors(false);
+ otrkOn=!otrkOn;clearOtrackAnchors(false);if(otrkOn&&!state.osnapOn){state.osnapOn=true;$('osnapToggle')?.classList.add('on');$('osnapToggle')?.setAttribute('aria-pressed','true')}
  const button=$('otrackToggle');
  if(button){button.classList.toggle('on',otrkOn);button.setAttribute('aria-pressed',String(otrkOn))}
  try{localStorage.setItem('cad2d-otrack',String(otrkOn))}catch(e){}
@@ -2890,6 +2902,9 @@ function drawOtrackGuides(){
  if(g.horizontal){const y=screen(g.horizontal).y;ctx.moveTo(0,y);ctx.lineTo(w,y)}
  ctx.stroke();ctx.setLineDash([]);
  ctx.strokeStyle='#ffcf72';ctx.strokeRect(p.x-4,p.y-4,8,8);
+ {const ref=g.vertical||g.horizontal;if(ref){const d=dist(ref,g.point),ang=((Math.atan2(g.point.y-ref.y,g.point.x-ref.x)*180/Math.PI)+360)%360;
+  const label=g.intersection?'Intersection':'Track: '+units(d)+' '+state.unit+' < '+ang.toFixed(0)+'°';ctx.font='12px Arial';const tw=ctx.measureText(label).width;
+  ctx.fillStyle='#16202aee';ctx.fillRect(p.x+12,p.y+10,tw+12,20);ctx.strokeStyle='#6bd5ff';ctx.strokeRect(p.x+12,p.y+10,tw+12,20);ctx.fillStyle='#e8f6ff';ctx.fillText(label,p.x+18,p.y+24)}}
  ctx.restore();
 }
 const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
@@ -2901,7 +2916,7 @@ function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.s
 function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
 
 function snapPoint(p){
- let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;
+ let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
  // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en AutoCAD).
  if(state.orthoOn&&state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)&&!(state.tool==='stretch'&&state.modifyCandidate?.phase==='window')){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
   else if(state.polarOn&&state.stage.length&&['line','polyline','rect','polygon','dimension','move','copy'].includes(state.tool)){
@@ -2956,15 +2971,20 @@ function snapPoint(p){
   }
   if(nearest){
    snapIndicator={point:P(nearest.x,nearest.y),type};
-   if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type)){
-    otrkAnchors=BlacklineTrackingMath.acquire(otrkAnchors,nearest,4);
-   }
+   if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type))cadOtrackHover(nearest);
    return snapIndicator.point;
   }
  }
  if(trackingEligible()&&otrkAnchors.length&&window.BlacklineTrackingMath){
-  const guide=BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
-  if(guide){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
+  if(state.orthoOn&&state.stage.length){
+   // Con ORTHO, el punto queda sobre la dirección ortogonal y se alinea con la referencia más cercana.
+   const a=state.stage.at(-1),horiz=Math.abs(q.y-a.y)<1e-9,lim=10/state.view.scale;let best=null;
+   for(const t of otrkAnchors){const d=horiz?Math.abs(q.x-t.x):Math.abs(q.y-t.y);if(d<lim&&(!best||d<best.d))best={d,t}}
+   if(best){const pt=horiz?P(best.t.x,a.y):P(a.x,best.t.y);otrkGuide={point:pt,vertical:horiz?best.t:null,horizontal:horiz?null:best.t,intersection:false};return pt}
+  }else{
+   const guide=BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
+   if(guide){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
+  }
  }
  if(state.snapOn&&state.grid>0)return P(Math.round(q.x/state.grid)*state.grid,Math.round(q.y/state.grid)*state.grid);
  return q;
@@ -4416,6 +4436,33 @@ function cadPrimitiveGripHit(raw){
  }
  return found;
 }
+
+// Pinzamiento de vértice: muestra la longitud y cuánto se estira (como la entrada dinámica de AutoCAD)
+// y acepta una longitud escrita: 2.5 ⏎ deja la línea en 2,50 m hacia donde apunta el mouse.
+let cadGripTyped='';
+function cadGripTypedDest(job){
+ const v=Number(cadGripTyped);if(!cadGripTyped||!(v>0))return null;
+ const e=job.original,g=job.grip;
+ if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=snapPoint(state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const m=snapPoint(state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
+}
+function cadGripLabel(job,candidate,dest){
+ const e=job.original,g=job.grip;let text;
+ if(e.type==='line'&&g.kind!=='move'){const L0=dist(e.a,e.b),L1=dist(candidate.a,candidate.b),dl=L1-L0,ang=((Math.atan2(candidate.b.y-candidate.a.y,candidate.b.x-candidate.a.x)*180/Math.PI)+360)%360;
+  text='Length '+units(L1)+' '+state.unit+'  ·  '+(dl>=0?'+':'−')+units(Math.abs(dl))+' '+state.unit+'  ·  '+ang.toFixed(1)+'°';}
+ else{const d=dist(g.p,dest);text='Move '+units(d)+' '+state.unit;}
+ if(cadGripTyped)text=cadGripTyped+' ⏎  ·  '+text;
+ const p=screen(dest);ctx.save();ctx.font='13px Arial';const w=ctx.measureText(text).width;
+ ctx.fillStyle='#1b2530f0';ctx.fillRect(p.x+16,p.y-34,w+14,22);ctx.strokeStyle='#ffce78';ctx.strokeRect(p.x+16,p.y-34,w+14,22);ctx.fillStyle='#fff2d6';ctx.fillText(text,p.x+23,p.y-18);ctx.restore();
+}
+window.addEventListener('keydown',ev=>{
+ if(!cadPrimitiveGripPlacement)return;
+ if(/^[0-9.,]$/.test(ev.key)){cadGripTyped+=ev.key===','?'.':ev.key;ev.preventDefault();ev.stopImmediatePropagation();schedule();return}
+ if(ev.key==='Backspace'&&cadGripTyped){cadGripTyped=cadGripTyped.slice(0,-1);ev.preventDefault();ev.stopImmediatePropagation();schedule();return}
+ if(ev.key==='Enter'&&cadGripTyped){ev.preventDefault();ev.stopImmediatePropagation();const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job);cadGripTyped='';
+  cadPrimitiveGripPlacement=null;state.drag=null;canvas.style.cursor='';if(dest)cadPrimitiveGripCommit(job,dest);schedule();return}
+ if(ev.key==='Escape')cadGripTyped='';
+},true);
 function cadPrimitiveGripTransform(origin,grip,destination){
  const e=clone(origin),delta=sub(destination,grip.p);
  if(e.type==='line'){
@@ -8018,25 +8065,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0430"></script>
-<script src="blackline-modern.js?v=20261120-0430"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0430"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0430"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0430"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0430"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0430"></script>
-<script src="cad-osnap-math.js?v=20261120-0430"></script>
-<script src="cad-scale-math.js?v=20261120-0430"></script>
-<script src="cad-object-tracking.js?v=20261120-0430"></script>
-<script src="cad-auto-opening.js?v=20261120-0430"></script>
-<script src="cad-wall-join.js?v=20261120-0430"></script>
-<script src="cad-wall-grip.js?v=20261120-0430"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0430"></script>
-<script src="cad-performance.js?v=20261120-0430"></script>
-<script src="cad-plan.js?v=20261120-0430"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0430"></script>
-<script src="cad-arq-pro.js?v=20261120-0430"></script>
-<script src="cad-autocad-plus.js?v=20261120-0430"></script>
-<script src="cad-touch.js?v=20261120-0430"></script><script src="cad-quickbar.js?v=20261120-0430"></script><script src="cad-buy-guide.js?v=20261120-0430"></script>
-<script src="cad-arq-tools.js?v=20261120-0430"></script><script src="cad-block-browser.js?v=20261120-0430"></script>
+<script src="workspace-upgrade.js?v=20261120-0500"></script>
+<script src="blackline-modern.js?v=20261120-0500"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0500"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0500"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0500"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0500"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0500"></script>
+<script src="cad-osnap-math.js?v=20261120-0500"></script>
+<script src="cad-scale-math.js?v=20261120-0500"></script>
+<script src="cad-object-tracking.js?v=20261120-0500"></script>
+<script src="cad-auto-opening.js?v=20261120-0500"></script>
+<script src="cad-wall-join.js?v=20261120-0500"></script>
+<script src="cad-wall-grip.js?v=20261120-0500"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0500"></script>
+<script src="cad-performance.js?v=20261120-0500"></script>
+<script src="cad-plan.js?v=20261120-0500"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0500"></script>
+<script src="cad-arq-pro.js?v=20261120-0500"></script>
+<script src="cad-autocad-plus.js?v=20261120-0500"></script>
+<script src="cad-touch.js?v=20261120-0500"></script><script src="cad-quickbar.js?v=20261120-0500"></script><script src="cad-buy-guide.js?v=20261120-0500"></script>
+<script src="cad-arq-tools.js?v=20261120-0500"></script><script src="cad-block-browser.js?v=20261120-0500"></script>
 </body></html>
