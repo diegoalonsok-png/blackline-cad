@@ -12,9 +12,10 @@
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
-  plan:{en:'Plans',es:'Plantas',cats:c=>!['Cortes y vistas','Alzados','Símbolos'].includes(c)},
+  plan:{en:'Plans',es:'Plantas',cats:c=>!['Cortes y vistas','Alzados','Símbolos','Documentación'].includes(c)},
   section:{en:'Sections & elevations',es:'Cortes y vistas',cats:c=>c==='Cortes y vistas'||c==='Alzados'},
-  symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'}
+  symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'},
+  doc:{en:'Documentation (levels, axes, sections…)',es:'Documentación (niveles, ejes, cortes…)',cats:c=>c==='Documentación'}
  };
  const KEY='cad2d-block-browser';
  let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120};
@@ -28,6 +29,7 @@
 #cadBlockBrowser .hd button:hover{background:#2b3a46}
 #cadBlockBrowser .tabs{display:flex;gap:6px;padding:10px 14px 0;flex-wrap:wrap}
 #cadBlockBrowser .tabs button{all:unset;cursor:pointer;padding:7px 14px;border-radius:999px;border:1px solid #3b4f5d;color:#cfdbe2}
+#cadBlockBrowser .tabs button.house{margin-left:auto;border-color:#d3b47a;color:#f3dcae}
 #cadBlockBrowser .tabs button.on{background:#d4a748;border-color:#d4a748;color:#17120a;font-weight:700}
 #cadBlockBrowser .tools{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid #26333d}
 #cadBlockBrowser input[type=search]{flex:1;min-width:120px;background:#0e1419;border:1px solid #3b4f5d;border-radius:10px;padding:8px 12px;color:#e6eef3;font:inherit}
@@ -88,7 +90,7 @@
   if(el){el.classList.remove('min');el.style.display='flex';place();paint();el.querySelector('input').focus();return}
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
-<div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
+<div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}<button data-a="house" class="house" title="${T('Open the complete test house at 1:1','Abrir la casa de prueba completa a 1:1')}">🏠 ${T('Test house 1:1','Casa de prueba 1:1')}</button></div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label></div>
 <div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
@@ -98,6 +100,7 @@
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();paint()});
   el.addEventListener('click',e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
+   if(a==='house'){el.style.display='none';window.cadOpenTestHouse?.();return}
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
