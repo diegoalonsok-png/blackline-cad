@@ -330,5 +330,4 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app .tabbar .tab{height:24px!important;padding-top:0!important;padding-bottom:0!important;display:inline-flex;align-items:center;border-radius:7px 7px 0 0!important;margin:0!important}
 .app .ribbon-shell,.app .ribbon{margin-top:1px}
 /* Ctrl+9: línea de comandos oculta; el área de dibujo ocupa su lugar. */
-.app.cad-hide-cmd .cmd{display:none!important}
-.app.cad-hide-cmd .workspace{grid-row:4 / 6!important}
+.app.cad-hide-cmd .cmd{visibility:hidden!important;pointer-events:none!important;overflow:hidden!important;min-height:0!important;height:0!important;padding:0!important;margin:0!important;border:0!important}

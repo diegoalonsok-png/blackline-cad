@@ -767,7 +767,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1850">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1850">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1945">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -6807,7 +6807,7 @@ function cadShowPalettes(){
  document.querySelectorAll('#cadWorkspacePalettes input[type=checkbox]').forEach(c=>{if(!c.checked){c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}))}});
  document.querySelectorAll('.sidebar>.panel.cad-palette[hidden],.sidebar>.panel[hidden]').forEach(p=>p.hidden=false);
  const g=$('arqPanel');if(g){g.hidden=false;const body=$('arqPanelBody');if(body?.hidden)$('arqCollapse')?.click();g.scrollIntoView({block:'nearest',behavior:'smooth'})}
- document.querySelector('.app')?.classList.remove('cad-hide-cmd');
+ document.querySelector('.app')?.classList.remove('cad-hide-cmd');document.querySelector('.app')?.style.removeProperty('grid-template-rows');
  try{sessionStorage.removeItem('cad2d-hidden-sides')}catch(e){}
  window.dispatchEvent(new Event('resize'));toast('Paletas visibles · MOSTRARPALETAS');
 }
@@ -6817,7 +6817,10 @@ function cadHidePalettes(){
  cadWsSection('left',false);cadWsSection('right',false);window.dispatchEvent(new Event('resize'));toast('Paletas ocultas · MOSTRARPALETAS las vuelve a mostrar');
 }
 function cadToggleCommandLine(){
- const app=document.querySelector('.app'),off=app.classList.toggle('cad-hide-cmd');
+ const app=document.querySelector('.app');app.style.removeProperty('grid-template-rows');const off=app.classList.toggle('cad-hide-cmd');
+ // La fila 5 de la grilla (línea de comandos) pasa a 0 px: el área de dibujo crece y nada se reacomoda.
+ if(off){const rows=getComputedStyle(app).gridTemplateRows.split(' '),ri=r=>parseInt(getComputedStyle(r).gridRowStart)-1,c=document.querySelector('.cmd'),w=document.querySelector('.workspace');
+  if(c&&w&&rows[ri(c)]!==undefined){rows[ri(c)]='0px';rows[ri(w)]='minmax(0,1fr)';app.style.setProperty('grid-template-rows',rows.join(' '),'important')}}
  window.dispatchEvent(new Event('resize'));toast(off?'Línea de comandos oculta · Ctrl+9 la vuelve a mostrar':'Línea de comandos visible');
  if(!off)$('command')?.focus();
 }
@@ -7698,7 +7701,7 @@ function initAdjustableChrome(){
  const app=document.querySelector('.app'),ws=document.querySelector('.workspace');
  const clamp=(x,a,b)=>Math.max(a,Math.min(x,b));
  const saved=(key,defaultValue)=>{try{return Number(localStorage.getItem(key))||defaultValue}catch(e){return defaultValue}};
- function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,38,120)+'px');
+ function apply(key,val){if(key==='ribbon')app.style.setProperty('--ribbon-height',clamp(val,52,120)+'px');
  else ws.style.setProperty(key==='left'?'--left-width':'--right-width',clamp(val,160,440)+'px');
  resize()}
  apply('ribbon',saved('cad2d-ribbon-height',42));
@@ -7723,7 +7726,7 @@ function initAdjustableChrome(){
  const app=document.querySelector('.app'),shell=$('ribbonShell');
  function read(){return parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42}
  function update(h){
-  const n=Math.max(38,Math.min(120,Math.round(h)));
+  const n=Math.max(52,Math.min(120,Math.round(h)));
   app.style.setProperty('--ribbon-height',n+'px');
   app.classList.toggle('cad-ribbon-compact',n<=67);
   if(shell.classList.contains('floating'))shell.style.height=Math.max(44,n)+'px';
