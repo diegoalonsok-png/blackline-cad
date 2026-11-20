@@ -15,7 +15,6 @@
   ['text','Text · T','<path d="M5 5h14M12 5v14M9 19h6"/>',run('TEXT')],
   ['hatch','Hatch · H (patterns & gradient)','<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 10 10 3.5M3.5 16.5 16.5 3.5M7 20.5 20.5 7M13.5 20.5l7-7"/>',run('HATCH')],
   ['blocks','Blocks · gallery','<rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/>',()=>{const b=document.querySelector('[data-tool="blockgallery"]');if(b)b.click();else window.CAD2D_ARQ?.openGallery?.()}],
-  ['house','Casa de prueba 1:1 · CASAPRUEBA','<path d="M3 11 12 4l9 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/>',()=>window.cadOpenTestHouse&&window.cadOpenTestHouse()],
   ['pdf','Plot / PDF · Ctrl+P','<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><text x="7.3" y="17" font-size="5.4" font-weight="700" font-family="Arial" fill="currentColor" stroke="none">PDF</text>',run('PLOT')]
  ];
  const css=document.createElement('style');

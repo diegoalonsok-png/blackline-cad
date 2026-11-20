@@ -91,7 +91,7 @@
   if(el){el.classList.remove('min');el.style.display='flex';place();paint();el.querySelector('input').focus();return}
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
-<div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}<button data-a="house" class="house" title="${T('Open the complete test house at 1:1','Abrir la casa de prueba completa a 1:1')}"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:5px"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9v11h14V9"/><path d="M9 20v-6h6v6"/><path d="M15.5 5.2V3.5h2v3.3"/></svg>${T('Test house 1:1','Casa de prueba 1:1')}</button></div>
+<div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label></div>
 <div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
@@ -101,7 +101,6 @@
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();paint()});
   el.addEventListener('click',e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
-   if(a==='house'){el.style.display='none';window.cadOpenTestHouse?.();return}
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
