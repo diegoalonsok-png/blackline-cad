@@ -1,4 +1,4 @@
-# CAD2D — 2D drafting web prototype
+# Blackline CAD (CAD2D) — CAD 2D online para arquitectura
 
 **Blackline CAD (CAD2D)** is a browser-based 2D drafting application for architectural plans and technical drawing.
 
@@ -6,10 +6,10 @@
 - **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
 - **CAD 2D online guide / guía de dibujo técnico:** https://blackline-cad.org/guia-cad-2d-online.html
 - **House-plan drawing exercise / plano de casa CAD 2D:** https://blackline-cad.org/plano-casa-cad-2d-online.html
-- **Features:** 2D linework, layers, snapping, dimensions, PDF/SVG/PNG export and DXF editing (see documented limitations below)
+- **Features:** 2D drafting, layers, object snaps, associative dimensions and named dimension styles, blocks with attributes, dynamic architectural block library, XREF, layouts and plotting to PDF with CTB, DWG opening, DXF import/export, PDF import (vector, with layers), cloud projects
 - **License:** Proprietary, all rights reserved. Public source visibility does not grant reuse rights; see [LICENSE](LICENSE).
 
-**Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye herramientas de dibujo, capas, cotas y exportación DXF, PDF, SVG y PNG con las limitaciones indicadas más abajo.
+**Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye dibujo 2D, capas, referencias a objetos, cotas asociativas con estilos, bloques con atributos y biblioteca de bloques dinámicos, XREF, presentaciones y ploteo a PDF con CTB, apertura de DWG, importación y exportación DXF, importación de PDF vectorial con capas y proyectos en la nube.
 
 A self-contained, dependency-free, English-language CAD workspace. Dark ribbon interface inspired by conventional CAD UI patterns and scholarly dark UI design.
 
@@ -25,14 +25,17 @@ Open `index.html` in a modern Chromium, Firefox, or Safari browser. Or serve wit
 - 2D LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, TEXT and DIMENSION
 - Selection, duplicate, delete, move, copy, rotate, scale, mirror, basic offset, basic trim, undo and redo
 - Editable drawing layers with color, visibility and locking
-- ASCII DXF R2000 export and limited DXF import
+- DXF R2000 import and export (blocks, attributes, MTEXT, hatches, dimensions), DWG opening through the conversion service
 - Vector PDF export with ISO A0–A4, US Letter, Legal, ARCH D/E, custom page size, model-to-paper scale and title block
 - SVG and PNG exports; JSON project save/open
 - Bottom command bar, coordinate entry, selection properties and keyboard shortcuts
 
-## Known limitations / next engineering milestones
+## Compatibilidad / Compatibility
 
-This is a functional **prototype**, not a replacement for a production CAD kernel. Test export geometry in LibreCAD, QCAD or AutoCAD before professional use. DXF import is restricted to several common 2D ASCII entity types; polyline bulges, blocks, xrefs, splines, external images, advanced hatches, annotations and layouts require a more complete CAD library. TRIM now shortens straight LINE entities to an actual crossing with another finite LINE; it does not yet support arcs, splines, polylines, extended boundaries, or full AutoCAD-style cutting edges. Rotated ellipse rendering needs refinement. No object drag-grips, advanced measurement calibration, orthogonal dimension styles, model/paper viewports, cloud storage, accounts or payments yet. PDF output uses basic vector shapes and standard Helvetica, with a simplified encoding for non-ASCII labels. Fixed-scale output can clip drawings if they exceed the paper.
+- **DWG:** se abre mediante un servicio de conversión (LibreDWG) que convierte a DXF y borra el archivo al terminar. Los objetos propios de AutoCAD Architecture (AEC) sin representación gráfica guardada no se convierten.
+- **DXF:** importación y exportación R2000 con capas, tipos de línea, bloques e INSERT, atributos, MTEXT, sombreados y cotas (lineales y alineadas como cotas nativas).
+- **PDF:** exportación vectorial con capas (OCG) y estilos de ploteo CTB; importación de PDF vectorial con capas y escala de ploteo.
+- **Recomendación:** como con cualquier intercambio entre programas CAD, revisá el archivo resultante antes de entregarlo.
 
 ## Deployment
 
@@ -40,7 +43,7 @@ Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted
 
 ## Intellectual property
 
-This prototype uses original HTML/CSS/JavaScript. It does not redistribute Autodesk or IntelliCAD UI artwork, program code or trademarks.
+Blackline CAD uses original HTML/CSS/JavaScript. It does not redistribute Autodesk or IntelliCAD UI artwork, program code or trademarks.
 
 ## CAD2D movable palettes
 
@@ -103,7 +106,7 @@ The **File formats** palette indicates operational formats. DWG upload/conversio
 
 ## Scaling to hundreds or thousands of simultaneous users
 
-The hosted app is currently a **static, client-side CAD prototype**. Hosting the HTML/JS/CSS assets through a CDN can distribute the same application to many visitors without running an individual CAD backend for each drawing. It does **not** guarantee that hundreds or thousands of users can work smoothly, nor that every browser can handle tens of thousands of entities. Validate hosting quotas and realistic concurrent load before release.
+The hosted app runs client-side (static assets on a CDN) with a separate billing/cloud API and a DWG conversion service. Hosting the HTML/JS/CSS assets through a CDN can distribute the same application to many visitors without running an individual CAD backend for each drawing. It does **not** guarantee that hundreds or thousands of users can work smoothly, nor that every browser can handle tens of thousands of entities. Validate hosting quotas and realistic concurrent load before release.
 
 The November 2026 rendering pass adds viewport culling, geometric bounding-box prechecks in object selection and OSNAP, and loop-based bounds for long polylines. These improvements lower unnecessary drawing work, but do not replace a proper spatial index. Still required before launch:
 
@@ -343,6 +346,6 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 
 Blackline CAD es una aplicación independiente; no está afiliada, patrocinada ni respaldada por Autodesk, Inc. Las marcas Autodesk y AutoCAD pertenecen a sus titulares y se mencionan únicamente cuando es necesario describir la interoperabilidad.
 
-**Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia del prototipo no equivale a certificación legal completa.
+**Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia no equivale a certificación legal completa.
 
 **Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG por sí sola es diagnóstica y no importa geometría. La configuración del dominio principal activa un conversor HTTPS que transforma DWG a DXF tras consentimiento del usuario; la importación efectiva depende de que el servicio responda correctamente. Comprobar licencias, condiciones de distribución, entidades admitidas y fidelidad técnica antes de garantizar compatibilidad.

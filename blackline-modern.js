@@ -215,6 +215,7 @@ requestAnimationFrame(requestResize);
   ['file-cloudsave','Guardar en la nube','cloud',''],
   ['file-cloud','Mis proyectos en la nube…','cloud',''],
   ['file-dxf','Export DXF','download',''],
+  ['file-bak','Copias de seguridad (.bak)…','save',''],
   ['file-print','Plot / Export PDF…','printer','Ctrl+P']
  ];
  const icons={
@@ -258,6 +259,7 @@ requestAnimationFrame(requestResize);
   if(key==='file-print')document.getElementById('pdfBtn')?.click();
   if(key==='file-cloudsave')runCommand('GUARDARNUBE');
   if(key==='file-cloud')runCommand('MISPROYECTOS');
+  if(key==='file-bak')runCommand('COPIAS');
  });
  document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!mark.contains(e.target))close()},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){e.preventDefault();close();mark.focus()}});
