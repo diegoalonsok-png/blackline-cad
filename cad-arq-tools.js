@@ -86,7 +86,7 @@ add('home','MEDIR',[['msDist','Distancia · DI','regla',run('DIST')],['msAng','�
 EXT.commands.MEASUREGEOM=EXT.commands.MEA=EXT.commands.MEDIR=()=>CORE.command('DIST');
 add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqVano','Vano','vano',run('VANO')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
 add('arq','GALERÍA',[['arqGaleria','Galería','galeria',run('GALERIA')],['arqBano','Baños','bano',run('BANO')],['arqCocina','Cocinas','cocina',run('COCINA')],['arqEscalera','Escaleras','escalera',run('ESCALERA')],['arqMuebles','Mobiliario','mobiliario',run('MOBILIARIO')]]);
-add('output','REFERENCIAS',[['outXref','Vincular plano · REFX','xref',run('REFX')],['outXreload','Recargar referencias · XRECARGAR','regen',run('XRECARGAR')]]);
+add('output','REFERENCIAS',[['outXref','Vincular plano · REFX','xref',run('REFX')],['outXrefCloud','Vincular plano de la nube · REFXNUBE','xref',run('REFXNUBE')],['outXreload','Recargar referencias · XRECARGAR','regen',run('XRECARGAR')]]);
 add('view','PANTALLA',[['viewRegen','Regenerar · RE','regen',run('REGEN')],['viewAudit','Auditar dibujo · AUDIT','auditar',run('AUDIT')],['viewShowPal','Mostrar paletas · Ctrl+1','paletas',run('MOSTRARPALETAS')],['viewClean','Limpiar pantalla · Ctrl+0','limpiar',run('CLEANSCREEN')]]);
 add('annotate','TEXTO',[['annMtext','Texto multilínea · MT','mtext',run('MTEXT')]]);
 add('annotate','ATRIBUTOS',[['annAttdef','Definir atributo · ATT','attdef',run('ATTDEF')],['annAttedit','Editar atributos','attdef',run('ATTEDIT')],['annAttext','Exportar atributos','attext',run('ATTEXT')]]);

@@ -17,6 +17,7 @@
  *   POST /auth/logout
  *   GET  /api/status              {plan:'trial'|'free'|'pro'|'studio', trialEndsAt, email, teamOf?}
  *   POST /api/checkout            {plan:'pro'|'pro-yearly'|'studio'|'studio-yearly'} → {url} de Stripe Checkout
+ *   GET  /api/xref/projects       XREF: mis proyectos + los de mi equipo (solo lectura) · GET /api/xref/projects/<id> · GET /api/xref/stamps?ids=a,b
  *   GET  /api/team                plan Estudio: {members:[email], max} · POST /api/team/add {email} · POST /api/team/remove {email}
  *   POST /api/portal              → {url} del portal de facturación de Stripe
  *   POST /api/stripe-webhook      eventos firmados de Stripe (fuente de verdad del plan)
@@ -267,6 +268,31 @@ async function handle(req,env){
      }
     }else await env.DB.prepare('DELETE FROM team_members WHERE owner_id=? AND email=?').bind(userId,mail).run();
     return cors(env,req,json({ok:true,members:await list(),max:TEAM_MAX}));
+   }
+   // ---------- XREF en la nube: leer (nunca modificar) proyectos propios y del equipo Estudio ----------
+   if(path.startsWith('/api/xref/')&&req.method==='GET'){
+    const me=await planFor(env,userId);await ensureTeam(env);
+    let owner=null;
+    if(me?.plan==='studio'&&!me.teamOf)owner=userId;
+    else if(me?.teamOf)owner=(await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(me.teamOf).first())?.id||null;
+    let ids=[userId];
+    if(owner){const {results}=await env.DB.prepare('SELECT u.id FROM team_members t JOIN users u ON u.email=t.email WHERE t.owner_id=?').bind(owner).all();ids=[...new Set([userId,owner,...(results||[]).map(r=>r.id)])]}
+    const marks=ids.map(()=>'?').join(',');
+    if(path==='/api/xref/projects'){
+     const {results}=await env.DB.prepare(`SELECT p.id,p.name,p.size,p.updated_at,p.user_id,u.email FROM projects p JOIN users u ON u.id=p.user_id WHERE p.user_id IN (${marks}) ORDER BY p.updated_at DESC LIMIT 300`).bind(...ids).all();
+     return cors(env,req,json({team:!!owner,projects:(results||[]).map(r=>({id:r.id,name:r.name,size:r.size,updatedAt:r.updated_at,owner:r.email,mine:r.user_id===userId}))}));
+    }
+    if(path==='/api/xref/stamps'){
+     const want=String(url.searchParams.get('ids')||'').split(',').map(x=>x.replace(/[^A-Za-z0-9-]/g,'')).filter(Boolean).slice(0,50);
+     if(!want.length)return cors(env,req,json({stamps:{}}));
+     const {results}=await env.DB.prepare(`SELECT id,updated_at FROM projects WHERE id IN (${want.map(()=>'?').join(',')}) AND user_id IN (${marks})`).bind(...want,...ids).all();
+     return cors(env,req,json({stamps:Object.fromEntries((results||[]).map(r=>[r.id,r.updated_at]))}));
+    }
+    const m=path.match(/^\/api\/xref\/projects\/([A-Za-z0-9-]{8,40})$/);
+    if(m){const r=await env.DB.prepare(`SELECT id,name,data,updated_at FROM projects WHERE id=? AND user_id IN (${marks})`).bind(m[1],...ids).first();
+     if(!r)return cors(env,req,json({error:'no encontrado o sin acceso'},404));
+     return cors(env,req,json({id:r.id,name:r.name,updatedAt:r.updated_at,data:await unzip(r.data)}));}
+    return cors(env,req,json({error:'no encontrado'},404));
    }
    // ---------- Proyectos en la nube ----------
    if(path==='/api/projects'&&req.method==='GET'){

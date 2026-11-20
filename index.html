@@ -6996,6 +6996,7 @@ async function cadXrefReload(only,quiet){
  let n=0;
  for(const key of keys){
   const def=state.blocks[key];let file=null,h=cadXrefHandles.get(key);
+  if(def.xref?.cloudId){try{if(await cadXrefLoadCloud(def.xref.cloudId,key.slice(5),true))n++}catch(e){if(!quiet)toast('No se pudo recargar '+key.slice(5)+': '+e.message)}continue}
   try{
    if(h){if((await h.queryPermission?.({mode:'read'}))==='prompt'&&!quiet)await h.requestPermission({mode:'read'});file=await h.getFile()}
    else if(!quiet){if(!window.confirm('Para recargar «'+key.slice(5)+'» elegí otra vez el archivo '+def.xref.file))continue;
@@ -7024,7 +7025,53 @@ function cadXrefBind(){
  renderBlockLibrary?.();updateAll();toast('Referencia unida al dibujo como bloque normal');
 }
 window.addEventListener('focus',()=>{if(cadXrefHandles.size)cadXrefReload(null,true)});
-window.CAD2D_XREF=Object.freeze({attachFile:(f,h)=>cadXrefAttachFile(f,h),reload:k=>cadXrefReload(k),detach:()=>cadXrefDetach(),bind:()=>cadXrefBind()});
+/* ---------- XREF en la nube (plan Estudio: también los proyectos del equipo, solo lectura) ----------
+   Se vincula un proyecto guardado en la nube. Cada minuto CAD2D pregunta si cambió; si alguien lo guardó de
+   nuevo, aparece un aviso con «Recargar». La referencia nunca modifica el proyecto original. */
+const cadApiBase=()=>{try{return new URL((window.CAD2D_AUTH_CONFIG||{}).statusUrl).origin}catch(e){return ''}};
+async function cadApi(path){const b=cadApiBase();if(!b)throw Error('la nube no está configurada');const r=await fetch(b+path,{credentials:'include',headers:{accept:'application/json'}});const j=await r.json().catch(()=>({}));if(r.status===401)throw Error('iniciá sesión (Account) para usar la nube');if(!r.ok)throw Error(j.error||('HTTP '+r.status));return j}
+function cadFlattenProject(proj){const saved=state.blocks;state.blocks=proj.blocks||{};try{const out=[];const walk=(list,d)=>{for(const e of list||[]){if(e.type==='blockRef'){if(d<8)walk(blockChildren(e),d+1)}else out.push(e)}};walk(proj.entities,0);return out}finally{state.blocks=saved}}
+async function cadXrefLoadCloud(id,name,isReload){
+ const j=await cadApi('/api/xref/projects/'+encodeURIComponent(id));let proj;try{proj=JSON.parse(j.data)}catch(e){throw Error('proyecto ilegible')}
+ const parsed={entities:cadFlattenProject(proj),layers:proj.layers||[],unitCode:{in:1,ft:2,mm:4,cm:5,m:6}[proj.unit]||0};
+ if(!parsed.entities.length)throw Error('el proyecto no tiene objetos');
+ const nm=cadXrefSafe(name||j.name);saveHistory();
+ const key=cadXrefApply(nm,parsed,{name:'☁ '+j.name,lastModified:j.updatedAt});
+ Object.assign(state.blocks[key].xref,{cloudId:id,updatedAt:j.updatedAt,cloudName:j.name});
+ if(!isReload&&!state.entities.some(e=>e.type==='blockRef'&&e.blockName===key)){
+  const layer=(state.layers.find(l=>l.name==='XREF')||(state.layers.push({id:'xref',name:'XREF',color:'#9aa7b0',visible:true,locked:false,width:.18}),state.layers.at(-1))).id;
+  state.entities.push({id:state.nextId++,type:'blockRef',blockName:key,p:P(0,0),scale:1,rotation:0,layer,xref:true});
+ }
+ document.getElementById('cadXrefBanner')?.remove();
+ renderLayers?.();updateAll();if(!isReload)zoomExtents();
+ toast((isReload?'Referencia actualizada: ':'Referencia de la nube vinculada: ')+'«'+j.name+'» · '+parsed.entities.length+' objetos');return true;
+}
+async function cadXrefAttachCloud(){
+ let j;try{j=await cadApi('/api/xref/projects')}catch(e){return toast('XREF nube: '+e.message)}
+ document.getElementById('cadXrefCloudDlg')?.remove();
+ const d=document.createElement('div');d.id='cadXrefCloudDlg';d.style.cssText='position:fixed;inset:0;z-index:9500;background:rgba(5,9,13,.6);display:flex;align-items:center;justify-content:center';
+ const row=p=>'<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid #2c3a44"><span style="flex:1">'+escapeHTML(p.name)+'<br><small style="color:#8fa7b4">'+(p.mine?'Mío':'de '+escapeHTML(p.owner))+' · '+new Date(p.updatedAt*1000).toLocaleString()+'</small></span><button class="btn" data-id="'+escapeHTML(p.id)+'" data-n="'+escapeHTML(p.name)+'">Vincular</button></div>';
+ const mine=j.projects.filter(p=>p.mine),team=j.projects.filter(p=>!p.mine);
+ d.innerHTML='<div style="background:#141c24;color:#e5eef7;border:1px solid #4d6676;border-radius:14px;padding:16px 18px;width:min(620px,94vw);max-height:86vh;overflow:auto;font:13px system-ui">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center"><b style="letter-spacing:.06em">VINCULAR PLANO DE LA NUBE (XREF)</b><button class="btn" data-x>✕</button></div>'+
+  '<p style="color:#a9bfcc;margin:6px 0 8px">El plano se ve atenuado debajo del tuyo, en sus coordenadas originales, y no se puede modificar desde acá. Si alguien lo vuelve a guardar en la nube, CAD2D te avisa para recargarlo.</p>'+
+  (team.length?'<b style="font-size:12px;color:#9fd8a8">EQUIPO</b>'+team.map(row).join(''):(j.team?'':'<p style="color:#8fa7b4;font-size:12px">Con el plan Estudio también ves los planos de tu equipo.</p>'))+
+  '<b style="font-size:12px;color:#9fc3d6;display:block;margin-top:8px">MIS PROYECTOS</b>'+(mine.length?mine.map(row).join(''):'<p style="color:#ffd27f">Todavía no guardaste proyectos en la nube (Archivo → Guardar en la nube).</p>')+'</div>';
+ document.body.append(d);
+ d.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b){if(e.target===d)d.remove();return}if(b.hasAttribute('data-x'))return d.remove();
+  if(b.dataset.id){d.remove();try{await cadXrefLoadCloud(b.dataset.id,b.dataset.n,false)}catch(err){toast('XREF nube: '+err.message)}}});
+}
+// Aviso de cambios: cada minuto, solo si hay referencias de la nube y la pestaña está visible.
+setInterval(async()=>{
+ if(document.hidden)return;const refs=Object.entries(state.blocks||{}).filter(([,d])=>d?.xref?.cloudId);if(!refs.length)return;
+ let j;try{j=await cadApi('/api/xref/stamps?ids='+refs.map(([,d])=>d.xref.cloudId).join(','))}catch(e){return}
+ const changed=refs.filter(([,d])=>(j.stamps||{})[d.xref.cloudId]>d.xref.updatedAt);if(!changed.length)return;
+ let bn=document.getElementById('cadXrefBanner');if(!bn){bn=document.createElement('div');bn.id='cadXrefBanner';bn.setAttribute('role','status');bn.style.cssText='position:fixed;right:18px;bottom:96px;z-index:9300;background:#1e2f3a;color:#e5eef7;border:1px solid #6f9fb8;border-radius:12px;padding:10px 12px;font:13px system-ui;box-shadow:0 10px 30px #0008;display:flex;gap:10px;align-items:center';document.body.append(bn)}
+ bn.innerHTML='<span>☁ Cambió '+changed.map(([k])=>'«'+escapeHTML(k.slice(5))+'»').join(', ')+'</span><button class="btn primary" data-r>Recargar</button><button class="btn" data-l>Después</button>';
+ bn.onclick=e=>{if(e.target.closest('[data-r]')){bn.remove();cadXrefReload(changed.map(([k])=>k),true)}else if(e.target.closest('[data-l]')){bn.remove();for(const [,d] of changed)d.xref.updatedAt=j.stamps[d.xref.cloudId]}};
+},60000);
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['REFXNUBE','XREFNUBE','XREFCLOUD','XATTACHCLOUD'])X.commands[k]=()=>cadXrefAttachCloud()}
+window.CAD2D_XREF=Object.freeze({attachCloud:()=>cadXrefAttachCloud(),attachFile:(f,h)=>cadXrefAttachFile(f,h),reload:k=>cadXrefReload(k),detach:()=>cadXrefDetach(),bind:()=>cadXrefBind()});
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};X.context=X.context||[];
  for(const k of['XREF','XATTACH','REFX','ADJUNTARREFX','REFEXTERNA'])X.commands[k]=()=>cadXrefAttach();
  for(const k of['XRELOAD','XRECARGAR','RECARGARREFX'])X.commands[k]=()=>cadXrefReload(cadXrefSelectedKeys().length?cadXrefSelectedKeys():null);
@@ -9713,6 +9760,6 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-arq-pro.js?v=20261120-1925"></script>
 <script src="cad-autocad-plus.js?v=20261120-1850"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261120-1850"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
-<script src="cad-arq-tools.js?v=20261120-1850"></script><script src="cad-block-browser.js?v=20261120-1850"></script>
+<script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261120-1850"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
