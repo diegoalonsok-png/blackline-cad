@@ -213,11 +213,27 @@ reg(['ZOOMOBJECT','ZO','ZOOMOBJETO'],()=>{
 });
 function calc(expr){
  const src=String(expr).toLowerCase().replace(/,/g,'.').replace(/\^/g,'**').replace(/π/g,'pi');
- if(!/^[0-9+\-*/().\s%a-z]*$/.test(src))throw Error('caracteres no permitidos');
+ if(!/^[0-9+\-*/().\s%a-z;]*$/.test(src))throw Error('caracteres no permitidos');
  const words=src.match(/[a-z]+/g)||[],okw=new Set(['sqrt','sin','cos','tan','asin','acos','atan','abs','pi','round','floor','ceil','log','ln','exp','min','max','deg','rad']);
  for(const w of words)if(!okw.has(w))throw Error('función desconocida: '+w);
- const fn=new Function('M','"use strict";const {sqrt,abs,round,floor,ceil,exp,min,max}=M,pi=M.PI,log=M.log10,ln=M.log,sin=x=>M.sin(x*M.PI/180),cos=x=>M.cos(x*M.PI/180),tan=x=>M.tan(x*M.PI/180),asin=x=>M.asin(x)*180/M.PI,acos=x=>M.acos(x)*180/M.PI,atan=x=>M.atan(x)*180/M.PI,deg=x=>x*180/M.PI,rad=x=>x*M.PI/180;return ('+src+');');
- const r=fn(Math);if(!Number.isFinite(r))throw Error('resultado no numérico');return r;
+ // Evaluador propio (sin eval / new Function): + - * / % **, paréntesis, funciones y pi.
+ const D=Math.PI/180,F={sqrt:Math.sqrt,abs:Math.abs,round:Math.round,floor:Math.floor,ceil:Math.ceil,exp:Math.exp,log:Math.log10,ln:Math.log,
+  sin:x=>Math.sin(x*D),cos:x=>Math.cos(x*D),tan:x=>Math.tan(x*D),asin:x=>Math.asin(x)/D,acos:x=>Math.acos(x)/D,atan:x=>Math.atan(x)/D,deg:x=>x/D,rad:x=>x*D,min:Math.min,max:Math.max};
+ const tk=src.match(/\*\*|\d*\.?\d+(?:e[+-]?\d+)?|[a-z]+|[-+*/%(),;]/g)||[];let i=0;
+ const peek=()=>tk[i],take=t=>{if(t&&tk[i]!==t)throw Error('se esperaba '+t);return tk[i++]};
+ const prim=()=>{const t=take();if(t===undefined)throw Error('expresión incompleta');
+  if(t==='(' ){const v=add();take(')');return v}
+  if(t==='-')return -pw();if(t==='+')return pw();
+  if(/^[\d.]/.test(t))return Number(t);
+  if(t==='pi')return Math.PI;
+  if(F[t]){take('(');const args=[add()];while(peek()===';'){take(';');args.push(add())}take(')');return F[t](...args)}
+  throw Error('símbolo inesperado: '+t)};
+ const pw=()=>{const b=prim();if(peek()==='**'){take();return b**unary()}return b};
+ const unary=()=>{if(peek()==='-'){take();return -unary()}if(peek()==='+'){take();return unary()}return pw()};
+ const mul=()=>{let v=unary();while(['*','/','%'].includes(peek())){const o=take(),r=unary();v=o==='*'?v*r:o==='/'?v/r:v%r}return v};
+ const add=()=>{let v=mul();while(['+','-'].includes(peek())){const o=take(),r=mul();v=o==='+'?v+r:v-r}return v};
+ const r=add();if(i<tk.length)throw Error('símbolo inesperado: '+tk[i]);
+ if(!Number.isFinite(r))throw Error('resultado no numérico');return r;
 }
 reg(['CAL','CALC','QUICKCALC','QC','CALCULADORA'],()=>{
  const e=ask('CALCULADORA · expresión (ángulos en grados). Ej: 2.40*3.15 + sqrt(2) · (4+3)/2','');if(!e)return;

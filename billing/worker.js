@@ -9,7 +9,11 @@
  * Endpoints
  *   GET  /auth/login              formulario de acceso por enlace mágico (sin contraseñas)
  *   POST /auth/request            {email} → envía enlace de un solo uso (15 min)
- *   GET  /auth/verify?token=      crea la sesión (cookie HttpOnly) y vuelve a la app
+ *   GET  /auth/verify?token=      paso de confirmación (no consume el token; evita que antivirus de correo lo gasten)
+ *   POST /auth/verify             crea la sesión (cookie HttpOnly, Secure, SameSite=Lax) y vuelve a la app
+ *
+ * Protecciones: cabeceras de seguridad y CSP en todas las respuestas, POST solo desde la app (anti-CSRF),
+ * límite de tamaño, máx. 3 enlaces vigentes por correo, límites por IP opcionales (AUTH_LIMITER, API_LIMITER).
  *   POST /auth/logout
  *   GET  /api/status              {plan:'trial'|'free'|'pro'|'studio', trialEndsAt, email}
  *   POST /api/checkout            {plan:'pro'|'pro-yearly'|'studio'} → {url} de Stripe Checkout
@@ -42,7 +46,30 @@ async function readSession(env,req){
  const expected=b64url(await hmac(env.SESSION_SECRET,id+'.'+exp));
  return safeEqual(sig,expected)?id:null;
 }
-const cookie=(env,value,maxAge)=>`cad2d_session=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}${env.COOKIE_DOMAIN?'; Domain='+env.COOKIE_DOMAIN:''}`;
+const cookie=(env,value,maxAge)=>`cad2d_session=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}${env.COOKIE_DOMAIN?'; Domain='+env.COOKIE_DOMAIN:''}`;
+
+/* ---------- Protecciones ---------- */
+const SEC_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-frame-options':'DENY',
+ 'strict-transport-security':'max-age=31536000; includeSubDomains','cache-control':'no-store','cross-origin-opener-policy':'same-origin',
+ 'permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()'};
+const PAGE_CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+function secure(res){
+ const r=new Response(res.body,res);
+ for(const [k,v] of Object.entries(SEC_HEADERS))if(!r.headers.has(k))r.headers.set(k,v);
+ if((r.headers.get('content-type')||'').startsWith('text/html'))r.headers.set('content-security-policy',PAGE_CSP);
+ return r;
+}
+const html=(body,status=200)=>new Response(body,{status,headers:{'content-type':'text/html; charset=utf-8'}});
+const escHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Solo la app y la propia API pueden hacer POST (anti-CSRF); el webhook de Stripe va firmado.
+function originAllowed(env,req){
+ const o=req.headers.get('origin');if(!o)return false;
+ return [env.APP_ORIGIN,env.API_ORIGIN].filter(Boolean).includes(o);
+}
+function tooLarge(req,max){const n=Number(req.headers.get('content-length')||0);return n>max}
+const clientIp=req=>req.headers.get('cf-connecting-ip')||'0.0.0.0';
+// Límite por IP con la API de Rate Limiting de Cloudflare (binding opcional AUTH_LIMITER / API_LIMITER en wrangler.toml).
+async function limited(binding,key){try{if(!binding)return false;const {success}=await binding.limit({key});return !success}catch(e){return false}}
 
 /* ---------- CORS (solo el origen de la app, con credenciales) ---------- */
 function cors(env,req,res){
@@ -92,15 +119,28 @@ const loginPage=(env,es)=>`<!doctype html><html lang="${es?'es':'en'}"><meta cha
 <script>f.onsubmit=async e=>{e.preventDefault();const r=await fetch('/auth/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:f.email.value})});m.textContent=r.ok?${es?"'Revisá tu correo.'":"'Check your inbox.'"}:${es?"'No se pudo enviar.'":"'Could not send the email.'"}}</script>`;
 
 export default {
- async fetch(req,env){
-  const url=new URL(req.url),path=url.pathname;
+ async fetch(req,env){return secure(await handle(req,env))}
+};
+async function handle(req,env){
+  {const url=new URL(req.url),path=url.pathname;
   if(req.method==='OPTIONS')return cors(env,req,new Response(null,{status:204}));
   try{
+   if(req.method!=='GET'&&req.method!=='POST')return json({error:'método no permitido'},405);
+   if(req.method==='POST'&&path!=='/api/stripe-webhook'){
+    if(!originAllowed(env,req))return cors(env,req,json({error:'origen no permitido'},403));
+    if(tooLarge(req,16*1024))return cors(env,req,json({error:'demasiado grande'},413));
+   }
+   if(path==='/api/stripe-webhook'&&tooLarge(req,512*1024))return json({error:'demasiado grande'},413);
+   if(path.startsWith('/api/')&&path!=='/api/stripe-webhook'&&await limited(env.API_LIMITER,clientIp(req)))return cors(env,req,json({error:'demasiados pedidos'},429));
    if(path==='/auth/login'&&req.method==='GET')return new Response(loginPage(env,isEs(req)),{headers:{'content-type':'text/html; charset=utf-8'}});
    if(path==='/auth/request'&&req.method==='POST'){
     const {email}=await req.json().catch(()=>({}));
     const mail=String(email||'').trim().toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)||mail.length>200)return json({error:'email inválido'},400);
+    if(!(req.headers.get('content-type')||'').includes('application/json'))return json({error:'formato inválido'},415);
+    if(await limited(env.AUTH_LIMITER,clientIp(req)))return json({error:'demasiados pedidos, probá en unos minutos'},429);
+    const recent=await env.DB.prepare('SELECT COUNT(*) AS n FROM login_tokens WHERE email=? AND expires_at>?').bind(mail,now()).first();
+    if((recent?.n||0)>=3)return json({ok:true}); // máx. 3 enlaces vigentes por correo (evita spam); misma respuesta
     const token=randomToken();
     await env.DB.prepare('INSERT INTO login_tokens(token_hash,email,expires_at) VALUES(?,?,?)').bind(await sha256(token),mail,now()+900).run();
     const link=`${env.API_ORIGIN}/auth/verify?token=${token}`;
@@ -109,10 +149,21 @@ export default {
     return json({ok:true}); // misma respuesta exista o no la cuenta
    }
    if(path==='/auth/verify'&&req.method==='GET'){
-    const token=url.searchParams.get('token')||'',h=await sha256(token);
+    // Los antivirus de correo abren los enlaces: el GET no consume el token, solo muestra un paso que se confirma solo.
+    const token=(url.searchParams.get('token')||'').slice(0,100),es=isEs(req);
+    return html(`<!doctype html><html lang="${es?'es':'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CAD2D</title>
+<body style="font-family:system-ui;background:#111821;color:#e5eef7;display:grid;place-items:center;min-height:100vh;margin:0">
+<form id="f" method="POST" action="/auth/verify" style="background:#18222c;padding:24px;border-radius:12px;border:1px solid #3c5262;width:min(360px,90vw);text-align:center">
+<input type="hidden" name="token" value="${escHtml(token)}"><p>${es?'Ingresando a CAD2D…':'Signing in to CAD2D…'}</p><button style="padding:10px 18px">${es?'Continuar':'Continue'}</button></form>
+<script>document.getElementById('f').submit()</script>`);
+   }
+   if(path==='/auth/verify'&&req.method==='POST'){
+    const form=await req.formData().catch(()=>null);
+    const token=String(form?.get('token')||'').slice(0,100),h=await sha256(token);
     const row=await env.DB.prepare('SELECT email,expires_at,used FROM login_tokens WHERE token_hash=?').bind(h).first();
-    if(!row||row.used||row.expires_at<now())return new Response('Enlace vencido o usado. Pedí uno nuevo.',{status:400});
-    await env.DB.prepare('UPDATE login_tokens SET used=1 WHERE token_hash=?').bind(h).run();
+    if(!row||row.used||row.expires_at<now())return html('<p style="font-family:system-ui">'+(isEs(req)?'Enlace vencido o usado. Pedí uno nuevo.':'Link expired or already used. Request a new one.')+'</p>',400);
+    const upd=await env.DB.prepare('UPDATE login_tokens SET used=1 WHERE token_hash=? AND used=0').bind(h).run();
+    if(upd?.meta&&upd.meta.changes===0)return html('<p>'+(isEs(req)?'Enlace ya usado.':'Link already used.')+'</p>',400);
     let user=await env.DB.prepare('SELECT id FROM users WHERE email=?').bind(row.email).first();
     if(!user){
      const id=crypto.randomUUID(),trial=now()+86400*Number(env.TRIAL_DAYS||90);
@@ -123,7 +174,7 @@ export default {
    if(path==='/auth/logout'&&req.method==='POST')return cors(env,req,json({ok:true},200,{'set-cookie':cookie(env,'',0)}));
    if(path==='/api/stripe-webhook'&&req.method==='POST'){
     const raw=await req.text();if(!await verifyStripe(env,req,raw))return new Response('firma inválida',{status:400});
-    const event=JSON.parse(raw),o=event.data.object;
+    let event;try{event=JSON.parse(raw)}catch(e){return json({error:'json inválido'},400)}const o=event?.data?.object||{};
     const seen=await env.DB.prepare('SELECT id FROM stripe_events WHERE id=?').bind(event.id).first();if(seen)return json({ok:true});
     await env.DB.prepare('INSERT INTO stripe_events(id,type,created_at) VALUES(?,?,?)').bind(event.id,event.type,now()).run();
     if(event.type==='checkout.session.completed'&&o.client_reference_id){
@@ -174,4 +225,4 @@ export default {
    console.error(error);return cors(env,req,json({error:'error interno'},500));
   }
  }
-};
+}
