@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0500">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0500">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0530">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0530">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0500"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0500"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0530"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0530"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -939,10 +939,10 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261120-0500"></script>
-<script src="cad-grip-settings.js?v=20261120-0500"></script>
-<script src="cad-cursor-mode.js?v=20261120-0500"></script>
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
+<script src="cad2d-config.js?v=20261120-0530"></script>
+<script src="cad-grip-settings.js?v=20261120-0530"></script>
+<script src="cad-cursor-mode.js?v=20261120-0530"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -2644,7 +2644,16 @@ function cadSvgDash(e,factor){
  const pat=CAD2D_LT_PATTERNS[lt];if(!pat)return '';const k=(1000/U[state.unit])*(e.ltscale||1)*(state.ltscale||1)*factor;
  return ` stroke-dasharray="${pat.map(v=>v===0?.01:Math.max(.3,v*k)).map(v=>Number(v.toFixed(3))).join(' ')}"`;
 }
-function drawEntity(e,forceColor){if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
+// Imágenes importadas (PNG/JPG/WebP/GIF): se dibujan dentro del rectángulo a–b, en escala real del dibujo.
+const cadImageCache=new Map();
+function cadImageEl(src){let im=cadImageCache.get(src);if(!im){im=new Image();im.onload=()=>schedule();im.src=src;cadImageCache.set(src,im)}return im}
+function drawImageEntity(e,forceColor){
+ const lay=layerFor(e);if(!forceColor&&!lay.visible)return;const a=screen(P(Math.min(e.a.x,e.b.x),Math.max(e.a.y,e.b.y))),b=screen(P(Math.max(e.a.x,e.b.x),Math.min(e.a.y,e.b.y)));
+ const im=cadImageEl(e.src);ctx.save();if(e.opacity!=null)ctx.globalAlpha=Math.max(.05,Math.min(1,e.opacity));
+ if(im.complete&&im.naturalWidth)ctx.drawImage(im,a.x,a.y,b.x-a.x,b.y-a.y);else{ctx.fillStyle='#22303a';ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y)}
+ ctx.globalAlpha=1;if(forceColor||state.selected.includes(e.id)){ctx.strokeStyle=forceColor||displayColors.selection;ctx.setLineDash([5,3]);ctx.lineWidth=1.5;ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)}ctx.restore();
+}
+function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,forceColor);if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
   for(const part of blockChildren(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
   if(state.selected.includes(e.id)&&!forceColor){
@@ -2859,7 +2868,7 @@ function cadZoomFactor(value){
  toast('ZOOM '+f+'x');log('ZOOM '+f+'x');
 }
 function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
-function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
+function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension'||e.type==='image')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
 try{otrkOn=localStorage.getItem('cad2d-otrack')==='true'}catch(e){}
@@ -2990,7 +2999,7 @@ function snapPoint(p){
  return q;
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
-function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return blockChildren(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
+function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return blockChildren(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
 function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
@@ -5742,7 +5751,73 @@ async function convertDWGAutomatically(file){
  importDXF(dxf,file.name.replace(/\.dwg$/i,'.dxf'));
  log('DWG converted via external service; verify layers, unsupported entities and 1:1 units.');
 }
-async function loadDrawingFile(f){if(!f)return;try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+
+/* ---------- Importar imágenes, TXT, CSV y Excel (.xlsx) al dibujo ---------- */
+function cadViewCenter(){return world(P(canvas.clientWidth/2,canvas.clientHeight/2))}
+function cadViewWidth(){return canvas.clientWidth/state.view.scale}
+async function cadReadImage(file){
+ const url=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=()=>ko(r.error);r.readAsDataURL(file)});
+ const im=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>ko(Error('Image could not be read'));i.src=url});
+ let w=im.naturalWidth,h=im.naturalHeight,src=url;const max=2400;
+ if(Math.max(w,h)>max||file.size>2.5e6){const k=Math.min(1,max/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);src=c.toDataURL(/png|gif|webp/i.test(file.type)?'image/png':'image/jpeg',.88);if(src.length>url.length&&k===1)src=url;w=c.width;h=c.height}
+ return {src,w,h};
+}
+async function cadUnzip(buf){
+ // Lector ZIP mínimo (formato de .xlsx) con DecompressionStream nativo del navegador.
+ const dv=new DataView(buf),u8=new Uint8Array(buf);let eocd=-1;for(let i=buf.byteLength-22;i>=Math.max(0,buf.byteLength-65557);i--)if(dv.getUint32(i,true)===0x06054b50){eocd=i;break}
+ if(eocd<0)throw Error('Not a valid .xlsx file');const n=dv.getUint16(eocd+10,true);let off=dv.getUint32(eocd+16,true);const files={},dec=new TextDecoder();
+ for(let k=0;k<n;k++){const method=dv.getUint16(off+10,true),csize=dv.getUint32(off+20,true),nl=dv.getUint16(off+28,true),el=dv.getUint16(off+30,true),cl=dv.getUint16(off+32,true),lo=dv.getUint32(off+42,true);const name=dec.decode(u8.subarray(off+46,off+46+nl));
+  files[name]={method,csize,lo};off+=46+nl+el+cl}
+ const read=async name=>{const f=files[name];if(!f)return null;const ln=dv.getUint16(f.lo+26,true),le=dv.getUint16(f.lo+28,true),data=u8.subarray(f.lo+30+ln+le,f.lo+30+ln+le+f.csize);
+  if(f.method===0)return dec.decode(data);if(f.method!==8)throw Error('Unsupported compression in .xlsx');
+  const out=await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer();return dec.decode(out)};
+ return {names:Object.keys(files),read};
+}
+async function cadReadXlsx(file){
+ const z=await cadUnzip(await file.arrayBuffer()),xml=t=>new DOMParser().parseFromString(t,'application/xml');
+ const shared=[];const ss=await z.read('xl/sharedStrings.xml');if(ss)for(const si of xml(ss).getElementsByTagName('si'))shared.push([...si.getElementsByTagName('t')].map(t=>t.textContent).join(''));
+ const sheetName=z.names.find(n=>/^xl\/worksheets\/sheet1\.xml$/i.test(n))||z.names.find(n=>/^xl\/worksheets\/sheet\d+\.xml$/i.test(n));if(!sheetName)throw Error('No worksheet found');
+ const doc=xml(await z.read(sheetName)),rows=[];const col=ref=>{let c=0;for(const ch of ref.replace(/\d+/g,''))c=c*26+(ch.charCodeAt(0)-64);return c-1};
+ for(const r of doc.getElementsByTagName('row')){const ri=Number(r.getAttribute('r'))-1;const row=rows[ri]=rows[ri]||[];
+  for(const c of r.getElementsByTagName('c')){const t=c.getAttribute('t'),v=c.getElementsByTagName('v')[0]?.textContent??'',is=c.getElementsByTagName('is')[0];let val=t==='s'?shared[Number(v)]??'':t==='inlineStr'?(is?.textContent||''):t==='b'?(v==='1'?'TRUE':'FALSE'):v;
+   if(t!=='s'&&t!=='inlineStr'&&t!=='str'&&/^-?\d+(\.\d+)?(E-?\d+)?$/i.test(val)){const n=Number(val);val=Number.isInteger(n)?String(n):String(+n.toFixed(4))}row[col(c.getAttribute('r')||'A1')]=val}}
+ return rows.map(r=>r||[]);
+}
+function cadParseCsv(text){
+ const sep=(text.split('\n')[0].match(/;/g)||[]).length>(text.split('\n')[0].match(/,/g)||[]).length?';':(text.includes('\t')?'\t':',');
+ const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const ch=text[i];if(q){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')q=false;else cell+=ch}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}
+ if(cell||row.length){row.push(cell);rows.push(row)}return rows;
+}
+function cadInsertTableData(rows,name){
+ rows=rows.slice(0,200).map(r=>Array.from(r,c=>String(c??'').trim()));while(rows.length&&rows.at(-1).every(c=>!c))rows.pop();
+ const cols=Math.min(30,Math.max(1,...rows.map(r=>r.length)));if(!rows.length)return toast('The sheet is empty');
+ const h=Math.max(.15,cadViewWidth()/90),rowH=h*2.2,cw=[...Array(cols)].map((_,j)=>Math.max(...rows.map(r=>(r[j]||'').length),3)*h*.62+h*1.2);
+ const W=cw.reduce((a,b)=>a+b,0),c=cadViewCenter(),o=P(c.x-W/2,c.y+rows.length*rowH/2),add=[];
+ for(let i=0;i<=rows.length;i++)add.push({type:'line',a:P(o.x,o.y-i*rowH),b:P(o.x+W,o.y-i*rowH)});
+ let x=o.x;for(let j=0;j<=cols;j++){add.push({type:'line',a:P(x,o.y),b:P(x,o.y-rows.length*rowH)});x+=cw[j]||0}
+ for(let i=0;i<rows.length;i++){let x0=o.x;for(let j=0;j<cols;j++){const t=rows[i][j];if(t)add.push({type:'text',p:P(x0+h*.6,o.y-i*rowH-rowH*.68),text:t.slice(0,120),h,fontFamily:'Arial',bold:i===0});x0+=cw[j]}}
+ saveHistory();const ids=[];for(const e of add){e.id=state.nextId++;e.layer=state.layerId;e.width=.13;state.entities.push(e);ids.push(e.id)}
+ state.selected=ids;updateAll();toast('Imported '+name+' · '+rows.length+' rows × '+cols+' columns as an editable table (selected: move it with M)');log('IMPORT '+name);
+}
+async function cadImportFile(f){
+ try{
+  if(/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)){
+   const img=await cadReadImage(f),c=cadViewCenter(),W=cadViewWidth()*.5,H=W*img.h/img.w;
+   saveHistory();const e={id:state.nextId++,type:'image',src:img.src,a:P(c.x-W/2,c.y-H/2),b:P(c.x+W/2,c.y+H/2),layer:state.layerId,name:f.name,pxW:img.w,pxH:img.h};state.entities.push(e);state.selected=[e.id];updateAll();
+   toast('Image placed: '+f.name+' · use SCALE or the grips to size it, M to move it');log('IMAGEATTACH '+f.name);return;
+  }
+  if(/\.xls$/i.test(f.name))return toast('Old .xls files are not supported: save the sheet as .xlsx or .csv in Excel');
+  if(/\.xlsx$/i.test(f.name))return cadInsertTableData(await cadReadXlsx(f),f.name);
+  const text=(await f.text()).replace(/^﻿/,'');
+  if(/\.(csv|tsv)$/i.test(f.name))return cadInsertTableData(cadParseCsv(text),f.name);
+  // TXT: una línea de texto por renglón, con interlineado.
+  const lines=text.split(/\r?\n/).slice(0,500);while(lines.length&&!lines.at(-1).trim())lines.pop();if(!lines.length)return toast('The text file is empty');
+  const h=Math.max(.15,cadViewWidth()/80),c=cadViewCenter(),x=c.x-cadViewWidth()*.3,y0=c.y+lines.length*h*1.6/2;
+  saveHistory();const ids=[];lines.forEach((t,i)=>{if(!t.trim())return;const e={id:state.nextId++,type:'text',p:P(x,y0-i*h*1.6),text:t.slice(0,300),h,fontFamily:'Arial',layer:state.layerId};state.entities.push(e);ids.push(e.id)});
+  state.selected=ids;updateAll();toast('Imported '+f.name+' · '+ids.length+' text lines');log('IMPORT '+f.name);
+ }catch(err){console.error(err);toast('Import failed: '+(err?.message||err))}
+}
+async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);if(data.layout)applyLayoutState(data.layout);renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -5977,7 +6052,7 @@ function makeSVG(o){
   return page.replace(/<\/svg>\s*$/,inner+'</svg>');
  }const px=p=>[o.w/2+(p.x-o.cx)*o.factor,o.h/2-(p.y-o.cy)*o.factor],num=n=>Number(n.toFixed(4)),xy=p=>px(p).map(num).join(',');let svg=[`<svg xmlns="http://www.w3.org/2000/svg" width="${num(o.w)}mm" height="${num(o.h)}mm" viewBox="0 0 ${num(o.w)} ${num(o.h)}"><rect width="100%" height="100%" fill="white"/><defs><clipPath id="drawing"><rect x="${o.margin}" y="${o.margin}" width="${o.w-2*o.margin}" height="${o.h-2*o.margin}"/></clipPath></defs><g clip-path="url(#drawing)">`];for(const e of (o.__noEntities?[]:flattenCADEntities(state.entities))){if(!layerFor(e).visible)continue;const c=colorOutput(e,o),sw=Math.max(.05,e.width??layerFor(e).width??.25),attr=`fill="none" stroke="${c}" stroke-width="${(e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))?Math.max(sw,e.pwidth*o.factor):sw}" stroke-linecap="round" stroke-linejoin="round"${cadSvgDash(e,o.factor)}`,point=p=>{let [x,y]=px(p);return `${num(x)} ${num(y)}`};if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'){
   for(const segment of cadHatchPatternPrimitives(e,6000))svg.push('<path '+attr+' d="M '+point(segment.a)+' L '+point(segment.b)+'"/>');
- }else if(e.type==='hatch'){if(cadIsGradient(e)&&o.style!=='mono'){const id='g'+e.id+'_'+Math.random().toString(36).slice(2,7),a=(Number(e.hatchAngle)||0)*Math.PI/180,f=n=>Number(n.toFixed(4));svg.push(e.hatchStyle==='gradient-radial'?`<radialGradient id="${id}"><stop offset="0" stop-color="${e.color}"/><stop offset="1" stop-color="${e.color2||'#ffffff'}"/></radialGradient>`:`<linearGradient id="${id}" x1="${f(.5-.5*Math.cos(a))}" y1="${f(.5+.5*Math.sin(a))}" x2="${f(.5+.5*Math.cos(a))}" y2="${f(.5-.5*Math.sin(a))}"><stop offset="0" stop-color="${e.color}"/><stop offset="1" stop-color="${e.color2||'#ffffff'}"/></linearGradient>`);svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="url(#'+id+')" stroke="none"/>')}else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e))svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="'+c+'" stroke="none"/>');else for(const sg of cadHatchPatternPrimitives(e,12000))svg.push(`<path ${attr} d="M ${point(sg.a)} L ${point(sg.b)}"/>`)}else if(e.type==='line')svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(e.b)}"/>`);else if(e.type==='rect'){let a=px(e.a),b=px(e.b);svg.push(`<rect ${attr} x="${num(Math.min(a[0],b[0]))}" y="${num(Math.min(a[1],b[1]))}" width="${num(Math.abs(a[0]-b[0]))}" height="${num(Math.abs(a[1]-b[1]))}"/>`)}else if(e.type==='polyline')svg.push(`<polyline ${attr} points="${e.pts.map(xy).join(' ')}${e.closed?' '+xy(e.pts[0]):''}"/>`);else if(e.type==='circle'){let a=px(e.c);svg.push(`<circle ${attr} cx="${num(a[0])}" cy="${num(a[1])}" r="${num(e.r*o.factor)}"/>`)}else if(e.type==='ellipse'){let a=px(e.c);svg.push(`<ellipse ${attr} cx="${num(a[0])}" cy="${num(a[1])}" rx="${num(e.rx*o.factor)}" ry="${num(e.ry*o.factor)}" transform="rotate(${num(-(e.rotation||0)*180/Math.PI)} ${num(a[0])} ${num(a[1])})"/>`)}else if(e.type==='arc'){let sweep=arcSweep(e.a0,e.a1),start=add(e.c,P(e.r*Math.cos(e.a0),e.r*Math.sin(e.a0))),end=add(e.c,P(e.r*Math.cos(e.a0+sweep),e.r*Math.sin(e.a0+sweep)));svg.push(`<path ${attr} d="M ${point(start)} A ${num(e.r*o.factor)} ${num(e.r*o.factor)} 0 ${sweep>Math.PI?1:0} 0 ${point(end)}"/>`)}else if(e.type==='text'){
+ }else if(e.type==='image'){const A=px(P(Math.min(e.a.x,e.b.x),Math.max(e.a.y,e.b.y))),B=px(P(Math.max(e.a.x,e.b.x),Math.min(e.a.y,e.b.y)));svg.push(`<image href="${e.src}" x="${num(A[0])}" y="${num(A[1])}" width="${num(B[0]-A[0])}" height="${num(B[1]-A[1])}" preserveAspectRatio="none"${e.opacity!=null?` opacity="${e.opacity}"`:''}/>`)}else if(e.type==='hatch'){if(cadIsGradient(e)&&o.style!=='mono'){const id='g'+e.id+'_'+Math.random().toString(36).slice(2,7),a=(Number(e.hatchAngle)||0)*Math.PI/180,f=n=>Number(n.toFixed(4));svg.push(e.hatchStyle==='gradient-radial'?`<radialGradient id="${id}"><stop offset="0" stop-color="${e.color}"/><stop offset="1" stop-color="${e.color2||'#ffffff'}"/></radialGradient>`:`<linearGradient id="${id}" x1="${f(.5-.5*Math.cos(a))}" y1="${f(.5+.5*Math.sin(a))}" x2="${f(.5+.5*Math.cos(a))}" y2="${f(.5-.5*Math.sin(a))}"><stop offset="0" stop-color="${e.color}"/><stop offset="1" stop-color="${e.color2||'#ffffff'}"/></linearGradient>`);svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="url(#'+id+')" stroke="none"/>')}else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e))svg.push('<polygon points="'+e.pts.map(xy).join(' ')+'" fill="'+c+'" stroke="none"/>');else for(const sg of cadHatchPatternPrimitives(e,12000))svg.push(`<path ${attr} d="M ${point(sg.a)} L ${point(sg.b)}"/>`)}else if(e.type==='line')svg.push(`<path ${attr} d="M ${point(e.a)} L ${point(e.b)}"/>`);else if(e.type==='rect'){let a=px(e.a),b=px(e.b);svg.push(`<rect ${attr} x="${num(Math.min(a[0],b[0]))}" y="${num(Math.min(a[1],b[1]))}" width="${num(Math.abs(a[0]-b[0]))}" height="${num(Math.abs(a[1]-b[1]))}"/>`)}else if(e.type==='polyline')svg.push(`<polyline ${attr} points="${e.pts.map(xy).join(' ')}${e.closed?' '+xy(e.pts[0]):''}"/>`);else if(e.type==='circle'){let a=px(e.c);svg.push(`<circle ${attr} cx="${num(a[0])}" cy="${num(a[1])}" r="${num(e.r*o.factor)}"/>`)}else if(e.type==='ellipse'){let a=px(e.c);svg.push(`<ellipse ${attr} cx="${num(a[0])}" cy="${num(a[1])}" rx="${num(e.rx*o.factor)}" ry="${num(e.ry*o.factor)}" transform="rotate(${num(-(e.rotation||0)*180/Math.PI)} ${num(a[0])} ${num(a[1])})"/>`)}else if(e.type==='arc'){let sweep=arcSweep(e.a0,e.a1),start=add(e.c,P(e.r*Math.cos(e.a0),e.r*Math.sin(e.a0))),end=add(e.c,P(e.r*Math.cos(e.a0+sweep),e.r*Math.sin(e.a0+sweep)));svg.push(`<path ${attr} d="M ${point(start)} A ${num(e.r*o.factor)} ${num(e.r*o.factor)} 0 ${sweep>Math.PI?1:0} 0 ${point(end)}"/>`)}else if(e.type==='text'){
  let a=px(e.p),rotate=Number(e.rotation)||0,fs=Math.max(.001,e.h*o.factor),width=(e.text||'').length*fs*.61;
  const cleanHighlight=/^#[0-9a-f]{6}$/i.test(e.highlightColor||'')?e.highlightColor:'#fff2a6';
  svg.push(`<g transform="translate(${num(a[0])} ${num(a[1])}) rotate(${-rotate})">`);
@@ -7263,13 +7338,33 @@ function initPermanentBlockGallery(){
 }
 
 function cadActiveBlockRef(){return state.entities.find(e=>state.selected.includes(e.id)&&e.type==='blockRef')||null}
+
+function cadExportRaster(kind){
+ const o=plotOptions(),svg=makeSVG(o),img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+ img.onload=()=>{const ratio=150/25.4,c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);const cx=c.getContext('2d');cx.fillStyle='white';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);
+  const mime='image/'+kind,ext=kind==='jpeg'?'jpg':kind;c.toBlob(b=>{if(b)download(`${state.file}.${ext}`,b,mime);else toast(ext.toUpperCase()+' not supported by this browser');URL.revokeObjectURL(url)},mime,.9)};
+ img.onerror=()=>toast('Image export failed');img.src=url;
+}
+// Planilla de cómputo simple: bloques por nombre y objetos/longitudes por capa (CSV con ; para Excel en español).
+function cadExportScheduleCsv(){
+ const q=v=>'"'+String(v).replace(/"/g,'""')+'"',rows=[['Type','Name','Layer','Count','Total length ('+state.unit+')']];
+ const blocks=new Map(),layers=new Map();
+ for(const e of state.entities){const lay=layerFor(e).name;
+  if(e.type==='blockRef'){const k=e.blockName+'|'+lay;blocks.set(k,(blocks.get(k)||0)+1)}
+  const L=e.type==='line'?dist(e.a,e.b):e.type==='polyline'?e.pts.slice(1).reduce((s,p,i)=>s+dist(e.pts[i],p),0)+(e.closed?dist(e.pts.at(-1),e.pts[0]):0):e.type==='circle'?TAU*e.r:0;
+  const r=layers.get(lay)||{n:0,len:0};r.n++;r.len+=L;layers.set(lay,r)}
+ for(const [k,n] of blocks){const [name,lay]=k.split('|');rows.push(['Block',name,lay,n,''])}
+ for(const [lay,r] of layers)rows.push(['Layer','',lay,r.n,r.len.toFixed(3).replace('.',',')]);
+ download(state.file+'-schedule.csv','﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n'),'text/csv');toast('Schedule exported · '+(rows.length-1)+' rows');
+}
 function cadExportActiveBlock(){
  const ref=cadActiveBlockRef();if(ref&&state.blocks[ref.blockName])$('blockLibrary').value=ref.blockName;
  if(!selectedBlock()){const keys=Object.keys(state.blocks||{});
   if(keys.length===1)$('blockLibrary').value=keys[0];
   else return toast(keys.length?'WBLOCK: seleccioná un bloque en el dibujo o Biblioteca':'WBLOCK: biblioteca vacía');
  }
- $('exportBlockBtn').click();
+ // WBLOCK / W exporta el bloque como .dxf (se abre en AutoCAD como dibujo).
+ $('exportBlockDxfBtn').click();
 }
 function initBlocks(){
  // Upgrade only legacy definitions that never specified dynamic2d.
@@ -7319,7 +7414,7 @@ function initBlocks(){
   const allLayers=[...layers];
   if(!allLayers.length)allLayers.push({...curLayer()});
   exportDXF(block.entities,block.name.replace(/[^a-z0-9_-]+/gi,'_'),allLayers);
-  toast('DXF exported as individual geometry (not native INSERT)');
+  toast('Block exported as DXF: '+block.name.replace(/[^a-z0-9_-]+/gi,'_')+'.dxf');
  };
  $('importBlockBtn').onclick=()=>$('blockFileInput').click();
  $('blockFileInput').onchange=async ev=>{
@@ -7665,6 +7760,13 @@ function initCadExportPopover(){
  option('Exportar .SVG','Vector abierto',()=>exportCadOpenSVG());
  option('Exportar .PDF','Impresión vectorial',()=>openPrint());
  option('Exportar .PNG','Imagen',()=>$('pngBtn').click());
+ option('Exportar .JPG','Imagen comprimida, fondo blanco',()=>cadExportRaster('jpeg'));
+ option('Exportar .WEBP','Imagen liviana para web',()=>cadExportRaster('webp'));
+ label('Datos');
+ option('Exportar planilla .CSV','Bloques, capas y cantidades (abre en Excel)',()=>cadExportScheduleCsv());
+ option('Exportar selección .DXF','Solo los objetos seleccionados',()=>{const sel=state.entities.filter(e=>state.selected.includes(e.id));if(!sel.length)return toast('Select objects first');exportDXF(sel,state.file+'-selection',state.layers)});
+ label('Importar');
+ option('Importar imagen, Excel, CSV o TXT','PNG · JPG · WEBP · GIF · BMP · XLSX · CSV · TXT · DXF · SVG',()=>$('fileInput').click());
  label('Formato DWG');
  const note=document.createElement('div');note.className='cad-export-note';note.textContent='DWG no se exporta directamente: no hay conversor DWG configurado. Usá DXF para abrir el plano en AutoCAD, LibreCAD, QCAD u otras aplicaciones compatibles y guardar como DWG desde un conversor externo que lo admita. DXF es el formato de intercambio editable recomendado.';p.append(note);
  btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-haspopup','dialog');
@@ -8065,25 +8167,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0500"></script>
-<script src="blackline-modern.js?v=20261120-0500"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0500"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0500"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0500"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0500"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0500"></script>
-<script src="cad-osnap-math.js?v=20261120-0500"></script>
-<script src="cad-scale-math.js?v=20261120-0500"></script>
-<script src="cad-object-tracking.js?v=20261120-0500"></script>
-<script src="cad-auto-opening.js?v=20261120-0500"></script>
-<script src="cad-wall-join.js?v=20261120-0500"></script>
-<script src="cad-wall-grip.js?v=20261120-0500"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0500"></script>
-<script src="cad-performance.js?v=20261120-0500"></script>
-<script src="cad-plan.js?v=20261120-0500"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0500"></script>
-<script src="cad-arq-pro.js?v=20261120-0500"></script>
-<script src="cad-autocad-plus.js?v=20261120-0500"></script>
-<script src="cad-touch.js?v=20261120-0500"></script><script src="cad-quickbar.js?v=20261120-0500"></script><script src="cad-buy-guide.js?v=20261120-0500"></script>
-<script src="cad-arq-tools.js?v=20261120-0500"></script><script src="cad-block-browser.js?v=20261120-0500"></script>
+<script src="workspace-upgrade.js?v=20261120-0530"></script>
+<script src="blackline-modern.js?v=20261120-0530"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0530"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0530"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0530"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0530"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0530"></script>
+<script src="cad-osnap-math.js?v=20261120-0530"></script>
+<script src="cad-scale-math.js?v=20261120-0530"></script>
+<script src="cad-object-tracking.js?v=20261120-0530"></script>
+<script src="cad-auto-opening.js?v=20261120-0530"></script>
+<script src="cad-wall-join.js?v=20261120-0530"></script>
+<script src="cad-wall-grip.js?v=20261120-0530"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0530"></script>
+<script src="cad-performance.js?v=20261120-0530"></script>
+<script src="cad-plan.js?v=20261120-0530"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0530"></script>
+<script src="cad-arq-pro.js?v=20261120-0530"></script>
+<script src="cad-autocad-plus.js?v=20261120-0530"></script>
+<script src="cad-touch.js?v=20261120-0530"></script><script src="cad-quickbar.js?v=20261120-0530"></script><script src="cad-buy-guide.js?v=20261120-0530"></script>
+<script src="cad-arq-tools.js?v=20261120-0530"></script><script src="cad-block-browser.js?v=20261120-0530"></script>
 </body></html>
