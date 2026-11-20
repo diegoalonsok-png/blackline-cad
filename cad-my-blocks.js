@@ -103,7 +103,7 @@ function dimStyleFromSelection(){
  const st=S(),d=st.entities.find(e=>st.selected.includes(e.id)&&e.type==='dimension');
  if(!d)return CORE.toast('Seleccioná una cota para crear un estilo con sus propiedades');
  const base=d.style||{};
- const style=CORE.dimStyles.validate({...base,color:base.color||d.color||''});
+ const style=CORE.dimStyles.validate({...base,color:base.color||d.color||st.layers.find(l=>l.id===d.layer)?.color||''});
  if(!style)return CORE.toast('Esta cota no tiene un estilo válido');
  const name=(window.prompt('Nombre del estilo de cota:',d.dimStyleName||'Cota '+(Object.keys(st.dimStyles||{}).length+1))||'').trim().slice(0,70);
  if(!name)return;

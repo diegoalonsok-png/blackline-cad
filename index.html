@@ -6650,7 +6650,7 @@ function importDXF(text,name,opts){
         let mode='aligned';if(dt===0){const r=((get(50,0)%180)+180)%180;mode=Math.abs(r)<1e-3||Math.abs(r-180)<1e-3?'horizontal':Math.abs(r-90)<1e-3?'vertical':'aligned'}
         let th=0,solid=false,txt='';for(const [t2,r2] of def.recs){if((t2==='TEXT'||t2==='MTEXT')&&!th){const f=fields(r2);th=f.get(40,0);txt=f.str(1,'')}if(t2==='SOLID')solid=true}
         const base=readDimensionStyle(),h=th>0?th:base.textHeight,dec=(cleanMText(txt).match(/[.,](\d+)/)||[,''])[1].length;
-        const style={...base,textHeight:h,arrow:h*.8,arrowType:solid?'arrow':'tick',precision:Math.min(4,dec),extOffset:h*.4,extBeyond:h*.5,color:''};
+        const style={...base,textHeight:h,arrow:h*.8,arrowType:solid?'arrow':'tick',precision:Math.min(4,dec),extOffset:h*.4,extBeyond:h*.5,color:common.color||layer.color||''};
         const ov=str(1,'');const dim={type:'dimension',a,b,p,mode,style,layer:lname,lineweight:common.width,id:entities.length+1};
         // Estilo de cota del archivo (DIMSTYLE, código 3) → modelo con nombre en la paleta, como en AutoCAD.
         const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
@@ -9114,6 +9114,7 @@ function initCadDimStylePalette(){
   '.bl-light #cadDimStylePalette .cad-ds-grid button{background:#fff;color:#22323c;border-color:#c3ced6}';
  document.head.append(css);
  const hp=$('cadHatchPalette'),gal=$('blacklineBlockGallery');if(hp&&hp.parentElement===aside)aside.insertBefore(sec,hp);else if(gal&&gal.parentElement===aside)aside.insertBefore(sec,gal);else aside.append(sec);
+ const dimLayerColor=()=>state.layers.find(l=>l.id==='dimensions'||/^(DIMENSIONS|COTAS)$/i.test(l.name))?.color||'#92c697';
  // Vista previa fiel del estilo: remate, color, tamaño relativo de texto y remate, prolongación y formato del número.
  const icon=(t,st)=>{st=st||{};const c=/^#[0-9a-f]{6}$/i.test(st.color||'')?st.color:'currentColor',th=+st.textHeight||.25,ar=+st.arrow||th*.8;
   const fs=Math.max(6,Math.min(13,9*Math.sqrt(th*U[state.unit]/1000/.25))),as=Math.max(3,Math.min(9,6*ar/Math.max(th,1e-9))),bey=Math.max(0,Math.min(10,4*((st.extBeyond??th*.5)/th)));
@@ -9141,8 +9142,8 @@ function initCadDimStylePalette(){
  const syncLib=()=>{const L=lib();state.dimStyles=state.dimStyles||{};for(const [n,st] of Object.entries(L))if(!state.dimStyles[n])state.dimStyles[n]=validateDimStyle(st)};
  const paint=()=>{
   syncLib();const saved=Object.keys(state.dimStyles||{}).sort();
-  $('cadDsGrid').innerHTML=PRESETS.map(([n,st])=>`<button type="button" data-p="${escapeHTML(n)}" class="${current===n?'on':''}">${icon(st.arrowType,{...st,textHeight:st.textHeight*1000/U[state.unit],arrow:st.arrow*1000/U[state.unit],extBeyond:st.extBeyond*1000/U[state.unit]})}<span>${escapeHTML(n)}</span></button>`).join('')+
-   saved.map(n=>`<button type="button" data-s="${escapeHTML(n)}" class="${current===n?'on':''}" title="Clic: usar · clic derecho: borrar">${icon(state.dimStyles[n].arrowType||'arrow',state.dimStyles[n])}<span>★ ${escapeHTML(n)}</span></button>`).join('')+
+  $('cadDsGrid').innerHTML=PRESETS.map(([n,st])=>`<button type="button" data-p="${escapeHTML(n)}" class="${current===n?'on':''}">${icon(st.arrowType,{...st,color:st.color||dimLayerColor(),textHeight:st.textHeight*1000/U[state.unit],arrow:st.arrow*1000/U[state.unit],extBeyond:st.extBeyond*1000/U[state.unit]})}<span>${escapeHTML(n)}</span></button>`).join('')+
+   saved.map(n=>`<button type="button" data-s="${escapeHTML(n)}" class="${current===n?'on':''}" title="Clic: usar · clic derecho: borrar">${icon(state.dimStyles[n].arrowType||'arrow',{...state.dimStyles[n],color:state.dimStyles[n].color||dimLayerColor()})}<span>★ ${escapeHTML(n)}</span></button>`).join('')+
    '<button type="button" data-add="1" title="Guarda el estilo actual (o el de la cota seleccionada) como modelo para todos tus dibujos" style="border-style:dashed;justify-content:center"><span style="font-size:20px;line-height:24px">＋</span><span>Guardar modelo</span></button>';
  };
  $('cadDsGrid').addEventListener('click',e=>{
@@ -9164,7 +9165,7 @@ function initCadDimStylePalette(){
  $('cadDsDraw').onclick=()=>{push();setTool('dimension')};
  const saveModel=()=>{
   const selDim=state.entities.find(x=>state.selected.includes(x.id)&&x.type==='dimension');
-  const st=validateDimStyle(selDim?.style?{...fromForm(),...selDim.style}:fromForm());
+  const st=validateDimStyle(selDim?.style?{...fromForm(),...selDim.style,color:selDim.style.color||selDim.color||layerFor(selDim)?.color||''}:fromForm());
   const name=window.prompt('Nombre del modelo de cota'+(selDim?' (tomado de la cota seleccionada)':'')+':',current&&!state.dimStyles[current]?current+' (mío)':'MI COTA');if(!name?.trim())return;const key=name.trim().slice(0,70);
   saveHistory();state.dimStyles[key]=st;const L=lib();L[key]=st;libSet(L);state.activeDimStyle=key;current=key;writeForm(st);push();renderDimStyles();queueLocalBackup();paint();toast('Modelo de cota guardado: '+key+' · disponible en todos tus dibujos')};
  $('cadDsSave').onclick=saveModel;
@@ -9597,7 +9598,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
 <script src="cad-performance.js?v=20261120-1850"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script><script src="cad-my-blocks.js?v=20261120-1930"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="cad-arq-pro.js?v=20261120-1925"></script>
 <script src="cad-autocad-plus.js?v=20261120-1850"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261120-1850"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
