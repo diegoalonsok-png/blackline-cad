@@ -11,7 +11,8 @@
   steel:'Acero · diagonal densa',concrete:'Hormigón · triple trazo',masonry:'Mampostería · ortogonal',
   ansi31:'ANSI31 · 45° simplificado',ansi32:'ANSI32 · cruzado simplificado',
   ansi33:'ANSI33 · doble 45° simplificado',ansi34:'ANSI34 · doble ortogonal simplificado',
-  earth:'Tierra · trama esquemática',sand:'Arena · trama esquemática'
+  earth:'Tierra · trama esquemática',sand:'Arena · trama esquemática',
+  ansi35:'ANSI35 · 45° con trazo fino',ansi36:'ANSI36 · 45° espaciado',ansi37:'ANSI37 · cruzado denso',ansi38:'ANSI38 · cruzado con horizontal',honey:'HONEY · panal 0/60/120°',net3:'NET3 · red triangular'
  });
  function passes(kind,spacing,angle){
   if(!Number.isFinite(spacing)||spacing<=0||!Number.isFinite(angle))return null;
@@ -33,6 +34,12 @@
    case 'ansi34':return [one(0),one(90),one(45,3)];
    case 'earth':return [one(30,2),one(150,2)];
    case 'sand':return [one(0,4),one(90,4)];
+   case 'ansi35':return [one(45),one(45,.33)];
+   case 'ansi36':return [one(45,1.6)];
+   case 'ansi37':return [one(45,.6),one(135,.6)];
+   case 'ansi38':return [one(45),one(135),one(0,2)];
+   case 'honey':return [one(0,1.5),one(60,1.5),one(120,1.5)];
+   case 'net3':return [one(0),one(60),one(120)];
    default:return null;
   }
  }
