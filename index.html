@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0615">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0615">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0630">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0630">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0615"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0615"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0630"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0630"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-0615"></script>
-<script src="cad-grip-settings.js?v=20261120-0615"></script>
-<script src="cad-cursor-mode.js?v=20261120-0615"></script>
+<script src="cad2d-config.js?v=20261120-0630"></script>
+<script src="cad-grip-settings.js?v=20261120-0630"></script>
+<script src="cad-cursor-mode.js?v=20261120-0630"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -1182,6 +1182,13 @@ function log(s){state.logs.push(s);state.logs=state.logs.slice(-8);$('log').inne
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
 function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}function layerFor(e){return state.layers.find(l=>l.id===e.layer)||state.layers[0]}
+// Capa de cotas: usa DIMENSIONS/COTAS si existe; si el dibujo (p. ej. un DXF importado) no la tiene, la crea.
+function cadDimLayerId(){
+ let l=state.layers.find(x=>x.id==='dimensions')||state.layers.find(x=>/^(DIMENSIONS?|COTAS?|A-ANNO-DIMS|DIM)$/i.test(x.name));
+ if(!l){l={id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false,width:.18};state.layers.push(l);try{renderLayers()}catch(e){}}
+ if(l.visible===false||l.locked){l.visible=true;l.locked=false;try{renderLayers()}catch(e){};toast('Layer '+l.name+' was hidden or locked: turned on for the new dimension')}
+ return l.id;
+}
 function ensureArchitecturalLayer(kind){const id=kind==='walls'?'walls':'openings',name=kind==='walls'?'WALLS':'OPENINGS';const existing=state.layers.find(l=>l.id===id||l.name.toUpperCase()===name);if(existing)return existing.id;state.layers.push({id,name,color:kind==='walls'?'#ff3333':'#e0ba83',visible:true,locked:false,width:kind==='walls'?.30:.05,linetype:'CONTINUOUS'});return id}
 function explicitWallLayerName(name){return /^(WALLS?|MUROS?|A[-_ ]?WALL|A[-_ ]?MURO|PAREDES?|MAMPOSTERIA|MAMPOSTERÍA)$/i.test(String(name||'').trim())}
 function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallLayerName(l.name)){l.color='#ff3333';l.width=.30}}}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
@@ -2837,7 +2844,7 @@ function previewEntity(){const s=state.stage,t=state.tool,m=state.mouse,cl=curLa
   const faces=cadWallFaces(s.at(-1),m,cadWallThickness(),cadWallJustify());
   if(faces){ctx.save();ctx.setLineDash([6,4]);for(const edge of faces)drawEntity({type:'line',...edge,layer:'walls'},'#ffcf70');ctx.restore()}
  }
- let e=null;if(t==='line'&&s.length){e={type:'line',a:s.at(-1),b:m,layer:cl.id}}else if(t==='polyline'){let pts=[...s,m];e={type:'polyline',pts,layer:cl.id};}else if(t==='area'&&s.length){e={type:'polyline',pts:[...s,m],closed:s.length>=2,layer:cl.id}}else if(t==='polygon'&&s.length===1){const pts=regularPolygon(s[0],m,Number($('polygonSides').value));if(pts)e={type:'polyline',pts,closed:true,layer:cl.id}}else if(t==='rect'&&s.length===1)e={type:'rect',a:s[0],b:m,layer:cl.id};else if(t==='circle'&&s.length===1)e={type:'circle',c:s[0],r:dist(s[0],m),layer:cl.id};else if(t==='arc'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e=cad2dArcCenter?{type:'arc',c:s[0],r:dist(s[0],s[1]),a0:ang(s[0],s[1]),a1:ang(s[0],m),layer:cl.id}:cad2dArc3(s[0],s[1],m,cl.id)}else if(t==='ellipse'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'ellipse',c:s[0],rx:Math.abs(s[1].x-s[0].x)||dist(s[0],s[1]),ry:Math.abs(m.y-s[0].y),layer:cl.id}}else if(t==='dimension'&&s.length===2)e={type:'dimension',a:s[0],b:s[1],p:m,mode:$('dimMode').value,style:readDimensionStyle(),dimStyleName:state.activeDimStyle||'',layer:'dimensions'};else if(t==='dimension'&&s.length===1&&['ordinateX','ordinateY','leader'].includes($('dimMode').value))e={type:'dimension',a:s[0],b:m,p:m,mode:$('dimMode').value,label:$('dimLeaderText').value,style:readDimensionStyle(),layer:'dimensions'};else if(t==='distance'&&s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};else if(t==='insertBlock'&&selectedBlock()){const factor=Number($('blockScale').value)||1,angle=Number($('blockRotation').value)||0;ctx.save();ctx.setLineDash([4,4]);for(const part of blockInsertionEntities(selectedBlock(),m,factor,angle))drawEntity(part,'#c7d0e5');ctx.restore()}if(e){ctx.save();ctx.setLineDash([5,4]);drawEntity(e,'#edcc7c');ctx.restore()}for(const p of s){let q=screen(p);ctx.fillStyle='#f1cb85';ctx.fillRect(q.x-3,q.y-3,6,6)}}
+ let e=null;if(t==='line'&&s.length){e={type:'line',a:s.at(-1),b:m,layer:cl.id}}else if(t==='polyline'){let pts=[...s,m];e={type:'polyline',pts,layer:cl.id};}else if(t==='area'&&s.length){e={type:'polyline',pts:[...s,m],closed:s.length>=2,layer:cl.id}}else if(t==='polygon'&&s.length===1){const pts=regularPolygon(s[0],m,Number($('polygonSides').value));if(pts)e={type:'polyline',pts,closed:true,layer:cl.id}}else if(t==='rect'&&s.length===1)e={type:'rect',a:s[0],b:m,layer:cl.id};else if(t==='circle'&&s.length===1)e={type:'circle',c:s[0],r:dist(s[0],m),layer:cl.id};else if(t==='arc'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e=cad2dArcCenter?{type:'arc',c:s[0],r:dist(s[0],s[1]),a0:ang(s[0],s[1]),a1:ang(s[0],m),layer:cl.id}:cad2dArc3(s[0],s[1],m,cl.id)}else if(t==='ellipse'){if(s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};if(s.length===2)e={type:'ellipse',c:s[0],rx:Math.abs(s[1].x-s[0].x)||dist(s[0],s[1]),ry:Math.abs(m.y-s[0].y),layer:cl.id}}else if(t==='dimension'&&s.length===2)e={type:'dimension',a:s[0],b:s[1],p:m,mode:$('dimMode').value,style:readDimensionStyle(),dimStyleName:state.activeDimStyle||'',layer:cadDimLayerId()};else if(t==='dimension'&&s.length===1&&['ordinateX','ordinateY','leader'].includes($('dimMode').value))e={type:'dimension',a:s[0],b:m,p:m,mode:$('dimMode').value,label:$('dimLeaderText').value,style:readDimensionStyle(),layer:cadDimLayerId()};else if(t==='distance'&&s.length===1)e={type:'line',a:s[0],b:m,layer:cl.id};else if(t==='insertBlock'&&selectedBlock()){const factor=Number($('blockScale').value)||1,angle=Number($('blockRotation').value)||0;ctx.save();ctx.setLineDash([4,4]);for(const part of blockInsertionEntities(selectedBlock(),m,factor,angle))drawEntity(part,'#c7d0e5');ctx.restore()}if(e){ctx.save();ctx.setLineDash([5,4]);drawEntity(e,'#edcc7c');ctx.restore()}for(const p of s){let q=screen(p);ctx.fillStyle='#f1cb85';ctx.fillRect(q.x-3,q.y-3,6,6)}}
 function drawInteractiveScalePreview(){
  if(state.tool!=='scale'||!state.stage.length||!state.selected.length||!window.BlacklineScaleMath)return;
  const origin=state.stage[0],factor=BlacklineScaleMath.mouseFactor(origin,state.mouse,state.scaleReference);
@@ -3047,9 +3054,9 @@ if(t==='polyline'){
  const mode=$('dimMode').value;
  s.push(P(p.x,p.y));
  if(['ordinateX','ordinateY','leader'].includes(mode)&&s.length===2){
-  done({type:'dimension',a:s[0],b:s[1],p:s[1],mode,style:readDimensionStyle(),dimStyleName:state.activeDimStyle||'',label:$('dimLeaderText').value.slice(0,120),layer:'dimensions'});s.length=0;
+  done({type:'dimension',a:s[0],b:s[1],p:s[1],mode,style:readDimensionStyle(),dimStyleName:state.activeDimStyle||'',label:$('dimLeaderText').value.slice(0,120),layer:cadDimLayerId()});s.length=0;
  }else if(s.length===3){
-  done({type:'dimension',a:s[0],b:s[1],p:s[2],mode,style:readDimensionStyle(),layer:'dimensions'});s.length=0;
+  done({type:'dimension',a:s[0],b:s[1],p:s[2],mode,style:readDimensionStyle(),layer:cadDimLayerId()});s.length=0;
  }
  prompt();schedule();return
 }if(t==='distance'){s.push(p);if(s.length===2){let d=dist(s[0],s[1]);log(`Distance: ${units(d)} ${state.unit}; Angle: ${(ang(s[0],s[1])*180/Math.PI).toFixed(2)}°`);toast(`Distance ${units(d)} ${state.unit}`);s.length=0}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
@@ -4364,7 +4371,7 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
   if(!target||target.type!=='circle'){state.modifyCandidate=null;return toast('Circle no longer exists')}
   const dir=sub(p,target.c),length=Math.hypot(dir.x,dir.y)||1;
   const b=add(target.c,mul(dir,target.r/length));
-  saveHistory();newEntity({type:'dimension',a:clone(target.c),b,p:clone(p),mode:$('dimMode').value,style:readDimensionStyle(),layer:'dimensions'});
+  saveHistory();newEntity({type:'dimension',a:clone(target.c),b,p:clone(p),mode:$('dimMode').value,style:readDimensionStyle(),layer:cadDimLayerId()});
   state.modifyCandidate=null;prompt();return
  }
  if(t==='insertBlock'){insertSelectedBlock(p);return}createAt(p)}
@@ -7835,7 +7842,8 @@ function initCadDimStylePalette(){
  const push=()=>{ // formulario → estilo vigente (lo usan las cotas nuevas)
   $('dimTextHeight').value=$('cadDsText').value;$('dimArrowSize').value=$('cadDsSize').value;$('dimPrecision').value=$('cadDsPrec').value;$('dimDisplayUnits').value=$('cadDsUnit').value;
   cadDimExtra={arrowType:$('cadDsArrow').value,color:$('cadDsColorOn').checked?$('cadDsColor').value:'',extOffset:Math.max(0,Number($('cadDsGap').value)||0),extBeyond:Math.max(0,Number($('cadDsBeyond').value)||0)};
-  $('cadDsInfo').textContent='Las cotas nuevas usan este estilo'+(state.activeDimStyle?' ('+state.activeDimStyle+')':'')+'. Valores en '+state.unit+'.';
+  const es=(()=>{try{return /^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){return false}})();
+  $('cadDsInfo').textContent=es?'Las cotas nuevas usan este estilo'+(state.activeDimStyle?' ('+state.activeDimStyle+')':'')+'. Valores en '+state.unit+'.':'New dimensions use this style'+(state.activeDimStyle?' ('+state.activeDimStyle+')':'')+'. Values in '+state.unit+'.';
  };
  let current='';
  const paint=()=>{
@@ -8252,25 +8260,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0615"></script>
-<script src="blackline-modern.js?v=20261120-0615"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0615"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0615"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0615"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0615"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0615"></script>
-<script src="cad-osnap-math.js?v=20261120-0615"></script>
-<script src="cad-scale-math.js?v=20261120-0615"></script>
-<script src="cad-object-tracking.js?v=20261120-0615"></script>
-<script src="cad-auto-opening.js?v=20261120-0615"></script>
-<script src="cad-wall-join.js?v=20261120-0615"></script>
-<script src="cad-wall-grip.js?v=20261120-0615"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0615"></script>
-<script src="cad-performance.js?v=20261120-0615"></script>
-<script src="cad-plan.js?v=20261120-0615"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0615"></script>
-<script src="cad-arq-pro.js?v=20261120-0615"></script>
-<script src="cad-autocad-plus.js?v=20261120-0615"></script>
-<script src="cad-touch.js?v=20261120-0615"></script><script src="cad-quickbar.js?v=20261120-0615"></script><script src="cad-buy-guide.js?v=20261120-0615"></script>
-<script src="cad-arq-tools.js?v=20261120-0615"></script><script src="cad-block-browser.js?v=20261120-0615"></script>
+<script src="workspace-upgrade.js?v=20261120-0630"></script>
+<script src="blackline-modern.js?v=20261120-0630"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0630"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0630"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0630"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0630"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0630"></script>
+<script src="cad-osnap-math.js?v=20261120-0630"></script>
+<script src="cad-scale-math.js?v=20261120-0630"></script>
+<script src="cad-object-tracking.js?v=20261120-0630"></script>
+<script src="cad-auto-opening.js?v=20261120-0630"></script>
+<script src="cad-wall-join.js?v=20261120-0630"></script>
+<script src="cad-wall-grip.js?v=20261120-0630"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0630"></script>
+<script src="cad-performance.js?v=20261120-0630"></script>
+<script src="cad-plan.js?v=20261120-0630"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0630"></script>
+<script src="cad-arq-pro.js?v=20261120-0630"></script>
+<script src="cad-autocad-plus.js?v=20261120-0630"></script>
+<script src="cad-touch.js?v=20261120-0630"></script><script src="cad-quickbar.js?v=20261120-0630"></script><script src="cad-buy-guide.js?v=20261120-0630"></script>
+<script src="cad-arq-tools.js?v=20261120-0630"></script><script src="cad-block-browser.js?v=20261120-0630"></script>
 </body></html>
