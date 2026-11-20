@@ -1383,6 +1383,8 @@ function cadRectWallCandidate(e,point,openingWidth){
  if(!horizontal&&!vertical)return null;
  const length=horizontal?dx:dy,thickness=horizontal?dy:dx;
  if(length<=openingWidth+1e-7)return null;
+ // Un rectángulo de más de 80 cm de espesor es un local, no un muro.
+ if(thickness>.8*1000/U[state.unit])return null;
  const t=horizontal?point.x-minX:point.y-minY;
  const normal=horizontal?point.y-(minY+maxY)/2:point.x-(minX+maxX)/2;
  const tolerance=Math.max(.06*1000/U[state.unit],8/Math.max(state.view.scale,.01));
@@ -6441,6 +6443,24 @@ function autoCutWallForOpening(ref,block){
  if(!['swing-door','double-door','framed-window'].includes(block.parametric.kind))return 0;
  const width=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
  if(ref.autoOpeningRectId)return cadCutRectWallForOpening(ref,width);
+ // Caras de muro dibujadas como rectángulo o polilínea (p. ej. con OFFSET o RECTANG): el lado que
+ // atraviesa el vano se separa en líneas para poder recortarlo y dejar el hueco libre.
+ if(!ref.autoOpeningPairIds){
+  const th=ref.rotation*Math.PI/180,ux=Math.cos(th),uy=Math.sin(th),reach=.62*ref.scale;
+  const spans=(a,b)=>{const v=sub(b,a),L=Math.hypot(v.x,v.y);if(L<width)return false;if(Math.abs((v.x*uy-v.y*ux)/L)>1e-3)return false;
+   const off=Math.abs((ref.p.x-a.x)*-v.y/L+(ref.p.y-a.y)*v.x/L);if(off>reach)return false;
+   const t0=((ref.p.x-a.x)*v.x+(ref.p.y-a.y)*v.y)/L,t1=t0+width*((ux*v.x+uy*v.y)/L);return Math.min(t0,t1)>-1e-6&&Math.max(t0,t1)<L+1e-6};
+  for(const e of [...state.entities]){
+   if(e.type!=='polyline'&&e.type!=='rect')continue;const l=layerFor(e);
+   if(!l.visible||l.locked||!(explicitWallLayerName(l.id)||explicitWallLayerName(l.name)))continue;
+   const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;
+   const closed=e.type==='rect'||e.closed,segs=[];for(let i=0;i<pts.length-(closed?0:1);i++)segs.push([pts[i],pts[(i+1)%pts.length]]);
+   if(!segs.some(([a,b])=>spans(a,b)))continue;
+   const base={layer:e.layer,color:e.color,width:e.width,linetype:e.linetype};
+   const lines=segs.filter(([a,b])=>dist(a,b)>1e-9).map(([a,b])=>({...clone(base),id:state.nextId++,type:'line',a:P(a.x,a.y),b:P(b.x,b.y)}));
+   state.entities.splice(state.entities.indexOf(e),1,...lines);
+  }
+ }
  const wallLines=state.entities.filter(e=>{
   if(e.type!=='line'||!e.id||e.autoOpeningRef!==undefined)return false;
   const l=layerFor(e);
@@ -6452,6 +6472,22 @@ function autoCutWallForOpening(ref,block){
   ?Math.max(ref.wallThickness/2+(.03*1000/U[state.unit]),.22*ref.scale)
   :Math.min(.30*ref.scale,Math.max(.22*ref.scale,width*.18));
  const planned=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,maxOffset);
+ // La abertura deja el hueco libre en AMBAS caras del muro: si solo se cortó una cara
+ // (la puerta quedó apoyada sobre el filo exterior), se busca su cara compañera.
+ if(!ref.autoOpeningPairIds){
+  const wide=BlacklineAutoOpening.plan(wallLines,ref.p,width,ref.rotation,Math.max(maxOffset,.62*ref.scale));
+  const lineOf=id=>wallLines.find(x=>x.id===id);
+  for(const e of [...planned]){
+   const w=lineOf(e.id);if(!w)continue;
+   if(w.wall2d){for(const x of wide){const o=lineOf(x.id);if(o?.wall2d?.group===w.wall2d.group&&!planned.some(q=>q.id===x.id))planned.push(x)}}
+   else if(planned.filter(q=>!lineOf(q.id)?.wall2d).length===1){
+    const d=(l,p)=>{const v=sub(l.b,l.a),L=Math.hypot(v.x,v.y)||1;return ((p.x-l.a.x)*-v.y+(p.y-l.a.y)*v.x)/L};
+    const near=wide.map(x=>({x,o:lineOf(x.id)})).filter(({x,o})=>o&&!o.wall2d&&x.id!==w.id&&Math.abs(d(w,o.a))<=.62*ref.scale&&Math.abs(d(w,o.b)-d(w,o.a))<1e-6*Math.max(1,ref.scale)+1e-9)
+     .sort((A,B)=>Math.abs(d(w,A.o.a))-Math.abs(d(w,B.o.a)))[0];
+    if(near){planned.push(near.x);ref.autoOpeningPlainPair=[w.id,near.x.id]}
+   }
+  }
+ }
  const edits=ref.autoOpeningPairIds?planned.filter(e=>ref.autoOpeningPairIds.includes(e.id)):planned;
  if(ref.autoOpeningPairIds&&edits.length!==2)return 0;
  if(ref.wallThickness&&!ref.autoOpeningPairIds){
@@ -6466,6 +6502,7 @@ function autoCutWallForOpening(ref,block){
   edits.length=0;edits.push(...eligible);
  }
  if(!edits.length)return 0;
+ {const plain=edits.filter(e=>!wallLines.find(x=>x.id===e.id)?.wall2d);if(!ref.autoOpeningPairIds&&plain.length===2)ref.autoOpeningPlainPair=plain.map(e=>e.id)}
  const removed=new Set(edits.map(e=>e.id)),generated=[];
  for(const edit of edits){
   const wall=state.entities.find(e=>e.id===edit.id);
@@ -6484,7 +6521,7 @@ function autoCutWallForOpening(ref,block){
  const byGroup=new Map();
  for(const edit of edits){
   const wall=wallLines.find(e=>e.id===edit.id);
-  const group=wall?.wall2d?.group||(ref.autoOpeningPairIds?.includes(edit.id)?'paired-'+ref.id:null);
+  const group=wall?.wall2d?.group||(ref.autoOpeningPairIds?.includes(edit.id)||ref.autoOpeningPlainPair?.includes(edit.id)?'paired-'+ref.id:null);
   if(!group)continue;
   if(!byGroup.has(group))byGroup.set(group,[]);
   byGroup.get(group).push(edit);
