@@ -36,7 +36,7 @@ This is a functional **prototype**, not a replacement for a production CAD kerne
 
 ## Deployment
 
-Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted GitHub Pages frontend currently runs CAD drawing and ASCII DXF/SVG import locally, without a live conversion backend. The optional DWG service is **not deployed**; if later enabled, DWG uploads will leave the browser only after an explicit user confirmation. See `backend/README.md`. Stripe and login can be integrated subsequently with a trusted server / verified webhook; never add Stripe secret keys to the frontend.
+Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted GitHub Pages frontend currently runs CAD drawing and ASCII DXF/SVG import locally, without a live conversion backend. The production-domain configuration enables an HTTPS DWG-to-DXF conversion endpoint with explicit user confirmation; verify live service availability separately. GitHub Pages without that configuration works with DXF/SVG directly. See `backend/README.md`. Stripe and login can be integrated subsequently with a trusted server / verified webhook; never add Stripe secret keys to the frontend.
 
 ## Intellectual property
 
@@ -54,9 +54,9 @@ CAD2D model space retains imported DXF coordinates as-is in declared drawing uni
 
 DXF files with missing/unsupported `$INSUNITS` require explicit user unit selection. Units are *assigned without multiplying the stored coordinates*. Ensure the original DWG/DXF was authored in those units before continuing.
 
-## DWG import plan
+## DWG import and DXF conversion
 
-The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, but binary geometry cannot be decoded by the static frontend. `backend/dwg_service.py` provides an **optional, not-yet-deployed** FastAPI adapter to a separately installed ODA File Converter. The website's `DWG_CONVERTER_ENDPOINT` variable stays blank until the converter has been licensed, secured, deployed and tested. Even when operational, the current DXF import path cannot guarantee the preservation of advanced blocks, layouts, xrefs, hatches or proxy objects. Direct DWG open is therefore **not working yet**. Test on representative files before launching commercially.
+CAD2D accepts `.dwg` files through its Open/Import workflow. On the official domain, `cad2d-config.js` configures an HTTPS converter endpoint; after consent, the app sends the DWG to the service, imports its DXF response, and saves/exports as DXF. The browser itself does not natively decode or write binary DWG. Converter availability is deployment-dependent and was not live-tested in this documentation update. Advanced blocks, layouts, xrefs, hatches and proxy objects may not be preserved; test representative files and 1:1 units.
 
 ## Desktop-CAD interaction improvements (November 2026)
 
@@ -99,7 +99,7 @@ The user's AC1032 (AutoCAD 2018-compatible) test drawing is recognized as DWG, b
 
 The floating **Text / Typography** palette offers browser-installed fonts (Arial, Helvetica, Georgia, Times New Roman, Courier New, monospace), text height in model units, rotation in degrees, bold and italic display. Click **Place text**, then the insertion point; or select existing text, adjust settings and **Apply to selected**. Double-click a text entity in Select mode to load its attributes in the typography editor. The project JSON retains these settings. SVG export carries font-family, weight, style and rotation. DXF export writes TEXT rotation and a simplified STYLE table for sans, serif and monospaced fonts; **not every CAD application will map fonts identically**. The custom vector PDF writer currently substitutes standard Helvetica/Times/Courier fonts; italic, Unicode and exact matching to installed desktop fonts are **not guaranteed**.
 
-The **File formats** palette indicates operational formats. DWG automatic upload/conversion is deliberately OFF until a licensed and secure converter endpoint is deployed and validated. Selecting a DWG reports this limitation; it does not imply the file was successfully loaded.
+The **File formats** palette indicates operational formats. DWG upload/conversion is enabled by production-domain configuration, conditional on availability of the configured HTTPS conversion service and consent. A recognized DWG header alone does not establish a successful import; verify the converted DXF geometry in the editor.
 
 ## Scaling to hundreds or thousands of simultaneous users
 
@@ -109,7 +109,7 @@ The November 2026 rendering pass adds viewport culling, geometric bounding-box p
 
 - Profile and stress-test 1k, 10k, 50k and 100k entities on representative Windows, macOS and mobile devices; instrument p50/p95 interaction latency and memory.
 - Move expensive DWG/DXF parsing, block resolution and file conversion off the main UI thread using Web Workers and, where possible, free/open-source WebAssembly. Ship the decoder as versioned CDN assets with no per-user CAD conversion server if legally and technically practical.
-- Confirm LibreDWG/WebAssembly version support, licence obligations, security and the entire file round-trip on original DWG samples before enabling. The current DWG service is NOT deployed and the frontend STILL cannot open DWG directly.
+- Confirm converter service uptime, LibreDWG licensing, security, supported DWG versions, and the full DWG-to-DXF import round-trip on actual samples. The frontend does not parse binary DWG directly; it imports DXF returned by the configured service.
 - Lazy load heavyweight format decoders; cap file sizes and entity counts; allow users to cancel long imports. The browser-only design must not freeze on malformed or huge drawings.
 - Use an object spatial index (R-tree/quadtree), cached tessellation and layer-based dirty regions for large projects; avoid redrawing all geometry for each pointer movement.
 - Add browser-based regression tests for import/export of original DWG/DXF, text, blocks, dimensions, xrefs, lineweights and **1:1 model units**. Show explicit warnings when fidelity is incomplete; do not silently discard unsupported entities.
@@ -345,4 +345,4 @@ Blackline CAD es una aplicación independiente; no está afiliada, patrocinada n
 
 **Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia del prototipo no equivale a certificación legal completa.
 
-**Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG es diagnóstica y no importa geometría: no habilitar importación/conversión DWG sin verificar licencias, condiciones de distribución y fidelidad técnica de una solución autorizada. No publicar la función como disponible hasta entonces.
+**Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG por sí sola es diagnóstica y no importa geometría. La configuración del dominio principal activa un conversor HTTPS que transforma DWG a DXF tras consentimiento del usuario; la importación efectiva depende de que el servicio responda correctamente. Comprobar licencias, condiciones de distribución, entidades admitidas y fidelidad técnica antes de garantizar compatibilidad.
