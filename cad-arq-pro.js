@@ -173,6 +173,7 @@ function chips(container,onPick){
   b.onclick=()=>{activeCat=cat;onPick()};container.append(b);
  }
 }
+window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
 function renderPanel(){
  const grid=$('arqPanelGrid');if(!grid)return;
  const sel=$('arqPanelCat');
