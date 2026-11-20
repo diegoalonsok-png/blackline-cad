@@ -35,7 +35,7 @@ test('borrar o fusionar capas protege la capa 0 y pide confirmación',()=>{
 });
 test('el cobro usa métodos de pago dinámicos (PayPal desde el Dashboard) y nunca claves en el cliente',()=>{
  const w=fs.readFileSync(path.join(__dirname,'..','billing','worker.js'),'utf8');
- assert.doesNotMatch(w,/payment_method_types/);assert.match(w,/locale:'es'/);
+ assert.doesNotMatch(w,/payment_method_types/);assert.match(w,/locale:'auto'/);
  for(const f of ['cad-plan.js','cad-arq-pro.js','cad-autocad-plus.js','index.html'])assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'..',f),'utf8'),/sk_(live|test)_[A-Za-z0-9]/);
 });
 test('unión en T: la cara del muro anfitrión se interrumpe entre las caras del tabique',()=>{

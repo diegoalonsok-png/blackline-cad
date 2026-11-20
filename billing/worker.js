@@ -81,20 +81,22 @@ async function planFor(env,userId){
  return {plan:user.trial_ends_at>now()?'trial':'free',email:user.email,trialEndsAt};
 }
 
-const loginPage=env=>`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CAD2D · Acceso</title>
+// Idioma de la persona (encabezado Accept-Language): español si lo pide, si no inglés.
+const isEs=req=>/^es\b/i.test(String(req.headers.get('accept-language')||'').trim());
+const loginPage=(env,es)=>`<!doctype html><html lang="${es?'es':'en'}"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CAD2D · ${es?'Acceso':'Sign in'}</title>
 <body style="font-family:system-ui;background:#111821;color:#e5eef7;display:grid;place-items:center;min-height:100vh;margin:0">
 <form id="f" style="background:#18222c;padding:24px;border-radius:12px;border:1px solid #3c5262;width:min(360px,90vw)">
-<h2 style="margin-top:0">CAD2D</h2><p>Te enviamos un enlace de acceso a tu correo. Sin contraseñas.</p>
-<input name="email" type="email" required placeholder="tu@correo.com" style="width:100%;padding:10px;box-sizing:border-box">
-<button style="margin-top:10px;width:100%;padding:10px">Enviar enlace</button><p id="m"></p></form>
-<script>f.onsubmit=async e=>{e.preventDefault();const r=await fetch('/auth/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:f.email.value})});m.textContent=r.ok?'Revisá tu correo.':'No se pudo enviar.'}</script>`;
+<h2 style="margin-top:0">CAD2D</h2><p>${es?'Te enviamos un enlace de acceso a tu correo. Sin contraseñas.':'We will email you a sign-in link. No passwords.'}</p>
+<input name="email" type="email" required placeholder="${es?'tu@correo.com':'you@email.com'}" style="width:100%;padding:10px;box-sizing:border-box">
+<button style="margin-top:10px;width:100%;padding:10px">${es?'Enviar enlace':'Send link'}</button><p id="m"></p></form>
+<script>f.onsubmit=async e=>{e.preventDefault();const r=await fetch('/auth/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:f.email.value})});m.textContent=r.ok?${es?"'Revisá tu correo.'":"'Check your inbox.'"}:${es?"'No se pudo enviar.'":"'Could not send the email.'"}}</script>`;
 
 export default {
  async fetch(req,env){
   const url=new URL(req.url),path=url.pathname;
   if(req.method==='OPTIONS')return cors(env,req,new Response(null,{status:204}));
   try{
-   if(path==='/auth/login'&&req.method==='GET')return new Response(loginPage(env),{headers:{'content-type':'text/html; charset=utf-8'}});
+   if(path==='/auth/login'&&req.method==='GET')return new Response(loginPage(env,isEs(req)),{headers:{'content-type':'text/html; charset=utf-8'}});
    if(path==='/auth/request'&&req.method==='POST'){
     const {email}=await req.json().catch(()=>({}));
     const mail=String(email||'').trim().toLowerCase();
@@ -103,7 +105,7 @@ export default {
     await env.DB.prepare('INSERT INTO login_tokens(token_hash,email,expires_at) VALUES(?,?,?)').bind(await sha256(token),mail,now()+900).run();
     const link=`${env.API_ORIGIN}/auth/verify?token=${token}`;
     await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},
-     body:JSON.stringify({from:env.MAIL_FROM,to:mail,subject:'Tu acceso a CAD2D',html:`<p>Ingresá a CAD2D con este enlace (vence en 15 minutos):</p><p><a href="${link}">${link}</a></p>`})});
+     body:JSON.stringify({from:env.MAIL_FROM,to:mail,...(isEs(req)?{subject:'Tu acceso a CAD2D',html:`<p>Ingresá a CAD2D con este enlace (vence en 15 minutos):</p><p><a href="${link}">${link}</a></p>`}:{subject:'Your CAD2D sign-in link',html:`<p>Sign in to CAD2D with this link (it expires in 15 minutes):</p><p><a href="${link}">${link}</a></p>`})})});
     return json({ok:true}); // misma respuesta exista o no la cuenta
    }
    if(path==='/auth/verify'&&req.method==='GET'){
@@ -153,7 +155,7 @@ export default {
     // Métodos de pago dinámicos: tarjeta, PayPal, SEPA, Apple/Google Pay… se activan desde el Dashboard
     // (Configuración → Métodos de pago) sin tocar este código (a propósito no se fija una lista de métodos).
     const tax=env.STRIPE_TAX==='1';
-    const session=await stripe(env,'checkout/sessions',{mode:'subscription',client_reference_id:userId,locale:'es',
+    const session=await stripe(env,'checkout/sessions',{mode:'subscription',client_reference_id:userId,locale:'auto',
      ...(user.stripe_customer_id?{customer:user.stripe_customer_id,customer_update:{address:'auto',name:'auto'}}:{customer_email:user.email}),
      line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',billing_address_collection:'required',
      ...(tax?{automatic_tax:{enabled:'true'},tax_id_collection:{enabled:'true'}}:{}),
