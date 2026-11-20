@@ -6607,6 +6607,7 @@ function importDXF(text,name,opts){
 
  // INSERT de primer nivel → referencia de bloque CAD2D (se mantiene como bloque, no se explota).
  const importedBlocks={},defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
+ const importedDimStyles={};
  function cadDxfBlockRef(def,o,lname,common,sub){
   if(o.cols>1||o.rows>1)return null;
   let A=[Math.cos(o.rot)*o.sx,Math.sin(o.rot)*o.sx,-Math.sin(o.rot)*o.sy,Math.cos(o.rot)*o.sy],ix=o.ix,iy=o.iy;
@@ -6650,6 +6651,8 @@ function importDXF(text,name,opts){
         const base=readDimensionStyle(),h=th>0?th:base.textHeight,dec=(cleanMText(txt).match(/[.,](\d+)/)||[,''])[1].length;
         const style={...base,textHeight:h,arrow:h*.8,arrowType:solid?'arrow':'tick',precision:Math.min(4,dec),extOffset:h*.4,extBeyond:h*.5,color:''};
         const ov=str(1,'');const dim={type:'dimension',a,b,p,mode,style,layer:lname,lineweight:common.width,id:entities.length+1};
+        // Estilo de cota del archivo (DIMSTYLE, código 3) → modelo con nombre en la paleta, como en AutoCAD.
+        const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
         if(ov&&ov!=='<>'&&!/<>/.test(ov))dim.label=cleanMText(ov).slice(0,120);
         if(common.color)dim.color=common.color;
         entities.push(dim);expanded++;continue;
@@ -6694,6 +6697,7 @@ function importDXF(text,name,opts){
  state.layers=[...layers.values()];
  suggestWallLayerFromDXF(state.layers);
  state.blocks=importedBlocks;
+ state.dimStyles=state.dimStyles||{};for(const [n,st] of Object.entries(importedDimStyles))if(!state.dimStyles[n])state.dimStyles[n]=validateDimStyle(st);try{renderDimStyles()}catch(e){}
  state.entities=entities;state.nextId=entities.length+1;state.layerId=state.layers[0].id;state.selected=[];
  state.file=name.replace(/\.dxf$/i,'');$('filename').textContent=state.file+'.dxf';
  $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
