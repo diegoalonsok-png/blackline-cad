@@ -743,8 +743,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0400">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-0400">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0430">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0430">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -828,8 +828,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-0400"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-0400"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0430"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0430"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -900,7 +900,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
   <main class="canvas-wrap" id="canvasWrap"><canvas id="cadCanvas"></canvas><div class="cad-floating-tools" id="cadFloatingTools" aria-label="Floating CAD tools"><div class="floating-tools-handle" id="cadFloatingGrip" title="Drag the CAD toolbar">⠿ <span>QUICK CAD</span><button type="button" id="cadFloatingMinimize" title="Collapse floating toolbar">−</button></div><div class="cad-floating-tool-list" id="cadFloatingList"><button data-floating-cad="erase" title="BORRAR / ERASE · E">⌫ BORRAR</button><button data-floating-cad="line" title="LINE">LINE</button><button data-floating-cad="polyline" title="PLINE">PL</button><button data-floating-cad="rect" title="RECTANGLE">▭</button><button data-floating-cad="circle" title="CIRCLE">◯</button><button data-floating-cad="arc" title="ARC">ARC</button><button data-floating-cad="move" title="MOVE">MOVE</button><button data-floating-cad="copy" title="COPY">COPY</button><button data-floating-cad="trim" title="TRIM">TRIM</button><button data-floating-cad="extend" title="EXTEND">EXT</button><button data-floating-cad="breakLine" title="BREAK LINE">BRK</button><button data-floating-cad="lengthen" title="LENGTHEN">LEN</button><button data-floating-cad="offset" title="OFFSET">OFF</button><button data-floating-cad="fillet" title="FILLET">FILLET</button><button data-floating-cad="chamfer" title="CHAMFER">CHA</button><button data-floating-cad="dimension" title="DIMENSION">DIM</button><button data-floating-cad="join" title="JOIN">JOIN</button><button data-floating-cad="explode" title="EXPLODE">EXP</button><button data-floating-cad="array" title="ARRAY">ARRAY</button><button data-floating-cad="color" title="COLOR">COLOR</button><button data-floating-cad="matchprop" title="MATCH PROPERTIES">MATCH</button><button data-floating-cad="area" title="AREA">AREA</button><button data-floating-cad="print" title="PRINT / PDF">PLOT</button></div></div><section id="cadLayoutWorkspace" class="cad-layout-workspace" hidden aria-label="Layout paper space">
  <div class="cad-layout-toolbar">
   <div class="cad-layout-title"><strong>LAYOUT 1</strong><span>Paper space · printable sheet</span></div>
-  <label>Sheet<select id="layoutPaper"><option value="A4">A4</option><option value="A3" selected>A3</option><option value="A2">A2</option><option value="A1">A1</option><option value="A0">A0</option><option value="LETTER">Letter</option><option value="ARCHD">ARCH D</option></select></label>
+  <label>Sheet<select id="layoutPaper"><option value="A4">A4</option><option value="A3" selected>A3</option><option value="A2">A2</option><option value="A1">A1</option><option value="A0">A0</option><option value="LETTER">Letter</option><option value="ARCHD">ARCH D</option><option value="CUSTOM">Custom…</option></select></label><label id="layoutCustomBox" hidden>W×H mm<input id="layoutPaperW" type="number" min="50" max="5000" step="1" value="600" style="width:70px"><input id="layoutPaperH" type="number" min="50" max="5000" step="1" value="400" style="width:70px"></label>
   <label>Orientation<select id="layoutOrientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></label>
   <label>Scale<select id="layoutScale"><option value="fit">Fit</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="100" selected>1:100</option><option value="125">1:125</option><option value="200">1:200</option><option value="250">1:250</option><option value="500">1:500</option><option value="1000">1:1000</option></select></label>
   <label>Margin mm<input id="layoutMargin" type="number" min="0" max="100" step="1" value="10"></label>
@@ -940,9 +940,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Diego Kurilo. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson" style="display:none">
-<script src="cad2d-config.js?v=20261120-0400"></script>
-<script src="cad-grip-settings.js?v=20261120-0400"></script>
-<script src="cad-cursor-mode.js?v=20261120-0400"></script>
+<script src="cad2d-config.js?v=20261120-0430"></script>
+<script src="cad-grip-settings.js?v=20261120-0430"></script>
+<script src="cad-cursor-mode.js?v=20261120-0430"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -5947,7 +5947,7 @@ function makeSVG(o){
 let cadActiveSpace='model';
 const CAD_LAYOUT_KEY='cad2d-layout1-settings';
 function collectLayoutState(){
- return {paper:$('layoutPaper').value,orientation:$('layoutOrientation').value,
+ return {paper:$('layoutPaper').value,paperW:Number($('layoutPaperW').value)||600,paperH:Number($('layoutPaperH').value)||400,orientation:$('layoutOrientation').value,
   scale:$('layoutScale').value,margin:Number($('layoutMargin').value),
   style:$('layoutStyle').value,title:$('layoutTitleBlock').checked,viewports:clone(cadLayoutViewports)};
 }
@@ -5957,11 +5957,13 @@ function applyLayoutState(v){
  option('layoutPaper',v.paper);option('layoutOrientation',v.orientation);option('layoutScale',v.scale);option('layoutStyle',v.style);
  if(Number.isFinite(Number(v.margin)))$('layoutMargin').value=Math.max(0,Math.min(100,Number(v.margin)));
  if(typeof v.title==='boolean')$('layoutTitleBlock').checked=v.title;
+ if(Number(v.paperW)>=50)$('layoutPaperW').value=v.paperW;if(Number(v.paperH)>=50)$('layoutPaperH').value=v.paperH;$('layoutCustomBox').hidden=$('layoutPaper').value!=='CUSTOM';
  cadLayoutViewports=Array.isArray(v.viewports)?v.viewports.filter(x=>x&&[x.x,x.y,x.w,x.h].every(Number.isFinite)).slice(0,24):[];
 }
 function syncLayoutToPlot(){
  const v=collectLayoutState();
  $('paper').value=v.paper;$('orientation').value=v.orientation;
+ if(v.paper==='CUSTOM'){$('paperW').value=Math.max(50,Math.min(5000,v.paperW));$('paperH').value=Math.max(50,Math.min(5000,v.paperH))}
  $('plotScale').value=v.scale;$('plotMargin').value=String(v.margin);
  $('plotStyle').value=v.style;$('titleBlock').value=v.title?'simple':'none';
 }
@@ -5996,14 +5998,14 @@ function switchCadSpace(space){
  $('cadLayoutWorkspace').hidden=cadActiveSpace!=='layout';
  $('modelSpaceTab').classList.toggle('active',cadActiveSpace==='model');
  $('paperSpaceTab').classList.toggle('active',cadActiveSpace==='layout');
- $('cadFloatingTools').hidden=cadActiveSpace==='layout';
+ $('cadFloatingTools').hidden=cadActiveSpace==='layout';{const qb=$('cadQuickBar');if(qb)qb.style.display=cadActiveSpace==='layout'?'none':''}
  if(cadActiveSpace==='layout'){state.stage=[];state.drag=null;state.tool='select';renderLayoutWorkspace()}
  else{resize();schedule()}
 }
 function initLayoutWorkspace(){
  try{applyLayoutState(JSON.parse(localStorage.getItem(CAD_LAYOUT_KEY)||'null'))}catch(error){}
- for(const id of ['layoutPaper','layoutOrientation','layoutScale','layoutMargin','layoutStyle','layoutTitleBlock'])
-  $(id).addEventListener('change',()=>{try{localStorage.setItem(CAD_LAYOUT_KEY,JSON.stringify(collectLayoutState()))}catch(error){}renderLayoutWorkspace()});
+ for(const id of ['layoutPaper','layoutPaperW','layoutPaperH','layoutOrientation','layoutScale','layoutMargin','layoutStyle','layoutTitleBlock'])
+  $(id).addEventListener('change',()=>{$('layoutCustomBox').hidden=$('layoutPaper').value!=='CUSTOM';try{localStorage.setItem(CAD_LAYOUT_KEY,JSON.stringify(collectLayoutState()))}catch(error){}renderLayoutWorkspace()});
  $('modelSpaceTab').onclick=()=>switchCadSpace('model');
  $('paperSpaceTab').onclick=()=>switchCadSpace('layout');
  $('cadPlotShortcut').onclick=()=>openPrint();
@@ -8016,25 +8018,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-0400"></script>
-<script src="blackline-modern.js?v=20261120-0400"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-0400"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-0400"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0400"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-0400"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0400"></script>
-<script src="cad-osnap-math.js?v=20261120-0400"></script>
-<script src="cad-scale-math.js?v=20261120-0400"></script>
-<script src="cad-object-tracking.js?v=20261120-0400"></script>
-<script src="cad-auto-opening.js?v=20261120-0400"></script>
-<script src="cad-wall-join.js?v=20261120-0400"></script>
-<script src="cad-wall-grip.js?v=20261120-0400"></script>
-<script src="cad-hatch-patterns.js?v=20261120-0400"></script>
-<script src="cad-performance.js?v=20261120-0400"></script>
-<script src="cad-plan.js?v=20261120-0400"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-0400"></script>
-<script src="cad-arq-pro.js?v=20261120-0400"></script>
-<script src="cad-autocad-plus.js?v=20261120-0400"></script>
-<script src="cad-touch.js?v=20261120-0400"></script><script src="cad-quickbar.js?v=20261120-0400"></script><script src="cad-buy-guide.js?v=20261120-0400"></script>
-<script src="cad-arq-tools.js?v=20261120-0400"></script><script src="cad-block-browser.js?v=20261120-0400"></script>
+<script src="workspace-upgrade.js?v=20261120-0430"></script>
+<script src="blackline-modern.js?v=20261120-0430"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0430"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0430"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0430"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0430"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0430"></script>
+<script src="cad-osnap-math.js?v=20261120-0430"></script>
+<script src="cad-scale-math.js?v=20261120-0430"></script>
+<script src="cad-object-tracking.js?v=20261120-0430"></script>
+<script src="cad-auto-opening.js?v=20261120-0430"></script>
+<script src="cad-wall-join.js?v=20261120-0430"></script>
+<script src="cad-wall-grip.js?v=20261120-0430"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0430"></script>
+<script src="cad-performance.js?v=20261120-0430"></script>
+<script src="cad-plan.js?v=20261120-0430"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0430"></script>
+<script src="cad-arq-pro.js?v=20261120-0430"></script>
+<script src="cad-autocad-plus.js?v=20261120-0430"></script>
+<script src="cad-touch.js?v=20261120-0430"></script><script src="cad-quickbar.js?v=20261120-0430"></script><script src="cad-buy-guide.js?v=20261120-0430"></script>
+<script src="cad-arq-tools.js?v=20261120-0430"></script><script src="cad-block-browser.js?v=20261120-0430"></script>
 </body></html>

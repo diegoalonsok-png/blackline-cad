@@ -242,18 +242,26 @@ function addViewport(rect){
 }
 function renderVpPanel(){
  const ws=$('cadLayoutWorkspace');if(!ws)return;let panel=$('cadVpPanel');
- if(!panel){panel=document.createElement('section');panel.id='cadVpPanel';panel.style.cssText='position:absolute;right:14px;top:14px;z-index:5;width:280px;max-height:70%;overflow:auto;background:#141c24;border:1px solid #4d6676;border-radius:10px;padding:9px;color:#e5eef7;font-size:11px;box-shadow:0 8px 24px rgba(0,0,0,.35)';ws.append(panel)}
+ if(!panel){panel=document.createElement('section');panel.id='cadVpPanel';panel.style.cssText='position:absolute;right:14px;top:14px;z-index:5;width:280px;max-height:70%;overflow:auto;background:#141c24;border:1px solid #4d6676;border-radius:10px;padding:9px;color:#e5eef7;font-size:11px;box-shadow:0 8px 24px rgba(0,0,0,.35)';ws.append(panel);
+  // Panel movible: se arrastra desde el título; la posición se recuerda.
+  try{const pos=JSON.parse(localStorage.getItem('cad2d-vp-panel')||'null');if(pos){panel.style.left=pos[0]+'px';panel.style.top=pos[1]+'px';panel.style.right='auto'}}catch(e){}
+  let pd=null;
+  panel.addEventListener('pointerdown',e=>{if(!e.target.closest('.vp-handle'))return;const r=panel.getBoundingClientRect(),w=ws.getBoundingClientRect();pd={dx:e.clientX-r.left,dy:e.clientY-r.top,wx:w.left,wy:w.top};panel.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation()});
+  panel.addEventListener('pointermove',e=>{if(!pd)return;const W=ws.clientWidth,H=ws.clientHeight;const x=Math.max(0,Math.min(W-80,e.clientX-pd.wx-pd.dx)),y=Math.max(0,Math.min(H-40,e.clientY-pd.wy-pd.dy));panel.style.left=x+'px';panel.style.top=y+'px';panel.style.right='auto'});
+  panel.addEventListener('pointerup',()=>{if(!pd)return;pd=null;try{localStorage.setItem('cad2d-vp-panel',JSON.stringify([parseFloat(panel.style.left)||0,parseFloat(panel.style.top)||0]))}catch(e){}});
+ }
  const list=CORE.layout.viewports;
- panel.innerHTML='<b style="letter-spacing:.05em">VENTANAS GRÁFICAS</b><p style="margin:5px 0;color:#9cb1bc">'+(list.length?'Arrastrá dentro de una ventana para moverla; desde su esquina inferior derecha, para cambiar su tamaño.':'Sin ventanas: la hoja muestra todo el dibujo ajustado. Creá una para elegir encuadre y escala.')+'</p><div style="display:flex;gap:5px;margin-bottom:6px"><button type="button" class="btn" id="cadVpNew">'+(vpCreate?'Dibujá el rectángulo…':'+ Nueva ventana')+'</button></div>';
+ panel.innerHTML='<b class="vp-handle" style="letter-spacing:.05em;display:block;cursor:move;user-select:none" title="Arrastrar para mover el panel">⠿ VENTANAS GRÁFICAS</b><p style="margin:5px 0;color:#9cb1bc">'+(list.length?'Arrastrá una ventana para moverla; desde su esquina inferior derecha, para cambiar su tamaño. Doble clic adentro para trabajar en ella: arrastrar desplaza el dibujo y la rueda hace zoom.':'Sin ventanas: la hoja muestra todo el dibujo ajustado. Creá una para elegir encuadre y escala.')+'</p><div style="display:flex;gap:5px;margin-bottom:6px"><button type="button" class="btn" id="cadVpNew">'+(vpCreate?'Dibujá el rectángulo…':'+ Nueva ventana')+'</button></div>';
  list.forEach((v,i)=>{
   const row=document.createElement('div');row.style.cssText='border-top:1px solid #2f4250;padding:6px 0;display:grid;gap:4px';
   row.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>Ventana '+(i+1)+'</b><button type="button" class="btn slim" data-del>✕</button></div>'+
-   '<label>Escala <select data-k="scale">'+SCALES.map(s=>'<option value="'+s+'"'+(String(v.scale)===s?' selected':'')+'>'+(s==='fit'?'Ajustar todo':'1:'+s)+'</option>').join('')+'</select></label>'+
+   '<label>Escala <select data-k="scale">'+(SCALES.includes(String(v.scale))?'':'<option value="'+v.scale+'" selected>1:'+v.scale+'</option>')+SCALES.map(s=>'<option value="'+s+'"'+(String(v.scale)===s?' selected':'')+'>'+(s==='fit'?'Ajustar todo':'1:'+s)+'</option>').join('')+'</select></label><label>1: <input type="number" min="1" step="any" data-custom value="'+(v.scale==='fit'?'':v.scale)+'" style="width:70px" title="Escala personalizada"></label>'+
    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">'+['x','y','w','h'].map(k=>'<label>'+({x:'X',y:'Y',w:'Ancho',h:'Alto'}[k])+' mm<input type="number" step="1" data-k="'+k+'" value="'+v[k]+'" style="width:100%"></label>').join('')+'</div>'+
    '<div style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn slim" data-center>Centrar en vista del modelo</button><button type="button" class="btn slim" data-sel>Centrar en selección</button><label><input type="checkbox" data-frame '+(v.frame!==false?'checked':'')+'> Marco</label></div>';
   const upd=patch=>{const l=CORE.layout.viewports.slice();l[i]={...l[i],...patch};saveVp(l)};
   row.querySelector('[data-del]').onclick=()=>{const l=CORE.layout.viewports.slice();l.splice(i,1);saveVp(l)};
   row.querySelector('[data-k="scale"]').onchange=e=>upd({scale:e.target.value});
+  row.querySelector('[data-custom]').onchange=e=>{const n=Number(e.target.value);if(n>0)upd({scale:String(n)})};
   for(const k of ['x','y','w','h'])row.querySelector('[data-k="'+k+'"]').onchange=e=>{const n=Number(e.target.value);if(Number.isFinite(n)&&(k==='x'||k==='y'||n>3))upd({[k]:n})};
   row.querySelector('[data-center]').onclick=()=>{const c=modelViewCenter();upd({cx:c.x,cy:c.y})};
   row.querySelector('[data-sel]').onclick=()=>{const sel=S().entities.filter(e=>S().selected.includes(e.id));if(!sel.length)return CORE.toast('Seleccioná objetos en MODEL');const b=CORE.getBounds(sel);upd({cx:(b.minX+b.maxX)/2,cy:(b.minY+b.maxY)/2})};
@@ -266,13 +274,16 @@ function pagePoint(ev){const m=pageMetrics();if(!m)return null;const r=m.page.ge
 document.addEventListener('pointerdown',ev=>{
  const page=$('cadLayoutPage');if(!page||!page.contains(ev.target)||CORE.layout.active!=='layout'||ev.button!==0)return;
  const q=pagePoint(ev);if(!q)return;ev.preventDefault();
+ const now=Date.now(),last=vpLastDown;vpLastDown={t:now,x:q.x,y:q.y};
+ if(!vpCreate&&last&&now-last.t<380&&Math.hypot(q.x-last.x,q.y-last.y)<4){ev.stopPropagation();vpLastDown=null;return vpToggleAt(q)}
  if(vpCreate){ev.stopPropagation();vpDrag={mode:'create',x0:q.x,y0:q.y,x:q.x,y:q.y};return}
- const list=CORE.layout.viewports;for(let i=list.length-1;i>=0;i--){const v=list[i];if(q.x>=v.x&&q.x<=v.x+v.w&&q.y>=v.y&&q.y<=v.y+v.h){const corner=q.x>v.x+v.w-6&&q.y>v.y+v.h-6;ev.stopPropagation();vpDrag={mode:corner?'resize':'move',i,x0:q.x,y0:q.y,orig:{...v}};return}}
+ const list=CORE.layout.viewports;for(let i=list.length-1;i>=0;i--){const v=list[i];if(q.x>=v.x&&q.x<=v.x+v.w&&q.y>=v.y&&q.y<=v.y+v.h){const corner=q.x>v.x+v.w-6&&q.y>v.y+v.h-6;ev.stopPropagation();if(vpActive===v.id&&!corner){const r=vpResolve(v);vpDrag={mode:'pan',i,x0:q.x,y0:q.y,orig:{...v,cx:r.cx,cy:r.cy,scale:r.scale},factor:r.factor};return}vpDrag={mode:corner?'resize':'move',i,x0:q.x,y0:q.y,orig:{...v}};return}}
 },true);
 document.addEventListener('pointermove',ev=>{
  if(!vpDrag)return;const q=pagePoint(ev);if(!q)return;
  if(vpDrag.mode==='create'){vpDrag.x=q.x;vpDrag.y=q.y;drawRubber();return}
  const l=CORE.layout.viewports.slice(),o=vpDrag.orig,dx=q.x-vpDrag.x0,dy=q.y-vpDrag.y0;
+ if(vpDrag.mode==='pan'){l[vpDrag.i]={...o,cx:o.cx-dx/vpDrag.factor,cy:o.cy+dy/vpDrag.factor};CORE.layout.viewports=l;CORE.layout.render();vpHighlight();return}
  l[vpDrag.i]=vpDrag.mode==='move'?{...o,x:+(o.x+dx).toFixed(1),y:+(o.y+dy).toFixed(1)}:{...o,w:+Math.max(10,o.w+dx).toFixed(1),h:+Math.max(10,o.h+dy).toFixed(1)};
  CORE.layout.viewports=l;CORE.layout.render();
 },true);
@@ -281,6 +292,37 @@ document.addEventListener('pointerup',()=>{
  if(d.mode==='create'){vpCreate=false;const r={x:Math.min(d.x0,d.x),y:Math.min(d.y0,d.y),w:Math.abs(d.x-d.x0),h:Math.abs(d.y-d.y0)};if(r.w>10&&r.h>10)addViewport(r);else renderVpPanel();return}
  saveVp(CORE.layout.viewports.slice());
 },true);
+/* Trabajar DENTRO de una ventana (como MSPACE en AutoCAD): doble clic en la ventana la activa;
+   arrastrar desplaza el dibujo, la rueda hace zoom (cambia la escala 1:N), doble clic afuera sale. */
+let vpActive=null,vpLastDown=null;
+function vpResolve(v){
+ const unit=CORE.U[S().unit]||1000;let cx=Number(v.cx),cy=Number(v.cy),factor;
+ const b=CORE.getBounds();if(!Number.isFinite(cx)){cx=(b.minX+b.maxX)/2;cy=(b.minY+b.maxY)/2}
+ if(v.scale==='fit'){const dx=Math.max(.001,b.maxX-b.minX),dy=Math.max(.001,b.maxY-b.minY);factor=Math.min(v.w/dx,v.h/dy)*.92}else factor=unit/Math.max(1e-6,Number(v.scale)||100);
+ return {cx,cy,factor,scale:+(unit/factor).toFixed(2)};
+}
+function vpHighlight(){
+ const m=pageMetrics();let h=$('cadVpActive');const v=CORE.layout.viewports.find(x=>x.id===vpActive);
+ if(!m||!v){h?.remove();return}
+ if(!h||!m.page.contains(h)){h?.remove();h=document.createElement('div');h.id='cadVpActive';h.style.cssText='position:absolute;border:2.5px solid #d4a748;box-shadow:0 0 0 4px #d4a74833;pointer-events:none;border-radius:2px';m.page.style.position='relative';m.page.append(h)}
+ Object.assign(h.style,{left:v.x*m.k+'px',top:v.y*m.k+'px',width:v.w*m.k+'px',height:v.h*m.k+'px'});
+}
+new MutationObserver(()=>{if(vpActive)requestAnimationFrame(vpHighlight)}).observe(document.body,{childList:true,subtree:true,attributes:false});
+function vpToggleAt(q){
+ const v=CORE.layout.viewports.slice().reverse().find(v=>q.x>=v.x&&q.x<=v.x+v.w&&q.y>=v.y&&q.y<=v.y+v.h);
+ if(v&&vpActive!==v.id){vpActive=v.id;vpHighlight();CORE.toast('Inside viewport: drag to pan · mouse wheel to zoom · double-click outside to exit')}
+ else if(!v||vpActive===v.id){vpActive=null;vpHighlight();CORE.toast('Back to paper space')}
+}
+document.addEventListener('wheel',ev=>{
+ if(!vpActive||CORE.layout.active!=='layout')return;const page=$('cadLayoutPage');if(!page||!page.contains(ev.target))return;
+ const q=pagePoint(ev);if(!q)return;const l=CORE.layout.viewports.slice(),i=l.findIndex(v=>v.id===vpActive);if(i<0)return;const v=l[i];
+ if(!(q.x>=v.x&&q.x<=v.x+v.w&&q.y>=v.y&&q.y<=v.y+v.h))return;
+ ev.preventDefault();ev.stopPropagation();
+ const r=vpResolve(v),k=ev.deltaY>0?1/1.15:1.15,f2=r.factor*k,ox=q.x-(v.x+v.w/2),oy=q.y-(v.y+v.h/2);
+ const mx=r.cx+ox/r.factor,my=r.cy-oy/r.factor,unit=CORE.U[S().unit]||1000;
+ l[i]={...v,cx:mx-ox/f2,cy:my+oy/f2,scale:String(+(unit/f2).toFixed(2))};
+ CORE.layout.viewports=l;CORE.layout.render();vpHighlight();clearTimeout(vpHighlight.t);vpHighlight.t=setTimeout(()=>saveVp(CORE.layout.viewports.slice()),350);
+},{capture:true,passive:false});
 function drawRubber(){
  const m=pageMetrics();if(!m||!vpDrag)return;let r=$('cadVpRubber');
  if(!r){r=document.createElement('div');r.id='cadVpRubber';r.style.cssText='position:absolute;border:1.5px dashed #2a8fd8;background:rgba(42,143,216,.08);pointer-events:none';m.page.style.position='relative';m.page.append(r)}
