@@ -766,8 +766,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1345">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1345">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1400">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1400">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -851,8 +851,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1345"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1345"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-1400"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-1400"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -900,7 +900,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1345"></script>
+<script src="assets/cad-analytics.js?v=20261120-1400"></script>
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0c1216"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
@@ -966,9 +966,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1345"></script>
-<script src="cad-grip-settings.js?v=20261120-1345"></script>
-<script src="cad-cursor-mode.js?v=20261120-1345"></script>
+<script src="cad2d-config.js?v=20261120-1400"></script>
+<script src="cad-grip-settings.js?v=20261120-1400"></script>
+<script src="cad-cursor-mode.js?v=20261120-1400"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -3784,6 +3784,7 @@ function cadHatchLineLoops(){
 function cadHatchAtPoint(p){
  const options=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked).map(e=>({pts:hatchBoundaryVertices(e),layer:e.layer})).filter(o=>o.pts&&cadHatchPointInPolygon(p,o.pts));
  for(const loop of cadHatchLineLoops())if(cadHatchPointInPolygon(p,loop.pts))options.push(loop);
+ {const face=cadFaceAtPoint(p);if(face)options.push({...face,layer:state.layerId})}
  options.sort((a,b)=>cadHatchPolygonArea(a.pts)-cadHatchPolygonArea(b.pts));
  if(!options.length)return toast('HATCH: no se encontró un contorno cerrado');
  cadHatchCreate(options.slice(0,1));
@@ -5270,7 +5271,7 @@ const CAD_COMMANDS=[
  ['DEDIT','DED','Editar texto de una cota seleccionada (<> = medida)'],['DIMSTYLE','D (EN)','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
  ['DIMDIAMETER','','Circle diameter'],['LEADER','','Leader with label'],
- ['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
+ ['LOCAL','ROOM','Marcar un local: clic adentro, nombre y m²'],['SUPERFICIES','PLANILLA','Planilla de locales y superficies, muros y aberturas'],['NUEVALAMINA','LAYOUT+','Nueva lámina (layout)'],['ROTULO','TITLEBLOCK','Datos del rótulo de la lámina'],['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
  ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
  ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
  ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
@@ -7923,6 +7924,114 @@ function cadExportRaster(kind){
  img.onerror=()=>toast('Image export failed');img.src=url;
 }
 // Planilla de cómputo simple: bloques por nombre y objetos/longitudes por capa (CSV con ; para Excel en español).
+// Cara mínima que contiene un punto: arma un grafo plano con todas las líneas visibles (partidas en sus
+// cruces y uniones en T) y recorre sus caras. Sirve para LOCAL y HATCH en ambientes con tabiques.
+function cadFaceAtPoint(p){
+ const segs=[],push=(a,b)=>{if(dist(a,b)>1e-9)segs.push([a,b])};
+ for(const e of state.entities){const L=layerFor(e);if(!L.visible||e.cadHidden)continue;
+  if(e.type==='line')push(e.a,e.b);
+  else if(e.type==='polyline'){for(let i=1;i<e.pts.length;i++)push(e.pts[i-1],e.pts[i]);if(e.closed)push(e.pts.at(-1),e.pts[0])}
+  else if(e.type==='rect'){const q=[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)];for(let i=0;i<4;i++)push(q[i],q[(i+1)%4])}
+  else if(e.type==='blockRef'){for(const c of blockChildren(e)){if(c.type==='line')push(c.a,c.b);else if(c.type==='polyline'){for(let i=1;i<c.pts.length;i++)push(c.pts[i-1],c.pts[i]);if(c.closed)push(c.pts.at(-1),c.pts[0])}}}
+ }
+ if(segs.length<3||segs.length>6000)return null;
+ let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const [a,b] of segs){minX=Math.min(minX,a.x,b.x);maxX=Math.max(maxX,a.x,b.x);minY=Math.min(minY,a.y,b.y);maxY=Math.max(maxY,a.y,b.y)}
+ const eps=Math.max(maxX-minX,maxY-minY,1)*1e-7;
+ const ts=segs.map(()=>[0,1]);
+ for(let i=0;i<segs.length;i++){const [a,b]=segs[i];
+  for(let j=i+1;j<segs.length;j++){const [c,d]=segs[j];
+   if(Math.max(a.x,b.x)<Math.min(c.x,d.x)-eps||Math.max(c.x,d.x)<Math.min(a.x,b.x)-eps||Math.max(a.y,b.y)<Math.min(c.y,d.y)-eps||Math.max(c.y,d.y)<Math.min(a.y,b.y)-eps)continue;
+   const rx=b.x-a.x,ry=b.y-a.y,sx=d.x-c.x,sy=d.y-c.y,den=rx*sy-ry*sx;if(Math.abs(den)<1e-14)continue;
+   const t=((c.x-a.x)*sy-(c.y-a.y)*sx)/den,u=((c.x-a.x)*ry-(c.y-a.y)*rx)/den,lt=eps/Math.hypot(rx,ry),lu=eps/Math.hypot(sx,sy);
+   if(t<-lt||t>1+lt||u<-lu||u>1+lu)continue;ts[i].push(Math.min(1,Math.max(0,t)));ts[j].push(Math.min(1,Math.max(0,u)));
+  }}
+ const key=q=>Math.round(q.x/eps/10)+','+Math.round(q.y/eps/10),nodes=new Map(),node=q=>{const k=key(q);if(!nodes.has(k))nodes.set(k,{p:q,out:[]});return nodes.get(k)};
+ const edges=new Set();
+ segs.forEach(([a,b],i)=>{const t=[...new Set(ts[i].map(v=>+v.toFixed(12)))].sort((x,y)=>x-y);for(let k=1;k<t.length;k++){const A=P(a.x+(b.x-a.x)*t[k-1],a.y+(b.y-a.y)*t[k-1]),B=P(a.x+(b.x-a.x)*t[k],a.y+(b.y-a.y)*t[k]);const na=node(A),nb=node(B);if(na===nb)continue;const id=key(na.p)+'|'+key(nb.p),id2=key(nb.p)+'|'+key(na.p);if(edges.has(id)||edges.has(id2))continue;edges.add(id);na.out.push(nb);nb.out.push(na)}});
+ for(const n of nodes.values())n.out.sort((x,y)=>Math.atan2(x.p.y-n.p.y,x.p.x-n.p.x)-Math.atan2(y.p.y-n.p.y,y.p.x-n.p.x));
+ const used=new Set();let best=null;
+ for(const n of nodes.values())for(const m of n.out){
+  const k0=key(n.p)+'>'+key(m.p);if(used.has(k0))continue;
+  const loop=[];let u=n,v=m,guard=0;
+  while(guard++<5000){const k=key(u.p)+'>'+key(v.p);if(used.has(k))break;used.add(k);loop.push(u.p);
+   const i=v.out.indexOf(u);const w=v.out[(i-1+v.out.length)%v.out.length];u=v;v=w;if(u===n&&v===m)break}
+  if(loop.length<3)continue;
+  let A=0;for(let i=0;i<loop.length;i++){const a=loop[i],b=loop[(i+1)%loop.length];A+=a.x*b.y-b.x*a.y}A/=2;
+  if(A<=eps*eps)continue;
+  if(!cadHatchPointInPolygon(p,loop))continue;
+  if(!best||A<best.area)best={pts:loop,area:A};
+ }
+ return best?{pts:best.pts}:null;
+}
+
+/* ---------- LOCALES y PLANILLA DE SUPERFICIES (herramienta para arquitectos) ----------
+   LOCAL: clic dentro de cada ambiente → nombre → contorno en la capa LOCALES + rótulo con m².
+   SUPERFICIES: planilla de locales (m² y perímetro), total cubierto, longitud de muros y aberturas;
+   se inserta como tabla en el dibujo o se exporta en CSV. */
+function cadAreaM2(pts){return cadHatchPolygonArea(pts)*Math.pow(U[state.unit]/1000,2)}
+function cadLenM(v){return v*U[state.unit]/1000}
+function cadPolyPerimeter(pts){return pts.reduce((s,a,i)=>s+dist(a,pts[(i+1)%pts.length]),0)}
+function cadPolyCentroid(pts){let a=0,cx=0,cy=0;for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[(i+1)%pts.length],f=p.x*q.y-q.x*p.y;a+=f;cx+=(p.x+q.x)*f;cy+=(p.y+q.y)*f}if(Math.abs(a)<1e-12){const n=pts.length;return P(pts.reduce((s,p)=>s+p.x,0)/n,pts.reduce((s,p)=>s+p.y,0)/n)}return P(cx/(3*a),cy/(3*a))}
+function cadRoomsLayer(){let l=state.layers.find(x=>/^LOCALES$/i.test(x.name));if(!l){l={id:'locales',name:'LOCALES',color:'#8dcce0',visible:true,locked:false,width:.13,linetype:'DASHED'};while(state.layers.some(x=>x.id===l.id))l.id+='_';state.layers.push(l);renderLayers?.()}return l}
+const cadFmt2=v=>v.toLocaleString(cad2dAliasLanguage==='es'?'es-AR':'en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+function cadRoomTool(){
+ setTool('select');
+ const es=cad2dAliasLanguage==='es';
+ toast(es?'LOCAL · clic dentro de un ambiente cerrado · Esc termina':'ROOM · click inside a closed room · Esc to finish');log('LOCAL');
+ const onKey=ev=>{if(ev.key==='Escape')cleanup()};
+ const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor=''};
+ const onDown=ev=>{
+  if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();
+  const r=canvas.getBoundingClientRect(),p=world(P(ev.clientX-r.left,ev.clientY-r.top));
+  const opts=state.entities.filter(e=>layerFor(e).visible&&!e.roomName&&e.type!=='hatch').map(e=>({pts:hatchBoundaryVertices(e)})).filter(o=>o.pts&&cadHatchPointInPolygon(p,o.pts));
+  for(const loop of cadHatchLineLoops())if(cadHatchPointInPolygon(p,loop.pts))opts.push(loop);
+  {const face=cadFaceAtPoint(p);if(face)opts.push(face)}
+  opts.sort((a,b)=>cadHatchPolygonArea(a.pts)-cadHatchPolygonArea(b.pts));
+  if(!opts.length)return toast(es?'LOCAL: no hay un contorno cerrado en ese punto':'ROOM: no closed boundary there');
+  const pts=clone(opts[0].pts),m2=cadAreaM2(pts);
+  const n=state.entities.filter(e=>e.roomName).length+1;
+  const name=window.prompt((es?'Nombre del local':'Room name')+' ('+cadFmt2(m2)+' m²)',(es?'LOCAL ':'ROOM ')+n);
+  if(name===null)return;
+  const lay=cadRoomsLayer(),c=cadPolyCentroid(pts),h=Math.max(.08,Math.min(.35,Math.sqrt(cadHatchPolygonArea(pts))*.06));
+  saveHistory();
+  const poly={type:'polyline',pts,closed:true,layer:lay.id,roomName:name.trim().slice(0,40)||('LOCAL '+n),linetype:'DASHED',width:.09};
+  const t1={type:'text',p:P(c.x-poly.roomName.length*h*.31,c.y+h*.2),h,text:poly.roomName.toUpperCase(),layer:lay.id,fontFamily:'Arial',bold:true};
+  const t2={type:'text',p:P(c.x-6*h*.6*.5,c.y-h*1.25),h:h*.75,text:cadFmt2(m2)+' m²',layer:lay.id,fontFamily:'Arial'};
+  for(const e of [poly,t1,t2]){e.id=state.nextId++;state.entities.push(e)}
+  poly.roomTags=[t1.id,t2.id];updateAll();log('LOCAL '+poly.roomName+' = '+cadFmt2(m2)+' m²');
+ };
+ canvas.style.cursor='crosshair';canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);
+}
+function cadRoomSchedule(){
+ const es=cad2dAliasLanguage==='es';
+ const rooms=state.entities.filter(e=>e.type==='polyline'&&e.closed&&e.roomName);
+ const rows=[[es?'LOCAL':'ROOM',es?'SUPERFICIE (m²)':'AREA (m²)',es?'PERÍMETRO (m)':'PERIMETER (m)']];let tot=0;
+ for(const e of rooms){const a=cadAreaM2(e.pts);tot+=a;rows.push([e.roomName,cadFmt2(a),cadFmt2(cadLenM(cadPolyPerimeter(e.pts)))])}
+ if(rooms.length)rows.push([es?'TOTAL LOCALES':'TOTAL ROOMS',cadFmt2(tot),'']);
+ // Muros: longitud total de líneas en capas de muros (con doble línea se informa también la mitad, ≈ eje)
+ let wl=0;for(const e of state.entities){const L=layerFor(e);if(!explicitWallLayerName(L.name)&&!/mur|wall/i.test(L.name))continue;if(e.type==='line')wl+=dist(e.a,e.b);else if(e.type==='polyline')wl+=e.pts.slice(1).reduce((s,p,i)=>s+dist(e.pts[i],p),0)+(e.closed?dist(e.pts.at(-1),e.pts[0]):0)}
+ const openings=new Map();for(const e of state.entities){if(e.type!=='blockRef')continue;const L=layerFor(e).name+' '+e.blockName;if(/abert|open|puert|door|vent|wind|carp/i.test(L))openings.set(e.blockName,(openings.get(e.blockName)||0)+1)}
+ const extra=[];if(wl>0)extra.push([es?'MUROS · líneas (m)':'WALLS · lines (m)',cadFmt2(cadLenM(wl)),es?'≈ eje: '+cadFmt2(cadLenM(wl)/2)+' m':'≈ axis: '+cadFmt2(cadLenM(wl)/2)+' m']);
+ for(const [k,n] of openings)extra.push([(es?'ABERTURA · ':'OPENING · ')+k,String(n)+' u','']);
+ const all=rows.concat(extra.length?[['','',''],...extra]:[]);
+ document.getElementById('cadRoomDlg')?.remove();
+ const d=document.createElement('div');d.id='cadRoomDlg';d.className='modal-backdrop show';
+ const table='<table style="width:100%;border-collapse:collapse;font-size:12px" data-no-cad-translate>'+all.map((r,i)=>'<tr>'+r.map((c,j)=>`<${i===0?'th':'td'} style="border-bottom:1px solid #2f3c46;padding:5px 6px;text-align:${j?'right':'left'};${/TOTAL/.test(r[0])?'font-weight:700':''}">${escapeHTML(c)}</${i===0?'th':'td'}>`).join('')+'</tr>').join('')+'</table>';
+ d.innerHTML='<div class="modal" style="max-width:620px"><div class="modal-head"><h2>'+(es?'Planilla de locales y superficies':'Room and area schedule')+'</h2><button class="btn" data-x>✕</button></div>'+
+  (rooms.length?'':'<p class="help">'+(es?'Todavía no hay locales. Usá el comando LOCAL y hacé clic dentro de cada ambiente.':'No rooms yet. Use the ROOM command and click inside each room.')+'</p>')+table+
+  '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px"><button class="btn" data-room>'+(es?'+ Marcar locales (LOCAL)':'+ Tag rooms (ROOM)')+'</button><button class="btn" data-csv>'+(es?'Exportar CSV':'Export CSV')+'</button><button class="btn primary" data-ins>'+(es?'Insertar tabla en el dibujo':'Insert table in drawing')+'</button></div></div>';
+ document.body.append(d);
+ d.addEventListener('click',e=>{
+  if(e.target===d||e.target.closest('[data-x]'))return d.remove();
+  if(e.target.closest('[data-room]')){d.remove();return cadRoomTool()}
+  if(e.target.closest('[data-csv]')){const q=v=>'"'+String(v).replace(/"/g,'""')+'"';const csv='﻿'+all.map(r=>r.map(q).join(';')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download=(state.file||'plano')+'-superficies.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);return}
+  if(e.target.closest('[data-ins]')){d.remove();cadInsertTableData(all,es?'planilla de superficies':'area schedule')}
+ });
+}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};
+ for(const k of['LOCALES','ROOM'])X.commands[k]=()=>cadRoomTool();window.cadRoomTool=cadRoomTool;
+ for(const k of['SUPERFICIES','PLANILLA','SCHEDULE','AREASCHEDULE','PLANILLALOCALES'])X.commands[k]=()=>cadRoomSchedule();}
+
 function cadExportScheduleCsv(){
  const q=v=>'"'+String(v).replace(/"/g,'""')+'"',rows=[['Type','Name','Layer','Count','Total length ('+state.unit+')']];
  const blocks=new Map(),layers=new Map();
@@ -8830,26 +8939,26 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1345"></script>
-<script src="blackline-modern.js?v=20261120-1345"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1345"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1345"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1345"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1345"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1345"></script>
-<script src="cad-osnap-math.js?v=20261120-1345"></script>
-<script src="cad-scale-math.js?v=20261120-1345"></script>
-<script src="cad-object-tracking.js?v=20261120-1345"></script>
-<script src="cad-auto-opening.js?v=20261120-1345"></script>
-<script src="cad-wall-join.js?v=20261120-1345"></script>
-<script src="cad-wall-grip.js?v=20261120-1345"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1345"></script>
-<script src="cad-performance.js?v=20261120-1345"></script>
-<script src="cad-plan.js?v=20261120-1345"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1345"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1345"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1345"></script>
-<script src="cad-arq-pro.js?v=20261120-1345"></script>
-<script src="cad-autocad-plus.js?v=20261120-1345"></script>
-<script src="cad-touch.js?v=20261120-1345"></script><script src="cad-quickbar.js?v=20261120-1345"></script><script src="cad-cmd-resize.js?v=20261120-1345"></script><script src="cad-buy-guide.js?v=20261120-1345"></script>
-<script src="cad-arq-tools.js?v=20261120-1345"></script><script src="cad-block-browser.js?v=20261120-1345"></script>
+<script src="workspace-upgrade.js?v=20261120-1400"></script>
+<script src="blackline-modern.js?v=20261120-1400"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-1400"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-1400"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1400"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-1400"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1400"></script>
+<script src="cad-osnap-math.js?v=20261120-1400"></script>
+<script src="cad-scale-math.js?v=20261120-1400"></script>
+<script src="cad-object-tracking.js?v=20261120-1400"></script>
+<script src="cad-auto-opening.js?v=20261120-1400"></script>
+<script src="cad-wall-join.js?v=20261120-1400"></script>
+<script src="cad-wall-grip.js?v=20261120-1400"></script>
+<script src="cad-hatch-patterns.js?v=20261120-1400"></script>
+<script src="cad-performance.js?v=20261120-1400"></script>
+<script src="cad-plan.js?v=20261120-1400"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1400"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1400"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1400"></script>
+<script src="cad-arq-pro.js?v=20261120-1400"></script>
+<script src="cad-autocad-plus.js?v=20261120-1400"></script>
+<script src="cad-touch.js?v=20261120-1400"></script><script src="cad-quickbar.js?v=20261120-1400"></script><script src="cad-cmd-resize.js?v=20261120-1400"></script><script src="cad-buy-guide.js?v=20261120-1400"></script>
+<script src="cad-arq-tools.js?v=20261120-1400"></script><script src="cad-block-browser.js?v=20261120-1400"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
