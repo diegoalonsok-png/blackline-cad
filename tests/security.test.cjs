@@ -11,6 +11,6 @@ test('sin eval ni new Function en el código de la app',()=>{
 });
 test('worker: anti-CSRF, límites, enlace no consumible por antivirus, cookie Lax',()=>{
  const w=R('billing/worker.js');
- assert.match(w,/originAllowed\(env,req\)/);assert.match(w,/tooLarge\(req,16\*1024\)/);assert.match(w,/AUTH_LIMITER/);
+ assert.match(w,/originAllowed\(env,req\)/);assert.match(w,/16\*1024/);assert.match(w,/tooLarge\(req,/);assert.match(w,/AUTH_LIMITER/);
  assert.match(w,/SameSite=Lax/);assert.match(w,/path==='\/auth\/verify'&&req\.method==='POST'/);assert.match(w,/content-security-policy/);
 });

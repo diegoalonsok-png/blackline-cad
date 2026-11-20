@@ -26,3 +26,23 @@ CREATE TABLE IF NOT EXISTS stripe_events (  -- evita procesar dos veces el mismo
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+
+-- Proyectos en la nube (gzip + base64; máx. ~1,9 MB por proyecto) y 10 versiones anteriores por proyecto
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  data TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  share_id TEXT UNIQUE                     -- enlace de solo lectura (NULL = no compartido)
+);
+CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id, updated_at);
+CREATE TABLE IF NOT EXISTS project_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_versions_project ON project_versions(project_id, id);
