@@ -4,3 +4,4 @@ node_modules/
 wrangler.toml
 wrangler.jsonc
 .dev.vars
+!dwg-converter/wrangler.jsonc

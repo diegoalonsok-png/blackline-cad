@@ -1,0 +1,23 @@
+// CAD2D · conversor DWG → DXF en Cloudflare Containers.
+// Se publica solo desde Cloudflare (Workers Builds, conectado a este repositorio):
+//   Workers & Pages → Create → Import a repository → blackline-cad
+//   Root directory: dwg-converter · Deploy command: npx wrangler deploy
+// Requiere el plan Workers Paid (5 USD/mes). Este archivo no contiene secretos.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cad2d-dwg",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-18",
+  "vars": {
+    "APP_ORIGIN": "https://blackline-cad.org,https://www.blackline-cad.org",
+    "MAX_PER_MINUTE": "6",
+    "CONTAINER_INSTANCES": "2"
+  },
+  "containers": [
+    { "class_name": "DwgConverter", "image": "./Dockerfile", "max_instances": 3, "instance_type": "basic" }
+  ],
+  "durable_objects": { "bindings": [{ "class_name": "DwgConverter", "name": "DWG_CONVERTER" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DwgConverter"] }],
+  "routes": [{ "pattern": "dwg.blackline-cad.org", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

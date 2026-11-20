@@ -1,5 +1,5 @@
 /* CAD2D · Worker de entrada al conversor DWG (Cloudflare Containers).
- * POST https://api.<dominio>/api/convert/dwg  (multipart con campo "file")  →  DXF ASCII
+ * POST https://dwg.<dominio>/api/convert/dwg  (multipart con campo "file")  →  DXF ASCII
  * - Solo acepta pedidos desde APP_ORIGIN (CORS) y archivos .dwg de hasta 25 MB.
  * - Límite simple por IP para evitar abusos.
  * - El contenedor convierte y borra el archivo; nada se guarda.
