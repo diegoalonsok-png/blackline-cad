@@ -4,15 +4,15 @@
  * - DOMINIO: dominio propio en Cloudflare Pages. En GitHub Pages este archivo no activa nada.
  * - DWG_ACTIVO: true solo cuando el conversor (dwg-converter/) esté publicado. Puede ser el
  *   contenedor de Cloudflare (plan Workers Paid) u otro servidor con el mismo Dockerfile.
- * - DWG_ENDPOINT: dirección del conversor si NO está en api.DOMINIO (otro proveedor).
+ * - DWG_ENDPOINT: dirección del conversor (dwg-converter/, dominio dwg.DOMINIO).
  * - CUENTAS_ACTIVAS: true cuando billing/ esté publicado.
  * - COBRO_ACTIVO: false = beta abierta para todos; true = 90 días de prueba por persona y después Pro.
  */
 (function(){
  'use strict';
  var DOMINIO='blackline-cad.org';
- var DWG_ACTIVO=false;
- var DWG_ENDPOINT='';
+ var DWG_ACTIVO=true; // si el conversor no responde, CAD2D avisa y sugiere DXF
+ var DWG_ENDPOINT='https://dwg.'+DOMINIO+'/api/convert/dwg';
  var CUENTAS_ACTIVAS=true;
  // Cada persona tiene 90 días con todo habilitado desde su primer uso (con o sin cuenta).
  // Después, las funciones Pro piden suscripción; el dibujo básico nunca se bloquea.
