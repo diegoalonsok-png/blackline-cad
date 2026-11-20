@@ -761,8 +761,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1230">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1230">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1300">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-1300">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -846,8 +846,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1230"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1230"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-1300"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-1300"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -895,7 +895,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1230"></script>
+<script src="assets/cad-analytics.js?v=20261120-1300"></script>
 </head>
 <body>
 <div class="app">
@@ -960,9 +960,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1230"></script>
-<script src="cad-grip-settings.js?v=20261120-1230"></script>
-<script src="cad-cursor-mode.js?v=20261120-1230"></script>
+<script src="cad2d-config.js?v=20261120-1300"></script>
+<script src="cad-grip-settings.js?v=20261120-1300"></script>
+<script src="cad-cursor-mode.js?v=20261120-1300"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -2959,7 +2959,11 @@ let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
 try{otrkOn=localStorage.getItem('cad2d-otrack')==='true'}catch(e){}
 function trackingEligible(){
- return otrkOn&&state.osnapOn&&['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','insertBlock'].includes(state.tool);
+ if(!otrkOn||!state.osnapOn)return false;
+ if(['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','insertBlock','wall2d','polygon','stretch','rotate','scale','mirror','text','table','area'].includes(state.tool))return true;
+ // Edición con pinzas (estirar vértices, mover muros/aberturas): también rastrea, como AutoCAD.
+ let grip=false;try{grip=!!cadPrimitiveGripPlacement}catch(e){}
+ return state.tool==='select'&&(grip||!!(state.drag&&/grip|vertex|wall/i.test(state.drag.type||'')));
 }
 let cadOtrkHoverTimer=null,cadOtrkHoverPt=null;
 function cadOtrackHover(pt){
@@ -2989,17 +2993,19 @@ function drawOtrackGuides(){
  if(!trackingEligible())return;
  const g=otrkGuide,w=canvas.width/dpr,h=canvas.height/dpr;
  ctx.save();
- for(const a of otrkAnchors){const p=screen(a);ctx.strokeStyle='#ffe27a';ctx.lineWidth=1.5;ctx.strokeRect(p.x-3,p.y-3,6,6)}
+ // Puntos adquiridos: cruz pequeña (como AutoCAD)
+ for(const a of otrkAnchors){const p=screen(a);ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-5,p.y);ctx.lineTo(p.x+5,p.y);ctx.moveTo(p.x,p.y-5);ctx.lineTo(p.x,p.y+5);ctx.stroke()}
  if(!g){ctx.restore();return}
  const p=screen(g.point);
- ctx.strokeStyle='#6bd5ff';ctx.lineWidth=1;ctx.setLineDash([4,5]);ctx.beginPath();
- if(g.vertical){const x=screen(g.vertical).x;ctx.moveTo(x,0);ctx.lineTo(x,h)}
- if(g.horizontal){const y=screen(g.horizontal).y;ctx.moveTo(0,y);ctx.lineTo(w,y)}
+ ctx.strokeStyle='#7dff9a';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();
+ if(g.rays){for(const r of g.rays){const A=screen(r.anchor),far=Math.hypot(w,h)*2;ctx.moveTo(A.x,A.y);ctx.lineTo(A.x+r.ux*far,A.y-r.uy*far)}}
+ else{if(g.vertical){const x=screen(g.vertical).x;ctx.moveTo(x,0);ctx.lineTo(x,h)}if(g.horizontal){const y=screen(g.horizontal).y;ctx.moveTo(0,y);ctx.lineTo(w,y)}}
  ctx.stroke();ctx.setLineDash([]);
- ctx.strokeStyle='#ffcf72';ctx.strokeRect(p.x-4,p.y-4,8,8);
- {const ref=g.vertical||g.horizontal;if(ref){const d=dist(ref,g.point),ang=((Math.atan2(g.point.y-ref.y,g.point.x-ref.x)*180/Math.PI)+360)%360;
-  const label=g.intersection?'Intersection':'Track: '+units(d)+' '+state.unit+' < '+ang.toFixed(0)+'°';ctx.font='12px Arial';const tw=ctx.measureText(label).width;
-  ctx.fillStyle='#16202aee';ctx.fillRect(p.x+12,p.y+10,tw+12,20);ctx.strokeStyle='#6bd5ff';ctx.strokeRect(p.x+12,p.y+10,tw+12,20);ctx.fillStyle='#e8f6ff';ctx.fillText(label,p.x+18,p.y+24)}}
+ ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-6,p.y-6);ctx.lineTo(p.x+6,p.y+6);ctx.moveTo(p.x+6,p.y-6);ctx.lineTo(p.x-6,p.y+6);ctx.stroke();
+ {const es=cad2dAliasLanguage==='es';let label;
+  if(g.intersection)label=es?'Intersección de rastreo':'Tracking intersection';
+  else{const r=g.rays?g.rays[0]:null,ref=r?r.anchor:(g.vertical||g.horizontal);if(ref){const d=dist(ref,g.point),ang=((Math.atan2(g.point.y-ref.y,g.point.x-ref.x)*180/Math.PI)+360)%360;label=(es?'Rastreo: ':'Track: ')+units(d)+' '+state.unit+' < '+ang.toFixed(0)+'°'}}
+  if(label){ctx.font='12px Arial';const tw=ctx.measureText(label).width;ctx.fillStyle='#16202aee';ctx.fillRect(p.x+12,p.y+10,tw+12,20);ctx.strokeStyle='#7dff9a';ctx.strokeRect(p.x+12,p.y+10,tw+12,20);ctx.fillStyle='#e8fff0';ctx.fillText(label,p.x+18,p.y+24)}}
  ctx.restore();
 }
 const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
@@ -3077,7 +3083,8 @@ function snapPoint(p){
    for(const t of otrkAnchors){const d=horiz?Math.abs(q.x-t.x):Math.abs(q.y-t.y);if(d<lim&&(!best||d<best.d))best={d,t}}
    if(best){const pt=horiz?P(best.t.x,a.y):P(a.x,best.t.y);otrkGuide={point:pt,vertical:horiz?best.t:null,horizontal:horiz?null:best.t,intersection:false};return pt}
   }else{
-   const guide=BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
+   const angs=[0,90,180,270];if(state.polarOn){const inc=Number(state.polarAngle)||45;for(let a=inc;a<360-1e-9;a+=inc)if(!angs.some(x=>Math.abs(x-a)<1e-6))angs.push(a)}
+   const guide=BlacklineTrackingMath.projectRays?BlacklineTrackingMath.projectRays(q,otrkAnchors,state.view.scale,10,angs):BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
    if(guide){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
   }
  }
@@ -5481,6 +5488,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}
  const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
+ {const n=Number(value.replace(',','.'));if(/^\d*[.,]?\d+$/.test(value)&&n>0&&otrkGuide?.rays?.length===1&&!otrkGuide.intersection&&trackingEligible()&&state.tool!=='select'){const r=otrkGuide.rays[0];otrkGuide=null;handlePoint(P(r.anchor.x+r.ux*n,r.anchor.y+r.uy*n),false);schedule();return}}
 /* ---------- Opciones de comando por teclado (estilo AutoCAD) ---------- */
  {const num=value.replace(',','.'),isNum=/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(num),n=Number(num),t=state.tool,st=state.stage,opt=rawOption;
   const say=m=>{log(m);$('command').placeholder=m;toast(m);cadRenderOptionChips()};
@@ -8518,7 +8526,7 @@ window.CAD2D_CORE=Object.freeze({
  layout:Object.freeze({get viewports(){return cadLayoutViewports},set viewports(v){cadLayoutViewports=Array.isArray(v)?v:[]},render:()=>renderLayoutWorkspace(),switchTo:space=>switchCadSpace(space),get active(){return cadActiveSpace},options:()=>layoutPlotOptions(),svg:o=>makeSVG(o),pdf:o=>makePDF(o)}),
  ribbon:Object.freeze({add:(tab,group,items)=>cad2dAddRibbonGroup(tab,group,items),rebuild:()=>buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home')}),
  openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
- osnap:Object.freeze({types:()=>CAD_OSNAP_TYPES.slice(),has:mode=>cadActiveOsnaps.has(mode),
+ otrack:Object.freeze({get on(){return otrkOn},get anchors(){return otrkAnchors.slice()},get guide(){return otrkGuide},eligible:()=>trackingEligible()}),osnap:Object.freeze({types:()=>CAD_OSNAP_TYPES.slice(),has:mode=>cadActiveOsnaps.has(mode),
   toggle:mode=>{if(!CAD_OSNAP_TYPES.includes(mode))return;cadActiveOsnaps.has(mode)?cadActiveOsnaps.delete(mode):cadActiveOsnaps.add(mode);saveCadOsnapModes();schedule()},
   set:list=>{cadActiveOsnaps=new Set(list.filter(m=>CAD_OSNAP_TYPES.includes(m)));saveCadOsnapModes();schedule()},
   get on(){return state.osnapOn}}),
@@ -8694,25 +8702,25 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1230"></script>
-<script src="blackline-modern.js?v=20261120-1230"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1230"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1230"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1230"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1230"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1230"></script>
-<script src="cad-osnap-math.js?v=20261120-1230"></script>
-<script src="cad-scale-math.js?v=20261120-1230"></script>
-<script src="cad-object-tracking.js?v=20261120-1230"></script>
-<script src="cad-auto-opening.js?v=20261120-1230"></script>
-<script src="cad-wall-join.js?v=20261120-1230"></script>
-<script src="cad-wall-grip.js?v=20261120-1230"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1230"></script>
-<script src="cad-performance.js?v=20261120-1230"></script>
-<script src="cad-plan.js?v=20261120-1230"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1230"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1230"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1230"></script>
-<script src="cad-arq-pro.js?v=20261120-1230"></script>
-<script src="cad-autocad-plus.js?v=20261120-1230"></script>
-<script src="cad-touch.js?v=20261120-1230"></script><script src="cad-quickbar.js?v=20261120-1230"></script><script src="cad-cmd-resize.js?v=20261120-1230"></script><script src="cad-buy-guide.js?v=20261120-1230"></script>
-<script src="cad-arq-tools.js?v=20261120-1230"></script><script src="cad-block-browser.js?v=20261120-1230"></script>
+<script src="workspace-upgrade.js?v=20261120-1300"></script>
+<script src="blackline-modern.js?v=20261120-1300"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-1300"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-1300"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1300"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-1300"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1300"></script>
+<script src="cad-osnap-math.js?v=20261120-1300"></script>
+<script src="cad-scale-math.js?v=20261120-1300"></script>
+<script src="cad-object-tracking.js?v=20261120-1300"></script>
+<script src="cad-auto-opening.js?v=20261120-1300"></script>
+<script src="cad-wall-join.js?v=20261120-1300"></script>
+<script src="cad-wall-grip.js?v=20261120-1300"></script>
+<script src="cad-hatch-patterns.js?v=20261120-1300"></script>
+<script src="cad-performance.js?v=20261120-1300"></script>
+<script src="cad-plan.js?v=20261120-1300"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1300"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1300"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1300"></script>
+<script src="cad-arq-pro.js?v=20261120-1300"></script>
+<script src="cad-autocad-plus.js?v=20261120-1300"></script>
+<script src="cad-touch.js?v=20261120-1300"></script><script src="cad-quickbar.js?v=20261120-1300"></script><script src="cad-cmd-resize.js?v=20261120-1300"></script><script src="cad-buy-guide.js?v=20261120-1300"></script>
+<script src="cad-arq-tools.js?v=20261120-1300"></script><script src="cad-block-browser.js?v=20261120-1300"></script>
 </body></html>
