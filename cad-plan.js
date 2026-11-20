@@ -121,7 +121,7 @@ function showPlans(reason,notice){
  const cur=status.plan,days=trialDays();
  const head=(notice?'<p class="note">'+notice+'</p>':'')+(reason?'<p class="note">'+reason+L(' es parte del plan Pro.',' is part of the Pro plan.')+'</p>':'');
  const state=!enforce?'<p>'+L('Estás usando la <b>beta abierta</b>: todo está habilitado sin cargo.','You are using the <b>open beta</b>: everything is enabled for free.')+'</p>'
-  :cur==='trial'?'<p>'+L('Prueba con todo incluido: <b>'+Math.max(0,days??0)+' días</b> restantes.','All-inclusive trial: <b>'+Math.max(0,days??0)+' days</b> left.')+'</p>'
+  :cur==='trial'?'<p>'+L('Prueba con todo incluido: <b>'+Math.max(0,days??0)+' días</b> restantes.','All-inclusive trial: <b>'+Math.max(0,days??0)+' days</b> left.')+'</p><p class="note">'+L('Podés pasar a Pro cuando quieras. Si te suscribís ahora, el primer cobro se hace recién cuando terminan tus días de prueba: no perdés ningún día.','You can go Pro at any time. If you subscribe now, the first charge happens only when your trial days end: you lose no days.')+'</p>'
   :'<p>'+L('Plan actual','Current plan')+': <b>'+(cur==='pro'?'Pro':cur==='studio'?'Studio':L('Gratis','Free'))+'</b>'+(status.email?' · '+status.email:'')+'</p>';
  const li=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
  const free=li([L('Dibujo 2D completo, capas y cotas','Full 2D drafting, layers and dimensions'),L('DXF, SVG, PNG y PDF A4','DXF, SVG, PNG and A4 PDF'),L('Galería básica de bloques','Basic block gallery')]);
@@ -152,8 +152,9 @@ function paintBadge(){
  if(!b){b=document.createElement('button');b.type='button';b.id='cadPlanBadge';b.onclick=()=>showPlans();host.append(b)}
  const days=trialDays();
  const inTrial=status.plan==='trial'&&(days??0)>0;
- b.hidden=!enforce||status.plan==='beta'||inTrial;           // durante la prueba no se menciona el cobro
- b.textContent=status.plan==='pro'||status.plan==='studio'?(PLANS[status.plan].label).toUpperCase():'PASAR A PRO';
+ // Durante la prueba también se puede comprar: el botón muestra los días que quedan.
+ b.hidden=!enforce||status.plan==='beta';
+ b.textContent=status.plan==='pro'||status.plan==='studio'?(PLANS[status.plan].label).toUpperCase():inTrial?L('PRO · prueba: '+days+' d','PRO · trial: '+days+' d'):L('PASAR A PRO','GO PRO');
  b.title='Planes y suscripción (comando PLAN)';
  maybeTrialEnded();
 }

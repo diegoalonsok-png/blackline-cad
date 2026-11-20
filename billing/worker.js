@@ -202,7 +202,9 @@ async function handle(req,env){
     const {plan='pro'}=await req.json().catch(()=>({}));
     const price={pro:env.PRICE_PRO_MONTHLY,'pro-yearly':env.PRICE_PRO_YEARLY,studio:env.PRICE_STUDIO_MONTHLY}[plan];
     if(!price)return cors(env,req,json({error:'plan inválido'},400));
-    const user=await env.DB.prepare('SELECT email,stripe_customer_id FROM users WHERE id=?').bind(userId).first();
+    const user=await env.DB.prepare('SELECT email,stripe_customer_id,trial_ends_at FROM users WHERE id=?').bind(userId).first();
+    // Compra durante la prueba: Stripe empieza a cobrar recién al terminar los días gratis (mínimo 48 h, regla de Stripe).
+    const trialEnd=Number(user.trial_ends_at)||0,keepTrial=trialEnd>now()+2*86400+300;
     // Métodos de pago dinámicos: tarjeta, PayPal, SEPA, Apple/Google Pay… se activan desde el Dashboard
     // (Configuración → Métodos de pago) sin tocar este código (a propósito no se fija una lista de métodos).
     const tax=env.STRIPE_TAX==='1';
@@ -210,7 +212,7 @@ async function handle(req,env){
      ...(user.stripe_customer_id?{customer:user.stripe_customer_id,customer_update:{address:'auto',name:'auto'}}:{customer_email:user.email}),
      line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',billing_address_collection:'required',
      ...(tax?{automatic_tax:{enabled:'true'},tax_id_collection:{enabled:'true'}}:{}),
-     subscription_data:{metadata:{user_id:userId}},
+     subscription_data:{metadata:{user_id:userId},...(keepTrial?{trial_end:trialEnd}:{})},
      success_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',cancel_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
    }
