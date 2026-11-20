@@ -324,3 +324,11 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app.blackline-modern.bl-light .tabbar .tab.active{background:var(--bl-surface)!important;color:var(--bl-accent)!important;box-shadow:inset 0 -2px 0 var(--bl-accent)!important}
 .app.blackline-modern.bl-light #cadQuickbar,.app.blackline-modern.bl-light .cad-quickbar{background:rgba(255,255,255,.96)!important;border-color:var(--bl-line)!important;color:var(--bl-ink)!important}
 .app.blackline-modern.bl-light .canvas-overlay b,.app.blackline-modern.bl-light .canvas-overlay strong{color:var(--bl-gold)!important}
+
+/* Pestañas de la cinta: separadas del encabezado (no tocan su borde inferior). */
+.app .tabbar{align-items:flex-end!important;padding-top:4px!important;box-sizing:border-box}
+.app .tabbar .tab{height:24px!important;padding-top:0!important;padding-bottom:0!important;display:inline-flex;align-items:center;border-radius:7px 7px 0 0!important;margin:0!important}
+.app .ribbon-shell,.app .ribbon{margin-top:1px}
+/* Ctrl+9: línea de comandos oculta; el área de dibujo ocupa su lugar. */
+.app.cad-hide-cmd .cmd{display:none!important}
+.app.cad-hide-cmd .workspace{grid-row:4 / 6!important}

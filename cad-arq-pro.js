@@ -468,6 +468,7 @@ function updateIsoBadge(){
 }
 // Orden de dibujo
 function drawOrder(front){
+ if(window.cadDrawOrder)return window.cadDrawOrder(front?'front':'back'); // maneja también sombreados al frente
  const st=S(),ids=new Set(selected().map(e=>e.id));if(!ids.size)return CORE.toast('ORDEN DE DIBUJO: seleccioná objetos primero');
  CORE.saveHistory();const moving=st.entities.filter(e=>ids.has(e.id)),rest=st.entities.filter(e=>!ids.has(e.id));
  st.entities.splice(0,st.entities.length,...(front?[...rest,...moving]:[...moving,...rest]));CORE.updateAll();CORE.toast(front?'Traído al frente':'Enviado al fondo');
@@ -582,7 +583,6 @@ EXT.context.push(info=>{
  }
  if(count){
   out.push(item('Aislar objetos · AISLAR',()=>C.AISLAR()),item('Ocultar objetos · OCULTAR',()=>C.OCULTAR()));
-  out.push(item('Orden: traer al frente',()=>drawOrder(true)),item('Orden: enviar al fondo',()=>drawOrder(false)));
   if(count>1)out.push(item('Agrupar · GRUPO',()=>C.GRUPO()));
   if(st.entities.some(e=>st.selected.includes(e.id)&&e.type==='blockRef'))out.push(item('Desagrupar · DESAGRUPAR',()=>C.DESAGRUPAR()),item('Contar bloques · CONTARBLOQUES',()=>C.CONTARBLOQUES()));
   if(count===1&&selected().some(e=>pathOf(e)))out.push(item('Dividir · DIV',()=>C.DIVIDIR()),item('Graduar · ME',()=>C.GRADUAR()));
