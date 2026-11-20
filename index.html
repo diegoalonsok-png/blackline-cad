@@ -5067,8 +5067,11 @@ if(cad2dLanguageSelect){
   try{localStorage.setItem('cad2d-alias-language',cad2dAliasLanguage)}catch(e){}
   // Recargar aplica el idioma a toda la interfaz (el dibujo se recupera de la copia local).
   window.BlacklineUILanguage?.setLanguage(cad2dAliasLanguage);
-  try{queueLocalBackup?.()}catch(e){}
-  setTimeout(()=>location.reload(),150);
+  // Guardar la copia local ANTES de recargar (queueLocalBackup tarda 1,8 s y la recarga la cancelaba).
+  (async()=>{
+   try{if(state.entities.length){clearTimeout(backupTimer);await persistLocalBackup();sessionStorage.setItem('cad2d-lang-restore','1')}}catch(e){}
+   location.reload();
+  })();
  });
 }
 function cad2dNormalizeCommand(value){
@@ -6310,13 +6313,16 @@ async function initializeLocalBackup(){
   if(found)backupStatus('Available: '+new Date(found.savedAt).toLocaleString()+' · '+(found.entities?.length||0)+' objects');
   else backupStatus('Automatic local backup is ready. No saved drawing yet.');
  }catch(ex){backupStatus('Could not read local backup.')}
+ // Tras cambiar el idioma (recarga), recuperar el dibujo sin preguntar.
+ let langRestore=false;try{langRestore=sessionStorage.getItem('cad2d-lang-restore')==='1';sessionStorage.removeItem('cad2d-lang-restore')}catch(e){}
+ if(langRestore&&backupAvailable&&!state.entities.length)await restoreLocalBackup(true);
 }
-async function restoreLocalBackup(){
+async function restoreLocalBackup(silent){
  if(!backupDb)return toast('Local storage unavailable');
  try{
   const snap=await backupTransaction('readonly',store=>store.get('current'));
   if(!snap||!Array.isArray(snap.entities)||!Array.isArray(snap.layers))return toast('No valid backup found');
-  if(!window.confirm('Restore local drawing from '+new Date(snap.savedAt).toLocaleString()+'? This replaces the current model. Save your open drawing first if needed.'))return;
+  if(silent!==true&&!window.confirm('Restore local drawing from '+new Date(snap.savedAt).toLocaleString()+'? This replaces the current model. Save your open drawing first if needed.'))return;
   clearTimeout(backupTimer);backupEnabled=false;
   state.entities=clone(snap.entities);state.layers=clone(snap.layers);state.blocks=clone(snap.blocks||{});state.dimStyles=clone(snap.dimStyles||{});state.activeDimStyle=snap.activeDimStyle||'';renderDimStyles();if(state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);
   state.unit=U[snap.unit]?snap.unit:'m';state.grid=Number(snap.grid)||1;
