@@ -66,6 +66,7 @@ const I={
  cal:'<rect x="5" y="2.5" width="14" height="19" rx="2"/><rect x="7.5" y="5" width="9" height="4"/><path d="M8 13h1M11.5 13h1M15 13h1M8 16.5h1M11.5 16.5h1M15 16.5h1"/>',
  mview:'<rect x="2" y="3" width="20" height="18" rx="1"/><rect x="4.5" y="5.5" width="8" height="7"/><rect x="14" y="5.5" width="5.5" height="5"/><path d="M4.5 15h15v3.5h-15z" stroke-dasharray="1.5 1.5"/>',
  buscar:'<circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6M7 10h6"/>',
+ mtext:'<rect x="3" y="3" width="18" height="18" rx="1.5" stroke-dasharray="2 2"/><path d="M7 8h10M7 12h10M7 16h6"/>',
  auditar:'<path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/><path d="m8.5 12 2.5 2.5 5-5"/>'
 };
 function setLinetype(lt){
@@ -79,6 +80,7 @@ add('home','MEDIR',[['msDist','Distancia · DI','regla',run('DIST')],['msAng','�
 EXT.commands.MEASUREGEOM=EXT.commands.MEA=EXT.commands.MEDIR=()=>CORE.command('DIST');
 add('arq','MUROS',[['arqMuro','Muro','muro',run('WALL')],['arqVano','Vano','vano',run('VANO')],['arqPuerta','Puertas y ventanas','puerta',()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')}]]);
 add('arq','GALERÍA',[['arqGaleria','Galería','galeria',run('GALERIA')],['arqBano','Baños','bano',run('BANO')],['arqCocina','Cocinas','cocina',run('COCINA')],['arqEscalera','Escaleras','escalera',run('ESCALERA')],['arqMuebles','Mobiliario','mobiliario',run('MOBILIARIO')]]);
+add('annotate','TEXTO',[['annMtext','Texto multilínea · MT','mtext',run('MTEXT')]]);
 add('arq','LOCALES',[['arqLocal','Local + m²','local',run('LOCAL')],['arqPlanilla','Planilla de superficies','listar',run('SUPERFICIES')],['arqContar','Contar bloques','contar',run('CONTARBLOQUES')]]);
 add('draw','MÁS DIBUJO',[['drSpline','Spline','spline',run('SPLINE')],['drDonut','Arandela','arandela',run('ARANDELA')],['drXline','Línea const.','xline',run('LINEACONST')],['drRay','Semirrecta','ray',run('SEMIRRECTA')],['drNube','Nube rev.','nube',run('NUBEREV')],['drDiv','Dividir','dividir',run('DIVIDIR')],['drMed','Graduar','graduar',run('GRADUAR')],['drCentro','Marca centro','centro',run('MARCACENTRO')],['drEje','Línea eje','eje',run('LINEACENTRO')]]);
 add('modify','ORGANIZAR',[['mdCamino','Matriz camino','matrizcamino',run('MATRIZCAMINO')],['mdGrupo','Agrupar','grupo',run('GRUPO')],['mdDesag','Desagrupar','desagrupar',run('DESAGRUPAR')],['mdFrente','Al frente','alfrente',run('ALFRENTE')],['mdFondo','Al fondo','alfondo',run('ALFONDO')],['mdPorCapa','Por capa','porcapa',run('PORCAPA')]]);
