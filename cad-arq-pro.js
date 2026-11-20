@@ -135,10 +135,10 @@ css.textContent=`
 #arqSizeRow input{width:100%;box-sizing:border-box}
 #arqSizeRow[hidden]{display:none}
 #arqPanelCat{width:100%;margin:6px 0}
-#arqModal{position:fixed;inset:0;z-index:9000;background:rgba(5,9,13,.72);display:flex;align-items:center;justify-content:center}
+#arqModal{position:fixed;inset:0;z-index:9000;background:transparent;display:block;pointer-events:none}
 #arqModal[hidden]{display:none}
-#arqModal .arq-box{width:min(1180px,94vw);height:min(820px,90vh);display:flex;flex-direction:column;background:#141c24;border:1px solid #4d6676;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5);color:#e5eef7}
-#arqModal header{display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid #2f4250}
+#arqModal .arq-box{position:absolute;left:3vw;top:5vh;pointer-events:auto;resize:both;overflow:hidden;min-width:320px;min-height:260px;max-width:98vw;max-height:96vh;width:min(1180px,94vw);height:min(820px,90vh);display:flex;flex-direction:column;background:#141c24;border:1px solid #4d6676;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5);color:#e5eef7}
+#arqModal header{cursor:move;user-select:none;display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid #2f4250}
 #arqModal header h2{font-size:14px;margin:0;letter-spacing:.06em;flex:1}
 #arqModal .arq-tools{padding:10px 14px;display:grid;gap:6px}
 #arqModal .arq-grid{flex:1;overflow:auto;padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-content:start}
@@ -223,12 +223,21 @@ function applySizeRow(){
 /* ---------- Galería grande (modal) ---------- */
 function buildModal(){
  if($('arqModal'))return;
- const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-label','Galería arquitectónica');
+ const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','false');m.setAttribute('aria-label','Galería arquitectónica (ventana flotante)');
  m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
  <div class="arq-tools"><input type="search" id="arqModalSearch" placeholder="Buscar en toda la galería…" aria-label="Buscar en la galería"><div class="arq-chips" id="arqModalChips" role="group" aria-label="Categorías"></div></div>
  <div class="arq-grid" id="arqModalGrid"></div></div>`;
  document.body.append(m);
- m.addEventListener('pointerdown',e=>{if(e.target===m)closeModal()});
+ // Ventana flotante: se mueve desde el título y se agranda/achica desde la esquina; recuerda posición y tamaño.
+ const box=m.querySelector('.arq-box'),KEY='cad2d-gallery-window';
+ try{const g=JSON.parse(localStorage.getItem(KEY)||'null');if(g){box.style.left=g.l+'px';box.style.top=g.t+'px';box.style.width=g.w+'px';box.style.height=g.h+'px'}}catch(e){}
+ const save=()=>{try{const r=box.getBoundingClientRect();localStorage.setItem(KEY,JSON.stringify({l:Math.round(r.left),t:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)}))}catch(e){}};
+ new ResizeObserver(()=>{if(!m.hidden)save()}).observe(box);
+ const hd=box.querySelector('header');let mv=null;
+ hd.addEventListener('pointerdown',e=>{if(e.target.closest('button,input'))return;const r=box.getBoundingClientRect();mv={dx:e.clientX-r.left,dy:e.clientY-r.top};hd.setPointerCapture(e.pointerId)});
+ hd.addEventListener('pointermove',e=>{if(!mv)return;const x=Math.min(innerWidth-80,Math.max(-box.offsetWidth+120,e.clientX-mv.dx)),y=Math.min(innerHeight-40,Math.max(0,e.clientY-mv.dy));box.style.left=x+'px';box.style.top=y+'px'});
+ hd.addEventListener('pointerup',()=>{if(mv){mv=null;save()}});
+ hd.addEventListener('dblclick',e=>{if(e.target.closest('button,input'))return;box.style.left='3vw';box.style.top='5vh';box.style.width='';box.style.height='';save()});
  $('arqModalClose').onclick=closeModal;
  $('arqModalSearch').oninput=e=>{query=e.target.value;renderModal()};
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!m.hidden){e.stopPropagation();closeModal()}},true);
