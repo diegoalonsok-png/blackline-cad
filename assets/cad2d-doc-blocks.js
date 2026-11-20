@@ -1,4 +1,4 @@
-/* Bloques de documentación de Diego Kurilo (dibujo propio): niveles, ejes, cortes, vistas, detalle,
+/* Bloques de documentación de la Biblioteca Blackline (dibujo original): niveles, ejes, cortes, vistas, detalle,
    etiquetas, título y figura humana. Se agregan a la galería como categoría "Documentación".
    Se escalan con las pinzas (pensados a 1:50; al doble sirven para 1:100). */
 (function(){

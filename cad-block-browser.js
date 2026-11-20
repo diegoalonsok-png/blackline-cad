@@ -12,7 +12,7 @@
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
-  dk:{en:'Diego Kurilo blocks',es:'Bloques Diego Kurilo',item:it=>/^dk-|^doc-/.test(it.id)},
+  dk:{en:'Blackline library',es:'Biblioteca Blackline',item:it=>/^dk-|^doc-/.test(it.id)},
   plan:{en:'Plans',es:'Plantas',cats:c=>!['Cortes y vistas','Alzados','Símbolos','Documentación'].includes(c)},
   section:{en:'Sections & elevations',es:'Cortes y vistas',cats:c=>c==='Cortes y vistas'||c==='Alzados'},
   symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'},
