@@ -284,3 +284,43 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app.blackline-modern.bl-light #blacklineBlockGallery #blCards .btn,.app.blackline-modern.bl-light #blacklineBlockGallery #blCategories .btn{background:#ffffff!important;color:#16212a!important;border:1px solid #c3ced6!important}
 .app.blackline-modern.bl-light #blCategories .btn[aria-pressed=true],
 .app.blackline-modern.bl-light #blCategories .btn.active{background:#d5e6ef!important}
+
+/* ── Modo claro refinado (2026-11-20): superficies blancas, bordes suaves, texto grafito ── */
+.app.blackline-modern.bl-light{--bl-surface:#ffffff;--bl-surface2:#f4f6f8;--bl-line:#d9dfe4;--bl-ink:#1e2a33;--bl-ink2:#5b6b76;--bl-accent:#0b6bcb;--bl-accent-soft:#e5f0fb;--bl-gold:#a8792a}
+.app.blackline-modern.bl-light #cadHeaderUndo,.app.blackline-modern.bl-light #cadHeaderRedo{background:var(--bl-surface)!important;border:1px solid var(--bl-line)!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light #cadHeaderUndo:hover,.app.blackline-modern.bl-light #cadHeaderRedo:hover{background:var(--bl-accent-soft)!important}
+.app.blackline-modern.bl-light #blToolStatus{background:var(--bl-accent-soft)!important;color:var(--bl-ink)!important;border:1px solid #c7dcf0!important}
+.app.blackline-modern.bl-light #ribbonGrip,.app.blackline-modern.bl-light .cad-ribbon-size,.app.blackline-modern.bl-light #cadRibbonLess,.app.blackline-modern.bl-light #cadRibbonMore{background:var(--bl-surface2)!important;color:var(--bl-ink2)!important;border-color:var(--bl-line)!important}
+.app.blackline-modern.bl-light button.tool,.app.blackline-modern.bl-light #ribbon button.tool{background:var(--bl-surface)!important;border:1px solid var(--bl-line)!important;color:var(--bl-ink)!important;box-shadow:0 1px 0 rgba(20,30,40,.04)!important}
+.app.blackline-modern.bl-light button.tool svg,.app.blackline-modern.bl-light button.tool svg *{stroke:var(--bl-ink)!important}
+.app.blackline-modern.bl-light button.tool:hover{background:var(--bl-accent-soft)!important;border-color:#b9d4ee!important}
+.app.blackline-modern.bl-light button.tool.active{background:var(--bl-accent-soft)!important;border-color:var(--bl-accent)!important}
+.app.blackline-modern.bl-light button.tool.active svg,.app.blackline-modern.bl-light button.tool.active svg *{stroke:var(--bl-accent)!important}
+.app.blackline-modern.bl-light #cadTextToolbar{background:var(--bl-surface2)!important;border-color:var(--bl-line)!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light #cadTextToolbar button{background:var(--bl-surface)!important;border:1px solid var(--bl-line)!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light #cadTextToolbar input,.app.blackline-modern.bl-light #cadTextToolbar select{background:var(--bl-surface)!important;color:var(--bl-ink)!important;border-color:var(--bl-line)!important}
+.app.blackline-modern.bl-light .workspace,.app.blackline-modern.bl-light #canvasWrap,.app.blackline-modern.bl-light .canvas-overlay{background:#fbfbfa!important}
+.app.blackline-modern.bl-light .canvas-overlay{background:rgba(255,255,255,.92)!important;color:var(--bl-ink)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light #zoomIn,.app.blackline-modern.bl-light #zoomOut,.app.blackline-modern.bl-light #zoomExtents,.app.blackline-modern.bl-light #panBtn{background:var(--bl-surface)!important;color:var(--bl-ink)!important;border:1px solid var(--bl-line)!important;box-shadow:0 2px 6px rgba(20,30,40,.08)!important}
+.app.blackline-modern.bl-light #modelScaleBadge{background:rgba(255,255,255,.92)!important;color:var(--bl-ink2)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light .cad-space-tab{background:var(--bl-surface)!important;color:var(--bl-ink2)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light .cad-space-tab.active{background:var(--bl-ink)!important;color:#fff!important;border-color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light nav.bl-icon-rail{background:var(--bl-surface)!important;border:1px solid var(--bl-line)!important;box-shadow:0 4px 14px rgba(20,30,40,.08)!important}
+.app.blackline-modern.bl-light nav.bl-icon-rail button{background:transparent!important;color:var(--bl-ink)!important;border-color:transparent!important}
+.app.blackline-modern.bl-light nav.bl-icon-rail button:hover,.app.blackline-modern.bl-light nav.bl-icon-rail button[aria-pressed=true]{background:var(--bl-accent-soft)!important;border-color:#b9d4ee!important}
+.app.blackline-modern.bl-light .layer-row.current{background:var(--bl-accent-soft)!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light #properties,.app.blackline-modern.bl-light #properties>div{background:var(--bl-surface)!important;color:var(--bl-ink)!important;border-color:var(--bl-line)!important}
+.app.blackline-modern.bl-light .cmd{background:var(--bl-surface2)!important;border-top:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light .cmd .log,.app.blackline-modern.bl-light .cmd .log span{color:var(--bl-ink2)!important}
+.app.blackline-modern.bl-light .cmd .command-row{background:var(--bl-surface)!important;border:1px solid var(--bl-line)!important;color:var(--bl-ink)!important;box-shadow:inset 0 1px 2px rgba(20,30,40,.04)!important}
+.app.blackline-modern.bl-light .cmd .command-row b{color:var(--bl-gold)!important}
+.app.blackline-modern.bl-light .cmd .command-row input{background:transparent!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light .cmd .command-row input::placeholder{color:#93a1ab!important}
+.app.blackline-modern.bl-light .cmd .command-row .btn,.app.blackline-modern.bl-light #runCommand{background:var(--bl-surface2)!important;color:var(--bl-ink)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light #cadSnapLive{background:var(--bl-accent-soft)!important;color:#174d80!important;border:1px solid #c7dcf0!important}
+.app.blackline-modern.bl-light #blDxfFeaturedCards>div{background:var(--bl-surface)!important;color:var(--bl-ink)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light #cadDsGrid button,.app.blackline-modern.bl-light #cadHatchGrid button{background:var(--bl-surface)!important;color:var(--bl-ink)!important;border:1px solid var(--bl-line)!important}
+.app.blackline-modern.bl-light #cadDsGrid button.on,.app.blackline-modern.bl-light #cadHatchGrid button.on{border-color:var(--bl-accent)!important;background:var(--bl-accent-soft)!important}
+.app.blackline-modern.bl-light .tabbar .tab.active{background:var(--bl-surface)!important;color:var(--bl-accent)!important;box-shadow:inset 0 -2px 0 var(--bl-accent)!important}
+.app.blackline-modern.bl-light #cadQuickbar,.app.blackline-modern.bl-light .cad-quickbar{background:rgba(255,255,255,.96)!important;border-color:var(--bl-line)!important;color:var(--bl-ink)!important}
+.app.blackline-modern.bl-light .canvas-overlay b,.app.blackline-modern.bl-light .canvas-overlay strong{color:var(--bl-gold)!important}
