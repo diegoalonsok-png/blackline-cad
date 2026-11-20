@@ -2,7 +2,7 @@
  * PLANTILLA NO DESPLEGADA. Ver billing/README.md antes de publicar.
  *
  * Variables (wrangler secret put …): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SESSION_SECRET, RESEND_API_KEY
- * Variables (wrangler.toml [vars]):    APP_ORIGIN, APP_PATH ('/' en Cloudflare Pages), API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, STRIPE_TAX ('1' = IVA automático),
+ * Variables (wrangler.toml [vars]):    APP_ORIGIN, APP_PATH ('/' en Cloudflare Pages), API_ORIGIN, PRICE_PRO_MONTHLY, PRICE_PRO_YEARLY, PRICE_STUDIO_MONTHLY, PRICE_STUDIO_YEARLY, STRIPE_TAX ('1' = IVA automático),
  *                                      TRIAL_DAYS (90 = 3 meses), MAIL_FROM, COOKIE_DOMAIN
  * Base de datos D1 enlazada como DB (schema.sql).
  *
@@ -15,8 +15,9 @@
  * Protecciones: cabeceras de seguridad y CSP en todas las respuestas, POST solo desde la app (anti-CSRF),
  * límite de tamaño, máx. 3 enlaces vigentes por correo, límites por IP opcionales (AUTH_LIMITER, API_LIMITER).
  *   POST /auth/logout
- *   GET  /api/status              {plan:'trial'|'free'|'pro'|'studio', trialEndsAt, email}
- *   POST /api/checkout            {plan:'pro'|'pro-yearly'|'studio'} → {url} de Stripe Checkout
+ *   GET  /api/status              {plan:'trial'|'free'|'pro'|'studio', trialEndsAt, email, teamOf?}
+ *   POST /api/checkout            {plan:'pro'|'pro-yearly'|'studio'|'studio-yearly'} → {url} de Stripe Checkout
+ *   GET  /api/team                plan Estudio: {members:[email], max} · POST /api/team/add {email} · POST /api/team/remove {email}
  *   POST /api/portal              → {url} del portal de facturación de Stripe
  *   POST /api/stripe-webhook      eventos firmados de Stripe (fuente de verdad del plan)
  *   GET  /api/projects            lista de proyectos en la nube · POST /api/projects {id?,name,data} guarda (crea o actualiza; guarda 10 versiones)
@@ -103,7 +104,18 @@ async function verifyStripe(env,req,raw){
  const sig=hex(await hmac(env.STRIPE_WEBHOOK_SECRET,t+'.'+raw));
  return header.split(',').filter(x=>x.startsWith('v1=')).some(x=>safeEqual(x.slice(3),sig));
 }
-const PLAN_BY_PRICE=env=>({[env.PRICE_PRO_MONTHLY]:'pro',[env.PRICE_PRO_YEARLY]:'pro',[env.PRICE_STUDIO_MONTHLY]:'studio'});
+const PLAN_BY_PRICE=env=>({[env.PRICE_PRO_MONTHLY]:'pro',[env.PRICE_PRO_YEARLY]:'pro',[env.PRICE_STUDIO_MONTHLY]:'studio',[env.PRICE_STUDIO_YEARLY]:'studio'});
+
+/* ---------- Equipo del plan Estudio: el titular + hasta 4 correos invitados, que pasan a Pro ---------- */
+const TEAM_MAX=4;
+let teamReady=false;
+async function ensureTeam(env){
+ if(teamReady)return;
+ await env.DB.prepare('CREATE TABLE IF NOT EXISTS team_members (owner_id TEXT NOT NULL, email TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(owner_id,email))').run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_team_email ON team_members(email)').run();
+ teamReady=true;
+}
+const ACTIVE_SUB="status IN ('active','trialing','past_due') AND current_period_end>?";
 
 /* ---------- Estado del usuario ---------- */
 async function planFor(env,userId){
@@ -112,6 +124,11 @@ async function planFor(env,userId){
  const sub=await env.DB.prepare("SELECT plan,status,current_period_end FROM subscriptions WHERE user_id=? AND status IN ('active','trialing','past_due') ORDER BY current_period_end DESC LIMIT 1").bind(userId).first();
  const trialEndsAt=new Date(user.trial_ends_at*1000).toISOString();
  if(sub&&sub.current_period_end>now()-3*86400)return {plan:sub.plan,email:user.email,trialEndsAt}; // 3 días de gracia
+ // Invitado por un titular del plan Estudio con la suscripción vigente → Pro
+ await ensureTeam(env);
+ const team=await env.DB.prepare(`SELECT u.email AS owner FROM team_members t JOIN users u ON u.id=t.owner_id JOIN subscriptions s ON s.user_id=t.owner_id
+  WHERE t.email=? AND s.plan='studio' AND s.${ACTIVE_SUB} LIMIT 1`).bind(user.email,now()-3*86400).first();
+ if(team)return {plan:'pro',email:user.email,trialEndsAt,teamOf:team.owner};
  return {plan:user.trial_ends_at>now()?'trial':'free',email:user.email,trialEndsAt};
 }
 
@@ -214,7 +231,7 @@ async function handle(req,env){
    if(!userId)return cors(env,req,json({error:'iniciá sesión'},401));
    if(path==='/api/checkout'&&req.method==='POST'){
     const {plan='pro'}=await req.json().catch(()=>({}));
-    const price={pro:env.PRICE_PRO_MONTHLY,'pro-yearly':env.PRICE_PRO_YEARLY,studio:env.PRICE_STUDIO_MONTHLY}[plan];
+    const price={pro:env.PRICE_PRO_MONTHLY,'pro-yearly':env.PRICE_PRO_YEARLY,studio:env.PRICE_STUDIO_MONTHLY,'studio-yearly':env.PRICE_STUDIO_YEARLY}[plan];
     if(!price)return cors(env,req,json({error:'plan inválido'},400));
     const user=await env.DB.prepare('SELECT email,stripe_customer_id,trial_ends_at FROM users WHERE id=?').bind(userId).first();
     // Compra durante la prueba: Stripe empieza a cobrar recién al terminar los días gratis (mínimo 48 h, regla de Stripe).
@@ -229,6 +246,27 @@ async function handle(req,env){
      subscription_data:{metadata:{user_id:userId},...(keepTrial?{trial_end:trialEnd}:{})},
      success_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',cancel_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
+   }
+   // ---------- Equipo (plan Estudio) ----------
+   if(path==='/api/team'||path==='/api/team/add'||path==='/api/team/remove'){
+    const me=await planFor(env,userId);
+    if(me?.plan!=='studio'||me.teamOf)return cors(env,req,json({error:'El equipo es parte del plan Estudio.',upgrade:true},402));
+    await ensureTeam(env);
+    const list=async()=>((await env.DB.prepare('SELECT email FROM team_members WHERE owner_id=? ORDER BY created_at').bind(userId).all()).results||[]).map(r=>r.email);
+    if(path==='/api/team'&&req.method==='GET')return cors(env,req,json({members:await list(),max:TEAM_MAX}));
+    if(req.method!=='POST')return cors(env,req,json({error:'método no permitido'},405));
+    const b=await req.json().catch(()=>({}));
+    const mail=String(b.email||'').trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)||mail.length>200)return cors(env,req,json({error:'email inválido'},400));
+    if(path==='/api/team/add'){
+     if(mail===me.email)return cors(env,req,json({error:'Vos ya estás incluido como titular.'},400));
+     const cur=await list();
+     if(!cur.includes(mail)){
+      if(cur.length>=TEAM_MAX)return cors(env,req,json({error:'El plan Estudio incluye hasta '+TEAM_MAX+' personas además del titular.'},400));
+      await env.DB.prepare('INSERT OR IGNORE INTO team_members(owner_id,email,created_at) VALUES(?,?,?)').bind(userId,mail,now()).run();
+     }
+    }else await env.DB.prepare('DELETE FROM team_members WHERE owner_id=? AND email=?').bind(userId,mail).run();
+    return cors(env,req,json({ok:true,members:await list(),max:TEAM_MAX}));
    }
    // ---------- Proyectos en la nube ----------
    if(path==='/api/projects'&&req.method==='GET'){

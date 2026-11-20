@@ -46,3 +46,13 @@ CREATE TABLE IF NOT EXISTS project_versions (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_versions_project ON project_versions(project_id, id);
+
+-- Plan Estudio: el titular invita hasta 4 correos, que pasan a Pro mientras su suscripción esté vigente.
+-- (El Worker también crea esta tabla solo si falta.)
+CREATE TABLE IF NOT EXISTS team_members (
+  owner_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY(owner_id,email)
+);
+CREATE INDEX IF NOT EXISTS idx_team_email ON team_members(email);

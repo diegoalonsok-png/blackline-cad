@@ -17,6 +17,7 @@
 const cfg=window.CAD2D_AUTH_CONFIG||{};
 const https=u=>typeof u==='string'&&/^https:\/\//.test(u)?u:'';
 const urls={login:https(cfg.loginUrl),status:https(cfg.statusUrl),checkout:https(cfg.checkoutUrl),portal:https(cfg.portalUrl)};
+urls.team=https(cfg.teamUrl)||(urls.status?urls.status.replace(/\/status$/,'/team'):'');
 const enforce=cfg.enforce===true&&!!urls.status;
 
 /* Matriz de planes. Las funciones básicas de dibujo NUNCA se bloquean: el usuario siempre
@@ -24,9 +25,9 @@ const enforce=cfg.enforce===true&&!!urls.status;
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
  pro:{label:'Pro',price:'3,99 € / mes · 29,99 € / año (ahorrás 37 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
- studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
+ studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team']}
 };
-const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
+const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo: el titular + 4 personas con Pro'};
 
 /* Prueba por persona: 90 días desde el primer uso en este navegador (sin registrarse).
    Con cuenta, manda la fecha del servidor. Es una indicación local, no un control de pago. */
@@ -59,7 +60,7 @@ async function refresh(){
    const best=[ends,localTrialEnd].filter(Boolean).sort().pop();
    if(Date.parse(best)>Date.now()){plan='trial';ends=best}else{plan='free';ends=best}
   }
-  status={plan,trialEndsAt:ends,email:j.email||null,source:'server'};
+  status={plan,trialEndsAt:ends,email:j.email||null,teamOf:j.teamOf||null,source:'server'};
  }catch(e){
   // Si el servidor no responde, NO se bloquea al usuario (fail-open): mejor perder un cobro que un dibujo.
   status={...status,source:'offline'};
@@ -82,12 +83,12 @@ function resumePendingCheckout(){
  if(!p||!status.email||Date.now()-p.at>2*864e5)return;
  try{localStorage.removeItem(PENDING_KEY)}catch(e){}
  if(status.plan==='pro'||status.plan==='studio')return;
- go('checkout',p.plan==='pro-yearly'?'pro-yearly':'pro');
+ go('checkout',['pro','pro-yearly','studio','studio-yearly'].includes(p.plan)?p.plan:'pro');
 }
 function paymentReturn(){
  const q=new URLSearchParams(location.search).get('pago');if(!q)return;
  history.replaceState(null,'',location.pathname+location.hash);
- setTimeout(()=>toast(q==='ok'?L('¡Gracias! Tu plan Pro ya está activo.','Thank you! Your Pro plan is now active.'):L('Pago cancelado. Podés seguir usando CAD2D.','Payment cancelled. You can keep using CAD2D.')),900);
+ setTimeout(()=>toast(q==='ok'?L('¡Gracias! Tu plan ya está activo.','Thank you! Your plan is now active.'):L('Pago cancelado. Podés seguir usando CAD2D.','Payment cancelled. You can keep using CAD2D.')),900);
 }
 function L(es,en){let lang='en';try{lang=localStorage.getItem('cad2d-alias-language')||document.documentElement.lang||'en'}catch(e){}return /^es/i.test(lang)?es:en}
 function toast(t){if(window.CAD2D_CORE?.toast)window.CAD2D_CORE.toast(t);const h=document.getElementById('statusHint');if(h)h.textContent=t}
@@ -95,7 +96,7 @@ function toast(t){if(window.CAD2D_CORE?.toast)window.CAD2D_CORE.toast(t);const h
 /* ---------- UI ---------- */
 const css=document.createElement('style');
 css.textContent=`#cadPlanDlg{position:fixed;inset:0;z-index:9300;background:rgba(5,9,13,.66);display:flex;align-items:center;justify-content:center}
-#cadPlanDlg .box{background:#141c24;border:1px solid #4d6676;border-radius:14px;padding:18px 18px 14px;width:min(640px,94vw);color:#e5eef7;font:13px/1.45 system-ui,-apple-system,Segoe UI,Arial,sans-serif;box-shadow:0 24px 60px #000a}
+#cadPlanDlg .box{background:#141c24;border:1px solid #4d6676;border-radius:14px;padding:18px 18px 14px;width:min(900px,94vw);max-height:92vh;overflow:auto;color:#e5eef7;font:13px/1.45 system-ui,-apple-system,Segoe UI,Arial,sans-serif;box-shadow:0 24px 60px #000a}
 #cadPlanDlg .top{display:flex;justify-content:space-between;align-items:center;letter-spacing:.06em;font-size:12px;color:#9fc3d6}
 #cadPlanDlg .x{all:unset;cursor:pointer;font-size:20px;color:#b9c9d4;padding:0 6px}
 #cadPlanDlg .note{color:#ffd27f;margin:10px 0 0}
@@ -112,6 +113,9 @@ css.textContent=`#cadPlanDlg{position:fixed;inset:0;z-index:9300;background:rgba
 #cadPlanDlg .fine{font-size:11px;color:#8fa3b0;margin:6px 0 0}
 #cadPlanDlg .foot{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
 #cadPlanBadge{font-size:10px;padding:2px 8px;border-radius:9px;border:1px solid #4d6676;background:#1b2833;color:#cfe3ef;cursor:pointer;margin-left:6px}
+#cadPlanDlg .cols.three{grid-template-columns:.8fr 1.3fr 1.3fr}#cadPlanDlg .col.studio{border-color:#6f9fb8}
+#cadPlanDlg .team{border:1px solid #33495a;border-radius:12px;padding:10px 12px;margin:0 0 12px}#cadPlanDlg .team .row{display:flex;gap:6px;align-items:center;margin:4px 0}#cadPlanDlg .team .row span{flex:1}#cadPlanDlg .team input{flex:1;padding:7px;border-radius:7px;border:1px solid #4d6676;background:#0f151b;color:#e5eef7}
+@media (max-width:760px){#cadPlanDlg .cols.three{grid-template-columns:1fr}}
 @media (max-width:640px){#cadPlanDlg .cols,#cadPlanDlg .cols.two{grid-template-columns:1fr}}`;
 document.head.append(css);
 function featureList(p){return '<ul>'+PLANS[p].features.filter(f=>FEATURE_LABEL[f]).map(f=>'<li>'+FEATURE_LABEL[f]+'</li>').join('')+'</ul>'}
@@ -122,28 +126,53 @@ function showPlans(reason,notice){
  const head=(notice?'<p class="note">'+notice+'</p>':'')+(reason?'<p class="note">'+reason+L(' es parte del plan Pro.',' is part of the Pro plan.')+'</p>':'');
  const state=!enforce?'<p>'+L('Estás usando la <b>beta abierta</b>: todo está habilitado sin cargo.','You are using the <b>open beta</b>: everything is enabled for free.')+'</p>'
   :cur==='trial'?'<p>'+L('Prueba con todo incluido: <b>'+Math.max(0,days??0)+' días</b> restantes.','All-inclusive trial: <b>'+Math.max(0,days??0)+' days</b> left.')+'</p><p class="note">'+L('Podés pasar a Pro cuando quieras. Si te suscribís ahora, el primer cobro se hace recién cuando terminan tus días de prueba: no perdés ningún día.','You can go Pro at any time. If you subscribe now, the first charge happens only when your trial days end: you lose no days.')+'</p>'
-  :'<p>'+L('Plan actual','Current plan')+': <b>'+(cur==='pro'?'Pro':cur==='studio'?'Studio':L('Gratis','Free'))+'</b>'+(status.email?' · '+status.email:'')+'</p>';
+  :'<p>'+L('Plan actual','Current plan')+': <b>'+(cur==='pro'?'Pro':cur==='studio'?L('Estudio','Studio'):L('Gratis','Free'))+'</b>'+(status.email?' · '+esc(status.email):'')+(status.teamOf?' · '+L('incluido en el equipo de ','included in the team of ')+esc(status.teamOf):'')+'</p>';
  const li=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
  const free=li([L('Dibujo 2D completo, capas y cotas','Full 2D drafting, layers and dimensions'),L('DXF, SVG, PNG y PDF A4','DXF, SVG, PNG and A4 PDF'),L('Galería básica de bloques','Basic block gallery')]);
  const pro=li([L('Toda la galería de bloques dinámicos','The whole dynamic block gallery'),L('Ploteo PDF A0–A3 y escalas a medida','A0–A3 PDF plotting and custom scales'),L('Proyectos ilimitados','Unlimited projects'),L('Sin marca de agua','No watermark')]);
  const isPro=cur==='pro'||cur==='studio';
+ const studio=li([L('Todo lo de Pro','Everything in Pro'),L('El titular + 4 personas con Pro','The owner + 4 people with Pro'),L('Invitás y quitás personas por correo cuando quieras','Add or remove people by email at any time')]);
  d.innerHTML='<div class="box"><div class="top"><b>BLACKLINE CAD · '+L('PLANES','PLANS')+'</b><button class="x" data-go="close" aria-label="Close">×</button></div>'+head+state+
-  '<div class="cols two">'+
+  '<div class="cols three">'+
    '<div class="col'+(cur==='free'?' cur':'')+'"><h3>'+L('Gratis','Free')+'</h3><div class="price">0 €</div>'+free+'</div>'+
    '<div class="col pro'+(isPro?' cur':'')+'"><h3>Pro</h3>'+
     '<div class="opts">'+
      '<button class="opt" data-go="checkout" data-plan="pro"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">3,99 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
      '<button class="opt best" data-go="checkout" data-plan="pro-yearly"><span class="tag">'+L('Ahorrás 37 %','Save 37 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">29,99 €</span><span class="sub">'+L('por año · ≈ 2,50 € / mes','per year · ≈ €2.50 / month')+'</span></button>'+
     '</div>'+pro+'<p class="fine">'+L('IVA incluido · tarjeta, PayPal y otros medios · cancelás cuando quieras','VAT included · card, PayPal and more · cancel anytime')+'</p></div>'+
-  '</div><div class="foot">'+
+   '<div class="col studio'+(cur==='studio'?' cur':'')+'"><h3>'+L('Estudio','Studio')+' · '+L('5 personas','5 people')+'</h3>'+
+    '<div class="opts">'+
+     '<button class="opt" data-go="checkout" data-plan="studio"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">9,99 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
+     '<button class="opt" data-go="checkout" data-plan="studio-yearly"><span class="tag">'+L('Ahorrás 25 %','Save 25 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">89,99 €</span><span class="sub">'+L('por año · ≈ 7,50 € / mes','per year · ≈ €7.50 / month')+'</span></button>'+
+    '</div>'+studio+'<p class="fine">'+L('IVA incluido · 2 € por persona al mes','VAT included · €2 per person per month')+'</p></div>'+
+  '</div>'+(cur==='studio'&&!status.teamOf&&urls.team?'<div class="team" id="cadPlanTeam"><b>'+L('Tu equipo','Your team')+'</b> <span class="fine">'+L('Cada persona entra con su correo y tiene Pro mientras tu plan esté vigente.','Each person signs in with their email and has Pro while your plan is active.')+'</span><div class="list">…</div><div class="row"><input type="email" placeholder="'+L('correo@estudio.com','name@studio.com')+'" aria-label="Email"><button class="btn" data-team="add">'+L('Agregar','Add')+'</button></div></div>':'')+
+  '<div class="foot">'+
   (urls.login&&!status.email?'<button class="btn" data-go="login">'+L('Ingresar / crear cuenta','Sign in / create account')+'</button>':'')+
   (urls.portal&&status.email&&isPro?'<button class="btn" data-go="portal">'+L('Administrar suscripción','Manage subscription')+'</button>':'')+
   (window.CAD2D_BUY_GUIDE?'<button class="btn" data-go="guide">'+L('▶ Cómo funciona · 1 min','▶ How it works · 1 min')+'</button>':'')+
   '<button class="btn" data-go="close">'+L('Seguir con el plan gratis','Keep using the free plan')+'</button></div></div>';
  if(isPro)d.querySelectorAll('.opt').forEach(b=>b.disabled=true);
  document.body.append(d);
+ if(d.querySelector('#cadPlanTeam'))teamUI(d.querySelector('#cadPlanTeam'));
  const onKey=e=>{if(e.key==='Escape'){d.remove();document.removeEventListener('keydown',onKey,true)}};document.addEventListener('keydown',onKey,true);
  d.addEventListener('click',e=>{const t=e.target.closest('[data-go]'),g=t?.dataset.go;if(!g&&e.target!==d)return;if(!g||g==='close'){d.remove();return}if(g==='guide'){d.remove();window.CAD2D_BUY_GUIDE?.open();return}go(g,t.dataset.plan||'pro')});
+}
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function teamCall(path,body){
+ const r=await fetch(urls.team+path,body?{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{credentials:'include',headers:{accept:'application/json'}});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'HTTP '+r.status);return j;
+}
+function teamUI(box){
+ const listEl=box.querySelector('.list'),input=box.querySelector('input');
+ const paint=j=>{const m=j.members||[];listEl.innerHTML=(m.length?m.map(e=>'<div class="row"><span>'+esc(e)+'</span><button class="btn" data-team="remove" data-email="'+esc(e)+'">'+L('Quitar','Remove')+'</button></div>').join(''):'<p class="fine">'+L('Todavía no invitaste a nadie.','You have not invited anyone yet.')+'</p>')+'<p class="fine">'+m.length+' / '+(j.max||4)+'</p>'};
+ const fail=e=>toast(L('Equipo: ','Team: ')+e.message);
+ teamCall('').then(paint,fail);
+ box.addEventListener('click',e=>{
+  const t=e.target.closest('[data-team]');if(!t)return;e.stopPropagation();
+  if(t.dataset.team==='add'){const v=input.value.trim();if(!v)return;teamCall('/add',{email:v}).then(j=>{input.value='';paint(j)},fail)}
+  else teamCall('/remove',{email:t.dataset.email}).then(paint,fail);
+ });
+ input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();box.querySelector('[data-team="add"]').click()}});
 }
 function upsell(reason){showPlans(reason)}
 function paintBadge(){
@@ -154,7 +183,7 @@ function paintBadge(){
  const inTrial=status.plan==='trial'&&(days??0)>0;
  // Durante la prueba también se puede comprar: el botón muestra los días que quedan.
  b.hidden=!enforce||status.plan==='beta';
- b.textContent=status.plan==='pro'||status.plan==='studio'?(PLANS[status.plan].label).toUpperCase():inTrial?L('PRO · prueba: '+days+' d','PRO · trial: '+days+' d'):L('PASAR A PRO','GO PRO');
+ b.textContent=status.plan==='pro'||status.plan==='studio'?(status.plan==='studio'?L('ESTUDIO','STUDIO'):'PRO'):inTrial?L('PRO · prueba: '+days+' d','PRO · trial: '+days+' d'):L('PASAR A PRO','GO PRO');
  b.title='Planes y suscripción (comando PLAN)';
  maybeTrialEnded();
 }
