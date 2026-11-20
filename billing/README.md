@@ -20,19 +20,19 @@ Principios:
 
 ## Precios (editables en `cad-plan.js` y en Stripe)
 
-> **20 nov 2026: Pro pasa a 3,99 €/mes y 29,99 €/año.** Hay que crear esos dos precios nuevos en Stripe (cuenta Blackline CAD, IVA incluido) y reemplazar `PRICE_PRO_MONTHLY` y `PRICE_PRO_YEARLY` en las variables del Worker `cad2d-billing`. Los IDs de abajo son los de 1,59 € y 12,99 €.
+> **20 nov 2026: Pro pasa a 3,99 €/mes y 29,99 €/año** (IVA incluido). Precios nuevos creados en Stripe y cargados en el Worker `cad2d-billing`: `PRICE_PRO_MONTHLY` = `price_1UdvJLDY9yzl20JEloIXAm7X` (3,99 €/mes), `PRICE_PRO_YEARLY` = `price_1UdvQBDY9yzl20JEmqGHOe5O` (29,99 €/año, predeterminado). Los anteriores (1,59 €, 12,99 €, 22,99 €) quedan archivados.
 
-Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). Precios en Stripe (entorno de prueba, cuenta Blackline CAD con Managed Payments): mensual `price_1UdWXqDRUE2reABAHniRmfHw` (1,59 €), anual `price_1UdWYdDRUE2reABAPWeKFW5K` (12,99 €). Modo activo: mensual `price_1UdX22DY9yzl20JEdPDjQo3X`, anual `price_1UdX22DY9yzl20JE1Gzk27li`.
+Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). El plan Estudio todavía no se vende (no hay botón ni `PRICE_STUDIO_MONTHLY`); sus importes son de referencia.
 
 | Plan | Precio (IVA incluido) | Te queda por cobro* |
 | --- | --- | --- |
 | Gratis | 0 € (dibujo, DXF, SVG, PNG, PDF A4, galería básica) | — |
 | Pro mensual | **3,99 €** | ≈ 2,94 € |
 | Pro anual | **29,99 €** (37 % menos que 12 meses) | ≈ 23,73 € |
-| Estudio mensual (5 usuarios) | 4,99 € | ≈ 3,74 € |
-| Estudio anual (5 usuarios) | 49,99 € | ≈ 39,71 € |
+| Estudio mensual (5 usuarios) | 9,99 € | ≈ 7,74 € |
+| Estudio anual (5 usuarios) | 89,99 € | ≈ 71,69 € |
 
-\* Estimación con IVA español del 21 %, tarjeta del EEE (1,5 % + 0,25 €), Billing 0,7 % y Stripe Tax 0,5 %. Con tarjetas de fuera del EEE la comisión es mayor (3,15 % + 0,25 €, más 2 % si hay conversión de moneda). El precio mensual se fijó en 1,59 € para que, tras comisiones e IVA, quede aproximadamente 1 € neto.
+\* Estimación con IVA español del 21 %, tarjeta del EEE (1,5 % + 0,25 €), Billing 0,7 % y Stripe Tax 0,5 %. Con tarjetas de fuera del EEE la comisión es mayor (3,15 % + 0,25 €, más 2 % si hay conversión de moneda).
 
 Al crear los precios en Stripe, marcá *Incluir impuestos en el precio* (`tax_behavior=inclusive`) para que el cliente pague exactamente esos importes. Con tickets tan chicos conviene **destacar el plan anual**: la comisión fija de 0,25 € se paga una vez por año en lugar de doce.
 
