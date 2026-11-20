@@ -965,7 +965,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">Los archivos DWG (AutoCAD 2000 a 2018 y posteriores) se abren directamente: se convierten a DXF en un servicio propio de Blackline y se borran apenas termina la conversión. Para guardar, CAD2D exporta DXF, que AutoCAD abre sin pasos extra.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio de AutoCAD. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.pdf,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
 <script src="cad2d-config.js?v=20261120-1450"></script>
 <script src="cad-grip-settings.js?v=20261120-1450"></script>
 <script src="cad-cursor-mode.js?v=20261120-1450"></script>
@@ -3311,7 +3311,7 @@ if(t==='polyline'){
   done({type:'dimension',a:s[0],b:s[1],p:s[2],mode,style:readDimensionStyle(),layer:cadDimLayerId()});s.length=0;
  }
  prompt();schedule();return
-}if(t==='distance'){s.push(p);if(s.length===1)state.measureResult=null;if(s.length===2){const r=cadMeasureInfo(s[0],s[1]);state.measureResult={a:s[0],b:s[1]};log(r.line);toast(r.main);s.length=0;draw()}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
+}if(t==='distance'){s.push(p);if(s.length===1)state.measureResult=null;if(s.length===2){const r=cadMeasureInfo(s[0],s[1]);state.measureResult={a:s[0],b:s[1]};cadLastMeasure={a:P(s[0].x,s[0].y),b:P(s[1].x,s[1].y)};log(r.line);toast(r.main);s.length=0;draw()}prompt();return}if(t==='text'){const style=getTextStyleFromPanel();if(!style.text){toast('Enter text in Typography palette first');return}done({type:'text',p,...style,layer:state.layerId});return}}
 function cancelCadCommand(){
  cadSelectionAnchor=null;cadSelectionAnchorShift=false;
  cadZoomOptionPending=false;
@@ -6292,6 +6292,7 @@ function cadInsertTableData(rows,name){
  saveHistory();const ids=[];for(const e of add){e.id=state.nextId++;e.layer=state.layerId;e.width=.13;state.entities.push(e);ids.push(e.id)}
  state.selected=ids;updateAll();toast('Imported '+name+' · '+rows.length+' rows × '+cols+' columns as an editable table (selected: move it with M)');log('IMPORT '+name);
 }
+window.CAD2D_IMPORT_FILE=f=>cadImportFile(f);
 async function cadImportFile(f){
  try{
   if(/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)){
@@ -6319,7 +6320,7 @@ async function cadDxfDecode(buf){
  const cp=m?'windows-'+m[1]:'windows-1252';
  try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
 }
-async function loadDrawingFile(f){if(!f)return;if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+async function loadDrawingFile(f){if(!f)return;if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -9309,6 +9310,23 @@ function cad2dAddRibbonGroup(tab,group,items){
  if(existing){for(const id of ids)if(!existing.includes(id))existing.push(id)}else ribbonTabs[tab].push([group,...ids]);
 }
 
+/* CALIBRAR: escala una imagen o PDF de fondo (o lo seleccionado) a tamaño real.
+   1) DIST entre dos puntos de medida conocida sobre la imagen · 2) CALIBRAR <medida real>, p. ej. CALIBRAR 4.50 */
+let cadLastMeasure=null;
+function cadCalibrate(raw){
+ const m=cadLastMeasure,real=Number(String(raw||'').replace(/^[^\d.,-]*/,'').replace(',','.').match(/-?\d+(\.\d+)?/)?.[0]);
+ if(!m){setTool('distance');return toast('CALIBRAR: primero medí con DIST dos puntos de largo conocido sobre la imagen; después escribí CALIBRAR y la medida real (ej. CALIBRAR 4.50)')}
+ const d=dist(m.a,m.b);if(!(d>1e-9))return toast('CALIBRAR: la medición es nula, medí de nuevo con DIST');
+ if(!(real>0))return toast('CALIBRAR: escribí la medida real, por ejemplo CALIBRAR 4.50 (en '+state.unit+'); medido ahora: '+units(d));
+ let ids=state.selected.filter(id=>state.entities.some(e=>e.id===id&&!layerFor(e).locked));
+ if(!ids.length){const img=[...state.entities].reverse().find(e=>e.type==='image'&&!layerFor(e).locked);if(img)ids=[img.id]}
+ if(!ids.length)return toast('CALIBRAR: seleccioná la imagen o los objetos a escalar');
+ const f=real/d,set=new Set(ids);saveHistory();
+ state.entities=state.entities.map(e=>set.has(e.id)?BlacklineScaleMath.scaleEntity(e,m.a,f):e);
+ state.selected=ids;cadLastMeasure=null;updateAll();log('CALIBRAR x'+f.toFixed(5));
+ toast('Calibrado: '+units(d)+' → '+units(real)+' (x'+f.toFixed(4)+'). Ya podés dibujar encima a escala real.');
+}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CALIBRAR','CALIBRATE','IMAGESCALE','ESCALAREAL'])X.commands[k]=raw=>cadCalibrate(raw)}
 function cad2dRunExtensionCommand(cmd,raw){
  const reg=window.CAD2D_EXTENSIONS,key=String(cmd||'').toUpperCase(),fn=reg?.commands?.[key];
  if(typeof fn!=='function')return false;
@@ -9535,7 +9553,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 <script src="cad-wall-grip.js?v=20261120-1450"></script>
 <script src="cad-hatch-patterns.js?v=20261120-1450"></script>
 <script src="cad-performance.js?v=20261120-1450"></script>
-<script src="cad-plan.js?v=20261120-1450"></script><script src="cad-cloud.js?v=20261120-1450"></script>
+<script src="assets/cad-pdf-import.js?v=20261120-1500"></script><script src="cad-plan.js?v=20261120-1450"></script><script src="cad-cloud.js?v=20261120-1450"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261120-1450"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1450"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1450"></script><script src="cad-my-blocks.js?v=20261120-1450"></script>
 <script src="cad-arq-pro.js?v=20261120-1450"></script>
 <script src="cad-autocad-plus.js?v=20261120-1450"></script>
