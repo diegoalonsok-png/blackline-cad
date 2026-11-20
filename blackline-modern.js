@@ -212,6 +212,8 @@ requestAnimationFrame(requestResize);
   ['file-import','Import image / Excel / TXT…','folder-open',''],
   ['file-save','Save','save','Ctrl+S'],
   ['file-saveas','Save As…','save',"Ctrl+Shift+S"],
+  ['file-cloudsave','Guardar en la nube','cloud',''],
+  ['file-cloud','Mis proyectos en la nube…','cloud',''],
   ['file-dxf','Export DXF','download',''],
   ['file-print','Plot / Export PDF…','printer','Ctrl+P']
  ];
@@ -220,7 +222,8 @@ requestAnimationFrame(requestResize);
   'folder-open':'<path d="M3 7V4h7l3 3h8v4M3 11h18l-3 10H5z"/>',
   save:'<path d="M4 3h14l3 3v15H3zM8 3v7h9V3M8 21v-8h9v8"/>',
   download:'<path d="M5 3h14v18H5zM12 7v10m-4-4 4 4 4-4"/>',
-  printer:'<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>'
+  printer:'<path d="M6 9V3h12v6M6 18H4V9h16v9h-2M6 14h12v7H6z"/>',
+  cloud:'<path d="M7 18h10a4 4 0 0 0 .5-7.97A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z"/>'
  };
  const title=document.createElement('div');title.className='bl-file-menu-title';title.textContent='BLACKLINE CAD · FILE';menu.append(title);
  for(const [id,label,icon,keys] of actions){
@@ -253,6 +256,8 @@ requestAnimationFrame(requestResize);
   if(key==='file-saveas')runCommand('SAVEAS');
   if(key==='file-dxf')document.getElementById('dxfBtn')?.click();
   if(key==='file-print')document.getElementById('pdfBtn')?.click();
+  if(key==='file-cloudsave')runCommand('GUARDARNUBE');
+  if(key==='file-cloud')runCommand('MISPROYECTOS');
  });
  document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target)&&!mark.contains(e.target))close()},true);
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){e.preventDefault();close();mark.focus()}});

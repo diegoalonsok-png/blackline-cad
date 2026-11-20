@@ -19,6 +19,9 @@
  *   POST /api/checkout            {plan:'pro'|'pro-yearly'|'studio'} → {url} de Stripe Checkout
  *   POST /api/portal              → {url} del portal de facturación de Stripe
  *   POST /api/stripe-webhook      eventos firmados de Stripe (fuente de verdad del plan)
+ *   GET  /api/projects            lista de proyectos en la nube · POST /api/projects {id?,name,data} guarda (crea o actualiza; guarda 10 versiones)
+ *   GET  /api/projects/<id>       abre · POST …/rename · POST …/delete · POST …/share {on} · GET …/versions[/<n>]
+ *   GET  /api/share/<shareId>     proyecto compartido de solo lectura (sin sesión)
  */
 const enc=new TextEncoder();
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8',...headers}});
@@ -81,6 +84,10 @@ function cors(env,req,res){
  return res;
 }
 
+/* ---------- Compresión de proyectos (gzip + base64) ---------- */
+async function zip(text){const s=new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));const u8=new Uint8Array(await new Response(s).arrayBuffer());let bin='';for(let i=0;i<u8.length;i+=0x8000)bin+=String.fromCharCode(...u8.subarray(i,i+0x8000));return btoa(bin)}
+async function unzip(b64){const bin=atob(b64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream('gzip'))).text()}
+
 /* ---------- Stripe ---------- */
 async function stripe(env,path,params){
  const body=new URLSearchParams();
@@ -128,7 +135,7 @@ async function handle(req,env){
    if(req.method!=='GET'&&req.method!=='POST')return json({error:'método no permitido'},405);
    if(req.method==='POST'&&path!=='/api/stripe-webhook'){
     if(!originAllowed(env,req))return cors(env,req,json({error:'origen no permitido'},403));
-    if(tooLarge(req,16*1024))return cors(env,req,json({error:'demasiado grande'},413));
+    if(tooLarge(req,path.startsWith('/api/projects')?8*1024*1024:16*1024))return cors(env,req,json({error:'demasiado grande'},413));
    }
    if(path==='/api/stripe-webhook'&&tooLarge(req,512*1024))return json({error:'demasiado grande'},413);
    if(path.startsWith('/api/')&&path!=='/api/stripe-webhook'&&await limited(env.API_LIMITER,clientIp(req)))return cors(env,req,json({error:'demasiados pedidos'},429));
@@ -191,6 +198,13 @@ async function handle(req,env){
     }
     return json({ok:true});
    }
+   // Proyecto compartido (solo lectura, sin sesión): GET /api/share/<id>
+   if(path.startsWith('/api/share/')&&req.method==='GET'){
+    const sid=path.slice(11).replace(/[^A-Za-z0-9_-]/g,'').slice(0,40);
+    const row=sid&&await env.DB.prepare('SELECT name,data,updated_at FROM projects WHERE share_id=?').bind(sid).first();
+    if(!row)return cors(env,req,json({error:'enlace no válido o desactivado'},404));
+    return cors(env,req,json({name:row.name,data:await unzip(row.data),updatedAt:row.updated_at,readOnly:true}));
+   }
    // A partir de aquí, endpoints de la app (requieren sesión)
    const userId=await readSession(env,req);
    if(path==='/api/status'&&req.method==='GET'){
@@ -215,6 +229,53 @@ async function handle(req,env){
      subscription_data:{metadata:{user_id:userId},...(keepTrial?{trial_end:trialEnd}:{})},
      success_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',cancel_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
+   }
+   // ---------- Proyectos en la nube ----------
+   if(path==='/api/projects'&&req.method==='GET'){
+    const {results}=await env.DB.prepare('SELECT id,name,size,updated_at,share_id FROM projects WHERE user_id=? ORDER BY updated_at DESC LIMIT 200').bind(userId).all();
+    return cors(env,req,json({projects:(results||[]).map(r=>({id:r.id,name:r.name,size:r.size,updatedAt:r.updated_at,shareId:r.share_id||null}))}));
+   }
+   if(path==='/api/projects'&&req.method==='POST'){
+    const body=await req.json().catch(()=>null);
+    if(!body||typeof body.data!=='string'||body.data.length<2)return cors(env,req,json({error:'proyecto inválido'},400));
+    try{const j=JSON.parse(body.data);if(!Array.isArray(j.entities)||!Array.isArray(j.layers))throw 0}catch(e){return cors(env,req,json({error:'proyecto inválido'},400))}
+    const name=String(body.name||'Dibujo').replace(/[\u0000-\u001f]/g,'').trim().slice(0,80)||'Dibujo';
+    const packed=await zip(body.data);if(packed.length>1900000)return cors(env,req,json({error:'proyecto demasiado grande para la nube (máx. ~1,9 MB comprimido)'},413));
+    const plan=(await planFor(env,userId))?.plan||'free';
+    let id=String(body.id||'').replace(/[^A-Za-z0-9-]/g,'').slice(0,40);
+    const own=id&&await env.DB.prepare('SELECT id,data FROM projects WHERE id=? AND user_id=?').bind(id,userId).first();
+    if(!own){
+     const n=(await env.DB.prepare('SELECT COUNT(*) AS n FROM projects WHERE user_id=?').bind(userId).first())?.n||0;
+     if(plan==='free'&&n>=3)return cors(env,req,json({error:'El plan gratis guarda hasta 3 proyectos en la nube. Pasá a Pro para guardar más.',upgrade:true},402));
+     if(n>=500)return cors(env,req,json({error:'límite de proyectos alcanzado'},400));
+     id=crypto.randomUUID();
+     await env.DB.prepare('INSERT INTO projects(id,user_id,name,data,size,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id,userId,name,packed,body.data.length,now(),now()).run();
+    }else{
+     await env.DB.prepare('INSERT INTO project_versions(project_id,data,created_at) VALUES(?,?,?)').bind(id,own.data,now()).run();
+     await env.DB.prepare('DELETE FROM project_versions WHERE project_id=? AND id NOT IN (SELECT id FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT 10)').bind(id,id).run();
+     await env.DB.prepare('UPDATE projects SET name=?,data=?,size=?,updated_at=? WHERE id=? AND user_id=?').bind(name,packed,body.data.length,now(),id,userId).run();
+    }
+    return cors(env,req,json({ok:true,id,updatedAt:now()}));
+   }
+   {const m=path.match(/^\/api\/projects\/([A-Za-z0-9-]{8,40})(?:\/(share|delete|versions|rename))?(?:\/(\d+))?$/);
+    if(m){
+     const [,pid,action,vid]=m;
+     const own=await env.DB.prepare('SELECT id,name,data,share_id FROM projects WHERE id=? AND user_id=?').bind(pid,userId).first();
+     if(!own)return cors(env,req,json({error:'no encontrado'},404));
+     if(!action&&req.method==='GET')return cors(env,req,json({id:pid,name:own.name,data:await unzip(own.data)}));
+     if(action==='delete'&&req.method==='POST'){await env.DB.prepare('DELETE FROM project_versions WHERE project_id=?').bind(pid).run();await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(pid,userId).run();return cors(env,req,json({ok:true}))}
+     if(action==='rename'&&req.method==='POST'){const b=await req.json().catch(()=>({}));const nm=String(b.name||'').trim().slice(0,80);if(!nm)return cors(env,req,json({error:'nombre vacío'},400));await env.DB.prepare('UPDATE projects SET name=? WHERE id=? AND user_id=?').bind(nm,pid,userId).run();return cors(env,req,json({ok:true}))}
+     if(action==='share'&&req.method==='POST'){
+      const b=await req.json().catch(()=>({}));
+      if(b.on===false){await env.DB.prepare('UPDATE projects SET share_id=NULL WHERE id=? AND user_id=?').bind(pid,userId).run();return cors(env,req,json({ok:true,shareId:null}))}
+      const sid=own.share_id||randomToken(12);await env.DB.prepare('UPDATE projects SET share_id=? WHERE id=? AND user_id=?').bind(sid,pid,userId).run();return cors(env,req,json({ok:true,shareId:sid}));
+     }
+     if(action==='versions'&&req.method==='GET'){
+      if(vid){const v=await env.DB.prepare('SELECT data,created_at FROM project_versions WHERE id=? AND project_id=?').bind(Number(vid),pid).first();if(!v)return cors(env,req,json({error:'no encontrado'},404));return cors(env,req,json({name:own.name,data:await unzip(v.data),createdAt:v.created_at}))}
+      const {results}=await env.DB.prepare('SELECT id,created_at,length(data) AS bytes FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT 10').bind(pid).all();
+      return cors(env,req,json({versions:(results||[]).map(r=>({id:r.id,createdAt:r.created_at,bytes:r.bytes}))}));
+     }
+    }
    }
    if(path==='/api/portal'&&req.method==='POST'){
     const user=await env.DB.prepare('SELECT stripe_customer_id FROM users WHERE id=?').bind(userId).first();
