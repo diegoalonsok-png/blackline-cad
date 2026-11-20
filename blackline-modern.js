@@ -65,7 +65,7 @@ const iconPaths={
  polyline:'<path d="M3 18 8 7 15 12 20 4"/><circle cx="3" cy="18" r="1.3"/><circle cx="8" cy="7" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="20" cy="4" r="1.3"/>',
  rect:'<rect x="4" y="5" width="16" height="14" rx="1.5"/>',
  circle:'<circle cx="12" cy="12" r="8"/>',
- arc:'<path d="M4 18 A10 10 0 0 1 20 18"/>',
+ arc:'<path d="M4 18 A10 10 0 0 1 20 18"/>',ellipse:'<ellipse cx="12" cy="12" rx="9" ry="5.5"/>',
  trim:'<path d="M4 6 18 20 M18 6 4 20"/><path d="M8 5h8 M8 19h8" stroke-dasharray="2 2"/><circle cx="5" cy="6" r="1.5"/><circle cx="19" cy="6" r="1.5"/>',
  move:'<path d="M12 2v20M2 12h20M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3"/>',
  copy:'<rect x="4" y="4" width="12" height="12" rx="1.5"/><rect x="8" y="8" width="12" height="12" rx="1.5"/>',
@@ -82,7 +82,7 @@ const iconPaths={
 };
 const rails=[
  ['select','Seleccionar','home'],['line','Línea','home'],['polyline','Polilínea','home'],
- ['rect','Rectángulo','home'],['circle','Círculo','home'],['arc','Arco','home'],
+ ['rect','Rectángulo','home'],['circle','Círculo','home'],['arc','Arco','home'],['ellipse','Elipse','draw'],
  ['trim','Recortar / TRIM','home'],['move','Mover','home'],['copy','Copiar','home'],
  ['rotate','Girar','modify'],['dimension','Acotar','home'],['blockgallery','Bloques','home']
 ];
