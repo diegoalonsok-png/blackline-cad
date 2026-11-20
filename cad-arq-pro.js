@@ -137,10 +137,19 @@ css.textContent=`
 #arqPanelCat{width:100%;margin:6px 0}
 #arqModal{position:fixed;inset:0;z-index:9000;background:transparent;display:block;pointer-events:none}
 #arqModal[hidden]{display:none}
-#arqModal .arq-box{position:absolute;left:3vw;top:5vh;pointer-events:auto;resize:both;overflow:hidden;min-width:320px;min-height:260px;max-width:98vw;max-height:96vh;width:min(1180px,94vw);height:min(820px,90vh);display:flex;flex-direction:column;background:#141c24;border:1px solid #4d6676;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5);color:#e5eef7}
+#arqModal .arq-box{position:absolute;left:3vw;top:5vh;pointer-events:auto;overflow:visible;min-width:320px;min-height:260px;max-width:98vw;max-height:96vh;width:min(1180px,94vw);height:min(820px,90vh);display:flex;flex-direction:column;background:#141c24;border:1px solid #4d6676;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5);color:#e5eef7}
 #arqModal header{cursor:move;user-select:none;display:flex;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid #2f4250}
 #arqModal header h2{font-size:14px;margin:0;letter-spacing:.06em;flex:1}
 #arqModal .arq-tools{padding:10px 14px;display:grid;gap:6px}
+#arqModal .arq-box{position:absolute}
+#arqModal .arq-grip{position:absolute;z-index:3;background:transparent}
+#arqModal .arq-grip.e{top:12px;right:-4px;width:10px;bottom:12px;cursor:ew-resize}#arqModal .arq-grip.w{top:12px;left:-4px;width:10px;bottom:12px;cursor:ew-resize}
+#arqModal .arq-grip.s{left:12px;right:12px;bottom:-4px;height:10px;cursor:ns-resize}#arqModal .arq-grip.n{left:12px;right:12px;top:-4px;height:8px;cursor:ns-resize}
+#arqModal .arq-grip.se,#arqModal .arq-grip.sw,#arqModal .arq-grip.ne,#arqModal .arq-grip.nw{width:16px;height:16px;background:#9adff3;border:2px solid #141c24;border-radius:4px}
+#arqModal .arq-grip.se{right:-7px;bottom:-7px;cursor:nwse-resize}#arqModal .arq-grip.sw{left:-7px;bottom:-7px;cursor:nesw-resize}#arqModal .arq-grip.ne{right:-7px;top:-7px;cursor:nesw-resize}#arqModal .arq-grip.nw{left:-7px;top:-7px;cursor:nwse-resize}
+#arqModal .arq-grip.e:hover,#arqModal .arq-grip.w:hover,#arqModal .arq-grip.s:hover,#arqModal .arq-grip.n:hover{background:#9adff355}
+#arqModal .arq-sizes{display:flex;gap:4px}#arqModal .arq-sizes .btn{padding:3px 8px;font-size:11px}
+#arqModal .arq-box.compact .arq-grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}#arqModal .arq-box.compact .arq-tools{padding-bottom:4px}#arqModal .arq-box.compact header{flex-wrap:wrap;gap:6px}#arqModal .arq-box.compact header h2{font-size:12px;flex:1 1 100%;margin:0}
 #arqModal .arq-grid{flex:1;overflow:auto;padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-content:start}
 #arqModal .arq-card .arq-name{font-size:11px}
 #arqVariantMenu{position:fixed;z-index:9100;background:#141c24;border:1px solid #4d6676;border-radius:8px;padding:6px;max-height:60vh;overflow:auto;display:grid;gap:3px;min-width:230px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
@@ -224,7 +233,7 @@ function applySizeRow(){
 function buildModal(){
  if($('arqModal'))return;
  const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','false');m.setAttribute('aria-label','Galería arquitectónica (ventana flotante)');
- m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
+ m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><span class="arq-sizes" role="group" aria-label="Tamaño de la ventana"><button type="button" class="btn" data-size="s" title="Ventana chica al costado: el dibujo queda libre para arrastrar">▯ Chica</button><button type="button" class="btn" data-size="m" title="Mitad de pantalla">◧ Media</button><button type="button" class="btn" data-size="l" title="Grande">▣ Grande</button></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
  <div class="arq-tools"><input type="search" id="arqModalSearch" placeholder="Buscar en toda la galería…" aria-label="Buscar en la galería"><div class="arq-chips" id="arqModalChips" role="group" aria-label="Categorías"></div></div>
  <div class="arq-grid" id="arqModalGrid"></div></div>`;
  document.body.append(m);
@@ -237,6 +246,19 @@ function buildModal(){
  hd.addEventListener('pointerdown',e=>{if(e.target.closest('button,input'))return;const r=box.getBoundingClientRect();mv={dx:e.clientX-r.left,dy:e.clientY-r.top};hd.setPointerCapture(e.pointerId)});
  hd.addEventListener('pointermove',e=>{if(!mv)return;const x=Math.min(innerWidth-80,Math.max(-box.offsetWidth+120,e.clientX-mv.dx)),y=Math.min(innerHeight-40,Math.max(0,e.clientY-mv.dy));box.style.left=x+'px';box.style.top=y+'px'});
  hd.addEventListener('pointerup',()=>{if(mv){mv=null;save()}});
+ // Pinzamientos visibles en bordes y esquinas.
+ for(const d of ['n','s','e','w','ne','nw','se','sw']){const g=document.createElement('div');g.className='arq-grip '+d;g.dataset.d=d;g.title='Arrastrá para cambiar el tamaño';box.append(g)}
+ box.style.resize='none';let rz=null;
+ box.addEventListener('pointerdown',e=>{const g=e.target.closest('.arq-grip');if(!g)return;e.preventDefault();const r=box.getBoundingClientRect();rz={d:g.dataset.d,x:e.clientX,y:e.clientY,r};g.setPointerCapture(e.pointerId)});
+ box.addEventListener('pointermove',e=>{if(!rz)return;const {d,x,y,r}=rz,dx=e.clientX-x,dy=e.clientY-y,MW=320,MH=240;let L=r.left,T=r.top,W=r.width,H=r.height;
+  if(d.includes('e'))W=Math.max(MW,r.width+dx);if(d.includes('s'))H=Math.max(MH,r.height+dy);
+  if(d.includes('w')){W=Math.max(MW,r.width-dx);L=r.right-W}if(d.includes('n')){H=Math.max(MH,r.height-dy);T=Math.max(0,r.bottom-H)}
+  Object.assign(box.style,{left:L+'px',top:T+'px',width:W+'px',height:H+'px'});box.classList.toggle('compact',W<700)});
+ box.addEventListener('pointerup',()=>{if(rz){rz=null;save()}});
+ const sizeTo=k=>{const W=innerWidth,H=innerHeight;const g=k==='s'?{l:W-400,t:90,w:380,h:H-150}:k==='m'?{l:W/2,t:70,w:W/2-20,h:H-120}:{l:W*.03,t:H*.05,w:Math.min(1180,W*.94),h:Math.min(820,H*.9)};
+  Object.assign(box.style,{left:g.l+'px',top:g.t+'px',width:g.w+'px',height:g.h+'px'});box.classList.toggle('compact',g.w<700);save()};
+ box.querySelector('.arq-sizes').addEventListener('click',e=>{const b=e.target.closest('[data-size]');if(b)sizeTo(b.dataset.size)});
+ if(parseFloat(box.style.width)<700)box.classList.add('compact');
  hd.addEventListener('dblclick',e=>{if(e.target.closest('button,input'))return;box.style.left='3vw';box.style.top='5vh';box.style.width='';box.style.height='';save()});
  $('arqModalClose').onclick=closeModal;
  $('arqModalSearch').oninput=e=>{query=e.target.value;renderModal()};
