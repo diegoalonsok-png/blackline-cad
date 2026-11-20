@@ -23,7 +23,7 @@ const enforce=cfg.enforce===true&&!!urls.status;
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'1,59 € / mes · 12,99 € / año (ahorrás 32 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
+ pro:{label:'Pro',price:'3,99 € / mes · 29,99 € / año (ahorrás 37 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
  studio:{label:'Estudio',price:'4,99 € / mes · 49,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team','custom-blocks']}
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo y bibliotecas compartidas'};
@@ -132,8 +132,8 @@ function showPlans(reason,notice){
    '<div class="col'+(cur==='free'?' cur':'')+'"><h3>'+L('Gratis','Free')+'</h3><div class="price">0 €</div>'+free+'</div>'+
    '<div class="col pro'+(isPro?' cur':'')+'"><h3>Pro</h3>'+
     '<div class="opts">'+
-     '<button class="opt" data-go="checkout" data-plan="pro"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">1,59 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
-     '<button class="opt best" data-go="checkout" data-plan="pro-yearly"><span class="tag">'+L('Ahorrás 32 %','Save 32 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">12,99 €</span><span class="sub">'+L('por año · ≈ 1,08 € / mes','per year · ≈ €1.08 / month')+'</span></button>'+
+     '<button class="opt" data-go="checkout" data-plan="pro"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">3,99 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
+     '<button class="opt best" data-go="checkout" data-plan="pro-yearly"><span class="tag">'+L('Ahorrás 37 %','Save 37 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">29,99 €</span><span class="sub">'+L('por año · ≈ 1,08 € / mes','per year · ≈ €1.08 / month')+'</span></button>'+
     '</div>'+pro+'<p class="fine">'+L('IVA incluido · tarjeta, PayPal y otros medios · cancelás cuando quieras','VAT included · card, PayPal and more · cancel anytime')+'</p></div>'+
   '</div><div class="foot">'+
   (urls.login&&!status.email?'<button class="btn" data-go="login">'+L('Ingresar / crear cuenta','Sign in / create account')+'</button>':'')+
@@ -164,7 +164,7 @@ function maybeTrialEnded(){
  const KEY='cad2d-trial-ended-notice';let last=0;try{last=Number(localStorage.getItem(KEY))||0}catch(e){}
  if(Date.now()-last<7*864e5||document.getElementById('cadPlanDlg'))return;
  try{localStorage.setItem(KEY,String(Date.now()))}catch(e){}
- setTimeout(()=>showPlans(null,L('¿Te está sirviendo Blackline CAD? Ya llevás 3 meses usándolo con todo incluido. Podés seguir dibujando gratis con lo básico, o conservar todo por 12,99 € al año (poco más de 1 € por mes) y ayudar a que siga creciendo.','Is Blackline CAD working for you? You have been using it with everything included for 3 months. You can keep drawing for free with the basics, or keep everything for €12.99 a year (about €1 a month) and help it keep growing.')),1500);
+ setTimeout(()=>showPlans(null,L('¿Te está sirviendo Blackline CAD? Ya llevás 3 meses usándolo con todo incluido. Podés seguir dibujando gratis con lo básico, o conservar todo por 29,99 € al año (2,50 € por mes) y ayudar a que siga creciendo.','Is Blackline CAD working for you? You have been using it with everything included for 3 months. You can keep drawing for free with the basics, or keep everything for €12.99 a year (about €1 a month) and help it keep growing.')),1500);
 }
 window.CAD2D_PLAN=Object.freeze({can,refresh,showPlans,upsell,plans:PLANS,get status(){return {...status}},enforced:enforce});
 paymentReturn();
