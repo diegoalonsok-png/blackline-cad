@@ -240,6 +240,17 @@ function addViewport(rect){
  list.push({id:'vp'+Date.now().toString(36),x:+rect.x.toFixed(1),y:+rect.y.toFixed(1),w:+rect.w.toFixed(1),h:+rect.h.toFixed(1),cx,cy,scale:'100',frame:true});
  saveVp(list);CORE.toast('Ventana creada a 1:100 centrada en '+(sel.length?'la selección':'la vista actual del modelo')+' · cambiá la escala en el panel VENTANAS');
 }
+// Ventana rápida: busca un lugar libre en la hoja (mitades, cuartos, sextos) y la crea a la escala pedida.
+function quickViewport(scale){
+ const o=CORE.layout.options?CORE.layout.options():null,m=pageMetrics();const W=(m?m.o.w:(o?.w||420)),H=(m?m.o.h:(o?.h||297)),M=(m?m.o.margin:10)||10;
+ const top=M+2,left=M+2,right=W-M-2-(m&&m.o.title!=='none'?0:0),bottom=H-M-34;
+ const existing=CORE.layout.viewports,hit=r=>existing.some(v=>r.x<v.x+v.w&&r.x+r.w>v.x&&r.y<v.y+v.h&&r.y+r.h>v.y);
+ for(const [cols,rows] of [[2,1],[2,2],[3,2],[4,2]]){
+  const cw=(right-left)/cols,ch=(bottom-top)/rows;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const rect={x:left+c*cw+3,y:top+r*ch+3,w:cw-6,h:ch-10};if(rect.w>20&&rect.h>20&&!hit(rect)){addViewport(rect);const l=CORE.layout.viewports.slice();l[l.length-1]={...l[l.length-1],scale:String(scale)};saveVp(l);CORE.toast('Ventana a 1:'+scale+' agregada · doble clic adentro para encuadrar');return}}
+ }
+ CORE.toast('No hay lugar libre en la hoja: achicá o borrá una ventana');
+}
 function renderVpPanel(){
  const ws=$('cadLayoutWorkspace');if(!ws)return;let panel=$('cadVpPanel');
  if(!panel){panel=document.createElement('section');panel.id='cadVpPanel';panel.style.cssText='position:absolute;right:14px;top:14px;z-index:5;width:280px;max-height:70%;overflow:auto;background:#141c24;border:1px solid #4d6676;border-radius:10px;padding:9px;color:#e5eef7;font-size:11px;box-shadow:0 8px 24px rgba(0,0,0,.35)';ws.append(panel);
@@ -251,12 +262,13 @@ function renderVpPanel(){
   panel.addEventListener('pointerup',()=>{if(!pd)return;pd=null;try{localStorage.setItem('cad2d-vp-panel',JSON.stringify([parseFloat(panel.style.left)||0,parseFloat(panel.style.top)||0]))}catch(e){}});
  }
  const list=CORE.layout.viewports;
- panel.innerHTML='<b class="vp-handle" style="letter-spacing:.05em;display:block;cursor:move;user-select:none" title="Arrastrar para mover el panel">⠿ VENTANAS GRÁFICAS</b><p style="margin:5px 0;color:#9cb1bc">'+(list.length?'Arrastrá una ventana para moverla; desde su esquina inferior derecha, para cambiar su tamaño. Doble clic adentro para trabajar en ella: arrastrar desplaza el dibujo y la rueda hace zoom.':'Sin ventanas: la hoja muestra todo el dibujo ajustado. Creá una para elegir encuadre y escala.')+'</p><div style="display:flex;gap:5px;margin-bottom:6px"><button type="button" class="btn" id="cadVpNew">'+(vpCreate?'Dibujá el rectángulo…':'+ Nueva ventana')+'</button></div>';
+ panel.innerHTML='<b class="vp-handle" style="letter-spacing:.05em;display:block;cursor:move;user-select:none" title="Arrastrar para mover el panel">⠿ VENTANAS GRÁFICAS</b><p style="margin:5px 0;color:#9cb1bc">'+(list.length?'Arrastrá una ventana para moverla; desde su esquina inferior derecha, para cambiar su tamaño. Doble clic adentro para trabajar en ella: arrastrar desplaza el dibujo y la rueda hace zoom.':'Sin ventanas: la hoja muestra todo el dibujo ajustado. Creá una para elegir encuadre y escala.')+'</p><div style="display:flex;gap:5px;margin-bottom:6px;flex-wrap:wrap"><button type="button" class="btn" id="cadVpNew">'+(vpCreate?'Dibujá el rectángulo…':'+ Nueva ventana')+'</button>'+['100','50','20'].map(k=>'<button type="button" class="btn slim" data-quick="'+k+'" title="Agrega una ventana a 1:'+k+' en un lugar libre de la hoja">+ 1:'+k+'</button>').join('')+'</div>';
  list.forEach((v,i)=>{
   const row=document.createElement('div');row.style.cssText='border-top:1px solid #2f4250;padding:6px 0;display:grid;gap:4px';
   row.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>Ventana '+(i+1)+'</b><button type="button" class="btn slim" data-del>✕</button></div>'+
    '<label>Escala <select data-k="scale">'+(SCALES.includes(String(v.scale))?'':'<option value="'+v.scale+'" selected>1:'+v.scale+'</option>')+SCALES.map(s=>'<option value="'+s+'"'+(String(v.scale)===s?' selected':'')+'>'+(s==='fit'?'Ajustar todo':'1:'+s)+'</option>').join('')+'</select></label><label>1: <input type="number" min="1" step="any" data-custom value="'+(v.scale==='fit'?'':v.scale)+'" style="width:70px" title="Escala personalizada"></label>'+
    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px">'+['x','y','w','h'].map(k=>'<label>'+({x:'X',y:'Y',w:'Ancho',h:'Alto'}[k])+' mm<input type="number" step="1" data-k="'+k+'" value="'+v[k]+'" style="width:100%"></label>').join('')+'</div>'+
+   '<label>Título <input type="text" data-title maxlength="40" value="'+String(v.title||'').replace(/[&"<>]/g,c=>({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]))+'" placeholder="Planta, Corte A-A…" style="width:70%"></label><label><input type="checkbox" data-label '+(v.label!==false?'checked':'')+'> Rótulo con escala debajo</label>'+
    '<div style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn slim" data-center>Centrar en vista del modelo</button><button type="button" class="btn slim" data-sel>Centrar en selección</button><label><input type="checkbox" data-frame '+(v.frame!==false?'checked':'')+'> Marco</label></div>';
   const upd=patch=>{const l=CORE.layout.viewports.slice();l[i]={...l[i],...patch};saveVp(l)};
   row.querySelector('[data-del]').onclick=()=>{const l=CORE.layout.viewports.slice();l.splice(i,1);saveVp(l)};
@@ -266,8 +278,11 @@ function renderVpPanel(){
   row.querySelector('[data-center]').onclick=()=>{const c=modelViewCenter();upd({cx:c.x,cy:c.y})};
   row.querySelector('[data-sel]').onclick=()=>{const sel=S().entities.filter(e=>S().selected.includes(e.id));if(!sel.length)return CORE.toast('Seleccioná objetos en MODEL');const b=CORE.getBounds(sel);upd({cx:(b.minX+b.maxX)/2,cy:(b.minY+b.maxY)/2})};
   row.querySelector('[data-frame]').onchange=e=>upd({frame:e.target.checked});
+  row.querySelector('[data-title]').onchange=e=>upd({title:e.target.value.slice(0,40)});
+  row.querySelector('[data-label]').onchange=e=>upd({label:e.target.checked});
   panel.append(row);
  });
+ panel.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>quickViewport(b.dataset.quick));
  $('cadVpNew').onclick=()=>{vpCreate=!vpCreate;renderVpPanel();CORE.toast(vpCreate?'VENTANA: arrastrá un rectángulo sobre la hoja':'Creación cancelada')};
 }
 function pagePoint(ev){const m=pageMetrics();if(!m)return null;const r=m.page.getBoundingClientRect();return {m,x:(ev.clientX-r.left)/m.k,y:(ev.clientY-r.top)/m.k}}
@@ -332,7 +347,7 @@ function drawRubber(){
 new MutationObserver(()=>{if(CORE.layout.active==='layout')renderVpPanel()}).observe($('cadLayoutWorkspace')||document.body,{attributes:true,attributeFilter:['hidden']});
 Object.assign(EXT.commands,{
  MVIEW:()=>{CORE.layout.switchTo('layout');vpCreate=true;renderVpPanel();CORE.toast('VENTANA: arrastrá un rectángulo sobre la hoja')},
- MV:()=>EXT.commands.MVIEW(),VENTANA:()=>EXT.commands.MVIEW(),VENTANAGRAFICA:()=>EXT.commands.MVIEW(),VPORTS:()=>EXT.commands.MVIEW(),
+ MV:()=>EXT.commands.MVIEW(),VP100:()=>{CORE.layout.switchTo('layout');setTimeout(()=>quickViewport('100'),60)},VP50:()=>{CORE.layout.switchTo('layout');setTimeout(()=>quickViewport('50'),60)},VP20:()=>{CORE.layout.switchTo('layout');setTimeout(()=>quickViewport('20'),60)},VENTANA:()=>EXT.commands.MVIEW(),VENTANAGRAFICA:()=>EXT.commands.MVIEW(),VPORTS:()=>EXT.commands.MVIEW(),
  TIPOLINEA:()=>{const r=window.prompt('Tipo de línea para la selección: C = continua · D = discontinua · P = punteada · E = eje','P');if(r===null)return;setLinetype({C:'CONTINUOUS',D:'DASHED',P:'DOTTED',E:'CENTER'}[r.trim().toUpperCase()[0]]||'DOTTED')},
  PUNTEADA:()=>setLinetype('DOTTED'),DISCONTINUA:()=>setLinetype('DASHED')
 });
