@@ -9114,8 +9114,16 @@ function initCadDimStylePalette(){
   '.bl-light #cadDimStylePalette .cad-ds-grid button{background:#fff;color:#22323c;border-color:#c3ced6}';
  document.head.append(css);
  const hp=$('cadHatchPalette'),gal=$('blacklineBlockGallery');if(hp&&hp.parentElement===aside)aside.insertBefore(sec,hp);else if(gal&&gal.parentElement===aside)aside.insertBefore(sec,gal);else aside.append(sec);
- const icon=t=>{const c='currentColor',m=t==='tick'?'<line x1="11" y1="20" x2="17" y2="12" stroke-width="2"/><line x1="83" y1="20" x2="89" y2="12" stroke-width="2"/>':t==='dot'?'<circle cx="14" cy="16" r="2.6" fill="'+c+'"/><circle cx="86" cy="16" r="2.6" fill="'+c+'"/>':t==='none'?'':t==='open'?'<path d="M22 12 14 16 22 20M78 12 86 16 78 20" fill="none"/>':'<path d="M22 12 14 16 22 20Z M78 12 86 16 78 20Z" fill="'+c+'"/>';
-  return '<svg viewBox="0 0 100 30" stroke="'+c+'" stroke-width="1.3"><line x1="14" y1="4" x2="14" y2="26"/><line x1="86" y1="4" x2="86" y2="26"/><line x1="14" y1="16" x2="86" y2="16"/>'+m+'<text x="50" y="12" font-size="9" text-anchor="middle" fill="'+c+'" stroke="none">2.50</text></svg>'};
+ // Vista previa fiel del estilo: remate, color, tamaño relativo de texto y remate, prolongación y formato del número.
+ const icon=(t,st)=>{st=st||{};const c=/^#[0-9a-f]{6}$/i.test(st.color||'')?st.color:'currentColor',th=+st.textHeight||.25,ar=+st.arrow||th*.8;
+  const fs=Math.max(6,Math.min(13,9*Math.sqrt(th*U[state.unit]/1000/.25))),as=Math.max(3,Math.min(9,6*ar/Math.max(th,1e-9))),bey=Math.max(0,Math.min(10,4*((st.extBeyond??th*.5)/th)));
+  const du=st.displayUnit||'drawing',val=du==='mm'?2500:du==='cm'?250:du==='m'?2.5:2.5*1000/U[state.unit];
+  const pr=Math.max(0,Math.min(4,st.precision??2)),txt=val.toFixed(pr)+(st.suffix||'');
+  const y=18,x0=14,x1=86,m=t==='tick'?`<line x1="${x0-as*.6}" y1="${y+as*.6}" x2="${x0+as*.6}" y2="${y-as*.6}" stroke-width="2"/><line x1="${x1-as*.6}" y1="${y+as*.6}" x2="${x1+as*.6}" y2="${y-as*.6}" stroke-width="2"/>`
+   :t==='dot'?`<circle cx="${x0}" cy="${y}" r="${as*.45}" fill="${c}"/><circle cx="${x1}" cy="${y}" r="${as*.45}" fill="${c}"/>`:t==='none'?''
+   :t==='open'?`<path d="M${x0+as} ${y-as*.5} ${x0} ${y} ${x0+as} ${y+as*.5}M${x1-as} ${y-as*.5} ${x1} ${y} ${x1-as} ${y+as*.5}" fill="none"/>`
+   :`<path d="M${x0+as} ${y-as*.45} ${x0} ${y} ${x0+as} ${y+as*.45}Z M${x1-as} ${y-as*.45} ${x1} ${y} ${x1-as} ${y+as*.45}Z" fill="${c}"/>`;
+  return `<svg viewBox="0 0 100 30" stroke="${c}" stroke-width="1.3"><line x1="${x0}" y1="${y-bey-2}" x2="${x0}" y2="28"/><line x1="${x1}" y1="${y-bey-2}" x2="${x1}" y2="28"/><line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}"/>${m}<text x="50" y="${y-3}" font-size="${fs.toFixed(1)}" text-anchor="middle" fill="${c}" stroke="none">${escapeHTML(txt)}</text></svg>`};
  const fromForm=()=>({...readDimensionStyle(),arrowType:$('cadDsArrow').value,color:$('cadDsColorOn').checked?$('cadDsColor').value:'',extOffset:Math.max(0,Number($('cadDsGap').value)||0),extBeyond:Math.max(0,Number($('cadDsBeyond').value)||0)});
  const writeForm=st=>{
   $('cadDsArrow').value=st.arrowType||'arrow';$('cadDsText').value=+Number(st.textHeight).toFixed(4);$('cadDsSize').value=+Number(st.arrow).toFixed(4);$('cadDsPrec').value=String(st.precision);$('cadDsUnit').value=['mm','cm','m'].includes(st.displayUnit)?st.displayUnit:'drawing';
@@ -9133,8 +9141,8 @@ function initCadDimStylePalette(){
  const syncLib=()=>{const L=lib();state.dimStyles=state.dimStyles||{};for(const [n,st] of Object.entries(L))if(!state.dimStyles[n])state.dimStyles[n]=validateDimStyle(st)};
  const paint=()=>{
   syncLib();const saved=Object.keys(state.dimStyles||{}).sort();
-  $('cadDsGrid').innerHTML=PRESETS.map(([n,st])=>`<button type="button" data-p="${escapeHTML(n)}" class="${current===n?'on':''}">${icon(st.arrowType)}<span>${escapeHTML(n)}</span></button>`).join('')+
-   saved.map(n=>`<button type="button" data-s="${escapeHTML(n)}" class="${current===n?'on':''}" title="Clic: usar · clic derecho: borrar">${icon(state.dimStyles[n].arrowType||'arrow')}<span>★ ${escapeHTML(n)}</span></button>`).join('')+
+  $('cadDsGrid').innerHTML=PRESETS.map(([n,st])=>`<button type="button" data-p="${escapeHTML(n)}" class="${current===n?'on':''}">${icon(st.arrowType,{...st,textHeight:st.textHeight*1000/U[state.unit],arrow:st.arrow*1000/U[state.unit],extBeyond:st.extBeyond*1000/U[state.unit]})}<span>${escapeHTML(n)}</span></button>`).join('')+
+   saved.map(n=>`<button type="button" data-s="${escapeHTML(n)}" class="${current===n?'on':''}" title="Clic: usar · clic derecho: borrar">${icon(state.dimStyles[n].arrowType||'arrow',state.dimStyles[n])}<span>★ ${escapeHTML(n)}</span></button>`).join('')+
    '<button type="button" data-add="1" title="Guarda el estilo actual (o el de la cota seleccionada) como modelo para todos tus dibujos" style="border-style:dashed;justify-content:center"><span style="font-size:20px;line-height:24px">＋</span><span>Guardar modelo</span></button>';
  };
  $('cadDsGrid').addEventListener('click',e=>{
