@@ -965,7 +965,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">Los archivos DWG (AutoCAD 2000 a 2018 y posteriores) se abren directamente: se convierten a DXF en un servicio propio de Blackline y se borran apenas termina la conversión. Para guardar, CAD2D exporta DXF, que AutoCAD abre sin pasos extra.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio de AutoCAD. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.dwt,.dws,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
 <script src="cad2d-config.js?v=20261120-1850"></script>
 <script src="cad-grip-settings.js?v=20261120-1850"></script>
 <script src="cad-cursor-mode.js?v=20261120-1850"></script>
@@ -6335,6 +6335,20 @@ async function convertDWGAutomatically(file){
  log('DWG converted via external service; verify layers, unsupported entities and 1:1 units.');
 }
 
+/* ---------- IMPORT: incorporar otro archivo al dibujo actual (OPEN reemplaza, IMPORT agrega) ---------- */
+function cadImportPicker(){
+ const i=document.createElement('input');i.type='file';i.accept='.dwg,.dwt,.dxf,.pdf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx';
+ i.onchange=async()=>{const f=i.files[0];if(!f)return;
+  try{
+   if(/\.(dwg|dwt)$/i.test(f.name)){const dxf=await convertDWGAutomatically(new File([f],f.name.replace(/\.dwt$/i,'.dwg'),{type:f.type}),{textOnly:true});const u=URL.createObjectURL(new Blob([dxf],{type:'application/dxf'}));await cadInsertDxfPlan(u,f.name);setTimeout(()=>URL.revokeObjectURL(u),60000);return}
+   if(/\.dxf$/i.test(f.name)){const u=URL.createObjectURL(f);await cadInsertDxfPlan(u,f.name);setTimeout(()=>URL.revokeObjectURL(u),60000);return}
+   if(/\.pdf$/i.test(f.name))return window.CAD2D_PDF_IMPORT?.(f);
+   if(/\.svg$/i.test(f.name)){if(state.entities.length&&!window.confirm('El SVG se abre como dibujo (reemplaza el actual; Ctrl+Z deshace). ¿Seguir?'))return;return loadDrawingFile(f)}
+   return cadImportFile(f);
+  }catch(e){toast(e.message||String(e))}
+ };i.click();
+}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['IMPORT','IMPORTAR','INSERTARARCHIVO'])X.commands[k]=()=>cadImportPicker()}
 /* ---------- Importar imágenes, TXT, CSV y Excel (.xlsx) al dibujo ---------- */
 function cadViewCenter(){return world(P(canvas.clientWidth/2,canvas.clientHeight/2))}
 function cadViewWidth(){return canvas.clientWidth/state.view.scale}
@@ -6412,6 +6426,8 @@ async function cadDxfDecode(buf){
 }
 async function loadDrawingFile(f){if(!f)return;
  // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
+ if(/\.(dwt|dws)$/i.test(f.name)){const tpl=/\.dwt$/i.test(f.name);await loadDrawingFile(new File([f],f.name.replace(/\.(dwt|dws)$/i,'.dwg'),{type:f.type}));
+  if(tpl){state.file='Dibujo nuevo';try{$('filename').textContent='Dibujo nuevo.dxf'}catch(e){}cadProjectSaveHandle=null;toast('Plantilla '+f.name+' cargada como dibujo nuevo: capas, estilos y bloques listos')}return}
  if(/\.(bak|sv\$|tmp)$/i.test(f.name)){const head=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer()),base=f.name.replace(/\.(bak|sv\$|tmp)$/i,'').replace(/_\d{8}-\d{4}$/,'');
   const ext=/^AC10\d\d/.test(head)?'.dwg':/^\s*[\[{]/.test(head)?'.cadjson':'.dxf';toast('Abriendo copia de seguridad '+f.name+' como '+ext.slice(1).toUpperCase());
   return loadDrawingFile(new File([f],base+ext,{type:f.type}))}
@@ -6796,11 +6812,10 @@ function importDXF(text,name,opts){
  state.file=name.replace(/\.dxf$/i,'');$('filename').textContent=state.file+'.dxf';
  $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
  updateAll();zoomExtents();
- let warning=[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+': '+n);
- if(blockCount)warning.push('block definitions: '+blockCount);
+ let warning=[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')');
  log('DXF imported: '+entities.length+' entities · '+state.layers.length+' layers');
  toast('DXF imported: '+entities.length+' supported entities');
- if(warning.length)alert('Partial DXF import. Unsupported/approximated items: '+warning.join('; ')+'. Keep your original drawing unchanged.');
+ if(warning.length)alert('Importación con advertencias: CAD2D no puede representar todavía estos elementos y no los muestra:\n\n· '+warning.join('\n· ')+'\n\nEl archivo original no se modifica: si lo guardás desde CAD2D con otro nombre, conservá el original para no perderlos.');
 }
 
 /* Plano típico (DXF) insertado dentro del dibujo actual: muros y líneas sueltos, pero el mobiliario,
@@ -9679,7 +9694,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261120-1950"></script>
+<script src="blackline-modern.js?v=20261120-1955"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
