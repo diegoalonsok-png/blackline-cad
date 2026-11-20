@@ -965,7 +965,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">Los archivos DWG (AutoCAD 2000 a 2018 y posteriores) se abren directamente: se convierten a DXF en un servicio propio de Blackline y se borran apenas termina la conversión. Para guardar, CAD2D exporta DXF, que AutoCAD abre sin pasos extra.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio de AutoCAD. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.pdf,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
 <script src="cad2d-config.js?v=20261120-1850"></script>
 <script src="cad-grip-settings.js?v=20261120-1850"></script>
 <script src="cad-cursor-mode.js?v=20261120-1850"></script>
@@ -6188,6 +6188,7 @@ function cad2dDrawingSignature(){return state.entities.length+':'+state.history.
 async function cad2dAutoSave(force=false){
  const sig=cad2dDrawingSignature();if(!force&&sig===cad2dLastAutoSig)return;
  const hh=new Date().toTimeString().slice(0,5);
+ try{await cadWriteBak()}catch(err){console.warn('[CAD2D BAK]',err)}
  try{
   const h=cadProjectSaveHandle,ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
   if(ok){const w=await h.createWritable();await w.write(cadDxfWithProject(state.file));await w.close();toast('Autosave · '+h.name+' · '+hh)}
@@ -6196,6 +6197,53 @@ async function cad2dAutoSave(force=false){
  }catch(err){console.warn('[CAD2D AUTOSAVE]',err)}
 }
 setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
+/* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
+   Cada autoguardado deja una copia DXF completa (con el proyecto CAD2D adentro) en el navegador; se guardan las
+   últimas 10 por dibujo. Si se eligió una carpeta de copias, además se escribe <nombre>.bak ahí.
+   Un .bak se abre directo en CAD2D, o renombrándolo a .dxf en cualquier programa CAD. */
+const CAD2D_BAK_KEEP=10;let cadBakDir=null;
+const cadBakName=()=>String(state.file||'Sin titulo').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80)||'Sin titulo';
+async function cadBakKeys(){if(!backupDb)return [];return (await backupTransaction('readonly',st=>st.getAllKeys())).filter(k=>typeof k==='string'&&k.startsWith('bak:'))}
+async function cadWriteBak(){
+ if(!state.entities.length)return;
+ const name=cadBakName(),text=cadDxfWithProject(name),ts=Date.now();
+ if(backupDb){
+  await backupTransaction('readwrite',st=>st.put({name,savedAt:new Date(ts).toISOString(),objects:state.entities.length,text},'bak:'+name+':'+ts));
+  const mine=(await cadBakKeys()).filter(k=>k.startsWith('bak:'+name+':')).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
+  for(const k of mine.slice(CAD2D_BAK_KEEP))await backupTransaction('readwrite',st=>st.delete(k));
+ }
+ if(cadBakDir){try{if(!cadBakDir.queryPermission||await cadBakDir.queryPermission({mode:'readwrite'})==='granted'){const fh=await cadBakDir.getFileHandle(name+'.bak',{create:true}),w=await fh.createWritable();await w.write(text);await w.close()}}catch(e){console.warn('[CAD2D BAK dir]',e)}}
+}
+async function cadBakLoadDir(){try{if(backupDb)cadBakDir=await backupTransaction('readonly',st=>st.get('bakdir'))||null}catch(e){}}
+setTimeout(cadBakLoadDir,1500);
+async function cadBakChooseDir(){
+ if(!window.showDirectoryPicker)return toast('Este navegador no permite elegir carpeta: usá Chrome o Edge. Las copias igual se guardan en el navegador.');
+ try{const d=await window.showDirectoryPicker({id:'cad2d-bak',mode:'readwrite'});cadBakDir=d;await backupTransaction('readwrite',st=>st.put(d,'bakdir'));toast('Copias .bak en la carpeta «'+d.name+'» cada '+(cad2dSaveMinutes||5)+' min');cadWriteBak().catch(()=>{})}catch(e){}
+}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','RECUPERAR','RECOVER'])X.commands[k]=()=>cadShowBackups();X.commands.CARPETABAK=()=>cadBakChooseDir()}
+async function cadShowBackups(){
+ document.getElementById('cadBakDlg')?.remove();
+ const keys=(await cadBakKeys()).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
+ const rows=[];for(const k of keys){const r=await backupTransaction('readonly',st=>st.get(k));if(r)rows.push([k,r])}
+ const d=document.createElement('div');d.id='cadBakDlg';d.className='modal-backdrop';d.style.cssText='position:fixed;inset:0;z-index:9500;background:rgba(5,9,13,.6);display:flex;align-items:center;justify-content:center';
+ const perm=cadBakDir?(cadBakDir.queryPermission?await cadBakDir.queryPermission({mode:'readwrite'}):'granted'):'';
+ d.innerHTML='<div style="background:#141c24;color:#e5eef7;border:1px solid #4d6676;border-radius:14px;padding:16px 18px;width:min(640px,94vw);max-height:86vh;overflow:auto;font:13px system-ui">'+
+  '<div style="display:flex;justify-content:space-between;align-items:center"><b style="letter-spacing:.06em">COPIAS DE SEGURIDAD (.bak)</b><button class="btn" data-x>✕</button></div>'+
+  '<p style="color:#a9bfcc;margin:6px 0 10px">Cada '+(cad2dSaveMinutes||5)+' min, si hubo cambios, CAD2D guarda una copia aunque el dibujo ya tenga nombre (últimas '+CAD2D_BAK_KEEP+' por dibujo). Un .bak se abre con «Abrir», o renombrándolo a .dxf.</p>'+
+  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn" data-dir>'+(cadBakDir?'Carpeta: '+escapeHTML(cadBakDir.name)+(perm==='granted'?'':' (tocar para reautorizar)'):'Elegir carpeta para copias .bak…')+'</button><button class="btn" data-now>Hacer copia ahora</button></div>'+
+  (rows.length?rows.map(([k,r])=>'<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #2c3a44"><span style="flex:1">'+escapeHTML(r.name)+'<br><small style="color:#8fa7b4">'+new Date(r.savedAt).toLocaleString()+' · '+r.objects+' objetos</small></span><button class="btn" data-open="'+escapeHTML(k)+'">Abrir</button><button class="btn" data-dl="'+escapeHTML(k)+'">Descargar .bak</button></div>').join(''):'<p style="color:#ffd27f">Todavía no hay copias: se crean solas al dibujar.</p>')+'</div>';
+ document.body.append(d);
+ d.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t){if(e.target===d)d.remove();return}
+  if(t.hasAttribute('data-x'))return d.remove();
+  if(t.hasAttribute('data-dir')){if(cadBakDir&&perm!=='granted'&&cadBakDir.requestPermission){if(await cadBakDir.requestPermission({mode:'readwrite'})==='granted'){toast('Carpeta reautorizada');d.remove();return cadShowBackups()}}else{await cadBakChooseDir();d.remove();return cadShowBackups()}}
+  if(t.hasAttribute('data-now')){await cadWriteBak();toast('Copia hecha');d.remove();return cadShowBackups()}
+  const k=t.dataset.open||t.dataset.dl;if(!k)return;const r=await backupTransaction('readonly',st=>st.get(k));if(!r)return;
+  const stamp=new Date(r.savedAt).toISOString().replace(/[-:T]/g,'').slice(0,12),file=new File([r.text],r.name+'_'+stamp.slice(0,8)+'-'+stamp.slice(8)+'.bak',{type:'application/dxf'});
+  if(t.dataset.dl){const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+  else{if(state.entities.length&&!window.confirm('¿Abrir la copia «'+file.name+'»? El dibujo actual se reemplaza (podés deshacer con Ctrl+Z).'))return;d.remove();await loadDrawingFile(file)}
+ });
+}
+
 function saveAsJSON(){return saveJSON(true)}
 
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
@@ -6322,7 +6370,12 @@ async function cadDxfDecode(buf){
  const cp=m?'windows-'+m[1]:'windows-1252';
  try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
 }
-async function loadDrawingFile(f){if(!f)return;if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+async function loadDrawingFile(f){if(!f)return;
+ // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
+ if(/\.(bak|sv\$|tmp)$/i.test(f.name)){const head=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer()),base=f.name.replace(/\.(bak|sv\$|tmp)$/i,'').replace(/_\d{8}-\d{4}$/,'');
+  const ext=/^AC10\d\d/.test(head)?'.dwg':/^\s*[\[{]/.test(head)?'.cadjson':'.dxf';toast('Abriendo copia de seguridad '+f.name+' como '+ext.slice(1).toUpperCase());
+  return loadDrawingFile(new File([f],base+ext,{type:f.type}))}
+if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -9586,7 +9639,7 @@ buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize()
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261120-1850"></script>
+<script src="blackline-modern.js?v=20261120-1950"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
