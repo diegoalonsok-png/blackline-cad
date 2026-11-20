@@ -2,7 +2,9 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const base='https://blackline-cad.org/';
-const paths=['index.html','manual-comandos.html','legal.html','guia-cad-2d-online.html','plano-casa-cad-2d-online.html','cad-2d-educacion.html'];
+// Las páginas públicas son las del sitemap; las principales siempre deben estar.
+const paths=[...fs.readFileSync('sitemap.xml','utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1]===base?'index.html':m[1].slice(base.length));
+for(const must of ['index.html','manual-comandos.html','legal.html'])if(!paths.includes(must))throw new Error('Falta en sitemap: '+must);
 test('Blackline CAD public pages have canonical, description, and crawlable metadata',()=>{
  for(const path of paths){
   const html=fs.readFileSync(path,'utf8');
