@@ -766,8 +766,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 #cadWallQuickThickness[aria-invalid=true]{border-color:#ff8f82}
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
-<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1430">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1430">
+<link rel="stylesheet" href="workspace-upgrade.css?v=20261120-0955">
+<link rel="stylesheet" href="blackline-modern.css?v=20261120-0955">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -851,8 +851,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261120-1430"></script>
-<script defer src="assets/cad-ui-language.js?v=20261120-1430"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261120-0955"></script>
+<script defer src="assets/cad-ui-language.js?v=20261120-0955"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -900,12 +900,12 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  },true);
 })();
 </script>
-<script src="assets/cad-analytics.js?v=20261120-1430"></script>
+<script src="assets/cad-analytics.js?v=20261120-0955"></script>
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0c1216"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 </head>
 <body>
 <div class="app">
- <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Load a sample 12 x 9 meter architectural DXF with multiple layers">Sample house</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
+ <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Insertar la casa de ejemplo de dos plantas, con muebles y sanitarios como bloques">Casa de ejemplo</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><button id="cadTextBarShadow" type="button" aria-pressed="false" title="Sombra detrás del texto">Sombra</button><input id="cadTextBarShadowColor" type="color" value="#333333" title="Color de sombra"><label>Despl. <input id="cadTextBarShadowOffset" type="number" min="0" max="10" step="0.01" value="0.04" style="width:65px"></label><span class="cad-text-divider"></span><label>Forma <select id="cadTextBarPath"><option value="straight">Recto</option><option value="circle">Circular</option></select></label><label>Radio <input id="cadTextBarRadius" type="number" min="0.01" step="0.1" value="2" style="width:65px"></label><label>Inicio ° <input id="cadTextBarStartAngle" type="number" step="15" value="0" style="width:65px"></label><label>Sentido <select id="cadTextBarDirection"><option value="ccw">Antihorario</option><option value="cw">Horario</option></select></label><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -966,9 +966,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">La importación, edición y exportación nativas de DWG no están disponibles. No se utiliza un conversor DWG activo ni se envían archivos DWG a un servicio externo desde la versión publicada.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">This is a browser-based CAD prototype, not a full AutoCAD-compatible engine. For production use, test DXF interchange, plotting, and dimensions against professional software before relying on them for construction documents.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
-<script src="cad2d-config.js?v=20261120-1430"></script>
-<script src="cad-grip-settings.js?v=20261120-1430"></script>
-<script src="cad-cursor-mode.js?v=20261120-1430"></script>
+<script src="cad2d-config.js?v=20261120-0955"></script>
+<script src="cad-grip-settings.js?v=20261120-0955"></script>
+<script src="cad-cursor-mode.js?v=20261120-0955"></script>
 <script>
 /* Diagnostic: visible non-invasive startup errors when a deployed CAD bundle fails. */
 window.addEventListener('error',function(event){
@@ -6019,12 +6019,20 @@ setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveM
 function saveAsJSON(){return saveJSON(true)}
 
 function openFile(){ $('fileInput').click()}$('openBtn').onclick=openFile;
-$('sampleHouseBtn').onclick=async()=>{try{
- const response=await fetch('./examples/sample-house.dxf',{cache:'no-store'});
- if(!response.ok)throw Error('Sample drawing could not be downloaded (HTTP '+response.status+')');
- importDXF(await response.text(),'sample-house.dxf');
- toast('Sample house loaded — inspect WALLS, DOORS, WINDOWS and FURNITURE layers');
-}catch(e){alert('Unable to open sample house: '+e.message)}};
+// Casa de ejemplo: vivienda de dos plantas con muebles, sanitarios, árboles y auto como bloques.
+$('sampleHouseBtn').onclick=async()=>{
+ const btn=$('sampleHouseBtn');if(btn.disabled)return;btn.disabled=true;
+ try{
+  const had=state.entities.length>0,b0=had?getBounds():null;
+  let x=had?b0.maxX+5:0;const y=had?b0.minY:0;
+  const baja=await cadInsertDxfPlan('examples/plantas/vivienda-planta-baja.dxf','Planta baja',{base:P(x,y),quiet:true});
+  if(!baja)return;
+  const bb=getBounds(state.entities.filter(e=>baja.includes(e.id)));
+  const alta=await cadInsertDxfPlan('examples/plantas/vivienda-planta-alta.dxf','Planta alta',{base:P(bb.maxX+5,y),quiet:true})||[];
+  state.selected=[];zoomExtents();updateAll();
+  toast('Casa de ejemplo: planta baja y planta alta · muebles, sanitarios, árboles y auto son bloques con sus capas');
+ }finally{btn.disabled=false}
+};
 $('saveProjectBtn').onclick=()=>saveJSON();$('saveAsBtn').onclick=saveAsJSON;/* Enable only after a real HTTPS DWG converter has been deployed and tested. */
 // Se configura en cad2d-config.js (window.CAD2D_DWG_ENDPOINT). Vacío = DWG desactivado.
 const DWG_CONVERTER_ENDPOINT=typeof window.CAD2D_DWG_ENDPOINT==='string'?window.CAD2D_DWG_ENDPOINT.trim():'';
@@ -6458,7 +6466,7 @@ function importDXF(text,name,opts){
 /* Plano típico (DXF) insertado dentro del dibujo actual: muros y líneas sueltos, pero el mobiliario,
    los sanitarios, los árboles y el auto siguen siendo BLOQUES, con sus capas y propiedades.
    Se ubica con un clic (esquina inferior izquierda del plano) y respeta las unidades del dibujo. */
-async function cadInsertDxfPlan(url,label){
+async function cadInsertDxfPlan(url,label,opts={}){
  let parsed;
  try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=importDXF(await cadDxfDecode(await r.arrayBuffer()),label||'plano',{parseOnly:true})}
  catch(e){return toast('No se pudo cargar el plano: '+e.message)}
@@ -6467,12 +6475,15 @@ async function cadInsertDxfPlan(url,label){
  for(const e of parsed.entities){const pts=e.type==='blockRef'?[e.p]:(e.pts||[e.a,e.b,e.c,e.p].filter(Boolean));for(const p of pts){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y}}
  if(!Number.isFinite(minX))return toast('El plano está vacío');
  setTool('select');
- toast((label||'Plano')+' · clic en el dibujo para ubicar la esquina inferior izquierda · Esc cancela');
+ if(!opts.base)toast((label||'Plano')+' · clic en el dibujo para ubicar la esquina inferior izquierda · Esc cancela');
  const onKey=ev=>{if(ev.key==='Escape'){cleanup();toast('Inserción cancelada')}};
  const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor=''};
  const onDown=ev=>{
   if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();cleanup();
-  const r=canvas.getBoundingClientRect(),raw=world(P(ev.clientX-r.left,ev.clientY-r.top)),base=(snapPoint?snapPoint(raw):null)||raw;
+  const r=canvas.getBoundingClientRect(),raw=world(P(ev.clientX-r.left,ev.clientY-r.top));
+  place((snapPoint?snapPoint(raw):null)||raw);
+ };
+ const place=base=>{
   saveHistory();
   // Capas: se agregan las que faltan (por nombre).
   const layerIdByName={};
@@ -6494,8 +6505,10 @@ async function cadInsertDxfPlan(url,label){
   }
   state.selected=added;renderLayers?.();updateAll();
   log((label||'Plano')+' insertado · '+added.length+' objetos · '+Object.keys(parsed.blocks).length+' bloques');
-  toast((label||'Plano')+' insertado: muebles, sanitarios, árboles y auto como bloques');
+  if(!opts.quiet)toast((label||'Plano')+' insertado: muebles, sanitarios, árboles y auto como bloques');
+  return added;
  };
+ if(opts.base)return place(opts.base);
  canvas.style.cursor='copy';
  canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);
 }
@@ -8939,26 +8952,26 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
 })();
 </script>
-<script src="workspace-upgrade.js?v=20261120-1430"></script>
-<script src="blackline-modern.js?v=20261120-1430"></script>
-<script defer src="assets/dxf-block-collection.js?v=20261120-1430"></script>
-<script defer src="assets/dxf-featured-blocks.js?v=20261120-1430"></script>
-<script defer src="assets/blackline-parametric-blocks.js?v=20261120-1430"></script>
-<script defer src="assets/cad2d-curated-library.js?v=20261120-1430"></script>
-<script defer src="assets/cad2d-architecture-pack.js?v=20261120-1430"></script>
-<script src="cad-osnap-math.js?v=20261120-1430"></script>
-<script src="cad-scale-math.js?v=20261120-1430"></script>
-<script src="cad-object-tracking.js?v=20261120-1430"></script>
-<script src="cad-auto-opening.js?v=20261120-1430"></script>
-<script src="cad-wall-join.js?v=20261120-1430"></script>
-<script src="cad-wall-grip.js?v=20261120-1430"></script>
-<script src="cad-hatch-patterns.js?v=20261120-1430"></script>
-<script src="cad-performance.js?v=20261120-1430"></script>
-<script src="cad-plan.js?v=20261120-1430"></script><script src="cad-cloud.js?v=20261120-1430"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1430"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1430"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1430"></script>
-<script src="cad-arq-pro.js?v=20261120-1430"></script>
-<script src="cad-autocad-plus.js?v=20261120-1430"></script>
-<script src="cad-touch.js?v=20261120-1430"></script><script src="cad-quickbar.js?v=20261120-1430"></script><script src="cad-cmd-resize.js?v=20261120-1430"></script><script src="cad-buy-guide.js?v=20261120-1430"></script>
-<script src="cad-arq-tools.js?v=20261120-1430"></script><script src="cad-block-browser.js?v=20261120-1430"></script>
+<script src="workspace-upgrade.js?v=20261120-0955"></script>
+<script src="blackline-modern.js?v=20261120-0955"></script>
+<script defer src="assets/dxf-block-collection.js?v=20261120-0955"></script>
+<script defer src="assets/dxf-featured-blocks.js?v=20261120-0955"></script>
+<script defer src="assets/blackline-parametric-blocks.js?v=20261120-0955"></script>
+<script defer src="assets/cad2d-curated-library.js?v=20261120-0955"></script>
+<script defer src="assets/cad2d-architecture-pack.js?v=20261120-0955"></script>
+<script src="cad-osnap-math.js?v=20261120-0955"></script>
+<script src="cad-scale-math.js?v=20261120-0955"></script>
+<script src="cad-object-tracking.js?v=20261120-0955"></script>
+<script src="cad-auto-opening.js?v=20261120-0955"></script>
+<script src="cad-wall-join.js?v=20261120-0955"></script>
+<script src="cad-wall-grip.js?v=20261120-0955"></script>
+<script src="cad-hatch-patterns.js?v=20261120-0955"></script>
+<script src="cad-performance.js?v=20261120-0955"></script>
+<script src="cad-plan.js?v=20261120-0955"></script><script src="cad-cloud.js?v=20261120-0955"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-0955"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-0955"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-0955"></script>
+<script src="cad-arq-pro.js?v=20261120-0955"></script>
+<script src="cad-autocad-plus.js?v=20261120-0955"></script>
+<script src="cad-touch.js?v=20261120-0955"></script><script src="cad-quickbar.js?v=20261120-0955"></script><script src="cad-cmd-resize.js?v=20261120-0955"></script><script src="cad-buy-guide.js?v=20261120-0955"></script>
+<script src="cad-arq-tools.js?v=20261120-0955"></script><script src="cad-block-browser.js?v=20261120-0955"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 </body></html>
