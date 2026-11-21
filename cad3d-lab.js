@@ -55,6 +55,37 @@ var css=[
 '#cad3dLab .tools button:hover{background:#293a47;border-color:#9bb3c2}',
 '#cad3dLab .tools button svg{width:17px;height:17px}',
 '#cad3dLab .tools .divider{height:28px;border-left:1px solid #52606d;margin:0 4px}',
+
+'#cad3dLab .archPalette{width:244px;min-width:170px;max-width:38%;flex:0 0 auto;display:flex;background:#111a22;border-right:1px solid #344754;overflow:hidden}',
+'#cad3dLab .archRail{display:flex;flex-direction:column;align-items:stretch;gap:1px;width:30px;min-width:30px;background:#0b1218;border-right:1px solid #344754;overflow:auto;scrollbar-width:none}',
+'#cad3dLab .archRail::-webkit-scrollbar{display:none}',
+'#cad3dLab .archRail button{flex:0 0 auto;writing-mode:vertical-rl;transform:rotate(180deg);text-orientation:mixed;height:74px;padding:7px 5px;border:0;border-left:2px solid transparent;background:#0f171e;color:#94a5b1;font:10px Inter,Segoe UI,Arial;letter-spacing:.5px;cursor:pointer}',
+'#cad3dLab .archRail button.active{background:#233340;color:#e1edf4;border-left-color:#9cbccd}',
+'#cad3dLab .archRail button:hover{background:#293947;color:#fff}',
+'#cad3dLab .archRail button.railToggle{height:29px;padding:2px;writing-mode:horizontal-tb;transform:none;font-size:16px;color:#b4c4ce}',
+'#cad3dLab .archPanel{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}',
+'#cad3dLab .archHeader{display:flex;align-items:center;gap:4px;padding:9px 7px 7px;border-bottom:1px solid #334552;font:600 10px Inter,Arial;letter-spacing:.7px;color:#d4e1e9}',
+'#cad3dLab .archHeader strong{flex:1;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+'#cad3dLab .archHeader button{padding:4px 5px;background:#1a2730;border:1px solid #374956;border-radius:4px;color:#b4c5ce;cursor:pointer;font:10px Inter,Arial}',
+'#cad3dLab .archHeader button.active{background:#354b5a;border-color:#718e9f;color:#fff}',
+'#cad3dLab .archShelf{overflow:auto;flex:1;min-height:0;padding:8px 7px;scrollbar-width:thin}',
+'#cad3dLab .archShelf .archGroup{padding:4px 1px 6px;color:#90a4b1;font:600 9px Inter,Arial;letter-spacing:1px;border-bottom:1px solid #31424e;margin:8px 0 7px}',
+'#cad3dLab .archItems{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}',
+'#cad3dLab .archItems.listMode{grid-template-columns:1fr;gap:2px}',
+'#cad3dLab .archItem{min-height:61px;margin:0;padding:6px 3px;border:1px solid #334654;border-radius:5px;background:#141f28;color:#d6e3eb;display:flex;flex-direction:column;align-items:center;gap:5px;justify-content:center;font:10px Inter,Arial;text-align:center;cursor:pointer;min-width:0}',
+'#cad3dLab .archItem svg{width:27px;height:27px;stroke:#b6c9d5;fill:none;flex:0 0 auto}',
+'#cad3dLab .archItem span{overflow-wrap:anywhere;line-height:1.15}',
+'#cad3dLab .archItem:hover{background:#263947;border-color:#839caa}',
+'#cad3dLab .archItem.active{background:#2d4351;border-color:#9abccc}',
+'#cad3dLab .archItem:disabled{opacity:.43;cursor:not-allowed;background:#101920}',
+'#cad3dLab .archItems.listMode .archItem{min-height:31px;padding:4px 6px;flex-direction:row;justify-content:flex-start;text-align:left;gap:9px}',
+'#cad3dLab .archItems.listMode .archItem svg{width:17px;height:17px}',
+'#cad3dLab .archItems.listMode .archItem span{flex:1}',
+'#cad3dLab .archSoon{color:#7f929f;font:9px Inter,Arial;white-space:nowrap}',
+'#cad3dLab .archDescription{font:10px/1.45 Inter,Arial;color:#8ca6b7;margin:11px 1px;border-top:1px solid #2d3d47;padding:9px 0}',
+'#cad3dLab .archPalette.collapsed{width:30px!important;min-width:30px;max-width:30px}',
+'#cad3dLab .archPalette.collapsed .archPanel{display:none}',
+'@media(max-width:750px){#cad3dLab .archPalette{width:174px;min-width:110px}#cad3dLab .archItems{grid-template-columns:repeat(2,minmax(0,1fr))}}',
 '#cad3dLab .body{flex:1;min-height:0;display:flex}',
 '#cad3dLab .view{position:relative;flex:1;min-width:110px;overflow:hidden;background:#0d1218}',
 '#cad3dLab .view canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}',
@@ -128,6 +159,93 @@ const ARCH_STYLES={
 function archStyle(kind,id){
  return (ARCH_STYLES[kind]||[]).find(function(st){return st.id===id;})||(ARCH_STYLES[kind]||[])[0]||null;
 }
+
+/* Independent Blackline palette layout based on user-provided AutoCAD Architecture screenshots.
+   Only implemented tools are clickable: no proprietary icons or Autodesk assets are used. */
+var activeArchSection='design',archViewMode='grid',archCollapsed=false;
+var ARCH_SECTIONS=[
+ ['design','Design'],['annotation','Annotation'],['interiors','Interiors'],
+ ['roombook','Roombook'],['details','Details'],['materials','Materials'],['massing','Massing']
+];
+var ARCH_TOOLS={
+ design:[
+  {label:'Wall',action:'wall',icon:'wall',group:'BUILD · PARAMETRIC'},
+  {label:'Door',action:'door',icon:'door',group:'BUILD · PARAMETRIC'},
+  {label:'Window',action:'window',icon:'window',group:'BUILD · PARAMETRIC'},
+  {label:'Corner window',icon:'window',group:'BUILD · PARAMETRIC'},
+  {label:'Door / Window assembly',icon:'door',group:'BUILD · PARAMETRIC'},
+  {label:'Opening',icon:'door',group:'BUILD · PARAMETRIC'},
+  {label:'Curtain wall',icon:'window',group:'BUILD · PARAMETRIC'},
+  {label:'Column',icon:'cylinder',group:'STRUCTURE'},
+  {label:'Custom column',icon:'cylinder',group:'STRUCTURE'},
+  {label:'Beam',icon:'cube',group:'STRUCTURE'},
+  {label:'Brace',icon:'cube',group:'STRUCTURE'},
+  {label:'Column grid',icon:'view',group:'STRUCTURE'},
+  {label:'Slab',action:'slab',preset:'floor-20',icon:'slab',group:'SLABS · ROOFS'},
+  {label:'Roof slab',action:'slab',preset:'roof-flat',icon:'slab',group:'SLABS · ROOFS'},
+  {label:'Roof (basic)',action:'slab',preset:'roof-pitch',icon:'slab',group:'SLABS · ROOFS'},
+  {label:'Stair',icon:'slab',group:'STAIRS'},
+  {label:'Stair tower',icon:'slab',group:'STAIRS'}
+ ],
+ massing:[
+  {label:'Box',action:'box',icon:'cube',group:'SOLIDS'},
+  {label:'Sphere',action:'sphere',icon:'sphere',group:'SOLIDS'},
+  {label:'Cylinder',action:'cylinder',icon:'cylinder',group:'SOLIDS'},
+  {label:'Cone',action:'cone',icon:'cone',group:'SOLIDS'},
+  {label:'Union (boxes)',action:'union',icon:'union',group:'BOOLEAN · LIMITED'},
+  {label:'Subtract (boxes)',action:'subtract',icon:'subtract',group:'BOOLEAN · LIMITED'},
+  {label:'Intersect (boxes)',action:'intersect',icon:'intersect',group:'BOOLEAN · LIMITED'}
+ ],
+ materials:[
+  {label:'Shaded / sketch',action:'sketch',icon:'view',group:'DISPLAY'},
+  {label:'Material library',icon:'slab',group:'MATERIALS'}
+ ]
+};
+function renderArchPalette(){
+ if(!root)return;
+ var palette=root.querySelector('.archPalette');if(!palette)return;
+ palette.classList.toggle('collapsed',archCollapsed);
+ var rail=palette.querySelector('.archRail');
+ rail.innerHTML='<button type="button" class="railToggle" data-arch-collapse title="'+(archCollapsed?'Expandir paleta':'Contraer paleta')+'" aria-label="'+(archCollapsed?'Expandir paleta':'Contraer paleta')+'">'+(archCollapsed?'»':'«')+'</button>'+
+  ARCH_SECTIONS.map(function(pair){return '<button type="button" data-arch-section="'+pair[0]+'" class="'+(activeArchSection===pair[0]?'active':'')+'" title="'+pair[1]+'">'+pair[1]+'</button>';}).join('');
+ var panel=palette.querySelector('.archPanel');
+ if(archCollapsed)return;
+ panel.querySelector('strong').textContent='TOOL PALETTES · '+(ARCH_SECTIONS.find(function(p){return p[0]===activeArchSection;})||['','Design'])[1].toUpperCase();
+ panel.querySelectorAll('[data-arch-mode]').forEach(function(b){b.classList.toggle('active',b.dataset.archMode===archViewMode);});
+ var defs=ARCH_TOOLS[activeArchSection]||[];
+ if(!defs.length){panel.querySelector('.archShelf').innerHTML='<p class="archDescription">Categoría de referencia. Las herramientas de esta sección todavía no están implementadas en CAD3D.</p>';return;}
+ var groups=[...new Set(defs.map(function(t){return t.group;}))];
+ var content=groups.map(function(group){
+  var tools=defs.filter(function(t){return t.group===group;});
+  return '<div class="archGroup">'+escapeHtml(group)+'</div><div class="archItems '+(archViewMode==='list'?'listMode':'')+'">'+tools.map(function(t){
+   var enabled=!!t.action;
+   var active=enabled&&placing===t.action&&(!t.preset||activePreset.slab===t.preset);
+   return '<button type="button" class="archItem '+(active?'active':'')+'" '+(enabled?'data-arch-tool="'+escapeHtml(t.label)+'"':'disabled title="Herramienta no implementada"')+'>'+
+   ico(t.icon||'cube')+'<span>'+escapeHtml(t.label)+'</span>'+(enabled?'':'<small class="archSoon">Próximamente</small>')+'</button>';
+  }).join('')+'</div>';
+ }).join('');
+ panel.querySelector('.archShelf').innerHTML=content+'<p class="archDescription">Las herramientas activas crean objetos 3D editables. Puertas y ventanas deben colocarse sobre un muro. Las funciones atenuadas aún no están disponibles.</p>';
+}
+function clickArchPalette(e){
+ var collapse=e.target.closest('[data-arch-collapse]');
+ if(collapse){archCollapsed=!archCollapsed;renderArchPalette();return;}
+ var section=e.target.closest('[data-arch-section]');
+ if(section){activeArchSection=section.dataset.archSection;renderArchPalette();return;}
+ var mode=e.target.closest('[data-arch-mode]');
+ if(mode){archViewMode=mode.dataset.archMode==='list'?'list':'grid';renderArchPalette();return;}
+ var button=e.target.closest('[data-arch-tool]');
+ if(!button)return;
+ var entry=(ARCH_TOOLS[activeArchSection]||[]).find(function(item){return item.label===button.dataset.archTool;});
+ if(!entry?.action)return;
+ if(entry.action==='wall'||entry.action==='door'||entry.action==='window'||entry.action==='slab'){
+  activeCategory=entry.action;
+  if(entry.preset)activePreset.slab=entry.preset;
+  renderCatalog();
+ }
+ action(entry.action);
+ renderArchPalette();
+}
+
 function renderCatalog(){
  if(!root)return;
  var tabs=root.querySelector('.catalogTabs'),items=root.querySelector('.catalogItems');
@@ -180,7 +298,7 @@ function build(){
  '<div class="divider"></div>'+tool('union','Union')+tool('subtract','Subtract')+tool('intersect','Intersect')+
  '<div class="divider"></div>'+tool('view','Views')+'<select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D" title="Puntos de vista"></select>'+tool('sketch','Croquis','view')+tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+
  '<div class="divider"></div>'+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+tool('json','.3DJSON','export')+tool('open','Open','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div>'+
- '<div class="body"><div class="view"><div class="hint">Botón de sólido → clic para colocarlo · WALL: dos puntos · Shift + clic: seleccionar</div></div>'+
+ '<div class="body"><aside class="archPalette" aria-label="Blackline 3D Architectural Tool Palettes"><nav class="archRail" aria-label="Categorías arquitectónicas"></nav><div class="archPanel"><header class="archHeader"><strong>TOOL PALETTES · DESIGN</strong><button type="button" data-arch-mode="grid" title="Iconos">▦</button><button type="button" data-arch-mode="list" title="Lista">☷</button></header><div class="archShelf"></div></div></aside><div class="view"><div class="hint">Botón de sólido → clic para colocarlo · WALL: dos puntos · Shift + clic: seleccionar</div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de la paleta 3D"></div><aside class="side"><h3>ARCHITECTURE · STYLES</h3><div class="catalog"><div class="catalogTabs"></div><div class="catalogItems"></div><button type="button" data-apply-style="1" title="Aplicar el estilo a un muro o losa seleccionado">Apply to selected</button></div><h3>3D PROPERTIES</h3><div class="props"><p>Agregá un objeto o seleccioná una figura. Unidades: metros.</p></div></aside></div>'+
  '<footer><span class="status" role="status">Módulo separado · CAD2D intacto</span><span>BLACKLINE · 3D LAB</span></footer><div class="edgeResizeR" data-resize="x" title="Arrastrar borde para ajustar ancho 3D"></div><div class="edgeResizeB" data-resize="y" title="Arrastrar borde para ajustar altura 3D"></div><div class="resizeGrip" data-resize="xy" role="button" title="Arrastrar la esquina para ajustar ancho y alto" aria-label="Redimensionar ventana 3D"></div>'+
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
@@ -200,7 +318,8 @@ function build(){
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
  root.querySelector('.catalog').addEventListener('click',clickCatalog);
- renderCatalog();
+ root.querySelector('.archPalette').addEventListener('click',clickArchPalette);
+ renderCatalog();renderArchPalette();
  root.querySelector('.fileInput').addEventListener('change',readJSON);
  root.querySelector('.cadInput').addEventListener('change',importCADFile);
  observer=new ResizeObserver(function(){resize();});
@@ -266,6 +385,7 @@ function setPlacement(which){
  placing=which;wallStart=null;slabStart=null;
  if(!root)return;
  root.querySelectorAll('.tools button[data-action]').forEach(function(b){b.classList.toggle('armed',b.dataset.action===which);});
+ renderArchPalette();
  if(which)text(''+which.toUpperCase()+': clic en el suelo para ubicar'+(which==='wall'||which==='slab'?' el primer punto y después el segundo':which==='door'||which==='window'?' la abertura sobre un muro':' el sólido')+' · Esc cancela');
 }
 
