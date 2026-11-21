@@ -213,6 +213,14 @@ var css=`
 }
 #cad3dLab .viewNav button, #cad3dLab .viewNav select { pointer-events:auto }
 #cad3dLab .viewCube { position:relative; width:83px; height:81px; transform:scale(.69); transform-origin:top left; margin-bottom:-25px }
+#cad3dLab .viewNav {width:168px}
+#cad3dLab .viewNavTop {display:flex;gap:8px;align-items:flex-start;pointer-events:none;height:62px}
+#cad3dLab .viewNavTop > * {pointer-events:auto}
+#cad3dLab .orbitBall {width:48px;height:48px;margin-top:2px;border:1px solid #8ca9b9;border-radius:50%;color:#edf7fc;cursor:grab;touch-action:none;user-select:none;position:relative;flex:none;background:radial-gradient(circle at 30% 25%,#7294a8,#263c50 60%,#101d2a 94%);box-shadow:inset -5px -7px 9px #071521b0,0 2px 7px #0008}
+#cad3dLab .orbitBall:active,#cad3dLab .orbitBall[data-dragging=true]{cursor:grabbing;border-color:#bce6f5}
+#cad3dLab .orbitBall svg{width:34px;height:34px;position:absolute;left:6px;top:6px;fill:none;stroke:currentColor;stroke-width:1.25;pointer-events:none}
+#cad3dLab .orbitBall:focus-visible{outline:2px solid #a8def6;outline-offset:2px}
+#cad3dLab .orbitBall .orbitBallDot{position:absolute;left:21px;top:21px;width:5px;height:5px;border-radius:50%;background:#d9f3ff;pointer-events:none}
 #cad3dLab .view.planRulers .viewNav { top:23px; left:26px }
 #cad3dLab .rulerX, #cad3dLab .rulerY {
  position:absolute; z-index:1; overflow:hidden; pointer-events:none;
@@ -503,11 +511,11 @@ function build(){
  }).join('')+'</aside>'+
  '<div class="view"><div class="rulerX" hidden aria-hidden="true"></div><div class="rulerY" hidden aria-hidden="true"></div>'+
  '<div class="snapMarker" hidden aria-hidden="true"></div><nav class="viewNav" aria-label="Vistas 3D">'+
- '<div class="viewCube">'+
+ '<div class="viewNavTop"><div class="viewCube">'+
  '<button type="button" class="cubeFace" data-view-preset="top" title="Planta" aria-label="Planta">TOP</button>'+
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
- '</div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
+ '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output>'+
  '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
@@ -544,6 +552,7 @@ function build(){
   if(!key)return;
   if(key==='fit')fit3DModel();else setViewPreset(key);
  });
+ bindOrbitBall(root.querySelector('.orbitBall'));
  root.querySelector('.viewCube').addEventListener('click',function(e){
   var face=e.target.closest('[data-view-preset]');
   if(face)setViewPreset(face.dataset.viewPreset);
@@ -1668,6 +1677,44 @@ function exportSketchSVG(){
  '<g fill="none" stroke="#282e30" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round">'+lines.join('')+'</g></svg>';
  download('blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+'-croquis.svg',svg,'image/svg+xml;charset=utf-8');
  text('Croquis SVG vectorial exportado · proyección de aristas, puede incluir líneas ocultas');
+}
+function orbitCameraBy(dx,dy){
+ if(!Number.isFinite(dx)||!Number.isFinite(dy))return;
+ if(viewMode==='walk')viewMode='perspective';
+ orbit.az-=dx*.010;
+ orbit.el=clamp(orbit.el+dy*.010,-1.49,1.49);
+ activeView='perspective';
+ syncViewControls();
+ applyViewCamera();
+}
+function bindOrbitBall(ball){
+ if(!ball)return;
+ var drag=null;
+ ball.addEventListener('pointerdown',function(e){
+  if(e.button!==0||drag)return;
+  e.preventDefault();e.stopPropagation();
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY};
+  ball.dataset.dragging='true';ball.setPointerCapture(e.pointerId);
+ });
+ ball.addEventListener('pointermove',function(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  e.preventDefault();e.stopPropagation();
+  var dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  drag.x=e.clientX;drag.y=e.clientY;
+  orbitCameraBy(dx,dy);
+ });
+ function finish(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  drag=null;delete ball.dataset.dragging;
+ }
+ ball.addEventListener('pointerup',finish);
+ ball.addEventListener('pointercancel',finish);
+ ball.addEventListener('lostpointercapture',function(){drag=null;delete ball.dataset.dragging;});
+ ball.addEventListener('keydown',function(e){
+  var vectors={ArrowLeft:[-12,0],ArrowRight:[12,0],ArrowUp:[0,-12],ArrowDown:[0,12]};
+  if(!vectors[e.key])return;
+  e.preventDefault();e.stopPropagation();orbitCameraBy(...vectors[e.key]);
+ });
 }
 function syncViewControls(){
  root.querySelector('.cad3dViewSelect').value=activeView;
