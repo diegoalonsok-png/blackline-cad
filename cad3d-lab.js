@@ -290,7 +290,7 @@ function fallbackGround(e){
 function fallbackPolygon(points,fill,stroke,width){
  var g=fallbackCtx;if(!points.length)return;
  g.beginPath();g.moveTo(points[0].x,points[0].y);for(var i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);g.closePath();
- g.fillStyle=fill;g.fill();g.strokeStyle=stroke;g.lineWidth=width||1;g.stroke();
+ g.fillStyle=renderStyle==='sketch'?'#f8f6ef':fill;g.fill();g.strokeStyle=renderStyle==='sketch'?'#303537':stroke;g.lineWidth=renderStyle==='sketch'?1.2:(width||1);g.stroke();
 }
 function fallbackBox(rec,w,d,h,offsetX,offsetY,offsetZ,color){
  var cx=(rec.x||0)+(offsetX||0),cy=(rec.y||0)+(offsetY||0),cz=(rec.z||0)+(offsetZ||0);
@@ -314,14 +314,14 @@ function fallbackDraw(){
  if(!fallbackCanvas||!fallbackCtx||root?.hidden)return;
  var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
  if(w<=0||h<=0)return;
- ctx.clearRect(0,0,w,h);ctx.fillStyle='#0d141a';ctx.fillRect(0,0,w,h);
- ctx.lineWidth=.65;ctx.strokeStyle='#23313c';
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='sketch'?'#f4f1e8':'#0d141a';ctx.fillRect(0,0,w,h);
+ ctx.lineWidth=.65;ctx.strokeStyle=renderStyle==='sketch'?'#e5e1d8':'#23313c';
  for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
  var origin=projection(0,0,0);
- ctx.strokeStyle='#7191a2';ctx.lineWidth=1;
+ ctx.strokeStyle=renderStyle==='sketch'?'#8d918e':'#7191a2';ctx.lineWidth=1;
  ctx.beginPath();ctx.moveTo(origin.x-4,origin.y);ctx.lineTo(origin.x+4,origin.y);ctx.moveTo(origin.x,origin.y-4);ctx.lineTo(origin.x,origin.y+4);ctx.stroke();
  if(underlay?.segments?.length){
   ctx.strokeStyle='#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
@@ -342,22 +342,22 @@ function fallbackDraw(){
   }else if(rec.type==='sphere'){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
-   ctx.fillStyle=grad;ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#5e8399';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+   ctx.fillStyle=renderStyle==='sketch'?'#f7f5ee':grad;ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
   }else if(rec.type==='cylinder'||rec.type==='cone'){
    var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
-   ctx.fillStyle='#547b91';ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
+   ctx.fillStyle=renderStyle==='sketch'?'#f7f5ee':'#547b91';ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
    ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();ctx.fill();ctx.stroke();
    ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
   }else if(rec.type==='boolean'&&rec.triangles?.length){
    var p=rec.triangles;
-   ctx.strokeStyle='#789ab3';ctx.lineWidth=1;
+   ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':'#789ab3';ctx.lineWidth=1;
    for(var i=0;i+8<p.length;i+=9){
     var a=projection(p[i],p[i+1],p[i+2]),b=projection(p[i+3],p[i+4],p[i+5]),c=projection(p[i+6],p[i+7],p[i+8]);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
    }
   }
  });
- ctx.font='11px Inter, Arial';ctx.textBaseline='top';ctx.fillStyle='#bbcedb';
+ ctx.font='11px Inter, Arial';ctx.textBaseline='top';ctx.fillStyle=renderStyle==='sketch'?'#47515a':'#bbcedb';
  ctx.fillText('3D · COMPATIBILITY VIEW (no WebGL)',10,12);
  if(placing){ctx.fillStyle='#e6ce90';ctx.fillText('Tool: '+placing.toUpperCase()+' · Click to place',10,30);}
 }
@@ -412,7 +412,7 @@ function init(){
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  target=new T.Vector3(0,0,1);updateCamera();
- renderer=new T.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+ renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
  root.querySelector('.view').appendChild(renderer.domElement);
  scene.add(new T.AmbientLight(0xffffff,1.3));
  var light=new T.DirectionalLight(0xffffff,2.1);light.position.set(-8,-6,16);scene.add(light);
@@ -635,8 +635,8 @@ function buildObject(r){
 function redraw(){
  if(fallbackCanvas){fallbackDraw();return;}
  if(!modelRoot)return;
- modelRoot.traverse(function(o){if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
- modelRoot.clear();records.forEach(buildObject);highlight();
+ modelRoot.traverse(function(o){if(o.isMesh||o.userData?.cadSketch){o.geometry?.dispose();o.material?.dispose();}});
+ modelRoot.clear();records.forEach(buildObject);applyRenderStyle();highlight();
 }
 function highlight(){
  if(fallbackCanvas){fallbackDraw();return;}
@@ -751,6 +751,88 @@ function booleanBox(kind){
  records=records.filter(function(r){return r.id!==a.id&&r.id!==b.id;});
  var result={id:serial++,type:'boolean',x:0,y:0,z:0,rot:0,triangles:triangles};
  records.push(result);selected=[result.id];redraw();renderProps();text('BOOLEAN '+kind.toUpperCase()+' · resultado 3D generado');
+}
+
+/* View-only sketch presentation: mesh geometry and parameters are never changed.
+   PNG reflects WebGL's occlusion. Vector SVG is a projected edge drawing and
+   may include obscured edges, intentionally disclosed in the toolbar status. */
+function applyRenderStyle(){
+ if(root){
+  var view=root.querySelector('.view');view?.classList.toggle('sketchView',renderStyle==='sketch');
+  var btn=root.querySelector('[data-action="sketch"]');btn?.classList.toggle('sketchActive',renderStyle==='sketch');
+ }
+ if(scene)scene.background=new T.Color(renderStyle==='sketch'?0xf3f1e8:0x0b1117);
+ if(gridHelper)gridHelper.visible=renderStyle!=='sketch';
+ if(axesHelper)axesHelper.visible=renderStyle!=='sketch';
+ if(!modelRoot)return;
+ modelRoot.traverse(function(m){
+  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
+  var old=m.children.filter(function(ch){return ch.userData?.cadSketch;});
+  old.forEach(function(ch){m.remove(ch);ch.geometry.dispose();ch.material.dispose();});
+  m.material.color.setHex(renderStyle==='sketch'?0xf7f4eb:m.userData.cadBaseColor);
+  if(renderStyle==='sketch'){
+   var edge=new T.EdgesGeometry(m.geometry,25);
+   var line=new T.LineSegments(edge,new T.LineBasicMaterial({color:0x25292a,depthTest:true,transparent:true,opacity:.95}));
+   line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
+  }
+ });
+}
+function setSketchStyle(mode){
+ renderStyle=mode==='sketch'?'sketch':'shaded';
+ if(renderer)applyRenderStyle();
+ if(fallbackCanvas)fallbackDraw();
+ text(renderStyle==='sketch'?'CROQUIS: vista lineal activa · exportá PNG o SVG':'Vista sombreada activa');
+}
+function exportViewPNG(){
+ var canvas=renderer?.domElement||fallbackCanvas;
+ if(!canvas)return text('Primero abrí el visor 3D');
+ try{
+  if(renderer)renderer.render(scene,camera);
+  else fallbackDraw();
+  var url=canvas.toDataURL('image/png');
+  if(!url||url==='data:,')throw Error('El navegador no pudo capturar el visor');
+  var a=document.createElement('a');a.href=url;a.download='blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+(renderStyle==='sketch'?'-croquis':'')+'.png';
+  document.body.appendChild(a);a.click();a.remove();
+  text('Vista '+(renderStyle==='sketch'?'tipo croquis ':'')+'exportada a PNG');
+ }catch(e){text('No se pudo exportar PNG: '+(e.message||e));}
+}
+function exportSketchSVG(){
+ if(!T||!modelRoot||!camera)return text('SVG requiere el visor WebGL completo; podés exportar PNG desde la vista compatible');
+ if(!records.length&&!underlay?.segments?.length)return text('No hay geometría para crear el croquis');
+ var rect=renderer.domElement.getBoundingClientRect(),w=Math.max(300,Math.round(rect.width)),h=Math.max(220,Math.round(rect.height));
+ camera.updateMatrixWorld();modelRoot.updateMatrixWorld(true);
+ var lines=[],limit=28000;
+ var proj=function(p){var v=p.clone().project(camera);return {x:(v.x+1)*.5*w,y:(1-v.y)*.5*h,z:v.z};};
+ var add=function(a,b){
+  if(lines.length>=limit)return;
+  if(a.z<-1||a.z>1||b.z<-1||b.z>1)return;
+  if(!Number.isFinite(a.x+a.y+b.x+b.y))return;
+  lines.push('<path d="M'+a.x.toFixed(2)+' '+a.y.toFixed(2)+' L'+b.x.toFixed(2)+' '+b.y.toFixed(2)+'"/>');
+ };
+ var work=new T.Vector3();
+ modelRoot.traverse(function(mesh){
+  if(!mesh.isMesh||lines.length>=limit)return;
+  var g=new T.EdgesGeometry(mesh.geometry,25),pos=g.getAttribute('position');
+  for(var i=0;i+1<pos.count&&lines.length<limit;i+=2){
+   var a=work.fromBufferAttribute(pos,i).clone().applyMatrix4(mesh.matrixWorld),b=work.fromBufferAttribute(pos,i+1).clone().applyMatrix4(mesh.matrixWorld);
+   add(proj(a),proj(b));
+  }
+  g.dispose();
+ });
+ if(underlay?.segments){
+  var point=new T.Vector3();
+  underlay.segments.forEach(function(v){
+   if(lines.length>=limit)return;
+   add(proj(point.set(v[0],v[1],0).clone()),proj(point.set(v[2],v[3],0).clone()));
+  });
+ }
+ if(!lines.length)return text('La vista actual no contiene líneas visibles para SVG');
+ var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'">'+
+ '<rect width="100%" height="100%" fill="#f8f6ee"/>'+
+ '<g fill="none" stroke="#282e30" stroke-width="1.15" stroke-linejoin="round" stroke-linecap="round">'+lines.join('')+'</g></svg>';
+ download('blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+'-croquis.svg',svg,'image/svg+xml;charset=utf-8');
+ text('Croquis SVG vectorial exportado · proyección de aristas, puede incluir líneas ocultas');
 }
 function orientation(){
  var n=(viewPresets.findIndex(function(v){return v[0]===root.querySelector('.cad3dViewSelect').value;})+1)%viewPresets.length;
