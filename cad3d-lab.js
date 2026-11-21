@@ -726,10 +726,10 @@ function applySunSettings(){
   });
   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&renderStyle!=='sketch';
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh)o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces;});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
@@ -1534,35 +1534,77 @@ function booleanBox(kind){
 /* View-only sketch presentation: mesh geometry and parameters are never changed.
    PNG reflects WebGL's occlusion. Vector SVG is a projected edge drawing and
    may include obscured edges, intentionally disclosed in the toolbar status. */
+const CAD3D_VISUAL_STYLES={
+ wire2d:'2D Wireframe',wire3d:'3D Wireframe',hidden:'Hidden',
+ shaded:'Shaded','shaded-edges':'Solid + Edges',realistic:'Realistic',
+ monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis'
+};
+function renderStyleControls(){
+ if(!root)return;
+ root.querySelectorAll('[data-render-style]').forEach(function(button){
+  button.setAttribute('aria-pressed',String(button.dataset.renderStyle===renderStyle));
+ });
+ var launcher=root.querySelector('.styleLaunch');
+ if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
+ var sketchButton=root.querySelector('[data-action="sketch"]');
+ if(sketchButton)sketchButton.classList.toggle('sketchActive',renderStyle==='sketch');
+ root.querySelector('.view')?.classList.toggle('sketchView',renderStyle==='sketch');
+}
 function applyRenderStyle(){
- if(root){
-  var view=root.querySelector('.view');view?.classList.toggle('sketchView',renderStyle==='sketch');
-  var btn=root.querySelector('[data-action="sketch"]');btn?.classList.toggle('sketchActive',renderStyle==='sketch');
- }
- if(scene)scene.background=new T.Color(renderStyle==='sketch'?0xf3f1e8:MODEL_BACKGROUND);
- if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&renderStyle!=='sketch';
- if(axesHelper)axesHelper.visible=renderStyle!=='sketch';
+ renderStyleControls();
+ if(!T)return;
+ var lightPaper=['sketch','hidden','monochrome','wire2d'].includes(renderStyle);
+ if(scene)scene.background=new T.Color(lightPaper?0xf3f1e8:MODEL_BACKGROUND);
+ if(gridHelper)gridHelper.visible=draftModes.grid&&!['sketch','hidden','wire2d'].includes(renderStyle);
+ if(axesHelper)axesHelper.visible=!['sketch','hidden','wire2d'].includes(renderStyle);
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
  if(!modelRoot)return;
+ var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
+ var withEdges=['wire2d','wire3d','hidden','shaded-edges','monochrome','sketch'].includes(renderStyle);
  modelRoot.traverse(function(m){
   if(!m.isMesh||!m.material||!m.geometry)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
-  var old=m.children.filter(function(ch){return ch.userData?.cadSketch;});
-  old.forEach(function(ch){m.remove(ch);ch.geometry.dispose();ch.material.dispose();});
-  m.material.color.setHex(renderStyle==='sketch'?0xf7f4eb:m.userData.cadBaseColor);
-  if(renderStyle==='sketch'){
-   var edge=new T.EdgesGeometry(m.geometry,25);
-   var line=new T.LineSegments(edge,new T.LineBasicMaterial({color:0x25292a,depthTest:true,transparent:true,opacity:.95}));
+  m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
+   m.remove(ch);ch.geometry.dispose();ch.material.dispose();
+  });
+  var mat=m.material,base=m.userData.cadBaseColor;
+  var color=renderStyle==='monochrome'?0xe8e8e3:renderStyle==='sketch'?0xf7f4eb:
+   renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
+  mat.color.setHex(color);
+  mat.colorWrite=!plainLines;
+  mat.depthWrite=renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
+  mat.depthTest=true;
+  mat.transparent=renderStyle==='xray';
+  mat.opacity=renderStyle==='xray'?.23:1;
+  mat.roughness=renderStyle==='realistic'?.54:.8;
+  mat.metalness=renderStyle==='realistic'?.10:.04;
+  m.castShadow=!plainLines;
+  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  if(withEdges){
+   var edge=new T.EdgesGeometry(m.geometry,22);
+   var colorEdge=renderStyle==='sketch'?0x22282c:renderStyle==='shaded-edges'?0x394954:0x43535e;
+   var depthTest=!['wire2d','wire3d'].includes(renderStyle);
+   var line=new T.LineSegments(edge,new T.LineBasicMaterial({
+    color:colorEdge,depthTest:depthTest,depthWrite:false,
+    transparent:renderStyle==='shaded-edges',opacity:renderStyle==='shaded-edges'?.68:1
+   }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
   }
  });
 }
-function setSketchStyle(mode){
- renderStyle=mode==='sketch'?'sketch':'shaded';
- if(root){root.querySelector('.view')?.classList.toggle('sketchView',renderStyle==='sketch');root.querySelector('[data-action="sketch"]')?.classList.toggle('sketchActive',renderStyle==='sketch');}
+function setVisualStyle(mode){
+ if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
+ renderStyle=mode;
  if(renderer)applyRenderStyle();
+ else renderStyleControls();
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&
+  !['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
  if(fallbackCanvas)fallbackDraw();
- text(renderStyle==='sketch'?'CROQUIS: vista lineal activa · exportá PNG o SVG':'Vista sombreada activa');
+ text('Visual Style: '+CAD3D_VISUAL_STYLES[mode]+' · cámara y geometría conservadas');
+ return true;
+}
+function setSketchStyle(mode){
+ setVisualStyle(mode==='sketch'?'sketch':'shaded-edges');
 }
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
@@ -1754,7 +1796,7 @@ function action(a){
  }
  if(['union','subtract','intersect'].includes(a)){setPlacement(null);booleanBox(a);return true;}
  if(a==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();text('Sun / Shadows '+(sunSettings.enabled?'ON':'OFF'));return true;}
- if(a==='sketch')setSketchStyle(renderStyle==='sketch'?'shaded':'sketch');
+ if(a==='sketch')setSketchStyle(renderStyle==='sketch'?'shaded-edges':'sketch');
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
