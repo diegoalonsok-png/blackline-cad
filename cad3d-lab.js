@@ -572,8 +572,8 @@ function drawUnderlay(){
  var geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(data,3));
  var line=new T.LineSegments(geo,new T.LineBasicMaterial({color:0x86aabc,transparent:true,opacity:.86,depthTest:false}));
  line.renderOrder=2;underlayGroup.add(line);
- var xs=[],ys=[];underlay.segments.forEach(function(s){xs.push(s[0],s[2]);ys.push(s[1],s[3]);});
- var minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs),minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+ var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+ underlay.segments.forEach(function(v){minX=Math.min(minX,v[0],v[2]);maxX=Math.max(maxX,v[0],v[2]);minY=Math.min(minY,v[1],v[3]);maxY=Math.max(maxY,v[1],v[3]);});
  if(camera){target.set((minX+maxX)/2,(minY+maxY)/2,.7);orbit.dist=clamp(Math.max(maxX-minX,maxY-minY)*1.6,3,450);updateCamera();}
 }
 function useOpenCAD2D(){
