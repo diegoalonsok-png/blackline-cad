@@ -42,8 +42,9 @@ var css=[
 '#cad3dLab .view canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}',
 '#cad3dLab .hint{position:absolute;top:9px;left:9px;padding:6px 8px;background:#111923cf;border:1px solid #364b59;border-radius:5px;color:#aec2d0;pointer-events:none;font-size:10px}',
 '#cad3dLab .side{width:227px;min-width:155px;max-width:65%;flex:0 0 auto;background:#151f28;border-left:1px solid #344553;padding:10px;overflow:auto}',
-'#cad3dLab .sideGrip{width:7px;flex:0 0 7px;cursor:col-resize;background:#0e171f;border-left:1px solid #2c3e4b;touch-action:none;position:relative}',
-'#cad3dLab .sideGrip::after{content:"";position:absolute;top:45%;left:2px;height:38px;border-left:2px solid #849eae;opacity:.55}',
+'#cad3dLab .sideGrip{width:6px;flex:0 0 6px;cursor:col-resize;background:#121b23;border-left:1px solid #293846;touch-action:none;position:relative;transition:background .15s}',
+'#cad3dLab .sideGrip:hover,#cad3dLab .sideGrip:active{background:#324655}',
+'#cad3dLab .sideGrip::after{content:"";position:absolute;top:calc(50% - 17px);left:2px;height:34px;border-left:1px solid #9bacb7;opacity:.38}',
 '#cad3dLab .side h3{font-size:12px;margin:0 0 10px}',
 '#cad3dLab .side p{line-height:1.4;color:#a8b9c5;font-size:11px}',
 '#cad3dLab .side label{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:7px 0;font-size:11px}',
@@ -51,9 +52,13 @@ var css=[
 '#cad3dLab .side .detail{padding:8px 0;margin-top:8px;border-top:1px solid #364a59}',
 '#cad3dLab .side button{border:1px solid #526b7c;background:#233544;color:#e6eef4;border-radius:5px;padding:5px 7px;margin-top:3px;cursor:pointer}',
 '#cad3dLab footer{height:26px;flex:0 0 26px;background:#0b1218;border-top:1px solid #354857;padding:5px 9px;color:#9fb5c5;display:flex;justify-content:space-between;gap:8px}',
-'#cad3dLab .resizeGrip{position:absolute;right:0;bottom:0;width:23px;height:23px;background:linear-gradient(135deg,transparent 60%,#7f9db0 62%,transparent 66%,transparent 74%,#7f9db0 76%,transparent 80%);cursor:nwse-resize;touch-action:none;z-index:6}',
+'#cad3dLab .resizeGrip{position:absolute;right:0;bottom:0;width:18px;height:18px;background:linear-gradient(135deg,transparent 57%,#7b8f9d 58%,#7b8f9d 60%,transparent 61%,transparent 72%,#7b8f9d 73%,#7b8f9d 75%,transparent 76%);opacity:.55;cursor:nwse-resize;touch-action:none;z-index:7}',
+'#cad3dLab .edgeResizeR{position:absolute;right:0;top:39px;bottom:18px;width:6px;cursor:ew-resize;touch-action:none;z-index:7}',
+'#cad3dLab .edgeResizeB{position:absolute;bottom:0;left:30px;right:18px;height:6px;cursor:ns-resize;touch-action:none;z-index:7}',
+'#cad3dLab .edgeResizeR:hover,#cad3dLab .edgeResizeB:hover{background:#6a849a45}',
+'#cad3dLab .resizeGrip:hover{opacity:1}',
 '#cad3dLab .tools button.armed{border-color:#b4cde0;background:#345369;color:#ffffff}',
-'@media(max-width:700px){#cad3dLab{left:2vw;top:8vh;width:96vw;height:83vh;min-width:0}#cad3dLab .side{width:155px;flex-basis:155px;padding:6px}#cad3dLab .tools button span{display:none}#cad3dLab .head small{display:none}}'
+'@media(max-width:700px){#cad3dLab{left:2vw;top:8vh;width:96vw;height:83vh;min-width:0}#cad3dLab .side{width:155px;flex-basis:auto;padding:6px}#cad3dLab .tools button span{display:none}#cad3dLab .head small{display:none}}'
 ].join('\n');
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -73,7 +78,7 @@ function launch(){
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D LAB');
- root.innerHTML='<div class="head"><strong>▣ BLACKLINE · CAD3D</strong><small>EXPERIMENTAL · MODEL SPACE</small><div class="stretch"></div><button type="button" data-smaller title="Reducir tamaño de ventana 3D">−</button><button type="button" data-bigger title="Agrandar tamaño de ventana 3D">+</button><button type="button" data-max title="Maximizar o restaurar ventana 3D">□</button><button type="button" data-close title="Cerrar 3D sin afectar el plano 2D">×</button></div>'+
+ root.innerHTML='<div class="head"><strong>▣ BLACKLINE · CAD3D</strong><small>EXPERIMENTAL · MODEL SPACE</small><div class="stretch"></div><button type="button" data-max title="Maximizar o restaurar ventana 3D">□</button><button type="button" data-close title="Cerrar 3D sin afectar el plano 2D">×</button></div>'+
  '<div class="tools" role="toolbar" aria-label="Herramientas tridimensionales">'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+
  '<div class="divider"></div>'+tool('wall','WALL 3D')+tool('door','Door')+tool('window','Window')+
@@ -82,16 +87,16 @@ function build(){
  '<div class="divider"></div>'+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+tool('json','.3DJSON','export')+tool('open','Open','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div>'+
  '<div class="body"><div class="view"><div class="hint">Botón de sólido → clic para colocarlo · WALL: dos puntos · Shift + clic: seleccionar</div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de la paleta 3D"></div><aside class="side"><h3>3D PROPERTIES</h3><div class="props"><p>Agregá un objeto o seleccioná una figura. Unidades: metros.</p></div></aside></div>'+
- '<footer><span class="status" role="status">Módulo separado · CAD2D intacto</span><span>BLACKLINE · 3D LAB</span></footer><div class="resizeGrip" role="button" title="Arrastrá para cambiar el tamaño de la ventana 3D" aria-label="Redimensionar ventana 3D"></div>'+
+ '<footer><span class="status" role="status">Módulo separado · CAD2D intacto</span><span>BLACKLINE · 3D LAB</span></footer><div class="edgeResizeR" data-resize="x" title="Arrastrar borde para ajustar ancho 3D"></div><div class="edgeResizeB" data-resize="y" title="Arrastrar borde para ajustar altura 3D"></div><div class="resizeGrip" data-resize="xy" role="button" title="Arrastrar la esquina para ajustar ancho y alto" aria-label="Redimensionar ventana 3D"></div>'+
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  document.body.appendChild(root);
  root.querySelector('[data-close]').addEventListener('click',close);
  root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
- root.querySelector('[data-smaller]').addEventListener('click',function(){adjustWindow(-110,-75);});
- root.querySelector('[data-bigger]').addEventListener('click',function(){adjustWindow(110,75);});
  root.querySelector('.sideGrip').addEventListener('pointerdown',beginSideResize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
  root.querySelector('.resizeGrip').addEventListener('pointerdown',beginResize);
+ root.querySelector('.edgeResizeR').addEventListener('pointerdown',beginResize);
+ root.querySelector('.edgeResizeB').addEventListener('pointerdown',beginResize);
  root.querySelector('.tools').addEventListener('click',function(e){var b=e.target.closest('[data-action]');if(b)action(b.dataset.action);});
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
@@ -122,14 +127,6 @@ function toggleMaximize(){
  }
  resize();
 }
-function adjustWindow(dx,dy){
- if(!root)return;
- if(restoredWindow)toggleMaximize();
- var r=root.getBoundingClientRect(),left=r.left,top=r.top;
- root.style.width=clamp(r.width+dx,Math.min(490,window.innerWidth-18),Math.max(490,window.innerWidth-left-5))+'px';
- root.style.height=clamp(r.height+dy,Math.min(320,window.innerHeight-18),Math.max(320,window.innerHeight-top-5))+'px';
- resize();
-}
 function beginSideResize(e){
  if(e.button!==0)return;
  e.preventDefault();e.stopPropagation();
@@ -144,15 +141,22 @@ function beginResize(e){
  e.preventDefault();e.stopPropagation();
  if(restoredWindow)toggleMaximize();
  var grip=e.currentTarget,rect=root.getBoundingClientRect();
+ var axis=grip.dataset.resize||'xy';
  var start={id:e.pointerId,x:e.clientX,y:e.clientY,w:rect.width,h:rect.height};
  grip.setPointerCapture(e.pointerId);
  var move=function(ev){
   if(ev.pointerId!==start.id)return;
-  root.style.width=clamp(start.w+ev.clientX-start.x,Math.min(490,window.innerWidth-30),window.innerWidth-root.offsetLeft-4)+'px';
-  root.style.height=clamp(start.h+ev.clientY-start.y,300,window.innerHeight-root.offsetTop-4)+'px';
+  var minW=Math.min(360,window.innerWidth-16),maxW=Math.max(minW,window.innerWidth-root.getBoundingClientRect().left-4);
+  var minH=Math.min(250,window.innerHeight-16),maxH=Math.max(minH,window.innerHeight-root.getBoundingClientRect().top-4);
+  if(axis.includes('x'))root.style.width=clamp(start.w+ev.clientX-start.x,minW,maxW)+'px';
+  if(axis.includes('y'))root.style.height=clamp(start.h+ev.clientY-start.y,minH,maxH)+'px';
   resize();
  };
- var end=function(ev){if(ev.pointerId!==start.id)return;grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',end);grip.removeEventListener('pointercancel',end);resize();};
+ var end=function(ev){
+  if(ev.pointerId!==start.id)return;
+  grip.removeEventListener('pointermove',move);grip.removeEventListener('pointerup',end);grip.removeEventListener('pointercancel',end);
+  resize();
+ };
  grip.addEventListener('pointermove',move);
  grip.addEventListener('pointerup',end);
  grip.addEventListener('pointercancel',end);
@@ -283,8 +287,10 @@ async function open(){
  cad3dLoading=true;
  text('Podés dibujar ahora · intentando activar el visor WebGL completo…');
  try{
-  if(!T){try{T=await import('https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js');}
-   catch(e){T=await import('https://unpkg.com/three@0.182.0/build/three.module.js');}}
+  if(!T){try{T=await import('./assets/three-cad3d-r160.module.js');}
+   catch(localError){console.warn('Local THREE module unavailable; trying CDN',localError);
+    try{T=await import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js');}
+    catch(e){T=await import('https://unpkg.com/three@0.160.0/build/three.module.js');}}}
   if(root.hidden)return;
   var previous={x:target?.x||0,y:target?.y||0,z:target?.z||1};
   if(fallbackCanvas){fallbackCanvas.remove();fallbackCanvas=null;fallbackCtx=null;}
