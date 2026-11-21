@@ -454,6 +454,8 @@ function build(){
  '<label class="sunToggle"><input type="checkbox" data-sun-ground checked> On ground</label>'+
  '<label class="sunToggle"><input type="checkbox" data-sun-faces checked> On faces</label>'+
  '<div class="sunPresetRow"><button type="button" class="btn" data-sun-preset="morning">Morning</button><button type="button" class="btn" data-sun-preset="noon">Noon</button><button type="button" class="btn" data-sun-preset="afternoon">Afternoon</button></div>'+
+ '<button type="button" class="btn" data-check-shadows title="Compare render with shadows on and off">Check visible shadows</button>'+
+ '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
@@ -542,6 +544,7 @@ function build(){
   if(opening&&!renderer)text('Sun activo · Las sombras reales requieren WebGL; vista de compatibilidad sin sombras');
  });
  root.querySelector('[data-sun-enabled]').addEventListener('change',function(){sunSettings.enabled=this.checked;applySunSettings();});
+ root.querySelector('[data-check-shadows]').addEventListener('click',checkVisibleShadows);
  root.querySelector('[data-sun-ground]').addEventListener('change',function(){sunSettings.onGround=this.checked;applySunSettings();});
  root.querySelector('[data-sun-faces]').addEventListener('change',function(){sunSettings.onFaces=this.checked;applySunSettings();});
  root.querySelectorAll('[data-sun-preset]').forEach(function(btn){btn.addEventListener('click',function(){
@@ -1600,6 +1603,40 @@ function setViewPreset(key){
  syncViewControls();applyViewCamera();
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
+}
+function checkVisibleShadows(){
+ var output=root.querySelector('.shadowFeedback');
+ function report(message){output.textContent=message;text(message);}
+ if(!renderer||!sunLight||!modelRoot)return report('WebGL unavailable: cannot verify actual cast shadows in compatibility preview.');
+ if(!records.some(visibleRecord))return report('Add a Wall or Box before checking shadows.');
+ if(!sunSettings.enabled){sunSettings.enabled=true;applySunSettings();}
+ var lightWasCasting=sunLight.castShadow;
+ try{
+  var source=renderer.domElement;
+  var testCanvas=document.createElement('canvas'),w=160,h=100;
+  testCanvas.width=w;testCanvas.height=h;
+  var ctx=testCanvas.getContext('2d',{willReadFrequently:true});
+  if(!ctx)throw Error('2D sample canvas unavailable');
+  function capture(){
+   renderer.shadowMap.needsUpdate=true;
+   renderer.render(scene,camera);
+   ctx.clearRect(0,0,w,h);ctx.drawImage(source,0,0,w,h);
+   return ctx.getImageData(0,0,w,h).data;
+  }
+  sunLight.castShadow=false;
+  var without=capture();
+  sunLight.castShadow=true;
+  var withShadows=capture();
+  var changed=0,difference=0;
+  for(var i=0;i<without.length;i+=4){
+   var d=Math.abs(without[i]-withShadows[i])+Math.abs(without[i+1]-withShadows[i+1])+Math.abs(without[i+2]-withShadows[i+2]);
+   if(d>24)changed++;
+   difference+=d;
+  }
+  report(changed>25?'Visible cast shadows confirmed: '+changed+' changed pixels in sample.':
+   'No visible cast shadow detected. Use Iso/3D view, turn On ground and On faces, and select Morning.');
+ }catch(err){report('Shadow image comparison unavailable: '+String(err?.message||err));}
+ finally{sunLight.castShadow=lightWasCasting;renderer.shadowMap.needsUpdate=true;renderer.render(scene,camera);}
 }
 function verify3DSolids(){
  var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean']);
