@@ -407,10 +407,10 @@ async function readJSON(e){
    return o;
   });
   records=sanitized;var ids=records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));});
-  serial=Math.max(1,finite(data.serial,0),...ids)+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
+  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
-window.BlacklineCAD3D=Object.freeze({open:open,close:close,get enabled(){return !root||!root.hidden;},get experimental(){return true;}});
+window.BlacklineCAD3D=Object.freeze({open:open,close:close,get enabled(){return !!root&&!root.hidden;},get experimental(){return true;}});
 /* Only install a launcher. Three.js is not requested until the explicit user click. */
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',launch,{once:true});else launch();
 })();
