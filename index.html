@@ -983,6 +983,69 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  color:var(--lexicon-text)!important;
  border-color:var(--lexicon-edge)!important;
 }
+/* Theme synchronization for the complete CAD chrome. Never recolor model canvas or entity geometry.
+   Extra specificity overrides the original graphite and Blackline Modern hardcoded styles. */
+.app.blackline-modern[data-lexicon-background]{
+ background:var(--lexicon-background)!important;
+ color:var(--lexicon-text)!important;
+}
+.app.blackline-modern[data-lexicon-background] :is(
+ .brandbar,.tabbar,.ribbon-shell,.ribbon,.workspace,.sidebar,.rightside,.panel,.cad-palette,
+ .cmd,.status,.cad-text-toolbar,#cadTextToolbar,.canvas-bottom,.cad-floating-tools,
+ .cad-floating-tool-list,.floating-tools-handle,.cad-layout-toolbar,.bl-icon-rail,
+ .cad-workspace-menu,.cad-status-menu,.cad-colors-popover,.cad-export-popover
+ ){
+ background:var(--lexicon-background)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
+.app.blackline-modern[data-lexicon-background] :is(
+ .panel-title,.palette-title,.tabbar .tab.active,.ribbon .tool.active,
+ .floating-tools-handle,.canvas-overlay,.cad-floating-tool-list,.cad-quick-actions,
+ .cad-command-finder,.cmd .command-row,.layer-row.current,.cad-space-tab,
+ .canvas-bottom button,.cad-layout-toolbar,.cad-workspace-controls
+ ){
+ background:var(--lexicon-raised)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
+.app.blackline-modern[data-lexicon-background] :is(
+ .brandbar .btn,.cad-workspace-controls .btn,.tabbar button,.ribbon .tool,.ribbon .group.stack .tool,
+ .sidebar button,.sidebar .btn,.status button,.cad-floating-tool-list button,
+ .bl-icon-rail button,.view-tools button,.cad-quick-actions button,
+ .cad-text-toolbar button,#cadTextToolbar button,.canvas-bottom button,#blCards button,
+ .cad-status-menu button,.cad-export-option,.cad-layout-toolbar button
+ ){
+ background:var(--lexicon-raised)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
+.app.blackline-modern[data-lexicon-background] :is(
+ .filename,.cad-command-finder,.cad-command-finder input,
+ .cmd .command-row,.cmd .command-row #command,
+ .sidebar select,.sidebar input:not([type=color]),
+ .cad-text-toolbar input:not([type=color]),.cad-text-toolbar select,
+ #cadTextToolbar input:not([type=color]),#cadTextToolbar select,
+ .bl-block-search,.cad-workspace-menu input:not([type=color])
+ ){
+ background:var(--lexicon-input)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
+.app.blackline-modern[data-lexicon-background] :is(
+ .ribbon .tool svg,.cad-floating-tools svg,.brandbar svg,.sidebar button svg
+ ){stroke:var(--lexicon-text)!important}
+.app.blackline-modern[data-lexicon-background] :is(
+ .brand small,.panel .help,.cad-text-note,.cad-snap-live,.hint,.canvas-overlay
+ ){color:var(--lexicon-text)!important}
+.app.blackline-modern[data-lexicon-background] :is(
+ .ribbon-grip,.cad-ribbon-size,.cad-floating-tool-list,.cad-quick-actions,
+ .canvas-overlay,.bl-icon-rail,.bl-icon-rail button,.view-tools button
+ ){
+ background:var(--lexicon-raised)!important;
+ border-color:var(--lexicon-edge)!important;
+ color:var(--lexicon-text)!important;
+}
 /* Lexicon controls: only the theme and background palette buttons. */
 .app .brandbar > #cadAppearanceControls #blThemeToggle,
 .app .brandbar > #cadAppearanceControls #cadLexiconBackgroundBtn{
