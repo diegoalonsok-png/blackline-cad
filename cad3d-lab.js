@@ -965,7 +965,7 @@ function bindCanvas(el){
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
   e.preventDefault();el.focus({preventScroll:true});
-  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho');
+  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho'&&!placing);
   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan};
   el.setPointerCapture(e.pointerId);
  });
