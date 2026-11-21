@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guía rápida de comandos y atajos | Blackline CAD</title>
+<meta name="robots" content="noindex,follow">
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#151b23;color:#e8eef3;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{position:sticky;top:0;background:#151b23;border-bottom:1px solid #364350;padding:17px 20px;z-index:1}
+h1{font-size:21px;margin:0 0 6px}p{margin:5px 0;color:#b9c6d0}input{width:100%;margin:12px 0 3px;padding:10px 12px;background:#222c35;border:1px solid #556c7b;color:#fff;border-radius:9px;font:inherit}
+nav{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}nav button{cursor:pointer;border:1px solid #536a7b;border-radius:7px;padding:6px 10px;background:#202b36;color:#dfedf5;font:inherit}nav button[aria-pressed=true]{background:#a7ccdf;color:#10202b}
+main{padding:15px 20px 25px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+article{padding:12px 14px;background:#1c2630;border:1px solid #3b4b58;border-radius:10px}
+article h2{font-size:15px;margin:0 0 7px}article p{font-size:13px}
+kbd{display:inline-block;font:600 12px ui-monospace,SFMono-Regular,Consolas,monospace;color:#c7e7f5;background:#0f1922;border:1px solid #455d6c;border-radius:4px;padding:2px 5px}
+a{color:#add8f0}footer{padding:14px 20px;color:#aebbc6}
+</style></head><body>
+<header><h1>Guía rápida · Blackline CAD</h1><p>Comandos y atajos para trabajar sin salir del editor. Escribí en el área de dibujo o en la línea inferior y confirmá con Enter.</p>
+<input id="search" type="search" autocomplete="off" placeholder="Buscar: línea, mover, cota, F3, DXF…" aria-label="Buscar comando o atajo">
+<nav id="tabs" aria-label="Filtrar herramientas"></nav></header>
+<main><div class="grid" id="items"></div><p id="empty" hidden>No se encontraron comandos.</p>
+<p style="margin-top:20px">Los alias pueden variar según el idioma configurado. Consultá el <a href="manual-comandos.html" target="_blank" rel="noopener">manual completo de comandos</a> para opciones y herramientas avanzadas.</p></main>
+<footer>Blackline CAD está en desarrollo. Verificá las dimensiones y los archivos exportados antes de usarlos profesionalmente.</footer>
+<script>
+const groups={
+'Dibujar':[
+['LINE / L','Línea','Marcá el punto inicial y el final. Para una longitud, escribí la distancia y pulsá Enter.'],
+['PLINE / PL','Polilínea','Dibujá una secuencia de segmentos unidos.'],
+['RECTANGLE / REC','Rectángulo','Marcá dos esquinas opuestas.'],
+['CIRCLE / C','Círculo','Elegí centro y radio.'],
+['ARC / A','Arco','Construí un arco mediante los puntos solicitados.'],
+['WALL','Muro','Dibujá muros arquitectónicos y ajustá su espesor desde las opciones.']
+],
+'Modificar':[
+['MOVE / M','Mover','Seleccioná objetos y especificá un punto base y su destino.'],
+['COPY / CO','Copiar','Seleccioná y colocá una o más copias.'],
+['ROTATE / RO','Girar','Elegí punto base y ángulo.'],
+['OFFSET / O','Desfase','Creá una copia paralela a una distancia indicada.'],
+['TRIM / TR','Recortar','Recortá segmentos con clic o barrido, según las opciones disponibles.'],
+['EXTEND / EX','Alargar','Extendé una entidad hasta un límite.'],
+['ERASE / E','Borrar','Eliminá los objetos seleccionados.'],
+['UNDO / Ctrl+Z','Deshacer','Revertí la última operación.']
+],
+'Anotar':[
+['DIM','Cotas','Indicá los puntos a medir y ubicá la línea de cota.'],
+['TEXT','Texto','Insertá una anotación o nombre de ambiente.'],
+['LAYER / LA','Capas','Organizá el dibujo por capas y controlá su visibilidad.'],
+['BLOCK / BL','Bloque','Agrupá elementos reutilizables o insertá bloques existentes.']
+],
+'Teclado':[
+['F1','Ayuda','Abre la ayuda del CAD.'],
+['F2','Historial','Muestra el historial de comandos.'],
+['F3','OSNAP','Activa o desactiva referencias a objetos.'],
+['F7','GRID','Muestra u oculta la rejilla.'],
+['F8','ORTHO','Activa o desactiva dibujo ortogonal.'],
+['F9','SNAP','Activa o desactiva el ajuste de rejilla.'],
+['F10','POLAR','Activa o desactiva el rastreo polar.'],
+['F11','OTRACK','Activa o desactiva el rastreo de referencias.'],
+['Ctrl+S','Guardar','Guarda el dibujo.'],
+['Ctrl+O','Abrir','Abre un dibujo.'],
+['Ctrl+P','Imprimir','Abre impresión o PDF.'],
+['Ctrl+Y','Rehacer','Repite una acción deshecha.'],
+['Ctrl+1','Propiedades','Muestra las propiedades.'],
+['Ctrl+9','Comandos','Muestra u oculta la línea de comandos.'],
+['Esc','Cancelar','Cancela el comando activo.'],
+['Enter','Confirmar','Confirma una opción o repite el último comando cuando corresponde.']
+],
+'Archivos':[
+['DXF','Formato de intercambio','Abrí, guardá y exportá dibujos compatibles en formato DXF.'],
+['PLOT / PDF','Imprimir','Revisá escala y orientación antes de generar el PDF.'],
+['MODEL / LAYOUT','Modelo y láminas','Dibujá a escala real en modelo; prepará láminas para imprimir.']
+]};
+const tabs=document.getElementById('tabs'),items=document.getElementById('items'),search=document.getElementById('search'),empty=document.getElementById('empty');let group='Todos';
+for(const name of ['Todos',...Object.keys(groups)]){const b=document.createElement('button');b.type='button';b.textContent=name;b.onclick=()=>{group=name;render()};tabs.append(b)}
+function render(){const term=search.value.toLocaleLowerCase('es').trim();items.replaceChildren();let count=0;
+ for(const [category,rows] of Object.entries(groups)){if(group!=='Todos'&&group!==category)continue;
+ for(const [keys,label,help] of rows){if(![category,keys,label,help].join(' ').toLocaleLowerCase('es').includes(term))continue;
+ const card=document.createElement('article'),title=document.createElement('h2'),key=document.createElement('kbd'),description=document.createElement('p');title.textContent=label;key.textContent=keys;description.textContent=help;card.append(title,key,description);items.append(card);count++}}
+ empty.hidden=count>0;[...tabs.children].forEach(b=>b.setAttribute('aria-pressed',String(b.textContent===group)))}
+search.addEventListener('input',render);render();
+</script></body></html>
