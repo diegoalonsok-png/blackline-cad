@@ -10361,6 +10361,13 @@ function initCadColorPopover(){
   app.style.setProperty('--lexicon-input',adjust(dark?-5:5));
   app.style.setProperty('--lexicon-edge',adjust(dark?55:-55));
   app.style.setProperty('--lexicon-text',text);
+  // Keep both CAD chrome theme systems synchronized. These are scoped to the
+  // application, so drawing canvas and entity colors remain untouched.
+  for(const [name,value] of Object.entries({
+   base:hex,toolbar:adjust(dark?6:-6),raised:adjust(delta),
+   input:adjust(dark?-5:5),edge:adjust(dark?55:-55),
+   text,muted:mean>153?'#46545e':'#bcbab2'
+  }))app.style.setProperty('--cad-ui-'+name,value);
   app.dataset.lexiconBackground=hex;
   try{localStorage.setItem('cad2d-lexicon-background',hex)}catch(e){}
   return true;
@@ -10369,6 +10376,7 @@ function initCadColorPopover(){
   const app=document.querySelector('.app');if(!app)return;
   delete app.dataset.lexiconBackground;
   for(const name of ['background','toolbar','raised','input','edge','text'])app.style.removeProperty('--lexicon-'+name);
+  for(const name of ['base','toolbar','raised','input','edge','text','muted'])app.style.removeProperty('--cad-ui-'+name);
   try{localStorage.removeItem('cad2d-lexicon-background')}catch(e){}
  };
  try{const saved=localStorage.getItem('cad2d-lexicon-background');if(saved)window.cadSetPaletteBackground(saved)}catch(e){};
