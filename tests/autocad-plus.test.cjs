@@ -55,8 +55,8 @@ test('ventanas gráficas: Layout guarda las ventanas y SVG/PDF las recortan por 
  assert.match(html,/viewports:clone\(cadLayoutViewports\)/);
  assert.match(html,/cadLayoutViewports=Array\.isArray\(v\.viewports\)/);
  assert.match(html,/if\(o\.viewports\?\.length&&!o\.__vp\)\{/);
- assert.match(html,/const cadPdfDrawEntities=\(\)=>\{/);
- assert.match(html,/re W n`\);cadPdfDrawEntities\(\);contents\.push\('Q'\)/);
+ assert.match(html,/const cadPdfDrawEntities=\(vpFrozen=\[\]\)=>\{/);
+ assert.match(html,/re W n`\);cadPdfDrawEntities\(v\.frozenLayers\|\|\[\]\);contents\.push\('Q'\)/);
 });
 test('cinta extensible: pestaña Arquitectura, tipos de línea y ningún botón sin icono',()=>{
  const t=fs.readFileSync(path.join(__dirname,'..','cad-arq-tools.js'),'utf8');

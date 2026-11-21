@@ -925,18 +925,37 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .app .brandbar{min-width:0;overflow:visible!important;position:relative;z-index:45}
 .brandbar>.cad-workspace-controls{flex:0 0 auto;min-width:max-content}
 .app .brandbar>.right{container-type:inline-size;flex:1 1 auto;min-width:68px;justify-content:flex-end;gap:4px;overflow:visible!important}
-.app .brandbar #blThemeToggle,.app .brandbar #cadHeaderActions summary{
+.app .brandbar #blThemeToggle{
  display:inline-grid;place-items:center;flex:none;width:30px;height:28px;min-height:0;padding:0!important;
  color:var(--cad-ui-text);font-size:16px;cursor:pointer;
 }
-#cadHeaderActions{position:relative;flex:none}
-#cadHeaderActions summary::-webkit-details-marker{display:none}
-#cadHeaderActions>div{position:absolute;top:calc(100% + 7px);right:0;display:grid;min-width:170px;gap:4px;padding:6px;
- background:var(--cad-ui-base);border:1px solid var(--cad-ui-edge);border-radius:8px;box-shadow:0 9px 20px #0007}
-#cadHeaderActions>div button{display:block!important;width:100%;text-align:left;white-space:nowrap}
-@container(max-width:250px){.brandbar .right>.cad-header-primary{display:none!important}}
+.app .brandbar .cad-header-extra{display:flex;align-items:center;gap:4px;flex:0 0 auto;white-space:nowrap}
+.app .brandbar .cad-header-extra .btn{min-height:28px;padding:4px 9px}
+.app .brandbar .right{overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin}
+@container(max-width:250px){.brandbar .right>.cad-header-primary{display:inline-flex!important}}
 @media(max-width:950px){.app .brandbar .cad-command-finder{display:none!important}}
 @media(max-width:680px){.app .brandbar .brand,.app .brandbar .cad-header-undo-redo{display:none!important}}
+/* Lexicon-inspired styling, strictly scoped to the three color/theme controls. */
+.app .brandbar #blThemeToggle,
+.app .status #cadColorButton,
+.app .status #cadCustomColorToggle{
+ border:1px solid #7d8995!important;
+ border-radius:12px!important;
+ background:var(--cad-ui-raised,#1c2630)!important;
+ color:var(--cad-ui-text,#e5edf3)!important;
+ box-shadow:none!important;
+ font-weight:500!important;
+ transition:border-color .15s ease,background-color .15s ease!important;
+}
+.app .brandbar #blThemeToggle{width:40px!important;height:36px!important;font-size:21px!important;padding:0!important}
+.app .status #cadColorButton{padding:4px 10px!important;min-height:28px!important}
+.app .status #cadCustomColorToggle{width:30px!important;min-width:30px!important;min-height:28px!important;font-size:18px!important;padding:1px!important}
+.app .brandbar #blThemeToggle:hover,
+.app .status #cadColorButton:hover,
+.app .status #cadCustomColorToggle:hover{border-color:#b7d5e5!important;background:var(--cad-ui-toolbar,#273747)!important}
+.app .brandbar #blThemeToggle:focus-visible,
+.app .status #cadColorButton:focus-visible,
+.app .status #cadCustomColorToggle:focus-visible{outline:2px solid #96d8eb!important;outline-offset:2px!important}
 </style>
 </head>
 <body>
@@ -944,9 +963,12 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right">
  <button type="button" class="btn slim cad-header-primary" data-cad-header-action="openBtn">Open</button>
  <button type="button" class="btn slim cad-header-primary" data-cad-header-action="saveProjectBtn">Save</button>
- <details id="cadHeaderActions"><summary class="btn slim" aria-label="Más acciones" title="Más acciones">⋯</summary><div>
-  <button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Insertar la casa de ejemplo de dos plantas, con muebles y sanitarios como bloques">Casa de ejemplo</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button>
- </div></details></div></header>
+ <div class="cad-header-extra" role="group" aria-label="Acciones directas">
+  <button class="btn slim" id="resetWorkspace" title="Restablecer paletas y barras sin modificar el dibujo">Reset interface</button>
+  <button class="btn slim" id="sampleHouseBtn" title="Insertar la casa de ejemplo">Casa de ejemplo</button>
+  <button class="btn slim" id="pdfBtn" title="Imprimir o generar PDF">Print / PDF</button>
+ </div>
+ <div hidden aria-hidden="true" id="cadFileActionHandlers"><button type="button" id="openBtn">Open</button><button type="button" id="saveProjectBtn">Save</button><button type="button" id="saveAsBtn">Save As</button><button type="button" id="dxfBtn">Save DXF</button><button type="button" id="cadExportBtn">Export</button></div></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><button id="cadTextBarShadow" type="button" aria-pressed="false" title="Sombra detrás del texto">Sombra</button><input id="cadTextBarShadowColor" type="color" value="#333333" title="Color de sombra"><label>Despl. <input id="cadTextBarShadowOffset" type="number" min="0" max="10" step="0.01" value="0.04" style="width:65px"></label><span class="cad-text-divider"></span><label>Forma <select id="cadTextBarPath"><option value="straight">Recto</option><option value="circle">Circular</option></select></label><label>Radio <input id="cadTextBarRadius" type="number" min="0.01" step="0.1" value="2" style="width:65px"></label><label>Inicio ° <input id="cadTextBarStartAngle" type="number" step="15" value="0" style="width:65px"></label><label>Sentido <select id="cadTextBarDirection"><option value="ccw">Antihorario</option><option value="cw">Horario</option></select></label><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -996,9 +1018,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">PEDIT: select exactly one unlocked polyline first. Vertex numbers begin at 1. Move/insert: click the target model coordinate or enter exact X,Y in COMMAND. Insert adds a vertex after the selected vertex.</p><div class="smallrow"><button class="btn" id="cadExplodeBtn" type="button">EXPLODE</button><button class="btn" id="cadReverseBtn" type="button">REVERSE</button></div><div class="field"><label for="arrayRows">Array rows</label><input id="arrayRows" type="number" min="1" max="100" value="2"></div><div class="field"><label for="arrayCols">Array columns</label><input id="arrayCols" type="number" min="1" max="100" value="3"></div><div class="field"><label for="arrayDx">Spacing X</label><input id="arrayDx" type="number" step="any" value="2"></div><div class="field"><label for="arrayDy">Spacing Y</label><input id="arrayDy" type="number" step="any" value="2"></div><div class="smallrow"><button class="btn" id="cadArrayBtn" type="button">RECTANGULAR ARRAY</button></div><p class="help">EXTEND: pick a LINE near the end to extend toward a crossing boundary. JOIN: select connected lines. EXPLODE: selected polylines and rectangles. ARRAY: duplicates selected elements at exact model distances.</p></div></section><section class="panel" id="dimensionPalette"><div class="panel-title">Dimensions / Annotation</div><div class="panel-content"><div class="field"><label for="dimStyleLibrary">Dimension style</label><select id="dimStyleLibrary" aria-label="Saved dimension styles"><option value="">Current settings</option></select></div><div class="smallrow"><button class="btn" id="dimSaveStyle" type="button">Save style</button><button class="btn" id="dimDeleteStyle" type="button">Delete style</button></div><p class="help">Named DIMSTYLE presets stay inside this drawing and are included in CADJSON backups.</p><div class="field"><label for="dimMode">Dimension type</label><select id="dimMode"><option value="aligned">Aligned</option><option value="horizontal">Horizontal</option><option value="vertical">Vertical</option><option value="angular">Angular · 3 points</option><option value="radius">Radius · circle</option><option value="diameter">Diameter · circle</option><option value="ordinateX">Ordinate X</option><option value="ordinateY">Ordinate Y</option><option value="leader">Leader / Callout</option></select></div><div class="field"><label for="dimPrecision">Precision</label><select id="dimPrecision"><option value="0">0</option><option value="1">0.0</option><option value="2" selected>0.00</option><option value="3">0.000</option><option value="4">0.0000</option></select></div><div class="field"><label for="dimDisplayUnits">Display units</label><select id="dimDisplayUnits"><option value="drawing">Drawing units</option><option value="mm">Millimeters (mm)</option><option value="cm">Centimeters (cm)</option><option value="m">Meters (m)</option><option value="in">Inches (in)</option><option value="ft">Feet (ft)</option></select></div><div class="field"><label for="dimTolerance">± Tolerance</label><input id="dimTolerance" type="number" min="0" step="0.01" value="0"></div><div class="field"><label for="dimTextHeight">Text height</label><input id="dimTextHeight" type="number" min="0.001" step="0.05" value="0.20"></div><div class="field"><label for="dimArrowSize">Arrow size</label><input id="dimArrowSize" type="number" min="0.001" step="0.03" value="0.12"></div><div class="field"><label for="dimSuffix">Suffix</label><input id="dimSuffix" type="text" value="" placeholder="Optional: mm, m"></div><div class="field"><label for="dimLeaderText">Leader text</label><input id="dimLeaderText" type="text" value="NOTE" placeholder="Annotation text"></div><div class="smallrow"><button class="btn" id="startDimension" type="button">Create dimension</button><button class="btn" id="applyDimensionStyle" type="button">Apply to selected</button></div><p class="help">Linear: specify two reference points and the dimension-line position. Radius/diameter: click a circle, then text placement. Angular: vertex, first ray, second ray. Model values remain 1:1; arrow sizes use model units.</p></div></section><section class="panel" id="modifyGeometryPanel"><div class="panel-title">Modify geometry</div><div class="panel-content"><div class="field"><label for="offsetDistance">Offset distance</label><input id="offsetDistance" type="number" step="any" min="0.000001" value="0.20"></div><div class="field"><label for="chamferLength">Chamfer distance</label><input id="chamferLength" type="number" step="any" value="0"></div><div class="field"><label for="filletRadius">Fillet radius</label><input id="filletRadius" type="number" step="any" value="0"></div><div class="smallrow"><button id="startOffset" type="button" class="btn">OFFSET</button><button id="startTrim" type="button" class="btn">TRIM</button></div><div class="smallrow"><button id="startChamfer" type="button" class="btn">CHAMFER</button><button id="startFillet" type="button" class="btn">FILLET</button></div><div class="smallrow"><button id="startPlot" type="button" class="btn">PRINT / PLOT · PDF</button></div><p class="help">OFFSET: choose a line, then click the target side. For circles choose inside/outside. CHAMFER and FILLET: select two straight line segments meeting at a corner, or whose ends can be extended to one. Enter distances in model units. Zero or negative CHAMFER / FILLET values join two lines directly without a bevel or arc. TRIM operates on crossing straight segments.</p></div></section><section class="panel" id="textPalette"><div class="panel-title">Text / Typography</div><div class="panel-content"><div class="field"><label for="textValue">Content</label><input id="textValue" type="text" value="ROOM NAME" placeholder="Type annotation"></div><div class="field"><label for="textFont">Font</label><select id="textFont"><option value="Arial">Arial / Sans</option><option value="Helvetica">Helvetica</option><option value="Georgia">Georgia / Serif</option><option value="Times New Roman">Times New Roman</option><option value="Courier New">Courier New / CAD</option><option value="monospace">Monospace</option><option value="Verdana">Verdana</option><option value="Tahoma">Tahoma</option><option value="Trebuchet MS">Trebuchet MS</option><option value="Palatino Linotype">Palatino Linotype</option><option value="Garamond">Garamond</option><option value="Cambria">Cambria</option><option value="Consolas">Consolas</option><option value="Segoe UI">Segoe UI</option></select></div><div class="field"><label for="textHeight">Text height</label><input id="textHeight" type="number" value="0.25" min="0.001" step="0.05"></div><div class="field"><label for="textAngle">Rotation °</label><input id="textAngle" type="number" value="0" step="15"></div><div class="field"><label for="textWeight">Weight</label><select id="textWeight"><option value="normal">Regular</option><option value="bold">Bold</option></select></div><div class="field"><label for="textItalic">Style</label><select id="textItalic"><option value="normal">Upright</option><option value="italic">Italic</option></select></div><div class="field"><label><input type="checkbox" id="textUnderline"> Subrayado</label></div><div class="field"><label><input type="checkbox" id="textHighlight"> Resaltado de fondo</label><input type="color" id="textHighlightColor" value="#fff2a6" aria-label="Color de resaltado"></div><div class="smallrow"><button class="btn" id="placeTextBtn" type="button">Place text</button><button class="btn" id="applyTextBtn" type="button">Apply to selected</button></div><div class="smallrow"><button class="btn" id="copyTextContent" type="button">Copy text</button><button class="btn" id="pasteTextContent" type="button">Paste text</button><button class="btn" id="importTextNotes" type="button">Importar TXT</button><button class="btn" id="exportTextNotes" type="button">Exportar TXT</button><input id="txtNotesInput" type="file" accept=".txt,text/plain" hidden></div><div id="fontPreview" class="font-preview">Aa Bb 123 · CAD2D</div><p class="help">Place: click in model space. Apply: select one or more text objects first. Fonts use installed system families. DXF stores a text style reference; PDF uses standard fallback fonts, so some appearances may differ.</p></div></section><section class="panel"><div class="panel-title">Drawing statistics</div><div class="panel-content" id="statistics"></div></section><section class="panel"><div class="panel-title">Keyboard / Coordinates</div><div class="panel-content help">F3 OSNAP · F7 GRID · F8 ORTHO · F9 SNAP · Ctrl+O open · Ctrl+S save · Ctrl+P print. Commands: AREA, ID, LIST, MATCHPROP (MA), LAYER (LA), PROPERTIES (PR), PURGE (PU), REGEN, QSAVE.<br><br>L line · PL polyline · B block · I insert · WBLOCK export · C circle · REC rectangle · A arc · T text · M move · CO copy · RO rotate · SC scale · O offset · E erase · DI distance · Z extents.<br><br>During drawing: type <b>10,5</b> for absolute point or <b>@3,0</b> for a relative point. <b>Esc</b> cancel · <b>Enter</b> end polyline · <b>Ctrl+Z</b> undo.</div></section></aside>
  </div>
  <div class="cmd"><div class="log" id="log"></div><div class="command-row"><b>COMMAND:</b><span id="cadCommandActive" class="cad-command-active" hidden aria-live="polite"></span><input id="command" type="text" placeholder="Comando / Command: LINEA · LINE · BORRAR · ERASE · 10,5 · @3,0" autocomplete="off" spellcheck="false"><button class="btn slim" id="runCommand">↵</button></div></div>
- <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on" title="Activar o desactivar grilla">GRID</button><button class="cad-status-arrow" data-status-menu="grid" aria-label="Opciones de grilla">▾</button><button id="snapToggle" title="Ajustar a grilla">SNAP</button><button class="cad-status-arrow" data-status-menu="snap" aria-label="Opciones de snap de grilla">▾</button><button id="orthoToggle" title="Movimiento ortogonal">ORTHO</button><button class="cad-status-arrow" data-status-menu="ortho" aria-label="Opciones ortogonales">▾</button><button id="polarToggle" title="Rastreo polar de ángulos (F10)" aria-pressed="false">POLAR</button><button class="cad-status-arrow" data-status-menu="polar" aria-label="Opciones de rastreo polar">▾</button><button id="osnapToggle" class="on" title="Activar o desactivar referencias a objetos">OSNAP</button><button type="button" id="cadGripMenuBtn" class="cad-grip-menu-btn" data-status-menu="grips" title="Pinzas y referencias: color y tamaño de vértices, color de los snaps">◆ GRIPS ▾</button><button id="otrackToggle" title="Rastreo de referencia a objetos · F11 (no se imprime)" aria-pressed="false">OTRACK</button><button class="cad-status-arrow" data-status-menu="otrack" aria-label="Opciones de rastreo OTRACK">▾</button><button class="cad-status-arrow" data-status-menu="osnap" aria-label="Configurar referencias a objetos">▾</button><span class="cad-snap-live" id="cadSnapLive" title="Referencia a objetos detectada">OSNAP · —</span><button id="cadSaveDxfStatus" title="Guardar dibujo DXF editable">↓ DXF</button><button id="cadPropertiesButton" title="Propiedades de objetos seleccionados: color, espesor y línea">▤ PROPIEDADES</button><button id="cadColorButton" title="Colores del espacio de trabajo / Colors">◉ COLORES</button><button id="measureBtn">DIST</button><button class="cad-status-arrow" data-status-menu="measure" aria-label="Opciones de medición">▾</button><button id="cadStatusPan" title="Desplazar vista · PAN">PAN</button><button id="cadStatusZoom" title="Encuadrar todo · ZOOM">ZOOM</button><button id="cadStatusScissor" title="Tijera, cortar entre dos clics · TS">✂ TIJERA</button><button id="cadStatusLayer" title="Abrir administrador de capas · LA">CAPAS</button><button id="cadStatusUnits" title="Configurar unidades del dibujo · UNITS">UNITS</button><button id="cadStatusLayout" title="Abrir presentación de impresión · LAYOUT">LAYOUT</button><button id="cadStatusUndo" title="Deshacer última edición · Ctrl+Z">↶</button><button id="cadStatusRedo" title="Rehacer edición · Ctrl+Y">↷</button><button id="cadStatusManual" title="Manual de comandos de CAD2D">? MANUAL</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><button class="cad-status-arrow" data-status-menu="scale" aria-label="Opciones de unidades y escala">▾</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
+ <footer class="status"><div class="coords" id="coords">X: 0.00 &nbsp; Y: 0.00</div><button id="gridToggle" class="on" title="Activar o desactivar grilla">GRID</button><button class="cad-status-arrow" data-status-menu="grid" aria-label="Opciones de grilla">▾</button><button id="snapToggle" title="Ajustar a grilla">SNAP</button><button class="cad-status-arrow" data-status-menu="snap" aria-label="Opciones de snap de grilla">▾</button><button id="orthoToggle" title="Movimiento ortogonal">ORTHO</button><button class="cad-status-arrow" data-status-menu="ortho" aria-label="Opciones ortogonales">▾</button><button id="dynToggle" type="button" title="DYN · medidas virtuales junto al cursor (F12)" aria-pressed="false">DYN</button><button id="polarToggle" title="Rastreo polar de ángulos (F10)" aria-pressed="false">POLAR</button><button class="cad-status-arrow" data-status-menu="polar" aria-label="Opciones de rastreo polar">▾</button><button id="osnapToggle" class="on" title="Activar o desactivar referencias a objetos">OSNAP</button><button type="button" id="cadGripMenuBtn" class="cad-grip-menu-btn" data-status-menu="grips" title="Pinzas y referencias: color y tamaño de vértices, color de los snaps">◆ GRIPS ▾</button><button id="otrackToggle" title="Rastreo de referencia a objetos · F11 (no se imprime)" aria-pressed="false">OTRACK</button><button class="cad-status-arrow" data-status-menu="otrack" aria-label="Opciones de rastreo OTRACK">▾</button><button class="cad-status-arrow" data-status-menu="osnap" aria-label="Configurar referencias a objetos">▾</button><span class="cad-snap-live" id="cadSnapLive" title="Referencia a objetos detectada">OSNAP · —</span><button id="cadSaveDxfStatus" title="Guardar dibujo DXF editable">↓ DXF</button><button id="cadPropertiesButton" title="Propiedades de objetos seleccionados: color, espesor y línea">▤ PROPIEDADES</button><button id="cadColorButton" title="Colores del espacio de trabajo / Colors">◉ COLORES</button><button type="button" id="cadCustomColorToggle" title="Color de objetos · abrir paleta" aria-haspopup="dialog" aria-expanded="false" style="padding:2px 7px;min-width:30px">◉</button><button id="measureBtn">DIST</button><button class="cad-status-arrow" data-status-menu="measure" aria-label="Opciones de medición">▾</button><button id="cadStatusPan" title="Desplazar vista · PAN">PAN</button><button id="cadStatusZoom" title="Encuadrar todo · ZOOM">ZOOM</button><button id="cadStatusScissor" title="Tijera, cortar entre dos clics · TS">✂ TIJERA</button><button id="cadStatusLayer" title="Abrir administrador de capas · LA">CAPAS</button><button id="cadStatusUnits" title="Configurar unidades del dibujo · UNITS">UNITS</button><button id="cadStatusLayout" title="Abrir presentación de impresión · LAYOUT">LAYOUT</button><button id="cadStatusUndo" title="Deshacer última edición · Ctrl+Z">↶</button><button id="cadStatusRedo" title="Rehacer edición · Ctrl+Y">↷</button><button id="cadStatusManual" title="Manual de comandos de CAD2D">? MANUAL</button><button id="scaleAuditBtn" title="Check model-space units and exact geometry">1:1 CHECK</button><button class="cad-status-arrow" data-status-menu="scale" aria-label="Opciones de unidades y escala">▾</button><span class="hint" id="statusHint">Ready · 0 entities</span></footer>
 </div>
-<div id="cadExportPopover" class="cad-export-popover" hidden role="dialog" aria-label="Exportar dibujo"></div><div id="cadQuickProperties" class="cad-quick-properties" hidden aria-label="Propiedades de objetos CAD"></div><div id="cadColorPopover" class="cad-colors-popover" hidden aria-label="Ajustes de colores de CAD"></div><div id="cadStatusMenu" class="cad-status-menu" role="menu" hidden></div><div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
+<div id="cadExportPopover" class="cad-export-popover" hidden role="dialog" aria-label="Exportar dibujo"></div><div id="cadQuickProperties" class="cad-quick-properties" hidden aria-label="Propiedades de objetos CAD"></div><div id="cadColorPopover" class="cad-colors-popover" hidden aria-label="Ajustes de colores de CAD"></div><section id="cadCustomColorPalette" hidden role="dialog" aria-label="Color de objetos" style="position:fixed;z-index:150000;width:190px;height:177px;min-width:158px;min-height:145px;max-width:90vw;max-height:70vh;resize:both;overflow:auto;background:#18232d;border:1px solid #61788b;border-radius:9px;box-shadow:0 8px 24px #0009;padding:9px;color:#eaf2f7"><header style="display:flex;align-items:center;justify-content:space-between;gap:5px;font-size:11px"><strong>Color de objetos</strong><button type="button" id="cadCustomColorClose" aria-label="Cerrar paleta" style="background:none;border:0;color:inherit;font-size:17px;cursor:pointer">×</button></header><input type="color" id="cadCustomObjectColor" value="#ffffff" aria-label="Elegir cualquier color" style="display:block;width:100%;height:65px;min-height:45px;margin:6px 0 4px;border:0;background:transparent;cursor:pointer"><input type="text" id="cadCustomColorHex" maxlength="7" value="#FFFFFF" aria-label="Color hexadecimal" spellcheck="false" style="width:100%;background:#101820;border:1px solid #4c6273;color:#eaf2f7;border-radius:5px;padding:4px;font:11px monospace"><small id="cadCustomColorHint" style="display:block;color:#adbecb;font-size:10px;margin-top:6px">Seleccioná objetos y elegí un color. No requiere Enter.</small></section><div id="cadStatusMenu" class="cad-status-menu" role="menu" hidden></div><div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
 <div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="ctb">Por color · tabla CTB</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option><option value="arq">Rótulo de arquitectura</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
 <div class="modal-backdrop" id="helpBackdrop"><div class="modal"><div class="modal-head"><h2>CAD2D — Quick start</h2><button class="btn" id="closeHelp">✕ Close</button></div><div class="shortcuts"><div><h3>Drawing</h3><p>Click Line and click two points; repeat; Enter finishes.</p><p>Polyline connects points; Enter or double click finishes.</p><p>Circle: center then radius point.</p><p>Text: click the insertion point, type text in the prompt.</p><p>Coordinates can be entered in the command line.</p></div><div><h3>Editing and navigation</h3><p>Select with a click or drag left to right for a BLUE enclosed window; drag right to left for a GREEN crossing window. Use Shift to add objects. Borrar / Erase or Delete removes selected entities.</p><p>Hold Shift to select multiple entities.</p><p>Use Move, Copy, Rotate, Scale and Mirror on selected entities.</p><p>Mouse wheel zooms, middle mouse pans.</p><p>Space + left drag pans; Esc cancels.</p></div><div><h3>Output</h3><p>Export DXF R2000 (AC1015).</p><p>Import standard ASCII DXF entities (basic 2D types).</p><p>Save/Open native project JSON to preserve editing state.</p><p>Vector PDF at ISO, US or custom page size.</p></div><div><h3>Accuracy</h3><p>Coordinates are stored numerically, not in pixels.</p><p>Unit selection converts existing geometry to preserve physical size.</p><p>SNAP follows the selected grid spacing.</p><p>OSNAP recognizes endpoints, midpoints and centers.</p></div></div><section aria-label="Acerca de CAD2D" style="margin-top:16px;border-top:1px solid #39424b;padding-top:12px">
 <h3 style="margin:0 0 6px">Acerca de CAD2D · Independencia y licencias</h3>
@@ -1049,7 +1071,10 @@ toolDefs.exportmenu=['Exportar','save'];
 ribbonTabs.home.push(['EXPORT','dxf','exportmenu']);
 ribbonTabs.output.push(['EXPORTAR','dxf','exportmenu']);
 let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#ff3333',visible:true,locked:false,width:.30},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false,width:.05},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'0',unit:'m',grid:1,precision:2,lineWidth:.30,gridOn:true,snapOn:false,orthoOn:false,polarOn:false,polarAngle:45,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
-const canvas=$('cadCanvas'),wrap=$('canvasWrap'),ctx=canvas.getContext('2d');canvas.tabIndex=0;canvas.setAttribute('aria-label','CAD model space: click to draw, type numbers for exact distance');let dpr=1,drawPending=false,spaceDown=false,pointer={x:0,y:0},lastClick=0;
+let cadDynOn=false;try{cadDynOn=localStorage.getItem('cad2d-dyn')==='true'}catch(e){}
+ function cadSetDyn(value){cadDynOn=!!value;const button=$('dynToggle');if(button){button.classList.toggle('on',cadDynOn);button.setAttribute('aria-pressed',String(cadDynOn));button.title='DYN '+(cadDynOn?'ON':'OFF')+' · medidas virtuales junto al cursor (F12)'}try{localStorage.setItem('cad2d-dyn',String(cadDynOn))}catch(e){}schedule();toast('DYN '+(cadDynOn?'ON · cotas virtuales activadas':'OFF · cotas virtuales ocultas'))}
+ function cadToggleDyn(){cadSetDyn(!cadDynOn)}
+ const canvas=$('cadCanvas'),wrap=$('canvasWrap'),ctx=canvas.getContext('2d');canvas.tabIndex=0;canvas.setAttribute('aria-label','CAD model space: click to draw, type numbers for exact distance');let dpr=1,drawPending=false,spaceDown=false,pointer={x:0,y:0},lastClick=0;
 Object.assign(icons,{
  line:'<path d="M5 18 19 6"/><circle cx="5" cy="18" r="1.7"/><circle cx="19" cy="6" r="1.7"/>',
  polyline:'<path d="M3 19 9 8 15 14 21 4"/><circle cx="3" cy="19" r="1.3"/><circle cx="9" cy="8" r="1.3"/><circle cx="15" cy="14" r="1.3"/><circle cx="21" cy="4" r="1.3"/>',
@@ -1679,14 +1704,10 @@ function cadRenameDrawing(){
  if(!given.trim())return toast('Escribí un nombre para el dibujo');
  cadSetDrawingName(given);queueLocalBackup();toast('Dibujo: '+state.file+'.dxf');
 }
-const headerActions=$('cadHeaderActions');
-headerActions.closest('.right').addEventListener('click',ev=>{
- const proxy=ev.target.closest('[data-cad-header-action]');
- if(proxy)$(proxy.dataset.cadHeaderAction).click();
- if(ev.target.closest('#cadHeaderActions button'))headerActions.open=false;
-});
-document.addEventListener('pointerdown',ev=>{
- if(headerActions.open&&!headerActions.contains(ev.target))headerActions.open=false;
+// Public Open/Save controls delegate to the existing file handlers.
+document.querySelector('.brandbar>.right')?.addEventListener('click',event=>{
+ const proxy=event.target.closest('[data-cad-header-action]');
+ if(proxy)$(proxy.dataset.cadHeaderAction)?.click();
 });
 $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
@@ -1852,7 +1873,7 @@ function drawCrosshair(){
  ctx.restore();
 }
 /* Non-editing dynamic drawing feedback. Distances remain model units. */
-function drawCadLiveMeasure(){
+function drawCadLiveMeasure(){if(!cadDynOn)return;
  const t=state.tool,base=state.stage.at(-1);
  if(!base||!['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','scale'].includes(t))return;
  const mouse=state.mouse;
@@ -3038,16 +3059,16 @@ function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,f
   }
   return;
  }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
-  ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();ctx.setLineDash([]);
+  ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();for(const hole of e.holes||[]){if(hole?.length>2){tracePath({type:'polyline',pts:hole,closed:true});ctx.closePath()}}ctx.setLineDash([]);
   if(cadIsGradient(e)&&!forceColor&&!isSelected){
    const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y),c=screen(P((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2));
    const R=Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2*state.view.scale||1,a=(Number(e.hatchAngle)||0)*Math.PI/180;
    const g=e.hatchStyle==='gradient-radial'?ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,R):ctx.createLinearGradient(c.x-Math.cos(a)*R,c.y+Math.sin(a)*R,c.x+Math.cos(a)*R,c.y-Math.sin(a)*R);
-   g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill();
+   g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill('evenodd');
   }
-  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill()}
+  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill('evenodd')}
   else{
-   ctx.save();ctx.clip();ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
+   ctx.save();ctx.clip('evenodd');ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
    for(const segment of cadHatchPatternPrimitives(e,6000)){
     ctx.beginPath();const a=screen(segment.a),b=screen(segment.b);
     ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
@@ -4125,13 +4146,43 @@ function cadHatchLineLoops(){
  }
  return loops;
 }
+function cadHatchContainedIslands(outer){
+ if(!outer?.length)return [];
+ const outerArea=cadHatchPolygonArea(outer),result=[],seen=new Set();
+ // Ignore open geometry. Retain every fully nested closed loop for even-odd island parity.
+ const candidates=[];
+ for(const e of state.entities){
+  if(!layerFor(e).visible||e.cadHidden||e.type==='hatch')continue;
+  if(e.type==='blockRef'){
+   for(const part of cadBlockChildrenCached(e))candidates.push(part);
+  }else candidates.push(e);
+ }
+ for(const e of candidates){
+  const pts=hatchBoundaryVertices(e);
+  if(!pts||pts.length<3||cadHatchPolygonArea(pts)>=outerArea-1e-8)continue;
+  // All vertices must be inside, never merely intersecting the exterior.
+  if(!pts.every(p=>cadHatchPointInPolygon(p,outer)))continue;
+  const bounds=pts.reduce((b,p)=>({minX:Math.min(b.minX,p.x),minY:Math.min(b.minY,p.y),maxX:Math.max(b.maxX,p.x),maxY:Math.max(b.maxY,p.y)}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+  const key=[bounds.minX,bounds.minY,bounds.maxX,bounds.maxY,cadHatchPolygonArea(pts)].map(n=>n.toFixed(6)).join(':');
+  if(!seen.has(key)){seen.add(key);result.push(clone(pts))}
+ }
+ for(const loop of cadHatchLineLoops()){
+  const pts=loop.pts;
+  if(pts?.length>=3&&cadHatchPolygonArea(pts)<outerArea-1e-8&&pts.every(p=>cadHatchPointInPolygon(p,outer))){
+   const b=pts.reduce((q,p)=>({minX:Math.min(q.minX,p.x),minY:Math.min(q.minY,p.y),maxX:Math.max(q.maxX,p.x),maxY:Math.max(q.maxY,p.y)}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+   const key=[b.minX,b.minY,b.maxX,b.maxY,cadHatchPolygonArea(pts)].map(n=>n.toFixed(6)).join(':');
+   if(!seen.has(key)){seen.add(key);result.push(clone(pts))}
+  }
+ }
+ return result;
+}
 function cadHatchAtPoint(p){
  const options=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked).map(e=>({pts:hatchBoundaryVertices(e),layer:e.layer})).filter(o=>o.pts&&cadHatchPointInPolygon(p,o.pts));
  for(const loop of cadHatchLineLoops())if(cadHatchPointInPolygon(p,loop.pts))options.push(loop);
  {const face=cadFaceAtPoint(p);if(face)options.push({...face,layer:state.layerId})}
  options.sort((a,b)=>cadHatchPolygonArea(a.pts)-cadHatchPolygonArea(b.pts));
  if(!options.length)return toast('HATCH: no se encontró un contorno cerrado');
- cadHatchCreate(options.slice(0,1));
+ cadHatchCreate(options.slice(0,1),true);
 }
 function hatchBoundaryVertices(e){
  if(e.type==='rect')return [e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)];
@@ -4139,14 +4190,14 @@ function hatchBoundaryVertices(e){
  if(e.type==='circle'&&e.r>0)return Array.from({length:128},(_,i)=>P(e.c.x+e.r*Math.cos(TAU*i/128),e.c.y+e.r*Math.sin(TAU*i/128)));
  return null;
 }
-function cadHatchCreate(boundaries){
+function cadHatchCreate(boundaries,detectIslands=false){
  const style=$('hatchStyle').value,spacing=Number($('hatchSpacing').value),angle=Number($('hatchAngle').value),color=$('hatchColor').value;
  if(style!=='solid'&&!/^gradient/.test(style)&&(!Number.isFinite(spacing)||spacing<=0||!Number.isFinite(angle)))return toast('HATCH: escala o ángulo inválido');
  const created=[];
  for(const boundary of boundaries){
   const vertices=boundary.pts;if(!vertices||vertices.length<3)continue;
   if(style!=='solid'&&!/^gradient/.test(style)&&!window.BlacklineHatchPatterns?.passes(style,spacing,angle))return toast('HATCH: patrón inválido');
-  created.push({type:'hatch',pts:clone(vertices),layer:boundary.layer||state.layerId,
+  created.push({type:'hatch',pts:clone(vertices),...(detectIslands?{holes:cadHatchContainedIslands(vertices)}:{}),layer:boundary.layer||state.layerId,
    color,width:.05,hatchStyle:style,hatchSpacing:spacing,hatchAngle:angle,...(/^gradient/.test(style)?{color2:$('hatchColor2').value}:{})});
  }
  if(!created.length)return toast('HATCH: no se pudo crear el sombreado');
@@ -5743,7 +5794,7 @@ function openCadUnitsDialog(){
 }
 function convertUnits(to){if(!U[to]||state.unit===to)return;const ratio=U[state.unit]/U[to];saveHistory();state.entities=state.entities.map(e=>scaleDrawingEntity(e,ratio));for(const block of Object.values(state.blocks))block.entities=block.entities.map(e=>scaleDrawingEntity(e,ratio));for(const style of Object.values(state.dimStyles||{})){style.textHeight*=ratio;style.arrow*=ratio}if(state.activeDimStyle&&state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.view.scale/=ratio;state.grid=Math.max(.000001,state.grid*ratio);state.unit=to;$('gridSpacing').value=Number(state.grid.toPrecision(9));$('canvasUnits').textContent='· '+to;updateAll();log(`UNITS ${to}`)}
 $('units').onchange=e=>convertUnits(e.target.value);$('gridSpacing').onchange=e=>{const n=Number(e.target.value);if(n>0&&Number.isFinite(n)){state.grid=n;schedule()}else e.target.value=state.grid};$('precision').onchange=e=>state.precision=Number(e.target.value);$('lineWidth').onchange=e=>state.lineWidth=Math.max(0,Number.isFinite(Number(e.target.value))?Number(e.target.value):.25);
-$('newLayer').onclick=()=>{let name=window.prompt('Layer name:','NEW-LAYER');if(!name?.trim())return;saveHistory();const id='layer_'+Date.now();state.layers.push({id,name:name.trim(),color:'#b8cad6',visible:true,locked:false});state.layerId=id;updateAll()};$('removeLayer').onclick=()=>{if(state.layerId==='0'||state.layers.length<=1)return toast('Cannot delete base layer');if(state.entities.some(e=>e.layer===state.layerId))return toast('Move or delete entities on this layer first');saveHistory();state.layers=state.layers.filter(l=>l.id!==state.layerId);state.layerId='0';updateAll()};$('deleteBtn').onclick=eraseSelected;$('duplicateBtn').onclick=duplicateSelected;$('gridToggle').onclick=()=>toggle('gridOn','gridToggle');$('snapToggle').onclick=()=>toggle('snapOn','snapToggle');$('orthoToggle').onclick=()=>toggle('orthoOn','orthoToggle');$('polarToggle').onclick=()=>togglePolar();$('osnapToggle').onclick=()=>{toggle('osnapOn','osnapToggle');if(!state.osnapOn){otrkGuide=null;otrkAnchors=[]}};
+$('newLayer').onclick=()=>{let name=window.prompt('Layer name:','NEW-LAYER');if(!name?.trim())return;saveHistory();const id='layer_'+Date.now();state.layers.push({id,name:name.trim(),color:'#b8cad6',visible:true,locked:false});state.layerId=id;updateAll()};$('removeLayer').onclick=()=>{if(state.layerId==='0'||state.layers.length<=1)return toast('Cannot delete base layer');if(state.entities.some(e=>e.layer===state.layerId))return toast('Move or delete entities on this layer first');saveHistory();state.layers=state.layers.filter(l=>l.id!==state.layerId);state.layerId='0';updateAll()};$('deleteBtn').onclick=eraseSelected;$('duplicateBtn').onclick=duplicateSelected;$('gridToggle').onclick=()=>toggle('gridOn','gridToggle');$('snapToggle').onclick=()=>toggle('snapOn','snapToggle');$('orthoToggle').onclick=()=>toggle('orthoOn','orthoToggle');$('dynToggle').onclick=cadToggleDyn;$('dynToggle').classList.toggle('on',cadDynOn);$('dynToggle').setAttribute('aria-pressed',String(cadDynOn));$('polarToggle').onclick=()=>togglePolar();$('osnapToggle').onclick=()=>{toggle('osnapOn','osnapToggle');if(!state.osnapOn){otrkGuide=null;otrkAnchors=[]}};
 $('otrackToggle').onclick=toggleOtrack;
 $('otrackToggle').classList.toggle('on',otrkOn);$('otrackToggle').setAttribute('aria-pressed',String(otrkOn));$('measureBtn').onclick=()=>setTool('distance');$('zoomIn').onclick=()=>centerZoom(1.3,P(wrap.clientWidth/2,wrap.clientHeight/2));$('zoomOut').onclick=()=>centerZoom(1/1.3,P(wrap.clientWidth/2,wrap.clientHeight/2));$('zoomExtents').onclick=zoomExtents;$('panBtn').onclick=()=>setTool('pan');$('tabs').onclick=e=>{const t=e.target.closest('[data-tab]');if(!t)return;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===t));buildRibbon(t.dataset.tab)};
 function parseCoordinate(s){
@@ -6118,7 +6169,10 @@ function cadDispatchImmediate(upper){
   return setTool('hatch');
  }
  if(['CTRLZ','CTRL+Z','DESHACER','UNDO'].includes(upper))return undo();
- if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
+ if(['DYN','DYNMODE','F12'].includes(upper))return cadToggleDyn();
+  if(upper==='DYNON')return cadSetDyn(true);
+  if(upper==='DYNOFF')return cadSetDyn(false);
+  if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
  if(['OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'].includes(upper))return clearOtrackAnchors();
  if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper)){
   if(state.tool==='select'&&(upper==='Z'||upper==='ZOOM')){
@@ -6535,6 +6589,7 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='F8'){ev.preventDefault();toggle('orthoOn','orthoToggle')}
   if(ev.key==='F10'){ev.preventDefault();togglePolar()}
  if(ev.key==='F11'){ev.preventDefault();toggleOtrack()}
+  if(ev.key==='F12'){ev.preventDefault();cadToggleDyn()}
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
@@ -10078,6 +10133,38 @@ function initCadQuickProperties(){
  document.addEventListener('pointerdown',e=>{if(!panel.hidden&&!panel.contains(e.target)&&e.target!==button&&!e.target.closest('[data-tool="properties"]'))close()});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)close()});
 }
+function initCadCustomObjectColor(){
+ const button=$('cadCustomColorToggle'),panel=$('cadCustomColorPalette'),picker=$('cadCustomObjectColor'),hex=$('cadCustomColorHex'),hint=$('cadCustomColorHint');
+ if(!button||!panel||!picker||!hex)return;
+ let historySaved=false,lastSelection='';
+ const validHex=value=>/^#[0-9a-f]{6}$/i.test(value);
+ const apply=value=>{
+  if(!validHex(value))return;
+  picker.value=value;hex.value=value.toUpperCase();button.style.color=value;
+  const selected=validEditSelection();
+  if(!selected.length){hint.textContent='Seleccioná un objeto para cambiarle el color';return}
+  const selection=selected.map(e=>e.id).sort().join(',');
+  if(!historySaved||selection!==lastSelection){saveHistory();historySaved=true;lastSelection=selection}
+  for(const e of selected)e.color=value;
+  hint.textContent='Color aplicado a '+selected.length+' objeto(s)';
+  // updateAll preserves selected entities and redraws without confirming via Enter.
+  updateAll();
+ };
+ const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false');historySaved=false;lastSelection=''};
+ button.addEventListener('click',()=>{
+  if(!panel.hidden){close();return}
+  panel.hidden=false;button.setAttribute('aria-expanded','true');historySaved=false;lastSelection='';
+  const rect=button.getBoundingClientRect();
+  panel.style.left=Math.max(8,Math.min(window.innerWidth-panel.offsetWidth-8,rect.left))+'px';
+  panel.style.top=Math.max(8,rect.top-panel.offsetHeight-7)+'px';
+  hint.textContent='Seleccioná objetos y elegí un color. No requiere Enter.';
+ });
+ $('cadCustomColorClose').onclick=close;
+ picker.addEventListener('input',()=>apply(picker.value));
+ hex.addEventListener('input',()=>{if(validHex(hex.value))apply(hex.value)});
+ document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!panel.contains(event.target)&&event.target!==button)close()});
+ document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden)close()});
+}
 function initCadColorPopover(){
  const panel=$('cadColorPopover'),btn=$('cadColorButton');
  if(!panel||!btn)return;
@@ -10150,6 +10237,7 @@ function initCadColorPopover(){
 }
 
 initCadStatusMenus();
+initCadCustomObjectColor();
 initCadExportPopover();
 initCadQuickProperties();setTimeout(initCadHatchPalette,0);setTimeout(initCadDimStylePalette,0);
 initCadColorPopover();
