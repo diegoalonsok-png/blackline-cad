@@ -25,8 +25,8 @@ test('comandos de capas, cotas y consulta registrados en español e inglés',()=
   assert.ok(src.includes("'"+c+"'"),c);
 });
 test('Shift + clic derecho abre referencias a objetos sin pisar el menú normal',()=>{
- assert.match(src,/if\(!ev\.shiftKey&&!ev\.ctrlKey\)return;/);
- assert.match(fs.readFileSync(path.join(__dirname,'..','cad-arq-pro.js'),'utf8'),/if\(ev\.shiftKey\|\|ev\.ctrlKey\)return;/);
+ assert.match(src,/if\(!ev\.shiftKey\)return;/);
+ assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'..','cad-arq-pro.js'),'utf8'),/CORE\.canvas\.addEventListener\('contextmenu'/);
  assert.match(html,/osnap:Object\.freeze\(\{types:/);
 });
 test('borrar o fusionar capas protege la capa 0 y pide confirmación',()=>{

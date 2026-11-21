@@ -296,17 +296,13 @@ function osnapMenu(x,y){
  document.body.append(m);m.style.left=Math.min(x,innerWidth-m.offsetWidth-8)+'px';m.style.top=Math.min(y,innerHeight-m.offsetHeight-8)+'px';
  const away=e=>{if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',away,true)}};setTimeout(()=>document.addEventListener('pointerdown',away,true),0);
 }
-CORE.canvas.addEventListener('contextmenu',ev=>{if(!ev.shiftKey&&!ev.ctrlKey)return;ev.preventDefault();ev.stopImmediatePropagation();osnapMenu(ev.clientX,ev.clientY)},true);
-/* Clic derecho con un comando activo: menú del comando (Enter, Cancelar, opciones, entrada reciente,
-   referencias a objetos), como en los CAD de escritorio. Con la preferencia 'cad2d-rightclick-enter'=1
-   se conserva el comportamiento anterior (clic derecho = Enter). En selectores de puntos = terminar. */
+CORE.canvas.addEventListener('contextmenu',ev=>{if(!ev.shiftKey)return;ev.preventDefault();ev.stopImmediatePropagation();osnapMenu(ev.clientX,ev.clientY)},true);
+// Point-picking commands finish their own selection before the main canvas handler.
 CORE.canvas.addEventListener('contextmenu',ev=>{
- if(ev.shiftKey||ev.ctrlKey)return;
- if(pk.on){ev.preventDefault();ev.stopImmediatePropagation();const done=pk.done,pts=pk.pts.slice(),mode=pk.mode;endPick();if(mode==='multi'&&done)done(pts,true);return}
- const st=S();const active=(st.tool!=='select'&&st.tool!=='pan')||st.stage.length;if(!active)return;
- let legacy=false;try{legacy=localStorage.getItem('cad2d-rightclick-enter')==='1'}catch(e){}
- if(legacy)return;
- ev.preventDefault();ev.stopImmediatePropagation();CORE.openContextMenu(ev.clientX,ev.clientY,CORE.world(P(ev.offsetX,ev.offsetY)));
+ if(ev.shiftKey||ev.ctrlKey||!pk.on)return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ const done=pk.done,pts=pk.pts.slice(),mode=pk.mode;endPick();
+ if(mode==='multi'&&done)done(pts,true);
 },true);
 
 /* ---------- Menú contextual ---------- */

@@ -185,7 +185,7 @@ requestAnimationFrame(requestResize);
  const saved=(()=>{try{return localStorage.getItem('blackline-ui-theme')}catch(e){return null}})();
  function apply(theme,user){
   const light=theme==='light';document.querySelector('.app')?.classList.toggle('bl-light',light);
-  b.textContent=light?'☾ Oscuro':'☼ Claro';b.title=light?'Cambiar a modo oscuro':'Cambiar a modo claro';b.setAttribute('aria-pressed',String(light));
+  b.textContent=light?'☾':'☀';b.title=light?'Cambiar a modo oscuro':'Cambiar a modo claro';b.setAttribute('aria-label',b.title);b.setAttribute('aria-pressed',String(light));
   try{localStorage.setItem('blackline-ui-theme',light?'light':'dark')}catch(e){}
   if(user)setTimeout(()=>window.cadApplyCanvasTheme?.(light?'light':'dark'),0);
  }

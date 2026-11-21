@@ -555,6 +555,22 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-quick-properties label select{background:#20343f;color:#e6eff4;border:1px solid #58717c;border-radius:5px;min-width:148px;padding:6px}
 .cad-quick-properties label input[type=color]{width:60px;height:30px;border:1px solid #58717c;border-radius:5px;background:#20343f}
 .cad-quick-summary,.cad-quick-help{color:#adc0ca;font-size:11px}
+.cad-quick-geometry{border-block:1px solid #445763;margin:10px 0;padding:9px 0 2px}
+.cad-quick-geometry[hidden]{display:none}
+.cad-quick-geometry label{margin:6px 0;color:inherit}
+.cad-quick-geometry input{width:105px;padding:5px 6px;background:#20343f;color:#e6eff4;border:1px solid #58717c;border-radius:5px;font:inherit}
+.cad-quick-geometry output{padding:5px 6px;color:#adc0ca}
+.app .workspace>.sidebar,.app .workspace>.sidebar :is(.layer-list,#blCards,#arqPanelGrid,.panel-content){scrollbar-width:auto!important}
+@supports selector(::-webkit-scrollbar){
+ .app .workspace>aside.sidebar,.app .workspace>.sidebar :is(.layer-list,#blCards,#arqPanelGrid,.panel-content){scrollbar-color:auto!important}
+ .workspace>.sidebar::-webkit-scrollbar,.workspace>.sidebar :is(.layer-list,#blCards,#arqPanelGrid,.panel-content)::-webkit-scrollbar{width:12px}
+ .workspace>.sidebar::-webkit-scrollbar-thumb,.workspace>.sidebar :is(.layer-list,#blCards,#arqPanelGrid,.panel-content)::-webkit-scrollbar-thumb{background:#657482;border:2px solid transparent;background-clip:padding-box;border-radius:8px}
+}
+#cadListResult{position:fixed;z-index:100000;top:12%;left:50%;transform:translateX(-50%);width:min(460px,92vw);max-height:75vh;overflow:auto;background:#fbf2dc;color:#30291e;border:1px solid #c6b693;border-radius:3px;padding:16px 20px;box-shadow:0 12px 30px #0006;font:13px/1.45 "Courier Prime","Courier New",monospace}
+#cadListResult header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1px dashed #9e8e70}
+#cadListResult button{background:transparent;color:inherit;font:inherit;border:1px solid #b5a381;border-radius:3px;padding:4px 8px;cursor:pointer}
+#cadListResult button:hover{background:#eee0c1}
+#cadListResult pre{font:inherit;white-space:pre-wrap;overflow-wrap:anywhere;margin:12px 0 0}
 .cad-quick-actions{display:flex;gap:6px;margin:15px 0 9px}
 .cad-quick-actions button{flex:1;border:1px solid #5b7c89;border-radius:5px;background:#2b4653;color:#eff7fa;padding:9px;cursor:pointer}
 .cad-quick-actions button:first-child{background:#355b6c}
@@ -878,7 +894,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  }
  window.addEventListener('keydown',function(ev){
   if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
-     ev.key.length!==1 || ev.key===' ' || modalOpen() || window.CAD2D_GRIP_TYPING || window.CAD2D_OPENING_TYPING)return;
+     modalOpen() || window.CAD2D_GRIP_TYPING || window.CAD2D_OPENING_TYPING)return;
+  if(window.CAD2D_CORE?.zoomShortcut(ev))return;
+  if(ev.key.length!==1||ev.key===' ')return;
   const target=ev.target;
   if(editable(target))return;
   const app=document.querySelector('.app');
@@ -903,18 +921,31 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <script src="assets/cad-analytics.js?v=20261120-1850"></script>
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0c1216"><link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <style id="cad-header-no-overlap">
-/* Keep the account/PRO control separate from the horizontally scrollable Save actions. */
-.brandbar{min-width:0}
+.app .brandbar{min-width:0;overflow:visible!important;position:relative;z-index:45}
 .brandbar>.cad-workspace-controls{flex:0 0 auto;min-width:max-content}
-.brandbar>.right{flex:1 1 auto;min-width:0;max-width:100%;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin!important;scrollbar-color:#6c7680 transparent}
-.brandbar>.right>button{flex:0 0 auto}
-.brandbar>.right::-webkit-scrollbar{display:block;height:3px}
-.brandbar>.right::-webkit-scrollbar-thumb{background:#6c7680;border-radius:3px}
+.app .brandbar>.right{container-type:inline-size;flex:1 1 auto;min-width:68px;justify-content:flex-end;gap:4px;overflow:visible!important}
+.app .brandbar #blThemeToggle,.app .brandbar #cadHeaderActions summary{
+ display:inline-grid;place-items:center;flex:none;width:30px;height:28px;min-height:0;padding:0!important;
+ color:var(--cad-ui-text);font-size:16px;cursor:pointer;
+}
+#cadHeaderActions{position:relative;flex:none}
+#cadHeaderActions summary::-webkit-details-marker{display:none}
+#cadHeaderActions>div{position:absolute;top:calc(100% + 7px);right:0;display:grid;min-width:170px;gap:4px;padding:6px;
+ background:var(--cad-ui-base);border:1px solid var(--cad-ui-edge);border-radius:8px;box-shadow:0 9px 20px #0007}
+#cadHeaderActions>div button{display:block!important;width:100%;text-align:left;white-space:nowrap}
+@container(max-width:250px){.brandbar .right>.cad-header-primary{display:none!important}}
+@media(max-width:950px){.app .brandbar .cad-command-finder{display:none!important}}
+@media(max-width:680px){.app .brandbar .brand,.app .brandbar .cad-header-undo-redo{display:none!important}}
 </style>
 </head>
 <body>
 <div class="app">
- <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right"><button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Insertar la casa de ejemplo de dos plantas, con muebles y sanitarios como bloques">Casa de ejemplo</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button></div></header>
+ <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right">
+ <button type="button" class="btn slim cad-header-primary" data-cad-header-action="openBtn">Open</button>
+ <button type="button" class="btn slim cad-header-primary" data-cad-header-action="saveProjectBtn">Save</button>
+ <details id="cadHeaderActions"><summary class="btn slim" aria-label="Más acciones" title="Más acciones">⋯</summary><div>
+  <button class="btn slim smallhide" id="resetWorkspace" title="Restore the default panel positions">Reset layout</button><button class="btn slim smallhide" id="openBtn">↥ Open drawing</button><button class="btn slim smallhide" id="sampleHouseBtn" title="Insertar la casa de ejemplo de dos plantas, con muebles y sanitarios como bloques">Casa de ejemplo</button><button class="btn slim" id="saveProjectBtn" title="Save current editable CAD project">Save</button><button class="btn slim" id="saveAsBtn" title="Save a new copy under another name">Save As</button><button class="btn slim" id="dxfBtn" title="Guardar dibujo editable en DXF 1:1">↓ Save .DXF</button><button class="btn slim" id="cadExportBtn" title="Exportar a formatos abiertos: DXF, SVG, PDF, PNG y CADJSON">⇩ Exportar ▾</button><button class="btn slim primary" id="pdfBtn">Print / PDF</button>
+ </div></details></div></header>
  <nav class="tabbar" id="tabs"><button class="tab active" data-tab="home">Home</button><button class="tab" data-tab="draw">Draw</button><button class="tab" data-tab="modify">Modify</button><button class="tab" data-tab="annotate">Annotate</button><button class="tab" data-tab="view">View</button><button class="tab" data-tab="output">Output</button></nav>
  <div class="ribbon-shell" id="ribbonShell"><div class="ribbon-grip" id="ribbonGrip" title="Drag to move toolbar. Drop at the top to dock." role="button" tabindex="0" aria-label="Move toolbar">⠿</div><div class="ribbon" id="ribbon"></div><div class="cad-ribbon-size" aria-label="Altura de barra"><button type="button" id="cadRibbonLess" title="Achicar barra / Smaller">−</button><button type="button" id="cadRibbonMore" title="Agrandar barra / Taller">+</button></div><button id="dockRibbonBtn" class="ribbon-dock" type="button" title="Dock toolbar at top">Dock ↑</button></div><div id="ribbonSizer" title="Drag to adjust toolbar height"></div><div id="cadTextToolbar" class="cad-text-toolbar" role="toolbar" aria-label="Barra de texto CAD"><strong>✎ TEXTO</strong><input id="cadTextBarValue" type="text" placeholder="Escribir texto para insertar…" aria-label="Texto a colocar en el plano"><select id="cadTextBarFont" aria-label="Fuente"><option>Arial</option><option>Helvetica</option><option>Georgia</option><option>Times New Roman</option><option>Courier New</option><option>Verdana</option><option>Tahoma</option></select><label>Altura <input id="cadTextBarHeight" type="number" min="0.001" step="0.05" value="0.25" aria-label="Altura en unidades del plano"></label><button type="button" id="cadTextBarBold" title="Negrita" aria-pressed="false">B</button><button type="button" id="cadTextBarItalic" title="Cursiva" aria-pressed="false"><i>I</i></button><button type="button" id="cadTextBarUnderline" class="cad-text-icon-button" title="Subrayado" aria-pressed="false"><u>U</u></button><span class="cad-text-divider"></span><label>Giro ° <input id="cadTextBarAngle" type="number" value="0" step="15" title="Ángulo de rotación del texto"></label><button type="button" id="cadTextBarHighlight" class="cad-text-icon-button" aria-pressed="false" title="Fondo resaltado">▣</button><input id="cadTextBarHighlightColor" type="color" value="#fff2a6" aria-label="Color de fondo resaltado"><button id="cadTextBarShadow" type="button" aria-pressed="false" title="Sombra detrás del texto">Sombra</button><input id="cadTextBarShadowColor" type="color" value="#333333" title="Color de sombra"><label>Despl. <input id="cadTextBarShadowOffset" type="number" min="0" max="10" step="0.01" value="0.04" style="width:65px"></label><span class="cad-text-divider"></span><label>Forma <select id="cadTextBarPath"><option value="straight">Recto</option><option value="circle">Circular</option></select></label><label>Radio <input id="cadTextBarRadius" type="number" min="0.01" step="0.1" value="2" style="width:65px"></label><label>Inicio ° <input id="cadTextBarStartAngle" type="number" step="15" value="0" style="width:65px"></label><label>Sentido <select id="cadTextBarDirection"><option value="ccw">Antihorario</option><option value="cw">Horario</option></select></label><span class="cad-text-divider"></span><button type="button" id="cadTextBarPlace" class="btn primary">✎ Colocar</button><button type="button" id="cadTextBarApply" class="btn">Aplicar a selección</button><button type="button" id="cadTextBarEdit" title="Cargar texto seleccionado en la barra">Editar selección</button><button type="button" id="cadTextBarCopy" title="Copiar contenido de texto al portapapeles">Copiar texto</button><button type="button" id="cadTextBarPaste" title="Pegar texto del portapapeles">Pegar texto</button><button type="button" id="cadTextBarImport" title="Importar notas TXT">Importar TXT</button><button type="button" id="cadTextBarExport" title="Exportar notas del plano a TXT">Exportar TXT</button><button type="button" id="cadTextBarPalette" title="Abrir la paleta completa de tipografía">Más tipografía…</button></div>
  <div class="workspace"><div id="leftDivider" title="Resize left palette area"></div><div id="rightDivider" title="Resize right palette area"></div>
@@ -1152,17 +1183,14 @@ function updateBlacklineToolStatus(){
 function ribbonAction(t){
  const ext=window.CAD2D_EXTENSIONS?.ribbon?.[t];if(typeof ext==='function'){try{ext()}catch(error){toast(String(error?.message||error))}return}
  if(t==='blockgallery')return openBlacklineBlockPalette();
- if(t==='overkill')return cadOverkill();if(t==='selectsimilar')return cadSelectSimilar();
- if(t==='copytolayer')return cadTransferLayer(true);if(t==='changelayer')return cadTransferLayer(false);
- if(t==='exportmenu')return openCadExportPopover();
- const commandTools={pasteclip:'PASTECLIP',copyclip:'COPYCLIP',cutclip:'CUTCLIP',undo:'UNDO',redo:'REDO',units:'UNITS',layers:'LAYER',properties:'PROPERTIES',selectall:'SELECTALL',block:'BLOCK',insert:'INSERT',purge:'PURGE',open:'OPEN',dxf:'DXF',pdf:'PDF',pedit:'PEDIT',list:'LIST',regen:'REGEN',dimstyle:'DIMSTYLE',textstyle:'STYLE'};
+ const commandTools={overkill:'OVERKILL',selectsimilar:'SELECTSIMILAR',copytolayer:'COPYTOLAYER',changelayer:'CHANGELAYER',exportmenu:'EXPORTMENU',print:'PLOT',save:'SAVE',help:'HELP',grid:'GRID',pasteclip:'PASTECLIP',copyclip:'COPYCLIP',cutclip:'CUTCLIP',undo:'UNDO',redo:'REDO',units:'UNITS',layers:'LAYER',properties:'PROPERTIES',selectall:'SELECTALL',block:'BLOCK',insert:'INSERT',purge:'PURGE',open:'OPEN',dxf:'DXF',pdf:'PDF',pedit:'PEDIT',list:'LIST',regen:'REGEN',dimstyle:'DIMSTYLE',textstyle:'STYLE'};
  if(commandTools[t]){$('command').value=commandTools[t];return runCommand()}
- if(t==='print')return openPrint();if(t==='save')return saveJSON();if(t==='help')return $('helpBackdrop').classList.add('show');if(t==='zoom')return setTool('zoomWindow');if(t==='grid')return toggle('gridOn','gridToggle');setTool(t)}
+ if(t==='zoom')return setTool('zoomWindow');setTool(t)}
 let cadWallOptionPending=null;
 function cadCommandName(tool){
  const names={select:'',wall2d:'WALL',line:'LINE',polyline:'PLINE',rect:'RECTANGLE',circle:'CIRCLE',
  arc:'ARC',ellipse:'ELLIPSE',polygon:'POLYGON',move:'MOVE',copy:'COPY',rotate:'ROTATE',
- scale:'SCALE',mirror:'MIRROR',offset:'OFFSET',trim:'TRIM',trimScissor:'TRIM',extend:'EXTEND',
+ scale:'SCALE',mirror:'MIRROR',offset:'OFFSET',trim:'TRIM',trimScissor:'TIJERA',extend:'EXTEND',
  stretch:'STRETCH',erase:'ERASE',insertBlock:'INSERT',dimension:'DIM',distance:'DIST',
  hatch:'HATCH',pan:'PAN',zoomWindow:'ZOOM',fillet:'FILLET',chamfer:'CHAMFER',text:'TEXT',
  area:'AREA',breakLine:'BREAK',breakAtPoint:'BREAKATPOINT',peditMove:'PEDIT',peditInsert:'PEDIT',
@@ -1194,6 +1222,7 @@ function cadUpdateCommandContext(message){
 // Opciones de comando por teclado (estilo AutoCAD): se reinician al cambiar de comando.
 var cad2dCmdOpt={};
 function setTool(t){
+ if(t!=='select')cad2dLastCommand=cadCommandName(t);
  cad2dCmdOpt={};
  if(cadVertexPlacement){cadVertexPlacement=null;canvas.style.cursor=''}
  cadSelectionAnchor=null;cadSelectionAnchorShift=false;
@@ -1214,7 +1243,7 @@ function setTool(t){
  if(t!=='insertBlock')state.galleryRepeatedInsert=false;
  document.getElementById('cadStretchConfirmEnter')?.remove();
  state.tool=t;cadWallOptionPending=null;$('command').value='';if(t==='wall2d')$('cadWallJustification').value='left';state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
- if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select'){cad2dLastCommand=cadCommandName(t);log('Command: '+cadCommandName(t))}}
+ if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select')log('Command: '+cadCommandName(t))}
 function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'LINE · Specify next point or [Undo/Close] · type a length + Enter':'LINE · Specify first point',polyline:state.stage.length?'PLINE · Specify next point or [Undo/Close] · type a length + Enter':'PLINE · Specify start point',polygon:state.stage.length?'POLYGON · Specify radius (type a value or click)':'POLYGON · Enter number of sides <'+$('polygonSides').value+'> or specify center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'RECTANG · Specify other corner or [Dimensions] · @length,width':'RECTANG · Specify first corner point',circle:state.stage.length?'CIRCLE · Specify radius or [Diameter]':'CIRCLE · Specify center point',arc:cad2dArcCenter?`ARC · Specify ${['center','start','end'][state.stage.length]||'end'} point`:`ARC · ${['Specify start point or [Center]','Specify second point','Specify end point'][state.stage.length]||'Specify end point'}`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'MEDIR · segundo punto':(state.measureResult?'DIST = '+cadMeasureInfo(state.measureResult.a,state.measureResult.b).main+' · clic para medir otra':'MEDIR · primer punto'),move:state.stage.length?'MOVE · Specify second point or type a distance':'MOVE · Select objects, then specify base point',copy:state.stage.length?'COPY · Specify second point or type a distance':'COPY · Select objects, then specify base point',rotate:state.stage.length?'ROTATE · Specify rotation angle (type degrees or click)':'ROTATE · Select objects, then specify base point',scale:state.stage.length?'SCALE · Specify scale factor (type a value or click)':'SCALE · Select objects, then specify base point',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready');try{cadRenderOptionChips()}catch(e){}}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-300);try{window.dispatchEvent(new CustomEvent('cad2d-log'))}catch(e){};$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -1402,64 +1431,82 @@ function cadWallCenterline(meta){
  const shift=mul(n,side*Number(meta.thickness)/2);
  return {a:add(a,shift),b:add(b,shift),length:len};
 }
-// Rectangular walls use a single closed RECT entity, rather than two LINE faces.
-// Both fragments are closed rectangles, so the reveals/caps remain closed for any thickness.
-function cadWallRectangleGeometry(e){
- if(e?.type==='rect'&&e.a&&e.b)return {a:e.a,b:e.b};
- if(e?.type!=='polyline'||!e.closed||e.pts?.length!==4)return null;
- const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y);
- const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
- if(maxX-minX<1e-8||maxY-minY<1e-8)return null;
- const corners=[P(minX,minY),P(maxX,minY),P(maxX,maxY),P(minX,maxY)];
- if(!corners.every(c=>e.pts.some(p=>dist(c,p)<1e-7)))return null;
- return {a:P(minX,minY),b:P(maxX,maxY)};
+function cadRectangleGeometry(entity){
+ let points=entity.pts;
+ if(entity.type==='rect'){
+  const {a,b}=entity;
+  points=[a,P(b.x,a.y),b,P(a.x,b.y)];
+ }else if(entity.type!=='polyline'||!entity.closed||!points)return null;
+ const repeated=points.length===5&&dist(points[0],points[4])<1e-8;
+ if(points.length!==4&&!repeated)return null;
+ const [a,b,c,d]=points,u=sub(b,a),v=sub(d,a),w=dist(a,b),h=dist(a,d);
+ if(!(w>1e-9&&h>1e-9)||Math.abs(u.x*v.x+u.y*v.y)>w*h*1e-7||
+    dist(c,add(a,add(u,v)))>Math.max(w,h)*1e-7)return null;
+ return {a,u,v,w,h,repeated};
 }
 function cadRectWallCandidate(e,point,openingWidth){
- const geometry=cadWallRectangleGeometry(e);
- if(!geometry||e.autoOpeningRef!==undefined)return null;
- const lay=layerFor(e);
- if(!lay?.visible||lay.locked)return null;
- const minX=Math.min(geometry.a.x,geometry.b.x),maxX=Math.max(geometry.a.x,geometry.b.x);
- const minY=Math.min(geometry.a.y,geometry.b.y),maxY=Math.max(geometry.a.y,geometry.b.y);
- const dx=maxX-minX,dy=maxY-minY;
- if(!(dx>1e-8&&dy>1e-8))return null;
- // A wall is the elongated dimension of the rectangle. Do not mistake a room for a wall.
- const horizontal=dx>dy*1.5,vertical=dy>dx*1.5;
- if(!horizontal&&!vertical)return null;
- const length=horizontal?dx:dy,thickness=horizontal?dy:dx;
- if(length<=openingWidth+1e-7)return null;
- // Un rectángulo de más de 80 cm de espesor es un local, no un muro.
- if(thickness>.8*1000/U[state.unit])return null;
- const t=horizontal?point.x-minX:point.y-minY;
- const normal=horizontal?point.y-(minY+maxY)/2:point.x-(minX+maxX)/2;
+ const rect=cadRectangleGeometry(e);
+ if(!rect||e.autoOpeningRef!=null||e.cadHidden)return null;
+ const layer=layerFor(e);if(!layer?.visible||layer.locked)return null;
+ const length=Math.max(rect.w,rect.h),thickness=Math.min(rect.w,rect.h);
+ if(length<=thickness*1.5||length<=openingWidth+1e-7||thickness>.8*1000/U[state.unit])return null;
+ const long=rect.w>rect.h?rect.u:rect.v,short=rect.w>rect.h?rect.v:rect.u;
+ let u=mul(long,1/length),origin=add(rect.a,mul(short,.5));
+ if(u.x<-1e-8||(Math.abs(u.x)<=1e-8&&u.y<0)){
+  u=mul(u,-1);origin=add(origin,long);
+ }
+ const n=P(-u.y,u.x),relative=sub(point,origin),t=relative.x*u.x+relative.y*u.y;
+ const distance=Math.abs(relative.x*n.x+relative.y*n.y);
  const tolerance=Math.max(.06*1000/U[state.unit],8/Math.max(state.view.scale,.01));
- if(Math.abs(normal)>thickness/2+tolerance||t<openingWidth/2+1e-7||length-t<openingWidth/2+1e-7)return null;
- return {entity:e,horizontal,minX,maxX,minY,maxY,length,thickness,t,distance:Math.abs(normal)};
+ if(distance>thickness/2+tolerance||t<openingWidth/2+1e-7||length-t<openingWidth/2+1e-7)return null;
+ return {origin,t,u,n,length,thickness,distance,center:add(origin,mul(u,t))};
 }
 function cadCutRectWallForOpening(ref,width){
  const e=state.entities.find(x=>x.id===ref.autoOpeningRectId);
  if(!e)return 0;
- const rect=cadRectWallCandidate(e,P(ref.p.x+(rectAxisX(ref.rotation)*width/2),ref.p.y+(rectAxisY(ref.rotation)*width/2)),width);
- if(!rect)return 0;
- const horizontal=rect.horizontal;
- const angle=(((ref.rotation%360)+360)%360);
- if(horizontal?Math.abs(Math.sin(angle*Math.PI/180))>1e-5:Math.abs(Math.cos(angle*Math.PI/180))>1e-5)return 0;
- const start=horizontal?ref.p.x:ref.p.y,end=start+width;
- const lo=horizontal?rect.minX:rect.minY,hi=horizontal?rect.maxX:rect.maxY;
- if(start<=lo+1e-7||end>=hi-1e-7)return 0;
+ const direction=P(rectAxisX(ref.rotation),rectAxisY(ref.rotation));
+ const rect=cadRectWallCandidate(e,add(ref.p,mul(direction,width/2)),width);
+ if(!rect||Math.abs(rect.u.x*direction.y-rect.u.y*direction.x)>1e-5)return 0;
+ const start=rect.t-width/2,end=rect.t+width/2;
  const original=clone(e);
- const piece=(lower,upper,role)=>{
-  const minX=horizontal?lower:rect.minX,maxX=horizontal?upper:rect.maxX;
-  const minY=horizontal?rect.minY:lower,maxY=horizontal?rect.maxY:upper;
-  const a=P(minX,minY),b=P(maxX,maxY);
-  return {...clone(e),type:'rect',id:state.nextId++,a,b,pts:undefined,closed:undefined,autoOpeningRef:ref.id,
-   autoOpeningSource:original.id,autoOpeningRole:role,
-   autoOpeningOriginal:clone(original),autoOpeningShape:{a:clone(a),b:clone(b)}};
+ const piece=(lo,hi,role)=>{
+  const half=mul(rect.n,rect.thickness/2);
+  const left=add(rect.origin,mul(rect.u,lo)),right=add(rect.origin,mul(rect.u,hi));
+  const a=sub(left,half),b=add(right,half);
+  const shape=e.type==='rect'?{a,b}:{pts:[a,sub(right,half),b,add(left,half)],closed:true};
+  return {...clone(e),...shape,id:state.nextId++,autoOpeningRef:ref.id,
+   autoOpeningSource:original.id,autoOpeningRole:role,autoOpeningOriginal:original,autoOpeningShape:clone(shape)};
  };
- const fragments=[piece(lo,start,'first'),piece(end,hi,'second')];
- state.entities=state.entities.filter(x=>x.id!==e.id);
- state.entities.push(...fragments);
+ const fragments=[piece(0,start,'first'),piece(end,rect.length,'second')];
+ state.entities.splice(state.entities.indexOf(e),1,...fragments);
  return 1;
+}
+function cadCutNewWallAtOpening(entity){
+ if(!autoOpeningEnabled||!cadRectangleGeometry(entity))return 0;
+ const occupied=new Set(state.entities.filter(e=>e.autoOpeningRef!=null).map(e=>e.autoOpeningRef));
+ let best=null;
+ for(const ref of state.entities){
+  if(ref.type!=='blockRef'||ref.cadHidden||occupied.has(ref.id))continue;
+  const layer=layerFor(ref),block=state.blocks?.[ref.blockName];
+  if(!layer?.visible||layer.locked||!['swing-door','double-door','framed-window'].includes(block?.parametric?.kind))continue;
+  const width=Number(ref.params?.width??block.parametric.defaults?.width)*ref.scale;
+  if(!(width>0))continue;
+  const u=P(rectAxisX(ref.rotation),rectAxisY(ref.rotation));
+  const hit=cadRectWallCandidate(entity,add(ref.p,mul(u,width/2)),width);
+  if(!hit||Math.abs(hit.u.x*u.y-hit.u.y*u.x)>1e-3||best&&hit.distance>=best.hit.distance)continue;
+  best={ref,hit,width,u};
+ }
+ if(!best)return 0;
+ const {ref,hit,width,u}=best;
+ const previous={p:ref.p,rotation:ref.rotation,wallThickness:ref.wallThickness,autoOpeningRectId:ref.autoOpeningRectId};
+ const direction=hit.u.x*u.x+hit.u.y*u.y<0?mul(hit.u,-1):hit.u;
+ ref.p=sub(hit.center,mul(direction,width/2));
+ ref.rotation=Math.atan2(direction.y,direction.x)*180/Math.PI;
+ ref.wallThickness=hit.thickness;
+ ref.autoOpeningRectId=entity.id;
+ const cut=cadCutRectWallForOpening(ref,width);
+ if(!cut)Object.assign(ref,previous);
+ return cut;
 }
 function rectAxisX(degrees){return Math.cos(degrees*Math.PI/180)}
 function rectAxisY(degrees){return Math.sin(degrees*Math.PI/180)}
@@ -1524,10 +1571,7 @@ function cadAlignOpeningToWall(ref,block,clickPoint){
  for(const entity of state.entities){
   const candidate=cadRectWallCandidate(entity,clickPoint,openingWidth);
   if(!candidate||best&&candidate.distance>=best.distance)continue;
-  const center=candidate.horizontal?P(clickPoint.x,(candidate.minY+candidate.maxY)/2):
-   P((candidate.minX+candidate.maxX)/2,clickPoint.y);
-  best={distance:candidate.distance,center,u:candidate.horizontal?P(1,0):P(0,1),
-   thickness:candidate.thickness,rectId:entity.id};
+  best={...candidate,rectId:entity.id};
  }
  if(!best)return false;
  ref.p=add(best.center,mul(best.u,-openingWidth/2));
@@ -1617,7 +1661,7 @@ function newEntity(e){if(typeof cad2dCmdOpt!=='undefined')cad2dCmdOpt.done=true;
  const layer=layerFor(e);e.width=e.width??layer.width??state.lineWidth;
  e=applyAutoWallJoin(e);
  if(e.type==='dimension'&&typeof cadAssociateDim==='function')cadAssociateDim(e);
- state.entities.push(e);updateAll()}
+ state.entities.push(e);const opened=cadCutNewWallAtOpening(e);updateAll();if(opened)toast('Vano abierto en la geometría nueva')}
 function cadCleanDrawingName(value){
  const name=String(value||'').trim().replace(/\.(?:dxf|dwg|cadjson|json|svg)$/i,'').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').trim();
  return name.slice(0,120)||'Untitled Drawing';
@@ -1634,6 +1678,15 @@ function cadRenameDrawing(){
  if(!given.trim())return toast('Escribí un nombre para el dibujo');
  cadSetDrawingName(given);queueLocalBackup();toast('Dibujo: '+state.file+'.dxf');
 }
+const headerActions=$('cadHeaderActions');
+headerActions.closest('.right').addEventListener('click',ev=>{
+ const proxy=ev.target.closest('[data-cad-header-action]');
+ if(proxy)$(proxy.dataset.cadHeaderAction).click();
+ if(ev.target.closest('#cadHeaderActions button'))headerActions.open=false;
+});
+document.addEventListener('pointerdown',ev=>{
+ if(headerActions.open&&!headerActions.contains(ev.target))headerActions.open=false;
+});
 $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
@@ -3186,6 +3239,17 @@ function cadZoomFactor(value){
  cadZoomOptionPending=false;state.tool='select';state.stage=[];prompt();schedule();
  toast('ZOOM '+f+'x');log('ZOOM '+f+'x');
 }
+function cadZoomShortcut(ev){
+ const button=ev.key==='+'||ev.code==='NumpadAdd'?'zoomIn':ev.key==='-'||ev.code==='NumpadSubtract'?'zoomOut':'';
+ if(!button||cadActiveSpace!=='model'||document.querySelector('#cad3dLab:not([hidden]),.modal-backdrop.show,#cadPlanDlg:not([hidden])'))return false;
+ const active=document.activeElement,command=$('command'),insideCommand=active===command;
+ const idleCommand=insideCommand&&state.tool==='select'&&/^[+\-]*$/.test(command.value.trim())&&!cad2dLtscalePending&&!cad2dSavetimePending;
+ if(active&&(['INPUT','TEXTAREA','SELECT'].includes(active.tagName)||active.isContentEditable)&&!idleCommand)return false;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ if(idleCommand)command.value='';
+ $(button).click();
+ return true;
+}
 function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension'||e.type==='image')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
@@ -4472,31 +4536,49 @@ function cadBreakAtPoint(p){
  toast('BREAKATPOINT: línea dividida en dos · Ctrl+Z para deshacer');
 }
 function cadListEntities(){
- const chosen=validEditSelection();
+ const chosen=selectedCadEntities();
  if(!chosen.length)return toast('LIST: seleccioná objetos para consultar sus propiedades');
- const rows=chosen.slice(0,60).map(e=>{
-  const l=layerFor(e),format=v=>Number(v).toFixed(state.precision);
-  let details='';
-  if(e.type==='line')details='A ('+format(e.a.x)+','+format(e.a.y)+') B ('+format(e.b.x)+','+format(e.b.y)+') · L '+format(dist(e.a,e.b));
-  else if(e.type==='circle')details='Centro ('+format(e.c.x)+','+format(e.c.y)+') · R '+format(e.r);
-  else if(e.type==='polyline')details=String(e.pts.length)+' vértices · '+(e.closed?'cerrada':'abierta');
-  else if(e.type==='rect')details='Ancho '+format(Math.abs(e.b.x-e.a.x))+' · Alto '+format(Math.abs(e.b.y-e.a.y));
-  else if(e.type==='blockRef')details='Bloque '+e.blockName;
-  else if(e.type==='hatch')details='Patrón '+(e.hatchStyle||'solid');
-  return '#'+e.id+' · '+e.type.toUpperCase()+' · '+l.name+' · '+details;
+ const format=n=>Number(n).toFixed(state.precision),point=p=>'('+format(p.x)+', '+format(p.y)+')';
+ const measure=(title,n)=>title+': '+format(n)+' '+state.unit;
+ const rows=chosen.map(e=>{
+  const layer=layerFor(e),rect=cadRectangleGeometry(e);
+  const data=['#'+e.id+' · '+(rect?'RECTÁNGULO':e.type.toUpperCase()),
+   'Capa: '+layer.name+' · '+format(e.width??layer.width??.25)+' mm'];
+  if(rect){
+   data.push(measure('Ancho',rect.w),measure('Largo',rect.h),measure('Perímetro',2*(rect.w+rect.h)));
+  }else if(e.type==='line'){
+   data.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Longitud',dist(e.a,e.b)));
+  }else if(e.type==='circle'||e.type==='arc'){
+   data.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
+   if(e.type==='circle')data.push(measure('Perímetro',TAU*e.r));
+   else data.push(measure('Longitud',e.r*arcSweep(e.a0,e.a1)),'Ángulo incluido: '+format(arcSweep(e.a0,e.a1)*180/Math.PI)+'°');
+  }else if(e.type==='polyline'){
+   const path=cadQuickPathInfo(e);
+   data.push(e.closed?'Cerrada · '+path.sides+' lados':'Abierta · '+e.pts.length+' vértices',
+    measure(e.closed?'Perímetro':'Longitud',path.length));
+  }else if(e.type==='ellipse'){
+   data.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry));
+  }else if(e.type==='blockRef')data.push('Bloque: '+e.blockName,'Inserción: '+point(e.p));
+  else if(e.type==='hatch')data.push('Patrón: '+(e.hatchStyle||'solid'));
+  else if(e.type==='text')data.push('Texto: '+e.text,measure('Altura',e.h));
+  if(cadQuickWidthEntity(e))data.push(measure('Grosor global',e.pwidth||0));
+  const area=cadEntityArea(e);
+  if(Number.isFinite(area))data.push('Área: '+format(area)+' '+state.unit+'²');
+  return data.join('\n');
  });
- const content='LIST · '+chosen.length+' objeto(s) · unidades '+state.unit+'\n'+rows.join('\n')+
- (chosen.length>60?'\n… '+(chosen.length-60)+' objetos más':'');
- log(content);toast('LIST: '+chosen.length+' objetos · detalles en historial de comandos');
- const old=document.getElementById('cadListResult');old?.remove();
- const box=document.createElement('div');box.id='cadListResult';
- box.style.cssText='position:fixed;z-index:100000;top:12%;left:50%;transform:translateX(-50%);width:min(700px,90vw);max-height:70vh;overflow:auto;background:#1d2730;color:#e7f5fa;border:1px solid #6995a8;border-radius:10px;padding:14px;box-shadow:0 12px 35px #0009';
- const header=document.createElement('div');header.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:12px';
- const title=document.createElement('strong');title.textContent='LIST · Propiedades de objetos';
- const close=document.createElement('button');close.type='button';close.textContent='Cerrar';close.className='btn';
- close.onclick=()=>box.remove();header.append(title,close);
- const pre=document.createElement('pre');pre.style.cssText='white-space:pre-wrap;font:12px Consolas,monospace';pre.textContent=content;
- box.append(header,pre);document.body.append(box);
+ const content=chosen.length+(chosen.length===1?' objeto seleccionado':' objetos seleccionados')+' · '+state.unit+
+  '\n\n'+rows.join('\n\n──────────────────────────────\n\n');
+ log('LIST · '+chosen.length+' objeto(s)\n'+rows.slice(0,15).join('\n\n'));
+ $('cadListResult')?.remove();
+ const box=document.createElement('section');box.id='cadListResult';box.setAttribute('role','dialog');
+ box.setAttribute('aria-label','LIST · Objetos seleccionados');
+ box.innerHTML='<header><strong>LIST · OBJETOS</strong><button type="button">Cerrar</button></header><pre></pre>';
+ box.querySelector('pre').textContent=content;
+ const close=box.querySelector('button');
+ function dismiss(){box.remove();canvas.focus({preventScroll:true})}
+ close.onclick=dismiss;
+ box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
+ document.body.append(box);close.focus({preventScroll:true});
 }
 function cadQuickSelect(){
  const all=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked);
@@ -5313,12 +5395,12 @@ function editCadTextInline(entity,anchor,opts={}){
  box.style.top=Math.max(8,Math.min(anchor.y+12,window.innerHeight-box.offsetHeight-8))+'px';
  field.focus();field.select();
 }
-canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();editCadTextInline(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='blockRef'&&cadBlockAttDefs(entity.blockName).length){state.selected=[entity.id];updateProps();cadEditBlockAttributes(entity);return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});// Right click: Enter while drafting, contextual menu only on an actual object.
+canvas.addEventListener('dblclick',ev=>{ev.preventDefault();if(state.tool==='select'&&(cadSelectionAnchor||performance.now()-cadLastWindowSelectionAt<500))return;if((state.tool==='polyline'||state.tool==='line')&&state.stage.length){finishStage();return}if(state.tool!=='select'&&state.stage.length){finishStage();return}if(state.tool==='select'){const entity=pick(world(P(ev.offsetX,ev.offsetY)));if(entity?.type==='text'){state.selected=[entity.id];syncTextPanel(entity);updateProps();editCadTextInline(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='dimension'){state.selected=[entity.id];updateProps();editCadDimensionText(entity,{x:ev.clientX,y:ev.clientY});return}if(entity?.type==='blockRef'&&cadBlockAttDefs(entity.blockName).length){state.selected=[entity.id];updateProps();cadEditBlockAttributes(entity);return}}zoomExtents();toast('Zoom extents')});canvas.addEventListener('auxclick',ev=>{if(ev.button===1)ev.preventDefault()});canvas.addEventListener('wheel',ev=>{ev.preventDefault();centerZoom(Math.exp(-Math.sign(ev.deltaY)*.17),P(ev.offsetX,ev.offsetY))},{passive:false});// Right click submits the current input or repeats the last command.
 function cadRightClickEnter(){
  const command=$('command');
  // A pending numeric length must be committed just like keyboard Enter.
- if(command?.value.trim()){runCommand();return}
- if(state.tool==='select'&&cad2dLastCommand){
+ if(command?.value.trim()||cad2dLtscalePending||cad2dSavetimePending){runCommand();return}
+ if((state.tool==='select'||state.tool==='pan')&&cad2dLastCommand){
   command.value=cad2dLastCommand;runCommand();
  }else finishStage();
 }
@@ -5355,7 +5437,7 @@ canvas.addEventListener('contextmenu',ev=>{
  const point=world(P(ev.offsetX,ev.offsetY));
  // Ctrl+right-click exposes the full menu, even during an active command.
  if(ev.ctrlKey){openCadContextMenu(ev.clientX,ev.clientY,point);return}
- if(state.tool==='select'){
+ if(state.tool==='select'&&!cad2dLastCommand&&!$('command').value.trim()){
   const target=pick(point);
   if(target||state.selected.length){openCadContextMenu(ev.clientX,ev.clientY,point);return}
  }
@@ -5404,7 +5486,7 @@ function drawZoomWindow(a,b){
  ctx.strokeStyle=crossing?'#39df8a':'#6cb1ff';ctx.lineWidth=1.4;
  ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(x,y,width,height);ctx.strokeRect(x,y,width,height);ctx.restore();
 }
-function zoomExtents(){cadRememberView();const b=getBounds(),w=wrap.clientWidth,h=wrap.clientHeight,dx=Math.max(1e-5,b.maxX-b.minX),dy=Math.max(1e-5,b.maxY-b.minY);state.view.scale=Math.min(w*.8/dx,h*.8/dy);state.view.ox=w/2-(b.minX+b.maxX)/2*state.view.scale;state.view.oy=h/2+(b.minY+b.maxY)/2*state.view.scale;schedule()}
+function zoomExtents(entities){cadRememberView();const b=getBounds(Array.isArray(entities)?entities:undefined),w=wrap.clientWidth,h=wrap.clientHeight,dx=Math.max(1e-5,b.maxX-b.minX),dy=Math.max(1e-5,b.maxY-b.minY);state.view.scale=Math.min(w*.8/dx,h*.8/dy);state.view.ox=w/2-(b.minX+b.maxX)/2*state.view.scale;state.view.oy=h/2+(b.minY+b.maxY)/2*state.view.scale;schedule()}
 function toggle(prop,id){state[prop]=!state[prop];$(id).classList.toggle('on',state[prop]);schedule()}
 function togglePolar(){
  state.polarOn=!state.polarOn;
@@ -5831,7 +5913,10 @@ function pasteCadObjects(){
  });
  saveHistory();
  for(const e of pasted){e.id=state.nextId++;state.entities.push(e)}
- state.selected=pasted.map(e=>e.id);updateAll();toast('Pasted '+pasted.length+' objects at model cursor');
+ const pastedIds=new Set(pasted.map(e=>e.id));
+ const openings=pasted.reduce((count,e)=>count+cadCutNewWallAtOpening(e),0);
+ state.selected=state.entities.filter(e=>pastedIds.has(e.id)||pastedIds.has(e.autoOpeningSource)).map(e=>e.id);
+ updateAll();toast('Pasted '+pasted.length+' objects at model cursor'+(openings?' · '+openings+' vano(s) abierto(s)':''));
  log('PASTECLIP '+pasted.length);
 }
 function cutSelectedCadObjects(){
@@ -5874,20 +5959,6 @@ function finishCadArea(){
  const value=Number(areaOfPolygon(state.stage).toFixed(Math.min(8,state.precision+2)));
  state.stage=[];state.tool='select';prompt();schedule();
  log('AREA: '+value+' '+state.unit+'²');toast('Enclosed area: '+value+' '+state.unit+'²');
-}
-function showCadEntityList(){
- const selected=selectedCadEntities();
- if(!selected.length)return toast('LIST: select one or more objects first');
- const lines=selected.slice(0,40).map(e=>{
-  const fields=['#'+e.id,e.type.toUpperCase(),'layer: '+layerFor(e).name];
-  if(e.type==='line')fields.push('length '+dist(e.a,e.b).toFixed(6)+' '+state.unit);
-  if(e.type==='circle')fields.push('radius '+e.r.toFixed(6)+' '+state.unit);
-  if(e.type==='text')fields.push(JSON.stringify(e.text));
-  const area=cadEntityArea(e);if(area!==null)fields.push('area '+area.toFixed(6)+' '+state.unit+'²');
-  return fields.join(' · ')
- });
- const message=lines.join('\n')+(selected.length>40?'\n…and '+(selected.length-40)+' more.':'');
- log('LIST: '+selected.length+' entities');window.alert(message);
 }
 function cadInvertSelection(){
  const current=new Set(state.selected);
@@ -5976,11 +6047,114 @@ function cadRenderOptionChips(){
  box.innerHTML=list.map(o=>`<button type="button" data-k="${o.keys[0]}" title="Escribí ${o.keys[0]} + Enter"><b>${o.keys[0]}</b> ${escapeHTML(o.label)}</button>`).join('');
  box.hidden=!list.length;
 }
+const CAD_COMMAND_UNMATCHED=Symbol('unmatched CAD command');
+function cadDispatchImmediate(upper){
+ if(['HATCHEDIT','-HATCHEDIT','EDITARSOMBREADO','EDITARHATCH','HE'].includes(upper))return cadHatchEdit();
+ if(['HATCHTOBACK','SOMBREADOALFONDO'].includes(upper))return cadHatchToBack();
+ if(['HATCHGENERATEBOUNDARY','GENERARCONTORNO','HATCHBOUNDARY'].includes(upper))return cadHatchGenerateBoundary();
+ if(['HATCH','-HATCH','BHATCH','SB','SOM','SOMBREADO'].includes(upper)){
+  if(state.selected.some(id=>state.entities.some(e=>e.id===id&&hatchBoundaryVertices(e))))return hatchSelected();
+  return setTool('hatch');
+ }
+ if(['CTRLZ','CTRL+Z','DESHACER','UNDO'].includes(upper))return undo();
+ if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
+ if(['OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'].includes(upper))return clearOtrackAnchors();
+ if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper)){
+  if(state.tool==='select'&&(upper==='Z'||upper==='ZOOM')){
+   const chosen=selectedCadEntities().filter(e=>layerFor(e).visible&&!e.cadHidden);
+   if(chosen.length){cadZoomOptionPending=false;return zoomExtents(chosen)}
+  }
+  setTool('zoomWindow');cadZoomOptionPending=true;
+  $('command').focus();$('command').placeholder='ZOOM: − / + / E / P anterior / W / 2x';
+  toast('ZOOM: escribí − y Enter para alejar, o elegí ventana');
+  return;
+ }
+ if(['ZP','ZOOMPREVIOUS','ZOOMANTERIOR','VISTAANTERIOR'].includes(upper))return cadZoomPrevious();
+ if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
+ if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
+ if(['PRUEBA5X4','CUARTO5X4','ROOM5X4'].includes(upper))return loadRoomTest();
+ if(['MURO','MUROS','WALL','WALL2D','DIBUJARMURO'].includes(upper))return setTool('wall2d');
+ if(upper==='WALLS')return setArchitecturalLayer('walls');
+ if(upper==='ABERTURA'||upper==='ABERTURAS'||upper==='OPENINGS')return setArchitecturalLayer('openings');
+ if(upper==='GRID'||upper==='GRILLA')return toggle('gridOn','gridToggle');
+ if(upper==='SNAP')return toggle('snapOn','snapToggle');
+ if(upper==='ORTHO'||upper==='ORTOGONAL')return toggle('orthoOn','orthoToggle');
+ if(upper==='OSNAP')return toggle('osnapOn','osnapToggle');
+ if(upper==='POLAR')return togglePolar();
+ if(upper==='TIJERA'||upper==='TRIM2'||upper==='TS')return setTool('trimScissor');
+ if(['TRIMFENCE','TF','RECORTARCERCA'].includes(upper)){setTool('trim');state.modifyCandidate={mode:'trimFence',first:null};prompt();schedule();return toast('TRIM CERCA: indicá dos puntos del barrido')}
+ if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
+ if(['BREAKATPOINT','PARTIRENPUNTO','BAP'].includes(upper))return setTool('breakAtPoint');
+ if(['ALIGN','ALINEAR','ALN'].includes(upper))return setTool('align2p');
+ if(['LIST','LISTAR','LI'].includes(upper))return cadListEntities();
+ if(['QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
+ if(['REGEN','REGENALL','REGENERAR','RE'].includes(upper)){schedule();return toast('REGEN: vista regenerada')}
+ if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
+ if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
+ if(['SELECTINVERT','INVERTSELECTION','INVERTIRSELECCION','INVERTIR'].includes(upper))return cadInvertSelection();
+ if(['DESELECT','DESELECTALL','DESELECCIONAR','NINGUNO'].includes(upper))return cadDeselectAll();
+ if(['SELECTALL','SELECCIONARTODO'].includes(upper))return selectAllCad();
+ if(upper==='COPYTOLAYER'||upper==='COPIARACAPA')return cadTransferLayer(true);
+ if(upper==='CHANGELAYER'||upper==='CAMBIARCAPA')return cadTransferLayer(false);
+ return CAD_COMMAND_UNMATCHED;
+}
+function cadDispatchNamed(value){
+ let aliases={S:'stretch',STRETCH:'stretch',ESTIRAR:'stretch',BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',ELLIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',TIJERA:'trimScissor',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polyline',PG:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=cad2dNormalizeCommand(value);if(aliases[cmd]){
+  const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
+  if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
+  else setTool(aliases[cmd]);
+  log('_'+cmd);return
+ }if(cmd==='COPIARPORTAPAPELES'||cmd==='COPIARCLIP')return copySelectedCadObjects();
+ if(cmd==='COPYCLIP'||cmd==='COPYBASE')return copySelectedCadObjects();
+ if(cmd==='PEGAR'||cmd==='PEGARCLIP')return pasteCadObjects();
+ if(cmd==='PASTECLIP'||cmd==='PASTEORIG')return pasteCadObjects();
+ if(cmd==='CUTCLIP')return cutSelectedCadObjects();
+ if(cmd==='PEDIT'||cmd==='PE')return openPeditPanel();
+ if(cmd==='LIST'||cmd==='LI')return cadListEntities();
+ if(cmd==='SELECCIONARTODO'||cmd==='SELECCIONAR_TODO'||cmd==='TODO')return selectAllCad();
+ if(cmd==='SELECTALL'||cmd==='AI_SELALL')return selectAllCad();
+ if(cmd==='PURGE'||cmd==='PU')return purgeUnusedCadLayers();
+ if(cmd==='CAPA'||cmd==='CAPAS')return openCadPaletteByTitle('Layer');
+ if(cmd==='LAYER'||cmd==='LA'||cmd==='LT'||cmd==='LTYPE')return openCadPaletteByTitle('Layer');
+ if(cmd==='PROPIEDADES')return openCadQuickProperties();
+ if(cmd==='PROPERTIES'||cmd==='PR'||cmd==='CHPROP')return openCadQuickProperties();
+ if(cmd==='STYLE'||cmd==='ST'||cmd==='TEXTSTYLE')return openCadPaletteByTitle('Text / Typography');
+ if(cmd==='DIMSTYLE'||cmd==='D'||cmd==='DSTYLE')return openCadPaletteByTitle('Dimensions / Annotation');
+ if(cmd==='DEDIT'||cmd==='DIMEDIT'||cmd==='EDITARCOTA'||cmd==='COTATEXTO')return editSelectedCadDimensionText();
+ if(cmd==='ED'||cmd==='TEDIT'||cmd==='DDEDIT'){
+  const target=selectedCadEntities().find(e=>e.type==='text');
+  if(target)syncTextPanel(target);
+  return openCadPaletteByTitle('Text / Typography');
+ }
+
+ if(cmd==='REGENERAR'||cmd==='REDIBUJAR')return schedule();
+ if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
+ if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();
+ if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
+ if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){
+  if(!window.confirm('Crear un dibujo nuevo? Guardá primero el trabajo actual.'))return;
+  const suggested=window.prompt('Nombre del dibujo nuevo (ej.: casa 2d):','Untitled Drawing');
+  if(suggested===null)return;
+  if(!suggested.trim())return toast('Ingresá un nombre para crear el dibujo');
+  saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
+  cadSetDrawingName(suggested);state.nextId=1;renderBlockLibrary();updateAll();zoomExtents();return
+ }
+ if(['BSAVE','BCLOSE','GUARDARBLOQUE'].includes(cmd)){if(!cadBlockEdit)return toast('No block is being edited');return cadBlockEditClose(true)}
+ if(['BCANCEL','BDISCARD'].includes(cmd))return cadBlockEditClose(false);
+ if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(cmd))return cadEditBlockDefinition(cadActiveBlockRef()?.blockName||$('blockLibrary').value);
+ if(cmd==='BLOCK')return $('createBlockBtn').click();
+ if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
+ if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
+ if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
+ if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
+ if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cad2dRunExtensionCommand(cmd,value))return;
+ return CAD_COMMAND_UNMATCHED;
+}
 function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(cad2dLtscalePending){cad2dLtscalePending=false;if(value){const v=Number(value.replace(',','.'));if(v>0){state.ltscale=v;updateAll();toast('LTSCALE = '+v);log('LTSCALE '+v)}else toast('LTSCALE: valor inválido')}return}
  if(cad2dSavetimePending){cad2dSavetimePending=false;if(value){const v=Math.round(Number(value.replace(',','.')));if(v>=0&&v<=120){cad2dSaveMinutes=v;try{localStorage.setItem('cad2d-savetime',String(v))}catch(e){}toast(v?'SAVETIME = '+v+' min':'Autosave off')}else toast('SAVETIME: 0–120')}return}
- if(/^(SAVETIME|AUTOSAVE|AUTOGUARDADO)$/i.test(value)){cad2dSavetimePending=true;toast('SAVETIME · minutes between autosaves (0 = off) <'+cad2dSaveMinutes+'>');return}
- if(/^(LTSCALE|LTS|ESCALATL)$/i.test(value)){cad2dLtscalePending=true;$('command').placeholder='LTSCALE · Enter new linetype scale factor <'+(state.ltscale||1)+'>';toast('LTSCALE · factor global de tipo de línea <'+(state.ltscale||1)+'>');return}
+ if(/^(SAVETIME|AUTOSAVE|AUTOGUARDADO)$/i.test(value)){cad2dLastCommand='SAVETIME';cad2dSavetimePending=true;toast('SAVETIME · minutes between autosaves (0 = off) <'+cad2dSaveMinutes+'>');return}
+ if(/^(LTSCALE|LTS|ESCALATL)$/i.test(value)){cad2dLastCommand='LTSCALE';cad2dLtscalePending=true;$('command').placeholder='LTSCALE · Enter new linetype scale factor <'+(state.ltscale||1)+'>';toast('LTSCALE · factor global de tipo de línea <'+(state.ltscale||1)+'>');return}
  if(value&&value!==cad2dCommandHistory.at(-1)&&!/^[0-9.,+\-]+$/.test(value)){
   cad2dCommandHistory.push(value);if(cad2dCommandHistory.length>80)cad2dCommandHistory.shift();
  }
@@ -6110,52 +6284,10 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(state.tool==='wall2d'&&['T','THICKNESS','ESPESOR'].includes(rawOption)){
   cadWallOptionPending='thickness';prompt();return;
  }
- if(['HATCHEDIT','-HATCHEDIT','EDITARSOMBREADO','EDITARHATCH','HE'].includes(upper))return cadHatchEdit();
- if(['HATCHTOBACK','SOMBREADOALFONDO'].includes(upper))return cadHatchToBack();
- if(['HATCHGENERATEBOUNDARY','GENERARCONTORNO','HATCHBOUNDARY'].includes(upper))return cadHatchGenerateBoundary();
- if(['HATCH','-HATCH','BHATCH','SB','SOM','SOMBREADO'].includes(upper)){
-  if(state.selected.some(id=>state.entities.some(e=>e.id===id&&hatchBoundaryVertices(e))))return hatchSelected();
-  return setTool('hatch');
- }
- if(['CTRLZ','CTRL+Z','DESHACER','UNDO'].includes(upper)){if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)return undoDrawingVertex();return undo();}
+ if(['CTRLZ','CTRL+Z','DESHACER','UNDO'].includes(upper)&&['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)return undoDrawingVertex();
+ const commandInput=value,immediate=cadDispatchImmediate(upper);
+ if(immediate!==CAD_COMMAND_UNMATCHED){cad2dLastCommand=commandInput;return immediate}
  value=upper;
- // Remember only recognized action names; numeric parameters never replace the last command.
- // Last command is set by a successfully activated tool, not by arbitrary text.
- if(['OTRACK','RASTREO','RASTREOOBJ','F11'].includes(upper))return toggleOtrack();
- if(['OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'].includes(upper))return clearOtrackAnchors();
- if(['Z','ZOOM','ZW','ZOOMVENTANA'].includes(upper)){
-  setTool('zoomWindow');cadZoomOptionPending=true;
-  $('command').focus();$('command').placeholder='ZOOM: − / + / E / P anterior / W / 2x';
-  toast('ZOOM: escribí − y Enter para alejar, o elegí ventana');
-  return;
- }
- if(['ZP','ZOOMPREVIOUS','ZOOMANTERIOR','VISTAANTERIOR'].includes(upper))return cadZoomPrevious();
- if(['ZE','ZOOMEXTENTS','ENCUADRAR','ZOOMEXTENSION'].includes(upper))return zoomExtents();
- if(['MANUAL','COMANDOS','COMMANDS','ATAJOS','SHORTCUTS'].includes(upper)){window.open('./manual-comandos.html','_blank','noopener');return}
- if(['PRUEBA5X4','CUARTO5X4','ROOM5X4'].includes(upper))return loadRoomTest();
- if(['MURO','MUROS','WALL','WALL2D','DIBUJARMURO'].includes(upper))return setTool('wall2d');
- if(upper==='WALLS')return setArchitecturalLayer('walls');
- if(upper==='ABERTURA'||upper==='ABERTURAS'||upper==='OPENINGS')return setArchitecturalLayer('openings');
- if(upper==='GRID'||upper==='GRILLA')return toggle('gridOn','gridToggle');
- if(upper==='SNAP')return toggle('snapOn','snapToggle');
- if(upper==='ORTHO'||upper==='ORTOGONAL')return toggle('orthoOn','orthoToggle');
- if(upper==='OSNAP')return toggle('osnapOn','osnapToggle');
- if(upper==='POLAR')return togglePolar();
- if(upper==='TIJERA'||upper==='TRIM2'||upper==='TS')return setTool('trimScissor');
- if(['TRIMFENCE','TF','RECORTARCERCA'].includes(upper)){setTool('trim');state.modifyCandidate={mode:'trimFence',first:null};prompt();schedule();return toast('TRIM CERCA: indicá dos puntos del barrido')}
- if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
- if(['BREAKATPOINT','PARTIRENPUNTO','BAP'].includes(upper))return setTool('breakAtPoint');
- if(['ALIGN','ALINEAR','ALN'].includes(upper))return setTool('align2p');
- if(['LIST','LISTAR','LI'].includes(upper))return cadListEntities();
- if(['QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
- if(['REGEN','REGENALL','REGENERAR','RE'].includes(upper)){schedule();return toast('REGEN: vista regenerada')}
- if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
- if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
- if(['SELECTINVERT','INVERTSELECTION','INVERTIRSELECCION','INVERTIR'].includes(upper))return cadInvertSelection();
- if(['DESELECT','DESELECTALL','DESELECCIONAR','NINGUNO'].includes(upper))return cadDeselectAll();
- if(['SELECTALL','SELECCIONARTODO'].includes(upper))return selectAllCad();
- if(upper==='COPYTOLAYER'||upper==='COPIARACAPA')return cadTransferLayer(true);
- if(upper==='CHANGELAYER'||upper==='CAMBIARCAPA')return cadTransferLayer(false);
  // OFFSET accepts the number directly, whether the object is selected yet or not.
  if(['fillet','chamfer'].includes(state.tool)){
   const num=value.replace(',','.');
@@ -6207,55 +6339,13 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
    const dest=add(origin,mul(delta,length/magnitude));
    handlePoint(dest,false);schedule();toast('Segmento / Segment: '+length+' '+state.unit);return;
   }
- }let aliases={S:'stretch',STRETCH:'stretch',ESTIRAR:'stretch',BORRAR:'erase',BORRA:'erase',ELIMINAR:'erase',SUPRIMIR:'erase',SUPR:'erase',LINEA:'line',LINEAS:'line',POLILINEA:'polyline',POLILINEAS:'polyline',RECTANGULO:'rect',CIRCULO:'circle',ARCO:'arc',ELIPSE:'ellipse',ELLIPSE:'ellipse',POLIGONO:'polygon',SOMBREADO:'hatch',TABLA:'table',TEXTO:'text',ACOTAR:'dimension',COTA:'dimension',COTALINEAL:'dimension',COTAALINEADA:'dimAligned',COTAHORIZONTAL:'dimHorizontal',COTAVERTICAL:'dimVertical',COTAANGULAR:'dimAngular',COTARADIO:'dimRadius',COTADIAMETRO:'dimDiameter',MOVER:'move',DESPLAZAR:'move',COPIAR:'copy',GIRAR:'rotate',ROTAR:'rotate',ESCALAR:'scale',ESCALA:'scale',SIMETRIA:'mirror',ESPEJO:'mirror',DESFASE:'offset',EQUIDISTANCIA:'offset',RECORTAR:'trim',TIJERA:'trimScissor',ALARGAR:'extend',EXTENDER:'extend',PARTIR:'breakLine',LONGITUD:'lengthen',UNIR:'join',DESCOMPONER:'explode',MATRIZ:'array',INVERTIR:'reverse',COLOROBJETO:'color',CHAFLAN:'chamfer',EMPALME:'fillet',DISTANCIA:'distance',MEDIR:'distance',SELECCIONAR:'select',SELECCION:'select',L:'line',LINE:'line',PL:'polyline',PLINE:'polyline',POL:'polyline',PG:'polygon',POLYGON:'polygon',H:'hatch',HATCH:'hatch',TABLE:'table',TB:'table',REC:'rect',RECT:'rect',RECTANGLE:'rect',C:'circle',CIRCLE:'circle',A:'arc',ARC:'arc',EL:'ellipse',T:'text',TEXT:'text',DT:'text',DLI:'dimension',DIM:'dimension',DIMLINEAR:'dimension',DIMALIGNED:'dimAligned',DAL:'dimAligned',DIMHORIZONTAL:'dimHorizontal',DIMVERTICAL:'dimVertical',DIMANGULAR:'dimAngular',DIMRADIUS:'dimRadius',DIMDIAMETER:'dimDiameter',DIMORDINATEX:'dimOrdinateX',DIMORDINATEY:'dimOrdinateY',DIMORDINATE:'dimOrdinateX',MLEADER:'dimLeader',LEADER:'dimLeader',LE:'dimLeader',M:'move',MOVE:'move',CO:'copy',COPY:'copy',RO:'rotate',ROTATE:'rotate',SC:'scale',SCALE:'scale',MI:'mirror',MIRROR:'mirror',O:'offset',OFFSET:'offset',TR:'trim',TRIM:'trim',EX:'extend',EXTEND:'extend',BR:'breakLine',BREAK:'breakLine',LEN:'lengthen',LENGTHEN:'lengthen',JOIN:'join',J:'join',EXPLODE:'explode',X:'explode',ARRAY:'array',AR:'array',REVERSE:'reverse',COLOR:'color',COLOUR:'color',CHA:'chamfer',CHAMFER:'chamfer',F:'fillet',FILLET:'fillet',E:'erase',ERASE:'erase',DI:'distance',DIST:'distance',ID:'id',AREA:'area',AA:'area',MATCHPROP:'matchprop',MA:'matchprop',P:'pan',PAN:'pan',SEL:'select',SELECT:'select'};let cmd=cad2dNormalizeCommand(value);if(aliases[cmd]){
-  const dimKinds={dimAligned:'aligned',dimHorizontal:'horizontal',dimVertical:'vertical',dimAngular:'angular',dimRadius:'radius',dimDiameter:'diameter',dimOrdinateX:'ordinateX',dimOrdinateY:'ordinateY',dimLeader:'leader'};
-  if(dimKinds[aliases[cmd]]){$('dimMode').value=dimKinds[aliases[cmd]];setTool('dimension')}
-  else setTool(aliases[cmd]);
-  log('_'+cmd);return
- }if(cmd==='COPIARPORTAPAPELES'||cmd==='COPIARCLIP')return copySelectedCadObjects();
- if(cmd==='COPYCLIP'||cmd==='COPYBASE')return copySelectedCadObjects();
- if(cmd==='PEGAR'||cmd==='PEGARCLIP')return pasteCadObjects();
- if(cmd==='PASTECLIP'||cmd==='PASTEORIG')return pasteCadObjects();
- if(cmd==='CUTCLIP')return cutSelectedCadObjects();
- if(cmd==='PEDIT'||cmd==='PE')return openPeditPanel();
- if(cmd==='LIST'||cmd==='LI')return showCadEntityList();
- if(cmd==='SELECCIONARTODO'||cmd==='SELECCIONAR_TODO'||cmd==='TODO')return selectAllCad();
- if(cmd==='SELECTALL'||cmd==='AI_SELALL')return selectAllCad();
- if(cmd==='PURGE'||cmd==='PU')return purgeUnusedCadLayers();
- if(cmd==='CAPA'||cmd==='CAPAS')return openCadPaletteByTitle('Layer');
- if(cmd==='LAYER'||cmd==='LA'||cmd==='LT'||cmd==='LTYPE')return openCadPaletteByTitle('Layer');
- if(cmd==='PROPIEDADES')return openCadQuickProperties();
- if(cmd==='PROPERTIES'||cmd==='PR'||cmd==='CHPROP')return openCadQuickProperties();
- if(cmd==='STYLE'||cmd==='ST'||cmd==='TEXTSTYLE')return openCadPaletteByTitle('Text / Typography');
- if(cmd==='DIMSTYLE'||cmd==='D'||cmd==='DSTYLE')return openCadPaletteByTitle('Dimensions / Annotation');
- if(cmd==='DEDIT'||cmd==='DIMEDIT'||cmd==='EDITARCOTA'||cmd==='COTATEXTO')return editSelectedCadDimensionText();
- if(cmd==='ED'||cmd==='TEDIT'||cmd==='DDEDIT'){
-  const target=selectedCadEntities().find(e=>e.type==='text');
-  if(target)syncTextPanel(target);
-  return openCadPaletteByTitle('Text / Typography');
- }
-
- if(cmd==='REGENERAR'||cmd==='REDIBUJAR')return schedule();
- if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
- if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();
- if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
- if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){
-  if(!window.confirm('Crear un dibujo nuevo? Guardá primero el trabajo actual.'))return;
-  const suggested=window.prompt('Nombre del dibujo nuevo (ej.: casa 2d):','Untitled Drawing');
-  if(suggested===null)return;
-  if(!suggested.trim())return toast('Ingresá un nombre para crear el dibujo');
-  saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
-  cadSetDrawingName(suggested);state.nextId=1;renderBlockLibrary();updateAll();zoomExtents();return
- }
- if(['BSAVE','BCLOSE','GUARDARBLOQUE'].includes(cmd)){if(!cadBlockEdit)return toast('No block is being edited');return cadBlockEditClose(true)}
- if(['BCANCEL','BDISCARD'].includes(cmd))return cadBlockEditClose(false);
- if(['BEDIT','EDITBLOCK','EDITARBLOQUE'].includes(cmd))return cadEditBlockDefinition(cadActiveBlockRef()?.blockName||$('blockLibrary').value);
- if(cmd==='BLOCK')return $('createBlockBtn').click();
- if(cmd==='I'||cmd==='IMPORTARBLOQUE'||cmd==='INSERTFILE')return $('importBlockBtn').click();if(cmd==='INSERT')return $('insertBlockBtn').click();
- if(cmd==='W'||cmd==='WBLOCK'||cmd==='EXPORTBLOCK')return cadExportActiveBlock();
- if(cmd==='BLOCKDXF')return $('exportBlockDxfBtn').click();
- if(cmd==='IMPORTBLOCK')return $('importBlockBtn').click();
- if(cmd==='LAYOUT'||cmd==='PAPERSPACE'||cmd==='PSPACE')return switchCadSpace('layout');if(cmd==='MSPACE')return switchCadSpace('model');if(cmd==='MODEL'||cmd==='1:1'||cmd==='SCALECHECK')return auditModelScale();if(cmd==='SCALETEST')return loadScaleReference();if(cmd==='U'||cmd==='UNDO'||cmd==='DESHACER')return undo();if(cmd==='REDO'||cmd==='REHACER')return redo();if(cmd==='ENCUADRAR'||cmd==='ZOOMEXTENSION')return zoomExtents();if(cmd==='Z'||cmd==='ZOOM'||cmd==='ZW'||cmd==='ZOOMVENTANA'){setTool('zoomWindow');cadZoomOptionPending=true;$('command').focus();return}if(cmd==='ZE'||cmd==='ZOOMEXTENTS')return zoomExtents();if(cmd==='EXPORTAR'||cmd==='EXPORTARDXF')return exportDXF();if(cmd==='DXF')return exportDXF();if(cmd==='EXPORTARFORMATOS'||cmd==='EXPORTFORMATS'||cmd==='EXPORTMENU')return openCadExportPopover();if(cmd==='SVG'||cmd==='EXPORTSVG')return exportCadOpenSVG();if(cmd==='PNG'||cmd==='EXPORTPNG')return $('pngBtn').click();if(cmd==='IMPRIMIR'||cmd==='TRAZAR'||cmd==='EXPORTARPDF')return openPrint();if(cmd==='PDF'||cmd==='PLOT'||cmd==='PRINT'||cmd==='EPDF')return openPrint();if(cmd==='GUARDAR')return saveJSON();if(cmd==='MANUAL'||cmd==='COMANDOS'||cmd==='ATAJOS')return window.open('./manual-comandos.html','_blank','noopener');if(cmd==='AYUDA')return $('helpBackdrop').classList.add('show');if(cmd==='HELP')return $('helpBackdrop').classList.add('show');if(cmd==='UNIDADES'||cmd==='UNITS'||cmd==='UN')return openCadUnitsDialog();if(cmd==='CERRAR'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cmd==='CLOSE'&&['line','polyline'].includes(state.tool))return closeDrawing();if(cad2dRunExtensionCommand(cmd,value))return;log(`Unknown command: ${value}`)}$('runCommand').onclick=runCommand;
+  }
+ if(['CERRAR','CLOSE'].includes(value)&&['line','polyline'].includes(state.tool))return closeDrawing();
+ const result=cadDispatchNamed(value);
+ if(result!==CAD_COMMAND_UNMATCHED){cad2dLastCommand=commandInput;return result}
+ log(`Unknown command: ${value}`);
+}
+$('runCommand').onclick=runCommand;
 /* CAD: lo que se escribe con el foco en el dibujo va a la línea de comandos (L ⏎, 500 ⏎, @100,0 ⏎…).
    Enter con la línea vacía y sin comando activo repite el último comando. */
 document.addEventListener('keydown',ev=>{
@@ -8497,12 +8587,16 @@ function relocateOpeningWithBlock(ref,previous){
  }
  const restored=[];
  const match=(a,b)=>a&&b&&Math.hypot(a.x-b.x,a.y-b.y)<1e-7;
+ const unchanged=f=>{
+  const shape=f.autoOpeningShape;
+  if(shape?.pts)return f.closed===shape.closed&&f.pts?.length===shape.pts.length&&f.pts.every((p,i)=>match(p,shape.pts[i]));
+  return match(f.a,shape?.a)&&match(f.b,shape?.b);
+ };
  for(const parts of groups.values()){
   const first=parts.find(e=>e.autoOpeningRole==='first');
   const second=parts.find(e=>e.autoOpeningRole==='second');
   if(parts.length!==2||!first||!second||
-     !match(first.a,first.autoOpeningShape?.a)||!match(first.b,first.autoOpeningShape?.b)||
-     !match(second.a,second.autoOpeningShape?.a)||!match(second.b,second.autoOpeningShape?.b)||
+     !unchanged(first)||!unchanged(second)||
      !first.autoOpeningOriginal||!second.autoOpeningOriginal){
    ref.p=P(previous.x,previous.y);
    return {ok:false,cut:0};
@@ -8518,7 +8612,7 @@ function relocateOpeningWithBlock(ref,previous){
  // A rectangle's original host ID was removed at the first cut. Rebind it
  // to the restored source before computing the new opening.
  const originalRectId=ref.autoOpeningRectId;
- const sourceRect=restored.find(e=>!!cadWallRectangleGeometry(e));
+ const sourceRect=restored.find(e=>!!cadRectangleGeometry(e));
  if(sourceRect)ref.autoOpeningRectId=sourceRect.id;
  const count=autoCutWallForOpening(ref,block);
  if(count!==(sourceRect?1:groups.size)){
@@ -9536,6 +9630,106 @@ function initCadStatusMenus(){
 }
 
 
+function cadQuickPathInfo(entity){
+ const points=entity.pts||[];
+ let length=0,sides=0;
+ function segment(a,b){const n=dist(a,b);length+=n;if(n>1e-9)sides++}
+ for(let i=1;i<points.length;i++)segment(points[i-1],points[i]);
+ if(entity.closed&&points.length>2)segment(points.at(-1),points[0]);
+ return {length,sides};
+}
+function cadQuickWidthEntity(e){return e.type==='polyline'||e.type==='rect'}
+function cadQuickCanResize(e){return !e.wall2d&&e.autoOpeningRef==null&&layerFor(e).visible&&!layerFor(e).locked&&!e.cadHidden}
+function cadRenderQuickGeometry(selected){
+ const group=$('cadPropsGeometry'),e=selected.length===1?selected[0]:null;
+ const label={circle:'Círculo',arc:'Arco',line:'Línea',polyline:'Polilínea',rect:'Rectángulo'};
+ const rect=e&&cadRectangleGeometry(e),unit=' ('+state.unit+')',path=e?.type==='polyline'&&!rect?cadQuickPathInfo(e):null;
+ const fields=[],editable=e&&cadQuickCanResize(e);
+ const addField=(key,title,value,canEdit=editable)=>{
+  if(value!==null&&!Number.isFinite(value))return;
+  const shown=value===null?'':String(Number(value.toPrecision(12)));
+  const content=canEdit?
+   '<input type="number" step="any" data-cad-geometry="'+key+'"'+(key==='globalWidth'?' id="cadPropsPwidth" placeholder="Varios"':'')+
+    ' value="'+shown+'" aria-label="'+escapeHTML(title)+'">':
+   '<output>'+shown+'</output>';
+  fields.push('<label>'+escapeHTML(title)+content+'</label>');
+ };
+ if(rect){
+  addField('rectWidth','Ancho'+unit,rect.w);addField('rectLength','Largo'+unit,rect.h);
+  addField('length','Perímetro'+unit,2*(rect.w+rect.h));
+ }else if(e?.type==='circle'||e?.type==='arc'){
+  addField('radius','Radio'+unit,e.r);addField('diameter','Diámetro'+unit,2*e.r);
+  if(e.type==='circle')addField('circumference','Perímetro'+unit,TAU*e.r);
+  else{
+   const sweep=arcSweep(e.a0,e.a1),degrees=a=>(((a*180/Math.PI)%360)+360)%360;
+   addField('length','Longitud de arco'+unit,e.r*sweep);
+   addField('arcStart','Ángulo inicial (°)',degrees(e.a0));addField('arcEnd','Ángulo final (°)',degrees(e.a1));
+   addField('arcSweep','Ángulo incluido (°)',sweep*180/Math.PI);
+  }
+ }else if(e?.type==='line'){
+  const length=dist(e.a,e.b);addField('length','Longitud'+unit,length,editable&&length>1e-9);
+ }else if(path){
+  addField('length',e.closed?'Perímetro'+unit:'Longitud'+unit,path.length,editable&&path.length>1e-9);
+ }
+ if(e?.type==='polyline'&&e.closed)addField('sides','Número de lados',rect?4:path.sides,false);
+ const widthEntities=selected.filter(cadQuickWidthEntity);
+ if(widthEntities.length){
+  const width=widthEntities[0].pwidth||0,mixed=widthEntities.some(item=>(item.pwidth||0)!==width);
+  addField('globalWidth','Grosor global'+unit,mixed?null:width,widthEntities.some(item=>layerFor(item).visible&&!layerFor(item).locked&&!item.cadHidden));
+ }
+ group.hidden=!fields.length;
+ group.innerHTML=fields.length?'<strong>Geometría'+(rect?' · Rectángulo':label[e?.type]?' · '+label[e.type]:'')+'</strong>'+fields.join(''):'';
+}
+function cadApplyQuickGeometry(input){
+ const key=input.dataset.cadGeometry,value=input.valueAsNumber;
+ const selected=validEditSelection().filter(e=>!e.cadHidden);
+ const rejected=message=>{refreshCadQuickProperties();if(message)toast(message)};
+ if(key==='globalWidth'){
+  if(!Number.isFinite(value)||value<0||value>1e12)return rejected('Grosor global: ingresá un valor entre 0 y 10¹²');
+  const changed=selected.filter(e=>cadQuickWidthEntity(e)&&(e.pwidth||0)!==value);
+  if(!changed.length)return;
+  saveHistory();
+  for(const e of changed){if(value===0)delete e.pwidth;else e.pwidth=value}
+ }else{
+  if(state.selected.length!==1||selected.length!==1||!cadQuickCanResize(selected[0]))return;
+  const e=selected[0],angular=['arcStart','arcEnd','arcSweep'].includes(key);
+  if(!Number.isFinite(value)||Math.abs(value)>1e12||(!angular&&value<=0))return rejected('Ingresá una medida válida');
+  let patch;
+  const rect=cadRectangleGeometry(e);
+  if(rect&&['rectWidth','rectLength','length'].includes(key)){
+   const factor=key==='length'?value/(2*(rect.w+rect.h)):1;
+   const u=mul(rect.u,key==='rectWidth'?value/rect.w:factor),v=mul(rect.v,key==='rectLength'?value/rect.h:factor);
+   const a=rect.a,b=add(a,u),d=add(a,v),c=add(b,v);
+   if(e.type==='rect')patch={b:c};
+   else patch={pts:rect.repeated?[a,b,c,d,a]:[a,b,c,d]};
+  }else if(e.type==='circle'||e.type==='arc'){
+   if(key==='radius')patch={r:value};
+   if(key==='diameter')patch={r:value/2};
+   if(key==='circumference'&&e.type==='circle')patch={r:value/TAU};
+   if(e.type==='arc'){
+    if(key==='arcStart')patch={a0:(value%360)*Math.PI/180};
+    if(key==='arcEnd')patch={a1:(value%360)*Math.PI/180};
+    if(key==='arcSweep'||key==='length'){
+     const sweep=key==='length'?value/e.r:value*Math.PI/180;
+     if(sweep<1e-8||sweep>TAU+1e-12)return rejected('El ángulo incluido debe estar entre 0° y 360°');
+     patch={a1:e.a0+Math.min(TAU,sweep)};
+    }
+   }
+  }else if(key==='length'&&e.type==='line'){
+   const result=lengthenedLineGeometry(e,e.b,'total',value);
+   if(result)patch={b:result.value};
+  }else if(key==='length'&&e.type==='polyline'){
+   const {length}=cadQuickPathInfo(e),factor=value/length;
+   if(length>1e-9&&Number.isFinite(factor))patch={pts:e.pts.map(q=>BlacklineScaleMath.scalePoint(q,e.pts[0],factor))};
+  }
+  if(!patch)return rejected();
+  const vertices=patch.pts||[patch.b].filter(Boolean);
+  if(vertices.some(q=>!Number.isFinite(q.x)||!Number.isFinite(q.y)))return rejected('La medida queda fuera del rango del dibujo');
+  if(JSON.stringify(patch)===JSON.stringify(Object.fromEntries(Object.keys(patch).map(k=>[k,e[k]]))))return;
+  saveHistory();Object.assign(e,patch);
+ }
+ updateAll();toast('Geometría actualizada · Ctrl+Z deshace');
+}
 function openCadQuickProperties(){const panel=$('cadQuickProperties');panel.hidden=false;refreshCadQuickProperties();$('cadPropertiesButton').setAttribute('aria-expanded','true');return panel}
 function refreshCadQuickProperties(){
  const panel=$('cadQuickProperties');if(!panel)return;
@@ -9545,7 +9739,7 @@ function refreshCadQuickProperties(){
  if(first){
   $('cadPropsColor').value=first.color||layerFor(first).color||'#ffffff';
   {const w=Number(first.width??layerFor(first).width??.25),opts=[...$('cadPropsWeight').options].map(o=>Number(o.value));$('cadPropsWeight').value=String(opts.reduce((a,b)=>Math.abs(b-w)<Math.abs(a-w)?b:a))}
-  $('cadPropsLtscale').value=String(first.ltscale||1);$('cadPropsPwidth').value=String(first.pwidth||0);
+  $('cadPropsLtscale').value=String(first.ltscale||1);
   {const hs=selected.filter(e=>e.type==='hatch'),box=$('cadPropsHatchBox');box.hidden=!hs.length;
    if(hs.length){const sel=$('cadPropsHatchPattern');if(!sel.options.length)sel.innerHTML=$('hatchStyle').innerHTML;const h=hs[0];sel.value=h.hatchStyle||'solid';
     $('cadPropsHatchScale').value=String(h.hatchSpacing||.25);$('cadPropsHatchAngle').value=String(h.hatchAngle||0);$('cadPropsHatchColor2').value=/^#[0-9a-f]{6}$/i.test(h.color2||'')?h.color2:'#ffffff';
@@ -9553,6 +9747,7 @@ function refreshCadQuickProperties(){
   $('cadPropsLinetype').value=first.linetype||'BYLAYER';
   $('cadPropsLayer').value=first.layer||state.layerId;
  }
+ cadRenderQuickGeometry(selected);
  let box=panel.querySelector('#cadImageQuickEditor');
  if(!box){box=document.createElement('div');box.id='cadImageQuickEditor';panel.append(box)}
  box.innerHTML=selected.length===1&&first?.type==='image'?cadImagePropertiesMarkup(first):'';
@@ -9784,19 +9979,26 @@ function initCadHatchPalette(){
 }
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
- panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><label>Ancho de polilínea <input type="number" id="cadPropsPwidth" min="0" step="0.01" value="0" title="Ancho global en unidades del dibujo (PEDIT W)"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Seleccioná una o varias líneas y aplicá las propiedades. Ctrl+Z deshace los cambios.</div>';
+ panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Enter confirma una medida. Aplicar guarda las propiedades generales. Ctrl+Z deshace los cambios.</div>';
  const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false')};
  $('cadPropsClose').onclick=close;
+ const geometry=$('cadPropsGeometry');
+ geometry.addEventListener('change',ev=>{if(ev.target.matches('[data-cad-geometry]'))cadApplyQuickGeometry(ev.target)});
+ geometry.addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&ev.target.matches('[data-cad-geometry]')){
+   ev.preventDefault();ev.stopPropagation();cadApplyQuickGeometry(ev.target);
+  }
+ });
  button.setAttribute('aria-expanded','false');
  button.onclick=()=>panel.hidden?openCadQuickProperties():close();
  $('cadPropsApply').onclick=()=>{
   const selected=validEditSelection();if(!selected.length)return toast('Seleccioná líneas u objetos primero');
   const color=$('cadPropsColor').value,weight=Number($('cadPropsWeight').value),linetype=$('cadPropsLinetype').value,layer=$('cadPropsLayer').value;
-  const ltscale=Number($('cadPropsLtscale').value)||1,pwidth=Math.max(0,Number($('cadPropsPwidth').value)||0);
+  const ltscale=Number($('cadPropsLtscale').value)||1;
   if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<0||!state.layers.some(l=>l.id===layer))return toast('Propiedades inválidas');
   const hp=$('cadPropsHatchPattern').value,hsc=Number($('cadPropsHatchScale').value),han=Number($('cadPropsHatchAngle').value)||0;
   if(!$('cadPropsHatchBox').hidden&&hp!=='solid'&&!/^gradient/.test(hp)&&!(hsc>0))return toast('Hatch: invalid pattern scale');
-  saveHistory();for(const e of selected){e.color=color;e.width=weight;e.linetype=linetype;e.layer=layer;if(e.type==='hatch'&&!$('cadPropsHatchBox').hidden){e.hatchStyle=hp;e.hatchSpacing=hsc>0?hsc:.25;e.hatchAngle=han;if(/^gradient/.test(hp))e.color2=$('cadPropsHatchColor2').value;else delete e.color2}if(ltscale!==1)e.ltscale=ltscale;else delete e.ltscale;if(['polyline','rect'].includes(e.type)){if(pwidth>0)e.pwidth=pwidth;else delete e.pwidth}}
+  saveHistory();for(const e of selected){e.color=color;e.width=weight;e.linetype=linetype;e.layer=layer;if(e.type==='hatch'&&!$('cadPropsHatchBox').hidden){e.hatchStyle=hp;e.hatchSpacing=hsc>0?hsc:.25;e.hatchAngle=han;if(/^gradient/.test(hp))e.color2=$('cadPropsHatchColor2').value;else delete e.color2}if(ltscale!==1)e.ltscale=ltscale;else delete e.ltscale;}
   updateAll();toast('Propiedades aplicadas a '+selected.length+' objeto(s)');
  };
  $('cadPropsHatchPattern').addEventListener('change',()=>{$('cadPropsHatchC2Row').style.display=/^gradient/.test($('cadPropsHatchPattern').value)?'':'none';$('cadPropsApply').click()});
@@ -9944,7 +10146,7 @@ function cad2dDrawExtensions(){
  }
 }
 window.CAD2D_CORE=Object.freeze({
- get state(){return state},get canvas(){return canvas},get ctx(){return ctx},U,
+ get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
@@ -10140,7 +10342,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261120-1955"></script>
+<script src="blackline-modern.js?v=20261121-1"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
@@ -10156,9 +10358,9 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-performance.js?v=20261120-1850"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
-<script src="cad-arq-pro.js?v=20261120-1925"></script>
-<script src="cad-autocad-plus.js?v=20261120-1850"></script>
-<script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261120-1850"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
+<script src="cad-arq-pro.js?v=20261121-1"></script>
+<script src="cad-autocad-plus.js?v=20261121-1"></script>
+<script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261120-1850"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 <script defer src="cad3d-lab.js?v=20261121-4"></script>

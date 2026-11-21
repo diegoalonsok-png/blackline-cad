@@ -1,5 +1,5 @@
 /* Barra rápida flotante y horizontal (estilo paleta compacta): zoom +, zoom −, zoom extensión,
-   texto, PDF, bloques y sombreado. Se arrastra desde el asa; la posición se recuerda. */
+   texto, cotas, PDF, bloques y sombreado. Se arrastra desde el asa; la posición se recuerda. */
 (function(){
  'use strict';
  const CORE=window.CAD2D_CORE;if(!CORE||document.getElementById('cadQuickBar'))return;
@@ -10,9 +10,10 @@
  const items=[
   ['zoomIn','Zoom +','<circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6M10 7v6M7 10h6"/>',click('zoomIn')],
   ['zoomOut','Zoom −','<circle cx="10" cy="10" r="6.5"/><path d="m15 15 6 6M7 10h6"/>',click('zoomOut')],
-  ['zoomExt','Zoom extents · ZE','<path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><rect x="8" y="8" width="8" height="8" rx="1"/>',()=>CORE.zoomExtents()],
+  ['zoomExt','Zoom extents · ZE','<path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><rect x="8" y="8" width="8" height="8" rx="1"/>',run('ZOOMEXTENTS')],
   null,
   ['text','Text · T','<path d="M5 5h14M12 5v14M9 19h6"/>',run('TEXT')],
+  ['dimension','Cota / Dimension · DIM','<path d="M4 5v14M20 5v14M4 12h16m-13-3-3 3 3 3m10-6 3 3-3 3"/>',run('DIM')],
   ['hatch','Hatch · H (patterns & gradient)','<rect x="3.5" y="3.5" width="17" height="17" rx="2"/><path d="M3.5 10 10 3.5M3.5 16.5 16.5 3.5M7 20.5 20.5 7M13.5 20.5l7-7"/>',run('HATCH')],
   ['blocks','Blocks · gallery','<rect x="3" y="3" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1"/>',()=>{const b=document.querySelector('[data-tool="blockgallery"]');if(b)b.click();else window.CAD2D_ARQ?.openGallery?.()}],
   ['pdf','Plot / PDF · Ctrl+P','<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><text x="7.3" y="17" font-size="5.4" font-weight="700" font-family="Arial" fill="currentColor" stroke="none">PDF</text>',run('PLOT')]
