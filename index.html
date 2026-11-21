@@ -5076,29 +5076,77 @@ function cadPrimitiveGripCommit(job,dest){
  const i=state.entities.findIndex(x=>x.id===job.id);
  state.entities[i]=result;updateAll();return true;
 }
-// Cota virtual al pasar el mouse sobre una pinza de una línea o polilínea seleccionada (como AutoCAD):
-// muestra la longitud del tramo y desaparece al salir de la pinza.
+function cadHoverDimensionTarget(){
+ const radius=gripHitRadius(),point=world(pointer),tol=radius/state.view.scale;
+ const selected=new Set(state.selected);
+ let nearest=null;
+ for(let i=state.entities.length-1;i>=0;i--){
+  const entity=state.entities[i],isSelected=selected.has(entity.id);
+  if(entity.cadHidden||(nearest?.isSelected&&!isSelected)||
+   !['line','rect','polyline','arc','circle'].includes(entity.type)||(entity.type==='circle'&&!isSelected))continue;
+  const box=window.BlacklinePerformance?.basicBounds(entity)||boundsEntity(entity);
+  if(!box||point.x<box.minX-tol||point.x>box.maxX+tol||point.y<box.minY-tol||point.y>box.maxY+tol||!layerFor(entity).visible)continue;
+  const grips=entity.type==='arc'?[entity.a0,entity.a1].map(angle=>({
+   kind:'vertex',p:add(entity.c,P(entity.r*Math.cos(angle),entity.r*Math.sin(angle)))
+  })):cadPrimitiveGrips(entity);
+  for(const grip of grips){
+   if(!isSelected&&grip.kind!=='vertex'&&grip.kind!=='corner')continue;
+   const distance=dist(screen(grip.p),pointer);
+   if(distance<=radius&&(!nearest||(isSelected&&!nearest.isSelected)||distance<nearest.distance)){
+    nearest={entity,grip,isSelected,distance};
+   }
+  }
+ }
+ return nearest;
+}
+function cadHoverDimensionEdges(entity,grip){
+ if(entity.type==='line')return [{a:entity.a,b:entity.b,index:0}];
+ const points=entity.type==='rect'?cadPrimitiveGrips(entity).slice(0,4).map(corner=>corner.p):entity.pts;
+ const closed=entity.type==='rect'||entity.closed;
+ const repeated=closed&&points.length>2&&dist(points[0],points.at(-1))<1e-9;
+ const count=points.length-(repeated?1:0),vertex=grip.index%count;
+ const indices=grip.kind==='segment'||grip.kind==='side'?[vertex]:[vertex-1,vertex];
+ return indices.filter(index=>closed||(index>=0&&index<count-1)).map(index=>{
+  const edge=(index+count)%count;
+  return {a:points[edge],b:points[(edge+1)%count],index:edge};
+ }).filter(({a,b})=>dist(a,b)>1e-9);
+}
+// The dimensions are temporary and follow the current drawing units.
 function cadDrawGripHoverDim(){
- if(!gripSettings.hoverDim||state.tool!=='select'||state.drag||!pointer||!state.selected.length)return;
- let active=false;try{active=!!cadPrimitiveGripPlacement}catch(e){}if(active)return;
- const R=gripHitRadius();let found=null;
- for(const id of state.selected){const e=state.entities.find(x=>x.id===id);if(!e||(e.type!=='line'&&e.type!=='polyline'))continue;
-  for(const g of cadPrimitiveGrips(e)){const p=screen(g.p);if(Math.hypot(p.x-pointer.x,p.y-pointer.y)<=R){found={e,g};break}}if(found)break}
- if(!found)return;
- const {e,g}=found,segs=[];
- if(e.type==='line')segs.push([e.a,e.b]);
- else{const p=e.pts,n=p.length;if(g.kind==='segment')segs.push([p[g.index],p[g.other]]);else{const i=g.index;if(i>0)segs.push([p[i-1],p[i]]);else if(e.closed)segs.push([p[n-1],p[0]]);if(i<n-1)segs.push([p[i],p[i+1]]);else if(e.closed)segs.push([p[n-1],p[0]])}}
+ if(!gripSettings.hoverDim||state.tool!=='select'||state.drag||cadPrimitiveGripPlacement||
+  cadVertexPlacement||!crosshairVisible||!pointer)return;
+ const target=cadHoverDimensionTarget();if(!target)return;
+ const {entity,grip}=target,es=cad2dAliasLanguage==='es';
+ const measure=(label,value)=>`${label}  ${units(value)} ${state.unit}`;
+ let edges=[],labels;
+ if(entity.type==='arc'||entity.type==='circle'){
+  labels=[measure(es?'Radio':'Radius',entity.r),entity.type==='arc'
+   ?measure(es?'Longitud de arco':'Arc length',entity.r*arcSweep(entity.a0,entity.a1))
+   :measure(es?'Diámetro':'Diameter',2*entity.r)];
+ }else{
+  edges=cadHoverDimensionEdges(entity,grip);
+  const rect=cadRectangleGeometry(entity);
+  labels=edges.map(({a,b,index},i)=>measure(rect
+   ?(index%2?(es?'Largo':'Length'):(es?'Ancho':'Width'))
+   :edges.length===2?(es?'Tramo ':'Segment ')+(i+1):(es?'Longitud':'Length'),dist(a,b)));
+ }
+ if(!labels.length)return;
  ctx.save();ctx.setTransform(dpr,0,0,dpr,0,0);
- for(const [a,b] of segs){
+ for(const {a,b} of edges){
   const A=screen(a),B=screen(b),L=Math.hypot(B.x-A.x,B.y-A.y);if(L<8)continue;
   let nx=-(B.y-A.y)/L,ny=(B.x-A.x)/L;if(ny>0){nx=-nx;ny=-ny}const off=22,A2={x:A.x+nx*off,y:A.y+ny*off},B2={x:B.x+nx*off,y:B.y+ny*off};
   ctx.strokeStyle='#7fd3ff';ctx.fillStyle='#7fd3ff';ctx.lineWidth=1;ctx.setLineDash([]);ctx.beginPath();
   ctx.moveTo(A.x+nx*4,A.y+ny*4);ctx.lineTo(A2.x+nx*5,A2.y+ny*5);ctx.moveTo(B.x+nx*4,B.y+ny*4);ctx.lineTo(B2.x+nx*5,B2.y+ny*5);ctx.moveTo(A2.x,A2.y);ctx.lineTo(B2.x,B2.y);ctx.stroke();
   const ux=(B.x-A.x)/L,uy=(B.y-A.y)/L;for(const [P0,s] of [[A2,1],[B2,-1]]){ctx.beginPath();ctx.moveTo(P0.x,P0.y);ctx.lineTo(P0.x+ux*s*8+nx*3,P0.y+uy*s*8+ny*3);ctx.lineTo(P0.x+ux*s*8-nx*3,P0.y+uy*s*8-ny*3);ctx.closePath();ctx.fill()}
-  const txt=units(dist(a,b))+' '+state.unit;let ang=Math.atan2(B.y-A.y,B.x-A.x);if(ang>Math.PI/2||ang<-Math.PI/2)ang+=Math.PI;
-  ctx.translate((A2.x+B2.x)/2,(A2.y+B2.y)/2);ctx.rotate(ang);ctx.font='700 13px Inter,Arial,sans-serif';const tw=ctx.measureText(txt).width;
-  ctx.fillStyle='rgba(10,20,28,.92)';ctx.fillRect(-tw/2-6,-19,tw+12,18);ctx.fillStyle='#bfe9ff';ctx.textAlign='center';ctx.fillText(txt,0,-5);ctx.setTransform(dpr,0,0,dpr,0,0);
  }
+ const anchor=screen(grip.p),viewWidth=canvas.width/dpr,viewHeight=canvas.height/dpr;
+ ctx.font='600 13px Inter,Arial,sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
+ const width=Math.max(...labels.map(label=>ctx.measureText(label).width))+20,height=12+labels.length*18;
+ const x=Math.max(6,Math.min(anchor.x+15,viewWidth-width-6));
+ const y=Math.max(6,Math.min(anchor.y>height+18?anchor.y-height-15:anchor.y+15,viewHeight-height-6));
+ ctx.setLineDash([]);ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,width,height,6):ctx.rect(x,y,width,height);
+ ctx.fillStyle='rgba(10,20,28,.96)';ctx.fill();ctx.strokeStyle='#7fd3ff';ctx.lineWidth=1;ctx.stroke();
+ ctx.fillStyle='#d1efff';labels.forEach((label,i)=>ctx.fillText(label,x+10,y+15+i*18));
  ctx.restore();
 }
 function cadDrawPrimitiveGrips(e){
