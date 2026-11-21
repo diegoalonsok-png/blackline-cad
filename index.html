@@ -10275,7 +10275,8 @@ function initCadLexiconBackgroundPalette(){
  button.addEventListener('click',()=>{
   if(!panel.hidden)return close();
   panel.hidden=false;button.setAttribute('aria-expanded','true');
-  try{const saved=localStorage.getItem('cad2d-lexicon-background');if(saved&&valid(saved)){custom.value=saved;swatches.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===saved)))}}catch(e){}
+  const active=document.querySelector('.app')?.dataset.lexiconBackground;
+  if(active&&valid(active)){custom.value=active;swatches.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===active)))}
   const rect=button.getBoundingClientRect();
   panel.style.left=Math.max(8,Math.min(window.innerWidth-panel.offsetWidth-8,rect.left))+'px';
   panel.style.top=Math.max(8,Math.min(window.innerHeight-panel.offsetHeight-8,rect.bottom+6))+'px';
@@ -10369,7 +10370,7 @@ function initCadColorPopover(){
    text,muted:mean>153?'#46545e':'#bcbab2'
   }))app.style.setProperty('--cad-ui-'+name,value);
   app.dataset.lexiconBackground=hex;
-  try{localStorage.setItem('cad2d-lexicon-background',hex)}catch(e){}
+  // Optional preview only: original Blackline colors are restored at the next load.
   return true;
  };
  window.cadResetPaletteBackground=()=>{
@@ -10379,8 +10380,9 @@ function initCadColorPopover(){
   for(const name of ['base','toolbar','raised','input','edge','text','muted'])app.style.removeProperty('--cad-ui-'+name);
   try{localStorage.removeItem('cad2d-lexicon-background')}catch(e){}
  };
- try{const saved=localStorage.getItem('cad2d-lexicon-background');if(saved)window.cadSetPaletteBackground(saved)}catch(e){};
- const note=document.createElement('div');note.className='cad-color-help';note.textContent='Elegí un esquema o personalizá cada color. Se guarda automáticamente en este navegador.';panel.append(note);
+ // The original CAD palette is always the startup default; discard legacy saved overrides.
+ try{localStorage.removeItem('cad2d-lexicon-background')}catch(e){};
+ const note=document.createElement('div');note.className='cad-color-help';note.textContent='El aspecto original de Blackline CAD es el predeterminado. Los colores alternativos son opcionales.';panel.append(note);
  const presets=document.createElement('div');presets.className='cad-color-presets';
  for(const [name,label] of [['dark','CAD oscuro'],['black','Negro'],['light','Claro'],['blueprint','Plano azul']]){
   const button=document.createElement('button');button.type='button';button.textContent=label;
