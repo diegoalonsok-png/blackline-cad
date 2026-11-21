@@ -535,7 +535,12 @@ function build(){
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
- root.querySelector('.sunLaunch').addEventListener('click',function(){var p=root.querySelector('.sunPanel');p.hidden=!p.hidden;this.setAttribute('aria-expanded',String(!p.hidden));});
+ root.querySelector('.sunLaunch').addEventListener('click',function(){
+  var p=root.querySelector('.sunPanel'),opening=p.hidden;
+  p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
+  if(opening&&!sunSettings.enabled){sunSettings.enabled=true;applySunSettings();}
+  if(opening&&!renderer)text('Sun activo · Las sombras reales requieren WebGL; vista de compatibilidad sin sombras');
+ });
  root.querySelector('[data-sun-enabled]').addEventListener('change',function(){sunSettings.enabled=this.checked;applySunSettings();});
  root.querySelector('[data-sun-ground]').addEventListener('change',function(){sunSettings.onGround=this.checked;applySunSettings();});
  root.querySelector('[data-sun-faces]').addEventListener('change',function(){sunSettings.onFaces=this.checked;applySunSettings();});
@@ -686,8 +691,8 @@ function applySunSettings(){
   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&renderStyle!=='sketch';
- if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?.65:1.3;
- if(sunFill)sunFill.intensity=sunSettings.enabled?.22:.7;
+ if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
+ if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh)o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces;});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
