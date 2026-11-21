@@ -3,7 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null;
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null;
 var DISABLE_KEY='blackline-cad3d-disabled';
 var icons={
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
@@ -70,7 +70,7 @@ function launch(){
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D LAB');
- root.innerHTML='<div class="head"><strong>▣ BLACKLINE · CAD3D</strong><small>EXPERIMENTAL · MODEL SPACE</small><div class="stretch"></div><button type="button" data-close title="Cerrar 3D sin afectar el plano 2D">×</button></div>'+
+ root.innerHTML='<div class="head"><strong>▣ BLACKLINE · CAD3D</strong><small>EXPERIMENTAL · MODEL SPACE</small><div class="stretch"></div><button type="button" data-max title="Maximizar o restaurar ventana 3D">□</button><button type="button" data-close title="Cerrar 3D sin afectar el plano 2D">×</button></div>'+
  '<div class="tools" role="toolbar" aria-label="Herramientas tridimensionales">'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+
  '<div class="divider"></div>'+tool('wall','WALL 3D')+tool('door','Door')+tool('window','Window')+
@@ -83,6 +83,7 @@ function build(){
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  document.body.appendChild(root);
  root.querySelector('[data-close]').addEventListener('click',close);
+ root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
  root.querySelector('.resizeGrip').addEventListener('pointerdown',beginResize);
  root.querySelector('.tools').addEventListener('click',function(e){var b=e.target.closest('[data-action]');if(b)action(b.dataset.action);});
@@ -102,9 +103,23 @@ function moveWindow(e){
  head.addEventListener('pointermove',move);head.addEventListener('pointerup',done);head.addEventListener('pointercancel',done);
 }
 
+function toggleMaximize(){
+ if(!root)return;
+ if(restoredWindow){
+  root.style.left=restoredWindow.left;root.style.top=restoredWindow.top;root.style.width=restoredWindow.width;root.style.height=restoredWindow.height;
+  restoredWindow=null;root.querySelector('[data-max]').textContent='□';
+ }else{
+  const r=root.getBoundingClientRect();
+  restoredWindow={left:root.style.left||r.left+'px',top:root.style.top||r.top+'px',width:root.style.width||r.width+'px',height:root.style.height||r.height+'px'};
+  root.style.left='10px';root.style.top='10px';root.style.width='calc(100vw - 20px)';root.style.height='calc(100vh - 20px)';
+  root.querySelector('[data-max]').textContent='▣';
+ }
+ resize();
+}
 function beginResize(e){
  if(e.button!==0)return;
  e.preventDefault();e.stopPropagation();
+ if(restoredWindow)toggleMaximize();
  var grip=e.currentTarget,rect=root.getBoundingClientRect();
  var start={id:e.pointerId,x:e.clientX,y:e.clientY,w:rect.width,h:rect.height};
  grip.setPointerCapture(e.pointerId);
@@ -594,7 +609,7 @@ async function importCADFile(ev){
  }catch(e){text('Error importando plano: '+(e.message||e));console.warn('CAD3D import',e);}
 }
 function exportJSON(){
- var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial};
+ var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay};
  download('blackline-cad3d.3djson',JSON.stringify(data,null,2),'application/json');text('Modelo editable .3DJSON exportado');
 }
 async function readJSON(e){
@@ -611,7 +626,14 @@ async function readJSON(e){
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
-  records=sanitized;var ids=records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));});
+  records=sanitized;
+  underlay=null;
+  if(data.underlay&&Array.isArray(data.underlay.segments)&&data.underlay.segments.length<=30000){
+   var valid=data.underlay.segments.filter(function(v){return Array.isArray(v)&&v.length===4&&v.every(function(n){return typeof n==='number'&&Number.isFinite(n)&&Math.abs(n)<1000000;});});
+   underlay={name:String(data.underlay.name||'Imported reference').slice(0,150),segments:valid};
+   drawUnderlay();
+  }
+  var ids=records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));});
   serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
