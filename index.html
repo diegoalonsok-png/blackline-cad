@@ -1057,6 +1057,9 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  width:0!important;
  height:0!important;
 }
+/* The bottom CAD command line is the single visible command input.
+   Keep the top finder in DOM for compatibility, but reclaim its header space. */
+.app .brandbar #cadCommandFinder{display:none!important}
 /* Lexicon controls: only the theme and background palette buttons. */
 .app .brandbar > #cadAppearanceControls #blThemeToggle,
 .app .brandbar > #cadAppearanceControls #cadLexiconBackgroundBtn{
