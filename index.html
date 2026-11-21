@@ -5429,7 +5429,59 @@ function cadLayerViewportControl(){
  };
 }
 function renderLayers(){cadLayerViewportControl();$('layerCount').textContent=state.layers.length;$('layers').innerHTML=state.layers.map(l=>`<div class="layer-row ${l.id===state.layerId?'current':''}"><button data-layer="${escapeHTML(l.id)}" data-act="visible" title="Toggle visibility">${l.visible?'◉':'◌'}</button><button data-layer="${escapeHTML(l.id)}" data-act="lock" title="Toggle lock">${l.locked?'🔒':'◇'}</button><input type="color" data-layer="${escapeHTML(l.id)}" data-act="color" value="${escapeHTML(/^#[0-9a-f]{6}$/i.test(l.color)?l.color:"#c6cbd1")}"><button type="button" class="layer-name cad-current-layer-button" data-layer="${escapeHTML(l.id)}" data-act="select" aria-pressed="${l.id===state.layerId}" title="Establecer capa actual / Set current layer" style="display:flex;align-items:center;gap:5px;min-width:0;text-align:left;color:inherit"><span aria-hidden="true" style="color:${l.id===state.layerId?'#31db7a':'#63737d'};font-weight:bold;flex:none">${l.id===state.layerId?'✓':'○'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(l.name)}</span></button><select class="layer-weight" data-layer="${escapeHTML(l.id)}" data-act="weight" title="Layer lineweight in millimeters · 0.00 = línea fina visible">${[0,.05,.09,.13,.18,.25,.35,.50,.70,1.0,1.4,2].map(w=>`<option value="${w}" ${Math.abs((l.width??.25)-w)<.001?'selected':''}>${w.toFixed(2)}</option>`).join('')}</select><button data-layer="${escapeHTML(l.id)}" data-act="rename" title="Rename layer">✎</button><div style="grid-column:1/-1;display:flex;gap:5px;justify-content:flex-end;padding:3px 0"><button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="freeze" title="Congelar capa en modelo y todas las vistas" aria-pressed="${!!l.frozen}" style="color:${l.frozen?'#87d8ff':'#bbcbd4'}">❄ ${l.frozen?'Congelada':'Congelar'}</button>${cadSelectedLayerViewport()?`<button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="vpfreeze" aria-pressed="${!!cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)}" title="Congelar solo en la ventana seleccionada">VP ❄ ${cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)?'Sí':'No'}</button>`:''}</div></div>`).join('');$('layers').querySelectorAll('[data-act]').forEach(el=>{const handler=()=>{let l=state.layers.find(x=>x.id===el.dataset.layer),a=el.dataset.act;if(!l)return;if(a==='select'){if(l.frozen)return toast('Descongelá esta capa antes de convertirla en actual');state.layerId=l.id}else if(a==='color'){saveHistory();l.color=el.value}else if(a==='weight'){saveHistory();const previous=l.width??.25;const next=Number(el.value);l.width=next;for(const ent of state.entities){if(ent.layer===l.id&&(ent.width===undefined||Math.abs(ent.width-previous)<.00001))ent.width=next}state.lineWidth=next;$('lineWidth').value=next}else if(a==='visible'){saveHistory();l.visible=!l.visible}else if(a==='freeze'){if(l.id===state.layerId&&!l.frozen)return toast('No se puede congelar la capa actual');saveHistory();l.frozen=!l.frozen;cadRefStyle.epoch=-1;state.selected=state.selected.filter(id=>{const e=state.entities.find(e=>e.id===id);return e&&!state.layers.find(x=>x.id===e.layer)?.frozen})}else if(a==='lock'){saveHistory();l.locked=!l.locked}else if(a==='vpfreeze'){const vp=cadSelectedLayerViewport();if(!vp)return;const frozen=new Set(Array.isArray(vp.frozenLayers)?vp.frozenLayers:[]);if(frozen.has(l.id))frozen.delete(l.id);else frozen.add(l.id);vp.frozenLayers=[...frozen];cadLayoutsPersist();renderLayoutWorkspace()}else if(a==='rename'){let name=window.prompt('New layer name:',l.name);if(name?.trim()){saveHistory();l.name=name.trim()}}renderLayers();schedule();queueLocalBackup()};el.addEventListener(el.tagName==='INPUT'?'change':el.tagName==='SELECT'?'change':'click',handler)})}
+/* Selected-image contextual controls. Uses native CAD commands and image opacity. */
+let cadImageBar=null;
+function cadUpdateImageBar(image){
+ if(!cadImageBar){
+  cadImageBar=document.createElement('div');
+  cadImageBar.id='cadImageControls';
+  cadImageBar.setAttribute('role','toolbar');
+  cadImageBar.setAttribute('aria-label','Image controls');
+  cadImageBar.style.cssText='position:absolute;z-index:25;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:7px;flex-wrap:wrap;max-width:calc(100% - 220px);padding:8px 10px;background:#151b21f5;border:1px solid #617080;border-radius:9px;box-shadow:0 6px 22px #0009;color:#e8edf1;font:12px system-ui;pointer-events:auto';
+  cadImageBar.innerHTML='<strong style="white-space:nowrap">▣ IMAGE</strong><button type="button" data-image-action="move" class="btn slim">Move</button><button type="button" data-image-action="scale" class="btn slim">Scale</button><button type="button" data-image-action="front" class="btn slim">Bring front</button><button type="button" data-image-action="back" class="btn slim">Send back</button><label style="white-space:nowrap">Opacity <input data-image-opacity type="range" min="10" max="100" step="5" value="100" style="width:85px;vertical-align:middle"></label><span data-image-size style="white-space:nowrap"></span><button type="button" data-image-action="close" class="btn slim" title="Close image controls">×</button>';
+  const wrap=canvas.parentElement;
+  if(getComputedStyle(wrap).position==='static')wrap.style.position='relative';
+  wrap.appendChild(cadImageBar);
+  cadImageBar.addEventListener('pointerdown',ev=>ev.stopPropagation());
+  cadImageBar.addEventListener('click',ev=>{
+   const action=ev.target.closest('[data-image-action]')?.dataset.imageAction;
+   if(!action)return;
+   if(action==='close'){state.selected=[];updateProps();schedule();return}
+   const e=state.entities.find(x=>x.id===Number(cadImageBar.dataset.imageId));
+   if(!e||e.type!=='image'||layerFor(e).locked)return;
+   if(action==='move'||action==='scale'){setTool(action);return}
+   if(action==='front'||action==='back'){
+    saveHistory();
+    state.entities=state.entities.filter(x=>x.id!==e.id);
+    if(action==='front')state.entities.push(e);else state.entities.unshift(e);
+    updateAll();
+   }
+  });
+  cadImageBar.querySelector('[data-image-opacity]').addEventListener('input',ev=>{
+   const e=state.entities.find(x=>x.id===Number(cadImageBar.dataset.imageId));
+   if(!e||e.type!=='image'||layerFor(e).locked)return;
+   const val=Number(ev.target.value)/100;
+   if(!Number.isFinite(val))return;
+   if(cadImageBar.dataset.opacityEditing!=='1'){saveHistory();cadImageBar.dataset.opacityEditing='1'}
+   e.opacity=val;schedule();
+  });
+  cadImageBar.querySelector('[data-image-opacity]').addEventListener('change',()=>{
+   cadImageBar.dataset.opacityEditing='0';updateAll();
+  });
+ }
+ cadImageBar.hidden=!image;
+ if(!image){cadImageBar.dataset.imageId='';cadImageBar.dataset.opacityEditing='0';return}
+ if(cadImageBar.dataset.imageId!==String(image.id)){
+  cadImageBar.dataset.imageId=String(image.id);cadImageBar.dataset.opacityEditing='0';
+ }
+ if(cadImageBar.dataset.opacityEditing!=='1')cadImageBar.querySelector('[data-image-opacity]').value=String(Math.round((image.opacity??1)*100));
+ const w=Math.abs(image.b.x-image.a.x).toFixed(2),h=Math.abs(image.b.y-image.a.y).toFixed(2);
+ cadImageBar.querySelector('[data-image-size]').textContent=w+' × '+h+' '+state.unit;
+ const locked=layerFor(image).locked;
+ cadImageBar.querySelectorAll('button[data-image-action]').forEach(b=>{if(b.dataset.imageAction!=='close')b.disabled=locked});
+}
 function updateProps(){const ids=state.selected,items=state.entities.filter(e=>ids.includes(e.id));
+ cadUpdateImageBar(items.length===1&&items[0].type==='image'?items[0]:null);
  const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
  const blockUI=$('blSelectedBlockEditor');
  if(blockUI){blockUI.hidden=!block;if(block){
