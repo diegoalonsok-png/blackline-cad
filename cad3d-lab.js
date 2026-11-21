@@ -1218,15 +1218,38 @@ function architectureParts(r,part){
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
   if(opening.kind==='door'){
-   part(w-2*frame,.048,h-frame,x,0,z,0x8b725e,0);
+   var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
+   var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
+   var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
+   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
+   // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
+   part(panelW,depth,panelH,x,0,z,leafColor,0);
    part(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
+   if(doubleDoor||sliding){
+    part(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
+   }
+   if(doorType==='garage-door'){
+    for(var rail=1;rail<5;rail++)part(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
+   }
+   if(glazed){
+    part(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
+   }
+   if(doorType==='pivot-door'){
+    part(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
+   }
   }else{
-   var d=thickness+.03;
+   var d=thickness+.03,windowType=opening.styleId||'';
    part(w,d,frame,x,0,z,0xb5c4cc,0);
    part(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
    part(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
    part(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   part(w-2*frame,.019,h-2*frame,x,0,z+frame,0x54889d,0);
+   part(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
+   if(/double|sliding|two-leaf/.test(windowType)){
+    part(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
+   }
+   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
+    part(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
+   }
   }
  });
 }
