@@ -5469,7 +5469,7 @@ function cadUpdateImageBar(image){
    cadImageBar.dataset.opacityEditing='0';updateAll();
   });
  }
- cadImageBar.hidden=!image;
+ cadImageBar.hidden=!image;cadImageBar.style.display=image?'flex':'none';
  if(!image){cadImageBar.dataset.imageId='';cadImageBar.dataset.opacityEditing='0';return}
  if(cadImageBar.dataset.imageId!==String(image.id)){
   cadImageBar.dataset.imageId=String(image.id);cadImageBar.dataset.opacityEditing='0';
