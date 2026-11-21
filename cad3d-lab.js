@@ -5,6 +5,21 @@ if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null, cad3dLoading=false, slabStart=null, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20'};
 var DISABLE_KEY='blackline-cad3d-disabled';
+var viewMode='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
+var viewPresets=[
+ ['perspective','Perspectiva libre','perspective',-.85,.55],
+ ['iso','Isométrica','ortho',-Math.PI/4,Math.atan(1/Math.sqrt(2))],
+ ['axo','Axonométrica','ortho',-Math.PI/3,.45],
+ ['top','Planta','ortho',-.85,Math.PI/2-.001],
+ ['bottom','Inferior','ortho',-.85,-Math.PI/2+.001],
+ ['front','Frontal','ortho',-Math.PI/2,0.001],
+ ['back','Posterior','ortho',Math.PI/2,.001],
+ ['left','Izquierda','ortho',Math.PI,.001],
+ ['right','Derecha','ortho',0,.001],
+ ['ne','Axonométrica NE','ortho',Math.PI/4,.56],
+ ['nw','Axonométrica NO','ortho',3*Math.PI/4,.56],
+ ['walk','Peatonal 1,65 m','walk',-Math.PI/2,.02]
+];
 var icons={
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
  sphere:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
@@ -67,6 +82,10 @@ var css=[
 '#cad3dLab .edgeResizeR:hover,#cad3dLab .edgeResizeB:hover{background:#6a849a45}',
 '#cad3dLab .resizeGrip:hover{opacity:1}',
 '#cad3dLab .tools button.armed{border-color:#b4cde0;background:#345369;color:#ffffff}',
+'#cad3dLab .tools button.sketchActive{border-color:#aebfc9;background:#40505a;color:#fff}',
+'#cad3dLab .cad3dViewSelect{background:#101820;border:1px solid #3c5160;border-radius:4px;color:#dce8ef;padding:5px 6px;min-width:120px;height:31px;font:11px Inter,Arial;cursor:pointer}',
+'#cad3dLab .view.sketchView{background:#f0eee6}',
+'#cad3dLab .view.sketchView .hint{background:#f6f4edeb;color:#354453;border-color:#c5c2b9}',
 '@media(max-width:700px){#cad3dLab{left:2vw;top:8vh;width:96vw;height:83vh;min-width:0}#cad3dLab .side{width:155px;flex-basis:auto;padding:6px}#cad3dLab .tools button span{display:none}#cad3dLab .head small{display:none}}'
 ].join('\n');
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
@@ -157,7 +176,7 @@ function build(){
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+
  '<div class="divider"></div>'+tool('wall','WALL 3D')+tool('door','Door')+tool('window','Window')+tool('slab','Slab')+
  '<div class="divider"></div>'+tool('union','Union')+tool('subtract','Subtract')+tool('intersect','Intersect')+
- '<div class="divider"></div>'+tool('view','Views')+
+ '<div class="divider"></div>'+tool('view','Views')+'<select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D" title="Puntos de vista"></select>'+tool('sketch','Croquis','view')+tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+
  '<div class="divider"></div>'+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+tool('json','.3DJSON','export')+tool('open','Open','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div>'+
  '<div class="body"><div class="view"><div class="hint">Botón de sólido → clic para colocarlo · WALL: dos puntos · Shift + clic: seleccionar</div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de la paleta 3D"></div><aside class="side"><h3>ARCHITECTURE · STYLES</h3><div class="catalog"><div class="catalogTabs"></div><div class="catalogItems"></div><button type="button" data-apply-style="1" title="Aplicar el estilo a un muro o losa seleccionado">Apply to selected</button></div><h3>3D PROPERTIES</h3><div class="props"><p>Agregá un objeto o seleccioná una figura. Unidades: metros.</p></div></aside></div>'+
@@ -165,6 +184,10 @@ function build(){
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  document.body.appendChild(root);
  root.querySelector('[data-close]').addEventListener('click',close);
+ var viewSelect=root.querySelector('.cad3dViewSelect');
+ viewSelect.innerHTML=viewPresets.map(function(v){return '<option value="'+v[0]+'">'+v[1]+'</option>';}).join('');
+ viewSelect.value='perspective';
+ viewSelect.addEventListener('change',function(){setViewPreset(this.value);});
  root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
  root.querySelector('.sideGrip').addEventListener('pointerdown',beginSideResize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
@@ -385,25 +408,44 @@ function close(){
 }
 function init(){
  scene=new T.Scene();scene.background=new T.Color(0x0b1117);
- camera=new T.PerspectiveCamera(50,1,.02,2000);camera.up.set(0,0,1);
+ perspectiveCamera=new T.PerspectiveCamera(50,1,.02,2000);perspectiveCamera.up.set(0,0,1);
+ orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
+ camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  target=new T.Vector3(0,0,1);updateCamera();
  renderer=new T.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
  root.querySelector('.view').appendChild(renderer.domElement);
  scene.add(new T.AmbientLight(0xffffff,1.3));
  var light=new T.DirectionalLight(0xffffff,2.1);light.position.set(-8,-6,16);scene.add(light);
  var fill=new T.DirectionalLight(0x8bc0ef,.7);fill.position.set(7,9,7);scene.add(fill);
- var grid=new T.GridHelper(60,60,0x526575,0x253440);grid.rotation.x=Math.PI/2;scene.add(grid);
- scene.add(new T.AxesHelper(2));
+ gridHelper=new T.GridHelper(60,60,0x526575,0x253440);gridHelper.rotation.x=Math.PI/2;scene.add(gridHelper);
+ axesHelper=new T.AxesHelper(2);scene.add(axesHelper);
  modelRoot=new T.Group();scene.add(modelRoot);raycaster=new T.Raycaster();
  underlayGroup=new T.Group();scene.add(underlayGroup);if(underlay)drawUnderlay();
- bindCanvas(renderer.domElement);resize();
+ bindCanvas(renderer.domElement);resize();applyViewCamera();applyRenderStyle();
 }
 function updateCamera(){
  if(!camera){if(fallbackCanvas)fallbackDraw();return;}
- camera.position.set(target.x+orbit.dist*Math.cos(orbit.el)*Math.cos(orbit.az),
- target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
- camera.lookAt(target);
+ camera.up.set(0,0,1);
+ if(viewMode==='walk'){
+  camera.position.set(target.x,target.y,1.65);
+  camera.lookAt(new T.Vector3(target.x-Math.cos(orbit.az)*8,target.y-Math.sin(orbit.az)*8,1.65+8*Math.tan(orbit.el)));
+ }else{
+  camera.position.set(target.x+orbit.dist*Math.cos(orbit.el)*Math.cos(orbit.az),
+   target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
+  camera.lookAt(target);
+ }
+ camera.updateMatrixWorld();
  if(fallbackCanvas)fallbackDraw();
+}
+function applyViewCamera(){
+ if(!T||!perspectiveCamera||!orthographicCamera)return;
+ camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;
+ var rect=root.querySelector('.view'),aspect=rect.clientWidth/Math.max(1,rect.clientHeight);
+ if(viewMode==='ortho'){
+  var half=Math.max(.15,orbit.dist*.38);
+  camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;
+ }else camera.aspect=aspect;
+ camera.updateProjectionMatrix();updateCamera();
 }
 function resize(){
  if(fallbackCanvas&&root&&!root.hidden){
@@ -415,7 +457,7 @@ function resize(){
  }
  if(!renderer||!root||root.hidden)return;
  var v=root.querySelector('.view');if(v.clientWidth<2||v.clientHeight<2)return;
- renderer.setSize(v.clientWidth,v.clientHeight,false);camera.aspect=v.clientWidth/v.clientHeight;camera.updateProjectionMatrix();
+ renderer.setSize(v.clientWidth,v.clientHeight,false);applyViewCamera();
 }
 function loop(){
  if(!renderer){if(fallbackCanvas)fallbackDraw();return;}
@@ -440,7 +482,11 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){if(!dragging||dragging.id!==e.pointerId)return;var select=!dragging.moved;dragging=null;if(select&&e.button===0){if(placing)placeAt(e);else selectAt(e);}});
  el.addEventListener('pointercancel',function(){dragging=null;});
- el.addEventListener('wheel',function(e){e.preventDefault();orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),1.4,300);updateCamera();},{passive:false});
+ el.addEventListener('wheel',function(e){e.preventDefault();if(viewMode==='walk'){
+  var step=clamp(Math.abs(e.deltaY)*.004,.08,1.4)*(e.deltaY>0?1:-1);
+  target.x+=Math.cos(orbit.az)*step;target.y+=Math.sin(orbit.az)*step;
+ }else orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),1.4,300);
+ applyViewCamera();},{passive:false});
 }
 
 function rayAt(e){
@@ -707,14 +753,28 @@ function booleanBox(kind){
  records.push(result);selected=[result.id];redraw();renderProps();text('BOOLEAN '+kind.toUpperCase()+' · resultado 3D generado');
 }
 function orientation(){
- var views=[[-.8,.6],[0,Math.PI/2-1e-3],[0,.001],[Math.PI/2,.001]];
- var n=finite(root.dataset.view,0)%views.length,angles=views[n];root.dataset.view=String(n+1);
- orbit.az=angles[0];orbit.el=angles[1];updateCamera();text(['Isometric','Top','Front','Right'][n]+' view');
+ var n=(viewPresets.findIndex(function(v){return v[0]===root.querySelector('.cad3dViewSelect').value;})+1)%viewPresets.length;
+ setViewPreset(viewPresets[n][0]);
+}
+function setViewPreset(key){
+ var v=viewPresets.find(function(p){return p[0]===key;})||viewPresets[0];
+ viewMode=v[2];orbit.az=v[3];orbit.el=v[4];
+ if(viewMode==='walk'){
+  var old=target||{x:0,y:0};
+  if(T&&target?.set)target.set(old.x,old.y,1.65);
+  else target={x:old.x,y:old.y,z:1.65,set:function(x,y,z){this.x=x;this.y=y;this.z=z;}};
+ }
+ root.querySelector('.cad3dViewSelect').value=v[0];
+ applyViewCamera();if(fallbackCanvas)fallbackDraw();
+ text(v[1]+' · '+(viewMode==='walk'?'altura ocular 1,65 m; rueda para avanzar / retroceder':viewMode==='ortho'?'proyección paralela':'perspectiva')+(fallbackCanvas?' · vista simplificada':''));
 }
 function action(a){
  if(['box','sphere','cylinder','cone','wall','door','window','slab'].includes(a)){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
  if(['union','subtract','intersect'].includes(a))return booleanBox(a);
  if(a==='view')return orientation();
+ if(a==='sketch')return setSketchStyle(renderStyle==='sketch'?'shaded':'sketch');
+ if(a==='shot')return exportViewPNG();
+ if(a==='sketchSvg')return exportSketchSVG();
  if(a==='obj')return exportOBJ();
  if(a==='dxf')return exportDXF();
  if(a==='json')return exportJSON();
