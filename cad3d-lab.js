@@ -649,21 +649,62 @@ function changeLayer(kind){
  selected=selected.filter(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});});
  renderLayerPanel();redraw();renderProps();
 }
+function cad3dBounds(){
+ var b={minX:Infinity,minY:Infinity,minZ:Infinity,maxX:-Infinity,maxY:-Infinity,maxZ:-Infinity};
+ records.filter(visibleRecord).forEach(function(r){
+  var halfW=(r.w||r.radius*2||2)/2,halfD=(r.d||r.radius*2||2)/2;
+  if(r.type==='sphere'){halfW=halfD=r.radius||1;}
+  var angle=(r.rot||0)*Math.PI/180;
+  var ex=Math.abs(Math.cos(angle))*halfW+Math.abs(Math.sin(angle))*halfD;
+  var ey=Math.abs(Math.sin(angle))*halfW+Math.abs(Math.cos(angle))*halfD;
+  var height=r.type==='sphere'?(r.radius||1)*2:(r.h||2);
+  b.minX=Math.min(b.minX,r.x-ex);b.maxX=Math.max(b.maxX,r.x+ex);
+  b.minY=Math.min(b.minY,r.y-ey);b.maxY=Math.max(b.maxY,r.y+ey);
+  b.minZ=Math.min(b.minZ,r.z||0);b.maxZ=Math.max(b.maxZ,(r.z||0)+height);
+ });
+ if(!Number.isFinite(b.minX))return {x:0,y:0,z:0,span:24};
+ return {x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2,z:(b.minZ+b.maxZ)/2,
+  span:Math.max(8,b.maxX-b.minX,b.maxY-b.minY,(b.maxZ-b.minZ)*2)};
+}
+function fit3DModel(){
+ var b=cad3dBounds();
+ if(target){target.x=b.x;target.y=b.y;target.z=b.z;}
+ else if(T)target=new T.Vector3(b.x,b.y,b.z);
+ else target={x:b.x,y:b.y,z:b.z};
+ orbit.dist=clamp(b.span*1.7,8,450);applyViewCamera();
+ text('Vista ajustada a los objetos 3D');
+}
 function applySunSettings(){
  if(root){
   root.querySelector('[data-sun-enabled]').checked=sunSettings.enabled;
+  root.querySelector('[data-sun-ground]').checked=sunSettings.onGround;
+  root.querySelector('[data-sun-faces]').checked=sunSettings.onFaces;
   ['azimuth','elevation'].forEach(function(key){
    root.querySelector('[data-sun-setting="'+key+'"]').value=String(sunSettings[key]);
    root.querySelector('[data-sun-'+key+']').textContent=sunSettings[key]+'°';
   });
+  root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&renderStyle!=='sketch';
+ if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?.65:1.3;
+ if(sunFill)sunFill.intensity=sunSettings.enabled?.22:.7;
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh)o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces;});
  if(!sunLight||!T)return;
- var az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180,r=40;
- sunLight.position.set(r*Math.cos(el)*Math.cos(az),r*Math.cos(el)*Math.sin(az),r*Math.sin(el));
- sunLight.intensity=sunSettings.enabled?3:2.1;sunLight.castShadow=sunSettings.enabled;
- sunLight.shadow.mapSize.set(1024,1024);
- Object.assign(sunLight.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:.5,far:140});
- sunLight.shadow.bias=-.0002;sunLight.shadow.camera.updateProjectionMatrix();
+ var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
+ var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
+ sunLight.target.position.set(bounds.x,bounds.y,bounds.z);scene.add(sunLight.target);
+ sunLight.position.set(bounds.x+radius*Math.cos(el)*Math.cos(az),
+  bounds.y+radius*Math.cos(el)*Math.sin(az),bounds.z+radius*Math.sin(el));
+ sunLight.target.updateMatrixWorld();
+ sunLight.intensity=sunSettings.enabled?2.7:2.1;
+ sunLight.castShadow=sunSettings.enabled;
+ sunLight.shadow.mapSize.set(2048,2048);
+ var shadowCamera=sunLight.shadow.camera;
+ shadowCamera.left=-range;shadowCamera.right=range;
+ shadowCamera.top=range;shadowCamera.bottom=-range;
+ shadowCamera.near=.5;shadowCamera.far=radius*3.5;
+ sunLight.shadow.bias=-.0002;sunLight.shadow.normalBias=.018;
+ shadowCamera.updateProjectionMatrix();
  if(renderer)renderer.shadowMap.needsUpdate=true;
 }
 function renderDraftModes(){
@@ -1314,7 +1355,7 @@ function redraw(){
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
  modelRoot.clear();records.filter(visibleRecord).forEach(function(record){modelRoot.add(buildObject(record));});
- modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();
+ modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();
 }
 function highlight(){
  if(fallbackCanvas){fallbackDraw();return;}
@@ -1457,6 +1498,7 @@ function applyRenderStyle(){
  }
  if(scene)scene.background=new T.Color(renderStyle==='sketch'?0xf3f1e8:MODEL_BACKGROUND);
  if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&renderStyle!=='sketch';
  if(axesHelper)axesHelper.visible=renderStyle!=='sketch';
  if(!modelRoot)return;
  modelRoot.traverse(function(m){
