@@ -7,7 +7,7 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
-var sunSettings={enabled:false,azimuth:135,elevation:45},sunLight=null;
+var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -35,6 +35,8 @@ var icons={
  opening:'<path d="M3 21V3h18v18M7 21V7h10v14" stroke-dasharray="3 2"/>',
  window:'<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/>',
  slab:'<path d="M2 9 17 4l5 5-15 6-5-6ZM2 9v5l5 6v-5M7 15l15-6v5l-15 6"/>',
+ floor:'<path d="M2 9 17 4l5 5-15 6-5-6M2 9v5l5 6v-5M7 15v5l15-6V9M7 20l15-6"/>',
+ sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.5 1.5m11.2 11.2 1.5 1.5M19.1 4.9l-1.5 1.5M6.4 17.6l-1.5 1.5"/>',
  union:'<rect x="2" y="8" width="12" height="12"/><rect x="10" y="3" width="12" height="12"/>',
  subtract:'<rect x="2" y="7" width="16" height="14"/><path d="M10 3h12v11h-7" stroke-dasharray="3 2"/>',
  intersect:'<rect x="2" y="8" width="14" height="12"/><rect x="9" y="3" width="13" height="12"/><path d="M9 8h7v7H9z" fill="currentColor" fill-opacity=".2"/>',
@@ -169,6 +171,12 @@ var css=`
 #cad3dLab .sunPanel label{display:grid;gap:3px;font-size:11px}
 #cad3dLab .sunPanel input[type=range]{width:100%}
 #cad3dLab .sunPanel .sunToggle{display:flex;align-items:center;gap:7px}
+#cad3dLab .sunPanel .sunPresetRow{display:flex;gap:5px}
+#cad3dLab .sunPanel .sunPresetRow button{flex:1;min-width:0;font-size:10px}
+#cad3dLab .tools [data-action] svg,#cad3dLab .sunLaunch svg{stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+#cad3dLab .viewShortcuts{position:absolute;bottom:12px;left:12px;z-index:3;display:flex;gap:5px}
+#cad3dLab .viewShortcuts button{background:#15212bcc;color:#e4ecf3;border:1px solid #536779;border-radius:6px;padding:5px 9px;cursor:pointer;font:11px Inter,Arial,sans-serif}
+#cad3dLab .viewShortcuts button:hover{background:#304354}
 #cad3dLab .dynReadout {position:absolute;z-index:4;pointer-events:none;display:none;padding:5px 8px;border:1px solid #8abed3;border-radius:6px;background:#17242deb;color:#eaf5fa;font:11px ui-monospace,Consolas,monospace;white-space:nowrap;box-shadow:0 3px 12px #0006}
 #cad3dLab .dynReadout[data-show="true"] {display:block}
 #cad3dLab .solidCheck {font-size:11px;color:var(--cad-ui-muted);margin-top:8px}
@@ -429,7 +437,7 @@ function build(){
  '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
  '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
  tool('wall','Wall','wall')+tool('door','Door','door')+tool('window','Window','window')+
- tool('slab','Slab','slab')+tool('floor','Floor','slab','Flat floor platform · two corners')+tool('opening','Opening','opening')+'</div>'+
+ tool('slab','Slab','slab')+tool('floor','Floor','floor','Flat floor platform · two corners')+tool('opening','Opening','opening')+'</div>'+
  '<div class="divider" aria-hidden="true"></div>'+
  '<div class="toolGroup" role="group" aria-label="Draw"><strong>Draw</strong>'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+'</div>'+
@@ -439,11 +447,14 @@ function build(){
  tool('union','Union','union','Unir dos cajas sin rotación')+
  tool('subtract','Subtract','subtract','Restar la segunda caja de la primera; sin rotación')+
  tool('intersect','Intersect','intersect','Intersectar dos cajas sin rotación')+'</div></div>'+
- '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">☀ Sun</button>'+
+ '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
  '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
- '<small>Visual simulation, not geolocated solar analysis.</small></div></div>'+
+ '<label class="sunToggle"><input type="checkbox" data-sun-ground checked> On ground</label>'+
+ '<label class="sunToggle"><input type="checkbox" data-sun-faces checked> On faces</label>'+
+ '<div class="sunPresetRow"><button type="button" class="btn" data-sun-preset="morning">Morning</button><button type="button" class="btn" data-sun-preset="noon">Noon</button><button type="button" class="btn" data-sun-preset="afternoon">Afternoon</button></div>'+
+ '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
@@ -472,7 +483,8 @@ function build(){
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
  '</div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
- '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output></div>'+
+ '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output>'+
+ '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
  '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
@@ -502,6 +514,11 @@ function build(){
   viewPresets.map(function(v){return '<option value="'+v[0]+'">'+v[1]+'</option>';}).join('');
  syncViewControls();
  viewSelect.addEventListener('change',function(){setViewPreset(this.value);});
+ root.querySelector('.viewShortcuts').addEventListener('click',function(e){
+  var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
+  if(!key)return;
+  if(key==='fit')fit3DModel();else setViewPreset(key);
+ });
  root.querySelector('.viewCube').addEventListener('click',function(e){
   var face=e.target.closest('[data-view-preset]');
   if(face)setViewPreset(face.dataset.viewPreset);
@@ -520,6 +537,12 @@ function build(){
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
  root.querySelector('.sunLaunch').addEventListener('click',function(){var p=root.querySelector('.sunPanel');p.hidden=!p.hidden;this.setAttribute('aria-expanded',String(!p.hidden));});
  root.querySelector('[data-sun-enabled]').addEventListener('change',function(){sunSettings.enabled=this.checked;applySunSettings();});
+ root.querySelector('[data-sun-ground]').addEventListener('change',function(){sunSettings.onGround=this.checked;applySunSettings();});
+ root.querySelector('[data-sun-faces]').addEventListener('change',function(){sunSettings.onFaces=this.checked;applySunSettings();});
+ root.querySelectorAll('[data-sun-preset]').forEach(function(btn){btn.addEventListener('click',function(){
+  var preset={morning:[80,28],noon:[135,70],afternoon:[245,28]}[this.dataset.sunPreset];
+  if(!preset)return;sunSettings.azimuth=preset[0];sunSettings.elevation=preset[1];sunSettings.enabled=true;applySunSettings();
+ });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
  root.querySelector('.draftBar').addEventListener('click',function(e){
@@ -916,9 +939,12 @@ function init(){
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
  renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
  root.querySelector('.view').appendChild(renderer.domElement);
- scene.add(new T.AmbientLight(0xffffff,1.3));
+ sunAmbient=new T.AmbientLight(0xffffff,1.3);scene.add(sunAmbient);
  sunLight=new T.DirectionalLight(0xffffff,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
- var fill=new T.DirectionalLight(0x8bc0ef,.7);fill.position.set(7,9,7);scene.add(fill);
+ sunFill=new T.DirectionalLight(0x8bc0ef,.7);sunFill.position.set(7,9,7);scene.add(sunFill);
+ // The grid is lines, not a shadow receiver. Keep visual ground separate from editable model.
+ sunGround=new T.Mesh(new T.PlaneGeometry(2000,2000),new T.ShadowMaterial({color:0x000000,opacity:.52,depthWrite:false,side:T.DoubleSide}));
+ sunGround.position.z=-.03;sunGround.receiveShadow=true;sunGround.castShadow=false;sunGround.renderOrder=1;scene.add(sunGround);
  gridHelper=new T.GridHelper(60,60,0x6e8391,new T.Color(MODEL_GRID));gridHelper.rotation.x=Math.PI/2;scene.add(gridHelper);
  axesHelper=new T.AxesHelper(2);scene.add(axesHelper);
  modelRoot=new T.Group();scene.add(modelRoot);raycaster=new T.Raycaster();
@@ -1190,7 +1216,7 @@ function selectAt(e){
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);
+ m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
