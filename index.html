@@ -3215,9 +3215,18 @@ function drawOtrackGuides(){
  for(const a of otrkAnchors){const p=screen(a);ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-5,p.y);ctx.lineTo(p.x+5,p.y);ctx.moveTo(p.x,p.y-5);ctx.lineTo(p.x,p.y+5);ctx.stroke()}
  if(!g){ctx.restore();return}
  const p=screen(g.point);
- ctx.strokeStyle='#7dff9a';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();
- if(g.rays){for(const r of g.rays){const A=screen(r.anchor),far=Math.hypot(w,h)*2;ctx.moveTo(A.x,A.y);ctx.lineTo(A.x+r.ux*far,A.y-r.uy*far)}}
- else{if(g.vertical){const x=screen(g.vertical).x;ctx.moveTo(x,0);ctx.lineTo(x,h)}if(g.horizontal){const y=screen(g.horizontal).y;ctx.moveTo(0,y);ctx.lineTo(w,y)}}
+ // OTRACK visual-only: short dashed amber guide from each acquired reference
+ // to the active projected cursor, never a persistent drawing entity.
+ ctx.strokeStyle='#ffb347';ctx.lineWidth=1.6;ctx.setLineDash([3,6]);ctx.lineCap='round';ctx.beginPath();
+ const guideSegment=(anchor)=>{
+  if(!anchor)return;
+  const A=screen(anchor);
+  if(Number.isFinite(A.x)&&Number.isFinite(A.y)&&Number.isFinite(p.x)&&Number.isFinite(p.y)){
+   ctx.moveTo(A.x,A.y);ctx.lineTo(p.x,p.y);
+  }
+ };
+ if(g.rays){for(const r of g.rays)guideSegment(r.anchor)}
+ else{if(g.vertical)guideSegment(g.vertical);if(g.horizontal)guideSegment(g.horizontal)}
  ctx.stroke();ctx.setLineDash([]);
  ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-6,p.y-6);ctx.lineTo(p.x+6,p.y+6);ctx.moveTo(p.x+6,p.y-6);ctx.lineTo(p.x-6,p.y+6);ctx.stroke();
  {const es=cad2dAliasLanguage==='es';let label;
