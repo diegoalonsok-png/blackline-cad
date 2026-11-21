@@ -10327,7 +10327,7 @@ function initCadColorPopover(){
  const toneNames=['Negro','Antracita','Gris medio','Gris claro','Blanco tiza'];
  const paletteHex=n=>{const v=Math.max(0,Math.min(255,Math.round(n)));return '#'+v.toString(16).padStart(2,'0').repeat(3)};
  let cadPaletteHue='#42454b';
- try{const oldHue=localStorage.getItem('cad2d-palette-hue');if(oldHue&&/^#[0-9a-f]{6}$/i.test(oldHue))cadPaletteHue=oldHue}catch(e){}
+ // Start with the original 14:00 graphite hue; alternative hues stay session-only.
  const hueRow=document.createElement('label');hueRow.className='cad-ui-hue-row';hueRow.textContent='Color de barras y botones';
  const huePicker=document.createElement('input');huePicker.type='color';huePicker.value=cadPaletteHue;huePicker.id='cadPaletteHue';hueRow.append(huePicker);toneBox.insertBefore(hueRow,paletteTone);
  const hueRGB=()=>[1,3,5].map(i=>parseInt(cadPaletteHue.slice(i,i+2),16));
@@ -10350,7 +10350,7 @@ function initCadColorPopover(){
   paletteTone.value=String(t);
   paletteToneLabel.textContent=t+'% · '+toneNames[Math.min(4,Math.round(t/25))];
   [...swatches.children].forEach((button,i)=>button.setAttribute('aria-pressed',String(Math.abs(t-i*25)<8)));
-  try{localStorage.setItem('cad2d-palette-tone-v2',String(t))}catch(e){}
+  // Palette selections are optional and do not override the original on restart.
  }
  for(const [i,value] of [0,25,50,75,100].entries()){
   const sample=document.createElement('button');sample.type='button';sample.style.background=paletteHex(5+value*2.36);
@@ -10358,9 +10358,10 @@ function initCadColorPopover(){
   sample.onclick=()=>setPaletteTone(value);swatches.append(sample);
  }
  paletteTone.addEventListener('input',()=>setPaletteTone(paletteTone.value));
- huePicker.addEventListener('input',()=>{cadPaletteHue=huePicker.value;try{localStorage.setItem('cad2d-palette-hue',cadPaletteHue)}catch(e){}setPaletteTone(paletteTone.value)});
- let savedTone=22;try{const modern=localStorage.getItem('cad2d-palette-tone-v2');const legacy=localStorage.getItem('cad2d-palette-tone');if(modern!==null&&Number.isFinite(Number(modern)))savedTone=Number(modern);else if(legacy!==null&&Number.isFinite(Number(legacy))&&Number(legacy)!==19)savedTone=Number(legacy);if(localStorage.getItem('cad2d-graphite-v1')!=='1'){if(savedTone===8)savedTone=22;localStorage.setItem('cad2d-graphite-v1','1')}}catch(e){}
- setPaletteTone(savedTone);
+ huePicker.addEventListener('input',()=>{cadPaletteHue=huePicker.value;setPaletteTone(paletteTone.value)});
+ // Restore the original CAD2D graphite default used at 14:00 (Buenos Aires).
+ // Previously saved alternate palettes must not become the startup default.
+ setPaletteTone(22);
  window.cadSetPaletteBackground=(hex)=>{
   if(!/^#[0-9a-f]{6}$/i.test(hex))return false;
   const app=document.querySelector('.app');
