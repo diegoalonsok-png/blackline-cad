@@ -7,6 +7,7 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
+var sunSettings={enabled:false,azimuth:135,elevation:45},sunLight=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -162,6 +163,12 @@ var css=`
 #cad3dLab .view canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab }
 #cad3dLab .view canvas:active { cursor:grabbing }
 #cad3dLab .view.placing canvas { cursor:crosshair }
+#cad3dLab .sunControl {position:relative;flex:none}
+#cad3dLab .sunPanel {position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;padding:12px;display:grid;gap:9px;background:var(--cad-ui-base,#17212a);border:1px solid var(--cad-ui-edge,#526579);border-radius:10px;box-shadow:0 12px 35px #0009;color:var(--cad-ui-text,#e9eef4)}
+#cad3dLab .sunPanel[hidden]{display:none!important}
+#cad3dLab .sunPanel label{display:grid;gap:3px;font-size:11px}
+#cad3dLab .sunPanel input[type=range]{width:100%}
+#cad3dLab .sunPanel .sunToggle{display:flex;align-items:center;gap:7px}
 #cad3dLab .dynReadout {position:absolute;z-index:4;pointer-events:none;display:none;padding:5px 8px;border:1px solid #8abed3;border-radius:6px;background:#17242deb;color:#eaf5fa;font:11px ui-monospace,Consolas,monospace;white-space:nowrap;box-shadow:0 3px 12px #0006}
 #cad3dLab .dynReadout[data-show="true"] {display:block}
 #cad3dLab .solidCheck {font-size:11px;color:var(--cad-ui-muted);margin-top:8px}
@@ -399,7 +406,7 @@ function build(){
  '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
  '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
  tool('wall','Wall','wall')+tool('door','Door','door')+tool('window','Window','window')+
- tool('slab','Slab','slab')+tool('opening','Opening','opening')+'</div>'+
+ tool('slab','Slab','slab')+tool('floor','Floor','slab','Flat floor platform · two corners')+tool('opening','Opening','opening')+'</div>'+
  '<div class="divider" aria-hidden="true"></div>'+
  '<div class="toolGroup" role="group" aria-label="Draw"><strong>Draw</strong>'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+'</div>'+
@@ -409,6 +416,11 @@ function build(){
  tool('union','Union','union','Unir dos cajas sin rotación')+
  tool('subtract','Subtract','subtract','Restar la segunda caja de la primera; sin rotación')+
  tool('intersect','Intersect','intersect','Intersectar dos cajas sin rotación')+'</div></div>'+
+ '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">☀ Sun</button>'+
+ '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
+ '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
+ '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
+ '<small>Visual simulation, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
@@ -483,6 +495,9 @@ function build(){
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
+ root.querySelector('.sunLaunch').addEventListener('click',function(){var p=root.querySelector('.sunPanel');p.hidden=!p.hidden;this.setAttribute('aria-expanded',String(!p.hidden));});
+ root.querySelector('[data-sun-enabled]').addEventListener('change',function(){sunSettings.enabled=this.checked;applySunSettings();});
+ root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
  root.querySelector('.draftBar').addEventListener('click',function(e){
   var mode=e.target.closest('[data-draft-mode]');
@@ -588,6 +603,23 @@ function changeLayer(kind){
  selected=selected.filter(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});});
  renderLayerPanel();redraw();renderProps();
 }
+function applySunSettings(){
+ if(root){
+  root.querySelector('[data-sun-enabled]').checked=sunSettings.enabled;
+  ['azimuth','elevation'].forEach(function(key){
+   root.querySelector('[data-sun-setting="'+key+'"]').value=String(sunSettings[key]);
+   root.querySelector('[data-sun-'+key+']').textContent=sunSettings[key]+'°';
+  });
+ }
+ if(!sunLight||!T)return;
+ var az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180,r=40;
+ sunLight.position.set(r*Math.cos(el)*Math.cos(az),r*Math.cos(el)*Math.sin(az),r*Math.sin(el));
+ sunLight.intensity=sunSettings.enabled?3:2.1;sunLight.castShadow=sunSettings.enabled;
+ sunLight.shadow.mapSize.set(1024,1024);
+ Object.assign(sunLight.shadow.camera,{left:-35,right:35,top:35,bottom:-35,near:.5,far:140});
+ sunLight.shadow.bias=-.0002;sunLight.shadow.camera.updateProjectionMatrix();
+ if(renderer)renderer.shadowMap.needsUpdate=true;
+}
 function renderDraftModes(){
  root.querySelectorAll('[data-draft-mode]').forEach(function(button){
   button.setAttribute('aria-pressed',String(draftModes[button.dataset.draftMode]));
@@ -614,7 +646,7 @@ function setPlacement(which){
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
   wall:'Muro: clic en el primer extremo y después en el segundo',
-  slab:'Losa: clic en dos esquinas opuestas',
+  slab:'Losa: clic en dos esquinas opuestas',floor:'Piso: dos esquinas de la plataforma, medidas editables en Properties',
   door:'Puerta: clic sobre un muro para insertar y abrir el vano',
   window:'Ventana: clic sobre un muro para insertar y abrir el vano',
   opening:'Vano: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' para calar',
@@ -859,16 +891,16 @@ function init(){
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
- renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
+ renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
  root.querySelector('.view').appendChild(renderer.domElement);
  scene.add(new T.AmbientLight(0xffffff,1.3));
- var light=new T.DirectionalLight(0xffffff,2.1);light.position.set(-8,-6,16);scene.add(light);
+ sunLight=new T.DirectionalLight(0xffffff,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
  var fill=new T.DirectionalLight(0x8bc0ef,.7);fill.position.set(7,9,7);scene.add(fill);
  gridHelper=new T.GridHelper(60,60,0x6e8391,new T.Color(MODEL_GRID));gridHelper.rotation.x=Math.PI/2;scene.add(gridHelper);
  axesHelper=new T.AxesHelper(2);scene.add(axesHelper);
  modelRoot=new T.Group();scene.add(modelRoot);raycaster=new T.Raycaster();
  underlayGroup=new T.Group();scene.add(underlayGroup);if(underlay)drawUnderlay();
- bindCanvas(renderer.domElement);resize();applyViewCamera();applyRenderStyle();
+ bindCanvas(renderer.domElement);resize();applyViewCamera();applyRenderStyle();applySunSettings();
 }
 function updateCamera(){
  if(!camera){scheduleFallbackDraw();return;}
@@ -1049,9 +1081,9 @@ function placeAt(e){
 }
 function placePoint(pt){
  var kind=placing;
- if(['wall','slab','move','copy','dist'].includes(kind)&&!firstPoint){
+ if(['wall','slab','floor','move','copy','dist'].includes(kind)&&!firstPoint){
   firstPoint=pt;
-  text(kind==='wall'?'Muro: indicá el extremo final':kind==='slab'?'Losa: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
+  text(kind==='wall'?'Muro: indicá el extremo final':kind==='slab'||kind==='floor'?'Piso: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
  }
  if(kind==='dist'){
   var length=Math.hypot(pt.x-firstPoint.x,pt.y-firstPoint.y);
@@ -1076,8 +1108,8 @@ function placePoint(pt){
   var wallStyle=archStyle('wall',activePreset.wall);rec=newRecord('wall');
   Object.assign(rec,{styleId:wallStyle.id,d:wallStyle.d,h:wallStyle.h,x:(firstPoint.x+pt.x)/2,y:(firstPoint.y+pt.y)/2,
    w:Math.hypot(dx,dy),rot:Math.atan2(dy,dx)*180/Math.PI,z:0});
- }else if(kind==='slab'){
-  var slabStyle=archStyle('slab',activePreset.slab);rec=newRecord('slab');
+ }else if(kind==='slab'||kind==='floor'){
+  var slabStyle=archStyle('slab',kind==='floor'?'floor-20':activePreset.slab);rec=newRecord('slab');
   Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
    w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
    x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:slabStyle.slabKind==='roof'?2.8:0});
@@ -1086,7 +1118,7 @@ function placePoint(pt){
  }
  if(!rec)return;
  records.push(rec);selected=[rec.id];redraw();renderProps();setPlacement(null);
- text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'?'Losa dibujada · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
+ text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'||kind==='floor'?'Losa / Piso dibujado · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
 }
 function selectAt(e){
  if(fallbackCanvas){
@@ -1117,7 +1149,7 @@ function selectAt(e){
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);parent.add(m);
+ m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
@@ -1479,7 +1511,7 @@ function run3DCommand(){
   if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
   placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
  }
- var aliases={MURO:'wall',LOSA:'slab',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
+ var aliases={MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
@@ -1490,7 +1522,7 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
- if(['box','sphere','cylinder','cone','dist'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
+ if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
   return true;
@@ -1507,6 +1539,7 @@ function action(a){
   return true;
  }
  if(['union','subtract','intersect'].includes(a)){setPlacement(null);booleanBox(a);return true;}
+ if(a==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();text('Sun / Shadows '+(sunSettings.enabled?'ON':'OFF'));return true;}
  if(a==='sketch')setSketchStyle(renderStyle==='sketch'?'shaded':'sketch');
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
