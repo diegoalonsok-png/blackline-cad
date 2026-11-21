@@ -3215,9 +3215,18 @@ function drawOtrackGuides(){
  for(const a of otrkAnchors){const p=screen(a);ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-5,p.y);ctx.lineTo(p.x+5,p.y);ctx.moveTo(p.x,p.y-5);ctx.lineTo(p.x,p.y+5);ctx.stroke()}
  if(!g){ctx.restore();return}
  const p=screen(g.point);
- ctx.strokeStyle='#7dff9a';ctx.lineWidth=1;ctx.setLineDash([3,4]);ctx.beginPath();
- if(g.rays){for(const r of g.rays){const A=screen(r.anchor),far=Math.hypot(w,h)*2;ctx.moveTo(A.x,A.y);ctx.lineTo(A.x+r.ux*far,A.y-r.uy*far)}}
- else{if(g.vertical){const x=screen(g.vertical).x;ctx.moveTo(x,0);ctx.lineTo(x,h)}if(g.horizontal){const y=screen(g.horizontal).y;ctx.moveTo(0,y);ctx.lineTo(w,y)}}
+ // OTRACK visual-only: short dashed amber guide from each acquired reference
+ // to the active projected cursor, never a persistent drawing entity.
+ ctx.strokeStyle='#ffb347';ctx.lineWidth=1.6;ctx.setLineDash([3,6]);ctx.lineCap='round';ctx.beginPath();
+ const guideSegment=(anchor)=>{
+  if(!anchor)return;
+  const A=screen(anchor);
+  if(Number.isFinite(A.x)&&Number.isFinite(A.y)&&Number.isFinite(p.x)&&Number.isFinite(p.y)){
+   ctx.moveTo(A.x,A.y);ctx.lineTo(p.x,p.y);
+  }
+ };
+ if(g.rays){for(const r of g.rays)guideSegment(r.anchor)}
+ else{if(g.vertical)guideSegment(g.vertical);if(g.horizontal)guideSegment(g.horizontal)}
  ctx.stroke();ctx.setLineDash([]);
  ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-6,p.y-6);ctx.lineTo(p.x+6,p.y+6);ctx.moveTo(p.x+6,p.y-6);ctx.lineTo(p.x-6,p.y+6);ctx.stroke();
  {const es=cad2dAliasLanguage==='es';let label;
@@ -3253,6 +3262,40 @@ function snapPoint(p){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
+   // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
+   // not just their insertion point. Read-only: never alter block entities.
+   if(e.type==='blockRef'){
+    const children=cadBlockChildrenCached(e);
+    let scanned=0;
+    for(const child of children){
+     if(++scanned>240||candidates.length>600)break;
+     if(child.type==='line'||child.type==='polyline'||child.type==='rect'){
+      const vertices=(child.type==='rect'?[
+       P(child.a.x,child.a.y),P(child.a.x,child.b.y),
+       P(child.b.x,child.b.y),P(child.b.x,child.a.y)
+      ]:getVertices(child)).filter(Boolean);
+      for(const v of vertices){
+       if(cadOsnapEnabled('END'))candidates.push([v,'END']);
+      }
+      if(cadOsnapEnabled('MID')){
+       const segments=child.type==='line'?[[child.a,child.b]]:
+        child.type==='rect'?[
+         [P(child.a.x,child.a.y),P(child.a.x,child.b.y)],
+         [P(child.a.x,child.b.y),P(child.b.x,child.b.y)],
+         [P(child.b.x,child.b.y),P(child.b.x,child.a.y)],
+         [P(child.b.x,child.a.y),P(child.a.x,child.a.y)]
+        ]:child.pts?.slice(1).map((v,i)=>[child.pts[i],v])||[];
+       if(child.type==='polyline'&&child.closed&&child.pts?.length>2)segments.push([child.pts.at(-1),child.pts[0]]);
+       for(const [a,b] of segments)if(a&&b)candidates.push([mul(add(a,b),.5),'MID']);
+      }
+     }else if(child.type==='circle'||child.type==='arc'||child.type==='ellipse'){
+      if(cadOsnapEnabled('CENTER')&&child.c)candidates.push([child.c,'CENTER']);
+      if(cadOsnapEnabled('QUAD')&&child.type==='circle'&&child.c){
+       candidates.push([P(child.c.x+child.r,child.c.y),'QUAD'],[P(child.c.x-child.r,child.c.y),'QUAD'],[P(child.c.x,child.c.y+child.r),'QUAD'],[P(child.c.x,child.c.y-child.r),'QUAD']);
+      }
+     }else if(child.type==='blockRef'&&cadOsnapEnabled('POINT')&&child.p)candidates.push([child.p,'POINT']);
+    }
+   }
    if(e.type==='line'){
     if(window.BlacklineOSNAPMath){
      if(cadOsnapEnabled('NEAREST')){
