@@ -885,7 +885,12 @@ function updatePlacementGuide(e){
 function fallbackPolygon(points,fill,stroke,width){
  var g=fallbackCtx;if(!points.length)return;
  g.beginPath();g.moveTo(points[0].x,points[0].y);for(var i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);g.closePath();
- g.fillStyle=renderStyle==='sketch'?'#f8f6ef':fill;g.fill();g.strokeStyle=renderStyle==='sketch'?'#303537':stroke;g.lineWidth=renderStyle==='sketch'?1.2:(width||1);g.stroke();
+ var wire=['wire2d','wire3d'].includes(renderStyle);
+ g.fillStyle=renderStyle==='sketch'||renderStyle==='hidden'?'#f8f6ef':
+  renderStyle==='monochrome'?'#e1e3e4':renderStyle==='realistic'?'#aa9b86':fill;
+ if(!wire){g.globalAlpha=renderStyle==='xray'?.26:1;g.fill();g.globalAlpha=1;}
+ g.strokeStyle=['sketch','hidden','wire2d','wire3d'].includes(renderStyle)?'#303537':stroke;
+ g.lineWidth=['sketch','wire2d','wire3d'].includes(renderStyle)?1.2:(width||1);g.stroke();
 }
 function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
  var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),ss=Math.sin(a);
@@ -909,9 +914,9 @@ function fallbackDraw(){
  var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
  if(w<=0||h<=0)return;
  var projection=fallbackProjector();
- ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='sketch'?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=['sketch','hidden','monochrome','wire2d'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
- if(draftModes.grid&&renderStyle!=='sketch')for(var i=-20;i<=20;i++){
+ if(draftModes.grid&&!['sketch','hidden','wire2d'].includes(renderStyle))for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
