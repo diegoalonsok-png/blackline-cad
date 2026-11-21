@@ -8,7 +8,7 @@ var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
-var viewMode='perspective',activeView='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
+var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
  ['iso','Isométrica','ortho',-Math.PI/4,Math.atan(1/Math.sqrt(2))],
@@ -165,6 +165,24 @@ var css=`
 #cad3dLab .view canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab }
 #cad3dLab .view canvas:active { cursor:grabbing }
 #cad3dLab .view.placing canvas { cursor:crosshair }
+#cad3dLab .styleControl {position:relative;flex:none}
+#cad3dLab .stylePanel {position:absolute;right:0;top:calc(100% + 6px);z-index:32;width:360px;max-width:min(90vw,360px);padding:12px;border:1px solid #536779;border-radius:11px;background:#141e28;color:#e8f0f6;box-shadow:0 16px 40px #000b}
+#cad3dLab .stylePanel[hidden]{display:none!important}
+#cad3dLab .stylePanel header {font-size:12px;font-weight:700;letter-spacing:.06em;margin-bottom:10px}
+#cad3dLab .styleGrid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#cad3dLab .styleGrid button {display:flex;align-items:center;gap:9px;text-align:left;min-width:0;padding:7px;background:#202d39;border:1px solid #435667;border-radius:8px;color:#dbe7ef;cursor:pointer}
+#cad3dLab .styleGrid button[aria-pressed=true]{border-color:#9ccfe5;box-shadow:inset 0 0 0 1px #9ccfe5;background:#294252}
+#cad3dLab .styleGrid button:hover{background:#354758}
+#cad3dLab .styleGrid small{display:block;font-size:10px;color:#aabfcb}
+#cad3dLab .styleThumb{flex:none;display:block;width:44px;height:38px;border:1px solid #687c8c;border-radius:5px;background:#edf1ed;position:relative;overflow:hidden}
+#cad3dLab .styleThumb::before{content:"";position:absolute;left:13px;top:8px;width:20px;height:20px;transform:skewY(-18deg);background:#9baab6;border:1px solid #475a68}
+#cad3dLab .styleThumb[data-kind="wire2d"]::before,#cad3dLab .styleThumb[data-kind="wire3d"]::before{background:transparent;border:2px solid #475a68;box-shadow:4px -4px 0 -2px #fff,4px -4px 0 0 #475a68}
+#cad3dLab .styleThumb[data-kind="hidden"]::before{background:#f8f8f4;border-color:#29333c}
+#cad3dLab .styleThumb[data-kind="shaded"]::before{background:#9aaeb5;border-color:transparent}
+#cad3dLab .styleThumb[data-kind="shaded-edges"]::before{background:#9aaeb5;border-color:#27323a}
+#cad3dLab .styleThumb[data-kind="realistic"]::before{background:linear-gradient(135deg,#d2b998,#8c7358);border-color:#654a38}
+#cad3dLab .styleThumb[data-kind="monochrome"]::before{background:#e2e2e2;border-color:#777}
+#cad3dLab .styleThumb[data-kind="xray"]::before{background:#96c6d477;border:1px dashed #547d90}
 #cad3dLab .sunControl {position:relative;flex:none}
 #cad3dLab .sunPanel {position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;padding:12px;display:grid;gap:9px;background:var(--cad-ui-base,#17212a);border:1px solid var(--cad-ui-edge,#526579);border-radius:10px;box-shadow:0 12px 35px #0009;color:var(--cad-ui-text,#e9eef4)}
 #cad3dLab .sunPanel[hidden]{display:none!important}
@@ -458,6 +476,11 @@ function build(){
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
+ '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
+ '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent']].map(function(st){
+ return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
+ }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
@@ -537,6 +560,16 @@ function build(){
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
+ root.querySelector('.styleLaunch').addEventListener('click',function(){
+  var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
+  this.setAttribute('aria-expanded',String(!panel.hidden));
+ });
+ root.querySelector('.styleGrid').addEventListener('click',function(e){
+  var button=e.target.closest('[data-render-style]');if(!button)return;
+  setVisualStyle(button.dataset.renderStyle);root.querySelector('.stylePanel').hidden=true;
+  root.querySelector('.styleLaunch').setAttribute('aria-expanded','false');
+ });
+ renderStyleControls();
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
