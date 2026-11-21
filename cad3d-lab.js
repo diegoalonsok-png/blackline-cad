@@ -3,7 +3,9 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, slabStart=null, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
+var draftModes={ortho:true,osnap:true,grid:true};
+var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var viewMode='perspective',activeView='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
@@ -37,6 +39,11 @@ var icons={
  intersect:'<rect x="2" y="8" width="14" height="12"/><rect x="9" y="3" width="13" height="12"/><path d="M9 8h7v7H9z" fill="currentColor" fill-opacity=".2"/>',
  export:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',
  folder:'<path d="M3 7V4h7l3 3h8v13H3z"/>',
+ move:'<path d="M12 2v20M2 12h20m-7-7-3-3-3 3m0 14 3 3 3-3M5 9l-3 3 3 3m14 0 3-3-3-3"/>',
+ copy:'<rect x="7" y="7" width="14" height="14" rx="2"/><path d="M17 3H5a2 2 0 0 0-2 2v12"/>',
+ rotate:'<path d="M4 9a8 8 0 1 1 0 6m0-6V3m0 6h6"/>',
+ erase:'<path d="M4 7h16M9 7V4h6v3m3 0-1 14H7L6 7M10 10v7m4-7v7"/>',
+ dist:'<path d="M3 16 16 3l5 5L8 21zM8 11l2 2m1-5 2 2m1-5 2 2"/>',
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
@@ -72,6 +79,8 @@ var css=`
  background:var(--cad-ui-toolbar); border-bottom:1px solid var(--cad-ui-edge);
  position:relative; z-index:2;
 }
+#cad3dLab .toolGroup { display:flex; align-items:center; gap:4px; flex:none }
+#cad3dLab .toolGroup strong { color:var(--cad-ui-muted); font-size:10px; padding:0 3px }
 #cad3dLab .solidTools {
  display:flex; align-items:center; gap:4px; flex:1; min-width:0; overflow-x:auto;
  scrollbar-width:thin; padding:2px;
@@ -163,11 +172,21 @@ var css=`
 }
 #cad3dLab .view.sketchView { background:#f0eee6 }
 #cad3dLab .viewNav {
- position:absolute; top:8px; left:8px; z-index:1; width:113px;
+ position:absolute; top:8px; left:8px; z-index:1; width:101px;
  display:grid; justify-items:start; gap:4px; pointer-events:none;
 }
 #cad3dLab .viewNav button, #cad3dLab .viewNav select { pointer-events:auto }
-#cad3dLab .viewCube { position:relative; width:83px; height:81px }
+#cad3dLab .viewCube { position:relative; width:83px; height:81px; transform:scale(.69); transform-origin:top left; margin-bottom:-25px }
+#cad3dLab .view.planRulers .viewNav { top:23px; left:26px }
+#cad3dLab .rulerX, #cad3dLab .rulerY {
+ position:absolute; z-index:1; overflow:hidden; pointer-events:none;
+ background:var(--cad-ui-toolbar); color:var(--cad-ui-muted); font:9px Inter,Arial,sans-serif;
+}
+#cad3dLab .rulerX { inset:0 0 auto 0; height:16px; border-bottom:1px solid var(--cad-ui-edge) }
+#cad3dLab .rulerY { inset:16px auto 0 0; width:20px; border-right:1px solid var(--cad-ui-edge) }
+#cad3dLab .rulerX span { position:absolute; bottom:0; height:13px; padding-left:3px; border-left:1px solid var(--cad-ui-edge) }
+#cad3dLab .rulerY span { position:absolute; right:0; width:100%; padding-right:2px; border-top:1px solid var(--cad-ui-edge); text-align:right }
+#cad3dLab .snapMarker { position:absolute; width:8px; height:8px; transform:translate(-50%,-50%); border:1px solid #f2d07e; z-index:2; pointer-events:none }
 #cad3dLab .cubeFace {
  position:absolute; width:42px; height:42px; display:grid; place-items:center; padding:0;
  transform-origin:0 0; border:1px solid var(--cad-ui-edge); background:var(--cad-ui-raised);
@@ -198,6 +217,14 @@ var css=`
  min-height:26px; padding:5px 9px; background:var(--cad-ui-toolbar); border-top:1px solid var(--cad-ui-edge);
  color:var(--cad-ui-muted); font-size:11px; overflow-wrap:anywhere;
 }
+#cad3dLab .draftBar { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:5px 7px; background:var(--cad-ui-toolbar); border-top:1px solid var(--cad-ui-edge) }
+#cad3dLab .draftBar form { display:flex; flex:1 1 210px; min-width:0; align-items:center; gap:5px }
+#cad3dLab .draftBar input { flex:1; min-width:0; padding:5px 7px; border:1px solid var(--cad-ui-edge); font:12px ui-monospace,monospace }
+#cad3dLab .draftBar .btn { min-height:24px; padding:3px 6px; font-size:10px }
+#cad3dLab .draftBar [aria-pressed=true] { outline:1px solid var(--bl-accent,#8bc7de); outline-offset:-2px }
+#cad3dLab .draftBar output { color:var(--cad-ui-muted); min-width:90px; font:10px ui-monospace,monospace }
+#cad3dLab .layerPanel select { width:100%; margin-bottom:5px; padding:4px }
+#cad3dLab .layerPanel .btn { margin:2px 0; padding:4px 7px; font-size:10px }
 #cad3dLab .resizeGrip { position:absolute; right:0; bottom:0; width:18px; height:18px; background:linear-gradient(135deg,transparent 57%,#7b8f9d 58%,#7b8f9d 60%,transparent 61%,transparent 72%,#7b8f9d 73%,#7b8f9d 75%,transparent 76%); opacity:.55; cursor:nwse-resize; touch-action:none; z-index:7 }
 #cad3dLab .edgeResizeR { position:absolute; right:0; top:39px; bottom:18px; width:6px; cursor:ew-resize; touch-action:none; z-index:7 }
 #cad3dLab .edgeResizeB { position:absolute; bottom:0; left:30px; right:18px; height:6px; cursor:ns-resize; touch-action:none; z-index:7 }
@@ -366,13 +393,15 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
- '<div class="solidTools" role="toolbar" aria-label="Sólidos y operaciones booleanas">'+
- tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+
+ '<div class="solidTools" role="toolbar" aria-label="Draw y Modify">'+
+ '<div class="toolGroup" role="group" aria-label="Draw"><strong>Draw</strong>'+
+ tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+'</div>'+
  '<div class="divider" aria-hidden="true"></div>'+
+ '<div class="toolGroup" role="group" aria-label="Modify"><strong>Modify</strong>'+
+ tool('move','Move')+tool('copy','Copy')+tool('rotate','Rotate')+tool('erase','Erase')+
  tool('union','Union','union','Unir dos cajas sin rotación')+
  tool('subtract','Subtract','subtract','Restar la segunda caja de la primera; sin rotación')+
- tool('intersect','Intersect','intersect','Intersectar dos cajas sin rotación')+
- '</div>'+
+ tool('intersect','Intersect','intersect','Intersectar dos cajas sin rotación')+'</div></div>'+
  tool('sketch','Croquis','view')+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
@@ -394,7 +423,8 @@ function build(){
  ['n','s','e','w','ne','nw','se','sw'].map(function(d){
   return '<div class="archGrip '+d+'" data-arch-grip="'+d+'" title="Arrastrá para cambiar el tamaño" aria-hidden="true"></div>';
  }).join('')+'</aside>'+
- '<div class="view"><nav class="viewNav" aria-label="Vistas 3D">'+
+ '<div class="view"><div class="rulerX" hidden aria-hidden="true"></div><div class="rulerY" hidden aria-hidden="true"></div>'+
+ '<div class="snapMarker" hidden aria-hidden="true"></div><nav class="viewNav" aria-label="Vistas 3D">'+
  '<div class="viewCube">'+
  '<button type="button" class="cubeFace" data-view-preset="top" title="Planta" aria-label="Planta">TOP</button>'+
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
@@ -402,8 +432,21 @@ function build(){
  '</div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
- '<aside class="side sidebar"><section class="panel"><header class="panel-title">Selection / Properties</header>'+
+ '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
+ '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
+ '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
+ '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button></div></section>'+
+ '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
  '<div class="props panel-content"></div></section></aside></div>'+
+ '<div class="draftBar"><form><label for="cad3dCommand">Command</label>'+
+ '<input type="text" id="cad3dCommand" autocomplete="off" spellcheck="false" placeholder="WALL · X,Y · @ΔX,ΔY">'+
+ '<button type="submit" class="btn" aria-label="Ejecutar comando 3D">↵</button></form>'+
+ '<button type="button" class="btn" data-draft-mode="ortho" title="Ortogonalidad · F8">ORTHO</button>'+
+ '<button type="button" class="btn" data-draft-mode="osnap" title="Extremos y puntos medios · F3">OSNAP</button>'+
+ '<button type="button" class="btn" data-draft-mode="grid" title="Grilla · F7">GRID</button>'+
+ '<button type="button" class="btn" data-draft-action="dist" title="Medir dos puntos">DIST</button>'+
+ '<output class="draftCoordinates">X 0 · Y 0 m</output></div>'+
  '<footer><span class="cad3dStatus" role="status"></span></footer>'+
  '<div class="edgeResizeR" data-resize="x" title="Arrastrar borde para ajustar ancho 3D"></div>'+
  '<div class="edgeResizeB" data-resize="y" title="Arrastrar borde para ajustar altura 3D"></div>'+
@@ -431,6 +474,18 @@ function build(){
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
+ root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
+ root.querySelector('.draftBar').addEventListener('click',function(e){
+  var mode=e.target.closest('[data-draft-mode]');
+  if(mode)toggleDraftMode(mode.dataset.draftMode);
+  if(e.target.closest('[data-draft-action="dist"]'))action('dist');
+ });
+ root.querySelector('.layerPanel select').addEventListener('change',function(){currentLayer=this.value;renderLayerPanel();});
+ root.querySelector('.layerPanel').addEventListener('click',function(e){
+  var button=e.target.closest('[data-layer-toggle]');
+  if(button)changeLayer(button.dataset.layerToggle);
+ });
+ renderDraftModes();renderLayerPanel();
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
  var palette=root.querySelector('.archPalette');
@@ -499,17 +554,51 @@ function beginResize(e){
  grip.addEventListener('pointerup',end);
  grip.addEventListener('pointercancel',end);
 }
+function layerForRecord(r){return layers.find(function(l){return l.id===(r.layerId||'0');})||layers[0];}
+function visibleRecord(r){return layerForRecord(r).visible;}
+function editableRecord(r){var layer=layerForRecord(r);return layer.visible&&!layer.locked;}
+function layerOptions(id){
+ return layers.map(function(l){return '<option value="'+escapeHtml(l.id)+'"'+(l.id===id?' selected':'')+'>'+escapeHtml(l.name)+'</option>';}).join('');
+}
+function renderLayerPanel(){
+ var panel=root.querySelector('.layerPanel'),layer=layerForRecord({layerId:currentLayer});
+ panel.querySelector('select').innerHTML=layerOptions(layer.id);
+ panel.querySelector('[data-layer-toggle=visible]').textContent=layer.visible?'Hide':'Show';
+ panel.querySelector('[data-layer-toggle=locked]').textContent=layer.locked?'Unlock':'Lock';
+}
+function changeLayer(kind){
+ if(kind==='add'){
+  var name=window.prompt('Nombre de la capa 3D','Capa '+layers.length)?.trim();
+  if(!name)return;
+  if(layers.length>=100||layers.some(function(l){return l.name.toLowerCase()===name.toLowerCase();}))return text('Usá un nombre de capa único · máximo 100 capas');
+  currentLayer='layer-'+serial++;
+  layers.push({id:currentLayer,name:name.slice(0,60),visible:true,locked:false});
+ }else{
+  var layer=layerForRecord({layerId:currentLayer});layer[kind]=!layer[kind];
+ }
+ selected=selected.filter(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});});
+ renderLayerPanel();redraw();renderProps();
+}
+function renderDraftModes(){
+ root.querySelectorAll('[data-draft-mode]').forEach(function(button){
+  button.setAttribute('aria-pressed',String(draftModes[button.dataset.draftMode]));
+ });
+}
+function toggleDraftMode(mode){
+ draftModes[mode]=!draftModes[mode];renderDraftModes();
+ if(mode==='grid'){if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';fallbackDraw();}
+ text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
+}
 function setPlacement(which){
- placing=which;wallStart=null;slabStart=null;
+ placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
  root.querySelectorAll('.solidTools button').forEach(function(b){
-  var armed=b.dataset.action===which;
-  b.classList.toggle('armed',armed);
-  if(['box','sphere','cylinder','cone'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
+  var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
+  if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
  root.querySelector('.archLaunch').classList.toggle('armed',!!ARCH_STYLES[which]);
  root.querySelector('.view').classList.toggle('placing',!!which);
- root.querySelector('.placementGuide').hidden=true;
+ root.querySelector('.placementGuide').hidden=true;root.querySelector('.snapMarker').hidden=true;
  if(!which)return;
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
@@ -517,7 +606,9 @@ function setPlacement(which){
   slab:'Losa: clic en dos esquinas opuestas',
   door:'Puerta: clic sobre un muro para insertar y abrir el vano',
   window:'Ventana: clic sobre un muro para insertar y abrir el vano',
-  opening:'Vano: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' para calar'
+  opening:'Vano: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' para calar',
+  move:'Move: elegí punto base y destino',copy:'Copy: elegí punto base y destino',
+  rotate:'Rotate: escribí los grados en Command y pulsá Enter',dist:'Distancia: elegí dos puntos'
  };
  text((instructions[which]||which.toUpperCase()+': clic en el plano de trabajo para colocar')+' · Esc cancela');
 }
@@ -555,17 +646,69 @@ function fallbackGround(e){
  if(t<0)return null;
  return {x:ray.origin[0]+ray.dir[0]*t,y:ray.origin[1]+ray.dir[1]*t,z:0};
 }
-function updatePlacementGuide(e){
- var first=wallStart||slabStart;
- if(!first)return;
- var view=root.querySelector('.view'),r=view.getBoundingClientRect(),p;
- if(fallbackCanvas)p=fallbackProjector()(first.x,first.y,first.z);
- else {
-  var projected=new T.Vector3(first.x,first.y,first.z).project(camera);
-  p={x:(projected.x+1)*r.width/2,y:(1-projected.y)*r.height/2};
+function pointOnScreen(point,view){
+ if(fallbackCanvas)return fallbackProjector()(point.x,point.y,point.z);
+ var q=new T.Vector3(point.x,point.y,point.z).project(camera);
+ return {x:(q.x+1)*view.clientWidth/2,y:(1-q.y)*view.clientHeight/2};
+}
+function worldPerPixel(view){
+ return !camera?1/fallbackScale(view.clientWidth,view.clientHeight):viewMode==='ortho'?
+  (camera.top-camera.bottom)/Math.max(1,view.clientHeight):
+  2*orbit.dist*Math.tan(camera.fov*Math.PI/360)/Math.max(1,view.clientHeight);
+}
+function renderRulers(){
+ var view=root.querySelector('.view'),xRuler=view.querySelector('.rulerX'),yRuler=view.querySelector('.rulerY');
+ var visible=activeView==='top'&&view.clientWidth>0&&!!target;
+ xRuler.hidden=yRuler.hidden=!visible;view.classList.toggle('planRulers',visible);
+ if(!visible)return;
+ var unit=worldPerPixel(view),base=Math.pow(10,Math.floor(Math.log10(unit*72))),step=[base,base*2,base*5,base*10].find(function(s){return s>=unit*72;});
+ var digits=Math.max(0,-Math.floor(Math.log10(step))),left=target.x-view.clientWidth*unit/2,top=target.y+view.clientHeight*unit/2,markup='';
+ for(var x=Math.ceil(left/step)*step;x<left+view.clientWidth*unit;x+=step){
+  if((x-left)/unit>24)markup+='<span style="left:'+((x-left)/unit).toFixed(2)+'px">'+x.toFixed(digits)+'</span>';
  }
- var guide=view.querySelector('.placementGuide'),dx=e.clientX-r.left-p.x,dy=e.clientY-r.top-p.y;
- Object.assign(guide.style,{left:p.x+'px',top:p.y+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
+ xRuler.innerHTML=markup;markup='';
+ for(var y=Math.floor(top/step)*step;y>top-view.clientHeight*unit;y-=step){
+  var px=(top-y)/unit-16;
+  if(px>=0)markup+='<span style="top:'+px.toFixed(2)+'px">'+y.toFixed(digits)+'</span>';
+ }
+ yRuler.innerHTML=markup;
+}
+function assistedPoint(p,view){
+ var x=p.x,y=p.y,snapped=false,tol=worldPerPixel(view)*9,nearest=tol*tol;
+ var axis=draftModes.ortho&&firstPoint&&['wall','move','copy'].includes(placing)?
+  Math.abs(x-firstPoint.x)>=Math.abs(y-firstPoint.y)?'x':'y':null;
+ function consider(sx,sy){
+  if(axis==='x'&&Math.abs(sy-firstPoint.y)>1e-7||axis==='y'&&Math.abs(sx-firstPoint.x)>1e-7)return;
+  var dx=sx-p.x,dy=sy-p.y,d=dx*dx+dy*dy;
+  if(d<nearest){nearest=d;x=sx;y=sy;snapped=true;}
+ }
+ if(draftModes.osnap){
+  (underlay?.segments||[]).forEach(function(s){consider(s[0],s[1]);consider(s[2],s[3]);consider((s[0]+s[2])/2,(s[1]+s[3])/2);});
+  records.forEach(function(r){
+   if(!visibleRecord(r))return;
+   if(r.type==='wall'){
+    var a=(r.rot||0)*Math.PI/180,dx=Math.cos(a)*r.w/2,dy=Math.sin(a)*r.w/2;
+    consider(r.x-dx,r.y-dy);consider(r.x+dx,r.y+dy);
+   }
+   consider(r.x,r.y);
+  });
+ }
+ if(axis==='x')y=firstPoint.y;
+ if(axis==='y')x=firstPoint.x;
+ return {x:x,y:y,z:0,snapped:snapped};
+}
+function updatePlacementGuide(e){
+ var view=root.querySelector('.view'),marker=view.querySelector('.snapMarker'),guide=view.querySelector('.placementGuide');
+ var raw=groundAt(e);
+ if(!raw){marker.hidden=true;guide.hidden=true;return;}
+ cursorPoint=placing?assistedPoint(raw,view):raw;
+ root.querySelector('.draftCoordinates').textContent='X '+cursorPoint.x.toFixed(2)+' · Y '+cursorPoint.y.toFixed(2)+' m';
+ if(!placing)return;
+ var p=pointOnScreen(cursorPoint,view);
+ Object.assign(marker.style,{left:p.x+'px',top:p.y+'px'});marker.hidden=!cursorPoint.snapped;
+ if(!firstPoint)return;
+ var start=pointOnScreen(firstPoint,view),dx=p.x-start.x,dy=p.y-start.y;
+ Object.assign(guide.style,{left:start.x+'px',top:start.y+'px',width:Math.hypot(dx,dy)+'px',transform:'rotate('+Math.atan2(dy,dx)+'rad)'});
  guide.hidden=false;
 }
 function fallbackPolygon(points,fill,stroke,width){
@@ -597,7 +740,7 @@ function fallbackDraw(){
  var projection=fallbackProjector();
  ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='sketch'?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
- if(renderStyle!=='sketch')for(var i=-20;i<=20;i++){
+ if(draftModes.grid&&renderStyle!=='sketch')for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
@@ -607,10 +750,14 @@ function fallbackDraw(){
  if(underlay?.segments?.length){
   ctx.strokeStyle='#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
   ctx.beginPath();
-  underlay.segments.forEach(function(p){var a=projection(p[0],p[1],0),b=projection(p[2],p[3],0);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);});
+  underlay.segments.forEach(function(p){
+   var a=projection(p[0],p[1],0),b=projection(p[2],p[3],0);
+   if((a.x<0&&b.x<0)||(a.x>w&&b.x>w)||(a.y<0&&b.y<0)||(a.y>h&&b.y>h))return;
+   ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+  });
   ctx.stroke();
  }
- records.forEach(function(rec){
+ records.filter(visibleRecord).forEach(function(rec){
   if(rec.type==='wall'||rec.type==='slab'){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
@@ -627,13 +774,20 @@ function fallbackDraw(){
    ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();ctx.fill();ctx.stroke();
    ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
   }else if(rec.type==='boolean'&&rec.triangles?.length){
-   var p=rec.triangles;
+   var p=rec.triangles,angle=(rec.rot||0)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
+   var vertex=function(i){return projection(rec.x+p[i]*cos-p[i+1]*sin,rec.y+p[i]*sin+p[i+1]*cos,rec.z+p[i+2]);};
    ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':'#789ab3';ctx.lineWidth=1;
    for(var i=0;i+8<p.length;i+=9){
-    var a=projection(p[i],p[i+1],p[i+2]),b=projection(p[i+3],p[i+4],p[i+5]),c=projection(p[i+6],p[i+7],p[i+8]);
+    var a=vertex(i),b=vertex(i+3),c=vertex(i+6);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
    }
   }
+ });
+}
+function scheduleFallbackDraw(){
+ if(fallbackFrame||!fallbackCanvas||root.hidden)return;
+ fallbackFrame=requestAnimationFrame(function(){
+  fallbackFrame=0;fallbackDraw();renderRulers();
  });
 }
 function beginFallback(){
@@ -686,6 +840,7 @@ function close(){
  root.hidden=true;launcher.setAttribute('aria-pressed','false');dragging=null;
  if(focused)launcher.focus({preventScroll:true});
  if(frame)cancelAnimationFrame(frame);frame=0;
+ if(fallbackFrame)cancelAnimationFrame(fallbackFrame);fallbackFrame=0;
 }
 function init(){
  scene=new T.Scene();scene.background=new T.Color(MODEL_BACKGROUND);
@@ -705,7 +860,7 @@ function init(){
  bindCanvas(renderer.domElement);resize();applyViewCamera();applyRenderStyle();
 }
 function updateCamera(){
- if(!camera){if(fallbackCanvas)fallbackDraw();return;}
+ if(!camera){scheduleFallbackDraw();return;}
  camera.up.set(0,0,1);
  if(Math.abs(orbit.el)===Math.PI/2)camera.up.set(0,1,0);
  if(viewMode==='walk'){
@@ -716,7 +871,7 @@ function updateCamera(){
    target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
   camera.lookAt(target);
  }
- camera.updateMatrixWorld();
+ camera.updateMatrixWorld();renderRulers();
  if(fallbackCanvas)fallbackDraw();
 }
 function applyViewCamera(){
@@ -736,7 +891,7 @@ function resize(){
   fallbackCanvas.width=Math.max(1,Math.round(rect.clientWidth*scale));
   fallbackCanvas.height=Math.max(1,Math.round(rect.clientHeight*scale));
   fallbackCtx.setTransform(scale,0,0,scale,0,0);
-  fallbackDraw();
+  fallbackDraw();renderRulers();
  }
  if(!renderer||!root||root.hidden)return;
  var v=root.querySelector('.view');if(v.clientWidth<2||v.clientHeight<2)return;
@@ -785,7 +940,7 @@ function bindCanvas(el){
     updateCamera();
    }
   }
-  updatePlacementGuide(e);
+  if(!dragging?.moved)updatePlacementGuide(e);
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
@@ -818,7 +973,7 @@ function groundAt(e){
 function fallbackHostHit(e,type){
  var ray=fallbackRayAt(e),nearest=null,near=Infinity;
  records.forEach(function(r){
-  if(r.type!==type)return;
+  if(r.type!==type||!editableRecord(r))return;
   var a=(r.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
   var x=ray.origin[0]-r.x,y=ray.origin[1]-r.y;
   var origin=[x*c+y*s,-x*s+y*c,ray.origin[2]-r.z];
@@ -843,7 +998,7 @@ function hostHitAt(e,type){
  if(fallbackCanvas)return fallbackHostHit(e,type);
  rayAt(e);var meshes=[];
  modelRoot.children.forEach(function(group){
-  if(records.some(function(r){return r.id===group.userData.owner&&r.type===type;})){
+  if(records.some(function(r){return r.id===group.userData.owner&&r.type===type&&editableRecord(r);})){
    group.traverse(function(o){if(o.isMesh)meshes.push(o);});
   }
  });
@@ -876,35 +1031,61 @@ function placeOpening(e){
 function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
  if(['door','window','opening'].includes(placing)){placeOpening(e);return;}
- var pt=groundAt(e);if(!pt){text('Elegí Planta o Isométrica para dibujar sobre el plano Z=0');return;}
- if(placing==='wall'){
-  if(!wallStart){wallStart=pt;updatePlacementGuide(e);text('Muro: clic en el extremo final');return;}
-  var dx=pt.x-wallStart.x,dy=pt.y-wallStart.y;
-  if(Math.hypot(dx,dy)<.05){text('WALL 3D: elegí un segundo punto distinto');return;}
-  var wall=newRecord('wall');var st=archStyle('wall',activePreset.wall);wall.styleId=st.id;wall.d=st.d;wall.h=st.h;wall.x=(wallStart.x+pt.x)/2;wall.y=(wallStart.y+pt.y)/2;wall.w=Math.hypot(dx,dy);wall.rot=Math.atan2(dy,dx)*180/Math.PI;wall.z=0;
-  records.push(wall);selected=[wall.id];redraw();renderProps();setPlacement(null);text('WALL 3D: muro paramétrico dibujado; longitud '+wall.w.toFixed(2)+' m');return;
- }
- if(placing==='slab'){
-  if(!slabStart){slabStart=pt;updatePlacementGuide(e);text('Losa: clic en la esquina opuesta');return;}
-  var st=archStyle('slab',activePreset.slab),rec=newRecord('slab');
-  rec.styleId=st.id;rec.slabKind=st.slabKind;rec.pitch=st.pitch;rec.w=Math.max(.05,Math.abs(pt.x-slabStart.x));rec.d=Math.max(.05,Math.abs(pt.y-slabStart.y));rec.h=st.h;
-  rec.x=(pt.x+slabStart.x)/2;rec.y=(pt.y+slabStart.y)/2;rec.z=st.slabKind==='roof'?2.8:0;
-  records.push(rec);selected=[rec.id];redraw();renderProps();setPlacement(null);text('SLAB paramétrica: '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m · '+st.name);return;
- }
+ if(placing==='rotate'){root.querySelector('#cad3dCommand').focus();return;}
+ var pt=groundAt(e);if(!pt){text('Elegí Planta o Isométrica para trabajar sobre Z=0');return;}
+ placePoint(assistedPoint(pt,root.querySelector('.view')));updatePlacementGuide(e);
+}
+function placePoint(pt){
  var kind=placing;
- if(!['box','sphere','cylinder','cone'].includes(kind))return;
- var created=newRecord(kind);created.x=pt.x;created.y=pt.y;created.z=0;records.push(created);selected=[created.id];
- redraw();renderProps();setPlacement(null);text(kind.toUpperCase()+' ubicado en X '+pt.x.toFixed(2)+' Y '+pt.y.toFixed(2));
+ if(['wall','slab','move','copy','dist'].includes(kind)&&!firstPoint){
+  firstPoint=pt;
+  text(kind==='wall'?'Muro: indicá el extremo final':kind==='slab'?'Losa: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
+ }
+ if(kind==='dist'){
+  var length=Math.hypot(pt.x-firstPoint.x,pt.y-firstPoint.y);
+  setPlacement(null);text('Distancia: '+length.toFixed(4)+' m');return;
+ }
+ if(kind==='move'||kind==='copy'){
+  var ids=new Set(selected),dx=pt.x-firstPoint.x,dy=pt.y-firstPoint.y,moved=[];
+  records.filter(function(r){return ids.has(r.id)&&editableRecord(r);}).forEach(function(r){
+   var dest=kind==='copy'?JSON.parse(JSON.stringify(r)):r;
+   if(kind==='copy'){
+    dest.id=serial++;dest.openings?.forEach(function(o){o.id=serial++;});records.push(dest);
+   }
+   dest.x+=dx;dest.y+=dy;moved.push(dest.id);
+  });
+  selected=moved;redraw();renderProps();setPlacement(null);text(moved.length+' objeto(s) '+(kind==='copy'?'copiados':'movidos'));return;
+ }
+ if(!editableRecord({layerId:currentLayer}))return text('Activá una capa visible y desbloqueada para dibujar');
+ var rec;
+ if(kind==='wall'){
+  var dx=pt.x-firstPoint.x,dy=pt.y-firstPoint.y;
+  if(Math.hypot(dx,dy)<.05){text('Muro: elegí un segundo punto distinto');return;}
+  var wallStyle=archStyle('wall',activePreset.wall);rec=newRecord('wall');
+  Object.assign(rec,{styleId:wallStyle.id,d:wallStyle.d,h:wallStyle.h,x:(firstPoint.x+pt.x)/2,y:(firstPoint.y+pt.y)/2,
+   w:Math.hypot(dx,dy),rot:Math.atan2(dy,dx)*180/Math.PI,z:0});
+ }else if(kind==='slab'){
+  var slabStyle=archStyle('slab',activePreset.slab);rec=newRecord('slab');
+  Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
+   w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
+   x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:slabStyle.slabKind==='roof'?2.8:0});
+ }else if(['box','sphere','cylinder','cone'].includes(kind)){
+  rec=newRecord(kind);rec.x=pt.x;rec.y=pt.y;
+ }
+ if(!rec)return;
+ records.push(rec);selected=[rec.id];redraw();renderProps();setPlacement(null);
+ text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'?'Losa dibujada · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
 }
 function selectAt(e){
  if(fallbackCanvas){
   var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34,projection=fallbackProjector();
-  records.forEach(function(rec){
+  var wallOrSlab=fallbackHostHit(e,'wall')||fallbackHostHit(e,'slab');
+  records.filter(editableRecord).forEach(function(rec){
    var p=projection(rec.x,rec.y,rec.z+(rec.h||rec.radius||1)*.5);
    var distance=Math.hypot((e.clientX-r.left)-p.x,(e.clientY-r.top)-p.y);
    if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
   });
-  var id=best?.id;
+  var id=wallOrSlab?.host.id??best?.id;
   if(id==null){if(!e.shiftKey)selected=[];}
   else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
   else selected=[id];
@@ -916,7 +1097,8 @@ function selectAt(e){
  raycaster.setFromCamera(p,camera);
  var hits=[];modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
- var id=intersects.length?intersects[0].object.userData.owner:null;
+ var hit=intersects.find(function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});});
+ var id=hit?hit.object.userData.owner:null;
  if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
  renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
 }
@@ -988,7 +1170,7 @@ function disposeMeshes(group){
 }
 function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
- if(!modelRoot)records.forEach(function(record){group.add(buildObject(record));});
+ if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
  try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
@@ -997,7 +1179,7 @@ function redraw(){
  if(fallbackCanvas){fallbackDraw();return;}
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
- modelRoot.clear();records.forEach(function(record){modelRoot.add(buildObject(record));});
+ modelRoot.clear();records.filter(visibleRecord).forEach(function(record){modelRoot.add(buildObject(record));});
  modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();
 }
 function highlight(){
@@ -1010,7 +1192,7 @@ function highlight(){
 }
 function newRecord(type){
  var n=records.length;
- return {id:serial++,type:type,x:(n%4)*1.65-2.5,y:Math.floor(n/4)*2.6-1,z:0,
+ return {id:serial++,type:type,layerId:currentLayer,x:(n%4)*1.65-2.5,y:Math.floor(n/4)*2.6-1,z:0,
  rot:0,w:type==='wall'?4:2,d:type==='wall'?.22:2,h:type==='wall'?2.8:type==='slab'?.20:2,radius:1,pitch:0,slabKind:'floor',openings:[]};
 }
 function styleOptions(kind,id){
@@ -1022,7 +1204,8 @@ function renderProps(){
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
- var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>';
+ var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
+  '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
  if(host)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
  var keys=['x','y','z'];
@@ -1050,8 +1233,13 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style]'))return;
- var r=records.find(function(v){return selected.includes(v.id);});if(!r)return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer]'))return;
+ var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('select[data-object-layer]')){
+  if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
+  if(!editableRecord(r))selected=[];
+  redraw();renderProps();text('Capa del objeto actualizada');return;
+ }
  if(input.matches('select[data-object-style]')){
   var st=ARCH_STYLES[r.type].find(function(s){return s.id===input.value;});
   r.styleId=st?.id||'';
@@ -1121,7 +1309,7 @@ function booleanBox(kind){
  }
  if(!triangles.length){text('Operación booleana sin volumen resultante');return;}
  records=records.filter(function(r){return r.id!==a.id&&r.id!==b.id;});
- var result={id:serial++,type:'boolean',x:0,y:0,z:0,rot:0,triangles:triangles};
+ var result={id:serial++,type:'boolean',layerId:a.layerId||'0',x:0,y:0,z:0,rot:0,triangles:triangles};
  records.push(result);selected=[result.id];redraw();renderProps();text('BOOLEAN '+kind.toUpperCase()+' · resultado 3D generado');
 }
 
@@ -1134,7 +1322,7 @@ function applyRenderStyle(){
   var btn=root.querySelector('[data-action="sketch"]');btn?.classList.toggle('sketchActive',renderStyle==='sketch');
  }
  if(scene)scene.background=new T.Color(renderStyle==='sketch'?0xf3f1e8:MODEL_BACKGROUND);
- if(gridHelper)gridHelper.visible=renderStyle!=='sketch';
+ if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';
  if(axesHelper)axesHelper.visible=renderStyle!=='sketch';
  if(!modelRoot)return;
  modelRoot.traverse(function(m){
@@ -1230,18 +1418,67 @@ function setViewPreset(key){
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
 }
+function run3DCommand(){
+ var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
+ if(!raw)return;
+ var upper=raw.toUpperCase(),number=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+ if(placing==='rotate'&&number.test(raw)){
+  var angle=Number(raw);
+  if(!Number.isFinite(angle))return text('Ingresá un ángulo válido');
+  records.filter(function(r){return selected.includes(r.id)&&editableRecord(r);}).forEach(function(r){r.rot=((r.rot||0)+angle)%360;});
+  redraw();renderProps();setPlacement(null);text('Rotación aplicada · '+angle+'°');return;
+ }
+ var relative=raw.startsWith('@'),xy=raw.replace(/^@/,'').split(',').map(function(v){return v.trim();});
+ if(placing&&xy.length===2&&xy.every(function(v){return number.test(v);})&&!['door','window','opening','rotate'].includes(placing)){
+  var x=Number(xy[0]),y=Number(xy[1]);
+  if(!Number.isFinite(x)||!Number.isFinite(y))return text('Ingresá coordenadas válidas');
+  if(relative&&!firstPoint)return text('Indicá primero un punto base para usar coordenadas relativas');
+  if(relative){x+=firstPoint.x;y+=firstPoint.y;}
+  placePoint({x:x,y:y,z:0});return;
+ }
+ if(firstPoint&&number.test(raw)&&['wall','move','copy','dist'].includes(placing)){
+  var distance=Number(raw),p=cursorPoint||firstPoint,dx=p.x-firstPoint.x,dy=p.y-firstPoint.y,len=Math.hypot(dx,dy);
+  if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
+  placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
+ }
+ var aliases={MURO:'wall',LOSA:'slab',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
+ var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
+ if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
+ if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
+ if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
+ if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
+ if(command==='pan'){text('Paneo: arrastrá con el botón central o derecho');return;}
+ if(!action(command))text('Comando 3D desconocido: '+raw);
+}
 function action(a){
- if(['box','sphere','cylinder','cone'].includes(a)||ARCH_STYLES[a]){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
- if(['union','subtract','intersect'].includes(a))return booleanBox(a);
- if(a==='sketch')return setSketchStyle(renderStyle==='sketch'?'shaded':'sketch');
- if(a==='shot')return exportViewPNG();
- if(a==='sketchSvg')return exportSketchSVG();
- if(a==='obj')return exportOBJ();
- if(a==='dxf')return exportDXF();
- if(a==='json')return exportJSON();
- if(a==='open')root.querySelector('.fileInput').click();
- if(a==='cad')root.querySelector('.cadInput').click();
- if(a==='plan')useOpenCAD2D();
+ if(['box','sphere','cylinder','cone','dist'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
+  if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
+  else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
+  return true;
+ }
+ if(['move','copy','rotate','erase'].includes(a)){
+  if(!selected.some(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});})){text('Seleccioná los objetos que querés modificar');return true;}
+  if(a==='erase'){
+   records=records.filter(function(r){return !selected.includes(r.id)||!editableRecord(r);});
+   selected=[];setPlacement(null);redraw();renderProps();text('Objetos eliminados');
+  }else{
+   setPlacement(a);
+   if(a==='rotate')root.querySelector('#cad3dCommand').focus();
+  }
+  return true;
+ }
+ if(['union','subtract','intersect'].includes(a)){setPlacement(null);booleanBox(a);return true;}
+ if(a==='sketch')setSketchStyle(renderStyle==='sketch'?'shaded':'sketch');
+ else if(a==='shot')exportViewPNG();
+ else if(a==='sketchSvg')exportSketchSVG();
+ else if(a==='obj')exportOBJ();
+ else if(a==='dxf')exportDXF();
+ else if(a==='json')exportJSON();
+ else if(a==='open')root.querySelector('.fileInput').click();
+ else if(a==='cad')root.querySelector('.cadInput').click();
+ else if(a==='plan')useOpenCAD2D();
+ else return false;
+ return true;
 }
 function download(filename,content,type){
  var blob=new Blob([content],{type:type||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob);
@@ -1260,7 +1497,7 @@ function trianglesWorld(fn){
  });
 }
 function exportOBJ(){
- if(!records.length)return text('No hay objetos 3D para exportar');
+ if(!records.some(visibleRecord))return text('No hay objetos 3D visibles para exportar');
  if(!T)return text('El motor de geometría 3D todavía no está disponible');
  var result=['# BLACKLINE CAD3D OBJ · triangulated surface · meters','# CAD3D parametric metadata is preserved only in .3djson'];var index=1,previous=null;
  trianglesWorld(function(points,owner){
@@ -1271,7 +1508,7 @@ function exportOBJ(){
  download('blackline-cad3d.obj',result.join('\n')+'\n');text('OBJ exportado · '+(index-1)+' vértices');
 }
 function exportDXF(){
- if(!records.length)return text('No hay geometría 3D');
+ if(!records.some(visibleRecord))return text('No hay geometría 3D visible');
  if(!T)return text('El motor de geometría 3D todavía no está disponible');
  var lines=['0','SECTION','2','HEADER','9','$ACADVER','1','AC1015','9','$INSUNITS','70','6','0','ENDSEC','0','SECTION','2','ENTITIES'],count=0;
  trianglesWorld(function(points){
@@ -1400,7 +1637,7 @@ async function importCADFile(ev){
  }catch(e){if(request===importSequence)text('Error importando plano: '+(e.message||e));}
 }
 function exportJSON(){
- var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay};
+ var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer};
  download('blackline-cad3d.3djson',JSON.stringify(data,null,2),'application/json');text('Modelo editable .3DJSON exportado');
 }
 async function readJSON(e){
@@ -1410,9 +1647,16 @@ async function readJSON(e){
   var data=JSON.parse(await file.text());
   if(request!==importSequence)return;
   if(data.format!=='BLACKLINE-CAD3D-1'||!Array.isArray(data.records)||data.records.length>1000)throw Error('Formato o contenido inválido');
+  var importedLayers=[{id:'0',name:'0',visible:true,locked:false}];
+  if(Array.isArray(data.layers))data.layers.slice(0,100).forEach(function(l){
+   if(!l||typeof l.id!=='string'||!l.id||l.id.length>60)return;
+   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true};
+   if(l.id==='0')importedLayers[0]=layer;
+   else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
+  });
   var accepted=['box','sphere','cone','cylinder','wall','slab','boolean'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
-   var o={id:finite(r.id,0),type:r.type,x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
+   var o={id:finite(r.id,0),type:r.type,layerId:importedLayers.some(function(l){return l.id===r.layerId;})?r.layerId:'0',x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
     styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
@@ -1429,8 +1673,9 @@ async function readJSON(e){
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
-  records=sanitized;
-  underlay=null;
+  records=sanitized;layers=importedLayers;
+  currentLayer=layers.some(function(l){return l.id===data.currentLayer;})?data.currentLayer:'0';
+  renderLayerPanel();underlay=null;
   if(data.underlay&&Array.isArray(data.underlay.segments)&&data.underlay.segments.length<=30000){
    var valid=data.underlay.segments.filter(function(v){return Array.isArray(v)&&v.length===4&&v.every(function(n){return typeof n==='number'&&Number.isFinite(n)&&Math.abs(n)<1000000;});});
    underlay={name:String(data.underlay.name||'Imported reference').slice(0,150),segments:valid};
@@ -1438,50 +1683,40 @@ async function readJSON(e){
   setPlacement(null);showArchPalette(false);
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
-  var ids=records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));});
+  var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));}));
   serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
-document.addEventListener('keydown',function(e){
- if(e.key==='Escape'&&root&&!root.hidden&&placing){setPlacement(null);text('Colocación 3D cancelada');}
-});
-
-/* Walk only when the 3D viewport is focused, never alter CAD2D commands. */
 window.addEventListener('keydown',function(ev){
- if(viewMode!=='walk'||!root||root.hidden)return;
- var focused=document.activeElement;
- if(!focused||!root.contains(focused)||focused.tagName==='INPUT'||focused.tagName==='SELECT'||focused.tagName==='TEXTAREA')return;
- var k=ev.key.toLowerCase();
- if(!['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k))return;
- ev.preventDefault();ev.stopImmediatePropagation();
- var step=ev.shiftKey?1:.25;
- var fwd=(k==='w'||k==='arrowup')?1:(k==='s'||k==='arrowdown')?-1:0;
- var side=(k==='a'||k==='arrowleft')?-1:(k==='d'||k==='arrowright')?1:0;
- target.x+=(-Math.cos(orbit.az)*fwd+Math.sin(orbit.az)*side)*step;
- target.y+=(-Math.sin(orbit.az)*fwd-Math.cos(orbit.az)*side)*step;
- applyViewCamera();if(fallbackCanvas)fallbackDraw();
-},true);
-
-/* Window-capture keyboard routing prevents the underlying CAD2D command line
-   from stealing pedestrian navigation while the floating 3D viewport is open. */
-window.addEventListener('keydown',function(ev){
- if(!root||root.hidden)return;
- if(ev.key==='Escape'&&placing){
-  ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');return;
+ if(!root||root.hidden||!root.contains(document.activeElement))return;
+ var mode={F3:'osnap',F7:'grid',F8:'ortho'}[ev.key];
+ if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
+ if(ev.key==='Escape'){
+  if(placing){ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');}
+  else if(!root.querySelector('.archPalette').hidden){ev.preventDefault();ev.stopImmediatePropagation();showArchPalette(false);}
+  return;
  }
- if(viewMode!=='walk'||ev.ctrlKey||ev.metaKey||ev.altKey)return;
- if(ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
+ if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
  var key=ev.key.toLowerCase();
- if(!['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key))return;
- ev.preventDefault();ev.stopImmediatePropagation();
- var speed=ev.shiftKey?1.5:.5,a=orbit.az;
- if(key==='w'||key==='arrowup'){target.x-=Math.cos(a)*speed;target.y-=Math.sin(a)*speed;}
- else if(key==='s'||key==='arrowdown'){target.x+=Math.cos(a)*speed;target.y+=Math.sin(a)*speed;}
- else if(key==='a'){target.x-=Math.sin(a)*speed;target.y+=Math.cos(a)*speed;}
- else if(key==='d'){target.x+=Math.sin(a)*speed;target.y-=Math.cos(a)*speed;}
- else if(key==='arrowleft')orbit.az+=.11;
- else if(key==='arrowright')orbit.az-=.11;
- updateCamera();
+ if(viewMode==='walk'&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  var step=ev.shiftKey?1:.25;
+  var fwd=(key==='w'||key==='arrowup')?1:(key==='s'||key==='arrowdown')?-1:0;
+  var side=(key==='a'||key==='arrowleft')?-1:(key==='d'||key==='arrowright')?1:0;
+  target.x+=(-Math.cos(orbit.az)*fwd+Math.sin(orbit.az)*side)*step;
+  target.y+=(-Math.sin(orbit.az)*fwd-Math.cos(orbit.az)*side)*step;
+  applyViewCamera();return;
+ }
+ if(key==='delete'||key==='backspace'){
+  ev.preventDefault();ev.stopImmediatePropagation();action('erase');return;
+ }
+ if(key==='+'||key==='-'){
+  ev.preventDefault();ev.stopImmediatePropagation();orbit.dist=clamp(orbit.dist*(key==='+'?.8:1.25),1.4,450);applyViewCamera();return;
+ }
+ if(/^[a-z0-9@.,-]$/i.test(ev.key)){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  var input=root.querySelector('#cad3dCommand');input.focus({preventScroll:true});input.value+=ev.key;
+ }
 },true);
 
 window.BlacklineCAD3D=Object.freeze({open:open,close:close,get enabled(){return !!root&&!root.hidden;},get experimental(){return true;}});

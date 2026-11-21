@@ -895,6 +895,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  window.addEventListener('keydown',function(ev){
   if(ev.defaultPrevented || ev.isComposing || ev.ctrlKey || ev.metaKey || ev.altKey ||
      modalOpen() || window.CAD2D_GRIP_TYPING || window.CAD2D_OPENING_TYPING)return;
+  if(ev.target?.closest?.('#cad3dLab'))return;
   if(window.CAD2D_CORE?.zoomShortcut(ev))return;
   if(ev.key.length!==1||ev.key===' ')return;
   const target=ev.target;
@@ -1729,8 +1730,12 @@ function cadDrawMeasureTag(){
  ctx.fillStyle='#e9dcc7';ctx.font='500 11px Inter,Arial,sans-serif';ctx.fillText(info.sub,cx,y+36);
  ctx.restore();
 }
-function draw(){drawPending=false;try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
- for(const e of state.entities.filter(entity=>entity.type==='hatch'&&!entity.onTop)){if(layerFor(e).visible&&!e.cadHidden)drawEntity(e)}
+function draw(){drawPending=false;
+ if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
+ let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+ for(const e of state.entities){
+  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&inViewport(e,w,h))drawEntity(e);
+ }
  for(const e of state.entities){
   if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
   if(fastView
@@ -5226,7 +5231,15 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   if(cadSelectionAnchor){state.drag.type='selectionSecond';return}
   const e=pick(world(raw));if(!e)state.drag.type='selectionStart';
  } });
-canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);pointer=raw;state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;const d=state.drag;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
+canvas.addEventListener('pointermove',ev=>{
+ const raw=P(ev.offsetX,ev.offsetY),d=state.drag;pointer=raw;
+ if(d?.type==='pan'){
+  state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y;
+  state.mouse=world(raw);
+  $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
+  schedule();return;
+ }
+ state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
   if(window.BlacklineWallGrip){
@@ -5254,8 +5267,7 @@ canvas.addEventListener('pointermove',ev=>{const raw=P(ev.offsetX,ev.offsetY);po
     }else obj.p=P(d.original.x+target.x-d.vertex.x,d.original.y+target.y-d.vertex.y);
    }
   }
- }else if(d.type==='pan'){state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y}
- else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
+ }else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
  }schedule()});
 canvas.addEventListener('pointerup',ev=>{
@@ -5315,6 +5327,7 @@ canvas.addEventListener('pointerup',ev=>{
   return;
  }
  if(d.type==='pan'){
+  schedule();
   if(d.middle){
    const movement=dist(raw,d.start);
    if(movement<=5){
@@ -10363,5 +10376,5 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261120-1850"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script defer src="cad3d-lab.js?v=20261121-4"></script>
+<script defer src="cad3d-lab.js?v=20261121-5"></script>
 </body></html>
