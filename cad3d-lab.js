@@ -645,7 +645,7 @@ function setPlacement(which){
  if(!which)return;
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
-  wall:'Muro: clic en el primer extremo y después en el segundo',
+  wall:'Muro continuo: clic en cada vértice para seguir dibujando · Enter finaliza · Esc cancela',
   slab:'Losa: clic en dos esquinas opuestas',floor:'Piso: dos esquinas de la plataforma, medidas editables en Properties',
   door:'Puerta: clic sobre un muro para insertar y abrir el vano',
   window:'Ventana: clic sobre un muro para insertar y abrir el vano',
@@ -1117,7 +1117,16 @@ function placePoint(pt){
   rec=newRecord(kind);rec.x=pt.x;rec.y=pt.y;
  }
  if(!rec)return;
- records.push(rec);selected=[rec.id];redraw();renderProps();setPlacement(null);
+ records.push(rec);selected=[rec.id];redraw();renderProps();
+ if(kind==='wall'){
+  // Continue exactly from the last vertex, like LINE / PLINE.
+  // Keep each wall as an editable 3D solid so doors/windows remain parametric.
+  firstPoint={x:pt.x,y:pt.y,z:pt.z||0};
+  cursorPoint=null;
+  text('Muro '+rec.w.toFixed(2)+' m creado · próximo tramo desde este vértice · Enter finaliza / Esc cancela');
+  return;
+ }
+ setPlacement(null);
  text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'||kind==='floor'?'Losa / Piso dibujado · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
 }
 function selectAt(e){
@@ -1490,7 +1499,10 @@ function updateDynamicReadout(e){
 }
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
- if(!raw)return;
+ if(!raw){
+  if(placing==='wall'){setPlacement(null);text('Muro continuo finalizado · Enter para reiniciar WALL');}
+  return;
+ }
  var upper=raw.toUpperCase(),number=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
  if(placing==='rotate'&&number.test(raw)){
   var angle=Number(raw);
@@ -1763,6 +1775,11 @@ window.addEventListener('keydown',function(ev){
  if(!root||root.hidden||!root.contains(document.activeElement))return;
  var mode={F3:'osnap',F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
+ if(ev.key==='Enter'&&placing==='wall'&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  setPlacement(null);text('Muro continuo finalizado');
+  return;
+ }
  if(ev.key==='Escape'){
   if(placing){ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');}
   else if(!root.querySelector('.archPalette').hidden){ev.preventDefault();ev.stopImmediatePropagation();showArchPalette(false);}
