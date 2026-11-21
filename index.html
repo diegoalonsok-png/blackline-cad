@@ -1672,7 +1672,7 @@ function draw(){drawPending=false;try{cadSyncAssocDims()}catch(err){console.warn
   if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
-  const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||snapPoint(state.mouse);
+  const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,state.mouse);
   const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
   if(candidate){drawEntity(candidate,'#ffce78');cadGripLabel(job,candidate,dest)}
  }
@@ -4837,12 +4837,42 @@ function cadPrimitiveGripHit(raw){
 // Pinzamiento de vértice: muestra la longitud y cuánto se estira (como la entrada dinámica de AutoCAD)
 // y acepta una longitud escrita: 2.5 ⏎ deja la línea en 2,50 m hacia donde apunta el mouse.
 let cadGripTyped='';
+// Grip edits must have their own ORTHO/OTRACK constraint: unlike LINE, SELECT
+// has no state.stage base point. Keep preview, typed length and commit identical.
+function cadGripTrackingDestination(job,point){
+ const snapped=snapPoint(point);
+ if(!job||(!state.orthoOn&&!otrkOn))return snapped;
+ const e=job.original,g=job.grip;
+ if(!e||!g)return snapped;
+ let base=null,axis=null;
+ if(e.type==='line'&&g.kind==='vertex'){
+  base=g.index===0?e.b:e.a;
+  const dx=g.p.x-base.x,dy=g.p.y-base.y;
+  if(otrkOn){if(Math.abs(dy)<1e-8)axis='h';else if(Math.abs(dx)<1e-8)axis='v'}
+ }else if(e.type==='polyline'&&g.kind==='vertex'){
+  const nb=cadGripNeighbours(e,g);
+  if(nb.length===1){base=nb[0];const dx=g.p.x-base.x,dy=g.p.y-base.y;
+   if(otrkOn){if(Math.abs(dy)<1e-8)axis='h';else if(Math.abs(dx)<1e-8)axis='v'}
+  }
+ }
+ if(!base)base=g.p;
+ if(!axis&&state.orthoOn){
+  const dx=snapped.x-base.x,dy=snapped.y-base.y;
+  axis=Math.abs(dx)>=Math.abs(dy)?'h':'v';
+ }
+ if(!axis)return snapped;
+ const target=axis==='h'?P(snapped.x,base.y):P(base.x,snapped.y);
+ if(otrkOn&&trackingEligible()){
+  otrkGuide={point:target,horizontal:axis==='h'?base:null,vertical:axis==='v'?base:null,intersection:false};
+ }
+ return target;
+}
 function cadGripTypedDest(job){
  const v=Number(cadGripTyped);if(!cadGripTyped||!(v>0))return null;
  const e=job.original,g=job.grip;
- if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=snapPoint(state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
- const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=snapPoint(state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
- const m=snapPoint(state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
+ if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=cadGripTrackingDestination(job,state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=cadGripTrackingDestination(job,state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const m=cadGripTrackingDestination(job,state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
 }
 function cadGripNeighbours(e,g){
  if(e.type!=='polyline'||g.kind!=='vertex')return [];const p=e.pts,i=g.index,n=p.length,out=[];
@@ -5115,13 +5145,13 @@ canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
  if(d.type==='primitiveGripStart'){
-  if(dist(raw,d.start)>5){cadPrimitiveGripCommit(d.job,snapPoint(world(raw)));schedule()}
+  if(dist(raw,d.start)>5){cadPrimitiveGripCommit(d.job,cadGripTrackingDestination(d.job,world(raw)));schedule()}
   else{cadPrimitiveGripPlacement=d.job;canvas.style.cursor='crosshair';schedule();toast('Grip activo · mové el mouse, clic para confirmar o Esc para cancelar')}
   return;
  }
  if(d.type==='primitiveGripPlace'){
   const job=cadPrimitiveGripPlacement;cadPrimitiveGripPlacement=null;canvas.style.cursor='';
-  if(job){const typed=cadGripTypedDest(job);cadGripTyped='';cadPrimitiveGripCommit(job,typed||snapPoint(world(raw)))}
+  if(job){const typed=cadGripTypedDest(job);cadGripTyped='';cadPrimitiveGripCommit(job,typed||cadGripTrackingDestination(job,world(raw)))}
   schedule();return;
  }
  if(d.type==='vertexMoveStart'){
