@@ -3038,16 +3038,16 @@ function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,f
   }
   return;
  }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
-  ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();ctx.setLineDash([]);
+  ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();for(const hole of e.holes||[]){if(hole?.length>2){tracePath({type:'polyline',pts:hole,closed:true});ctx.closePath()}}ctx.setLineDash([]);
   if(cadIsGradient(e)&&!forceColor&&!isSelected){
    const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y),c=screen(P((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2));
    const R=Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2*state.view.scale||1,a=(Number(e.hatchAngle)||0)*Math.PI/180;
    const g=e.hatchStyle==='gradient-radial'?ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,R):ctx.createLinearGradient(c.x-Math.cos(a)*R,c.y+Math.sin(a)*R,c.x+Math.cos(a)*R,c.y-Math.sin(a)*R);
-   g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill();
+   g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill('evenodd');
   }
-  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill()}
+  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill('evenodd')}
   else{
-   ctx.save();ctx.clip();ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
+   ctx.save();ctx.clip('evenodd');ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
    for(const segment of cadHatchPatternPrimitives(e,6000)){
     ctx.beginPath();const a=screen(segment.a),b=screen(segment.b);
     ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
@@ -4125,13 +4125,43 @@ function cadHatchLineLoops(){
  }
  return loops;
 }
+function cadHatchContainedIslands(outer){
+ if(!outer?.length)return [];
+ const outerArea=cadHatchPolygonArea(outer),result=[],seen=new Set();
+ // Ignore open geometry. Retain every fully nested closed loop for even-odd island parity.
+ const candidates=[];
+ for(const e of state.entities){
+  if(!layerFor(e).visible||e.cadHidden||e.type==='hatch')continue;
+  if(e.type==='blockRef'){
+   for(const part of cadBlockChildrenCached(e))candidates.push(part);
+  }else candidates.push(e);
+ }
+ for(const e of candidates){
+  const pts=hatchBoundaryVertices(e);
+  if(!pts||pts.length<3||cadHatchPolygonArea(pts)>=outerArea-1e-8)continue;
+  // All vertices must be inside, never merely intersecting the exterior.
+  if(!pts.every(p=>cadHatchPointInPolygon(p,outer)))continue;
+  const bounds=pts.reduce((b,p)=>({minX:Math.min(b.minX,p.x),minY:Math.min(b.minY,p.y),maxX:Math.max(b.maxX,p.x),maxY:Math.max(b.maxY,p.y)}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+  const key=[bounds.minX,bounds.minY,bounds.maxX,bounds.maxY,cadHatchPolygonArea(pts)].map(n=>n.toFixed(6)).join(':');
+  if(!seen.has(key)){seen.add(key);result.push(clone(pts))}
+ }
+ for(const loop of cadHatchLineLoops()){
+  const pts=loop.pts;
+  if(pts?.length>=3&&cadHatchPolygonArea(pts)<outerArea-1e-8&&pts.every(p=>cadHatchPointInPolygon(p,outer))){
+   const b=pts.reduce((q,p)=>({minX:Math.min(q.minX,p.x),minY:Math.min(q.minY,p.y),maxX:Math.max(q.maxX,p.x),maxY:Math.max(q.maxY,p.y)}),{minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity});
+   const key=[b.minX,b.minY,b.maxX,b.maxY,cadHatchPolygonArea(pts)].map(n=>n.toFixed(6)).join(':');
+   if(!seen.has(key)){seen.add(key);result.push(clone(pts))}
+  }
+ }
+ return result;
+}
 function cadHatchAtPoint(p){
  const options=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked).map(e=>({pts:hatchBoundaryVertices(e),layer:e.layer})).filter(o=>o.pts&&cadHatchPointInPolygon(p,o.pts));
  for(const loop of cadHatchLineLoops())if(cadHatchPointInPolygon(p,loop.pts))options.push(loop);
  {const face=cadFaceAtPoint(p);if(face)options.push({...face,layer:state.layerId})}
  options.sort((a,b)=>cadHatchPolygonArea(a.pts)-cadHatchPolygonArea(b.pts));
  if(!options.length)return toast('HATCH: no se encontró un contorno cerrado');
- cadHatchCreate(options.slice(0,1));
+ cadHatchCreate(options.slice(0,1),true);
 }
 function hatchBoundaryVertices(e){
  if(e.type==='rect')return [e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)];
@@ -4139,14 +4169,14 @@ function hatchBoundaryVertices(e){
  if(e.type==='circle'&&e.r>0)return Array.from({length:128},(_,i)=>P(e.c.x+e.r*Math.cos(TAU*i/128),e.c.y+e.r*Math.sin(TAU*i/128)));
  return null;
 }
-function cadHatchCreate(boundaries){
+function cadHatchCreate(boundaries,detectIslands=false){
  const style=$('hatchStyle').value,spacing=Number($('hatchSpacing').value),angle=Number($('hatchAngle').value),color=$('hatchColor').value;
  if(style!=='solid'&&!/^gradient/.test(style)&&(!Number.isFinite(spacing)||spacing<=0||!Number.isFinite(angle)))return toast('HATCH: escala o ángulo inválido');
  const created=[];
  for(const boundary of boundaries){
   const vertices=boundary.pts;if(!vertices||vertices.length<3)continue;
   if(style!=='solid'&&!/^gradient/.test(style)&&!window.BlacklineHatchPatterns?.passes(style,spacing,angle))return toast('HATCH: patrón inválido');
-  created.push({type:'hatch',pts:clone(vertices),layer:boundary.layer||state.layerId,
+  created.push({type:'hatch',pts:clone(vertices),...(detectIslands?{holes:cadHatchContainedIslands(vertices)}:{}),layer:boundary.layer||state.layerId,
    color,width:.05,hatchStyle:style,hatchSpacing:spacing,hatchAngle:angle,...(/^gradient/.test(style)?{color2:$('hatchColor2').value}:{})});
  }
  if(!created.length)return toast('HATCH: no se pudo crear el sombreado');
