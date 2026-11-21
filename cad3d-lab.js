@@ -4,7 +4,7 @@
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
-var draftModes={ortho:true,osnap:true,grid:true};
+var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var viewMode='perspective',activeView='perspective',renderStyle='shaded',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
@@ -162,6 +162,9 @@ var css=`
 #cad3dLab .view canvas { display:block; width:100%; height:100%; touch-action:none; cursor:grab }
 #cad3dLab .view canvas:active { cursor:grabbing }
 #cad3dLab .view.placing canvas { cursor:crosshair }
+#cad3dLab .dynReadout {position:absolute;z-index:4;pointer-events:none;display:none;padding:5px 8px;border:1px solid #8abed3;border-radius:6px;background:#17242deb;color:#eaf5fa;font:11px ui-monospace,Consolas,monospace;white-space:nowrap;box-shadow:0 3px 12px #0006}
+#cad3dLab .dynReadout[data-show="true"] {display:block}
+#cad3dLab .solidCheck {font-size:11px;color:var(--cad-ui-muted);margin-top:8px}
 #cad3dLab .placementGuide {
  position:absolute; z-index:1; height:0; border-top:1px dashed #f2ca79;
  transform-origin:0 0; pointer-events:none;
@@ -393,7 +396,11 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
- '<div class="solidTools" role="toolbar" aria-label="Draw y Modify">'+
+ '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
+ '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
+ tool('wall','Wall','wall')+tool('door','Door','door')+tool('window','Window','window')+
+ tool('slab','Slab','slab')+tool('opening','Opening','opening')+'</div>'+
+ '<div class="divider" aria-hidden="true"></div>'+
  '<div class="toolGroup" role="group" aria-label="Draw"><strong>Draw</strong>'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+'</div>'+
  '<div class="divider" aria-hidden="true"></div>'+
@@ -430,7 +437,7 @@ function build(){
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
  '</div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
- '<div class="placementGuide" hidden aria-hidden="true"></div></div>'+
+ '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
  '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
@@ -438,13 +445,14 @@ function build(){
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
  '<button type="button" class="btn" data-layer-toggle="locked"></button></div></section>'+
  '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
- '<div class="props panel-content"></div></section></aside></div>'+
+ '<div class="props panel-content"></div><div class="solidCheck" role="status"></div><button type="button" class="btn" data-verify-solids title="Check 3D geometry">Check 3D solids</button></section></aside></div>'+
  '<div class="draftBar"><form><label for="cad3dCommand">Command</label>'+
  '<input type="text" id="cad3dCommand" autocomplete="off" spellcheck="false" placeholder="WALL · X,Y · @ΔX,ΔY">'+
  '<button type="submit" class="btn" aria-label="Ejecutar comando 3D">↵</button></form>'+
  '<button type="button" class="btn" data-draft-mode="ortho" title="Ortogonalidad · F8">ORTHO</button>'+
  '<button type="button" class="btn" data-draft-mode="osnap" title="Extremos y puntos medios · F3">OSNAP</button>'+
- '<button type="button" class="btn" data-draft-mode="grid" title="Grilla · F7">GRID</button>'+
+ '<button type="button" class="btn" data-draft-mode="grid" title="Grilla · F7">GRID</button>'+ 
+ '<button type="button" class="btn" data-draft-mode="dyn" title="Dynamic coordinate feedback · DYN">DYN</button>'+
  '<button type="button" class="btn" data-draft-action="dist" title="Medir dos puntos">DIST</button>'+
  '<output class="draftCoordinates">X 0 · Y 0 m</output></div>'+
  '<footer><span class="cad3dStatus" role="status"></span></footer>'+
@@ -474,6 +482,7 @@ function build(){
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
+ root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
  root.querySelector('.draftBar').addEventListener('click',function(e){
   var mode=e.target.closest('[data-draft-mode]');
@@ -587,6 +596,7 @@ function renderDraftModes(){
 function toggleDraftMode(mode){
  draftModes[mode]=!draftModes[mode];renderDraftModes();
  if(mode==='grid'){if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';fallbackDraw();}
+ if(mode==='dyn'&&!draftModes.dyn)root?.querySelector('.dynReadout')?.removeAttribute('data-show');
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
@@ -599,6 +609,7 @@ function setPlacement(which){
  root.querySelector('.archLaunch').classList.toggle('armed',!!ARCH_STYLES[which]);
  root.querySelector('.view').classList.toggle('placing',!!which);
  root.querySelector('.placementGuide').hidden=true;root.querySelector('.snapMarker').hidden=true;
+ root.querySelector('.dynReadout').removeAttribute('data-show');
  if(!which)return;
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
@@ -940,13 +951,14 @@ function bindCanvas(el){
     updateCamera();
    }
   }
-  if(!dragging?.moved)updatePlacementGuide(e);
+  if(!dragging?.moved){updatePlacementGuide(e);updateDynamicReadout(e);}
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;
   if(click&&e.button===0){if(placing)placeAt(e);else selectAt(e);}
+  if(draftModes.dyn)updateDynamicReadout(e);
  });
  el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId)dragging=null;});
  el.addEventListener('wheel',function(e){
@@ -1418,6 +1430,32 @@ function setViewPreset(key){
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
 }
+function verify3DSolids(){
+ var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean']);
+ var invalid=records.filter(function(r){
+  if(!supported.has(r.type))return true;
+  var dims=r.type==='sphere'?[r.radius]:r.type==='cylinder'||r.type==='cone'?[r.radius,r.h]:r.type==='boolean'?[]:[r.w,r.d,r.h];
+  return dims.some(function(v){return !Number.isFinite(v)||v<=0;});
+ });
+ var meshCount=0,geometryValid=true;
+ if(T&&modelRoot)modelRoot.traverse(function(o){if(o.isMesh){meshCount++;var p=o.geometry?.getAttribute('position');if(!p||p.count<3)geometryValid=false;}});
+ var ok=!invalid.length&&geometryValid&&(records.length===0||!T||!modelRoot||meshCount>0);
+ var message=records.length===0?'No 3D objects yet. Create a Box, Wall or Sphere.':
+ (ok?'3D geometry OK: '+records.length+' object(s)'+(T&&modelRoot?' · '+meshCount+' mesh(es)':' · compatibility preview mode'):
+ '3D geometry warning: '+invalid.length+' invalid record(s), '+meshCount+' mesh(es).');
+ root.querySelector('.solidCheck').textContent=message;text(message);return ok;
+}
+function updateDynamicReadout(e){
+ var el=root?.querySelector('.dynReadout');if(!el)return;
+ if(!draftModes.dyn||!placing||root.hidden){el.removeAttribute('data-show');return;}
+ var point=groundAt(e);if(!point){el.removeAttribute('data-show');return;}
+ var length=firstPoint?' · L '+Math.hypot(point.x-firstPoint.x,point.y-firstPoint.y).toFixed(2)+' m':'';
+ el.textContent='X '+point.x.toFixed(2)+' · Y '+point.y.toFixed(2)+' m'+length;
+ var rect=root.querySelector('.view').getBoundingClientRect();
+ el.style.left=clamp(e.clientX-rect.left+16,8,Math.max(8,rect.width-el.offsetWidth-12))+'px';
+ el.style.top=clamp(e.clientY-rect.top+16,8,Math.max(8,rect.height-34))+'px';
+ el.dataset.show='true';
+}
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  if(!raw)return;
@@ -1444,6 +1482,7 @@ function run3DCommand(){
  var aliases={MURO:'wall',LOSA:'slab',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
+ if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
  if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
