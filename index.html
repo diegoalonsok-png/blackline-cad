@@ -938,7 +938,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 /* Lexicon-inspired styling, strictly scoped to the three color/theme controls. */
 .app .brandbar #blThemeToggle,
 .app .status #cadColorButton,
-.app .status #cadCustomColorToggle{
+.app #cadAppearanceControls #cadCustomColorToggle{
  border:1px solid #7d8995!important;
  border-radius:12px!important;
  background:var(--cad-ui-raised,#1c2630)!important;
@@ -949,18 +949,19 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 }
 .app .brandbar #blThemeToggle{width:40px!important;height:36px!important;font-size:21px!important;padding:0!important}
 .app .status #cadColorButton{padding:4px 10px!important;min-height:28px!important}
-.app .status #cadCustomColorToggle{width:30px!important;min-width:30px!important;min-height:28px!important;font-size:18px!important;padding:1px!important}
+.app #cadAppearanceControls #cadCustomColorToggle{width:30px!important;min-width:30px!important;min-height:28px!important;font-size:18px!important;padding:1px!important}
 .app .brandbar #blThemeToggle:hover,
 .app .status #cadColorButton:hover,
-.app .status #cadCustomColorToggle:hover{border-color:#b7d5e5!important;background:var(--cad-ui-toolbar,#273747)!important}
+.app #cadAppearanceControls #cadCustomColorToggle:hover{border-color:#b7d5e5!important;background:var(--cad-ui-toolbar,#273747)!important}
 .app .brandbar #blThemeToggle:focus-visible,
 .app .status #cadColorButton:focus-visible,
-.app .status #cadCustomColorToggle:focus-visible{outline:2px solid #96d8eb!important;outline-offset:2px!important}
+.app #cadAppearanceControls #cadCustomColorToggle:focus-visible{outline:2px solid #96d8eb!important;outline-offset:2px!important}
 </style>
 </head>
 <body>
 <div class="app">
  <header class="brandbar"><div class="mark">⌁</div><div class="brand">CAD2D<small>ARCHITECTURAL DRAFTING · 2D</small></div><div class="cad-header-undo-redo" role="group" aria-label="Deshacer y rehacer cambios del dibujo"><button type="button" id="cadHeaderUndo" aria-label="Deshacer (Ctrl+Z)" title="Deshacer · Undo · Ctrl+Z"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button><button type="button" id="cadHeaderRedo" aria-label="Rehacer (Ctrl+Y)" title="Rehacer · Redo · Ctrl+Y"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button></div><button type="button" class="filename cad-drawing-name" id="filename" title="Clic para cambiar el nombre del dibujo" aria-label="Nombre del dibujo: clic para renombrar">Untitled Drawing.dxf</button><label for="cadAliasLanguage" title="Perfil de alias del teclado" style="display:flex;gap:5px;align-items:center;white-space:nowrap;font-size:11px;color:#b7c9d4">Alias <select id="cadAliasLanguage" aria-label="Idioma de alias CAD" style="background:#151e26;color:#e9f2f7;border:1px solid #496071;border-radius:6px;padding:6px"><option value="en" selected>EN</option><option value="es">ES</option></select></label><div class="cad-command-finder" id="cadCommandFinder"><span class="finder-symbol">⌕</span><input type="search" id="cadCommandSearch" autocomplete="off" spellcheck="false" aria-label="Search CAD commands" aria-expanded="false" placeholder="Comandos · LINE, TRIM, DIM…"><div class="cad-command-results" id="cadCommandResults" role="listbox" hidden></div></div><div class="right">
+ <div id="cadAppearanceControls" role="group" aria-label="Theme and object color" style="display:flex;align-items:center;gap:5px;flex:none"></div>
  <button type="button" class="btn slim cad-header-primary" data-cad-header-action="openBtn">Open</button>
  <button type="button" class="btn slim cad-header-primary" data-cad-header-action="saveProjectBtn">Save</button>
  <div class="cad-header-extra" role="group" aria-label="Acciones directas">
@@ -10149,6 +10150,7 @@ function initCadQuickProperties(){
 }
 function initCadCustomObjectColor(){
  const button=$('cadCustomColorToggle'),panel=$('cadCustomColorPalette'),picker=$('cadCustomObjectColor'),hex=$('cadCustomColorHex'),hint=$('cadCustomColorHint');
+ $('cadAppearanceControls')?.append(button);
  if(!button||!panel||!picker||!hex)return;
  let historySaved=false,lastSelection='';
  const validHex=value=>/^#[0-9a-f]{6}$/i.test(value);
