@@ -5435,12 +5435,33 @@ function cadUpdateImageBar(image){
  const wrap=canvas.parentElement;
  if(!wrap)return;
  if(!cadImageBar){
-  const style=document.createElement('style');style.id='cadImageRibbonStyle';style.textContent="#cadImageControls{position:absolute;z-index:35;display:flex;align-items:center;gap:5px;padding:7px 9px;max-width:calc(100% - 24px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:#202428f5;border:2px solid #89929b;border-radius:35px;box-shadow:0 6px 18px #0009;color:#f1f5f9;font:12px system-ui;pointer-events:auto;scrollbar-width:thin} #cadImageControls[hidden]{display:none!important} #cadImageControls strong{font-size:11px;letter-spacing:.7px;margin:0 6px 0 3px;flex:0 0 auto} #cadImageControls button{flex:0 0 auto;min-width:37px;min-height:36px;border:0;border-radius:9px;padding:6px 9px;background:#101418;color:#f0f4f7;cursor:pointer;font-size:13px} #cadImageControls button:hover{background:#3a4753} #cadImageControls button:disabled{opacity:.4;cursor:default} #cadImageControls label{display:flex;align-items:center;gap:6px;margin:0 8px;white-space:nowrap} #cadImageControls input[type=range]{width:88px;accent-color:#9abed4} #cadImageControls [data-image-size]{font-size:11px;color:#bdcad4;flex:0 0 auto}";document.head.append(style);
+  const style=document.createElement('style');style.id='cadImageRibbonStyle';style.textContent="#cadImageControls{position:absolute;z-index:35;display:flex;align-items:center;gap:3px;padding:4px 6px;max-width:calc(100% - 16px);overflow-x:auto;overflow-y:hidden;white-space:nowrap;background:#202429f2;border:1px solid #737e87;border-radius:23px;box-shadow:0 4px 14px #0007;color:#e8edf3;font:11px system-ui;pointer-events:auto;scrollbar-width:none} #cadImageControls[hidden]{display:none!important} #cadImageControls::-webkit-scrollbar{display:none} #cadImageControls .cad-image-drag{flex:0 0 auto;padding:3px 4px;border:0;background:transparent;color:#aeb9c4;cursor:grab;touch-action:none;user-select:none;font-size:16px;line-height:24px} #cadImageControls .cad-image-drag:active{cursor:grabbing} #cadImageControls strong{font-size:10px;letter-spacing:.6px;margin:0 4px 0 0;flex:0 0 auto;font-weight:600} #cadImageControls button[data-image-action]{flex:0 0 auto;min-width:27px;min-height:28px;border:0;border-radius:6px;padding:3px 7px;background:#11161c;color:#eaf0f5;cursor:pointer;font-size:11px} #cadImageControls button:hover{background:#35404c} #cadImageControls button:disabled{opacity:.4;cursor:default} #cadImageControls label{display:flex;align-items:center;gap:4px;margin:0 3px;white-space:nowrap;font-size:10px} #cadImageControls input[type=range]{width:66px;accent-color:#9abed4} #cadImageControls [data-image-size]{display:none}";document.head.append(style);
   cadImageBar=document.createElement('div');cadImageBar.id='cadImageControls';cadImageBar.setAttribute('role','toolbar');cadImageBar.setAttribute('aria-label','Image controls');
-  cadImageBar.innerHTML='<strong>▣ IMAGE</strong><button type="button" data-image-action="move">Move</button><button type="button" data-image-action="scale">Scale</button><button type="button" data-image-action="front">Bring front</button><button type="button" data-image-action="back">Send back</button><label>Opacity <input data-image-opacity type="range" min="10" max="100" step="5" value="100"></label><span data-image-size></span><button type="button" data-image-action="close" title="Deselect image">×</button>';
+  cadImageBar.innerHTML='<span class="cad-image-drag" role="button" tabindex="0" aria-label="Drag image toolbar" title="Drag toolbar">⠿</span><strong>IMAGE</strong><button type="button" data-image-action="move" title="Move image">Move</button><button type="button" data-image-action="scale" title="Scale image">Scale</button><button type="button" data-image-action="front" title="Bring to front">↑</button><button type="button" data-image-action="back" title="Send to back">↓</button><label title="Image opacity">Opacity <input data-image-opacity type="range" min="10" max="100" step="5" value="100"></label><span data-image-size></span><button type="button" data-image-action="close" title="Close">×</button>';
   if(getComputedStyle(wrap).position==='static')wrap.style.position='relative';
   wrap.append(cadImageBar);
   cadImageBar.addEventListener('pointerdown',ev=>ev.stopPropagation());
+  const handle=cadImageBar.querySelector('.cad-image-drag');
+  let dragging=null;
+  handle.addEventListener('pointerdown',ev=>{
+   if(ev.button!==0)return;
+   ev.preventDefault();ev.stopPropagation();
+   dragging={id:ev.pointerId,x:ev.clientX,y:ev.clientY,left:cadImageBar.offsetLeft,top:cadImageBar.offsetTop};
+   cadImageBar.dataset.manualPosition='1';
+   handle.setPointerCapture(ev.pointerId);
+  });
+  handle.addEventListener('pointermove',ev=>{
+   if(!dragging||ev.pointerId!==dragging.id)return;
+   ev.preventDefault();
+   const maxX=Math.max(4,wrap.clientWidth-cadImageBar.offsetWidth-4);
+   const maxY=Math.max(4,wrap.clientHeight-cadImageBar.offsetHeight-4);
+   cadImageBar.style.left=Math.max(4,Math.min(maxX,dragging.left+ev.clientX-dragging.x))+'px';
+   cadImageBar.style.top=Math.max(4,Math.min(maxY,dragging.top+ev.clientY-dragging.y))+'px';
+  });
+  const release=ev=>{if(dragging&&ev.pointerId===dragging.id)dragging=null;};
+  handle.addEventListener('pointerup',release);
+  handle.addEventListener('pointercancel',release);
+
   cadImageBar.addEventListener('click',ev=>{
    const action=ev.target.closest('[data-image-action]')?.dataset.imageAction;if(!action)return;
    if(action==='close'){state.selected=[];updateProps();schedule();return}
@@ -5469,8 +5490,15 @@ function cadUpdateImageBar(image){
  const barWidth=Math.min(cadImageBar.scrollWidth,wrapRect.width-24);
  const x=Math.max(12,Math.min(wantedX-barWidth/2,wrapRect.width-barWidth-12));
  const imageTop=imageMid.y+(canvasRect.top-wrapRect.top);
- cadImageBar.style.left=Math.round(x)+'px';
- cadImageBar.style.top=Math.round(Math.max(8,imageTop-56))+'px';
+ if(cadImageBar.dataset.manualPosition!=='1'){
+  cadImageBar.style.left=Math.round(x)+'px';
+  cadImageBar.style.top=Math.round(Math.max(8,imageTop-43))+'px';
+ }else{
+  const maxX=Math.max(4,wrap.clientWidth-cadImageBar.offsetWidth-4);
+  const maxY=Math.max(4,wrap.clientHeight-cadImageBar.offsetHeight-4);
+  cadImageBar.style.left=Math.min(maxX,Math.max(4,cadImageBar.offsetLeft))+'px';
+  cadImageBar.style.top=Math.min(maxY,Math.max(4,cadImageBar.offsetTop))+'px';
+ }
 }
 
 /* Native editable properties for selected raster images, shared by Properties and Ctrl+1. */
