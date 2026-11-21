@@ -7,7 +7,7 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
-var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
+var sunSettings={enabled:true,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -741,7 +741,9 @@ function applySunSettings(){
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
- var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
+ // Fit the directional shadow frustum to the current model. The previous 30-unit
+  // minimum wasted most of the 2048px map on smaller architectural models.
+  var radius=Math.max(25,bounds.span*2),range=Math.max(12,Math.min(450,bounds.span*1.75));
  sunLight.target.position.set(bounds.x,bounds.y,bounds.z);scene.add(sunLight.target);
  sunLight.position.set(bounds.x+radius*Math.cos(el)*Math.cos(az),
   bounds.y+radius*Math.cos(el)*Math.sin(az),bounds.z+radius*Math.sin(el));
