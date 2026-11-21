@@ -179,7 +179,7 @@ requestAnimationFrame(requestResize);
 
 /* User-switchable light/dark CAD interface; geometry and plot color are untouched. */
 (function initBlacklineTheme(){
- const host=document.querySelector('.brandbar .right')||document.querySelector('.brandbar');
+ const host=document.getElementById('cadAppearanceControls')||document.querySelector('.brandbar .right')||document.querySelector('.brandbar');
  if(!host)return;
  const b=document.createElement('button');b.id='blThemeToggle';b.type='button';b.className='btn slim';b.style.whiteSpace='nowrap';
  const saved=(()=>{try{return localStorage.getItem('blackline-ui-theme')}catch(e){return null}})();
