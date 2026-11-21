@@ -190,7 +190,12 @@ requestAnimationFrame(requestResize);
   if(user)setTimeout(()=>window.cadApplyCanvasTheme?.(light?'light':'dark'),0);
  }
  b.onclick=()=>apply(document.querySelector('.app')?.classList.contains('bl-light')?'dark':'light',true);
- host.prepend(b);apply(saved==='light'?'light':'dark');
+ // Existing static button is the only theme control. Remove legacy duplicate buttons.
+ for(const duplicate of document.querySelectorAll('[id="blThemeToggle"]')){
+  if(duplicate!==b)duplicate.remove();
+ }
+ if(b.parentElement!==host)host.prepend(b);
+ apply(saved==='light'?'light':'dark');
 })();
 
 
