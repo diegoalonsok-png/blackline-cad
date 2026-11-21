@@ -426,6 +426,7 @@ function init(){
 function updateCamera(){
  if(!camera){if(fallbackCanvas)fallbackDraw();return;}
  camera.up.set(0,0,1);
+ if(viewMode==='ortho'&&Math.abs(orbit.el)>1.55)camera.up.set(0,1,0);
  if(viewMode==='walk'){
   camera.position.set(target.x,target.y,1.65);
   camera.lookAt(new T.Vector3(target.x-Math.cos(orbit.az)*8,target.y-Math.sin(orbit.az)*8,1.65+8*Math.tan(orbit.el)));
