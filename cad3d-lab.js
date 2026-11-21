@@ -3,7 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null;
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null, cad3dLoading=false;
 var DISABLE_KEY='blackline-cad3d-disabled';
 var icons={
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
@@ -260,7 +260,7 @@ function fallbackDraw(){
 }
 function beginFallback(error){
  fallbackError=error;
- if(!root)return;
+ if(!root||fallbackCanvas)return;
  var holder=root.querySelector('.view');
  fallbackCanvas=document.createElement('canvas');fallbackCanvas.className='cad3dFallback';
  fallbackCanvas.setAttribute('aria-label','3D editing viewport compatibility renderer');
@@ -275,14 +275,27 @@ function beginFallback(error){
 
 async function open(){
  build();root.hidden=false;document.getElementById('cad3dOpen').setAttribute('aria-pressed','true');
- if(renderer||fallbackCanvas){resize();loop();return;}
- text('Cargando motor 3D bajo demanda…');
+ if(renderer){resize();loop();return;}
+ if(!fallbackCanvas)beginFallback(null);
+ resize();
+ if(cad3dLoading){text('Visor de compatibilidad operativo · motor 3D completo cargándose');return;}
+ if(T&&renderer)return;
+ cad3dLoading=true;
+ text('Podés dibujar ahora · intentando activar el visor WebGL completo…');
  try{
   if(!T){try{T=await import('https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js');}
    catch(e){T=await import('https://unpkg.com/three@0.182.0/build/three.module.js');}}
   if(root.hidden)return;
-  init();redraw();renderProps();loop();text('3D listo · '+records.length+' sólidos');
- }catch(e){console.warn('Blackline CAD3D: WebGL fallback',e);beginFallback(e);}
+  var previous={x:target?.x||0,y:target?.y||0,z:target?.z||1};
+  if(fallbackCanvas){fallbackCanvas.remove();fallbackCanvas=null;fallbackCtx=null;}
+  target=new T.Vector3(previous.x,previous.y,previous.z);
+  init();redraw();renderProps();loop();text('3D WebGL activo · '+records.length+' sólidos · clic para dibujar');
+ }catch(e){
+  console.warn('Blackline CAD3D: WebGL fallback',e);
+  renderer=null;modelRoot=null;camera=null;
+  if(!fallbackCanvas)beginFallback(e);
+  text('Vista compatible operativa · WebGL no disponible · podés dibujar y editar');
+ }finally{cad3dLoading=false;}
 }
 function close(){
  if(!root)return;root.hidden=true;document.getElementById('cad3dOpen').setAttribute('aria-pressed','false');
