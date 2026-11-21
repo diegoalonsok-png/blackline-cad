@@ -181,7 +181,7 @@ requestAnimationFrame(requestResize);
 (function initBlacklineTheme(){
  const host=document.getElementById('cadAppearanceControls')||document.querySelector('.brandbar .right')||document.querySelector('.brandbar');
  if(!host)return;
- const b=document.createElement('button');b.id='blThemeToggle';b.type='button';b.className='btn slim';b.style.whiteSpace='nowrap';
+ const b=document.getElementById('blThemeToggle')||document.createElement('button');b.id='blThemeToggle';b.type='button';b.className='btn slim';b.style.whiteSpace='nowrap';
  const saved=(()=>{try{return localStorage.getItem('blackline-ui-theme')}catch(e){return null}})();
  function apply(theme,user){
   const light=theme==='light';document.querySelector('.app')?.classList.toggle('bl-light',light);
