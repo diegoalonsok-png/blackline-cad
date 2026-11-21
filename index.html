@@ -965,7 +965,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">Los archivos DWG (AutoCAD 2000 a 2018 y posteriores) se abren directamente: se convierten a DXF en un servicio propio de Blackline y se borran apenas termina la conversión. Para guardar, CAD2D exporta DXF, que AutoCAD abre sin pasos extra.</p>
 <p class="help"><a href="acerca.html" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="novedades.html" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="legal.html" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio de AutoCAD. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
-<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.dwt,.dws,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx" style="display:none">
+<input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.dwt,.dws,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx,.docx" style="display:none">
 <script src="cad2d-config.js?v=20261120-1850"></script>
 <script src="cad-grip-settings.js?v=20261120-1850"></script>
 <script src="cad-cursor-mode.js?v=20261120-1850"></script>
@@ -6452,7 +6452,7 @@ async function convertDWGAutomatically(file){
 
 /* ---------- IMPORT: incorporar otro archivo al dibujo actual (OPEN reemplaza, IMPORT agrega) ---------- */
 function cadImportPicker(){
- const i=document.createElement('input');i.type='file';i.accept='.dwg,.dwt,.dxf,.pdf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx';
+ const i=document.createElement('input');i.type='file';i.accept='.dwg,.dwt,.dxf,.pdf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx,.docx';
  i.onchange=async()=>{const f=i.files[0];if(!f)return;
   try{
    if(/\.(dwg|dwt)$/i.test(f.name)){const dxf=await convertDWGAutomatically(new File([f],f.name.replace(/\.dwt$/i,'.dwg'),{type:f.type}),{textOnly:true});const u=URL.createObjectURL(new Blob([dxf],{type:'application/dxf'}));await cadInsertDxfPlan(u,f.name);setTimeout(()=>URL.revokeObjectURL(u),60000);return}
@@ -6464,7 +6464,7 @@ function cadImportPicker(){
  };i.click();
 }
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['IMPORT','IMPORTAR','INSERTARARCHIVO'])X.commands[k]=()=>cadImportPicker()}
-/* ---------- Importar imágenes, TXT, CSV y Excel (.xlsx) al dibujo ---------- */
+/* ---------- Importar imágenes, TXT, Word (.docx), CSV y Excel (.xlsx) al dibujo ---------- */
 function cadViewCenter(){return world(P(canvas.clientWidth/2,canvas.clientHeight/2))}
 function cadViewWidth(){return canvas.clientWidth/state.view.scale}
 async function cadReadImage(file){
@@ -6526,6 +6526,31 @@ async function cadReadXlsx(file){
  }
  throw Error('No readable cells were found in the first 200 rows and 30 columns of any Excel sheet');
 }
+/* DOCX is a ZIP container; parse text only, without executing embedded content. */
+async function cadReadDocx(file){
+ const z=await cadUnzip(await file.arrayBuffer()),raw=await z.read('word/document.xml');
+ if(!raw)throw Error('This Word file has no readable document.xml');
+ const doc=new DOMParser().parseFromString(raw,'application/xml');
+ if(doc.getElementsByTagName('parsererror').length)throw Error('Invalid Word document XML');
+ const lines=[];
+ for(const p of [...doc.getElementsByTagNameNS('*','p')].slice(0,500)){
+  let line='';
+  const walk=node=>{
+   for(const child of node.childNodes){
+    if(child.nodeType!==1)continue;
+    const tag=child.localName;
+    if(tag==='t')line+=child.textContent||'';
+    else if(tag==='tab')line+='\t';
+    else if(tag==='br'||tag==='cr')line+='\n';
+    else if(tag!=='p')walk(child);
+   }
+  };
+  walk(p);lines.push(line);
+ }
+ const text=lines.join('\n').slice(0,150000);
+ if(!text.trim())throw Error('This Word document contains no readable text');
+ return text;
+}
 function cadParseCsv(text,forcedSeparator=null){
  const sep=forcedSeparator||(text.split('\n')[0].match(/;/g)||[]).length>(text.split('\n')[0].match(/,/g)||[]).length?';':(text.includes('\t')?'\t':',');
  const rows=[];let row=[],cell='',q=false;for(let i=0;i<text.length;i++){const ch=text[i];if(q){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++}else if(ch==='"')q=false;else cell+=ch}else if(ch==='"')q=true;else if(ch===sep){row.push(cell);cell=''}else if(ch==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell=''}else cell+=ch}
@@ -6544,7 +6569,7 @@ function cadInsertTableData(rows,name){
 }
 window.CAD2D_IMPORT_FILE=f=>cadImportFile(f);
 $('cadImportTableBtn').onclick=()=>{
- const input=document.createElement('input');input.type='file';input.accept='.xlsx,.csv,.tsv,.txt';
+ const input=document.createElement('input');input.type='file';input.accept='.xlsx,.csv,.tsv,.txt,.docx';
  input.onchange=async()=>{if(input.files?.[0])await cadImportFile(input.files[0])};
  input.click();
 };
@@ -6554,6 +6579,11 @@ async function cadImportFile(f){
    const img=await cadReadImage(f),c=cadViewCenter(),W=cadViewWidth()*.5,H=W*img.h/img.w;
    saveHistory();const e={id:state.nextId++,type:'image',src:img.src,a:P(c.x-W/2,c.y-H/2),b:P(c.x+W/2,c.y+H/2),layer:state.layerId,name:f.name,pxW:img.w,pxH:img.h};state.entities.push(e);state.selected=[e.id];updateAll();
    toast('Image placed: '+f.name+' · use SCALE or the grips to size it, M to move it');log('IMAGEATTACH '+f.name);return;
+  }
+  if(/\.doc$/i.test(f.name))return toast('For Word .doc files, save as .docx or .txt first');
+  if(/\.docx$/i.test(f.name)){
+   const text=await cadReadDocx(f);
+   return cadImportFile(new File([text],f.name.replace(/\.docx$/i,'.txt'),{type:'text/plain'}));
   }
   if(/\.xls$/i.test(f.name))return toast('Old .xls files are not supported: save the sheet as .xlsx or .csv in Excel');
   if(/\.xlsx$/i.test(f.name))return cadInsertTableData(await cadReadXlsx(f),f.name);
@@ -6588,7 +6618,7 @@ async function loadDrawingFile(f){if(!f)return;
  if(/\.(bak|sv\$|tmp)$/i.test(f.name)){const head=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer()),base=f.name.replace(/\.(bak|sv\$|tmp)$/i,'').replace(/_\d{8}-\d{4}$/,'');
   const ext=/^AC10\d\d/.test(head)?'.dwg':/^\s*[\[{]/.test(head)?'.cadjson':'.dxf';toast('Abriendo copia de seguridad '+f.name+' como '+ext.slice(1).toUpperCase());
   return loadDrawingFile(new File([f],base+ext,{type:f.type}))}
-if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)importDXF(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){ev.preventDefault();dragDepth=0;await loadDrawingFile(ev.dataTransfer.files[0])}});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
@@ -9384,7 +9414,7 @@ function initCadExportPopover(){
  option('Exportar planilla .CSV','Bloques, capas y cantidades (abre en Excel)',()=>cadExportScheduleCsv());
  option('Exportar selección .DXF','Solo los objetos seleccionados',()=>{const sel=state.entities.filter(e=>state.selected.includes(e.id));if(!sel.length)return toast('Select objects first');exportDXF(sel,state.file+'-selection',state.layers)});
  label('Importar');
- option('Importar imagen, Excel, CSV o TXT','PNG · JPG · WEBP · GIF · BMP · XLSX · CSV · TXT · DXF · SVG',()=>$('fileInput').click());
+ option('Importar imagen, Word, Excel, CSV o TXT','PNG · JPG · WEBP · GIF · BMP · DOCX · XLSX · CSV · TXT · DXF · SVG',()=>$('fileInput').click());
  label('Formato DWG');
  const note=document.createElement('div');note.className='cad-export-note';note.textContent='DWG no se exporta directamente: no hay conversor DWG configurado. Usá DXF para abrir el plano en AutoCAD, LibreCAD, QCAD u otras aplicaciones compatibles y guardar como DWG desde un conversor externo que lo admita. DXF es el formato de intercambio editable recomendado.';p.append(note);
  btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-haspopup','dialog');
