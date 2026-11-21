@@ -937,6 +937,27 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @container(max-width:250px){.brandbar .right>.cad-header-primary{display:none!important}}
 @media(max-width:950px){.app .brandbar .cad-command-finder{display:none!important}}
 @media(max-width:680px){.app .brandbar .brand,.app .brandbar .cad-header-undo-redo{display:none!important}}
+/* Lexicon-inspired styling, strictly scoped to the three color/theme controls. */
+.app .brandbar #blThemeToggle,
+.app .status #cadColorButton,
+.app .status #cadCustomColorToggle{
+ border:1px solid #7d8995!important;
+ border-radius:12px!important;
+ background:var(--cad-ui-raised,#1c2630)!important;
+ color:var(--cad-ui-text,#e5edf3)!important;
+ box-shadow:none!important;
+ font-weight:500!important;
+ transition:border-color .15s ease,background-color .15s ease!important;
+}
+.app .brandbar #blThemeToggle{width:40px!important;height:36px!important;font-size:21px!important;padding:0!important}
+.app .status #cadColorButton{padding:4px 10px!important;min-height:28px!important}
+.app .status #cadCustomColorToggle{width:30px!important;min-width:30px!important;min-height:28px!important;font-size:18px!important;padding:1px!important}
+.app .brandbar #blThemeToggle:hover,
+.app .status #cadColorButton:hover,
+.app .status #cadCustomColorToggle:hover{border-color:#b7d5e5!important;background:var(--cad-ui-toolbar,#273747)!important}
+.app .brandbar #blThemeToggle:focus-visible,
+.app .status #cadColorButton:focus-visible,
+.app .status #cadCustomColorToggle:focus-visible{outline:2px solid #96d8eb!important;outline-offset:2px!important}
 </style>
 </head>
 <body>
