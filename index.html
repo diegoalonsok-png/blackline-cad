@@ -5462,6 +5462,55 @@ function cadUpdateImageBar(image){
  cadImageBar.querySelector('[data-image-size]').textContent=Math.abs(image.b.x-image.a.x).toFixed(2)+' × '+Math.abs(image.b.y-image.a.y).toFixed(2)+' '+state.unit;
  const locked=layerFor(image).locked;cadImageBar.querySelectorAll('button[data-image-action]').forEach(b=>{if(b.dataset.imageAction!=='close')b.disabled=locked});
 }
+
+/* Native editable properties for selected raster images, shared by Properties and Ctrl+1. */
+function cadImagePropertiesMarkup(e){
+ if(!e||e.type!=='image')return '';
+ const fmt=n=>Number(Number(n).toFixed(5));
+ const x=Math.min(e.a.x,e.b.x),y=Math.min(e.a.y,e.b.y),w=Math.abs(e.b.x-e.a.x),h=Math.abs(e.b.y-e.a.y);
+ const field=(label,key,val)=>'<label style="display:flex;align-items:center;justify-content:space-between;gap:9px;margin:5px 0"><span>'+label+'</span><input data-cad-image-prop="'+key+'" type="number" step="any" value="'+fmt(val)+'" style="width:110px;min-width:0;background:#161d25;color:#edf1f6;border:1px solid #586575;padding:5px;border-radius:5px"></label>';
+ return '<div data-cad-image-editor="'+e.id+'" style="grid-column:1/-1;border-top:1px solid #586575;padding:10px 3px;margin-top:7px;min-width:210px">'+
+  '<strong style="display:block;margin-bottom:8px">▣ IMAGE · Properties</strong>'+
+  '<div style="font-size:11px;overflow-wrap:anywhere;margin:4px 0 8px;color:#bdc7d1">'+escapeHTML(e.name||'Imported image')+'</div>'+
+  field('X ('+state.unit+')','x',x)+field('Y ('+state.unit+')','y',y)+field('Width ('+state.unit+')','w',w)+field('Height ('+state.unit+')','h',h)+
+  field('Opacity (%)','opacity',Math.round((e.opacity??1)*100))+
+  '<small style="display:block;color:#a5b2c0;margin-top:6px">Edit values to position, resize and adjust transparency.</small></div>';
+}
+function cadApplyImageProperty(container,event){
+ const input=event.target.closest?.('[data-cad-image-prop]');
+ if(!input)return;
+ const editor=input.closest('[data-cad-image-editor]');
+ const e=state.entities.find(v=>v.id===Number(editor?.dataset.cadImageEditor)&&v.type==='image');
+ if(!e||layerFor(e).locked)return;
+ const value=Number(input.value),key=input.dataset.cadImageProp;
+ if(!Number.isFinite(value)||((key==='w'||key==='h')&&value<=0)||((key==='opacity')&&(value<10||value>100))){toast('Invalid image property value');return}
+ const minX=Math.min(e.a.x,e.b.x),minY=Math.min(e.a.y,e.b.y);
+ const w=Math.abs(e.b.x-e.a.x),h=Math.abs(e.b.y-e.a.y);
+ const flipX=e.b.x<e.a.x,flipY=e.b.y<e.a.y;
+ let x=minX,y=minY,nw=w,nh=h;
+ if(key==='x')x=value;
+ else if(key==='y')y=value;
+ else if(key==='w')nw=value;
+ else if(key==='h')nh=value;
+ else if(key==='opacity'){if(Math.abs((e.opacity??1)-value/100)<1e-9)return;saveHistory();e.opacity=value/100;updateAll();return}
+ else return;
+ if(x===minX&&y===minY&&nw===w&&nh===h)return;
+ saveHistory();
+ e.a=P(flipX?x+nw:x,flipY?y+nh:y);
+ e.b=P(flipX?x:x+nw,flipY?y:y+nh);
+ updateAll();
+}
+function cadUpdateImagePropertiesEditor(e){
+ const props=$('properties');
+ if(!props)return;
+ const old=props.querySelector('[data-cad-image-editor]');
+ if(old)old.remove();
+ if(e?.type==='image')props.insertAdjacentHTML('beforeend',cadImagePropertiesMarkup(e));
+ if(!props.dataset.cadImageEditorBound){
+  props.dataset.cadImageEditorBound='1';
+  props.addEventListener('change',ev=>cadApplyImageProperty(props,ev));
+ }
+}
 function updateProps(){const ids=state.selected,items=state.entities.filter(e=>ids.includes(e.id));
  cadUpdateImageBar(items.length===1&&items[0].type==='image'?items[0]:null);
  const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
@@ -5495,7 +5544,7 @@ function updateProps(){const ids=state.selected,items=state.entities.filter(e=>i
    }
   }
  }}
-$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
+$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');cadUpdateImagePropertiesEditor(items.length===1&&items[0].type==='image'?items[0]:null);$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
 function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){if(v.params){for(const k of ['width','depth','frameWidth','frameDepth'])if(Number.isFinite(v.params[k]))v.params[k]*=ratio;}return v;}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
 function openCadUnitsDialog(){
@@ -7958,6 +8007,7 @@ function openCadContextMenu(x,y,worldPoint){
  const title=active?(cad2dAliasLanguage==='en'?'Active command · ':'Comando activo · ')+state.tool:count?(cad2dAliasLanguage==='en'?'Selection · '+count+' object(s)':'Selección · '+count+' objeto(s)'):(cad2dAliasLanguage==='en'?'Model space':'Espacio modelo');
  const selectedText=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='text'):null;
  const selectedDimension=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='dimension'):null;
+ const selectedImage=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='image'):null;
  const item=(label,action,disabled=false)=>({label:window.BlacklineUILanguage?.translate(label,cad2dAliasLanguage)||label,action,disabled});
  const command=(label,name,disabled=false)=>item(label,()=>cad2dExecuteContextCommand(name),disabled);
  // Comandos de contexto específicos para la herramienta activa, sin alterar la geometría.
@@ -7997,6 +8047,7 @@ function openCadContextMenu(x,y,worldPoint){
    item('Zoom extensión · ZE',()=>zoomExtents()),
  ]:count?[
    item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+   ...(selectedImage?[item('Propiedades de imagen',()=>openCadQuickProperties())]:[]),
    null,
    command('Mover · M','MOVE'),command('Copiar · CO','COPY'),
    command('Girar · RO','ROTATE'),command('Escalar · SC','SCALE'),
@@ -9428,6 +9479,11 @@ function refreshCadQuickProperties(){
   $('cadPropsLinetype').value=first.linetype||'BYLAYER';
   $('cadPropsLayer').value=first.layer||state.layerId;
  }
+ let box=panel.querySelector('#cadImageQuickEditor');
+ if(!box){box=document.createElement('div');box.id='cadImageQuickEditor';panel.append(box)}
+ box.innerHTML=selected.length===1&&first?.type==='image'?cadImagePropertiesMarkup(first):'';
+ box.hidden=!(selected.length===1&&first?.type==='image');
+ if(!panel.dataset.cadImageEditorBound){panel.dataset.cadImageEditorBound='1';panel.addEventListener('change',ev=>cadApplyImageProperty(panel,ev))}
 }
 
 /* Export formats with explicit distinction between editable CAD and print formats. */
