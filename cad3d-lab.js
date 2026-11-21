@@ -315,8 +315,8 @@ function fallbackDraw(){
  var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
  if(w<=0||h<=0)return;
  ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='sketch'?'#f4f1e8':'#0d141a';ctx.fillRect(0,0,w,h);
- ctx.lineWidth=.65;ctx.strokeStyle=renderStyle==='sketch'?'#e5e1d8':'#23313c';
- for(var i=-20;i<=20;i++){
+ ctx.lineWidth=.65;ctx.strokeStyle='#23313c';
+ if(renderStyle!=='sketch')for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
@@ -397,7 +397,7 @@ async function open(){
   init();redraw();renderProps();loop();text('3D WebGL activo · '+records.length+' sólidos · clic para dibujar');
  }catch(e){
   console.warn('Blackline CAD3D: WebGL fallback',e);
-  renderer=null;modelRoot=null;camera=null;
+  renderer?.domElement?.remove();renderer?.dispose();renderer=null;modelRoot=null;camera=null;perspectiveCamera=null;orthographicCamera=null;
   if(!fallbackCanvas)beginFallback(e);
   text('Vista compatible operativa · WebGL no disponible · podés dibujar y editar');
  }finally{cad3dLoading=false;}
@@ -411,7 +411,7 @@ function init(){
  perspectiveCamera=new T.PerspectiveCamera(50,1,.02,2000);perspectiveCamera.up.set(0,0,1);
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
- target=new T.Vector3(0,0,1);updateCamera();
+ var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
  renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));
  root.querySelector('.view').appendChild(renderer.domElement);
  scene.add(new T.AmbientLight(0xffffff,1.3));
@@ -466,8 +466,9 @@ function loop(){
  frame=requestAnimationFrame(tick);
 }
 function bindCanvas(el){
+ el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){e.preventDefault();});
- el.addEventListener('pointerdown',function(e){dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:e.button===2};el.setPointerCapture(e.pointerId);});
+ el.addEventListener('pointerdown',function(e){el.focus({preventScroll:true});dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:e.button===2};el.setPointerCapture(e.pointerId);});
  el.addEventListener('pointermove',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
   var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
@@ -780,6 +781,7 @@ function applyRenderStyle(){
 }
 function setSketchStyle(mode){
  renderStyle=mode==='sketch'?'sketch':'shaded';
+ if(root){root.querySelector('.view')?.classList.toggle('sketchView',renderStyle==='sketch');root.querySelector('[data-action="sketch"]')?.classList.toggle('sketchActive',renderStyle==='sketch');}
  if(renderer)applyRenderStyle();
  if(fallbackCanvas)fallbackDraw();
  text(renderStyle==='sketch'?'CROQUIS: vista lineal activa · exportá PNG o SVG':'Vista sombreada activa');
@@ -1074,6 +1076,22 @@ async function readJSON(e){
 document.addEventListener('keydown',function(e){
  if(e.key==='Escape'&&root&&!root.hidden&&placing){setPlacement(null);text('Colocación 3D cancelada');}
 });
+
+/* Walk only when the 3D viewport is focused, never alter CAD2D commands. */
+window.addEventListener('keydown',function(ev){
+ if(viewMode!=='walk'||!root||root.hidden)return;
+ var focused=document.activeElement;
+ if(!focused||!root.contains(focused)||focused.tagName==='INPUT'||focused.tagName==='SELECT'||focused.tagName==='TEXTAREA')return;
+ var k=ev.key.toLowerCase();
+ if(!['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k))return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ var step=ev.shiftKey?1:.25;
+ var fwd=(k==='w'||k==='arrowup')?1:(k==='s'||k==='arrowdown')?-1:0;
+ var side=(k==='a'||k==='arrowleft')?-1:(k==='d'||k==='arrowright')?1:0;
+ target.x+=(-Math.cos(orbit.az)*fwd+Math.sin(orbit.az)*side)*step;
+ target.y+=(-Math.sin(orbit.az)*fwd-Math.cos(orbit.az)*side)*step;
+ applyViewCamera();if(fallbackCanvas)fallbackDraw();
+},true);
 window.BlacklineCAD3D=Object.freeze({open:open,close:close,get enabled(){return !!root&&!root.hidden;},get experimental(){return true;}});
 /* Only install a launcher. Three.js is not requested until the explicit user click. */
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',launch,{once:true});else launch();
