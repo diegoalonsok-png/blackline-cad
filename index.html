@@ -4839,28 +4839,20 @@ function cadPrimitiveGripHit(raw){
 let cadGripTyped='';
 // Grip edits must have their own ORTHO/OTRACK constraint: unlike LINE, SELECT
 // has no state.stage base point. Keep preview, typed length and commit identical.
+// Grip OTRACK: use the vertex being moved as the acquisition point.
 function cadGripTrackingDestination(job,point){
  const snapped=snapPoint(point);
  if(!job||(!state.orthoOn&&!otrkOn))return snapped;
- const e=job.original,g=job.grip;
- if(!e||!g)return snapped;
- let base=null,axis=null;
- if(e.type==='line'&&g.kind==='vertex'){
-  base=g.index===0?e.b:e.a;
-  const dx=g.p.x-base.x,dy=g.p.y-base.y;
-  if(otrkOn){if(Math.abs(dy)<1e-8)axis='h';else if(Math.abs(dx)<1e-8)axis='v'}
- }else if(e.type==='polyline'&&g.kind==='vertex'){
-  const nb=cadGripNeighbours(e,g);
-  if(nb.length===1){base=nb[0];const dx=g.p.x-base.x,dy=g.p.y-base.y;
-   if(otrkOn){if(Math.abs(dy)<1e-8)axis='h';else if(Math.abs(dx)<1e-8)axis='v'}
-  }
- }
- if(!base)base=g.p;
- if(!axis&&state.orthoOn){
-  const dx=snapped.x-base.x,dy=snapped.y-base.y;
-  axis=Math.abs(dx)>=Math.abs(dy)?'h':'v';
- }
- if(!axis)return snapped;
+ const g=job.grip;
+ if(!g?.p)return snapped;
+ const base=g.p;
+ const dx=point.x-base.x,dy=point.y-base.y;
+ const scale=Math.max(0.0001,state.view.scale);
+ if(Math.hypot(dx,dy)<3/scale)return snapped;
+ // ORTHO locks nearest axis. OTRACK locks only near horizontal/vertical rays.
+ const ratio=Math.min(Math.abs(dx),Math.abs(dy))/Math.max(Math.abs(dx),Math.abs(dy),1e-12);
+ if(!state.orthoOn&&ratio>0.36)return snapped;
+ const axis=Math.abs(dx)>=Math.abs(dy)?'h':'v';
  const target=axis==='h'?P(snapped.x,base.y):P(base.x,snapped.y);
  if(otrkOn&&trackingEligible()){
   otrkGuide={point:target,horizontal:axis==='h'?base:null,vertical:axis==='v'?base:null,intersection:false};
