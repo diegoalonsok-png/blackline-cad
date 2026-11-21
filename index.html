@@ -4859,11 +4859,28 @@ function cadGripTrackingDestination(job,point){
  }
  return target;
 }
+// Typed grip displacement perpendicular to the original segment starts at the moving vertex.
+function cadGripPerpendicularTyped(job,target,value){
+ const e=job.original,g=job.grip;
+ if(!g||g.kind!=='vertex')return null;
+ let fixed=null;
+ if(e.type==='line')fixed=g.index===0?e.b:e.a;
+ else if(e.type==='polyline'){const nb=cadGripNeighbours(e,g);if(nb.length===1)fixed=nb[0]}
+ if(!fixed)return null;
+ const original=P(g.p.x-fixed.x,g.p.y-fixed.y);
+ const movement=P(target.x-g.p.x,target.y-g.p.y);
+ const tol=1e-7;
+ if(Math.abs(original.y)<tol&&Math.abs(original.x)>tol&&Math.abs(movement.x)<tol&&Math.abs(movement.y)>tol)
+  return P(g.p.x,g.p.y+Math.sign(movement.y)*value);
+ if(Math.abs(original.x)<tol&&Math.abs(original.y)>tol&&Math.abs(movement.y)<tol&&Math.abs(movement.x)>tol)
+  return P(g.p.x+Math.sign(movement.x)*value,g.p.y);
+ return null;
+}
 function cadGripTypedDest(job){
  const v=Number(cadGripTyped);if(!cadGripTyped||!(v>0))return null;
  const e=job.original,g=job.grip;
- if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=cadGripTrackingDestination(job,state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
- const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=cadGripTrackingDestination(job,state.mouse),d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=cadGripTrackingDestination(job,state.mouse),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=cadGripTrackingDestination(job,state.mouse),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
  const m=cadGripTrackingDestination(job,state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
 }
 function cadGripNeighbours(e,g){
