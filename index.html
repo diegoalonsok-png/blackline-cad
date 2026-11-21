@@ -3184,18 +3184,26 @@ function trackingEligible(){
  return state.tool==='select'&&(grip||!!(state.drag&&/grip|vertex|wall/i.test(state.drag.type||'')));
 }
 let cadOtrkHoverTimer=null,cadOtrkHoverPt=null;
+function cadOtrackReleaseHover(){
+ clearTimeout(cadOtrkHoverTimer);cadOtrkHoverTimer=null;cadOtrkHoverPt=null;
+}
 function cadOtrackHover(pt){
+ if(!trackingEligible()||!window.BlacklineTrackingMath)return;
  if(cadOtrkHoverPt&&Math.hypot(cadOtrkHoverPt.x-pt.x,cadOtrkHoverPt.y-pt.y)<1e-9)return;
- cadOtrkHoverPt=P(pt.x,pt.y);clearTimeout(cadOtrkHoverTimer);
+ cadOtrackReleaseHover();cadOtrkHoverPt=P(pt.x,pt.y);
+ const acquired=P(pt.x,pt.y);
  cadOtrkHoverTimer=setTimeout(()=>{
-  if(!trackingEligible()||!snapIndicator||Math.hypot(snapIndicator.point.x-pt.x,snapIndicator.point.y-pt.y)>1e-9)return;
-  const has=otrkAnchors.some(a=>Math.hypot(a.x-pt.x,a.y-pt.y)<1e-9);
-  otrkAnchors=has?otrkAnchors.filter(a=>Math.hypot(a.x-pt.x,a.y-pt.y)>=1e-9):BlacklineTrackingMath.acquire(otrkAnchors,pt,7);
+  cadOtrkHoverTimer=null;
+  if(!trackingEligible()||!cadOtrkHoverPt||Math.hypot(cadOtrkHoverPt.x-acquired.x,cadOtrkHoverPt.y-acquired.y)>1e-9)return;
+  // Acquire once and keep the reference for further OTRACK projections.
+  if(!otrkAnchors.some(a=>Math.hypot(a.x-acquired.x,a.y-acquired.y)<1e-9)){
+   otrkAnchors=BlacklineTrackingMath.acquire(otrkAnchors,acquired,7);
+  }
   schedule();
- },420);
+ },280);
 }
 function clearOtrackAnchors(announce=true){
- otrkAnchors=[];otrkGuide=null;
+ cadOtrackReleaseHover();otrkAnchors=[];otrkGuide=null;
  if(announce)toast('OTRACK: referencias temporales limpiadas');
  schedule();
 }
@@ -3334,9 +3342,12 @@ function snapPoint(p){
   if(nearest){
    snapIndicator={point:P(nearest.x,nearest.y),type};
    if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type))cadOtrackHover(nearest);
+   else cadOtrackReleaseHover();
    return snapIndicator.point;
   }
  }
+ // The pointer left its OSNAP marker: allow a later visit to the same point.
+ cadOtrackReleaseHover();
  if(trackingEligible()&&otrkAnchors.length&&window.BlacklineTrackingMath){
   if(state.orthoOn&&state.stage.length){
    // Con ORTHO, el punto queda sobre la dirección ortogonal y se alinea con la referencia más cercana.
