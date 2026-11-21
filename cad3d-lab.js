@@ -3,7 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null, cad3dLoading=false;
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null, cad3dLoading=false, slabStart=null, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20'};
 var DISABLE_KEY='blackline-cad3d-disabled';
 var icons={
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
@@ -13,6 +13,7 @@ var icons={
  wall:'<path d="M3 20V7l18-4v13L3 20ZM3 12l18-4"/>',
  door:'<path d="M4 21V3h16v18M8 21V6h8v15M14 13h.1"/>',
  window:'<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/>',
+ slab:'<path d="M2 9 17 4l5 5-15 6-5-6ZM2 9v5l5 6v-5M7 15l15-6v5l-15 6"/>',
  union:'<rect x="2" y="8" width="12" height="12"/><rect x="10" y="3" width="12" height="12"/>',
  subtract:'<rect x="2" y="7" width="16" height="14"/><path d="M10 3h12v11h-7" stroke-dasharray="3 2"/>',
  intersect:'<rect x="2" y="8" width="14" height="12"/><rect x="9" y="3" width="13" height="12"/><path d="M9 8h7v7H9z" fill="currentColor" fill-opacity=".2"/>',
@@ -51,6 +52,14 @@ var css=[
 '#cad3dLab .side input{background:#0a1117;color:#e4edf2;border:1px solid #4c5e6d;border-radius:4px;width:84px;padding:4px 5px;font:11px Inter,Arial}',
 '#cad3dLab .side .detail{padding:8px 0;margin-top:8px;border-top:1px solid #364a59}',
 '#cad3dLab .side button{border:1px solid #526b7c;background:#233544;color:#e6eef4;border-radius:5px;padding:5px 7px;margin-top:3px;cursor:pointer}',
+'#cad3dLab .catalog{padding:3px 0 9px;margin:0 0 12px;border-bottom:1px solid #354655}',
+'#cad3dLab .catalogTabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;margin:0 0 6px}',
+'#cad3dLab .catalogTabs button{margin:0;padding:5px 3px;font:10px Inter,Arial;border-color:#40515e;background:#101923}',
+'#cad3dLab .catalogTabs button.active,#cad3dLab .catalogItems button.active{border-color:#92b8ca;background:#2f4351;color:#fff}',
+'#cad3dLab .catalogItems{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;max-height:186px;overflow-y:auto}',
+'#cad3dLab .catalogItems button{margin:0;padding:6px 3px;border-color:#334653;background:#0e171e;text-align:center;min-width:0;font:10px Inter,Arial}',
+'#cad3dLab .catalogItems svg{display:block;width:29px;height:29px;margin:0 auto 4px;stroke:#a6c3d0;fill:none;stroke-width:1.5}',
+'#cad3dLab .catalogItems span{display:block;font-size:10px;overflow-wrap:anywhere}',
 '#cad3dLab footer{height:26px;flex:0 0 26px;background:#0b1218;border-top:1px solid #354857;padding:5px 9px;color:#9fb5c5;display:flex;justify-content:space-between;gap:8px}',
 '#cad3dLab .resizeGrip{position:absolute;right:0;bottom:0;width:18px;height:18px;background:linear-gradient(135deg,transparent 57%,#7b8f9d 58%,#7b8f9d 60%,transparent 61%,transparent 72%,#7b8f9d 73%,#7b8f9d 75%,transparent 76%);opacity:.55;cursor:nwse-resize;touch-action:none;z-index:7}',
 '#cad3dLab .edgeResizeR{position:absolute;right:0;top:39px;bottom:18px;width:6px;cursor:ew-resize;touch-action:none;z-index:7}',
@@ -67,6 +76,71 @@ function clamp(a,min,max){return Math.max(min,Math.min(max,a));}
 function text(s){if(root)root.querySelector('.status').textContent=s;}
 function ico(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[name]||icons.cube)+'</svg>';}
 function tool(id,name,shape){return '<button type="button" data-action="'+id+'" title="'+name+'">'+ico(shape||id)+'<span>'+name+'</span></button>';}
+
+/* Independent, original architectural style definitions. No Autodesk assets. */
+const ARCH_STYLES={
+ wall:[
+  {id:'exterior-20',name:'Exterior 20 cm',d:.20,h:2.80},
+  {id:'partition-10',name:'Partition 10 cm',d:.10,h:2.70},
+  {id:'masonry-30',name:'Masonry 30 cm',d:.30,h:3.00},
+  {id:'light-15',name:'Light wall 15 cm',d:.15,h:2.60}
+ ],
+ door:[
+  {id:'single-swing',name:'Single swing',w:.90,h:2.10,sill:0},
+  {id:'double-swing',name:'Double swing',w:1.60,h:2.10,sill:0},
+  {id:'sliding-door',name:'Sliding',w:1.80,h:2.10,sill:0},
+  {id:'open-door',name:'Empty opening',w:1.00,h:2.10,sill:0}
+ ],
+ window:[
+  {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
+  {id:'double-window',name:'Two-leaf',w:1.60,h:1.20,sill:.90},
+  {id:'sliding-window',name:'Sliding',w:1.60,h:1.20,sill:.85},
+  {id:'casement',name:'Casement',w:.90,h:1.30,sill:.90}
+ ],
+ slab:[
+  {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
+  {id:'thin-12',name:'Thin 12 cm',h:.12,pitch:0,slabKind:'floor'},
+  {id:'roof-flat',name:'Flat roof',h:.18,pitch:0,slabKind:'roof'},
+  {id:'roof-pitch',name:'Pitched roof',h:.18,pitch:12,slabKind:'roof'}
+ ]
+};
+function archStyle(kind,id){
+ return (ARCH_STYLES[kind]||[]).find(function(st){return st.id===id;})||(ARCH_STYLES[kind]||[])[0]||null;
+}
+function renderCatalog(){
+ if(!root)return;
+ var tabs=root.querySelector('.catalogTabs'),items=root.querySelector('.catalogItems');
+ if(!tabs||!items)return;
+ var names={wall:'WALL',door:'DOORS',window:'WINDOWS',slab:'SLABS / ROOFS'};
+ tabs.innerHTML=Object.keys(ARCH_STYLES).map(function(kind){
+  return '<button type="button" data-category="'+kind+'" class="'+(activeCategory===kind?'active':'')+'">'+names[kind]+'</button>';
+ }).join('');
+ items.innerHTML=ARCH_STYLES[activeCategory].map(function(st){
+  return '<button type="button" data-style="'+escapeHtml(st.id)+'" class="'+(activePreset[activeCategory]===st.id?'active':'')+'" title="'+escapeHtml(st.name)+'">'+ico(activeCategory)+'<span>'+escapeHtml(st.name)+'</span></button>';
+ }).join('');
+}
+function clickCatalog(e){
+ var cat=e.target.closest('[data-category]');
+ if(cat){activeCategory=cat.dataset.category;renderCatalog();return;}
+ var item=e.target.closest('[data-style]');
+ if(item){
+  var st=archStyle(activeCategory,item.dataset.style);if(!st)return;
+  activePreset[activeCategory]=st.id;renderCatalog();setPlacement(activeCategory);
+  text('Estilo '+st.name+' seleccionado · clic en el visor para colocar');return;
+ }
+ if(e.target.closest('[data-apply-style]')){
+  if(selected.length!==1){text('Seleccioná un solo muro o losa para cambiar su estilo');return;}
+  var rec=records.find(function(r){return r.id===selected[0];});
+  if(!rec||rec.type!==activeCategory||!['wall','slab'].includes(activeCategory)){text('El estilo elegido no corresponde al objeto seleccionado');return;}
+  var st=archStyle(activeCategory,activePreset[activeCategory]);
+  if(!st)return;
+  rec.styleId=st.id;
+  if(rec.type==='wall'){rec.d=st.d;rec.h=st.h;}
+  if(rec.type==='slab'){rec.h=st.h;rec.pitch=st.pitch;rec.slabKind=st.slabKind;}
+  redraw();renderProps();text('Estilo '+st.name+' aplicado a '+rec.type);
+ }
+}
+
 function launch(){
  if(document.getElementById('cad3dOpen'))return;
  var bar=document.querySelector('#tabs.tabbar')||document.querySelector('.tabbar');
@@ -81,12 +155,12 @@ function build(){
  root.innerHTML='<div class="head"><strong>▣ BLACKLINE · CAD3D</strong><small>EXPERIMENTAL · MODEL SPACE</small><div class="stretch"></div><button type="button" data-max title="Maximizar o restaurar ventana 3D">□</button><button type="button" data-close title="Cerrar 3D sin afectar el plano 2D">×</button></div>'+
  '<div class="tools" role="toolbar" aria-label="Herramientas tridimensionales">'+
  tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+
- '<div class="divider"></div>'+tool('wall','WALL 3D')+tool('door','Door')+tool('window','Window')+
+ '<div class="divider"></div>'+tool('wall','WALL 3D')+tool('door','Door')+tool('window','Window')+tool('slab','Slab')+
  '<div class="divider"></div>'+tool('union','Union')+tool('subtract','Subtract')+tool('intersect','Intersect')+
  '<div class="divider"></div>'+tool('view','Views')+
  '<div class="divider"></div>'+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+tool('json','.3DJSON','export')+tool('open','Open','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div>'+
  '<div class="body"><div class="view"><div class="hint">Botón de sólido → clic para colocarlo · WALL: dos puntos · Shift + clic: seleccionar</div></div>'+
- '<div class="sideGrip" title="Arrastrar para cambiar el ancho de la paleta 3D"></div><aside class="side"><h3>3D PROPERTIES</h3><div class="props"><p>Agregá un objeto o seleccioná una figura. Unidades: metros.</p></div></aside></div>'+
+ '<div class="sideGrip" title="Arrastrar para cambiar el ancho de la paleta 3D"></div><aside class="side"><h3>ARCHITECTURE · STYLES</h3><div class="catalog"><div class="catalogTabs"></div><div class="catalogItems"></div><button type="button" data-apply-style="1" title="Aplicar el estilo a un muro o losa seleccionado">Apply to selected</button></div><h3>3D PROPERTIES</h3><div class="props"><p>Agregá un objeto o seleccioná una figura. Unidades: metros.</p></div></aside></div>'+
  '<footer><span class="status" role="status">Módulo separado · CAD2D intacto</span><span>BLACKLINE · 3D LAB</span></footer><div class="edgeResizeR" data-resize="x" title="Arrastrar borde para ajustar ancho 3D"></div><div class="edgeResizeB" data-resize="y" title="Arrastrar borde para ajustar altura 3D"></div><div class="resizeGrip" data-resize="xy" role="button" title="Arrastrar la esquina para ajustar ancho y alto" aria-label="Redimensionar ventana 3D"></div>'+
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  document.body.appendChild(root);
@@ -100,6 +174,8 @@ function build(){
  root.querySelector('.tools').addEventListener('click',function(e){var b=e.target.closest('[data-action]');if(b)action(b.dataset.action);});
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
+ root.querySelector('.catalog').addEventListener('click',clickCatalog);
+ renderCatalog();
  root.querySelector('.fileInput').addEventListener('change',readJSON);
  root.querySelector('.cadInput').addEventListener('change',importCADFile);
  observer=new ResizeObserver(function(){resize();});
@@ -162,10 +238,10 @@ function beginResize(e){
  grip.addEventListener('pointercancel',end);
 }
 function setPlacement(which){
- placing=which;wallStart=null;
+ placing=which;wallStart=null;slabStart=null;
  if(!root)return;
  root.querySelectorAll('.tools button[data-action]').forEach(function(b){b.classList.toggle('armed',b.dataset.action===which);});
- if(which)text(''+which.toUpperCase()+': clic en el suelo para ubicar'+(which==='wall'?' el primer punto y después el segundo':which==='door'||which==='window'?' la abertura sobre un muro':' el sólido')+' · Esc cancela');
+ if(which)text(''+which.toUpperCase()+': clic en el suelo para ubicar'+(which==='wall'||which==='slab'?' el primer punto y después el segundo':which==='door'||which==='window'?' la abertura sobre un muro':' el sólido')+' · Esc cancela');
 }
 
 /* Lightweight orthographic compatibility renderer: allows drawing/editing
@@ -231,8 +307,8 @@ function fallbackDraw(){
   ctx.stroke();
  }
  records.forEach(function(rec){
-  if(rec.type==='box'||rec.type==='wall'){
-   fallbackBox(rec,rec.w,rec.d,rec.h,0,0,0,rec.type==='wall'?'#8d9197':'#648b9f');
+  if(rec.type==='box'||rec.type==='wall'||rec.type==='slab'){
+   fallbackBox(rec,rec.w,rec.d,rec.h,0,0,0,rec.type==='wall'?'#8d9197':rec.type==='slab'?'#a1aebc':'#648b9f');
    if(rec.type==='wall')(rec.openings||[]).forEach(function(o){
     var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),ss=Math.sin(a);
     var x=rec.x+o.offset*c,y=rec.y+o.offset*ss;
@@ -406,7 +482,7 @@ function placeAt(e){
   var rec=hit.wall;
   var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180;
   var offset=clamp(dx*Math.cos(rot)+dy*Math.sin(rot),-rec.w/2+.15,rec.w/2-.15);
-  var kind=placing,op={id:serial++,kind:kind,offset:offset,w:kind==='door'?.9:1.2,h:kind==='door'?2.1:1.25,sill:kind==='door'?0:.9};
+  var kind=placing,st=archStyle(kind,activePreset[kind]),op={id:serial++,kind:kind,styleId:st.id,offset:offset,w:st.w,h:st.h,sill:st.sill};
   rec.openings.push(op);selected=[rec.id];redraw();renderProps();text(kind.toUpperCase()+' vinculada: posición '+offset.toFixed(2)+' m, vano regenerado');
   setPlacement(null);return;
  }
@@ -415,8 +491,15 @@ function placeAt(e){
   if(!wallStart){wallStart=pt.clone();text('WALL 3D: elegí el punto final');return;}
   var dx=pt.x-wallStart.x,dy=pt.y-wallStart.y;
   if(Math.hypot(dx,dy)<.05){text('WALL 3D: elegí un segundo punto distinto');return;}
-  var wall=newRecord('wall');wall.x=(wallStart.x+pt.x)/2;wall.y=(wallStart.y+pt.y)/2;wall.w=Math.hypot(dx,dy);wall.rot=Math.atan2(dy,dx)*180/Math.PI;wall.z=0;
+  var wall=newRecord('wall');var st=archStyle('wall',activePreset.wall);wall.styleId=st.id;wall.d=st.d;wall.h=st.h;wall.x=(wallStart.x+pt.x)/2;wall.y=(wallStart.y+pt.y)/2;wall.w=Math.hypot(dx,dy);wall.rot=Math.atan2(dy,dx)*180/Math.PI;wall.z=0;
   records.push(wall);selected=[wall.id];redraw();renderProps();setPlacement(null);text('WALL 3D: muro paramétrico dibujado; longitud '+wall.w.toFixed(2)+' m');return;
+ }
+ if(placing==='slab'){
+  if(!slabStart){slabStart=pt.clone();text('SLAB: elegí la segunda esquina de la losa');return;}
+  var st=archStyle('slab',activePreset.slab),rec=newRecord('slab');
+  rec.styleId=st.id;rec.slabKind=st.slabKind;rec.pitch=st.pitch;rec.w=Math.max(.05,Math.abs(pt.x-slabStart.x));rec.d=Math.max(.05,Math.abs(pt.y-slabStart.y));rec.h=st.h;
+  rec.x=(pt.x+slabStart.x)/2;rec.y=(pt.y+slabStart.y)/2;rec.z=st.slabKind==='roof'?2.8:0;
+  records.push(rec);selected=[rec.id];redraw();renderProps();setPlacement(null);text('SLAB paramétrica: '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m · '+st.name);return;
  }
  var kind=placing;
  if(!['box','sphere','cylinder','cone'].includes(kind))return;
@@ -485,6 +568,15 @@ function wallGeo(r,parent){
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
+ if(r.type==='slab'){
+  var g=boxGeom(r.w,r.d,r.h),p=g.getAttribute('position');
+  if(r.pitch){
+   var slope=Math.tan(clamp(r.pitch,-45,45)*Math.PI/180);
+   for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+p.getX(i)*slope);
+   p.needsUpdate=true;g.computeVertexNormals();
+  }
+  addMesh(g,r.slabKind==='roof'?0x89939a:0xb5bdc3,r.id,group);
+ }
  if(r.type==='wall')wallGeo(r,group);
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
@@ -511,7 +603,7 @@ function highlight(){
 function newRecord(type){
  var n=records.length;
  return {id:serial++,type:type,x:(n%4)*1.65-2.5,y:Math.floor(n/4)*2.6-1,z:0,
- rot:0,w:type==='wall'?4:2,d:type==='wall'?.22:2,h:type==='wall'?2.8:2,radius:1,openings:[]};
+ rot:0,w:type==='wall'?4:2,d:type==='wall'?.22:2,h:type==='wall'?2.8:type==='slab'?.20:2,radius:1,pitch:0,slabKind:'floor',openings:[]};
 }
 function create(type){
  if(type==='door'||type==='window'){
@@ -529,18 +621,19 @@ function renderProps(){
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto. WALL 3D: longitud, espesor y altura. Door/Window: seleccioná primero el muro. Los vanos se regeneran al editar.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
- var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>';
+ var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+(r.styleId?'<p>STYLE: '+escapeHtml(r.styleId)+'</p>':'');
  var keys=['x','y','z'];
  if(r.type!=='boolean')keys.push('rot');
- if(r.type==='box'||r.type==='wall')keys.push('w','d','h');
+ if(r.type==='box'||r.type==='wall'||r.type==='slab')keys.push('w','d','h');
+ if(r.type==='slab')keys.push('pitch');
  if(r.type==='sphere')keys.push('radius');
  if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
- var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:'Height (m)',radius:'Radius (m)'};
+ var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
  if(r.type==='wall'){
   html+='<div class="detail"><strong>OPENINGS · PARAMETRIC</strong><p>Una puerta o ventana permanece ligada a su muro. Editá la posición, ancho, alto y antepecho: se reconstruye el vano.</p>';
   (r.openings||[]).forEach(function(o,i){
-   html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>';
+   html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>'+(o.styleId?'<p>'+escapeHtml(o.styleId)+'</p>':'');
    [['offset','Offset X'],['w','Width'],['h','Height'],['sill','Sill']].forEach(function(k){html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';});
    html+='<button type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
@@ -563,6 +656,7 @@ function change(e){
   var name=input.dataset.key;
   if(['w','d','h','radius'].includes(name))val=clamp(val,.01,1000);
   else if(name==='rot')val=clamp(val,-3600,3600);
+  else if(name==='pitch')val=clamp(val,-45,45);
   else val=clamp(val,-10000,10000);
   r[name]=val;
  }
@@ -618,7 +712,7 @@ function orientation(){
  orbit.az=angles[0];orbit.el=angles[1];updateCamera();text(['Isometric','Top','Front','Right'][n]+' view');
 }
 function action(a){
- if(['box','sphere','cylinder','cone','wall','door','window'].includes(a)){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
+ if(['box','sphere','cylinder','cone','wall','door','window','slab'].includes(a)){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
  if(['union','subtract','intersect'].includes(a))return booleanBox(a);
  if(a==='view')return orientation();
  if(a==='obj')return exportOBJ();
@@ -814,12 +908,13 @@ async function readJSON(e){
  try{
   var data=JSON.parse(await file.text());
   if(data.format!=='BLACKLINE-CAD3D-1'||!Array.isArray(data.records)||data.records.length>1000)throw Error('Formato o contenido inválido');
-  var accepted=['box','sphere','cone','cylinder','wall','boolean'];
+  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
    var o={id:finite(r.id,0),type:r.type,x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
+    styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
-   if(r.type==='wall')o.openings=(Array.isArray(r.openings)?r.openings:[]).slice(0,150).filter(function(v){return v&&['door','window'].includes(v.kind);}).map(function(v){return {id:finite(v.id,0),kind:v.kind,offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,500),h:clamp(finite(v.h,1),.05,500),sill:clamp(finite(v.sill,0),0,500)};});
+   if(r.type==='wall')o.openings=(Array.isArray(r.openings)?r.openings:[]).slice(0,150).filter(function(v){return v&&['door','window'].includes(v.kind);}).map(function(v){return {id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,500),h:clamp(finite(v.h,1),.05,500),sill:clamp(finite(v.sill,0),0,500)};});
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
