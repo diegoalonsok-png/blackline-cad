@@ -3262,6 +3262,37 @@ function snapPoint(p){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
+   // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
+   // not just their insertion point. Read-only: never alter block entities.
+   if(e.type==='blockRef'){
+    const children=cadBlockChildrenCached(e);
+    let scanned=0;
+    for(const child of children){
+     if(++scanned>240||candidates.length>600)break;
+     if(child.type==='line'||child.type==='polyline'||child.type==='rect'){
+      const vertices=getVertices(child).filter(Boolean);
+      for(const v of vertices){
+       if(cadOsnapEnabled('END'))candidates.push([v,'END']);
+      }
+      if(cadOsnapEnabled('MID')){
+       const segments=child.type==='line'?[[child.a,child.b]]:
+        child.type==='rect'?[
+         [P(child.a.x,child.a.y),P(child.a.x,child.b.y)],
+         [P(child.a.x,child.b.y),P(child.b.x,child.b.y)],
+         [P(child.b.x,child.b.y),P(child.b.x,child.a.y)],
+         [P(child.b.x,child.a.y),P(child.a.x,child.a.y)]
+        ]:child.pts?.slice(1).map((v,i)=>[child.pts[i],v])||[];
+       if(child.type==='polyline'&&child.closed&&child.pts?.length>2)segments.push([child.pts.at(-1),child.pts[0]]);
+       for(const [a,b] of segments)if(a&&b)candidates.push([mul(add(a,b),.5),'MID']);
+      }
+     }else if(child.type==='circle'||child.type==='arc'||child.type==='ellipse'){
+      if(cadOsnapEnabled('CENTER')&&child.c)candidates.push([child.c,'CENTER']);
+      if(cadOsnapEnabled('QUAD')&&child.type==='circle'&&child.c){
+       candidates.push([P(child.c.x+child.r,child.c.y),'QUAD'],[P(child.c.x-child.r,child.c.y),'QUAD'],[P(child.c.x,child.c.y+child.r),'QUAD'],[P(child.c.x,child.c.y-child.r),'QUAD']);
+      }
+     }else if(child.type==='blockRef'&&cadOsnapEnabled('POINT')&&child.p)candidates.push([child.p,'POINT']);
+    }
+   }
    if(e.type==='line'){
     if(window.BlacklineOSNAPMath){
      if(cadOsnapEnabled('NEAREST')){
