@@ -10561,7 +10561,33 @@ initBlocks();initPermanentBlockGallery();initDockablePalettes();
  for(const [id,command] of [['cadStatusPan','PAN'],['cadStatusZoom','ZOOM'],['cadStatusScissor','TIJERA'],['cadStatusLayer','LAYER'],['cadStatusUnits','UNITS'],['cadStatusLayout','LAYOUT'],['cadStatusUndo','UNDO'],['cadStatusRedo','REDO']]){
   const button=$(id);if(button)button.addEventListener('click',()=>{$('command').value=command;runCommand()});
  }
- $('cadStatusManual')?.addEventListener('click',()=>window.open('./manual-comandos.html','_blank','noopener'));
+ function openCadQuickGuide(){
+ let backdrop=document.getElementById('cadQuickGuideBackdrop');
+ if(!backdrop){
+  backdrop=document.createElement('div');
+  backdrop.id='cadQuickGuideBackdrop';
+  backdrop.setAttribute('role','presentation');
+  backdrop.style.cssText='position:fixed;inset:0;z-index:210000;background:#000b;display:flex;justify-content:center;align-items:center;padding:20px';
+  const dialog=document.createElement('section');
+  dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');dialog.setAttribute('aria-label','CAD2D quick command and shortcut guide');
+  dialog.style.cssText='width:min(1060px,96vw);height:min(760px,90vh);display:flex;flex-direction:column;border:1px solid #536879;border-radius:13px;overflow:hidden;background:#151b23;box-shadow:0 22px 65px #000b';
+  const toolbar=document.createElement('div');
+  toolbar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 12px;background:#101820;border-bottom:1px solid #3d4d5b;color:#e7edf3;font-size:13px';
+  const label=document.createElement('strong');label.textContent='CAD2D · Quick guide / Guía rápida';
+  const actions=document.createElement('div');actions.style.cssText='display:flex;align-items:center;gap:9px';
+  const full=document.createElement('a');full.href='./manual-comandos.html';full.target='_blank';full.rel='noopener';full.textContent='Full manual / Manual completo';full.style.cssText='color:#b4d7ea;text-decoration:underline';
+  const close=document.createElement('button');close.type='button';close.textContent='✕';close.setAttribute('aria-label','Close quick guide');
+  close.style.cssText='background:#293744;color:#fff;border:1px solid #536879;border-radius:7px;padding:5px 11px;cursor:pointer';
+  close.onclick=()=>{backdrop.remove();document.getElementById('cadStatusManual')?.focus()};
+  actions.append(full,close);toolbar.append(label,actions);
+  const frame=document.createElement('iframe');frame.src='./guia-rapida-cad2d.html';frame.title='Quick guide: commands and keyboard shortcuts';frame.style.cssText='border:0;flex:1;width:100%;min-height:0';
+  dialog.append(toolbar,frame);backdrop.append(dialog);
+  backdrop.addEventListener('pointerdown',e=>{if(e.target===backdrop)close.click()});
+  backdrop.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close.click()}});
+  document.body.append(backdrop);close.focus();
+ }else backdrop.querySelector('button[aria-label="Close quick guide"]')?.focus();
+}
+$('cadStatusManual')?.addEventListener('click',openCadQuickGuide);
 initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings();initTypographyPalette();
  (function initCadTextBar(){
  const pairs=[['cadTextBarValue','textValue'],['cadTextBarFont','textFont'],['cadTextBarHeight','textHeight'],['cadTextBarAngle','textAngle'],['cadTextBarHighlightColor','textHighlightColor']];
