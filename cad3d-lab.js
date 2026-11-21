@@ -18,6 +18,8 @@ var viewPresets=[
  ['right','Derecha','ortho',0,.001],
  ['ne','Axonométrica NE','ortho',Math.PI/4,.56],
  ['nw','Axonométrica NO','ortho',3*Math.PI/4,.56],
+ ['se','Axonométrica SE','ortho',-Math.PI/4,.56],
+ ['sw','Axonométrica SO','ortho',-3*Math.PI/4,.56],
  ['walk','Peatonal 1,65 m','walk',-Math.PI/2,.02]
 ];
 var icons={
@@ -851,7 +853,7 @@ function setViewPreset(key){
  }
  root.querySelector('.cad3dViewSelect').value=v[0];
  applyViewCamera();if(fallbackCanvas)fallbackDraw();
- text(v[1]+' · '+(viewMode==='walk'?'altura ocular 1,65 m; rueda para avanzar / retroceder':viewMode==='ortho'?'proyección paralela':'perspectiva')+(fallbackCanvas?' · vista simplificada':''));
+ text(v[1]+' · '+(viewMode==='walk'?'altura ocular 1,65 m; W/A/S/D caminar · rueda avanzar / retroceder':viewMode==='ortho'?'proyección paralela':'perspectiva')+(fallbackCanvas?' · vista simplificada':''));
 }
 function action(a){
  if(['box','sphere','cylinder','cone','wall','door','window','slab'].includes(a)){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
@@ -1093,6 +1095,29 @@ window.addEventListener('keydown',function(ev){
  target.y+=(-Math.sin(orbit.az)*fwd-Math.cos(orbit.az)*side)*step;
  applyViewCamera();if(fallbackCanvas)fallbackDraw();
 },true);
+
+/* Window-capture keyboard routing prevents the underlying CAD2D command line
+   from stealing pedestrian navigation while the floating 3D viewport is open. */
+window.addEventListener('keydown',function(ev){
+ if(!root||root.hidden)return;
+ if(ev.key==='Escape'&&placing){
+  ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');return;
+ }
+ if(viewMode!=='walk'||ev.ctrlKey||ev.metaKey||ev.altKey)return;
+ if(ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
+ var key=ev.key.toLowerCase();
+ if(!['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key))return;
+ ev.preventDefault();ev.stopImmediatePropagation();
+ var speed=ev.shiftKey?1.5:.5,a=orbit.az;
+ if(key==='w'||key==='arrowup'){target.x-=Math.cos(a)*speed;target.y-=Math.sin(a)*speed;}
+ else if(key==='s'||key==='arrowdown'){target.x+=Math.cos(a)*speed;target.y+=Math.sin(a)*speed;}
+ else if(key==='a'){target.x-=Math.sin(a)*speed;target.y+=Math.cos(a)*speed;}
+ else if(key==='d'){target.x+=Math.sin(a)*speed;target.y-=Math.cos(a)*speed;}
+ else if(key==='arrowleft')orbit.az+=.11;
+ else if(key==='arrowright')orbit.az-=.11;
+ updateCamera();
+},true);
+
 window.BlacklineCAD3D=Object.freeze({open:open,close:close,get enabled(){return !!root&&!root.hidden;},get experimental(){return true;}});
 /* Only install a launcher. Three.js is not requested until the explicit user click. */
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',launch,{once:true});else launch();
