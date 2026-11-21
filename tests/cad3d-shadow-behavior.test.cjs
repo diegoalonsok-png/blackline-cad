@@ -22,7 +22,7 @@ function setup(){
  const root={querySelector(selector){
   return {checked:false,value:0,textContent:'',setAttribute(){}};
  }};
- const ctx={root,sunSettings,sunGround,sunAmbient,sunFill,modelRoot,sunLight,renderer,scene,T:{},
+ const ctx={root,sunSettings,sunGround,sunAmbient,sunFill,modelRoot,sunLight,renderer,scene,T:{},renderStyle:'shaded-edges',
   records:[{id:1,type:'box',x:1,y:2,z:0,w:2,d:2,h:2}],
   visibleRecord:()=>true,Math,Number,Infinity};
  vm.runInNewContext(extract('function cad3dBounds(){','function renderDraftModes(){'),ctx);
