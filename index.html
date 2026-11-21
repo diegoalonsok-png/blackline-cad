@@ -3270,7 +3270,10 @@ function snapPoint(p){
     for(const child of children){
      if(++scanned>240||candidates.length>600)break;
      if(child.type==='line'||child.type==='polyline'||child.type==='rect'){
-      const vertices=getVertices(child).filter(Boolean);
+      const vertices=(child.type==='rect'?[
+       P(child.a.x,child.a.y),P(child.a.x,child.b.y),
+       P(child.b.x,child.b.y),P(child.b.x,child.a.y)
+      ]:getVertices(child)).filter(Boolean);
       for(const v of vertices){
        if(cadOsnapEnabled('END'))candidates.push([v,'END']);
       }
