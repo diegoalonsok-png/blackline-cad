@@ -273,13 +273,36 @@ const ARCH_STYLES={
   {id:'single-swing',name:'Single swing',w:.90,h:2.10,sill:0},
   {id:'double-swing',name:'Double swing',w:1.60,h:2.10,sill:0},
   {id:'sliding-door',name:'Sliding',w:1.80,h:2.10,sill:0},
-  {id:'open-door',name:'Empty opening',w:1.00,h:2.10,sill:0}
+  {id:'open-door',name:'Empty opening',w:1.00,h:2.10,sill:0},
+  {id:'single-left-80',name:'Single hinged · 80 cm',w:.80,h:2.10,sill:0},
+  {id:'single-right-100',name:'Single hinged · 100 cm',w:1.00,h:2.10,sill:0},
+  {id:'interior-70',name:'Interior · 70 cm',w:.70,h:2.05,sill:0},
+  {id:'double-wide',name:'Double hinged · 180 cm',w:1.80,h:2.20,sill:0},
+  {id:'sliding-pocket',name:'Pocket sliding · 90 cm',w:.90,h:2.10,sill:0},
+  {id:'sliding-double',name:'Double sliding · 240 cm',w:2.40,h:2.20,sill:0},
+  {id:'pivot-door',name:'Pivot entrance · 120 cm',w:1.20,h:2.40,sill:0},
+  {id:'french-door',name:'French glazed · 160 cm',w:1.60,h:2.20,sill:0},
+  {id:'garage-door',name:'Garage sectional · 260 cm',w:2.60,h:2.40,sill:0},
+  {id:'service-door',name:'Service · 80 cm',w:.80,h:2.00,sill:0},
+  {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
   {id:'double-window',name:'Two-leaf',w:1.60,h:1.20,sill:.90},
   {id:'sliding-window',name:'Sliding',w:1.60,h:1.20,sill:.85},
-  {id:'casement',name:'Casement',w:.90,h:1.30,sill:.90}
+  {id:'casement',name:'Casement',w:.90,h:1.30,sill:.90},
+  {id:'fixed-narrow',name:'Fixed narrow · 60 cm',w:.60,h:1.40,sill:.80},
+  {id:'fixed-wide',name:'Picture fixed · 240 cm',w:2.40,h:1.50,sill:.70},
+  {id:'sliding-small',name:'Sliding · 120 cm',w:1.20,h:1.00,sill:1.00},
+  {id:'sliding-large',name:'Sliding · 240 cm',w:2.40,h:1.50,sill:.70},
+  {id:'double-casement',name:'Double casement · 140 cm',w:1.40,h:1.30,sill:.90},
+  {id:'awning',name:'Awning · 100 cm',w:1.00,h:.80,sill:1.30},
+  {id:'hopper',name:'Hopper · 80 cm',w:.80,h:.60,sill:1.50},
+  {id:'clerestory',name:'Clerestory · 200 cm',w:2.00,h:.55,sill:2.05},
+  {id:'floor-to-ceiling',name:'Full-height glazing · 180 cm',w:1.80,h:2.40,sill:0},
+  {id:'corner-fixed',name:'Tall fixed · 100 cm',w:1.00,h:2.20,sill:.15},
+  {id:'bathroom',name:'Bathroom · 60 cm',w:.60,h:.60,sill:1.70},
+  {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -647,9 +670,9 @@ function setPlacement(which){
  var instructions={
   wall:'Muro continuo: clic en cada vértice para seguir dibujando · Enter finaliza · Esc cancela',
   slab:'Losa: clic en dos esquinas opuestas',floor:'Piso: dos esquinas de la plataforma, medidas editables en Properties',
-  door:'Puerta: clic sobre un muro para insertar y abrir el vano',
-  window:'Ventana: clic sobre un muro para insertar y abrir el vano',
-  opening:'Vano: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' para calar',
+  door:'Puertas continuas: clic sobre cada muro · Enter o Esc termina',
+  window:'Ventanas continuas: clic sobre cada muro · Enter o Esc termina',
+  opening:'Vanos continuos: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' · Enter o Esc termina',
   move:'Move: elegí punto base y destino',copy:'Copy: elegí punto base y destino',
   rotate:'Rotate: escribí los grados en Command y pulsá Enter',dist:'Distancia: elegí dos puntos'
  };
@@ -1069,8 +1092,17 @@ function placeOpening(e){
  }else{
   op.h=span;op.sill=Math.min(style.sill,rec.h-span);
  }
- rec.openings.push(op);selected=[rec.id];redraw();renderProps();setPlacement(null);
- text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+' · geometría regenerada');
+ var overlaps=(rec.openings||[]).some(function(other){
+  var left=Math.abs(other.offset-op.offset)<(other.w+op.w)/2+.015;
+  if(!left)return false;
+  if(slab)return Math.abs((other.offsetY||0)-(op.offsetY||0))<((other.d||0)+(op.d||0))/2+.015;
+  return Math.max(other.sill||0,op.sill||0)<Math.min((other.sill||0)+(other.h||0),(op.sill||0)+op.h)+.015;
+ });
+ if(overlaps){text('La abertura se superpone a otra existente. Elegí otro lugar del muro.');return;}
+ rec.openings.push(op);selected=[rec.id];redraw();renderProps();
+ // Remain armed for another opening on this wall or a different wall.
+ text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
+  ' · '+rec.openings.length+' abertura(s) en este elemento · clic para colocar otra · Enter / Esc termina');
 }
 function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
@@ -1500,7 +1532,9 @@ function updateDynamicReadout(e){
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  if(!raw){
-  if(placing==='wall'){setPlacement(null);text('Muro continuo finalizado · Enter para reiniciar WALL');}
+  if(['wall','door','window','opening'].includes(placing)){
+   var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
+  }
   return;
  }
  var upper=raw.toUpperCase(),number=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
@@ -1775,9 +1809,9 @@ window.addEventListener('keydown',function(ev){
  if(!root||root.hidden||!root.contains(document.activeElement))return;
  var mode={F3:'osnap',F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
- if(ev.key==='Enter'&&placing==='wall'&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
+ if(ev.key==='Enter'&&['wall','door','window','opening'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
   ev.preventDefault();ev.stopImmediatePropagation();
-  setPlacement(null);text('Muro continuo finalizado');
+  var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
   return;
  }
  if(ev.key==='Escape'){
