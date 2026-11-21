@@ -938,6 +938,51 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @container(max-width:250px){.brandbar .right>.cad-header-primary{display:inline-flex!important}}
 @media(max-width:950px){.app .brandbar .cad-command-finder{display:none!important}}
 @media(max-width:680px){.app .brandbar .brand,.app .brandbar .cad-header-undo-redo{display:none!important}}
+/* Selected Lexicon background overrides older hardcoded graphite colors.
+   Only app chrome is recolored: drawing geometry and model space stay unchanged. */
+.app[data-lexicon-background] .brandbar,
+.app[data-lexicon-background] .tabbar,
+.app[data-lexicon-background] .ribbon-shell,
+.app[data-lexicon-background] .ribbon{
+ background:var(--lexicon-toolbar)!important;
+ color:var(--lexicon-text)!important;
+}
+.app[data-lexicon-background] .sidebar,
+.app[data-lexicon-background] .sidebar.rightside,
+.app[data-lexicon-background] .panel,
+.app[data-lexicon-background] .cad-palette,
+.app[data-lexicon-background] .cmd,
+.app[data-lexicon-background] .status,
+.app[data-lexicon-background] .floating-tools-handle,
+.app[data-lexicon-background] .cad-floating-tools{
+ background:var(--lexicon-background)!important;
+ color:var(--lexicon-text)!important;
+}
+.app[data-lexicon-background] .panel-title,
+.app[data-lexicon-background] .palette-title,
+.app[data-lexicon-background] .floating-tools-handle{
+ background:var(--lexicon-raised)!important;
+ color:var(--lexicon-text)!important;
+}
+.app[data-lexicon-background] .btn,
+.app[data-lexicon-background] .status button,
+.app[data-lexicon-background] .sidebar button,
+.app[data-lexicon-background] .tabbar button,
+.app[data-lexicon-background] .ribbon .tool{
+ background:var(--lexicon-raised)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
+.app[data-lexicon-background] .ribbon .tool svg{
+ stroke:var(--lexicon-text)!important;
+}
+.app[data-lexicon-background] input:not([type=color]),
+.app[data-lexicon-background] select,
+.app[data-lexicon-background] textarea{
+ background:var(--lexicon-input)!important;
+ color:var(--lexicon-text)!important;
+ border-color:var(--lexicon-edge)!important;
+}
 /* Lexicon controls: only the theme and background palette buttons. */
 .app .brandbar > #cadAppearanceControls #blThemeToggle,
 .app .brandbar > #cadAppearanceControls #cadLexiconBackgroundBtn{
@@ -10153,7 +10198,7 @@ function initCadLexiconBackgroundPalette(){
  const valid=hex=>/^#[0-9a-f]{6}$/i.test(hex);
  function select(hex){
   if(!valid(hex))return;
-  window.cadSetPaletteBackground?.(hex);
+  if(!window.cadSetPaletteBackground?.(hex))return;
   custom.value=hex;
   swatches.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===hex)));
  }
@@ -10167,12 +10212,17 @@ function initCadLexiconBackgroundPalette(){
  button.addEventListener('click',()=>{
   if(!panel.hidden)return close();
   panel.hidden=false;button.setAttribute('aria-expanded','true');
+  try{const saved=localStorage.getItem('cad2d-lexicon-background');if(saved&&valid(saved)){custom.value=saved;swatches.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.color===saved)))}}catch(e){}
   const rect=button.getBoundingClientRect();
   panel.style.left=Math.max(8,Math.min(window.innerWidth-panel.offsetWidth-8,rect.left))+'px';
   panel.style.top=Math.max(8,Math.min(window.innerHeight-panel.offsetHeight-8,rect.bottom+6))+'px';
  });
  custom.addEventListener('input',()=>select(custom.value));
- reset.addEventListener('click',()=>select('#42454b'));
+ reset.addEventListener('click',()=>{
+  window.cadResetPaletteBackground?.();
+  custom.value='#34363b';
+  swatches.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));
+ });
  document.addEventListener('pointerdown',e=>{if(!panel.hidden&&!panel.contains(e.target)&&!button.contains(e.target))close()});
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)close()});
 }
@@ -10234,14 +10284,31 @@ function initCadColorPopover(){
  let savedTone=22;try{const modern=localStorage.getItem('cad2d-palette-tone-v2');const legacy=localStorage.getItem('cad2d-palette-tone');if(modern!==null&&Number.isFinite(Number(modern)))savedTone=Number(modern);else if(legacy!==null&&Number.isFinite(Number(legacy))&&Number(legacy)!==19)savedTone=Number(legacy);if(localStorage.getItem('cad2d-graphite-v1')!=='1'){if(savedTone===8)savedTone=22;localStorage.setItem('cad2d-graphite-v1','1')}}catch(e){}
  setPaletteTone(savedTone);
  window.cadSetPaletteBackground=(hex)=>{
-  if(!/^#[0-9a-f]{6}$/i.test(hex))return;
-  cadPaletteHue=hex;huePicker.value=hex;
+  if(!/^#[0-9a-f]{6}$/i.test(hex))return false;
+  const app=document.querySelector('.app');
+  if(!app)return false;
   const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
-  const brightness=rgb.reduce((s,v)=>s+v,0)/3;
-  const tone=Math.max(0,Math.min(100,Math.round((brightness-5)/2.36)));
-  try{localStorage.setItem('cad2d-palette-hue',hex)}catch(e){}
-  setPaletteTone(tone);
+  const mean=rgb.reduce((s,v)=>s+v,0)/3;
+  const text=mean>153?'#17212a':'#f4f7fa';
+  const adjust=amount=>'#'+rgb.map(v=>Math.max(0,Math.min(255,Math.round(v+amount))).toString(16).padStart(2,'0')).join('');
+  const dark=mean<110,delta=dark?17:-17;
+  app.style.setProperty('--lexicon-background',hex);
+  app.style.setProperty('--lexicon-toolbar',adjust(dark?6:-6));
+  app.style.setProperty('--lexicon-raised',adjust(delta));
+  app.style.setProperty('--lexicon-input',adjust(dark?-5:5));
+  app.style.setProperty('--lexicon-edge',adjust(dark?55:-55));
+  app.style.setProperty('--lexicon-text',text);
+  app.dataset.lexiconBackground=hex;
+  try{localStorage.setItem('cad2d-lexicon-background',hex)}catch(e){}
+  return true;
  };
+ window.cadResetPaletteBackground=()=>{
+  const app=document.querySelector('.app');if(!app)return;
+  delete app.dataset.lexiconBackground;
+  for(const name of ['background','toolbar','raised','input','edge','text'])app.style.removeProperty('--lexicon-'+name);
+  try{localStorage.removeItem('cad2d-lexicon-background')}catch(e){}
+ };
+ try{const saved=localStorage.getItem('cad2d-lexicon-background');if(saved)window.cadSetPaletteBackground(saved)}catch(e){};
  const note=document.createElement('div');note.className='cad-color-help';note.textContent='Elegí un esquema o personalizá cada color. Se guarda automáticamente en este navegador.';panel.append(note);
  const presets=document.createElement('div');presets.className='cad-color-presets';
  for(const [name,label] of [['dark','CAD oscuro'],['black','Negro'],['light','Claro'],['blueprint','Plano azul']]){
