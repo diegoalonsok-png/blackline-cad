@@ -1016,7 +1016,7 @@ ribbonTabs.output.push(['PROJECT','open','dxf','pdf','purge']);
 toolDefs.exportmenu=['Exportar','save'];
 ribbonTabs.home.push(['EXPORT','dxf','exportmenu']);
 ribbonTabs.output.push(['EXPORTAR','dxf','exportmenu']);
-let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#ff3333',visible:true,locked:false,width:.30},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false,width:.05},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'walls',unit:'m',grid:1,precision:2,lineWidth:.30,gridOn:true,snapOn:false,orthoOn:false,polarOn:false,polarAngle:45,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
+let state={dimStyles:{},activeDimStyle:'',blocks:{},entities:[],layers:[{id:'0',name:'0',color:'#e5e7eb',visible:true,locked:false},{id:'walls',name:'WALLS',color:'#ff3333',visible:true,locked:false,width:.30},{id:'openings',name:'OPENINGS',color:'#e0ba83',visible:true,locked:false,width:.05},{id:'dimensions',name:'DIMENSIONS',color:'#92c697',visible:true,locked:false},{id:'text',name:'TEXT',color:'#d7d3e8',visible:true,locked:false}],layerId:'0',unit:'m',grid:1,precision:2,lineWidth:.30,gridOn:true,snapOn:false,orthoOn:false,polarOn:false,polarAngle:45,osnapOn:true,tool:'select',stage:[],selected:[],history:[],future:[],nextId:1,view:{ox:0,oy:0,scale:43},mouse:{x:0,y:0},drag:null,hover:null,file:'Untitled Drawing',logs:[],measurement:null,modifyCandidate:null};
 const canvas=$('cadCanvas'),wrap=$('canvasWrap'),ctx=canvas.getContext('2d');canvas.tabIndex=0;canvas.setAttribute('aria-label','CAD model space: click to draw, type numbers for exact distance');let dpr=1,drawPending=false,spaceDown=false,pointer={x:0,y:0},lastClick=0;
 Object.assign(icons,{
  line:'<path d="M5 18 19 6"/><circle cx="5" cy="18" r="1.7"/><circle cx="19" cy="6" r="1.7"/>',
@@ -1608,7 +1608,13 @@ function cadDimAssocCommand(mode){
  updateAll();toast(mode==='off'?n+' cota(s) desasociadas: ya no siguen al objeto':n+' de '+list.length+' cota(s) asociadas a los objetos');
 }
 window.cadDimAssocCommand=cadDimAssocCommand;
-function newEntity(e){if(typeof cad2dCmdOpt!=='undefined')cad2dCmdOpt.done=true;e.id=state.nextId++;e.layer=e.layer||state.layerId;const layer=layerFor(e);e.width=e.width??layer.width??state.lineWidth;
+function newEntity(e){if(typeof cad2dCmdOpt!=='undefined')cad2dCmdOpt.done=true;e.id=state.nextId++;
+ const ordinaryGeometry=['line','polyline','rect'].includes(e.type)&&!e.wall2d;
+ const zeroLayer=state.layers.find(l=>l.id==='0'||l.name==='0');
+ const wallLayerIsActive=explicitWallLayerName(curLayer()?.name);
+ // Ordinary LINE/PLINE/RECT must not inherit WALLS by accident; dedicated WALL2D keeps its own layer.
+ e.layer=e.layer||(ordinaryGeometry&&wallLayerIsActive&&zeroLayer&&!zeroLayer.locked&&zeroLayer.visible?zeroLayer.id:state.layerId);
+ const layer=layerFor(e);e.width=e.width??layer.width??state.lineWidth;
  e=applyAutoWallJoin(e);
  if(e.type==='dimension'&&typeof cadAssociateDim==='function')cadAssociateDim(e);
  state.entities.push(e);updateAll()}
