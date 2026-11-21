@@ -1377,11 +1377,72 @@ function architectureParts(r,part){
   }
  });
 }
+/* Build a true miter at two-wall L corners rather than overlapping capped boxes.
+   Join is derived at render time: original parametric endpoints, spans and
+   door/window opening offsets remain editable and unchanged. */
+function wallJoinOffsets(wall){
+ if(wall.type!=='wall')return {start:null,end:null};
+ var theta=(wall.rot||0)*Math.PI/180,u={x:Math.cos(theta),y:Math.sin(theta)};
+ var normal={x:-u.y,y:u.x},half=(wall.w||0)/2;
+ var ends=[
+  {key:'start',point:{x:wall.x-u.x*half,y:wall.y-u.y*half}},
+  {key:'end',point:{x:wall.x+u.x*half,y:wall.y+u.y*half}}
+ ];
+ var result={start:null,end:null};
+ ends.forEach(function(end){
+  var matches=[];
+  records.forEach(function(other){
+   if(other===wall||other.type!=='wall'||other.id===wall.id||Math.abs((other.z||0)-(wall.z||0))>.025)return;
+   var a=(other.rot||0)*Math.PI/180,d={x:Math.cos(a),y:Math.sin(a)},h=(other.w||0)/2;
+   [{key:'start',point:{x:other.x-d.x*h,y:other.y-d.y*h}},
+    {key:'end',point:{x:other.x+d.x*h,y:other.y+d.y*h}}].forEach(function(p){
+    if(Math.hypot(end.point.x-p.point.x,end.point.y-p.point.y)<.025)
+     matches.push({other:other,at:p.key,dir:d});
+   });
+  });
+  // Do not apply L miters to ambiguous T, X or multiway intersections.
+  if(matches.length!==1)return;
+  var next=matches[0],v=next.dir;
+  // For the connected path the other wall must run away from an end point,
+  // or toward a start point; flip its travel direction when needed.
+  if((end.key==='end'&&next.at==='end')||(end.key==='start'&&next.at==='start'))
+   v={x:-v.x,y:-v.y};
+  var cross=u.x*v.y-u.y*v.x;
+  if(Math.abs(cross)<.15)return; // collinear: no visible miter required
+  var otherNormal={x:-v.y,y:v.x},ratio=next.other.d/wall.d;
+  if(!Number.isFinite(ratio)||ratio<=0)return;
+  // Solve intersection of equal-side offset lines in world XY.
+  var compute=function(localY){
+   var nx=otherNormal.x*localY*ratio-normal.x*localY;
+   var ny=otherNormal.y*localY*ratio-normal.y*localY;
+   return (nx*v.y-ny*v.x)/cross;
+  };
+  var lo=compute(-wall.d/2),hi=compute(wall.d/2);
+  if(!Number.isFinite(lo+hi)||Math.max(Math.abs(lo),Math.abs(hi))>Math.max(wall.d,next.other.d)*2.5)return;
+  result[end.key]={minus:lo,plus:hi};
+ });
+ return result;
+}
+function applyWallMiter(g,r,partWidth,partCenter,join){
+ var start=join.start&&Math.abs(partCenter-partWidth/2+r.w/2)<.0001;
+ var end=join.end&&Math.abs(partCenter+partWidth/2-r.w/2)<.0001;
+ if(!start&&!end)return;
+ var positions=g.getAttribute('position');
+ for(var i=0;i<positions.count;i++){
+  var px=positions.getX(i),py=positions.getY(i);
+  var v=start&&Math.abs(px+partWidth/2)<.00001?join.start:
+   end&&Math.abs(px-partWidth/2)<.00001?join.end:null;
+  if(v)positions.setX(i,px+(py<0?v.minus:v.plus));
+ }
+ positions.needsUpdate=true;g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
+ var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
  if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope){
   var g=boxGeom(w,d,h);
+  if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
    var p=g.getAttribute('position');
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
