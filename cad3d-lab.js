@@ -7,7 +7,7 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
-var sunSettings={enabled:true,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
+var sunSettings={enabled:true,azimuth:135,elevation:45,softness:2.5,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -476,7 +476,8 @@ function build(){
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
- '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
+ '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+ 
+  '<label>Shadow softness <output data-sun-softness>2.5</output><input data-sun-setting="softness" type="range" min="1" max="5" step="0.5" value="2.5" title="Soft shadow edges"></label>'+ 
  '<label class="sunToggle"><input type="checkbox" data-sun-ground checked> On ground</label>'+
  '<label class="sunToggle"><input type="checkbox" data-sun-faces checked> On faces</label>'+
  '<div class="sunPresetRow"><button type="button" class="btn" data-sun-preset="morning">Morning</button><button type="button" class="btn" data-sun-preset="noon">Noon</button><button type="button" class="btn" data-sun-preset="afternoon">Afternoon</button></div>'+
@@ -733,7 +734,9 @@ function applySunSettings(){
    root.querySelector('[data-sun-setting="'+key+'"]').value=String(sunSettings[key]);
    root.querySelector('[data-sun-'+key+']').textContent=sunSettings[key]+'°';
   });
-  root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
+  root.querySelector('[data-sun-setting="softness"]').value=String(sunSettings.softness);
+   root.querySelector('[data-sun-softness]').textContent=String(sunSettings.softness);
+   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
@@ -756,6 +759,9 @@ function applySunSettings(){
  shadowCamera.top=range;shadowCamera.bottom=-range;
  shadowCamera.near=.5;shadowCamera.far=radius*3.5;
  sunLight.shadow.bias=-.0002;sunLight.shadow.normalBias=.018;
+  // VSM blurs the shadow map; PCFSoft ignores shadow.radius in Three.js r160.
+  sunLight.shadow.radius=sunSettings.softness;
+  sunLight.shadow.blurSamples=8;
  shadowCamera.updateProjectionMatrix();
  if(renderer)renderer.shadowMap.needsUpdate=true;
 }
@@ -1035,7 +1041,7 @@ function init(){
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
- renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
+ renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.VSMShadowMap;
  root.querySelector('.view').appendChild(renderer.domElement);
  sunAmbient=new T.AmbientLight(0xffffff,1.3);scene.add(sunAmbient);
  sunLight=new T.DirectionalLight(0xffffff,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
