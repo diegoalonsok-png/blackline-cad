@@ -989,8 +989,10 @@ function init(){
  sunLight=new T.DirectionalLight(0xffffff,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
  sunFill=new T.DirectionalLight(0x8bc0ef,.7);sunFill.position.set(7,9,7);scene.add(sunFill);
  // The grid is lines, not a shadow receiver. Keep visual ground separate from editable model.
- sunGround=new T.Mesh(new T.PlaneGeometry(2000,2000),new T.ShadowMaterial({color:0x000000,opacity:.52,depthWrite:false,side:T.DoubleSide}));
- sunGround.position.z=-.03;sunGround.receiveShadow=true;sunGround.castShadow=false;sunGround.renderOrder=1;scene.add(sunGround);
+ sunGround=new T.Mesh(new T.PlaneGeometry(2000,2000),
+  new T.MeshStandardMaterial({color:0x9ba5a8,roughness:1,metalness:0,side:T.DoubleSide}));
+ sunGround.position.z=-.03;sunGround.receiveShadow=true;sunGround.castShadow=false;
+ sunGround.renderOrder=0;scene.add(sunGround);
  gridHelper=new T.GridHelper(60,60,0x6e8391,new T.Color(MODEL_GRID));gridHelper.rotation.x=Math.PI/2;scene.add(gridHelper);
  axesHelper=new T.AxesHelper(2);scene.add(axesHelper);
  modelRoot=new T.Group();scene.add(modelRoot);raycaster=new T.Raycaster();
