@@ -4,8 +4,8 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const src=fs.readFileSync('cad3d-lab.js','utf8');
 test('CAD3D source parses as JavaScript',()=>assert.doesNotThrow(()=>new vm.Script(src)));
-test('Sun uses a real WebGL shadow receiver not model geometry',()=>{
- assert(src.includes('new T.ShadowMaterial('),'ShadowMaterial receiver is missing');
+test('Sun uses a lit WebGL ground receiver, separate from editable records',()=>{
+ assert(src.includes('new T.MeshStandardMaterial({color:0x9ba5a8'),'Lit ground receiver is missing');
  assert(src.includes('sunGround.receiveShadow=true'),'Ground must receive shadows');
  assert(src.includes('renderer.shadowMap.enabled=true'),'Renderer must enable shadow maps');
  assert(src.includes('sunLight.castShadow=sunSettings.enabled'),'Sun must cast shadows');
@@ -27,4 +27,12 @@ test('CAD3D view controls and differentiated floor/sun icons are implemented',()
 });
 test('Sun activates from the toolbar without requiring a second checkbox click',()=>{
  assert(src.includes('if(opening&&!sunSettings.enabled){sunSettings.enabled=true;applySunSettings();}'));
+});
+
+test('A user can compare actual WebGL rendered pixels with cast shadows on/off',()=>{
+ assert(src.includes('function checkVisibleShadows(){'));
+ assert(src.includes('sunLight.castShadow=false;'));
+ assert(src.includes('sunLight.castShadow=true;'));
+ assert(src.includes("ctx.getImageData(0,0,w,h).data"));
+ assert(src.includes("data-check-shadows"));
 });
