@@ -877,6 +877,13 @@ function assistedPoint(p,view){
    if(r.type==='wall'){
     var a=(r.rot||0)*Math.PI/180,dx=Math.cos(a)*r.w/2,dy=Math.sin(a)*r.w/2;
     consider(r.x-dx,r.y-dy);consider(r.x+dx,r.y+dy);
+    // Snap to any point on the host wall axis for reliable T junctions.
+    // Only active during WALL, respecting the existing OSNAP and ORTHO modes.
+    if(placing==='wall'&&r.w>.001){
+     var ux=Math.cos(a),uy=Math.sin(a);
+     var along=clamp((p.x-r.x)*ux+(p.y-r.y)*uy,-r.w/2,r.w/2);
+     consider(r.x+ux*along,r.y+uy*along);
+    }
    }
    consider(r.x,r.y);
   });
