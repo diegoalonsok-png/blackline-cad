@@ -10130,6 +10130,12 @@ initAdjustableChrome();initMovableRibbon();initDisplayColors();initGripSettings(
  syncFromPalette();
  })();setupModifyPanel();initializeDimensionPalette();initAdvancedCad();initFloatingCadToolbar();initDrawExtras();initLayoutWorkspace();initCadCommandFinder();
 buildRibbon('home');renderLayers();updateProps();updateStats();prompt();resize();initializeLocalBackup();new ResizeObserver(resize).observe(wrap);log('CAD2D initialized · Model space ready');log('Select a tool or type LINE / CIRCLE / RECT / PDF');
+/* Read-only reference bridge for the isolated CAD3D lab. Never mutates the CAD2D drawing. */
+window.BlacklineCAD3DBridge=Object.freeze({
+ snapshot:()=>({unit:state.unit,layers:clone(state.layers),entities:clone(flattenCADEntities(state.entities))}),
+ convertDWG: file=>convertDWGAutomatically(file,{textOnly:true}),
+ decodeDXF: async file=>cadDxfDecode(await file.arrayBuffer())
+});
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
