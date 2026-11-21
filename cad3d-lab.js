@@ -3,7 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null;
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, dragging=null, winDrag=null, observer=null, placing=null, wallStart=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, fallbackError=null;
 var DISABLE_KEY='blackline-cad3d-disabled';
 var icons={
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
@@ -163,16 +163,126 @@ function setPlacement(which){
  root.querySelectorAll('.tools button[data-action]').forEach(function(b){b.classList.toggle('armed',b.dataset.action===which);});
  if(which)text(''+which.toUpperCase()+': clic en el suelo para ubicar'+(which==='wall'?' el primer punto y después el segundo':which==='door'||which==='window'?' la abertura sobre un muro':' el sólido')+' · Esc cancela');
 }
+
+/* Lightweight orthographic compatibility renderer: allows drawing/editing
+   even when Three.js CDN or WebGL is blocked. Never touches the CAD2D canvas. */
+function projection(x,y,z){
+ var w=fallbackCanvas?.clientWidth||500,h=fallbackCanvas?.clientHeight||400;
+ var ca=Math.cos(orbit.az),sa=Math.sin(orbit.az),ce=Math.cos(orbit.el),se=Math.sin(orbit.el);
+ var dx=x-target.x,dy=y-target.y,dz=z-target.z;
+ var scale=Math.min(w,h)*1.25/Math.max(orbit.dist,1);
+ return {x:w/2+((dx*ca+dy*sa)*scale),y:h/2-((-dx*sa+dy*ca)*se-dz*ce)*scale,scale:scale};
+}
+function fallbackGround(e){
+ var rc=fallbackCanvas.getBoundingClientRect(),w=rc.width,h=rc.height;
+ if(w<2||h<2)return null;
+ var scale=Math.min(w,h)*1.25/Math.max(orbit.dist,1);
+ var uu=(e.clientX-rc.left-w/2)/scale;
+ var vv=-(e.clientY-rc.top-h/2)/scale;
+ var se=Math.sin(orbit.el),ce=Math.cos(orbit.el),ca=Math.cos(orbit.az),sa=Math.sin(orbit.az);
+ var perpendicular=(vv-(target.z*ce))/Math.max(.16,se);
+ return {x:target.x+uu*ca-perpendicular*sa,y:target.y+uu*sa+perpendicular*ca,z:0,
+ clone:function(){return {x:this.x,y:this.y,z:this.z,clone:this.clone};}};
+}
+function fallbackPolygon(points,fill,stroke,width){
+ var g=fallbackCtx;if(!points.length)return;
+ g.beginPath();g.moveTo(points[0].x,points[0].y);for(var i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);g.closePath();
+ g.fillStyle=fill;g.fill();g.strokeStyle=stroke;g.lineWidth=width||1;g.stroke();
+}
+function fallbackBox(rec,w,d,h,offsetX,offsetY,offsetZ,color){
+ var cx=(rec.x||0)+(offsetX||0),cy=(rec.y||0)+(offsetY||0),cz=(rec.z||0)+(offsetZ||0);
+ var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),ss=Math.sin(a);
+ var pts=[];
+ for(var z=0;z<=1;z++)for(var y=0;y<=1;y++)for(var x=0;x<=1;x++){
+  var lx=(x-.5)*w,ly=(y-.5)*d;
+  pts.push(projection(cx+lx*c-ly*ss,cy+lx*ss+ly*c,cz+z*h));
+ }
+ var selectedObject=selected.includes(rec.id);
+ var stroke=selectedObject?'#efc978':'#5a7585';
+ var faces=[
+  {v:[0,1,3,2],fill:'#243440'},{v:[4,6,7,5],fill:color||'#617788'},
+  {v:[0,4,5,1],fill:'#2e4554'},{v:[2,3,7,6],fill:'#395569'},
+  {v:[0,2,6,4],fill:'#425a68'},{v:[1,5,7,3],fill:'#4e6a7b'}
+ ];
+ faces.sort(function(a,b){return b.v.reduce(function(n,i){return n+pts[i].y;},0)-a.v.reduce(function(n,i){return n+pts[i].y;},0);});
+ faces.forEach(function(face){fallbackPolygon(face.v.map(function(i){return pts[i];}),face.fill,stroke,selectedObject?1.8:.85);});
+}
+function fallbackDraw(){
+ if(!fallbackCanvas||!fallbackCtx||root?.hidden)return;
+ var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
+ if(w<=0||h<=0)return;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle='#0d141a';ctx.fillRect(0,0,w,h);
+ ctx.lineWidth=.65;ctx.strokeStyle='#23313c';
+ for(var i=-20;i<=20;i++){
+  var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
+ }
+ var origin=projection(0,0,0);
+ ctx.strokeStyle='#7191a2';ctx.lineWidth=1;
+ ctx.beginPath();ctx.moveTo(origin.x-4,origin.y);ctx.lineTo(origin.x+4,origin.y);ctx.moveTo(origin.x,origin.y-4);ctx.lineTo(origin.x,origin.y+4);ctx.stroke();
+ if(underlay?.segments?.length){
+  ctx.strokeStyle='#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
+  ctx.beginPath();
+  underlay.segments.forEach(function(p){var a=projection(p[0],p[1],0),b=projection(p[2],p[3],0);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);});
+  ctx.stroke();
+ }
+ records.forEach(function(rec){
+  if(rec.type==='box'||rec.type==='wall'){
+   fallbackBox(rec,rec.w,rec.d,rec.h,0,0,0,rec.type==='wall'?'#8d9197':'#648b9f');
+   if(rec.type==='wall')(rec.openings||[]).forEach(function(o){
+    var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),ss=Math.sin(a);
+    var x=rec.x+o.offset*c,y=rec.y+o.offset*ss;
+    var lo=projection(x-o.w/2*c,y-o.w/2*ss,rec.z+o.sill);
+    var hi=projection(x+o.w/2*c,y+o.w/2*ss,rec.z+o.sill+o.h);
+    ctx.save();ctx.strokeStyle=o.kind==='door'?'#d6b98d':'#80c4e6';ctx.lineWidth=2;ctx.strokeRect(Math.min(lo.x,hi.x),Math.min(lo.y,hi.y),Math.abs(lo.x-hi.x),Math.abs(lo.y-hi.y));ctx.restore();
+   });
+  }else if(rec.type==='sphere'){
+   var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
+   var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
+   ctx.fillStyle=grad;ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#5e8399';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+  }else if(rec.type==='cylinder'||rec.type==='cone'){
+   var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
+   ctx.fillStyle='#547b91';ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
+   ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
+  }else if(rec.type==='boolean'&&rec.triangles?.length){
+   var p=rec.triangles;
+   ctx.strokeStyle='#789ab3';ctx.lineWidth=1;
+   for(var i=0;i+8<p.length;i+=9){
+    var a=projection(p[i],p[i+1],p[i+2]),b=projection(p[i+3],p[i+4],p[i+5]),c=projection(p[i+6],p[i+7],p[i+8]);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
+   }
+  }
+ });
+ ctx.font='11px Inter, Arial';ctx.textBaseline='top';ctx.fillStyle='#bbcedb';
+ ctx.fillText('3D · COMPATIBILITY VIEW (no WebGL)',10,12);
+ if(placing){ctx.fillStyle='#e6ce90';ctx.fillText('Tool: '+placing.toUpperCase()+' · Click to place',10,30);}
+}
+function beginFallback(error){
+ fallbackError=error;
+ if(!root)return;
+ var holder=root.querySelector('.view');
+ fallbackCanvas=document.createElement('canvas');fallbackCanvas.className='cad3dFallback';
+ fallbackCanvas.setAttribute('aria-label','3D editing viewport compatibility renderer');
+ fallbackCtx=fallbackCanvas.getContext('2d',{alpha:false});
+ if(!fallbackCtx){text('No se pudo iniciar el visor 3D (Canvas2D no disponible)');return;}
+ holder.appendChild(fallbackCanvas);
+ target={x:0,y:0,z:1,set:function(x,y,z){this.x=x;this.y=y;this.z=z;}};
+ camera=null;renderer=null;modelRoot=null;raycaster=null;underlayGroup=null;
+ bindCanvas(fallbackCanvas);resize();renderProps();fallbackDraw();
+ text('Vista 3D compatible: seleccioná BOX o WALL y hacé clic en la pantalla · motor WebGL no disponible');
+}
+
 async function open(){
  build();root.hidden=false;document.getElementById('cad3dOpen').setAttribute('aria-pressed','true');
- if(renderer){resize();loop();return;}
+ if(renderer||fallbackCanvas){resize();loop();return;}
  text('Cargando motor 3D bajo demanda…');
  try{
   if(!T){try{T=await import('https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js');}
    catch(e){T=await import('https://unpkg.com/three@0.182.0/build/three.module.js');}}
   if(root.hidden)return;
   init();redraw();renderProps();loop();text('3D listo · '+records.length+' sólidos');
- }catch(e){text('Error al iniciar 3D: '+String(e&&e.message||e));console.error('Blackline CAD3D',e);}
+ }catch(e){console.warn('Blackline CAD3D: WebGL fallback',e);beginFallback(e);}
 }
 function close(){
  if(!root)return;root.hidden=true;document.getElementById('cad3dOpen').setAttribute('aria-pressed','false');
@@ -194,17 +304,26 @@ function init(){
  bindCanvas(renderer.domElement);resize();
 }
 function updateCamera(){
- if(!camera)return;
+ if(!camera){if(fallbackCanvas)fallbackDraw();return;}
  camera.position.set(target.x+orbit.dist*Math.cos(orbit.el)*Math.cos(orbit.az),
  target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
  camera.lookAt(target);
+ if(fallbackCanvas)fallbackDraw();
 }
 function resize(){
+ if(fallbackCanvas&&root&&!root.hidden){
+  var rect=root.querySelector('.view'),scale=Math.min(2,window.devicePixelRatio||1);
+  fallbackCanvas.width=Math.max(1,Math.round(rect.clientWidth*scale));
+  fallbackCanvas.height=Math.max(1,Math.round(rect.clientHeight*scale));
+  fallbackCtx.setTransform(scale,0,0,scale,0,0);
+  fallbackDraw();
+ }
  if(!renderer||!root||root.hidden)return;
  var v=root.querySelector('.view');if(v.clientWidth<2||v.clientHeight<2)return;
  renderer.setSize(v.clientWidth,v.clientHeight,false);camera.aspect=v.clientWidth/v.clientHeight;camera.updateProjectionMatrix();
 }
 function loop(){
+ if(!renderer){if(fallbackCanvas)fallbackDraw();return;}
  if(frame)return;
  function tick(){frame=0;if(!renderer||root.hidden)return;renderer.render(scene,camera);frame=requestAnimationFrame(tick);}
  frame=requestAnimationFrame(tick);
@@ -234,11 +353,24 @@ function rayAt(e){
  raycaster.setFromCamera(new T.Vector2((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1),camera);
 }
 function groundAt(e){
+ if(fallbackCanvas)return fallbackGround(e);
  rayAt(e);var p=new T.Vector3();
  if(!raycaster.ray.intersectPlane(new T.Plane(new T.Vector3(0,0,1),0),p))return null;
  return p;
 }
 function wallHitAt(e){
+ if(fallbackCanvas){
+  var pt=fallbackGround(e),nearest=null,threshold=Math.max(.3,orbit.dist/65);
+  if(!pt)return null;
+  records.forEach(function(r){
+   if(r.type!=='wall')return;
+   var ca=Math.cos((r.rot||0)*Math.PI/180),sa=Math.sin((r.rot||0)*Math.PI/180);
+   var relX=pt.x-r.x,relY=pt.y-r.y,u=relX*ca+relY*sa,v=-relX*sa+relY*ca;
+   var distance=Math.hypot(Math.max(0,Math.abs(u)-r.w/2),Math.abs(v));
+   if(distance<threshold&&(!nearest||distance<nearest.distance))nearest={wall:r,point:pt,distance:distance};
+  });
+  return nearest;
+ }
  rayAt(e);var meshes=[];modelRoot.traverse(function(o){if(o.isMesh)meshes.push(o);});
  var hits=raycaster.intersectObjects(meshes,false);
  for(var i=0;i<hits.length;i++){
@@ -248,7 +380,7 @@ function wallHitAt(e){
  return null;
 }
 function placeAt(e){
- if(!renderer||!modelRoot)return;
+ if(!renderer&&!fallbackCanvas)return;
  if(placing==='door'||placing==='window'){
   var hit=wallHitAt(e);
   if(!hit){text('Hacé clic sobre un muro 3D para vincular la abertura');return;}
@@ -273,6 +405,20 @@ function placeAt(e){
  redraw();renderProps();setPlacement(null);text(kind.toUpperCase()+' ubicado en X '+pt.x.toFixed(2)+' Y '+pt.y.toFixed(2));
 }
 function selectAt(e){
+ if(fallbackCanvas){
+  var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34;
+  records.forEach(function(rec){
+   var p=projection(rec.x,rec.y,rec.z+(rec.h||rec.radius||1)*.5);
+   var distance=Math.hypot((e.clientX-r.left)-p.x,(e.clientY-r.top)-p.y);
+   if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
+  });
+  var id=best?.id;
+  if(id==null){if(!e.shiftKey)selected=[];}
+  else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
+  else selected=[id];
+  renderProps();highlight();text(selected.length+' objetos seleccionados');
+  return;
+ }
  var box=renderer.domElement.getBoundingClientRect();
  var p=new T.Vector2(2*(e.clientX-box.left)/box.width-1,-2*(e.clientY-box.top)/box.height+1);
  raycaster.setFromCamera(p,camera);
@@ -330,11 +476,13 @@ function buildObject(r){
  modelRoot.add(group);
 }
 function redraw(){
+ if(fallbackCanvas){fallbackDraw();return;}
  if(!modelRoot)return;
  modelRoot.traverse(function(o){if(o.isMesh){o.geometry.dispose();o.material.dispose();}});
  modelRoot.clear();records.forEach(buildObject);highlight();
 }
 function highlight(){
+ if(fallbackCanvas){fallbackDraw();return;}
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
@@ -451,7 +599,7 @@ function orientation(){
  orbit.az=angles[0];orbit.el=angles[1];updateCamera();text(['Isometric','Top','Front','Right'][n]+' view');
 }
 function action(a){
- if(['box','sphere','cylinder','cone','wall','door','window'].includes(a)){if(!renderer)return text('Primero debe cargarse el visor 3D');setPlacement(a);return;}
+ if(['box','sphere','cylinder','cone','wall','door','window'].includes(a)){if(!renderer&&!fallbackCanvas)return text('Todavía se está iniciando el visor 3D');setPlacement(a);return;}
  if(['union','subtract','intersect'].includes(a))return booleanBox(a);
  if(a==='view')return orientation();
  if(a==='obj')return exportOBJ();
@@ -587,6 +735,13 @@ function dxfToUnderlay(raw,filename){
  return {name:filename,segments:segments};
 }
 function drawUnderlay(){
+ if(fallbackCanvas){
+  if(!underlay?.segments?.length){fallbackDraw();return;}
+  var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  underlay.segments.forEach(function(v){minX=Math.min(minX,v[0],v[2]);maxX=Math.max(maxX,v[0],v[2]);minY=Math.min(minY,v[1],v[3]);maxY=Math.max(maxY,v[1],v[3]);});
+  target.set((minX+maxX)/2,(minY+maxY)/2,.7);orbit.dist=clamp(Math.max(maxX-minX,maxY-minY)*1.6,3,450);
+  fallbackDraw();return;
+ }
  if(!underlayGroup||!T)return;
  underlayGroup.children.forEach(function(o){if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});underlayGroup.clear();
  if(!underlay||!underlay.segments.length)return;
