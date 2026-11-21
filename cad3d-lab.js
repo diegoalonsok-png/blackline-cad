@@ -1680,7 +1680,7 @@ function exportSketchSVG(){
 }
 function orbitCameraBy(dx,dy){
  if(!Number.isFinite(dx)||!Number.isFinite(dy))return;
- if(viewMode==='walk')viewMode='perspective';
+ if(viewMode!=='perspective')viewMode='perspective';
  orbit.az-=dx*.010;
  orbit.el=clamp(orbit.el+dy*.010,-1.49,1.49);
  activeView='perspective';
