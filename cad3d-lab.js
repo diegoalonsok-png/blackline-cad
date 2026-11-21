@@ -1400,7 +1400,28 @@ function wallJoinOffsets(wall){
      matches.push({other:other,at:p.key,dir:d});
    });
   });
-  // Do not apply L miters to ambiguous T, X or multiway intersections.
+  // If an endpoint hits the middle of a continuous wall, trim the branch
+  // against the host's near face rather than allowing its cap to protrude.
+  // The host stays continuous (T junction, no alteration to its openings).
+  if(matches.length===0){
+   var branch=[];
+   records.forEach(function(host){
+    if(host===wall||host.type!=='wall'||host.id===wall.id||Math.abs((host.z||0)-(wall.z||0))>.025)return;
+    var a=(host.rot||0)*Math.PI/180,hu={x:Math.cos(a),y:Math.sin(a)},hn={x:-hu.y,y:hu.x};
+    var dx=end.point.x-host.x,dy=end.point.y-host.y;
+    var along=dx*hu.x+dy*hu.y,dist=dx*hn.x+dy*hn.y;
+    if(Math.abs(along)>host.w/2-Math.max(host.d,wall.d)*.6||Math.abs(dist)>.025)return;
+    var toward=end.key==='end'?{x:-u.x,y:-u.y}:u;
+    var side=toward.x*hn.x+toward.y*hn.y,incidence=u.x*hn.x+u.y*hn.y;
+    if(Math.abs(incidence)<.25||Math.abs(side)<.25)return;
+    var trim=Math.sign(side)*(host.d/2)/incidence;
+    if(Math.abs(trim)>wall.w*.4)return;
+    branch.push({minus:trim,plus:trim});
+   });
+   if(branch.length===1)result[end.key]=branch[0];
+   return;
+  }
+  // Only unambiguous two-wall endpoint connections receive an L miter.
   if(matches.length!==1)return;
   var next=matches[0],v=next.dir;
   // For the connected path the other wall must run away from an end point,
