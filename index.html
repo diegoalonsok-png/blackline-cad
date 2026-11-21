@@ -1046,6 +1046,17 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
  border-color:var(--lexicon-edge)!important;
  color:var(--lexicon-text)!important;
 }
+/* Hide only the small horizontal scrollbar below Reset interface.
+   Keep horizontal navigation and all header buttons functional. */
+.app .brandbar .right{
+ scrollbar-width:none!important;
+ -ms-overflow-style:none;
+}
+.app .brandbar .right::-webkit-scrollbar{
+ display:none!important;
+ width:0!important;
+ height:0!important;
+}
 /* Lexicon controls: only the theme and background palette buttons. */
 .app .brandbar > #cadAppearanceControls #blThemeToggle,
 .app .brandbar > #cadAppearanceControls #cadLexiconBackgroundBtn{
