@@ -42,9 +42,9 @@ test('typing PL in the model space fills COMMAND continuously without a click',(
 
 test('direct distance 5 + Enter computes an actual 5-unit segment for LINE, PLINE and WALL',()=>{
  const first=main.indexOf('// Direct distance entry: point + mouse direction + length + Enter.');
- const last=main.indexOf('}let aliases=',first);
+ const last=main.indexOf("\n if(['CERRAR','CLOSE']",first);
  assert.ok(first>=0&&last>first,'real runCommand direct distance branch');
- const code=main.slice(first,last+1);
+ const code=main.slice(first,last);
  const P=(x,y)=>({x,y}),sub=(a,b)=>P(a.x-b.x,a.y-b.y),add=(a,b)=>P(a.x+b.x,a.y+b.y),
   mul=(a,n)=>P(a.x*n,a.y*n);
  for(const tool of ['line','polyline','wall2d']){

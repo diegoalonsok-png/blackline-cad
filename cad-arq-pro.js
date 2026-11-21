@@ -630,18 +630,6 @@ EXT.context.push(info=>{
  return {top,bottom:out};
 });
 
-/* ---------- Clic derecho estilo CAD ----------
-   Sin comando activo, sin selección y sin objeto bajo el cursor: menú contextual por defecto
-   (Repetir último, Entrada reciente, Galería…) en lugar de un Enter silencioso.
-   Con comando activo se mantiene el comportamiento actual (Enter / confirmar). */
-CORE.canvas.addEventListener('contextmenu',ev=>{
- if(ev.shiftKey||ev.ctrlKey)return; // Shift/Ctrl + clic derecho: menú de referencias a objetos
- const st=S();if(st.tool!=='select'||st.stage.length||pick.active)return;
- const cmd=document.getElementById('command');if(cmd&&cmd.value.trim())return;
- const w=CORE.world(P(ev.offsetX,ev.offsetY));if(CORE.pick(w))return; // el núcleo abre el menú de objeto
- ev.preventDefault();ev.stopImmediatePropagation();
- try{localStorage.getItem('cad2d-rightclick-enter')==='1'?CORE.command(''):CORE.openContextMenu(ev.clientX,ev.clientY,w)}catch(e){CORE.openContextMenu(ev.clientX,ev.clientY,w)}
-},true);
 /* ---------- Conexión ---------- */
 const canvas=CORE.canvas;
 canvas.addEventListener('pointerdown',onPointerDown,true);

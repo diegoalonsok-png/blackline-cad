@@ -44,7 +44,7 @@ test('el texto de los bloques girados 180° queda legible',()=>{
 });
 test('el núcleo expone un puente acotado para extensiones',()=>{
  assert.match(html,/window\.CAD2D_CORE=Object\.freeze\(\{/);
- assert.match(html,/if\(cad2dRunExtensionCommand\(cmd,value\)\)return;log\(`Unknown command/);
+ assert.match(html,/if\(cad2dRunExtensionCommand\(cmd,value\)\)return;\s*return CAD_COMMAND_UNMATCHED/);
  assert.match(html,/cad2dExtendContextMenu\(actions,/);
  assert.match(html,/previewEntity\(\);cad2dDrawExtensions\(\);/);
  assert.match(html,/src="cad-arq-pro\.js/);
