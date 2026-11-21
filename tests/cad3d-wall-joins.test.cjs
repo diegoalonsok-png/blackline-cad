@@ -50,3 +50,21 @@ test('miter changes mesh geometry without modifying original wall parameters or 
  assert(Math.abs(coords[2].x-2.1)<EPS);assert(Math.abs(coords[3].x-1.9)<EPS);
  assert.equal(JSON.stringify([a,b]),original);
 });
+
+test('T junction trims branch wall to the host face without cutting the host',()=>{
+ const host=wall(1,0,0,8,.20,0),branch=wall(2,0,-2,4,.20,90);
+ const ctx=joins([host,branch]),end=ctx.wallJoinOffsets(branch).end;
+ assert(end,'Expected branch to be trimmed at host centerline');
+ assert(Math.abs(end.minus+0.10)<EPS);
+ assert(Math.abs(end.plus+0.10)<EPS);
+ assert.equal(ctx.wallJoinOffsets(host).start,null);
+ assert.equal(ctx.wallJoinOffsets(host).end,null);
+});
+test('T junction handles a branch that starts at the host and goes outward',()=>{
+ const host=wall(1,0,0,8,.30,0),branch=wall(2,0,-2,4,.10,-90);
+ // Branch: from y=0 toward y=-4, so start is on the host.
+ const ctx=joins([host,branch]),start=ctx.wallJoinOffsets(branch).start;
+ assert(start,'Expected branch start to be trimmed');
+ assert(Math.abs(start.minus-.15)<EPS);
+ assert(Math.abs(start.plus-.15)<EPS);
+});
