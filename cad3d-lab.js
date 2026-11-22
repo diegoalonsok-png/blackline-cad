@@ -665,7 +665,7 @@ function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
    tool('wall','Wall','wall')+tool('slab','Slab','slab')+tool('floor','Floor','floor')+
-   tool('door','Door','door')+tool('window','Window','window')+
+   tool('door','Door','door')+tool('window','Window','window')+tool('opening','Opening','opening')+
    tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
    tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
@@ -682,19 +682,6 @@ function build(){
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
- '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
- '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
- tool('wall','Wall','wall')+tool('door','Door','door')+tool('window','Window','window')+
- tool('slab','Slab','slab')+tool('floor','Floor','floor','Flat floor platform · two corners')+tool('opening','Opening','opening')+'</div>'+
- '<div class="divider" aria-hidden="true"></div>'+
- '<div class="toolGroup" role="group" aria-label="Draw"><strong>Draw</strong>'+
- tool('box','Box','cube')+tool('sphere','Sphere')+tool('cylinder','Cylinder')+tool('cone','Cone')+'</div>'+
- '<div class="divider" aria-hidden="true"></div>'+
- '<div class="toolGroup" role="group" aria-label="Modify"><strong>Modify</strong>'+
- tool('move','Move')+tool('copy','Copy')+tool('rotate','Rotate')+tool('erase','Erase')+
- tool('union','Union','union','Unir dos cajas sin rotación')+
- tool('subtract','Subtract','subtract','Restar la segunda caja de la primera; sin rotación')+
- tool('intersect','Intersect','intersect','Intersectar dos cajas sin rotación')+'</div></div>'+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
@@ -1045,7 +1032,12 @@ function applySunSettings(){
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?1.05:1.15;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.38:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){
+  o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);
+  o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);
+  // Transparent glass must not block sunlight; all other meshes retain normal shadows.
+  if(o.userData?.cadGlass){o.receiveShadow=false;o.castShadow=false;}
+ }});
  if(scene&&scene.background&&typeof scene.background.setHex==='function'&&['shaded','shaded-edges','realistic'].includes(renderStyle))
   scene.background.setHex(sunSettings.enabled?0xc4d8e4:MODEL_BACKGROUND);
  if(sunGround&&sunGround.material&&sunGround.material.color&&typeof sunGround.material.color.setHex==='function')
@@ -1083,7 +1075,7 @@ function setPlacement(which){
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
- root.querySelectorAll('.solidTools button, .cad3dBasicBars button').forEach(function(b){
+ root.querySelectorAll('.cad3dBasicBars button').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
@@ -2111,9 +2103,15 @@ function architectureParts(r,part){
      -.045,z+leafH*.52,0xc5ccd1,0,motion);
    }else{
     // Per-leaf sash and glazing all inherit the same hinge/sliding transformation.
-    carpPart(Math.max(.04,leafW-.018),.052,leafH,leafCenter,0,z+frame,0xa0b7c1,0,motion);
-    carpPart(Math.max(.04,leafW-.095),.058,Math.max(.04,leafH-.11),
-     leafCenter,0,z+frame+.055,0x4d8297,0,motion);
+    // Window sash is an actual perimeter frame, not an opaque solid sheet.
+    // Transparent glass is a separate mesh that does not cast an opaque shadow.
+    var sashWidth=Math.max(.04,leafW-.018),sashBar=Math.min(.055,leafW*.16),sashHeight=leafH;
+    carpPart(sashBar,.075,sashHeight,leafCenter-sashWidth/2+sashBar/2,0,z+frame,0xa0b7c1,0,motion);
+    carpPart(sashBar,.075,sashHeight,leafCenter+sashWidth/2-sashBar/2,0,z+frame,0xa0b7c1,0,motion);
+    carpPart(sashWidth,.075,sashBar,leafCenter,0,z+frame,0xa0b7c1,0,motion);
+    carpPart(sashWidth,.075,sashBar,leafCenter,0,z+frame+sashHeight-sashBar,0xa0b7c1,0,motion);
+    carpPart(Math.max(.02,sashWidth-2*sashBar),.014,Math.max(.04,leafH-2*sashBar),
+     leafCenter,0,z+frame+sashBar,0x4d8297,0,motion);
     cad3DPaneBars(carpPart,opening,false,leafCenter,leafW,z+frame,leafH,motion);
    }
   }
@@ -2220,6 +2218,13 @@ function buildObject(r){
   }
   var component=addMesh(g,color,r.id,group,x,y,z);
   if(openingId!=null)component.userData.openingId=openingId;
+  if(openingId!=null&&color===0x4d8297){
+   component.userData.cadGlass=true;
+   component.material.transparent=true;component.material.opacity=.28;
+   component.material.depthWrite=false;component.material.metalness=.05;
+   component.material.roughness=.12;
+   component.castShadow=false;component.receiveShadow=false;
+  }
  });
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
@@ -2592,15 +2597,16 @@ function applyRenderStyle(){
   var color=sketch?sketch.fill:renderStyle==='monochrome'?0xe8e8e3:
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
+  if(m.userData.cadGlass&&!plainLines){mat.transparent=true;mat.opacity=.28;mat.depthWrite=false;}
   mat.colorWrite=!plainLines;
-  mat.depthWrite=renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
+  mat.depthWrite=m.userData.cadGlass?false:renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
   mat.depthTest=true;
-  mat.transparent=renderStyle==='xray';
-  mat.opacity=renderStyle==='xray'?.23:1;
+  mat.transparent=renderStyle==='xray'||!!m.userData.cadGlass;
+  mat.opacity=m.userData.cadGlass?.28:renderStyle==='xray'?.23:1;
   mat.roughness=renderStyle==='realistic'?.54:.8;
   mat.metalness=renderStyle==='realistic'?.10:.04;
-  m.castShadow=!plainLines;
-  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  m.castShadow=!m.userData.cadGlass&&!plainLines;
+  m.receiveShadow=!m.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
