@@ -2320,9 +2320,21 @@ function cadOpeningMirrorGeometry(parts,ref){
   return e;
  });
 }
+// Connect detailed authored carpentry from the architectural gallery to the
+// same opening grips as native/free doors and windows WITHOUT replacing geometry.
+function cadDetailedArqOpening(ref){
+ const def=state.blocks?.[ref?.blockName],a=def?.arq;
+ if(!a)return null;
+ const item=window.CAD2D_ARQ_LIBRARY?.library?.find(x=>x.id===a.id);
+ if(!item)return null;
+ const physical=item.cat==='Carpinterías'&&/(puerta|ventana|ventanal|paño fijo|pano fijo|carpintería|corrediz|banderola)/i.test(item.name);
+ const elevation=item.cat==='Alzados'&&/^(puerta|ventana|paño fijo|pano fijo|carpintería)/i.test(item.name);
+ if(!physical&&!elevation)return null;
+ return {item,def,physical,door:physical&&/puerta/i.test(item.name)};
+}
 function cadGenericBlockGrips(ref){
  const def=state.blocks?.[ref.blockName];
- if(!def||def.dynamicActions===false||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
+ if(!def||def.dynamicActions===false||cadDetailedArqOpening(ref)||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
  const p=screen(ref.p||P(0,0));
  return [
   {action:'genericMirror',x:p.x-30,y:p.y-37},
@@ -2374,7 +2386,15 @@ function cadDrawGenericBlockGrips(ref){
  ctx.restore();
 }
 function cadOpeningQuickGrips(ref){
- const def=state.blocks?.[ref.blockName];
+ const def=state.blocks?.[ref.blockName],arq=cadDetailedArqOpening(ref);
+ if(arq){
+  const width=Number(def.arq.w)*(1000/U[state.unit])*(Number(ref.scale)||1);
+  if(!(width>0&&Number.isFinite(width)))return [];
+  const theta=(Number(ref.rotation)||0)*Math.PI/180;
+  const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
+  const actions=['mirror',...(arq.door?['swing']:[]),'rotate','resize'];
+  return actions.map((action,i)=>({action,x:p.x+(i-(actions.length-1)/2)*29,y:p.y-35}));
+ }
  if(!['swing-door','double-door','framed-window'].includes(def?.parametric?.kind))return [];
  const width=Number(ref.params?.width??def.parametric.defaults.width)*(Number(ref.scale)||1);
  if(!(width>0))return [];
@@ -2394,7 +2414,27 @@ function cadOpeningQuickHit(raw){
 }
 function cadOpeningQuickApply(grip){
  const ref=state.entities.find(e=>e.id===grip.id),def=state.blocks?.[ref?.blockName];
- if(!ref||layerFor(ref).locked||!def?.parametric)return;
+ if(!ref||layerFor(ref).locked)return;
+ const arq=cadDetailedArqOpening(ref);
+ if(arq){
+  if(!window.CAD2D_ARQ?.canEdit?.(arq.item.id))return toast('Bloque PRO: se requiere membresía activa');
+  if(!['mirror','swing','rotate'].includes(grip.action)||(grip.action==='swing'&&!arq.door))return;
+  saveHistory();
+  if(grip.action==='mirror'){
+   // Reflect around the existing bounding box, not around world origin,
+   // so the architectural opening stays in its original position.
+   const ext=def.arq.ext,center=Number(ext?.x0??0)+Number(ext?.x1??def.arq.w);
+   const delta=(Number.isFinite(center)?center:def.arq.w)*(1000/U[state.unit])*(Number(ref.scale)||1);
+   const th=(Number(ref.rotation)||0)*Math.PI/180,sign=ref.flipBlockX?-1:1;
+   ref.flipBlockX=!Boolean(ref.flipBlockX);
+   ref.p=P(ref.p.x+sign*delta*Math.cos(th),ref.p.y+sign*delta*Math.sin(th));
+  }
+  if(grip.action==='swing')ref.flipOpeningSide=!Boolean(ref.flipOpeningSide);
+  if(grip.action==='rotate')ref.rotation=((Number(ref.rotation)||0)+90)%360;
+  updateAll();toast('Abertura dinámica: '+({mirror:'espejo',swing:'sentido de apertura',rotate:'giro +90°'}[grip.action])+' · Ctrl+Z');
+  return;
+ }
+ if(!def?.parametric)return;
  saveHistory();
  if(grip.action==='mirror')ref.params={...def.parametric.defaults,...ref.params,mirror:!Boolean(ref.params?.mirror)};
  if(grip.action==='swing')ref.flipOpeningSide=!Boolean(ref.flipOpeningSide);
@@ -2403,10 +2443,21 @@ function cadOpeningQuickApply(grip){
 }
 function cadOpeningWidthMeters(ref){
  const def=state.blocks?.[ref?.blockName];
+ if(cadDetailedArqOpening(ref))return Number(def.arq.w)*(Number(ref.scale)||1);
  return Number(ref.params?.width??def?.parametric?.defaults?.width)*(Number(ref.scale)||1)*U[state.unit]/1000;
 }
 function cadResizeOpening(ref,meters){
  const def=state.blocks?.[ref?.blockName],kind=def?.parametric?.kind;
+ const arq=cadDetailedArqOpening(ref);
+ if(arq){
+  if(layerFor(ref).locked||!layerFor(ref).visible)return {ok:false,reason:'Capa bloqueada o invisible'};
+  if(!window.CAD2D_ARQ?.canEdit?.(arq.item.id))return {ok:false,reason:'Requiere plan PRO activo'};
+  const width=Number(meters),scale=Number(ref.scale)||1,W=width/scale,item=arq.item;
+  if(!Number.isFinite(W)||W<item.wMin-1e-8||W>item.wMax+1e-8||width<=0)
+   return {ok:false,reason:'Ancho permitido: '+item.wMin.toFixed(2)+' a '+item.wMax.toFixed(2)+' m (escala '+scale+')'};
+  const ok=window.CAD2D_ARQ?.resizeByRefId?.(ref.id,W,def.arq.d);
+  return ok?{ok:true,width,cut:0}:{ok:false,reason:'No se pudo regenerar la abertura'};
+ }
  if(!['swing-door','double-door','framed-window'].includes(kind)||layerFor(ref).locked)return {ok:false,reason:'Abertura no editable'};
  const current=Number(ref.params?.width??def.parametric.defaults.width),scale=Number(ref.scale)||1;
  const target=Number(meters),next=target*1000/U[state.unit]/scale,ratio=next/current;
@@ -2460,8 +2511,8 @@ function cadWindowDepthEditor(ref,client){
 function cadOpeningResizeEditor(ref,client){
  // Ephemeral CAD dimension overlay, never an entity and never included in DXF/SVG/PDF.
  document.getElementById('cadOpeningResizeEditor')?.remove();
- const def=state.blocks?.[ref.blockName],width=Number(ref.params?.width??def?.parametric?.defaults?.width)*(Number(ref.scale)||1);
- if(!(width>0))return;
+ const width=cadOpeningWidthMeters(ref)*1000/U[state.unit];
+ if(!(width>0&&Number.isFinite(width)))return;
  const theta=(Number(ref.rotation)||0)*Math.PI/180;
  const start=screen(ref.p),end=screen(P(ref.p.x+width*Math.cos(theta),ref.p.y+width*Math.sin(theta)));
  const dx=end.x-start.x,dy=end.y-start.y,len=Math.hypot(dx,dy);
