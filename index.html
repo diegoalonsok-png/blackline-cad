@@ -8880,8 +8880,15 @@ function relocateOpeningWithBlock(ref,previous){
 }
 function insertSelectedBlock(point){
  const block=selectedBlock();if(!block)return toast('Choose a block first');
- const arqPro=block.arq?.id&&window.CAD2D_ARQ_LIBRARY?.library?.some(item=>item.id===block.arq.id&&item.pro);
- if((block.pro||arqPro)&&window.CAD2D_PLAN&&!window.CAD2D_PLAN.can('arq-pro'))return window.CAD2D_PLAN.upsell('Bloque PRO: '+block.name);
+ const arqItem=block.arq?.id&&window.CAD2D_ARQ_LIBRARY?.library?.find(item=>item.id===block.arq.id);
+ const billing=window.CAD2D_PLAN,billingStatus=billing?.status;
+ // Paid-tier definitions remain protected even when selected via INSERT,
+ // a backup, a previously saved reference, or the generic block selector.
+ if(block.paidOnly||arqItem?.paidOnly){
+  const paid=Boolean(billing?.enforced&&billingStatus?.source==='server'&&['pro','studio'].includes(billingStatus.plan));
+  if(!paid)return billing?.upsell?.('Blackline Select requiere membresía PRO o Estudio confirmada')||toast('Requiere plan PRO o Estudio');
+ }
+ if((block.pro||arqItem?.pro)&&billing&&!billing.can('arq-pro'))return billing.upsell('Bloque PRO: '+block.name);
  const factor=Number($('blockScale').value),angle=Number($('blockRotation').value);
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  // Keep the original wall intact if we detect a two-face wall but cannot cut BOTH faces.
@@ -10773,7 +10780,8 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-performance.js?v=20261120-1850"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
-<script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
+<script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script>
+<script src="assets/blackline-select-premium.js?v=20261122-1"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="cad-arq-pro.js?v=20261121-1"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
