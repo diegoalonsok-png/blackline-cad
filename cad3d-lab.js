@@ -3,7 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
-var selectedOpeningId=null;
+var selectedOpeningId=null,openingTransfer=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 /* CAD2D-style reversible record history (bounded to avoid memory growth).
@@ -643,7 +643,7 @@ function build(){
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
  '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select><div class="viewZoomControls" role="group" aria-label="Zoom 3D"><button type="button" data-zoom3d="in" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-zoom3d="out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" data-zoom3d="extents" aria-label="Zoom extents" title="Fit model">Fit</button></div></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output>'+
- '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
+ '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="plan2d" title="AutoCAD 2D style plan with coordinate rulers">Plan 2D</button><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
  '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
@@ -676,7 +676,7 @@ function build(){
  root.querySelector('.viewShortcuts').addEventListener('click',function(e){
   var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
   if(!key)return;
-  if(key==='fit')fit3DModel();else setViewPreset(key);
+  if(key==='fit')fit3DModel();else if(key==='plan2d')setPlan2D();else setViewPreset(key);
  });
  bindOrbitBall(root.querySelector('.orbitBall'));
  root.querySelector('.viewZoomControls').addEventListener('click',function(e){
@@ -1294,7 +1294,7 @@ function bindCanvas(el){
   if(!dragging||dragging.id!==e.pointerId)return;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;
-  if(click&&e.button===0){if(placing)placeAt(e);else selectAt(e);}
+  if(click&&e.button===0){if(openingTransfer)finishOpeningTransfer(e);else if(placing)placeAt(e);else selectAt(e);}
   if(draftModes.dyn)updateDynamicReadout(e);
  });
  el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId)dragging=null;});
@@ -1403,6 +1403,35 @@ function placeOpening(e){
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
   ' · '+rec.openings.length+' abertura(s) en este elemento · clic para colocar otra · Enter / Esc termina');
+}
+function transferOpeningToWall(sourceWall,opening,targetWall,targetPoint){
+ if(!sourceWall||!opening||!targetWall||sourceWall.id===targetWall.id||targetWall.type!=='wall')return false;
+ if(!editableRecord(sourceWall)||!editableRecord(targetWall))return false;
+ if((targetWall.openings||[]).length>=150)return false;
+ var rot=(targetWall.rot||0)*Math.PI/180,dx=targetPoint.x-targetWall.x,dy=targetPoint.y-targetWall.y;
+ var maxOffset=(targetWall.w-opening.w)/2;
+ if(maxOffset<0)return false;
+ var proposal=Object.assign({},opening,{offset:clamp(dx*Math.cos(rot)+dy*Math.sin(rot),-maxOffset,maxOffset)});
+ if(!openingFitsHost(targetWall,proposal))return false;
+ sourceWall.openings=sourceWall.openings.filter(function(x){return x.id!==opening.id;});
+ targetWall.openings=targetWall.openings||[];targetWall.openings.push(proposal);
+ selected=[targetWall.id];selectedOpeningId=proposal.id;
+ redraw();renderProps();highlight();return true;
+}
+function finishOpeningTransfer(e){
+ var transfer=openingTransfer;
+ if(!transfer)return false;
+ var hit=hostHitAt(e,'wall');
+ if(!hit){text('MOVE OPENING: hacé clic sobre el muro de destino · Esc cancela');return true;}
+ var source=records.find(function(r){return r.id===transfer.wallId;});
+ var item=source?.openings?.find(function(o){return o.id===transfer.openingId;});
+ if(!source||!item){openingTransfer=null;text('No se encontró la carpintería original');return true;}
+ if(!transferOpeningToWall(source,item,hit.host,hit.point)){
+  text('No se puede trasladar: muro de destino insuficiente, vano superpuesto o misma pared');return true;
+ }
+ openingTransfer=null;
+ text('Carpintería transferida a muro #'+hit.host.id+' · vano anterior cerrado y nuevo vano generado');
+ return true;
 }
 function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
@@ -1997,6 +2026,7 @@ function renderProps(){
     html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
+ if(focusOpening&&r.type==='wall')html+='<div class="detail"><button class="btn" type="button" data-transfer-opening="'+focusOpening.id+'">Move to another wall</button><small>Choose a target wall in the viewport (Esc cancels)</small></div>';
  if(!focusOpening)html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
  p.innerHTML=html;
 }
@@ -2124,6 +2154,14 @@ function addWallExtrusion(btn){
  redraw();renderProps();text('Extruded profile attached to wall');
 }
 function clickProps(e){
+ var transferButton=e.target.closest('[data-transfer-opening]');
+ if(transferButton){
+  var wall=records.find(function(r){return selected.includes(r.id)&&r.type==='wall'&&editableRecord(r);});
+  var item=wall?.openings?.find(function(o){return o.id===Number(transferButton.dataset.transferOpening);});
+  if(!item)return text('Seleccioná una puerta o ventana para trasladarla');
+  setPlacement(null);openingTransfer={wallId:wall.id,openingId:item.id};
+  text('MOVE OPENING · clic sobre el muro de destino · Esc cancela');return;
+ }
  var chosen=e.target.closest('[data-select-opening-id]');
  if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
  if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
@@ -2370,6 +2408,12 @@ function syncViewControls(){
  root.querySelectorAll('[data-view-preset]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.viewPreset===activeView));
  });
+}
+function setPlan2D(){
+ setPlacement(null);openingTransfer=null;
+ setViewPreset('top');setVisualStyle('wire2d');
+ if(!draftModes.osnap){draftModes.osnap=true;renderDraftModes();}
+ text('PLAN 2D · Planta ortográfica CAD · regla X/Y en metros · OSNAP activo · DIST para medir · Iso / 3D para volver');
 }
 function setViewPreset(key){
  var v=viewPresets.find(function(p){return p[0]===key;});
