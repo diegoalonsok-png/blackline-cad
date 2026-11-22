@@ -954,9 +954,7 @@ function cad3dBasicBars(){
    tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
    tool('select','Select','cube')+tool('move','Move','move')+tool('copy','Copy','copy')+
-   tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+
-   tool('union','Union','union')+tool('subtract','Subtract','subtract')+
-   tool('intersect','Intersect','intersect')+'</div></div>';
+   tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
 function build(){
  if(root)return;
@@ -965,6 +963,14 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
+ '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
+ '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
+ '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="0.01" max="1000" step="0.1" value="2.8" aria-label="Extrude height in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
+ '<button type="button" class="btn" data-solid-command="extrude" title="Extrude the selected box or slab to the specified total height">Extrude</button>'+
+ '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">Union</button>'+
+ '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">Subtract</button>'+
+ '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">Intersect</button>'+
+ '</div>'+
  '<div class="tools"><label class="btn" style="cursor:pointer" title="Importar modelo OBJ exportado desde SketchUp">Import 3D<input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+cad3DBlockCatalog()+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
@@ -1098,6 +1104,12 @@ function build(){
   var button=e.target.closest('.tools [data-action], .cad3dBasicBars [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
+ });
+ root.querySelector('.cad3dModelTools').addEventListener('click',function(e){
+  var button=e.target.closest('[data-solid-command]');if(!button)return;
+  var command=button.dataset.solidCommand;
+  if(command==='extrude')cad3dExtrudeSelection();
+  else if(['union','subtract','intersect'].includes(command))action(command);
  });
  root.querySelector('.cad3dOBJInput').addEventListener('change',async function(e){
   var file=e.target.files&&e.target.files[0];if(!file)return;
@@ -2792,6 +2804,22 @@ function clickProps(e){
 }
 /* Exact axis-aligned box boolean prototype: partition at all six cutting planes.
    It is intentionally limited to two unrotated boxes, not a general CSG solver. */
+/* Extrusion of native solid footprints. Free-form profile extrusion requires a dedicated profile engine. */
+function cad3dExtrudeSelection(){
+ if(selected.length!==1){text('Extrude: seleccioná un BOX o una losa 3D');return false;}
+ var rec=records.find(function(r){return r.id===selected[0]&&editableRecord(r);});
+ if(!rec||!['box','slab'].includes(rec.type)){text('Extrude admite BOX o SLAB; perfiles 2D libres todavía no están disponibles');return false;}
+ var input=root.querySelector('.cad3dExtrudeHeight');
+ var height=Number(input&&input.value);
+ if(!Number.isFinite(height)||height<.01||height>1000){text('Ingresá una altura entre 0,01 y 1000 metros');return false;}
+ if(rec.type==='slab'){
+  if((rec.openings||[]).length){text('La losa tiene aberturas: extrusión directa no disponible');return false;}
+  rec.type='box';rec.pitch=0;rec.styleId='';
+ }
+ rec.h=height;
+ redraw();renderProps();text('Extrude aplicado · altura '+height.toFixed(2)+' m');
+ return true;
+}
 function booleanBox(kind){
  if(selected.length!==2){text('Booleanas: seleccioná dos BOX con Shift + clic');return;}
  var a=records.find(function(r){return r.id===selected[0];}),b=records.find(function(r){return r.id===selected[1];});
@@ -3475,6 +3503,7 @@ function run3DCommand(){
 }
 function action(a){
  if(a==='select'){setPlacement(null);text('Select · elegí un objeto 3D');return true;}
+ if(a==='extrude'){cad3dExtrudeSelection();return true;}
  if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
