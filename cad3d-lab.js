@@ -1287,7 +1287,7 @@ function placeOpening(e){
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
- var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
+ var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w,openAngle:0,openFraction:0,hingeSide:'left',openDirection:1,glassOpacity:.24};
  if(slab){
   var maxY=(rec.d-span)/2;
   op.offsetY=clamp(-dx*s+dy*c,-maxY,maxY);op.d=span;
@@ -1705,6 +1705,19 @@ function renderProps(){
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
+   if(r.type==='wall'&&o.kind!=='opening'){
+    var motion=cadOpeningMotion(o);
+    if(motion!=='fixed'){
+     html+='<label>Open / Close <select data-opening-preset="'+o.id+'">'+
+      '<option value="0"'+(!cadOpeningActive(o)?' selected':'')+'>Closed</option>'+
+      '<option value="50">Half open</option><option value="100">Fully open</option></select></label>';
+     if(motion==='slide')html+='<label>Slide (%) <input type="number" min="0" max="100" step="5" data-opening-slide="'+o.id+'" value="'+Math.round(clamp(finite(o.openFraction,0),0,1)*100)+'"></label>';
+     else html+='<label>Open angle (°) <input type="number" min="0" max="'+(motion==='tilt'?90:170)+'" step="5" data-opening-angle="'+o.id+'" value="'+clamp(finite(o.openAngle,0),0,motion==='tilt'?90:170)+'"></label>';
+     if(motion!=='tilt')html+='<label>Hinge / Slide side <select data-opening-hinge="'+o.id+'"><option value="left"'+(o.hingeSide!=='right'?' selected':'')+'>Left</option><option value="right"'+(o.hingeSide==='right'?' selected':'')+'>Right</option></select></label>';
+     html+='<label>Opening direction <select data-opening-direction="'+o.id+'"><option value="1"'+(o.openDirection!==-1?' selected':'')+'>Inward</option><option value="-1"'+(o.openDirection===-1?' selected':'')+'>Outward</option></select></label>';
+    }
+    if(cadOpeningIsGlass(o))html+='<label>Glass transparency <input type="number" min="0.08" max="0.85" step="0.05" data-opening-glass="'+o.id+'" value="'+cadGlassOpacity(o)+'"></label>';
+   }
    if(r.type==='wall'){
     var available=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host!=='slab';}):ARCH_STYLES[o.kind];
     if(available)html+='<label>Model <select data-opening-style="'+o.id+'">'+available.map(function(st){return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';}).join('')+'</select></label>';
@@ -1717,13 +1730,33 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],select[data-opening-preset],input[data-opening-angle],input[data-opening-slide],select[data-opening-hinge],select[data-opening-direction],input[data-opening-glass]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('[data-opening-preset],[data-opening-angle],[data-opening-slide],[data-opening-hinge],[data-opening-direction],[data-opening-glass]')){
+  var key=Number(input.dataset.openingPreset||input.dataset.openingAngle||input.dataset.openingSlide||input.dataset.openingHinge||input.dataset.openingDirection||input.dataset.openingGlass);
+  var moving=(r.openings||[]).find(function(o){return o.id===key;});
+  if(!moving||moving.kind==='opening')return;
+  var motion=cadOpeningMotion(moving),v=Number(input.value);
+  if(input.dataset.openingGlass){
+   if(!Number.isFinite(v))return;moving.glassOpacity=clamp(v,.08,.85);
+  }else{
+   if(motion==='fixed')return;
+   if(input.dataset.openingPreset){
+    if(!Number.isFinite(v))return;
+    if(motion==='slide')moving.openFraction=clamp(v/100,0,1);
+    else moving.openAngle=clamp(v/100*(motion==='tilt'?65:90),0,motion==='tilt'?90:170);
+   }else if(input.dataset.openingSlide){if(!Number.isFinite(v))return;moving.openFraction=clamp(v/100,0,1);}
+   else if(input.dataset.openingAngle){if(!Number.isFinite(v))return;moving.openAngle=clamp(v,0,motion==='tilt'?90:170);}
+   else if(input.dataset.openingHinge)moving.hingeSide=input.value==='right'?'right':'left';
+   else if(input.dataset.openingDirection)moving.openDirection=input.value==='-1'?-1:1;
+  }
+  selectedOpeningId=moving.id;redraw();renderProps();text('Apertura paramétrica actualizada');return;
+ }
  if(input.matches('select[data-opening-style]')){
   var opening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
   var style=opening&&(ARCH_STYLES[opening.kind]||[]).find(function(st){return st.id===input.value;});
   if(!opening||!style)return;
-  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w});
+  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w,openAngle:0,openFraction:0});
   if(r.type==='wall'){candidate.h=style.h;candidate.sill=Math.min(style.sill,Math.max(0,r.h-style.h));}
   else candidate.d=style.d;
   if(!openingFitsCADHost(r,candidate,opening.id)){renderProps();text('El modelo elegido no entra en el muro o se superpone a otro vano');return;}
@@ -2329,7 +2362,10 @@ async function readJSON(e){
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
-     if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
+     if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);
+      op.openAngle=clamp(finite(v.openAngle,0),0,170);op.openFraction=clamp(finite(v.openFraction,0),0,1);
+      op.hingeSide=v.hingeSide==='right'?'right':'left';op.openDirection=v.openDirection===-1?-1:1;
+      op.glassOpacity=clamp(finite(v.glassOpacity,.24),.08,.85);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
      return op;
     });
@@ -2348,7 +2384,7 @@ async function readJSON(e){
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
   var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));}));
-  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
+  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];selectedOpeningId=null;redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){
