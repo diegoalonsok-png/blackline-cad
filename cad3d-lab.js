@@ -1033,9 +1033,10 @@ function applySunSettings(){
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?1.05:1.15;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.38:0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){
-  var solid=!['wire2d','wire3d','hidden'].includes(renderStyle);
-  o.receiveShadow=!o.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&solid;
-  o.castShadow=!o.userData.cadGlass&&solid;
+  o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);
+  o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);
+  // Transparent glass must not block sunlight; all other meshes retain normal shadows.
+  if(o.userData?.cadGlass){o.receiveShadow=false;o.castShadow=false;}
  }});
  if(scene&&scene.background&&typeof scene.background.setHex==='function'&&['shaded','shaded-edges','realistic'].includes(renderStyle))
   scene.background.setHex(sunSettings.enabled?0xc4d8e4:MODEL_BACKGROUND);
