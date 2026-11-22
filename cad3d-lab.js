@@ -594,6 +594,157 @@ var css=`
  box-shadow:0 7px 22px #0009!important;
  backdrop-filter:blur(7px);
 }
+
+/* Same compact icon toolbar language as the CAD2D top bar.
+ * Zone docking rather than loose floating absolute coordinates. */
+#cad3dLab.cad3dCompactMode .cad3dDockZone{
+ display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;
+ flex:none;gap:3px;padding:3px 7px!important;
+ background:#0b1117!important;color:#e8eff4!important;
+ border-bottom:1px solid #34424d!important;overflow:visible!important;
+ scrollbar-width:thin;box-sizing:border-box;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockTop{min-height:44px!important}
+#cad3dLab.cad3dCompactMode .cad3dDockBottom{
+ min-height:0;max-height:120px;padding:0 7px!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockBottom.cad3dDockEmpty:not(.cad3dDockCandidate){display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dDockZone>.cad3dDockBar{
+ position:relative!important;left:auto!important;top:auto!important;
+ width:max-content!important;height:auto!important;max-width:100%!important;
+ flex:none!important;display:flex!important;flex-wrap:nowrap!important;
+ align-items:center!important;gap:4px!important;padding:3px 5px 3px 3px!important;
+ min-height:39px!important;margin:0!important;
+ overflow:visible!important;border:0!important;
+ border-right:1px solid #34424d!important;border-radius:0!important;
+ background:transparent!important;box-shadow:none!important;
+ z-index:auto!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockZone>.cad3dDockBar:focus-within{z-index:60!important}
+#cad3dLab.cad3dCompactMode .cad3dDockZone>.cad3dDockBar:has(details[open]),
+#cad3dLab.cad3dCompactMode .cad3dDockZone>.cad3dDockBar:has([aria-expanded="true"]){z-index:70!important}
+#cad3dLab.cad3dCompactMode .cad3dDockBar > strong{display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dDockBar > .cad3dToolbarGrip{
+ display:grid!important;place-items:center!important;
+ width:17px!important;min-width:17px!important;max-width:17px!important;
+ height:31px!important;min-height:31px!important;max-height:31px!important;
+ flex:0 0 17px!important;padding:0!important;margin:0 3px 0 0!important;
+ border:1px solid #475461!important;border-radius:3px!important;
+ color:#a2b1be!important;background:#222d37!important;cursor:grab!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockBar > .cad3dToolbarGrip:active{cursor:grabbing!important}
+#cad3dLab.cad3dCompactMode .cad3dDockBar > .cad3dToolbarGrip svg{width:12px!important;height:17px!important;flex:none!important}
+#cad3dLab.cad3dCompactMode .cad3dBar > button.btn,
+#cad3dLab.cad3dCompactMode .cad3dProfileTools > button.btn,
+#cad3dLab.cad3dCompactMode .cad3dModelTools > button.btn,
+#cad3dLab.cad3dCompactMode .tools > button.btn,
+#cad3dLab.cad3dCompactMode .tools > label.btn,
+#cad3dLab.cad3dCompactMode .tools > .block3DMenu > summary.btn,
+#cad3dLab.cad3dCompactMode .tools > .ioMenu > summary.btn,
+#cad3dLab.cad3dCompactMode .tools > .viewSaveMenu > summary.btn,
+#cad3dLab.cad3dCompactMode .tools > .sunControl > button.btn,
+#cad3dLab.cad3dCompactMode .tools > .styleControl > button.btn{
+ display:inline-flex!important;justify-content:center!important;align-items:center!important;
+ flex:0 0 36px!important;width:36px!important;min-width:36px!important;max-width:36px!important;
+ height:36px!important;min-height:36px!important;max-height:36px!important;
+ padding:5px!important;margin:0!important;gap:0!important;
+ border:1px solid #25333e!important;border-radius:6px!important;
+ background:#030609!important;color:#ebf2f6!important;
+ font-size:0!important;line-height:0!important;box-shadow:none!important;
+ overflow:hidden!important;white-space:nowrap!important;cursor:pointer!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dBar > button.btn:hover,
+#cad3dLab.cad3dCompactMode .cad3dProfileTools > button.btn:hover,
+#cad3dLab.cad3dCompactMode .cad3dModelTools > button.btn:hover,
+#cad3dLab.cad3dCompactMode .tools > button.btn:hover,
+#cad3dLab.cad3dCompactMode .tools > label.btn:hover,
+#cad3dLab.cad3dCompactMode .tools summary.btn:hover{
+ background:#192b38!important;border-color:#88b0c6!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dBar > button.btn.armed,
+#cad3dLab.cad3dCompactMode .cad3dProfileTools > button.btn.armed,
+#cad3dLab.cad3dCompactMode .cad3dModelTools > button.btn.armed{
+ background:#1b4256!important;border-color:#a2d7ee!important;
+ box-shadow:inset 0 -2px 0 #8dcce0!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockBar .btn > span,
+#cad3dLab.cad3dCompactMode .cad3dDockBar summary.btn > span{display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dDockBar .btn > svg,
+#cad3dLab.cad3dCompactMode .cad3dDockBar summary.btn > svg{
+ width:21px!important;height:21px!important;max-width:21px!important;max-height:21px!important;
+ flex:0 0 21px!important;display:block!important;
+}
+#cad3dLab.cad3dCompactMode .tools .ioMenu > summary::after,
+#cad3dLab.cad3dCompactMode .tools .viewSaveMenu > summary::after{display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dModelTools >label{
+ display:flex!important;align-items:center!important;gap:5px!important;
+ font:0 Segoe UI,Arial,sans-serif!important;color:#b7c8d4!important;
+ white-space:nowrap!important;margin:0 3px!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dModelTools >label::before{
+ content:"H";font:700 12px Segoe UI,Arial,sans-serif;color:#a9c4d3;
+}
+#cad3dLab.cad3dCompactMode .cad3dModelTools .cad3dExtrudeHeight{
+ width:58px!important;height:30px!important;min-height:30px!important;
+ background:#151e25!important;border:1px solid #556671!important;
+ border-radius:4px!important;color:#eef5f9!important;
+ font:12px Segoe UI,Arial,sans-serif!important;text-align:center!important;
+ padding:3px!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockSide{
+ position:absolute!important;top:8px!important;bottom:8px!important;
+ z-index:28!important;display:flex!important;flex-direction:column!important;
+ align-items:stretch!important;justify-content:flex-start!important;
+ flex-wrap:nowrap!important;gap:3px!important;
+ width:max-content!important;min-width:8px!important;max-width:105px!important;
+ height:auto!important;overflow:visible!important;
+ padding:3px!important;border:1px solid #32434f!important;border-radius:5px!important;
+ background:#0b1117e8!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockLeft{left:4px!important}
+#cad3dLab.cad3dCompactMode .cad3dDockRight{right:4px!important}
+#cad3dLab.cad3dCompactMode .cad3dDockSide.cad3dDockEmpty:not(.cad3dDockCandidate){
+ display:none!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockSide > .cad3dDockBar{
+ flex-direction:column!important;align-items:center!important;
+ flex-wrap:nowrap!important;width:53px!important;max-width:105px!important;
+ min-height:0!important;max-height:100%!important;overflow:visible!important;
+ padding:4px!important;border-right:0!important;
+ border-bottom:1px solid #34424d!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockSide .cad3dModelTools >label{
+ flex-direction:column!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockSide .cad3dModelTools .cad3dExtrudeHeight{width:48px!important}
+#cad3dLab.cad3dCompactMode.cad3dDraggingDock .cad3dDockZone{
+ outline:1px dashed #4d6f82;outline-offset:-2px;
+}
+#cad3dLab.cad3dCompactMode.cad3dDraggingDock .cad3dDockSide.cad3dDockEmpty{
+ display:flex!important;width:52px!important;min-height:120px!important;
+}
+#cad3dLab.cad3dCompactMode.cad3dDraggingDock .cad3dDockBottom.cad3dDockEmpty{
+ display:flex!important;min-height:40px!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockZone.cad3dDockCandidate{
+ outline:2px solid #91c8e5!important;outline-offset:-2px;
+ background:#173042!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockPlaceholder{
+ flex:0 0 auto;border:1px dashed #91c8e5!important;
+ border-radius:5px;background:#26475b70!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockDraggingBar{
+ position:absolute!important;z-index:950!important;display:flex!important;
+ flex-wrap:nowrap!important;align-items:center!important;gap:3px!important;
+ height:45px!important;max-height:45px!important;
+ width:max-content!important;max-width:calc(100% - 12px)!important;
+ padding:4px!important;margin:0!important;
+ background:#17252ff2!important;border:1px solid #8bbcd2!important;
+ border-radius:6px!important;box-shadow:0 12px 30px #000a!important;
+ pointer-events:none!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockDraggingBar > strong{display:none!important}
 `;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
