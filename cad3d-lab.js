@@ -1518,12 +1518,38 @@ function selectAt(e){
  var hits=[];modelRoot.traverse(function(o){if(o.isMesh||(plan&&o.isLine&&o.userData.openingId!=null))hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
  var allowed=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
- // Architectural plan symbols are selectable even when a wall surface sits above them.
- var hit=plan?intersects.find(function(item){return item.object.userData.openingId!=null&&allowed(item);})||intersects.find(allowed):intersects.find(allowed);
+ var visibleHits=intersects.filter(allowed);
+ var firstHit=visibleHits[0]||null;
+ // Door/window geometry is hosted by the wall, and its glass can lie just
+ // behind the front wall/frame face. Prefer its own tagged mesh over the host
+ // wall only when the ray hits the SAME host at a comparable depth.
+ // Never select a window through a different wall in front of it.
+ var nearbyOpening=firstHit&&visibleHits.find(function(item){
+  if(item.object.userData.openingId==null)return false;
+  if(item.object.userData.owner!==firstHit.object.userData.owner)return false;
+  var host=records.find(function(r){return r.id===item.object.userData.owner;});
+  var tolerance=Math.max(.12,Math.min(.7,(host?.d||.2)*2+.2));
+  return item.distance<=firstHit.distance+tolerance;
+ });
+ var hit=nearbyOpening||firstHit;
  var id=hit?hit.object.userData.owner:null;
- selectedOpeningId=hit?.object.userData.openingId??null;
- if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
- renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
+ var openingId=hit?.object.userData.openingId??null;
+ if(id===null){
+  if(!e.shiftKey)selected=[];
+  selectedOpeningId=null;
+ }else if(e.shiftKey){
+  var already=selected.includes(id);
+  selected=already?selected.filter(function(n){return n!==id;}):selected.concat(id);
+  selectedOpeningId=already?null:openingId;
+ }else{
+  selected=[id];selectedOpeningId=openingId;
+ }
+ renderProps();highlight();
+ if(selectedOpeningId!=null){
+  var host=records.find(function(r){return r.id===id;});
+  var op=host?.openings?.find(function(o){return o.id===selectedOpeningId;});
+  text((op?.kind==='door'?'DOOR':op?.kind==='window'?'WINDOW':'OPENING')+' #'+selectedOpeningId+' seleccionada · editá Style, Width, Height y Sill en Properties');
+ }else text(selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function glazingOpacity(opening){return clamp(finite(opening?.glassOpacity,.24),.08,.85);}
