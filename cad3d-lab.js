@@ -216,6 +216,15 @@ var css=`
 #cad3dLab .styleThumb[data-kind="realistic"]::before{background:linear-gradient(135deg,#d2b998,#8c7358);border-color:#654a38}
 #cad3dLab .styleThumb[data-kind="monochrome"]::before{background:#e2e2e2;border-color:#777}
 #cad3dLab .styleThumb[data-kind="xray"]::before{background:#96c6d477;border:1px dashed #547d90}
+#cad3dLab .styleThumb[data-kind^="sketch"]{background:linear-gradient(145deg,#fcfaf2 45%,#d5d3c9 46%);border-color:#a9a79b}
+#cad3dLab .styleThumb[data-kind^="sketch"]::before{background:#efede5;border:1.5px solid #444c50;box-shadow:5px 4px 0 #767d8144}
+#cad3dLab .styleThumb[data-kind="sketch-pencil"]::before{border-style:dashed;border-color:#727578;background:#edeae1}
+#cad3dLab .styleThumb[data-kind="sketch-ink"]::before{border:2px solid #222;background:#faf9f4}
+#cad3dLab .styleThumb[data-kind="sketch-marker"]::before{background:#cbcfc4;border-color:#657981}
+#cad3dLab .styleThumb[data-kind="sketch-watercolor"]::before{background:linear-gradient(130deg,#b5c7c3,#ece1ce);border-color:#758d8a}
+#cad3dLab .styleThumb[data-kind="sketch-mono"]::before{background:#d7d7d2;border-color:#555}
+#cad3dLab .styleThumb[data-kind="sketch-blueprint"]{background:linear-gradient(145deg,#3c5d75,#23394c);border-color:#6b8ba3}
+#cad3dLab .styleThumb[data-kind="sketch-blueprint"]::before{background:#42677f;border-color:#e4f2fa}
 #cad3dLab .sunControl {position:relative;flex:none}
 #cad3dLab .sunPanel {position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;padding:12px;display:grid;gap:9px;background:var(--cad-ui-base,#17212a);border:1px solid var(--cad-ui-edge,#526579);border-radius:10px;box-shadow:0 12px 35px #0009;color:var(--cad-ui-text,#e9eef4)}
 #cad3dLab .sunPanel[hidden]{display:none!important}
@@ -872,8 +881,8 @@ function applySunSettings(){
    root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
- if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
- if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
+ if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?(isCad3DSketch(renderStyle)?.38:.65):1.3;
+ if(sunFill)sunFill.intensity=sunSettings.enabled?(isCad3DSketch(renderStyle)?.13:.22):0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=!o.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!o.userData.cadGlass&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
@@ -884,7 +893,7 @@ function applySunSettings(){
  sunLight.position.set(bounds.x+radius*Math.cos(el)*Math.cos(az),
   bounds.y+radius*Math.cos(el)*Math.sin(az),bounds.z+radius*Math.sin(el));
  sunLight.target.updateMatrixWorld();
- sunLight.intensity=sunSettings.enabled?2.7:2.1;
+ sunLight.intensity=sunSettings.enabled?(isCad3DSketch(renderStyle)?2.1:2.7):2.1;
  sunLight.castShadow=sunSettings.enabled;
  sunLight.shadow.mapSize.set(2048,2048);
  var shadowCamera=sunLight.shadow.camera;
@@ -2138,7 +2147,7 @@ function applyRenderStyle(){
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
  renderStyle=mode;
- if(renderer)applyRenderStyle();
+ if(renderer){applyRenderStyle();applySunSettings();}
  else renderStyleControls();
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&
   !['hidden','wire2d','wire3d'].includes(renderStyle);
