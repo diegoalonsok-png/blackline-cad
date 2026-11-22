@@ -10,7 +10,7 @@ function extract(from,to){
 }
 test('Door and window geometry carries a distinct opening ID',()=>{
  const code=extract('function architectureParts(', '/* Build a true miter');
- const ctx={clamp:(x,a,b)=>Math.min(b,Math.max(a,x))};
+ const ctx={clamp:(x,a,b)=>Math.min(b,Math.max(a,x)),cadOpeningActive:()=>false,cadGlassOpacity:()=>.24};
  vm.runInNewContext(code,ctx);
  for(const kind of ['door','window']){
   const parts=[];
@@ -52,7 +52,7 @@ test('Selected window shows Model, Width, Height and Sill but not wall dimension
  const panel={innerHTML:''},wall={id:12,type:'wall',layerId:'0',
   openings:[{id:91,kind:'window',styleId:'fixed',offset:0,w:1.2,h:1.4,sill:.8}]};
  const ctx={root:{querySelector(){return panel}},records:[wall],selected:[12],selectedOpeningId:91,
-  escapeHtml:s=>String(s),ARCH_STYLES:{window:[{id:'fixed',name:'Fixed'},{id:'sliding-window',name:'Sliding'}],opening:[]}};
+  escapeHtml:s=>String(s),cadOpeningMotion:()=> 'fixed',cadOpeningIsGlass:()=>true,cadGlassOpacity:()=>.24,clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),finite:(v,d)=>Number.isFinite(Number(v))?Number(v):d,ARCH_STYLES:{window:[{id:'fixed',name:'Fixed'},{id:'sliding-window',name:'Sliding'}],opening:[]}};
  vm.runInNewContext(code,ctx);ctx.renderProps();
  assert.match(panel.innerHTML,/WINDOW #91/);
  assert.match(panel.innerHTML,/data-opening-style="91"/);
