@@ -28,7 +28,7 @@ function cad3dHistoryStep(backward){
  cad3dHistoryRestoring=true;
  try{
   records=data.records;layers=data.layers;currentLayer=data.currentLayer;
-  cad3dHistoryNow=cad3dSnapshot();selected=[];
+  cad3dHistoryNow=cad3dSnapshot();selected=[];selectedOpeningId=null;
   setPlacement(null);renderLayerPanel();redraw();renderProps();
  }finally{cad3dHistoryRestoring=false;}
  text(backward?'UNDO: cambio revertido':'REDO: cambio restaurado');
@@ -1939,13 +1939,13 @@ function renderProps(){
  '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
- if(host)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
+ if(host&&!focusOpening)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
  var keys=focusOpening?[]:['x','y','z'];
- if(r.type!=='boolean')keys.push('rot');
- if(r.type==='box'||r.type==='wall'||r.type==='slab')keys.push('w','d','h');
- if(r.type==='slab')keys.push('pitch');
- if(r.type==='sphere')keys.push('radius');
- if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
+ if(!focusOpening&&r.type!=='boolean')keys.push('rot');
+ if(!focusOpening&&(r.type==='box'||r.type==='wall'||r.type==='slab'))keys.push('w','d','h');
+ if(!focusOpening&&r.type==='slab')keys.push('pitch');
+ if(!focusOpening&&r.type==='sphere')keys.push('radius');
+ if(!focusOpening&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
  if(r.type==='wall'&&!focusOpening){
@@ -2141,7 +2141,7 @@ function clickProps(e){
  }
  var del=e.target.closest('[data-remove-object]');if(del){
   records=records.filter(function(r){return r.id!==Number(del.dataset.removeObject);});
-  selected=[];redraw();renderProps();text('Objeto eliminado');
+  selected=[];selectedOpeningId=null;redraw();renderProps();text('Objeto eliminado');
  }
 }
 /* Exact axis-aligned box boolean prototype: partition at all six cutting planes.
@@ -2822,7 +2822,7 @@ async function readJSON(e){
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
   var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;})).concat((r.attachments||[]).map(function(a){return a.id;}));}));
-  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
+  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];selectedOpeningId=null;redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){
