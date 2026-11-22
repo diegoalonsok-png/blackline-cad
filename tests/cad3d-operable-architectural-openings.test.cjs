@@ -50,7 +50,7 @@ test('Right-side Properties has leaves, operation, hinge, swing, open and close 
  const code=extract('function renderProps(){','function change(e){');
  const panel={innerHTML:''};
  const wall={id:5,type:'wall',layerId:'0',openings:[
-  {id:9,kind:'window',styleId:'fixed',offset:0,w:1.2,h:1.4,sill:.8}]};
+  {id:9,kind:'window',styleId:'casement',operation:'casement',offset:0,w:1.2,h:1.4,sill:.8}]};
  const vmCtx={root:{querySelector(){return panel;}},records:[wall],selected:[5],selectedOpeningId:9,
   escapeHtml:String,ARCH_STYLES:{window:[{id:'fixed',name:'Fixed'}],opening:[]},render3DGrips(){}};
  vm.runInNewContext(code,vmCtx);vmCtx.renderProps();
