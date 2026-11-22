@@ -9009,7 +9009,33 @@ async function importDXFBlockLibrary(file){
   if(type==='LINE')return {...base,type:'line',a:P(num(a,10),num(a,20)),b:P(num(a,11),num(a,21))};
   if(type==='CIRCLE'&&num(a,40)>0)return {...base,type:'circle',c:P(num(a,10),num(a,20)),r:num(a,40)};
   if(type==='ARC'&&num(a,40)>0)return {...base,type:'arc',c:P(num(a,10),num(a,20)),r:num(a,40),a0:num(a,50)*Math.PI/180,a1:num(a,51)*Math.PI/180};
-  if(type==='LWPOLYLINE'){const pts=[];let x=null;for(const [c,v] of a){if(c===10)x=Number(v);else if(c===20&&x!==null){pts.push(P(x,Number(v)));x=null}}if(a.some(x=>x[0]===42&&Math.abs(Number(x[1]))>1e-10))unsupported.set('bulge arcs',(unsupported.get('bulge arcs')||0)+1);if(pts.length>1)return {...base,type:'polyline',pts,closed:Boolean(num(a,70)&1)}}
+  if(type==='LWPOLYLINE'){
+   // DXF group 42 is the bulge of the segment leaving each vertex (including the closing segment).
+   // Sample curved segments rather than silently replacing them with straight chords.
+   const verts=[];
+   for(const [code,value] of a){
+    if(code===10)verts.push({x:Number(value),y:NaN,b:0});
+    else if(code===20&&verts.length)verts[verts.length-1].y=Number(value);
+    else if(code===42&&verts.length)verts[verts.length-1].b=Number(value);
+   }
+   if(verts.length<2||verts.length>5000||verts.some(v=>![v.x,v.y,v.b].every(Number.isFinite)))return null;
+   const closed=Boolean(num(a,70)&1),pts=[P(verts[0].x,verts[0].y)];
+   const segments=verts.length-(closed?0:1);
+   for(let i=0;i<segments;i++){
+    const v=verts[i],w=verts[(i+1)%verts.length],dx=w.x-v.x,dy=w.y-v.y,chord=Math.hypot(dx,dy),bulge=v.b;
+    if(chord<1e-10)continue;
+    if(Math.abs(bulge)<1e-10){pts.push(P(w.x,w.y));continue;}
+    const sweep=4*Math.atan(bulge),r=chord*(1+bulge*bulge)/(4*Math.abs(bulge));
+    const h=chord*(1-bulge*bulge)/(4*bulge),cx=(v.x+w.x)/2-dy/chord*h,cy=(v.y+w.y)/2+dx/chord*h;
+    const start=Math.atan2(v.y-cy,v.x-cx),count=Math.max(6,Math.min(96,Math.ceil(Math.abs(sweep)/(Math.PI/36))));
+    for(let k=1;k<=count;k++){
+     const t=start+sweep*k/count;
+     pts.push(k===count?P(w.x,w.y):P(cx+r*Math.cos(t),cy+r*Math.sin(t)));
+    }
+   }
+   if(closed&&pts.length>2&&Math.hypot(pts.at(-1).x-pts[0].x,pts.at(-1).y-pts[0].y)<1e-8)pts.pop();
+   if(pts.length>1)return {...base,type:'polyline',pts,closed};
+  }
   if(type==='TEXT'||type==='MTEXT')return {...base,type:'text',p:P(num(a,10),num(a,20)),h:Math.max(.001,num(a,40,.25)),rotation:num(a,50),text:a.filter(x=>x[0]===1||x[0]===3).map(x=>x[1]).join(''),fontFamily:'Arial'};
   if(type==='ELLIPSE'){const rx=Math.hypot(num(a,11),num(a,21));if(rx>0)return {...base,type:'ellipse',c:P(num(a,10),num(a,20)),rx,ry:rx*num(a,40,1),rotation:Math.atan2(num(a,21),num(a,11))}}
   if(type==='INSERT')return {insert:str(a,2),x:num(a,10),y:num(a,20),sx:num(a,41,1),sy:num(a,42,1),angle:num(a,50)};
