@@ -8,6 +8,8 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
+// Safety gate: legacy artistic presets are not production-ready. CAD geometry and technical views remain enabled.
+var CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED=false;
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
@@ -51,6 +53,21 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+/* CAD3D Navigation refresh: isolated presentation only; existing orbit/pan behavior retained. */
+#cad3dLab .viewCube{
+ border-radius:20px; background:radial-gradient(circle at 35% 24%,#344758,#14212c 70%,#0c151e);
+ border:1px solid #7897a8; box-shadow:0 7px 22px #0008,inset 0 1px 1px #d5ecf355;
+}
+#cad3dLab .viewCube:hover{border-color:#c0e3f3;box-shadow:0 9px 25px #0009,0 0 0 2px #80c6ed33}
+#cad3dLab .orbitBall{
+ border-radius:50%; background:radial-gradient(circle at 36% 24%,#405d70,#142737 73%,#0b1824);
+ border:1px solid #91b5c8; box-shadow:0 7px 22px #0009,inset 0 2px 2px #e4f7ff44;
+ transition:box-shadow .16s,border-color .16s,transform .16s;
+}
+#cad3dLab .orbitBall:hover{border-color:#d1efff;box-shadow:0 9px 24px #000a,0 0 0 3px #7dc3e53b;transform:translateY(-1px)}
+#cad3dLab .orbitBall[data-dragging=true]{box-shadow:0 3px 11px #0009,inset 0 1px 8px #061622;transform:translateY(1px)}
+#cad3dLab .orbitBall:focus-visible{outline:2px solid #c0eaff;outline-offset:3px}
+
 .app .tabbar #cad3dOpen {
  align-self:center; justify-content:center; flex:none; min-width:54px; height:24px!important;
  padding:0 15px!important; border:1px solid var(--cad-ui-edge)!important; border-radius:6px!important;
@@ -779,7 +796,8 @@ function build(){
  gallerySearch.addEventListener('input',function(){
   var needle=this.value.toLocaleLowerCase().trim(),visible=0;
   root.querySelectorAll('.styleGrid [data-render-style]').forEach(function(b){
-   var show=(b.textContent+' '+b.dataset.renderFamily).toLocaleLowerCase().includes(needle);
+   var show=(CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED||!b.dataset.renderStyle.startsWith('sketch'))&&
+    (b.textContent+' '+b.dataset.renderFamily).toLocaleLowerCase().includes(needle);
    b.hidden=!show;if(show)visible++;
   });
   root.querySelector('.styleGalleryCount').textContent=visible+' estilos';
@@ -2382,13 +2400,18 @@ function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_S
 
 function renderStyleControls(){
  if(!root)return;
+ if(!CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED&&isCad3DSketch(renderStyle))renderStyle='shaded-edges';
  root.querySelectorAll('[data-render-style]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.renderStyle===renderStyle));
  });
  var launcher=root.querySelector('.styleLaunch');
  if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
  var sketchButton=root.querySelector('[data-action="sketch"]');
- if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
+ if(sketchButton){
+  sketchButton.classList.toggle('sketchActive',CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED&&isCad3DSketch(renderStyle));
+  sketchButton.title=CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED?'Croquis artístico':'Croquis artístico en reconstrucción: estilos anteriores desactivados';
+  sketchButton.setAttribute('aria-disabled',String(!CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED));
+ }
  root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
 }
 /* Lightweight, deterministic hatch strokes drawn on visible box faces.
@@ -2509,6 +2532,9 @@ function applyRenderStyle(){
 }
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
+ if(!CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED&&isCad3DSketch(mode)){
+  text('Los antiguos estilos artísticos están desactivados hasta disponer de un renderizador verificado.');return false;
+ }
  renderStyle=mode;
  if(isCad3DSketch(mode)){sunSettings.enabled=true;sunSettings.onGround=true;sunSettings.onFaces=true;}
  if(renderer)applyRenderStyle();
@@ -2860,7 +2886,10 @@ function action(a){
  }
  if(['union','subtract','intersect'].includes(a)){setPlacement(null);booleanBox(a);return true;}
  if(a==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();text('Sun / Shadows '+(sunSettings.enabled?'ON':'OFF'));return true;}
- if(a==='sketch')setSketchStyle(isCad3DSketch(renderStyle)?'shaded-edges':'sketch');
+ if(a==='sketch'){
+  if(!CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED)text('Croquis artístico en reconstrucción; el modo CAD3D técnico sigue disponible.');
+  else setSketchStyle(isCad3DSketch(renderStyle)?'shaded-edges':'sketch');
+ }
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
