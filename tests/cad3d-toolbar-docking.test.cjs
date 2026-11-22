@@ -71,5 +71,5 @@ test('real browser: toolbars compact, drag to bottom, re-dock to top and keep co
   })()`);
   assert.equal(result.docked,'bottom');assert.equal(result.commandWorked,true);
   assert.equal(result.returned,'top');assert.equal(result.saved,true);
- }finally{try{ws?.close();}catch(_){}proc.kill('SIGTERM');server.close();fs.rmSync(tmp,{recursive:true,force:true});}
+ }finally{try{ws?.close();}catch(_){}proc.kill('SIGTERM');server.close();try{fs.rmSync(tmp,{recursive:true,force:true,maxRetries:8,retryDelay:100});}catch(_){} }
 });
