@@ -1047,7 +1047,7 @@ function build(){
  '<path d="M36 27v18M27 36h18M36 27l-3 3m3-3 3 3M36 45l-3-3m3 3 3-3M27 36l3-3m-3 3 3 3M45 36l-3-3m3 3-3 3" fill="none" stroke="#d8eaf3" stroke-width="1.4" stroke-linecap="round"/>'+
  '<circle cx="36" cy="36" r="2.4" fill="#f3f8fc"/></svg></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output><div class="cad3dContextMenu" role="menu" aria-label="CAD3D context menu" hidden></div>'+
- '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
+ '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="front">Front · F</button><button type="button" data-view-shortcut="left">Left · L</button><button type="button" data-view-shortcut="right">Right · R</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button><button type="button" data-view-shortcut="zoom-in" aria-label="Zoom in">+</button><button type="button" data-view-shortcut="zoom-out" aria-label="Zoom out">−</button><button type="button" data-view-shortcut="views">Views · V</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
  '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
@@ -1080,7 +1080,11 @@ function build(){
  root.querySelector('.viewShortcuts').addEventListener('click',function(e){
   var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
   if(!key)return;
-  if(key==='fit')fit3DModel();else setViewPreset(key);
+  if(key==='fit')fit3DModel();
+  else if(key==='zoom-in')cad3dZoomStep(1);
+  else if(key==='zoom-out')cad3dZoomStep(-1);
+  else if(key==='views'){viewSelect.focus();viewSelect.click();}
+  else setViewPreset(key);
  });
  bindOrbitBall(root.querySelector('.orbitBall'));
  bindNavigationCube(root.querySelector('.viewCube'));
@@ -1161,7 +1165,7 @@ function build(){
   // Do not intercept numeric dimensions or modifier combinations.
   if(ev.isComposing||ev.ctrlKey||ev.metaKey||ev.altKey||ev.repeat)return;
   var key=ev.key.toUpperCase();
-  if(this.value.trim()===''&&['T','L','R','B','Z'].includes(key)){
+  if(this.value.trim()===''&&['T','F','L','R','B','Z','V','P','I','O','+','-'].includes(key)){
    ev.preventDefault();ev.stopPropagation();cad3dViewAlias(key);
   }
  });
@@ -1770,10 +1774,23 @@ function cad3dStartZoom(){
  root.querySelector('.view').style.cursor='zoom-in';
  text('ZOOM · clic para acercar · Shift+clic para alejar · arrastrar verticalmente para zoom · Esc para salir');
 }
+function cad3dZoomStep(direction){
+ orbit.dist=clamp(orbit.dist*(direction>0?.8:1.25),1.4,450);
+ if(viewMode==='walk'){
+  target.x-=Math.cos(orbit.az)*(direction>0?.7:-.7);
+  target.y-=Math.sin(orbit.az)*(direction>0?.7:-.7);
+ }
+ applyViewCamera();
+ text('Zoom '+(direction>0?'+':'−')+' · '+(viewMode==='ortho'?'ortogonal':viewMode==='walk'?'peatonal':'perspectiva'));
+}
 function cad3dViewAlias(word){
- var aliases={T:'top',TOP:'top',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back'};
+ var aliases={T:'top',TOP:'top',F:'front',FRONT:'front',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back',
+  P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso',O:'axo',ORTHO:'axo'};
  var key=String(word||'').trim().toUpperCase();
  if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
+ if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA'){var picker=root.querySelector('.cad3dViewSelect');picker.focus();picker.click();return true;}
+ if(key==='+'||key==='PLUS'||key==='ZOOMIN'){cad3dZoomStep(1);return true;}
+ if(key==='-'||key==='MINUS'||key==='ZOOMOUT'){cad3dZoomStep(-1);return true;}
  if(!Object.prototype.hasOwnProperty.call(aliases,key))return false;
  cad3dEndZoom();
  setViewPreset(aliases[key]);
@@ -3342,7 +3359,8 @@ function bindOrbitBall(ball){
  });
 }
 function syncViewControls(){
- root.querySelector('.cad3dViewSelect').value=activeView;
+ var selector=root.querySelector('.cad3dViewSelect');
+ if(selector)selector.value=activeView;
  root.querySelectorAll('[data-view-preset]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.viewPreset===activeView));
  });
@@ -3751,12 +3769,12 @@ window.addEventListener('keydown',function(ev){
  if(key==='delete'||key==='backspace'){
   ev.preventDefault();ev.stopImmediatePropagation();action('erase');return;
  }
- if(key==='+'||key==='-'){
-  ev.preventDefault();ev.stopImmediatePropagation();orbit.dist=clamp(orbit.dist*(key==='+'?.8:1.25),1.4,450);applyViewCamera();return;
+ if(key==='+'||key==='='||key==='add'||key==='numpadadd'||key==='-'||key==='subtract'||key==='numpadsubtract'){
+  ev.preventDefault();ev.stopImmediatePropagation();cad3dZoomStep(['+','=','add','numpadadd'].includes(key)?1:-1);return;
  }
  if(/^[a-z0-9@.,-]$/i.test(ev.key)){
   ev.preventDefault();ev.stopImmediatePropagation();
-  if(['T','L','R','Z','B'].includes(ev.key.toUpperCase())){
+  if(['T','F','L','R','Z','B','V','P','I','O'].includes(ev.key.toUpperCase())){
    cad3dViewAlias(ev.key);return;
   }
   var input=root.querySelector('#cad3dCommand');input.focus({preventScroll:true});input.value+=ev.key;
