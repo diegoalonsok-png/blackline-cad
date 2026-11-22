@@ -53,6 +53,16 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+/* CAD2D-inspired Draw/Modify dock within isolated CAD3D window. */
+#cad3dLab .cad3dRibbon{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;padding:6px 8px;background:#192630;border-bottom:1px solid #536b7c;flex:none;max-height:126px;overflow:auto}
+#cad3dLab .cad3dRibbonGroup{display:flex;flex-wrap:wrap;gap:3px;align-content:center;max-width:100%;padding:2px 7px 3px;border-right:1px solid #42596a}
+#cad3dLab .cad3dRibbonGroup:last-child{border-right:0}
+#cad3dLab .cad3dRibbonGroup strong{width:100%;font:700 9px Inter,Arial,sans-serif;letter-spacing:.12em;color:#a8bfcb}
+#cad3dLab .cad3dRibbon .btn{min-height:27px;padding:4px 7px;white-space:nowrap;font:11px Inter,Arial,sans-serif}
+#cad3dLab .cad3dRibbon .btn[disabled]{opacity:.38;cursor:not-allowed}
+#cad3dLab .cad3dRibbon .btn.armed{outline:1px solid #92d3ee;background:#2b4b5d}
+#cad3dLab .cad3dRibbonNote{font-size:10px;color:#9bb0be;padding:2px 6px;align-self:center}
+
 /* CAD3D Navigation refresh: isolated presentation only; existing orbit/pan behavior retained. */
 #cad3dLab .viewCube{
  border-radius:20px; background:radial-gradient(circle at 35% 24%,#344758,#14212c 70%,#0c151e);
@@ -648,12 +658,37 @@ function launch(){
  var toolStatus=bar.querySelector('#blToolStatus');bar.insertBefore(b,toolStatus||null);
  b.addEventListener('click',open);
 }
+
+// Draw and Modify mirror CAD2D command naming. Unported actions are deliberately disabled,
+// rather than silently performing an unrelated 3D operation.
+var CAD3D_RIBBON_GROUPS=[
+ ['DRAW','line','polyline','polygon','rect','circle','arc','ellipse','hatch','text','box','sphere','cylinder','cone'],
+ ['MODIFY','select','move','copy','rotate','scale','mirror','offset','trim','extend','fillet','chamfer','erase','array','join','explode','union','subtract','intersect']
+];
+var CAD3D_RIBBON_NAMES={line:'Line',polyline:'Polyline',polygon:'Polygon',rect:'Rectangle',circle:'Circle',arc:'Arc',ellipse:'Ellipse',hatch:'Hatch',text:'Text',
+ box:'Box',sphere:'Sphere',cylinder:'Cylinder',cone:'Cone',select:'Select',move:'Move',copy:'Copy',rotate:'Rotate',scale:'Scale',mirror:'Mirror',
+ offset:'Offset',trim:'Trim',extend:'Extend',fillet:'Fillet',chamfer:'Chamfer',erase:'Erase',array:'Array',join:'Join',explode:'Explode',
+ union:'Union',subtract:'Subtract',intersect:'Intersect'};
+var CAD3D_RIBBON_ACTIVE=new Set(['select','move','copy','rotate','erase','box','sphere','cylinder','cone','union','subtract','intersect']);
+function cad3DRibbonMarkup(){
+ return '<div class="cad3dRibbon" role="group" aria-label="CAD2D Draw and Modify inside CAD3D">'+
+  CAD3D_RIBBON_GROUPS.map(function(group){
+   return '<div class="cad3dRibbonGroup" role="toolbar" aria-label="'+group[0]+'">'+
+    '<strong>'+group[0]+'</strong>'+group.slice(1).map(function(id){
+     var enabled=CAD3D_RIBBON_ACTIVE.has(id),name=CAD3D_RIBBON_NAMES[id]||id;
+     return '<button type="button" class="btn" data-action="'+id+'"'+(enabled?'':' disabled aria-disabled="true"')+
+      ' title="'+name+(enabled?' · CAD3D':' · pendiente de adaptar al plano 3D')+'">'+name+'</button>';
+    }).join('')+'</div>';
+  }).join('')+'<span class="cad3dRibbonNote">Comandos grises: aún no implementados en CAD3D</span></div>';
+}
+
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
  root.innerHTML='<div class="head"><strong>BLACKLINE · CAD3D</strong><div class="stretch"></div>'+
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
+ cad3DRibbonMarkup()+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
  '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
  '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
@@ -784,7 +819,7 @@ function build(){
  root.querySelector('.edgeResizeR').addEventListener('pointerdown',beginResize);
  root.querySelector('.edgeResizeB').addEventListener('pointerdown',beginResize);
  root.addEventListener('click',function(e){
-  var button=e.target.closest('.tools [data-action]'), menu=e.target.closest('.ioMenu');
+  var button=e.target.closest('.tools [data-action], .cad3dRibbon [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
@@ -1028,7 +1063,7 @@ function toggleDraftMode(mode){
 function setPlacement(which){
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
- root.querySelectorAll('.solidTools button').forEach(function(b){
+ root.querySelectorAll('.solidTools button, .cad3dRibbon button').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
@@ -2898,6 +2933,7 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
+ if(a==='select'){setPlacement(null);text('Select · clic sobre un objeto para seleccionarlo');return true;}
  if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
