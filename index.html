@@ -8880,6 +8880,8 @@ function relocateOpeningWithBlock(ref,previous){
 }
 function insertSelectedBlock(point){
  const block=selectedBlock();if(!block)return toast('Choose a block first');
+ const arqPro=block.arq?.id&&window.CAD2D_ARQ_LIBRARY?.library?.some(item=>item.id===block.arq.id&&item.pro);
+ if((block.pro||arqPro)&&window.CAD2D_PLAN&&!window.CAD2D_PLAN.can('arq-pro'))return window.CAD2D_PLAN.upsell('Bloque PRO: '+block.name);
  const factor=Number($('blockScale').value),angle=Number($('blockRotation').value);
  if(!Number.isFinite(factor)||factor<=0||!Number.isFinite(angle))return toast('Invalid insertion scale / angle');
  // Keep the original wall intact if we detect a two-face wall but cannot cut BOTH faces.
@@ -9186,7 +9188,7 @@ function initPermanentBlockGallery(){
  const box=(name,cat,w,h)=>add(name,cat,w,h,[['rect',0,0,w,h],['rect',.08,.08,Math.max(.08,w-.16),Math.max(.08,h-.16)]]);
  const circular=(name,cat,d)=>add(name,cat,d,d,[['circle',d/2,d/2,d/2],['circle',d/2,d/2,Math.max(.025,d*.12)]]);
  // Colección editorial propia de bloques arquitectónicos en planta: dibujo vectorial, no imágenes.
- const premium=(id,cat,w,h,draw)=>add('Premium · '+id,cat,w,h,draw);
+ const premium=(id,cat,w,h,draw)=>entries.push({id:'Premium · '+id,cat,w,h,draw,pro:true});
  premium('Sofá modular 3 cuerpos 260','Furniture',2.60,1.02,[
   ['rect',0,0,2.60,1.02],['rect',.10,.18,2.40,.70],['rect',.04,.14,.18,.75],['rect',2.38,.14,.18,.75],
   ['line',.22,.21,.22,.86],['line',.98,.21,.98,.86],['line',1.68,.21,1.68,.86],['line',2.38,.21,2.38,.86],
@@ -9282,6 +9284,48 @@ function initPermanentBlockGallery(){
  }
  box('Jardinera 120 × 040','Landscape',1.2,.4);
  box('Cantero rectangular 200 × 060','Landscape',2,.6);
+ // Free library of original 1:1 parametric openings. Every size is an independent
+ // definition using the native swing-door/double-door/framed-window engine, not X/Y stretching.
+ const openingNames=new Set(entries.map(e=>e.id));
+ const openingCm=w=>String(Math.round(w*100)).padStart(3,'0');
+ function addFreeOpening(name,kind,w,{reverse=false,mullion=false,vano=false}={}){
+  if(openingNames.has(name))return;
+  openingNames.add(name);
+  const t=.05,d=.12,leaf=Math.max(.12,w-2*t);
+  let draw;
+  if(kind==='swing-door'){
+   const hinge=reverse?w-t:t;
+   draw=[['rect',0,-d/2,t,d],['rect',w-t,-d/2,t,d],
+     ['line',hinge,0,hinge,leaf],
+     ['arc',hinge,0,leaf,reverse?90:0,reverse?180:90]];
+  }else if(kind==='double-door'){
+   const half=(w-2*t)/2;
+   draw=[['rect',0,-d/2,t,d],['rect',w-t,-d/2,t,d],
+     ['line',t,0,t,half],['line',w-t,0,w-t,half],
+     ['arc',t,0,half,0,90],['arc',w-t,0,half,90,180]];
+  }else{
+   draw=vano?[['line',0,-d/2,0,d/2],['line',w,-d/2,w,d/2]]:[
+     ['rect',0,-d/2,t,d],['rect',w-t,-d/2,t,d],
+     ['line',t,-d/2,w-t,-d/2],['line',t,d/2,w-t,d/2],
+     ['line',t,-t*.28,w-t,-t*.28],['line',t,t*.28,w-t,t*.28]];
+   if(mullion&&!vano)draw.push(['rect',w/2-t/2,-d/2,t,d]);
+  }
+  entries.push({id:name,cat:'Openings',w,h:kind==='framed-window'?d:w,
+   kind,reverse,mullion,vano,free:true,draw});
+ }
+ for(const w of [.60,.65,.70,.75,.80,.85,.90,.95,1.00,1.10,1.20]){
+  addFreeOpening('Puerta abatible '+openingCm(w)+' · izquierda','swing-door',w);
+  addFreeOpening('Puerta abatible '+openingCm(w)+' · derecha','swing-door',w,{reverse:true});
+ }
+ for(const w of [1.20,1.40,1.50,1.60,1.80,2.00,2.20,2.40])
+  addFreeOpening('Puerta doble abatible '+openingCm(w),'double-door',w);
+ for(const w of [.60,.75,.90,1.00,1.20,1.50,1.80,2.10,2.40,3.00])
+  addFreeOpening('Ventana marco simple '+openingCm(w),'framed-window',w);
+ for(const w of [1.20,1.50,1.80,2.10,2.40,2.70,3.00,3.60,4.00,4.50])
+  addFreeOpening('Ventana marco + parteluz '+openingCm(w),'framed-window',w,{mullion:true});
+ for(const w of [.70,.80,.90,1.00,1.20,1.50,1.80,2.40,3.00])
+  addFreeOpening('Vano libre '+openingCm(w),'framed-window',w,{vano:true});
+ const canUseLibraryPro=()=>!window.CAD2D_PLAN||window.CAD2D_PLAN.can('arq-pro');
  const cats=[...new Set(entries.map(x=>x.cat))];
  let activeCategory=cats[0];
  const catIcons={Openings:'▯',Furniture:'▤',Sanitary:'◉',Vehicles:'▰',Landscape:'♧'};
@@ -9294,7 +9338,7 @@ function initPermanentBlockGallery(){
  }
 
  function svgFor(x){
-  const defaults=x.kind?{width:x.w,frameWidth:.05,frameDepth:x.kind==='framed-window'?.12:.12,mirror:false,mullion:Boolean(x.mullion),...(x.vano?{vano:true}:{})}:null;
+  const defaults=x.kind?{width:x.w,frameWidth:.05,frameDepth:.12,mirror:Boolean(x.reverse),mullion:Boolean(x.mullion),...(x.vano?{vano:true}:{})}:null;
   const geometry=x.kind?blockInstanceGeometry({parametric:{kind:x.kind,defaults},entities:[]},{params:defaults}):x.draw.map(d=>{
    const t=d[0],v=d.slice(1);
    if(t==='line')return {type:'line',a:P(v[0],v[1]),b:P(v[2],v[3])};
@@ -9332,6 +9376,7 @@ function initPermanentBlockGallery(){
  }
  window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);if(!x)return false;install(x);return true};
  function install(x){
+  if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
   const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e'],Rooms:['BL_ROOMS','#e4c8a1']}[x.cat];
   if(!info)return toast('Unknown block category');
@@ -9360,7 +9405,7 @@ function initPermanentBlockGallery(){
     ...(x.kind==='swing-door'?{mirror:Boolean(x.reverse)}:{}),
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion),...(x.vano?{vano:true}:{})}:{})
    }}:null;
-   state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{})});
+   state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{}),...(x.pro?{pro:true}:{})});
    if(x.wholeRoom){state.blocks[key].dynamic2d=blDynEligible(state.blocks[key]);state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
    renderBlockLibrary();queueLocalBackup()
   }
@@ -9378,7 +9423,7 @@ function initPermanentBlockGallery(){
    if(x.kind)button.dataset.dynamic='true';
    button.setAttribute('aria-label','Insert '+x.id+' at 1:1');
    button.title=x.id+' · ancho '+x.w+' m · marco paramétrico 0,05 m · clic para insertar';
-   button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.kind?'<span style="font-size:9px;display:block;color:#9cdeed">↔ PARAMÉTRICO</span>':x.wholeRoom?'<span style="font-size:9px;display:block;color:#9cdeed">AMBIENTE · BLOQUE ÚNICO</span>':'');
+   button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.pro?'<span style="font-size:9px;color:#f2d38f">PRO · membresía</span>':x.free?'<span style="font-size:9px;color:#9fe0c4">FREE · PARAMÉTRICO</span>':x.kind?'<span style="font-size:9px;color:#9cdeed">↔ PARAMÉTRICO</span>':x.wholeRoom?'<span style="font-size:9px;color:#9cdeed">AMBIENTE · BLOQUE ÚNICO</span>':'');
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
    button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{install(x);for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
