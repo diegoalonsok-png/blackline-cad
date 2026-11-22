@@ -1219,7 +1219,9 @@ function updateCamera(){
    target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
   camera.lookAt(target);
  }
- camera.updateMatrixWorld();renderRulers();
+ camera.updateMatrixWorld();
+ if(modelRoot)modelRoot.traverse(function(o){if(o.userData?.cadPlanSymbol)o.visible=activeView==='top'&&viewMode==='ortho';});
+ renderRulers();
  if(fallbackCanvas)fallbackDraw();
 }
 function applyViewCamera(){
@@ -1901,6 +1903,74 @@ function addShapedOpenings(wall,group){
   }
  });
 }
+/* Parametric operable sashes are rebuilt at their actual opened positions.
+   The host void remains unchanged; frames cast shadows and glazing transmits sun. */
+function addOperableOpeningMeshes(wall,group){
+ (wall.openings||[]).forEach(function(o){
+  if(o.kind==='opening'||(o.shape||'rect')!=='rect')return;
+  var motion=openingMotionType(o),slide=clamp(finite(o.openFraction,0),0,1);
+  var angle=clamp(finite(o.openAngle,0),0,170)*Math.PI/180;
+  if(motion==='fixed'||(motion==='sliding'?slide<=0:angle<=0))return;
+  var glass=openingIsGlass(o),w=o.w,h=o.h;
+  var m=Math.min(.055,w/12,h/12),usable=Math.max(.08,w-2*m),leafHeight=Math.max(.08,h-2*m);
+  var n=/double|french|bifold|folding|terrace|industrial|patio/.test(o.styleId||'')?2:1;
+  if(motion==='sliding')n=2;
+  var leafWidth=usable/n;
+  function leafGeometry(parent,left,right){
+   var span=right-left,center=(left+right)/2;
+   function part(pw,pd,ph,px,py,pz,color,clear){
+    var mesh=addMesh(boxGeom(pw,pd,ph),color,wall.id,parent,px,py,pz,clear,glazingOpacity(o));
+    mesh.userData.openingId=o.id;return mesh;
+   }
+   if(glass){
+    var lip=Math.min(.04,span/9,leafHeight/9);
+    part(span,.043,lip,center,0,0,0x7c9099,false);
+    part(span,.043,lip,center,0,leafHeight-lip,0x7c9099,false);
+    part(lip,.043,leafHeight,left+lip/2,0,0,0x7c9099,false);
+    part(lip,.043,leafHeight,right-lip/2,0,0,0x7c9099,false);
+    part(Math.max(.02,span-2*lip),.016,Math.max(.02,leafHeight-2*lip),center,0,lip,0x5794a8,true);
+   }else part(span,.045,leafHeight,center,0,0,0x987e66,false);
+  }
+  for(var i=0;i<n;i++){
+   var hinged=motion!=='sliding',rightHinge=o.hingeSide==='right';
+   if(n===2&&hinged)rightHinge=i===1;
+   var left=o.offset-usable/2+i*leafWidth,right=left+leafWidth;
+   var sash=new T.Group();
+   if(hinged){
+    var pivot=rightHinge?right:left;
+    sash.position.set(pivot,0,o.sill+m);
+    sash.rotation.z=(o.openDirection===-1?-1:1)*(rightHinge?-1:1)*angle;
+    leafGeometry(sash,rightHinge?-leafWidth:0,rightHinge?0:leafWidth);
+   }else{
+    sash.position.set(0,i===0?-.024:.024,o.sill+m);
+    var dx=i===1?(o.hingeSide==='right'?1:-1)*leafWidth*slide:0;
+    leafGeometry(sash,left+dx,right+dx);
+   }
+   group.add(sash);
+  }
+ });
+}
+function addDoorPlanSymbols(wall,group){
+ (wall.openings||[]).forEach(function(o){
+  if(o.kind!=='door'||(o.shape||'rect')!=='rect')return;
+  if(openingMotionType(o)==='fixed')return;
+  var symbol=new T.Group();symbol.userData.cadPlanSymbol=true;
+  var hingeRight=o.hingeSide==='right',dir=o.openDirection===-1?-1:1;
+  var reach=Math.max(.1,o.w-.07),pivot=o.offset+(hingeRight?o.w/2-.035:-o.w/2+.035);
+  var hingeSign=hingeRight?-1:1,pts=[];
+  for(var i=0;i<=24;i++){
+   var phi=Math.PI*i/48;
+   pts.push(new T.Vector3(pivot+hingeSign*reach*Math.cos(phi),dir*reach*Math.sin(phi),.025));
+  }
+  var mat=new T.LineBasicMaterial({color:0x1d3d4e,depthTest:false,depthWrite:false});
+  var arc=new T.Line(new T.BufferGeometry().setFromPoints(pts),mat);
+  arc.userData.owner=wall.id;arc.userData.openingId=o.id;symbol.add(arc);
+  var leaf=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(pivot,0,.025),pts[pts.length-1]]),mat.clone());
+  leaf.userData.owner=wall.id;leaf.userData.openingId=o.id;symbol.add(leaf);
+  symbol.visible=activeView==='top'&&viewMode==='ortho';
+  group.add(symbol);
+ });
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
@@ -1918,6 +1988,8 @@ function buildObject(r){
  });
  if(r.type==='wall')addWallAttachments(r,group);
  if(r.type==='wall')addShapedOpenings(r,group);
+ if(r.type==='wall')addOperableOpeningMeshes(r,group);
+ if(r.type==='wall')addDoorPlanSymbols(r,group);
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
   var cone=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);
