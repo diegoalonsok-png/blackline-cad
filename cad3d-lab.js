@@ -1817,6 +1817,12 @@ function renderProps(){
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
+   if(r.type==='wall'){
+    var kinds=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host==='wall';}):ARCH_STYLES[o.kind];
+    if(kinds)html+='<label>Model <select data-opening-style="'+o.id+'">'+kinds.map(function(st){
+     return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';
+    }).join('')+'</select></label>';
+   }
    if(r.type==='wall')html+='<label>Void shape <select data-opening-shape="'+o.id+'">'+
      ['rect','round','arch','segment','triangle','pointed'].map(function(s){return '<option value="'+s+'"'+((o.shape||'rect')===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></label>';
     html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
@@ -1827,7 +1833,7 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape],select[data-opening-style]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
@@ -1844,12 +1850,29 @@ function change(e){
   }
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
  }
- var val=Number(input.value);if(!Number.isFinite(val))return text('Valor inválido');
+ if(input.dataset.openingStyle){
+  var item=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
+  if(!item)return;
+  var variants=item.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host==='wall';}):ARCH_STYLES[item.kind];
+  var preset=variants.find(function(st){return st.id===input.value;});
+  if(!preset)return;
+  if(preset.w>r.w||preset.h>r.h){renderProps();text('El modelo no entra en este muro');return;}
+  var nextSill=Math.max(0,Math.min(preset.sill||0,r.h-preset.h));
+  var nextOffset=clamp(item.offset,-(r.w-preset.w)/2,(r.w-preset.w)/2);
+  var collision=(r.openings||[]).some(function(other){
+   return other!==item&&Math.abs(other.offset-nextOffset)<(other.w+preset.w)/2+.015&&
+    Math.max(other.sill||0,nextSill)<Math.min((other.sill||0)+(other.h||0),nextSill+preset.h)+.015;
+  });
+  if(collision){renderProps();text('La carpintería se superpone a otro vano');return;}
+  Object.assign(item,{styleId:preset.id,w:preset.w,h:preset.h,sill:nextSill,offset:nextOffset,shape:preset.shape||'rect'});
+  redraw();renderProps();text('Modelo actualizado y vano regenerado');return;
+ }
  if(input.dataset.openingShape){
   var cut=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingShape);});
   if(cut&&['rect','round','arch','segment','triangle','pointed'].includes(input.value)){cut.shape=input.value;redraw();renderProps();text('Forma del vano actualizada');}
   return;
  }
+ var val=Number(input.value);if(!Number.isFinite(val))return text('Valor inválido');
  if(input.dataset.attId){
   var att=(r.attachments||[]).find(function(a){return a.id===Number(input.dataset.attId);});
   if(!att)return;
