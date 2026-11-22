@@ -50,7 +50,30 @@ var icons={
  dist:'<path d="M3 16 16 3l5 5L8 21zM8 11l2 2m1-5 2 2m1-5 2 2"/>',
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
-var css=`/* CAD3D own basic Draw + Modify ribbons, preserving CAD2D. */
+var css=`
+/* Native CAD3D view save dialog: preserves scene, camera and user project. */
+#cad3dLab .viewSaveMenu{position:relative;display:inline-flex;align-items:center;flex:none}
+#cad3dLab .viewSaveMenu>summary{list-style:none;cursor:pointer;white-space:nowrap}
+#cad3dLab .viewSaveMenu>summary::-webkit-details-marker{display:none}
+#cad3dLab .viewSavePanel{position:absolute;right:0;top:calc(100% + 8px);z-index:100;display:grid;gap:9px;width:min(326px,85vw);padding:14px;border:1px solid #688ba0;border-radius:10px;background:#152330;box-shadow:0 13px 35px #000b;color:#e7f1f6}
+#cad3dLab .viewSavePanel label{font-size:11px;color:#bbccda;display:grid;gap:4px}
+#cad3dLab .viewSavePanel input,#cad3dLab .viewSavePanel select{box-sizing:border-box;width:100%;min-height:31px;background:#23313d;color:#eff8ff;border:1px solid #566f7e;border-radius:5px;padding:5px 7px}
+#cad3dLab .viewSavePanel .saveRow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+#cad3dLab .viewSavePanel output{font-size:11px;color:#afc5d0}
+#cad3dLab .viewSavePanel button{min-height:32px;cursor:pointer}
+
+/* Classic drafting / refined CAD3D navigator, isolated from CAD2D. */
+#cad3dLab .view.wire2dView{background:#fff!important}
+#cad3dLab .viewCube{border-radius:19px;border:1px solid #86a9bd;background:linear-gradient(150deg,#344b5b,#203444 42%,#101c28);box-shadow:inset 0 1px 0 #d9f1ff88,inset 0 -2px 7px #08111ca0,0 5px 15px #0007}
+#cad3dLab .viewCube:hover{border-color:#bce3f6;box-shadow:0 0 0 2px #8ad5f340,0 7px 20px #0009}
+#cad3dLab .cubePlane{stroke:#bed2dc;stroke-width:1.1}
+#cad3dLab .cubeFaceLabel{fill:#f7fbff;letter-spacing:.65px}
+#cad3dLab .cubeCornerZone{fill:#c7d8e0;stroke:#233744}
+#cad3dLab .orbitBall{border:1px solid #91b6c7;background:radial-gradient(circle at 36% 28%,#52778b,#203c4d 57%,#0a1825);box-shadow:inset 0 2px 1px #e4f9ff75,inset 0 -6px 10px #04121a9c,0 6px 18px #0008}
+#cad3dLab .orbitBall:hover{border-color:#d0efff;box-shadow:inset 0 1px 0 #ecfbff9a,0 0 0 2px #8ecce93b,0 7px 19px #000a}
+#cad3dLab .orbitBall svg{width:66px;height:66px;filter:drop-shadow(0 1px 1px #0007)}
+#cad3dLab .orbitBall:focus-visible,#cad3dLab .viewCube:focus-visible{outline:2px solid #c4eeff;outline-offset:3px}
+/* CAD3D own basic Draw + Modify ribbons, preserving CAD2D. */
 #cad3dLab .cad3dBasicBars{display:flex;align-items:center;gap:8px;flex:none;overflow-x:auto;scrollbar-width:thin;padding:5px 9px;background:#172530;border-bottom:1px solid #4c6576;min-height:42px}
 #cad3dLab .cad3dBasicBars .cad3dBar{display:flex;align-items:center;gap:3px;flex:none}
 #cad3dLab .cad3dBasicBars .cad3dBar strong{font:700 10px Inter,Arial,sans-serif;color:#b9c8d3;margin:0 5px 0 2px}
@@ -711,6 +734,16 @@ function build(){
  '</div></div><small class="styleGalleryNote">Los croquis usan sol, luz y sombras cuando WebGL está disponible. Los estilos no cambian la geometría.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
+ '<details class="viewSaveMenu"><summary class="btn" title="Guardar esta vista en PNG, JPG o PDF">Guardar vista ▾</summary>'+
+ '<div class="viewSavePanel" role="group" aria-label="Exportar vista 3D">'+
+ '<label>Formato<select data-save-format><option value="png">PNG</option><option value="jpg">JPG</option><option value="pdf">PDF</option></select></label>'+
+ '<label>Tamaño<select data-save-size><option value="viewport">Vista actual</option><option value="hd">1920 × 1080 px</option><option value="2k">2560 × 1440 px</option><option value="4k">3840 × 2160 px</option><option value="a4">A4 horizontal</option><option value="a3">A3 horizontal</option><option value="a2">A2 horizontal</option><option value="custom">Personalizado (píxeles)</option></select></label>'+
+ '<div class="saveRow"><label>Ancho (px)<input data-save-width type="number" min="128" max="8192" step="1" value="1920"></label>'+
+ '<label>Alto (px)<input data-save-height type="number" min="128" max="8192" step="1" value="1080"></label></div>'+
+ '<label>Resolución de impresión (DPI)<select data-save-dpi><option value="96">96</option><option value="150">150</option><option value="300" selected>300</option></select></label>'+
+ '<output class="saveViewInfo">1920 × 1080 píxeles</output>'+
+ '<button type="button" class="btn" data-save-go>Guardar imagen / PDF</button>'+
+ '</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
@@ -827,6 +860,10 @@ function build(){
   if(!preset)return;sunSettings.azimuth=preset[0];sunSettings.elevation=preset[1];sunSettings.enabled=true;applySunSettings();
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
+ root.querySelector('.viewSaveMenu').addEventListener('change',updateSaveViewSettings);
+ root.querySelector('.viewSaveMenu').addEventListener('input',updateSaveViewSettings);
+ root.querySelector('[data-save-go]').addEventListener('click',saveCAD3DView);
+ updateSaveViewSettings();
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
  root.querySelector('#cad3dCommand').addEventListener('keydown',function(ev){
   // Immediate view shortcuts even with the Command field focused.
@@ -1173,7 +1210,7 @@ function fallbackPolygon(points,fill,stroke,width){
  g.fillStyle=isCad3DSketch(renderStyle)||renderStyle==='hidden'?'#f8f6ef':
   renderStyle==='monochrome'?'#e1e3e4':renderStyle==='realistic'?'#aa9b86':fill;
  if(!wire){g.globalAlpha=renderStyle==='xray'?.26:1;g.fill();g.globalAlpha=1;}
- g.strokeStyle=['sketch','hidden','wire2d','wire3d'].includes(renderStyle)?'#303537':stroke;
+ g.strokeStyle=renderStyle==='wire2d'?'#000000':['sketch','hidden','wire3d'].includes(renderStyle)?'#303537':stroke;
  g.lineWidth=['sketch','wire2d','wire3d'].includes(renderStyle)?1.2:(width||1);g.stroke();
 }
 function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
@@ -1193,7 +1230,7 @@ function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
  faces.sort(function(a,b){return b.v.reduce(function(n,i){return n+pts[i].y;},0)-a.v.reduce(function(n,i){return n+pts[i].y;},0);});
  faces.forEach(function(face){fallbackPolygon(face.v.map(function(i){return pts[i];}),face.fill,stroke,selectedObject?1.8:.85);});
  if(renderStyle==='wire2d'){
-  fallbackCtx.fillStyle='#111111';
+  fallbackCtx.fillStyle='#000000';
   pts.forEach(function(p){fallbackCtx.beginPath();fallbackCtx.arc(p.x,p.y,2,0,Math.PI*2);fallbackCtx.fill();});
  }
 }
@@ -1202,7 +1239,7 @@ function fallbackDraw(){
  var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
  if(w<=0||h<=0)return;
  var projection=fallbackProjector();
- ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#f6f5f1':
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#ffffff':
   CAD3D_SKETCH_PRESETS[renderStyle]?'#'+CAD3D_SKETCH_PRESETS[renderStyle].bg.toString(16).padStart(6,'0'):
   ['hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
@@ -1211,10 +1248,10 @@ function fallbackDraw(){
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
  var origin=projection(0,0,0);
- ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#8d918e':'#7191a2';ctx.lineWidth=1;
+ ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#8d918e':'#7191a2';ctx.lineWidth=1;
  ctx.beginPath();ctx.moveTo(origin.x-4,origin.y);ctx.lineTo(origin.x+4,origin.y);ctx.moveTo(origin.x,origin.y-4);ctx.lineTo(origin.x,origin.y+4);ctx.stroke();
  if(underlay?.segments?.length){
-  ctx.strokeStyle=renderStyle==='wire2d'?'#111111':'#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
+  ctx.strokeStyle=renderStyle==='wire2d'?'#000000':'#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
   ctx.beginPath();
   underlay.segments.forEach(function(p){
    var a=projection(p[0],p[1],0),b=projection(p[2],p[3],0);
@@ -1234,18 +1271,18 @@ function fallbackDraw(){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
    ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':grad;
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';
    ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);if(renderStyle!=='wire2d')ctx.fill();ctx.stroke();
   }else if(rec.type==='cylinder'||rec.type==='cone'){
    var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
    ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':'#547b91';
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
    ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();if(renderStyle!=='wire2d')ctx.fill();ctx.stroke();
    ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
   }else if(rec.type==='boolean'&&rec.triangles?.length){
    var p=rec.triangles,angle=(rec.rot||0)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
    var vertex=function(i){return projection(rec.x+p[i]*cos-p[i+1]*sin,rec.y+p[i]*sin+p[i+1]*cos,rec.z+p[i+2]);};
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':'#789ab3';ctx.lineWidth=1;
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':'#789ab3';ctx.lineWidth=1;
    for(var i=0;i+8<p.length;i+=9){
     var a=vertex(i),b=vertex(i+3),c=vertex(i+6);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
@@ -2479,6 +2516,7 @@ function renderStyleControls(){
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
  root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+ root.querySelector('.view')?.classList.toggle('wire2dView',renderStyle==='wire2d');
 }
 /* Lightweight, deterministic hatch strokes drawn on visible box faces.
    Presentation-only THREE.LineSegments. CAD model geometry and opening records remain untouched. */
@@ -2535,7 +2573,7 @@ function applyRenderStyle(){
  if(!T)return;
  var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf6f5f1:
+ if(scene)scene.background=new T.Color(renderStyle==='wire2d'?0xffffff:sketch?sketch.bg:lightPaper?0xf6f5f1:
   sunSettings.enabled&&['shaded','shaded-edges','realistic'].includes(renderStyle)?0xc4d8e4:MODEL_BACKGROUND);
  if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:sunSettings.enabled?0xd1cbc0:0x9ba5a8);
  if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
@@ -2588,7 +2626,7 @@ function applyRenderStyle(){
      var dots=new T.BufferGeometry();
      dots.setAttribute('position',new T.Float32BufferAttribute(coords,3));
      var points=new T.Points(dots,new T.PointsMaterial({
-      color:0x151515,size:3.2,sizeAttenuation:false,depthTest:false,depthWrite:false
+      color:0x000000,size:3.2,sizeAttenuation:false,depthTest:false,depthWrite:false
      }));
      points.userData.cadSketch=true;points.renderOrder=6;m.add(points);
     }
@@ -2611,6 +2649,118 @@ function setVisualStyle(mode){
 }
 function setSketchStyle(mode){
  setVisualStyle(isCad3DSketch(mode)?mode:'shaded-edges');
+}
+
+function saveViewSettings(){
+ var menu=root.querySelector('.viewSaveMenu');
+ var size=menu.querySelector('[data-save-size]').value;
+ var dpi=Number(menu.querySelector('[data-save-dpi]').value)||300;
+ var dims={hd:[1920,1080],'2k':[2560,1440],'4k':[3840,2160],
+  a4:[297,210],a3:[420,297],a2:[594,420]};
+ var w,h;
+ if(size==='viewport'){
+  var source=renderer?.domElement||fallbackCanvas;
+  w=source?.width||1280;h=source?.height||720;
+ }else if(['a4','a3','a2'].includes(size)){
+  w=Math.round(dims[size][0]*dpi/25.4);
+  h=Math.round(dims[size][1]*dpi/25.4);
+ }else if(dims[size]){w=dims[size][0];h=dims[size][1];}
+ else{w=Number(menu.querySelector('[data-save-width]').value);h=Number(menu.querySelector('[data-save-height]').value);}
+ return {size:size,dpi:dpi,w:Math.round(w),h:Math.round(h),
+  format:menu.querySelector('[data-save-format]').value};
+}
+function updateSaveViewSettings(){
+ var menu=root.querySelector('.viewSaveMenu'),settings=saveViewSettings();
+ if(settings.size!=='custom'&&Number.isFinite(settings.w)&&Number.isFinite(settings.h)){
+  menu.querySelector('[data-save-width]').value=settings.w;
+  menu.querySelector('[data-save-height]').value=settings.h;
+ }
+ var pixels=settings.w*settings.h,valid=Number.isInteger(settings.w)&&Number.isInteger(settings.h)&&
+  settings.w>=128&&settings.h>=128&&settings.w<=8192&&settings.h<=8192&&pixels<=24000000;
+ menu.querySelector('.saveViewInfo').textContent=valid?
+  settings.w+' × '+settings.h+' px · '+(pixels/1000000).toFixed(2)+' MP · '+settings.dpi+' DPI':
+  'Resolución inválida: máximo 8192 px por lado y 24 megapíxeles';
+ menu.querySelector('[data-save-go]').disabled=!valid;
+}
+function cad3dPDFfromJPEG(jpegDataUrl,w,h,dpi){
+ var binary=atob(jpegDataUrl.split(',')[1]);
+ var jpg=new Uint8Array(binary.length);for(var k=0;k<binary.length;k++)jpg[k]=binary.charCodeAt(k);
+ var enc=new TextEncoder(),chunks=[],offset=0,xref=[0];
+ function append(value){var bytes=typeof value==='string'?enc.encode(value):value;chunks.push(bytes);offset+=bytes.length;}
+ function object(n,header,stream){
+  xref[n]=offset;append(n+' 0 obj\n'+header);
+  if(stream){append('\nstream\n');append(stream);append('\nendstream');}
+  append('\nendobj\n');
+ }
+ var pw=(w*72/dpi).toFixed(3),ph=(h*72/dpi).toFixed(3);
+ append('%PDF-1.4\n');
+ object(1,'<< /Type /Catalog /Pages 2 0 R >>');
+ object(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+ object(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pw+' '+ph+
+  '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+ object(4,'<< /Type /XObject /Subtype /Image /Width '+w+' /Height '+h+
+  ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpg.length+' >>',jpg);
+ var cmds=enc.encode('q\n'+pw+' 0 0 '+ph+' 0 0 cm\n/Im0 Do\nQ\n');
+ object(5,'<< /Length '+cmds.length+' >>',cmds);
+ var xrefAt=offset;append('xref\n0 6\n0000000000 65535 f \n');
+ for(var n=1;n<=5;n++)append(String(xref[n]).padStart(10,'0')+' 00000 n \n');
+ append('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xrefAt+'\n%%EOF');
+ return new Blob(chunks,{type:'application/pdf'});
+}
+async function saveCAD3DView(){
+ var o=saveViewSettings(),pixels=o.w*o.h;
+ if(!Number.isInteger(o.w)||!Number.isInteger(o.h)||o.w<128||o.h<128||o.w>8192||o.h>8192||pixels>24000000){
+  text('Elegí un tamaño entre 128 y 8192 píxeles por lado (máximo 24 MP)');return;
+ }
+ if(!renderer&&!fallbackCanvas)return text('El visor 3D aún no está disponible');
+ var view=root.querySelector('.view'),filename='blackline-cad3d-'+(activeView||'vista')+'-'+o.w+'x'+o.h;
+ var out=document.createElement('canvas');out.width=o.w;out.height=o.h;
+ var ctx=out.getContext('2d');if(!ctx)return text('No se pudo preparar la exportación');
+ var source=renderer?.domElement||fallbackCanvas;
+ var oldW=source.width,oldH=source.height,oldPixelRatio=renderer?.getPixelRatio();
+ var oldAspect=camera?.aspect,oldLeft=camera?.left,oldRight=camera?.right,oldTop=camera?.top,oldBottom=camera?.bottom;
+ try{
+  if(renderer){
+   // Temporarily render at requested pixel size, restore in finally.
+   var max=renderer.capabilities.maxTextureSize;
+   if(o.w>max||o.h>max)throw Error('La GPU admite como máximo '+max+' px por lado');
+   renderer.setPixelRatio(1);renderer.setSize(o.w,o.h,false);
+   if(camera.isPerspectiveCamera)camera.aspect=o.w/o.h;
+   else if(camera.isOrthographicCamera){
+    var centerX=(oldLeft+oldRight)/2,halfHeight=(oldTop-oldBottom)/2;
+    var halfWidth=halfHeight*o.w/o.h;
+    camera.left=centerX-halfWidth;camera.right=centerX+halfWidth;
+   }
+   camera.updateProjectionMatrix();renderer.render(scene,camera);
+   ctx.drawImage(renderer.domElement,0,0,o.w,o.h);
+  }else{
+   // Compatibility renderer is raster; upscaling cannot add detail.
+   fallbackDraw();ctx.drawImage(fallbackCanvas,0,0,o.w,o.h);
+  }
+  if(o.format==='pdf'){
+   var pdf=cad3dPDFfromJPEG(out.toDataURL('image/jpeg',.93),o.w,o.h,o.dpi);
+   var pdfUrl=URL.createObjectURL(pdf),pdfLink=document.createElement('a');
+   pdfLink.href=pdfUrl;pdfLink.download=filename+'.pdf';
+   document.body.appendChild(pdfLink);pdfLink.click();pdfLink.remove();
+   setTimeout(function(){URL.revokeObjectURL(pdfUrl);},1200);
+  }else{
+   var type=o.format==='jpg'?'image/jpeg':'image/png';
+   var url=out.toDataURL(type,.94),a=document.createElement('a');
+   if(url==='data:,')throw Error('No se pudo generar la imagen');
+   a.href=url;a.download=filename+'.'+o.format;document.body.appendChild(a);a.click();a.remove();
+  }
+  text('Vista exportada '+o.w+' × '+o.h+' px · '+o.format.toUpperCase()+
+   (renderer?'':' · Vista de compatibilidad ampliada'));
+  root.querySelector('.viewSaveMenu').open=false;
+ }catch(err){text('No se pudo guardar la vista: '+(err.message||err));}
+ finally{
+  if(renderer){
+   renderer.setPixelRatio(oldPixelRatio);renderer.setSize(view.clientWidth,view.clientHeight,false);
+   camera.aspect=oldAspect;
+   if(camera.isOrthographicCamera){camera.left=oldLeft;camera.right=oldRight;camera.top=oldTop;camera.bottom=oldBottom;}
+   camera.updateProjectionMatrix();renderer.render(scene,camera);
+  }
+ }
 }
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
@@ -3183,7 +3333,14 @@ async function readJSON(e){
 }
 window.addEventListener('keydown',function(ev){
  if(!root||root.hidden||!root.contains(document.activeElement))return;
- var mode={F3:'osnap',F7:'grid',F8:'ortho'}[ev.key];
+ // CAD3D-specific viewport styles: plain F3 switches to 2D Wireframe; F4 to shaded.
+ // Ctrl/Cmd+F3 is also accepted when the browser delivers it. Shift+F3 preserves OSNAP.
+ if(ev.key==='F3'&&ev.shiftKey){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode('osnap');return;}
+ if(ev.key==='F3'||ev.key==='F4'){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  setVisualStyle(ev.key==='F3'?'wire2d':'shaded-edges');return;
+ }
+ var mode={F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
  if(ev.key==='Enter'&&['wall','door','window','opening'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
   ev.preventDefault();ev.stopImmediatePropagation();
