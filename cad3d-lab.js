@@ -1221,7 +1221,7 @@ function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
   pts.push(project(rec.x+lx*c-ly*ss,rec.y+lx*ss+ly*c,rec.z+z+iz*h+lx*(slope||0)));
  }
  var selectedObject=selected.includes(rec.id);
- var stroke=renderStyle==='wire2d'?'#000000':selectedObject?'#efc978':'#5a7585';
+ var stroke=renderStyle==='wire2d'?'#111111':selectedObject?'#efc978':'#5a7585';
  var faces=[
   {v:[0,1,3,2],fill:'#243440'},{v:[4,6,7,5],fill:color||'#617788'},
   {v:[0,4,5,1],fill:'#2e4554'},{v:[2,3,7,6],fill:'#395569'},
@@ -2603,7 +2603,7 @@ function applyRenderStyle(){
   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
-   var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x000000:
+   var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
     renderStyle==='wire3d'?0x191d21:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
