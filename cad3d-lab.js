@@ -1296,103 +1296,169 @@ function cad3dBuildProfile(r,group){
  */
 var cad3dToolbarLayout=null;
 function cad3dEnableMovableToolbars(){
- const specs=[['draw','.cad3dBasicBars .cad3dBar[aria-label="Draw"]'],
+ // Docking model: the four zones own the real toolbar nodes. No loose floating bars
+ // are left behind on pointer release. Track dragging on window so reparenting does
+ // not discard pointer capture (the root cause of the old one-move-only behavior).
+ const descriptors=[
+  ['draw','.cad3dBasicBars .cad3dBar[aria-label="Draw"]'],
   ['modify','.cad3dBasicBars .cad3dBar[aria-label="Modify"]'],
-  ['draw2d','.cad3dProfileTools'],['model3d','.cad3dModelTools'],['options','.tools']];
- const key='blackline-cad3d-toolbars-v1';
- let saved={};
- try{const data=JSON.parse(localStorage.getItem(key)||'{}');if(data&&typeof data==='object')saved=data;}catch(_e){}
+  ['draw2d','.cad3dProfileTools'],
+  ['model3d','.cad3dModelTools'],
+  ['options','.tools']
+ ];
+ const key='blackline-cad3d-dock-layout-v2';
+ const top=root.querySelector('.cad3dBasicBars');
+ const body=root.querySelector('.body');
+ const bottom=document.createElement('div');
+ bottom.className='cad3dDockZone cad3dDockBottom';
+ bottom.dataset.dockZone='bottom';
+ bottom.setAttribute('aria-label','Barras inferiores CAD3D');
+ root.querySelector('.draftBar').before(bottom);
+ const left=document.createElement('div'),right=document.createElement('div');
+ left.className='cad3dDockZone cad3dDockSide cad3dDockLeft';left.dataset.dockZone='left';
+ right.className='cad3dDockZone cad3dDockSide cad3dDockRight';right.dataset.dockZone='right';
+ left.setAttribute('aria-label','Barras izquierda CAD3D');
+ right.setAttribute('aria-label','Barras derecha CAD3D');
+ body.append(left,right);
+ top.classList.add('cad3dDockZone','cad3dDockTop');top.dataset.dockZone='top';
+ const zones={top,bottom,left,right},states=[],byId=new Map();
+ root.classList.add('cad3dCompactMode');
+ for(const [id,selector] of descriptors){
+  const el=root.querySelector(selector);if(!el)continue;
+  const grip=document.createElement('button');grip.type='button';
+  grip.className='cad3dToolbarGrip';grip.dataset.cad3dToolbar=id;
+  grip.title='Arrastrar y acoplar arriba, abajo o a los lados. Doble clic: volver arriba.';
+  grip.setAttribute('aria-label','Mover barra '+id);
+  grip.innerHTML='<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="3" r="1"/><circle cx="11" cy="3" r="1"/><circle cx="5" cy="8" r="1"/><circle cx="11" cy="8" r="1"/><circle cx="5" cy="13" r="1"/><circle cx="11" cy="13" r="1"/></svg>';
+  el.prepend(grip);el.classList.add('cad3dDockBar');top.appendChild(el);
+  const state={id,el,grip};states.push(state);byId.set(id,state);
+ }
+ const refresh=()=>{
+  for(const zone of Object.values(zones)){
+   const count=zone.querySelectorAll(':scope > .cad3dDockBar').length;
+   zone.classList.toggle('cad3dDockEmpty',count===0);
+  }
+ };
  const persist=()=>{
-  const data={};for(const state of states){
-   if(state.floating)data[state.id]={x:state.x,y:state.y};
+  const layout={};
+  for(const [zoneName,zone] of Object.entries(zones)){
+   [...zone.children].filter(el=>el.classList.contains('cad3dDockBar')).forEach((el,index)=>{
+    const st=states.find(x=>x.el===el);if(st)layout[st.id]={zone:zoneName,index};
+   });
   }
-  try{localStorage.setItem(key,JSON.stringify(data));}catch(_e){}
+  try{localStorage.setItem(key,JSON.stringify(layout));}catch(_e){}
+  refresh();
  };
- const states=[];
- const clampPosition=(bar,x,y)=>{
-  const maxX=Math.max(0,root.clientWidth-Math.min(bar.scrollWidth,bar.offsetWidth||bar.scrollWidth)-8);
-  const maxY=Math.max(38,root.clientHeight-bar.offsetHeight-55);
-  return {x:Math.round(clamp(x,4,maxX)),y:Math.round(clamp(y,38,maxY))};
+ let saved={};
+ try{const v=JSON.parse(localStorage.getItem(key)||'{}');if(v&&typeof v==='object')saved=v;}catch(_e){}
+ const order=[...states].sort((a,b)=>{
+  const pa=saved[a.id],pb=saved[b.id];
+  return (Number(pa?.index)||0)-(Number(pb?.index)||0);
+ });
+ // Restore only explicitly known zones. Older version's detached coordinates
+ // are deliberately ignored to avoid restoring the faulty loose layout.
+ for(const st of order){
+  const pref=saved[st.id],zone=zones[pref?.zone]||top;
+  zone.appendChild(st.el);
+ }
+ refresh();
+ const placeBefore=(zone,px,py,exclude)=>{
+  const vertical=zone.classList.contains('cad3dDockSide');
+  const items=[...zone.children].filter(el=>el!==exclude&&el.classList.contains('cad3dDockBar'));
+  return items.find(el=>{
+   const b=el.getBoundingClientRect();
+   return vertical?py<(b.top+b.bottom)/2:px<(b.left+b.right)/2;
+  })||null;
  };
- const position=(state,x,y)=>{
-  const p=clampPosition(state.el,x,y);
-  state.x=p.x;state.y=p.y;state.el.style.left=p.x+'px';state.el.style.top=p.y+'px';
+ const zoneFor=(px,py)=>{
+  const t=top.getBoundingClientRect(),bt=bottom.getBoundingClientRect(),bd=body.getBoundingClientRect();
+  if(py<t.bottom+35)return top;
+  if(py>bt.top-35)return bottom;
+  if(px<bd.left+80)return left;
+  if(px>bd.right-80)return right;
+  // Release in canvas interior? Snap to nearest dock; never abandon a loose bar.
+  const distances=[
+   [Math.abs(py-t.bottom),top],
+   [Math.abs(py-bt.top),bottom],
+   [Math.abs(px-bd.left),left],
+   [Math.abs(px-bd.right),right]
+  ];
+  distances.sort((a,b)=>a[0]-b[0]);return distances[0][1];
  };
- const float=(state,x,y)=>{
-  if(!state.floating){
-   state.el.classList.add('cad3dDockFloating');
-   root.appendChild(state.el);
-   state.floating=true;
-   state.grip.dataset.floating='true';
-   state.grip.title='Mover barra flotante · doble clic para acoplar';
+ let drag=null;
+ function cleanup(){
+  window.removeEventListener('pointermove',onMove,true);
+  window.removeEventListener('pointerup',onUp,true);
+  window.removeEventListener('pointercancel',onCancel,true);
+  window.removeEventListener('keydown',onEscape,true);
+  root.classList.remove('cad3dDraggingDock');
+  Object.values(zones).forEach(z=>z.classList.remove('cad3dDockCandidate'));
+ }
+ function finish(cancelled){
+  if(!drag)return;
+  const d=drag;drag=null;cleanup();
+  if(d.active){
+   d.el.classList.remove('cad3dDockDraggingBar');
+   d.el.style.left='';d.el.style.top='';d.el.style.width='';
+   const zone=cancelled?d.originZone:(d.placeholder.parentNode||d.originZone);
+   const next=d.placeholder.parentNode===zone?d.placeholder:null;
+   if(next)zone.insertBefore(d.el,next);
+   else zone.insertBefore(d.el,zone.children[d.originIndex]||null);
+   d.placeholder.remove();
+   persist();
   }
-  position(state,x,y);
- };
- const dock=(state)=>{
-  if(!state.floating)return;
-  state.el.classList.remove('cad3dDockFloating');
-  state.el.style.removeProperty('left');state.el.style.removeProperty('top');
-  if(state.marker.parentNode)state.marker.parentNode.insertBefore(state.el,state.marker);
-  state.floating=false;state.grip.dataset.floating='false';
-  state.grip.title='Arrastrar barra · doble clic para acoplar';
-  persist();
- };
- for(const [id,selector] of specs){
-  const el=root.querySelector(selector);
-  if(!el)continue;
-  const marker=document.createComment('cad3d-toolbar:'+id);
-  el.parentNode.insertBefore(marker,el);
-  const grip=document.createElement('button');
-  grip.type='button';grip.className='cad3dToolbarGrip';grip.dataset.cad3dToolbar=id;
-  grip.setAttribute('aria-label','Mover barra '+id+' · doble clic para acoplar');
-  grip.title='Arrastrar barra · doble clic para acoplar';
-  grip.innerHTML='<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="3" r="1.2"/><circle cx="11" cy="3" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="13" r="1.2"/><circle cx="11" cy="13" r="1.2"/></svg>';
-  el.insertBefore(grip,el.firstChild);
-  const state={id,el,marker,grip,floating:false,x:0,y:0};states.push(state);
-  grip.addEventListener('dblclick',function(e){e.preventDefault();e.stopPropagation();dock(state);});
-  let drag=null;
-  grip.addEventListener('pointerdown',function(e){
+ }
+ function onMove(e){
+  if(!drag||e.pointerId!==drag.pointer)return;
+  const d=drag,dx=e.clientX-d.startX,dy=e.clientY-d.startY;
+  if(!d.active){
+   if(Math.hypot(dx,dy)<5)return;
+   d.active=true;
+   d.placeholder=document.createElement('div');
+   d.placeholder.className='cad3dDockPlaceholder';
+   d.placeholder.style.width=d.rect.width+'px';
+   d.placeholder.style.height=d.rect.height+'px';
+   d.el.before(d.placeholder);
+   d.el.classList.add('cad3dDockDraggingBar');
+   d.el.style.width=d.rect.width+'px';
+   root.appendChild(d.el);
+   root.classList.add('cad3dDraggingDock');
+  }
+  d.el.style.left=Math.round(d.rect.left-d.rootRect.left+dx)+'px';
+  d.el.style.top=Math.round(d.rect.top-d.rootRect.top+dy)+'px';
+  const zone=zoneFor(e.clientX,e.clientY);
+  Object.values(zones).forEach(z=>z.classList.toggle('cad3dDockCandidate',z===zone));
+  const before=placeBefore(zone,e.clientX,e.clientY,d.el);
+  zone.insertBefore(d.placeholder,before);
+  d.placeholder.style.width=zone.classList.contains('cad3dDockSide')?'43px':Math.min(d.rect.width,260)+'px';
+  d.placeholder.style.height=zone.classList.contains('cad3dDockSide')?'44px':'36px';
+  e.preventDefault();
+ }
+ function onUp(e){if(drag&&e.pointerId===drag.pointer)finish(false);}
+ function onCancel(e){if(drag&&e.pointerId===drag.pointer)finish(true);}
+ function onEscape(e){if(drag&&e.key==='Escape'){e.preventDefault();finish(true);}}
+ for(const st of states){
+  st.grip.addEventListener('pointerdown',e=>{
    if(e.button!==0||drag)return;
    e.preventDefault();e.stopPropagation();
-   const bounds=el.getBoundingClientRect(),host=root.getBoundingClientRect();
-   drag={pointer:e.pointerId,startX:e.clientX,startY:e.clientY,
-    x:state.floating?state.x:bounds.left-host.left,
-    y:state.floating?state.y:bounds.top-host.top,moved:false};
-   grip.setPointerCapture(e.pointerId);
+   const el=st.el,zone=el.parentNode,rect=el.getBoundingClientRect();
+   const rootRect=root.getBoundingClientRect();
+   drag={el,originZone:zone,originIndex:[...zone.children].indexOf(el),
+    startX:e.clientX,startY:e.clientY,pointer:e.pointerId,rect,rootRect,
+    active:false,placeholder:null};
+   window.addEventListener('pointermove',onMove,true);
+   window.addEventListener('pointerup',onUp,true);
+   window.addEventListener('pointercancel',onCancel,true);
+   window.addEventListener('keydown',onEscape,true);
   });
-  grip.addEventListener('pointermove',function(e){
-   if(!drag||e.pointerId!==drag.pointer)return;
-   const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
-   if(!drag.moved&&Math.hypot(dx,dy)<5)return;
-   if(!drag.moved){drag.moved=true;float(state,drag.x,drag.y);}
-   position(state,drag.x+dx,drag.y+dy);
+  st.grip.addEventListener('dblclick',e=>{
+   e.preventDefault();e.stopPropagation();if(drag)finish(true);
+   top.appendChild(st.el);persist();
   });
-  function finish(e){
-   if(!drag||e.pointerId!==drag.pointer)return;
-   if(drag.moved){
-    // Releasing over the original dock strip snaps the bar back into place.
-    const dockHost=state.marker.parentNode;
-    if(dockHost.classList?.contains('cad3dBasicBars')){
-     const dockRect=dockHost.getBoundingClientRect();
-     if(e.clientX>=dockRect.left&&e.clientX<=dockRect.right&&
-        e.clientY>=dockRect.top&&e.clientY<=dockRect.bottom) dock(state);
-    }
-    persist();
-   }
-   drag=null;
-  }
-  grip.addEventListener('pointerup',finish);
-  grip.addEventListener('pointercancel',function(e){finish(e);});
-  grip.addEventListener('lostpointercapture',function(){if(drag){drag=null;persist();}});
-  const previous=saved[id];
-  if(previous&&Number.isFinite(previous.x)&&Number.isFinite(previous.y))float(state,previous.x,previous.y);
  }
- root.addEventListener('click',function(e){
-  if(e.target.closest('.cad3dToolbarGrip'))e.stopPropagation();
- },true);
- return {reset(){states.forEach(dock);persist();},relayout(){
-  states.filter(x=>x.floating).forEach(x=>position(x,x.x,x.y));
- }};
+ root.addEventListener('click',e=>{if(e.target.closest('.cad3dToolbarGrip'))e.stopPropagation();},true);
+ return {reset(){for(const st of states)top.appendChild(st.el);persist();},
+  relayout(){refresh();}};
 }
 function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
