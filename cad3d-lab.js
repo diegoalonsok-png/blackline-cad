@@ -1354,6 +1354,58 @@ function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
  m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);
 }
+/* Shared wall-local void silhouette for walls and wall-mounted extrusions. */
+function openingSpanAtX(o,x){
+ var half=o.w/2,dx=Math.abs(x-o.offset);
+ if(dx>=half||!Number.isFinite(dx))return null;
+ var shape=o.shape||'rect',bottom=o.sill||0,top=bottom+o.h;
+ if(shape==='round'){
+  var f=Math.sqrt(Math.max(0,1-(dx/half)*(dx/half)));
+  return [bottom+o.h*(1-f)/2,bottom+o.h*(1+f)/2];
+ }
+ if(shape==='triangle')return [bottom,bottom+o.h*(1-dx/half)];
+ if(['arch','segment','pointed'].includes(shape)){
+  var cap=Math.min(o.h*(shape==='segment'?.22:.42),half),base=top-cap;
+  var rise=shape==='pointed'?1-dx/half:Math.sqrt(Math.max(0,1-(dx/half)*(dx/half)));
+  return [bottom,base+cap*rise];
+ }
+ return [bottom,top];
+}
+function profileSpansAtX(att,x){
+ var local=x-(att.offset||0),w=att.w,h=att.h,z=att.sill||0;
+ if(Math.abs(local)>=w/2)return [];
+ if(att.shape==='circle'){
+  var rad=Math.min(w,h)/2;
+  if(Math.abs(local)>=rad)return [];
+  var rise=Math.sqrt(Math.max(0,rad*rad-local*local));
+  return [[z-rise,z+rise]];
+ }
+ if(att.shape==='polyline'){
+  var pts=att.points||[],hits=[];
+  for(var i=0;i<pts.length;i++){
+   var a=pts[i],b=pts[(i+1)%pts.length],x0=a[0]*w,x1=b[0]*w;
+   if((x0<=local&&local<x1)||(x1<=local&&local<x0))
+    hits.push(z+(a[1]+(local-x0)/(x1-x0)*(b[1]-a[1]))*h);
+  }
+  hits.sort(function(a,b){return a-b;});
+  var spans=[];
+  for(var j=0;j+1<hits.length;j+=2)if(hits[j+1]-hits[j]>.0001)spans.push([hits[j],hits[j+1]]);
+  return spans;
+ }
+ return [[z,z+h]];
+}
+function subtractVerticalSpans(spans,cuts){
+ cuts.forEach(function(cut){
+  spans=spans.flatMap(function(s){
+   if(cut[1]<=s[0]||cut[0]>=s[1])return [s];
+   var out=[];
+   if(s[0]<cut[0])out.push([s[0],cut[0]]);
+   if(cut[1]<s[1])out.push([cut[1],s[1]]);
+   return out;
+  });
+ });
+ return spans;
+}
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
  var wall=r.type==='wall',length=r.w,span=wall?r.h:r.d,base=wall?0:-span/2,top=base+span;
@@ -1364,19 +1416,37 @@ function architectureParts(r,part){
    bottom:clamp(bottom,base,top),top:clamp(upper,base,top)};
  }).filter(function(o){return o.right-o.left>.01&&o.top-o.bottom>.01;});
  var xs=[-length/2,length/2],ys=[base,top];
- cuts.forEach(function(o){xs.push(o.left,o.right);ys.push(o.bottom,o.top);});
+ cuts.forEach(function(o){
+  xs.push(o.left,o.right);ys.push(o.bottom,o.top);
+  if(wall&&(o.source.shape||'rect')!=='rect'){
+   var steps=Math.max(12,Math.min(96,Math.ceil((o.right-o.left)/.025)));
+   for(var step=1;step<steps;step++)xs.push(o.left+(o.right-o.left)*step/steps);
+  }
+ });
  xs=[...new Set(xs)].sort(function(a,b){return a-b;});ys=[...new Set(ys)].sort(function(a,b){return a-b;});
  var color=wall?0xaab0b5:r.slabKind==='roof'?0x89939a:0xb5bdc3;
- for(var i=0;i<xs.length-1;i++)for(var j=0;j<ys.length-1;j++){
-  var x0=xs[i],x1=xs[i+1],y0=ys[j],y1=ys[j+1],x=(x0+x1)/2,y=(y0+y1)/2;
-  if(cuts.some(function(o){return x>o.left&&x<o.right&&y>o.bottom&&y<o.top;}))continue;
+ for(var i=0;i<xs.length-1;i++){
+  var midX=(xs[i]+xs[i+1])/2,localY=ys.slice();
+  if(wall)cuts.forEach(function(o){
+   var span=openingSpanAtX(o.source,midX);
+   if(span){localY.push(clamp(span[0],base,top),clamp(span[1],base,top));}
+  });
+  localY=[...new Set(localY)].sort(function(a,b){return a-b;});
+  for(var j=0;j<localY.length-1;j++){
+  var x0=xs[i],x1=xs[i+1],y0=localY[j],y1=localY[j+1],x=(x0+x1)/2,y=(y0+y1)/2;
+  if(cuts.some(function(o){
+   if(x<=o.left||x>=o.right)return false;
+   var span=wall?openingSpanAtX(o.source,x):[o.bottom,o.top];
+   return span&&y>span[0]&&y<span[1];
+  }))continue;
   if(wall)part(x1-x0,thickness,y1-y0,x,0,y0,color,0);
   else part(x1-x0,y1-y0,thickness,x,y,0,color,slope);
+  }
  }
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
-  if(opening.kind==='opening'||opening.styleId==='open-door')return;
+  if(opening.kind==='opening'||opening.styleId==='open-door'||(opening.shape||'rect')!=='rect')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
   if(opening.kind==='door'){
