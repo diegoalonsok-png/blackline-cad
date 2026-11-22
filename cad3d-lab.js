@@ -763,7 +763,7 @@ function applySunSettings(){
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){var solid=!o.userData.cadGlass;o.receiveShadow=solid&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=solid&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
@@ -1402,9 +1402,24 @@ function selectAt(e){
  renderProps();highlight();text(selectedOpeningId!=null?'Carpintería seleccionada: Model, Width, Height y Sill en Properties':selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
-function addMesh(g,color,id,parent,x,y,z){
- var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);return m;
+function cadOpeningMotion(o){
+ if(!o||o.kind==='opening'||o.styleId==='open-door')return 'fixed';
+ var id=o.styleId||'';
+ if(/sliding|pocket|terrace/.test(id))return 'slide';
+ if(/awning|hopper/.test(id))return 'tilt';
+ if(/fixed|picture|corner|clerestory|ribbon|floor-to-ceiling|garage/.test(id))return 'fixed';
+ return o.kind==='window'||o.kind==='door'?'hinge':'fixed';
+}
+function cadOpeningIsGlass(o){return o.kind==='window'||(o.kind==='door'&&/french|terrace/.test(o.styleId||''));}
+function cadOpeningActive(o){return cadOpeningMotion(o)==='slide'?Number(o.openFraction)>0:Number(o.openAngle)>0;}
+function cadGlassOpacity(o){return clamp(finite(o.glassOpacity,.24),.08,.85);}
+function addMesh(g,color,id,parent,x,y,z,glass,opacity){
+ var clear=glass===true;
+ var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:clear?.14:.8,metalness:clear?0:.04,side:T.DoubleSide,transparent:clear,opacity:clear?clamp(finite(opacity,.24),.08,.85):1,depthWrite:!clear}));
+ m.userData.owner=id;m.userData.cadGlass=clear;
+ if(clear)m.userData.cadGlassOpacity=m.material.opacity;
+ if(x!==undefined)m.position.set(x,y,z);
+ m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);return m;
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
@@ -1428,7 +1443,7 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
-  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
+  function carpPart(w,d,h,x,y,z,color,slope,glass){part(w,d,h,x,y,z,color,slope,opening.id,glass,cadGlassOpacity(opening));}
   if(opening.kind==='opening'||opening.styleId==='open-door')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
@@ -1436,20 +1451,20 @@ function architectureParts(r,part){
    var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
    var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
    var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
-   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
+   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame),moving=cadOpeningActive(opening);
    // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
+   if(!moving)carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
    carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
-   if(doubleDoor||sliding){
+   if(!moving&&(doubleDoor||sliding)){
     carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
    }
-   if(doorType==='garage-door'){
+   if(!moving&&doorType==='garage-door'){
     for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
    }
-   if(glazed){
+   if(!moving&&glazed){
     carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
    }
-   if(doorType==='pivot-door'){
+   if(!moving&&doorType==='pivot-door'){
     carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
    }
   }else{
@@ -1458,11 +1473,11 @@ function architectureParts(r,part){
    carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
    carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
    carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
-   if(/double|sliding|two-leaf/.test(windowType)){
+   if(!cadOpeningActive(opening))carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0,true);
+   if(!cadOpeningActive(opening)&&/double|sliding|two-leaf/.test(windowType)){
     carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
    }
-   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
+   if(!cadOpeningActive(opening)&&/awning|hopper|clerestory|ribbon/.test(windowType)){
     carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
    }
   }
@@ -1552,7 +1567,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,glass,opacity){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1560,10 +1575,11 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  var component=addMesh(g,color,r.id,group,x,y,z);
+  var component=addMesh(g,color,r.id,group,x,y,z,glass,opacity);
   if(openingId!=null)component.userData.openingId=openingId;
  });
- if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
+ if(r.type==='wall')addCadOpeningLeaves(r,group);
+  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
   var cone=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);
   cone.rotateX(Math.PI/2);cone.translate(0,0,r.h/2);addMesh(cone,0x8fa9bc,r.id,group);
@@ -1796,14 +1812,14 @@ function applyRenderStyle(){
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
-  mat.depthWrite=renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
+  mat.depthWrite=!m.userData.cadGlass&&(renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray'));
   mat.depthTest=true;
-  mat.transparent=renderStyle==='xray';
-  mat.opacity=renderStyle==='xray'?.23:1;
+  mat.transparent=renderStyle==='xray'||m.userData.cadGlass===true;
+   mat.opacity=renderStyle==='xray'?.23:m.userData.cadGlass?clamp(finite(m.userData.cadGlassOpacity,.24),.08,.85):1;
   mat.roughness=renderStyle==='realistic'?.54:.8;
   mat.metalness=renderStyle==='realistic'?.10:.04;
-  m.castShadow=!plainLines;
-  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  m.castShadow=!plainLines&&!m.userData.cadGlass;
+   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines&&!m.userData.cadGlass;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
