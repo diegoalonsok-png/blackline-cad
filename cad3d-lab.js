@@ -1474,10 +1474,15 @@ function selectAt(e){
  renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
-function addMesh(g,color,id,parent,x,y,z,glass){
+function glazingOpacity(opening){return clamp(finite(opening?.glassOpacity,.24),.08,.85);}
+function openingIsGlass(opening){
+ return opening.kind==='window'||(opening.kind==='door'&&/french|terrace|industrial|patio|glazed|folding/.test(opening.styleId||''));
+}
+function addMesh(g,color,id,parent,x,y,z,glass,opacity){
  var clear=glass===true;
- var mat=new T.MeshStandardMaterial({color:color,roughness:clear?.12:.8,metalness:clear?.05:.04,side:T.DoubleSide,transparent:clear,opacity:clear?.24:1,depthWrite:!clear});
+ var mat=new T.MeshStandardMaterial({color:color,roughness:clear?.12:.8,metalness:clear?.05:.04,side:T.DoubleSide,transparent:clear,opacity:clear?clamp(finite(opacity,.24),.08,.85):1,depthWrite:!clear});
  var m=new T.Mesh(g,mat);m.userData.owner=id;m.userData.cadGlass=clear;
+ if(clear)m.userData.cadGlassOpacity=mat.opacity;
  if(x!==undefined)m.position.set(x,y,z);
  m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);
 }
@@ -1600,7 +1605,7 @@ function architectureParts(r,part){
      part(Math.max(.04,leafW-.02),.05,.028,cx,0,z+frameW+height-.028,0x607783,0);
     }else part(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
     if(glazed){
-     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0,true);
+     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0,true,glazingOpacity(opening));
      part(Math.max(.03,leafW-.08),.055,.025,cx,0,z+frameW+height*.52,0xa5b5be,0);
     }
     // Door leaf side rails / panel divisions.
@@ -1622,7 +1627,7 @@ function architectureParts(r,part){
    part(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
    part(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
    part(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
-   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true);
+   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true,glazingOpacity(opening));
    for(var pane=1;pane<n;pane++)
     part(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
    if(/french|glass-block|quad-fixed/.test(id)){
@@ -1800,14 +1805,24 @@ function addShapedOpenings(wall,group){
   points.forEach(function(p,i){if(i)outline.lineTo(p[0],p[1]);else outline.moveTo(p[0],p[1]);});
   outline.closePath();
   if(o.kind!=='opening'&&o.styleId!=='open-door'){
+   var clear=openingIsGlass(o);
    var mesh=new T.Mesh(new T.ExtrudeGeometry(outline,{depth:.025,bevelEnabled:false,steps:1}),new T.MeshStandardMaterial({
-    color:o.kind==='window'?0x5794a8:0x987e66,
-    transparent:o.kind==='window',opacity:o.kind==='window'?.24:1,roughness:o.kind==='window'?.18:.7,side:T.DoubleSide
+    color:clear?0x5794a8:0x987e66,
+    transparent:clear,opacity:clear?glazingOpacity(o):1,roughness:clear?.18:.7,side:T.DoubleSide
    }));
    mesh.rotation.x=Math.PI/2;mesh.position.y=.0125;mesh.userData.owner=wall.id;
-   mesh.userData.cadGlass=o.kind==='window';mesh.castShadow=!mesh.userData.cadGlass;
+   mesh.userData.cadGlass=clear;if(clear)mesh.userData.cadGlassOpacity=glazingOpacity(o);
+   mesh.castShadow=!mesh.userData.cadGlass;
    mesh.receiveShadow=sunSettings.onFaces&&!mesh.userData.cadGlass;
    mesh.material.depthWrite=!mesh.userData.cadGlass;group.add(mesh);
+  }
+  // Frames around nonrectangular glazed panels remain opaque and cast shadows.
+  if(o.kind!=='opening'){
+   var curvePts=points.map(function(p){return new T.Vector3(p[0],0,p[1]);});
+   var curve=new T.CatmullRomCurve3(curvePts,true,'centripetal');
+   var rim=new T.Mesh(new T.TubeGeometry(curve,Math.min(160,Math.max(48,points.length)),.024,5,true),
+    new T.MeshStandardMaterial({color:0x697f8c,roughness:.78,metalness:.1}));
+   rim.userData.owner=wall.id;rim.castShadow=true;rim.receiveShadow=sunSettings.onFaces;group.add(rim);
   }
   for(var side of [-1,1]){
    var path=points.map(function(p){return new T.Vector3(p[0],side*(wall.d/2+.012),p[1]);});
@@ -1821,7 +1836,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,glass){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,glass,opacity){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1829,7 +1844,7 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  addMesh(g,color,r.id,group,x,y,z,glass);
+  addMesh(g,color,r.id,group,x,y,z,glass,opacity);
  });
  if(r.type==='wall')addWallAttachments(r,group);
  if(r.type==='wall')addShapedOpenings(r,group);
@@ -1923,6 +1938,8 @@ function renderProps(){
      return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';
     }).join('')+'</select></label>';
    }
+   if(r.type==='wall'&&openingIsGlass(o))
+    html+='<label>Glass opacity <input type="number" min="0.08" max="0.85" step="0.05" data-glass-opacity="'+o.id+'" value="'+glazingOpacity(o)+'"></label>';
    if(r.type==='wall')html+='<label>Void shape <select data-opening-shape="'+o.id+'">'+
      ['rect','round','arch','segment','triangle','pointed'].map(function(s){return '<option value="'+s+'"'+((o.shape||'rect')===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></label>';
     html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
@@ -1933,7 +1950,7 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape],select[data-opening-style]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape],select[data-opening-style],input[data-glass-opacity]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
@@ -1949,6 +1966,14 @@ function change(e){
    else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
   }
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
+ }
+ if(input.dataset.glassOpacity){
+  var glassOpening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.glassOpacity);});
+  if(glassOpening&&openingIsGlass(glassOpening)&&Number.isFinite(Number(input.value))){
+   glassOpening.glassOpacity=clamp(Number(input.value),.08,.85);
+   redraw();renderProps();text('Transparencia del vidrio actualizada, sin sombra opaca');
+  }
+  return;
  }
  if(input.dataset.openingStyle){
   var item=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
@@ -2127,7 +2152,7 @@ function applyRenderStyle(){
   mat.depthTest=true;
   var isGlass=m.userData.cadGlass===true;
   mat.transparent=isGlass||renderStyle==='xray';
-  mat.opacity=renderStyle==='xray'?.16:isGlass?.24:1;
+  mat.opacity=renderStyle==='xray'?.16:isGlass?clamp(finite(m.userData.cadGlassOpacity,.24),.08,.85):1;
   mat.roughness=isGlass?.12:renderStyle==='realistic'?.54:.8;
   mat.metalness=isGlass?.05:renderStyle==='realistic'?.10:.04;
   m.castShadow=!plainLines&&!isGlass;
@@ -2677,6 +2702,7 @@ async function readJSON(e){
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
        shape:['rect','round','arch','segment','triangle','pointed'].includes(v.shape)?v.shape:'rect',
+       glassOpacity:clamp(finite(v.glassOpacity,.24),.08,.85),
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
      if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
