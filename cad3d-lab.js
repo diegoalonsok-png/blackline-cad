@@ -110,6 +110,8 @@ var css=`
 #cad3dLab .cad3dBasicBars .btn{padding:5px 7px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:28px;font-size:11px}
 #cad3dLab .cad3dBasicBars svg{width:16px;height:16px;flex:none}
 #cad3dLab .cad3dBasicBars .armed{background:#31536a;outline:1px solid #98d9f1}
+#cad3dLab .cad3dHeightProperty{display:grid;gap:4px;padding:9px!important;margin:5px 0 10px;border:1px solid #6594ad;border-radius:8px;background:#263b4a;font-weight:700}
+#cad3dLab .cad3dHeightProperty input{min-height:34px;font-size:15px;font-weight:700}
 #cad3dLab .cad3dProfileTools{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;min-height:42px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
 #cad3dLab .cad3dProfileTools>strong{flex:none;white-space:nowrap}
 #cad3dLab .cad3dProfileTools .btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;min-width:auto!important;width:auto!important;height:32px!important;min-height:32px!important;max-height:32px!important;padding:5px 10px!important;margin:0!important;white-space:nowrap;font:12px Inter,Arial,sans-serif!important;line-height:1!important}
@@ -2869,14 +2871,21 @@ function renderProps(){
  if(!focus&&r.type==='imported3d')html+='<div class="detail"><strong>Imported model:</strong> '+escapeHtml(r.name||'3D mesh')+
  ' · '+Math.floor((r.meshVertices||[]).length/9)+' triangles</div>'+
  '<label>Model color <input type="color" data-object-color value="'+(r.materialColor||'#b6bdc0')+'"></label>';
- var keys=focus?[]:['x','y','z'];
+ // Height appears FIRST in Properties, where it is immediately visible for editing.
+ var heightEditable=['wall','slab','box','block3d','imported3d','profile2d','cylinder','cone'].includes(r.type);
+ var keys=focus?[]:(heightEditable?['h']:[]);
+ if(!focus)keys.push('x','y','z');
  if(!focus&&r.type!=='boolean')keys.push('rot');
- if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'||r.type==='block3d'||r.type==='imported3d'))keys.push('w','d','h');
+ if(!focus&&['box','wall','slab','block3d','imported3d'].includes(r.type))keys.push('w','d');
  if(!focus&&r.type==='slab')keys.push('pitch');
- if(!focus&&r.type==='sphere')keys.push('radius');
- if(!focus&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
- var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
- keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
+ if(!focus&&['sphere','cone','cylinder'].includes(r.type))keys.push('radius');
+ var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Slab thickness (m)':r.type==='profile2d'?'Extrusion height (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
+ keys.forEach(function(k){
+  var primary=k==='h';
+  html+='<label'+(primary?' class="cad3dHeightProperty"':'')+'>'+labels[k]+
+   '<input type="number" step="any"'+(primary?' min="'+(r.type==='profile2d'?0:.01)+'"':'')+
+   ' data-key="'+k+'" value="'+escapeHtml(r[k]??0)+'"></label>';
+ });
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
   r.openings.filter(function(o){return !focus||o.id===focus.id;}).forEach(function(o,i){
@@ -2991,7 +3000,22 @@ function change(e){
   o[key]=val;
  }else{
   var name=input.dataset.key;
-  if(['w','d','h','radius'].includes(name))val=clamp(val,.01,1000);
+  if(['w','d','radius'].includes(name))val=clamp(val,.01,1000);
+  if(name==='h'){
+   val=clamp(val,r.type==='profile2d'?0:.01,1000);
+   if(r.type==='profile2d'){
+    if(val>0&&(!r.profileClosed||!Array.isArray(r.profilePoints)||r.profilePoints.length<3)){
+     text('Solo podés dar altura a un perfil 2D cerrado');renderProps();return;
+    }
+    r.extrudedHeight=val;
+   }
+   if(r.type==='wall'&&Array.isArray(r.openings)&&r.openings.some(function(o){
+    return (o.sill||0)+(o.h||0)>val+1e-6;
+   })){
+    text('Altura insuficiente: una puerta o ventana supera la nueva altura del muro');renderProps();return;
+   }
+   if((r.type==='wall'||r.type==='slab')&&r.styleId)r.styleId='';
+  }
   else if(name==='rot')val=clamp(val,-3600,3600);
   else if(name==='pitch')val=clamp(val,-45,45);
   else val=clamp(val,-10000,10000);
