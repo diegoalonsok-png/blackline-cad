@@ -61,7 +61,7 @@
  document.head.append(css);
 
  let el=null,armedId=null;
- const items=()=>LIB.library;
+ const items=()=>LIB.library.filter(it=>!it.hideFromGallery);
  const inView=it=>{const v=VIEWS[st.view];if(v?.item)return v.item(it);const f=v?.cats;return !f||f(it.cat)};
  const cm=v=>Math.round(v*100);
  function filtered(){
