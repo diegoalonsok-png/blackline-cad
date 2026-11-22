@@ -1894,16 +1894,19 @@ function cadDrawMeasureTag(){
 function draw(){drawPending=false;
  if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+ const selectedIds=new Set(state.selected);
+ // Both paint passes use conservative viewport culling; selection membership is O(1).
+ const visibleForPaint=e=>fastView
+  ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
+  : inViewport(e,w,h);
  for(const e of state.entities){
-  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&inViewport(e,w,h))drawEntity(e);
+  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e))drawEntity(e);
  }
  for(const e of state.entities){
   if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
-  if(fastView
-   ? !BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
-   : !inViewport(e,w,h))continue;
+  if(!visibleForPaint(e))continue;
   drawEntity(e);
-  if(state.selected.includes(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
+  if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,state.mouse);
