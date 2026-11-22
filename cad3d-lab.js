@@ -920,7 +920,7 @@ function toggleDraftMode(mode){
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
- placing=which;firstPoint=null;cursorPoint=null;
+ openingTransfer=null;placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
  root.querySelectorAll('.solidTools button').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
@@ -2511,7 +2511,7 @@ function cad3dSelectionTransform(command,values){
   }
   if(command==='copy'){trial.id=serial++;wall.openings.push(trial);selectedOpeningId=trial.id;}
   else Object.assign(opening,trial);
-  redraw();renderProps();text(command.toUpperCase()+' aplicada a la carpintería, no al muro');return;
+  openingTransfer=null;redraw();renderProps();text(command.toUpperCase()+' aplicada a la carpintería, no al muro');return;
  }
  if(command==='scale'){
   var k=v[0];
@@ -2598,7 +2598,7 @@ function run3DCommand(){
  var aliases={
  MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',
  VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',
- DI:'dist',U:'undo',DESHACER:'undo',REHACER:'redo',RE:'regen',
+ DI:'dist',MEDIR:'dist',MEASURE:'dist',DISTANCE:'dist',U:'undo',DESHACER:'undo',REHACER:'redo',RE:'regen',
  SELECCIONARTODO:'selectall',TODO:'selectall',BORRAR:'erase',
  GUARDAR:'save',GUARDARCOMO:'save',QSAVE:'save',SAVEAS:'save',SAVE:'save',
  ABRIR:'open',OPEN:'open',EXPORTAR:'export',EXPORT:'export',
@@ -2616,6 +2616,7 @@ function run3DCommand(){
   renderProps();highlight();text(selected.length+' objetos seleccionados');return;
  }
  if(['zoom','zoomextents'].includes(command)){fit3DModel();return;}
+ if(command==='moveopening'){action('move');return;}
  if(command==='regen'||command==='re'){
   redraw();renderProps();text('REGEN: vista y sólidos 3D regenerados');return;
  }
