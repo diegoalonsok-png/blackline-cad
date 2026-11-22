@@ -36,10 +36,14 @@ const LAYERS={
  'Vehículos':['A-VEHICULOS','#b7c0c7'],'Equipos':['A-INSTALACIONES','#ff9f7f'],
  'Alzados':['A-ALZADOS','#9fd6e6'],'Personas':['A-PERSONAS','#d9c6a5'],'Oficina':['A-MOBILIARIO','#c7a4ff'],'Símbolos':['A-SIMBOLOS','#f2f2f2'],'Obra y maquinaria':['A-OBRA','#f0b35a'],'Cortes y vistas':['A-CORTES','#c9d6e8'],'Documentación':['A-DOC','#e8d38a']
 };
-function ensureLayer(cat){
- const [name,color]=LAYERS[cat]||['A-MOBILIARIO','#c7a4ff'];
- const st=S();let layer=st.layers.find(l=>l.name.toUpperCase()===name);
- if(!layer){layer={id:name.toLowerCase(),name,color,visible:true,locked:false,width:.13};st.layers.push(layer)}
+// Folder/category names are organizational only. Library blocks have no
+// architectural layer assignment: they are defined on layer 0 in white.
+function ensureLayer(){
+ const st=S();let layer=st.layers.find(l=>l.id==='0'||l.name==='0');
+ if(!layer){
+  layer={id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.13};
+  st.layers.unshift(layer);
+ }
  return layer;
 }
 
@@ -50,10 +54,10 @@ function ensureDefinition(item,W,D){
  const name=defName(item,built.w,built.d);
  if(!st.blocks[name]){
   const ents=built.entities.map(e=>scaleEntity(e,k));
-  for(const e of ents){e.layer='0';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
+  for(const e of ents){e.layer='0';e.color='#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
   const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities(ents)});
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
-  def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);
+  def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
   const bb=LIB.bounds(built.entities);
   def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
   st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
@@ -652,5 +656,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>(LAYERS[cat]||[])[0]||null,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
