@@ -84,3 +84,44 @@ test('Animated wall architecture omits static infill, keeping its jamb/head fram
  assert(samples[0].length>samples[1].length,'Open doors must not retain closed static panel');
  assert(samples[1].some(p=>p[10]===4),'Jamb/head frame must remain associated with door');
 });
+
+
+test('Quick grips reposition, stretch and flip selected door without changing wall dimensions',()=>{
+ const a=source.indexOf('function clickProps(e){'),b=source.indexOf('/* Exact axis-aligned box boolean prototype:',a);
+ assert(a>=0&&b>a);
+ const original=wall(),host=Object.assign({w:4,h:3,type:'wall',layerId:'0'},original);
+ const ctx={
+  records:[host],selected:[22],selectedOpeningId:4,editableRecord:()=>true,
+  openingFitsHost:(wall,trial,id)=>trial.w>0&&trial.w<=wall.w&&Math.abs(trial.offset)+trial.w/2<=wall.w/2,
+  redraw(){},renderProps(){},highlight(){},text(){},
+ };
+ vm.runInNewContext(source.slice(a,b),ctx);
+ const invoke=action=>ctx.clickProps({target:{closest:selector=>selector==='[data-opening-quick]'?{dataset:{openingQuick:action,openingId:'4'}}:null}});
+ invoke('shift-right');assert.equal(host.openings[0].offset,.1);
+ invoke('widen');assert(Math.abs(host.openings[0].w-1.1)<1e-8);
+ invoke('flip-hinge');assert.equal(host.openings[0].hingeSide,'right');
+ invoke('flip-swing');assert.equal(host.openings[0].openDirection,-1);
+ assert.equal(host.w,4);assert.equal(host.h,3);
+});
+test('In plan view the door swing symbol takes picking priority over wall faces',()=>{
+ const a=source.indexOf('function selectAt(e){'),b=source.indexOf('function boxGeom(',a);
+ assert(a>=0&&b>a);
+ const mesh={isMesh:true,userData:{owner:22}},arc={isLine:true,userData:{owner:22,openingId:4}};
+ const ctx={
+  fallbackCanvas:null,activeView:'top',viewMode:'ortho',root:{querySelector(){return {}}},
+  worldPerPixel:()=>.01,selected:[],selectedOpeningId:null,
+  records:[{id:22,type:'wall'}],editableRecord:()=>true,
+  renderer:{domElement:{getBoundingClientRect(){return {left:0,top:0,width:200,height:200}}}},
+  T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},
+  camera:{},modelRoot:{traverse(fn){fn(mesh);fn(arc)}},
+  raycaster:{params:{Line:{}},setFromCamera(){},intersectObjects(objs){
+   assert(objs.includes(arc));return [{object:mesh},{object:arc}];
+  }},
+  clamp:(v,a,b)=>Math.max(a,Math.min(v,b)),
+  renderProps(){},highlight(){},text(){}
+ };
+ vm.runInNewContext(source.slice(a,b),ctx);
+ ctx.selectAt({clientX:100,clientY:100,shiftKey:false});
+ assert.equal(ctx.selectedOpeningId,4);
+ assert.deepEqual(Array.from(ctx.selected),[22]);
+});
