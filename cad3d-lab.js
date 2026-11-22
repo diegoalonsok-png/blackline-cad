@@ -318,7 +318,14 @@ const ARCH_STYLES={
   {id:'french-door',name:'French glazed · 160 cm',w:1.60,h:2.20,sill:0},
   {id:'garage-door',name:'Garage sectional · 260 cm',w:2.60,h:2.40,sill:0},
   {id:'service-door',name:'Service · 80 cm',w:.80,h:2.00,sill:0},
-  {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0}
+  {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0},
+  {id:'arched-entry',name:'Arched entrance',w:1.40,h:2.50,sill:0,shape:'arch'},
+  {id:'industrial-double',name:'Industrial steel double',w:2,h:2.35,sill:0},
+  {id:'folding-bifold',name:'Bifold folding door',w:2.8,h:2.3,sill:0},
+  {id:'revolving-door',name:'Revolving entrance',w:2.2,h:2.4,sill:0},
+  {id:'barn-sliding',name:'Barn sliding door',w:1.1,h:2.3,sill:0},
+  {id:'fire-rated',name:'Fire-rated door',w:1,h:2.1,sill:0},
+  {id:'pointed-door',name:'Pointed arch doorway',w:1.2,h:2.6,sill:0,shape:'pointed'}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
@@ -336,7 +343,18 @@ const ARCH_STYLES={
   {id:'floor-to-ceiling',name:'Full-height glazing · 180 cm',w:1.80,h:2.40,sill:0},
   {id:'corner-fixed',name:'Tall fixed · 100 cm',w:1.00,h:2.20,sill:.15},
   {id:'bathroom',name:'Bathroom · 60 cm',w:.60,h:.60,sill:1.70},
-  {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40}
+  {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40},
+  {id:'round-window',name:'Circular porthole',w:.85,h:.85,sill:1.15,shape:'round'},
+  {id:'oval-window',name:'Oval window',w:1.4,h:.9,sill:1.1,shape:'round'},
+  {id:'arched-window',name:'Arched window',w:1.2,h:1.55,sill:.85,shape:'arch'},
+  {id:'segmental-window',name:'Segmental arch',w:1.7,h:1.25,sill:.9,shape:'segment'},
+  {id:'triangular-window',name:'Triangular window',w:1.4,h:1.1,sill:1.1,shape:'triangle'},
+  {id:'pointed-window',name:'Pointed Gothic arch',w:1.1,h:1.55,sill:.8,shape:'pointed'},
+  {id:'louvered-window',name:'Louvered window',w:1,h:1.2,sill:.95},
+  {id:'bay-window',name:'Bay picture window',w:2.2,h:1.4,sill:.8},
+  {id:'tilt-turn',name:'Tilt and turn',w:1,h:1.3,sill:.9},
+  {id:'guillotine',name:'Vertical sash',w:.95,h:1.25,sill:.85},
+  {id:'glass-block',name:'Glass block panel',w:1.2,h:1.4,sill:.8}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -346,6 +364,11 @@ const ARCH_STYLES={
  ],
  opening:[
   {id:'wall-opening',name:'Wall opening',host:'wall',w:.90,h:2.10,sill:0},
+  {id:'round-opening',name:'Round opening',host:'wall',w:1.2,h:1.2,sill:.8,shape:'round'},
+  {id:'arched-opening',name:'Arched passage',host:'wall',w:1.8,h:2.55,sill:0,shape:'arch'},
+  {id:'segment-opening',name:'Segmental passage',host:'wall',w:1.7,h:2.45,sill:0,shape:'segment'},
+  {id:'pointed-opening',name:'Pointed arch',host:'wall',w:1.4,h:2.7,sill:0,shape:'pointed'},
+  {id:'triangle-opening',name:'Triangular opening',host:'wall',w:1.3,h:1.2,sill:1,shape:'triangle'},
   {id:'slab-opening',name:'Slab opening',host:'slab',w:1,d:1}
  ]
 };
@@ -1224,7 +1247,7 @@ function placeOpening(e){
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
- var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
+ var op={id:serial++,kind:kind,styleId:style.id,shape:style.shape||'rect',offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
  if(slab){
   var maxY=(rec.d-span)/2;
   op.offsetY=clamp(-dx*s+dy*c,-maxY,maxY);op.d=span;
@@ -1591,7 +1614,9 @@ function renderProps(){
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
-   html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
+   if(r.type==='wall')html+='<label>Void shape <select data-opening-shape="'+o.id+'">'+
+     ['rect','round','arch','segment','triangle','pointed'].map(function(s){return '<option value="'+s+'"'+((o.shape||'rect')===s?' selected':'')+'>'+s+'</option>';}).join('')+'</select></label>';
+    html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
  html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
@@ -1599,7 +1624,7 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
@@ -1617,6 +1642,11 @@ function change(e){
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
  }
  var val=Number(input.value);if(!Number.isFinite(val))return text('Valor inválido');
+ if(input.dataset.openingShape){
+  var cut=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingShape);});
+  if(cut&&['rect','round','arch','segment','triangle','pointed'].includes(input.value)){cut.shape=input.value;redraw();renderProps();text('Forma del vano actualizada');}
+  return;
+ }
  if(input.dataset.attId){
   var att=(r.attachments||[]).find(function(a){return a.id===Number(input.dataset.attId);});
   if(!att)return;
@@ -2212,6 +2242,7 @@ async function readJSON(e){
     var kinds=r.type==='wall'?['door','window','opening']:['opening'];
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
+       shape:['rect','round','arch','segment','triangle','pointed'].includes(v.shape)?v.shape:'rect',
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
      if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
