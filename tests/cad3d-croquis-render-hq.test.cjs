@@ -29,7 +29,7 @@ function makeScene(){
   getPixelRatio(){return this.pixelRatio},
   setPixelRatio(n){this.pixelRatio=n},
   getSize(){return {x:640,y:420}},
-  setSize(w,h){this.width=w;this.height=h;tracker.restore+=(w===640&&h===420)?1:0},
+  setSize(w,h){this.width=w;this.height=h;tracker.maxWidth=Math.max(tracker.maxWidth||0,w);tracker.restore+=(w===640&&h===420)?1:0},
   render(){tracker.draw++}
  }};
  return {ctx,canvas,props,doc,tracker,view};
@@ -44,7 +44,8 @@ test('Export renders a true larger canvas locally and restores live WebGL viewpo
   scene:{},camera:{},text:t=>out.push(t),URL:{createObjectURL:()=>'/blob',revokeObjectURL(){}},
   setTimeout(fn){fn()},fallbackDraw(){}};
  vm.runInNewContext(code,env);env.exportSketchPresentation();
- assert(s.view.renderer.width>640);
+ assert(s.tracker.maxWidth>640,'The offscreen render must exceed viewport resolution');
+ assert.equal(s.view.renderer.width,640,'The live view is restored after capture');
  assert.equal(s.view.renderer.pixelRatio,2);
  assert.equal(s.tracker.restore,1);
  assert.equal(s.tracker.export,1);
