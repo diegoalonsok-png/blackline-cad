@@ -528,7 +528,7 @@ function build(){
  tool('sketch','Croquis','view')+tool('renderSketch','Render Croquis HQ','export','Exportar un croquis a alta resolución, sin servidor')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico']].map(function(st){
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-etching','Grabado a plumín','Rayado fino editorial'],['sketch-bluepen','Plumín azul','Tinta azul y fondo marfil'],['sketch-gesture','Croquis gestual','Líneas de boceto a mano'],['sketch-duotone','Marcador bicolor','Azul y rojo de presentación']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
  }).join('')+'</div><div class="styleTuning" hidden>'+
  '<label>Edge weight <input type="range" data-sketch-adjust="weight" min="0.5" max="2.5" step="0.1" value="1"><output data-sketch-value="weight">1.0×</output></label>'+
@@ -1787,7 +1787,9 @@ const CAD3D_VISUAL_STYLES={
  shaded:'Shaded','shaded-edges':'Solid + Edges',realistic:'Realistic',
  monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis técnico',
  'sketch-pencil':'Croquis lápiz','sketch-ink':'Croquis tinta','sketch-marker':'Croquis marcador',
- 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint'
+ 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint',
+ 'sketch-etching':'Grabado a plumín','sketch-bluepen':'Plumín azul',
+ 'sketch-gesture':'Croquis gestual','sketch-duotone':'Marcador bicolor'
 };
 const CAD3D_SKETCH_PRESETS={
  // width is the profile width relative to object dimension; jitter varies
@@ -1798,7 +1800,11 @@ const CAD3D_SKETCH_PRESETS={
  'sketch-marker':{bg:0xf5f1e8,ground:0xe8e3d8,fill:0xd1d7d2,edge:0x334952,alpha:.86,width:.0065,jitter:.17,passes:2,fillMix:.55,stroke:'marker',paper:'marker'},
  'sketch-watercolor':{bg:0xf8f3ea,ground:0xe5e1d8,fill:0xcfdcd4,edge:0x687982,alpha:.62,width:.003,jitter:.28,passes:3,fillMix:.48,stroke:'wash',paper:'watercolor'},
  'sketch-mono':{bg:0xf7f7f4,ground:0xe8e8e3,fill:0xdcdedc,edge:0x262e33,alpha:.9,width:.0044,jitter:0,passes:1,fillMix:.84,stroke:'clean',paper:'ink'},
- 'sketch-blueprint':{bg:0x23415b,ground:0x456379,fill:0x54758c,edge:0xe0f4ff,alpha:.96,width:.004,jitter:0,passes:2,fillMix:.8,stroke:'blueprint',paper:'blueprint'}
+ 'sketch-blueprint':{bg:0x23415b,ground:0x456379,fill:0x54758c,edge:0xe0f4ff,alpha:.96,width:.004,jitter:0,passes:2,fillMix:.8,stroke:'blueprint',paper:'blueprint'},
+ 'sketch-etching':{bg:0xfffcf4,ground:0xf1ecdd,fill:0xf4f0e5,edge:0x222f35,alpha:.94,width:.0024,jitter:.14,passes:3,fillMix:.9,stroke:'etching',paper:'ink'},
+ 'sketch-bluepen':{bg:0xfff4d5,ground:0xefe4c8,fill:0xd9d2bd,edge:0x203d6b,alpha:.95,width:.003,jitter:.17,passes:3,fillMix:.68,stroke:'bluepen',paper:'pencil'},
+ 'sketch-gesture':{bg:0xfffdfa,ground:0xf1eee8,fill:0xfaf9f3,edge:0x323333,alpha:.85,width:.0041,jitter:.54,passes:4,fillMix:.95,stroke:'gesture',paper:'pencil'},
+ 'sketch-duotone':{bg:0xf8f2e3,ground:0xf0eadc,fill:0xf6f0e2,edge:0x255c9a,alpha:.85,width:.005,jitter:.35,passes:3,fillMix:.59,stroke:'duotone',paper:'marker'}
 };
 const cadSketchTuning={weight:1,roughness:1,wash:.65,paper:.45};
 function cadEffectiveSketch(mode){
@@ -1866,9 +1872,9 @@ function cadSketchRibbonGeometry(edges,sketch,scale){
   for(var p=0;p<passes;p++){
    var noise=(rand(i*5+p*3)-.5)*2,rough=sketch.jitter||0;
    var j=noise*rough*width*(p===0?.4:1.2);
-   var start=(p>0&&stroke==='pencil')?rand(i+p*.4)*.15:0;
-   var end=(p>0&&stroke==='wash')?.65+rand(i+p)*.3:1;
-   var weight=width*(p===0?1:stroke==='marker'?.55:.31)*(1+noise*.22);
+   var start=(p>0&&['pencil','gesture','bluepen'].includes(stroke))?rand(i+p*.4)*(stroke==='gesture'?.35:.15):0;
+   var end=(p>0&&stroke==='wash')?.65+rand(i+p)*.3:(stroke==='gesture'?1+(rand(i+p*1.9)-.5)*.34:1);
+   var weight=width*(p===0?1:['marker','duotone'].includes(stroke)?.55:.31)*(1+noise*.22);
    var x0=ax+dx*start+nx*j,y0=ay+dy*start+ny*j,z0=az+dz*start+nz*j;
    var x1=ax+dx*end+nx*j,y1=ay+dy*end+ny*j,z1=az+dz*end+nz*j;
    quad(x0,y0,z0,x1,y1,z1,nx,ny,nz,weight/2);
