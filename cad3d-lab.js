@@ -51,6 +51,14 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+#cad3dLab .block3DMenu{position:relative;flex:none}
+#cad3dLab .block3DMenu>summary{list-style:none}
+#cad3dLab .block3DMenu>summary::-webkit-details-marker{display:none}
+#cad3dLab .block3DPanel{position:absolute;top:calc(100% + 6px);left:0;z-index:90;display:grid;grid-template-columns:1fr 1fr;gap:5px;min-width:275px;max-height:64vh;overflow-y:auto;padding:12px;border:1px solid #628294;border-radius:10px;background:#172734;box-shadow:0 9px 27px #000a;color:#e8f4fb}
+#cad3dLab .block3DPanel>strong,#cad3dLab .block3DPanel>small{grid-column:1/-1}
+#cad3dLab .block3DPanel>small{font-size:11px;color:#acc0cd}
+#cad3dLab .block3DMenu:not([open]) .block3DPanel{display:none}
+
 /* Native CAD3D view save dialog: preserves scene, camera and user project. */
 #cad3dLab .viewSaveMenu{position:relative;display:inline-flex;align-items:center;flex:none}
 #cad3dLab .viewSaveMenu>summary{list-style:none;cursor:pointer;white-space:nowrap}
@@ -661,6 +669,54 @@ function launch(){
  var toolStatus=bar.querySelector('#blToolStatus');bar.insertBefore(b,toolStatus||null);
  b.addEventListener('click',open);
 }
+
+var CAD3D_COMPONENTS={
+ chair:{name:'Silla 1',group:'Muebles',w:.55,d:.55,h:.95,parts:[
+ [0,0,.43,.53,.53,.09,0xa0805e],[0,.23,.45,.53,.07,.50,0xa0805e],
+ [-.21,-.20,0,.06,.06,.43,0x454f54],[.21,-.20,0,.06,.06,.43,0x454f54],
+ [-.21,.20,0,.06,.06,.43,0x454f54],[.21,.20,0,.06,.06,.43,0x454f54]]},
+ table:{name:'Mesa 1',group:'Muebles',w:1.6,d:.9,h:.76,parts:[
+ [0,0,.7,1.6,.9,.06,0xad8c69],[-.68,-.32,0,.08,.08,.7,0x4e575c],
+ [.68,-.32,0,.08,.08,.7,0x4e575c],[-.68,.32,0,.08,.08,.7,0x4e575c],
+ [.68,.32,0,.08,.08,.7,0x4e575c]]},
+ sofa:{name:'Sofá 1',group:'Muebles',w:2.1,d:.9,h:.9,parts:[
+ [0,0,.17,2.1,.9,.33,0x8c9ba3],[0,.34,.47,2.1,.19,.43,0x627887],
+ [-.97,0,.35,.16,.87,.43,0x627887],[.97,0,.35,.16,.87,.43,0x627887],
+ [-.47,-.10,.52,.92,.54,.11,0xa8b5ba],[.47,-.10,.52,.92,.54,.11,0xa8b5ba]]},
+ bed:{name:'Cama 1',group:'Muebles',w:2,d:2.1,h:1.04,parts:[
+ [0,0,.15,2,2.1,.30,0x796655],[0,-.03,.44,1.93,1.93,.22,0xd3d5ce],
+ [0,.99,.24,2,.12,.8,0x796655],[-.44,.65,.67,.8,.38,.13,0xf1eee8],[.44,.65,.67,.8,.38,.13,0xf1eee8]]},
+ shelf:{name:'Estante 1',group:'Muebles',w:1.5,d:.38,h:2.1,parts:[
+ [-.72,0,0,.06,.38,2.1,0x7b6956],[.72,0,0,.06,.38,2.1,0x7b6956],
+ [0,0,0,1.5,.38,.07,0x7b6956],[0,0,.52,1.5,.38,.07,0x7b6956],
+ [0,0,1.05,1.5,.38,.07,0x7b6956],[0,0,1.58,1.5,.38,.07,0x7b6956],
+ [0,0,2.03,1.5,.38,.07,0x7b6956]]},
+ desk:{name:'Escritorio 1',group:'Muebles',w:1.5,d:.75,h:.76,parts:[
+ [0,0,.70,1.5,.75,.06,0xa78967],[-.66,0,0,.07,.65,.70,0x47535a],
+ [.66,0,0,.07,.65,.70,0x47535a],[.36,.30,.56,.48,.15,.14,0x8d7862]]},
+ planter:{name:'Maceta 1',group:'Exterior',w:.7,d:.7,h:1.35,parts:[
+ [0,0,0,.62,.62,.55,0xb07c5b],[0,0,.55,.08,.08,.78,0x598261],
+ [-.18,0,.83,.42,.32,.45,0x57845f],[.2,0,.88,.41,.36,.46,0x4d8057],
+ [0,.13,1.02,.45,.39,.33,0x67936a]]},
+ bollard:{name:'Bolardo 1',group:'Exterior',w:.28,d:.28,h:.88,parts:[
+ [0,0,0,.2,.2,.83,0x515c63],[0,0,.81,.28,.28,.07,0xd1d5d4]]}
+};
+var activeCAD3DBlock='chair';
+function cad3DBlockCatalog(){
+ return '<details class="block3DMenu"><summary class="btn">3D Blocks ▾</summary><div class="block3DPanel">'+
+ '<strong>3D COMPONENTS</strong><small>Geometrías originales en metros · seleccionables y editables</small>'+
+ Object.keys(CAD3D_COMPONENTS).map(function(id){var spec=CAD3D_COMPONENTS[id];
+  return '<button type="button" class="btn" data-3d-block="'+id+'">'+spec.name+'</button>';
+ }).join('')+'</div></details>';
+}
+function buildCAD3DBlock(record,group){
+ var def=CAD3D_COMPONENTS[record.blockId];if(!def)return;
+ var sx=record.w/def.w,sy=record.d/def.d,sz=record.h/def.h;
+ def.parts.forEach(function(p){
+  var w=p[3]*sx,d=p[4]*sy,h=p[5]*sz,g=boxGeom(w,d,h);
+  addMesh(g,p[6],record.id,group,p[0]*sx,p[1]*sy,p[2]*sz);
+ });
+}
 function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
@@ -681,7 +737,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
- '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
+ '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+cad3DBlockCatalog()+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
@@ -810,6 +866,12 @@ function build(){
   var button=e.target.closest('.tools [data-action], .cad3dBasicBars [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
+ });
+ root.querySelector('.block3DPanel').addEventListener('click',function(e){
+  var button=e.target.closest('[data-3d-block]');if(!button)return;
+  var id=button.dataset['3dBlock'];if(!CAD3D_COMPONENTS[id])return;
+  activeCAD3DBlock=id;setPlacement('block3d');root.querySelector('.block3DMenu').open=false;
+  text('Bloque '+CAD3D_COMPONENTS[id].name+' · clic para colocarlo');
  });
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
  root.querySelector('.styleLaunch').addEventListener('click',function(){
@@ -1257,8 +1319,8 @@ function fallbackDraw(){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
    });
-  }else if(rec.type==='box'){
-   fallbackBox(projection,rec,rec.w,rec.d,rec.h,0,0,0,'#648b9f');
+  }else if(rec.type==='box'||rec.type==='block3d'){
+   fallbackBox(projection,rec,rec.w,rec.d,rec.h,0,0,0,rec.type==='block3d'?'#a58a69':'#648b9f');
   }else if(rec.type==='sphere'){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
@@ -1690,6 +1752,10 @@ function placePoint(pt){
   Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
    w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
    x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:slabStyle.slabKind==='roof'?2.8:0});
+ }else if(kind==='block3d'){
+  var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
+  rec=newRecord('block3d');
+  Object.assign(rec,{blockId:activeCAD3DBlock,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
  }else if(['box','sphere','cylinder','cone'].includes(kind)){
   rec=newRecord(kind);rec.x=pt.x;rec.y=pt.y;
  }
@@ -2200,6 +2266,7 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
+ if(r.type==='block3d')buildCAD3DBlock(r,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
  if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
   var g=boxGeom(w,d,h);
@@ -2280,9 +2347,10 @@ function renderProps(){
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
+ if(!focus&&r.type==='block3d')html+='<div class="detail">3D Block: '+escapeHtml(CAD3D_COMPONENTS[r.blockId]?.name||r.blockId)+'</div>'; 
  var keys=focus?[]:['x','y','z'];
  if(!focus&&r.type!=='boolean')keys.push('rot');
- if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'))keys.push('w','d','h');
+ if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'||r.type==='block3d'))keys.push('w','d','h');
  if(!focus&&r.type==='slab')keys.push('pitch');
  if(!focus&&r.type==='sphere')keys.push('radius');
  if(!focus&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
@@ -3293,12 +3361,13 @@ async function readJSON(e){
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
-  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean'];
+  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
    var o={id:finite(r.id,0),type:r.type,layerId:importedLayers.some(function(l){return l.id===r.layerId;})?r.layerId:'0',x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
     styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
+   if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
    if((r.type==='wall'||r.type==='slab')&&Array.isArray(r.openings)){
     var kinds=r.type==='wall'?['door','window','opening']:['opening'];
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
