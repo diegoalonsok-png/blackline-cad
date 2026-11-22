@@ -19,7 +19,12 @@ const cm=m=>Math.round(m*100);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byId=id=>LIB.library.find(x=>x.id===id);
 const plan=()=>window.CAD2D_PLAN;
-const allowed=item=>!item.pro||!plan()||plan().can('arq-pro');
+const allowed=item=>!item.pro||Boolean(plan()?.can('arq-pro'));
+const denyPro=item=>{
+ const gate=plan();
+ if(gate?.upsell)return gate.upsell('Bloque PRO: '+item.name);
+ CORE.toast('Bloque PRO: acceso no disponible; actualizá el plan o reintentá la conexión.');
+};
 
 /* ---------- Capas arquitectónicas ---------- */
 const LAYERS={
@@ -66,8 +71,8 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 /* ---------- Inserción ---------- */
 let pendingInsert=null,lastItem=null;
 function armInsert(item,W,D){
- if(item.dxfPlan&&window.cadInsertDxfPlan){if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);return window.cadInsertDxfPlan(item.dxfPlan,item.name)}
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
+ if(item.dxfPlan&&window.cadInsertDxfPlan){if(!allowed(item))return denyPro(item);return window.cadInsertDxfPlan(item.dxfPlan,item.name)}
+ if(!allowed(item))return denyPro(item);
  const name=ensureDefinition(item,W??item.w,D??item.d),st=S();
  const layer=ensureLayer(item.cat);
  if(!pendingInsert)pendingInsert={prevLayer:st.layerId};
@@ -234,7 +239,7 @@ function applySizeRow(){
 function buildModal(){
  if($('arqModal'))return;
  const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','false');m.setAttribute('aria-label','Galería arquitectónica (ventana flotante)');
- m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><span class="arq-sizes" role="group" aria-label="Tamaño de la ventana"><button type="button" class="btn" data-size="s" title="Ventana chica al costado: el dibujo queda libre para arrastrar">▯ Chica</button><button type="button" class="btn" data-size="m" title="Mitad de pantalla">◧ Media</button><button type="button" class="btn" data-size="l" title="Grande">▣ Grande</button></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
+ m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES · ${LIB.library.filter(x=>x.pro).length} PRO</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><span class="arq-sizes" role="group" aria-label="Tamaño de la ventana"><button type="button" class="btn" data-size="s" title="Ventana chica al costado: el dibujo queda libre para arrastrar">▯ Chica</button><button type="button" class="btn" data-size="m" title="Mitad de pantalla">◧ Media</button><button type="button" class="btn" data-size="l" title="Grande">▣ Grande</button></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
  <div class="arq-tools"><input type="search" id="arqModalSearch" placeholder="Buscar en toda la galería…" aria-label="Buscar en la galería"><div class="arq-chips" id="arqModalChips" role="group" aria-label="Categorías"></div></div>
  <div class="arq-grid" id="arqModalGrid"></div></div>`;
  document.body.append(m);
@@ -341,7 +346,7 @@ function hitGrip(raw){
 function snapMeters(v,fine){const step=fine?.01:.05;return Math.round(v/step)*step}
 function resizeRef(ref,W,D){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return;
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
+ if(!allowed(item))return denyPro(item);
  const w=Math.max(item.wMin,Math.min(item.wMax,W)),d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
  if(Math.abs(w-a.w)<1e-6&&Math.abs(d-a.d)<1e-6)return CORE.toast('Sin cambios · rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm');
  CORE.saveHistory();
@@ -351,7 +356,7 @@ function resizeRef(ref,W,D){
 }
 function swapVariant(ref,id){
  const a=arqOf(ref),item=byId(id);if(!a||!item)return;
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
+ if(!allowed(item))return denyPro(item);
  CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d);delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
 }
