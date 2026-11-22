@@ -2391,7 +2391,9 @@ function cadOpeningQuickGrips(ref){
   const width=Number(def.arq.w)*(1000/U[state.unit])*(Number(ref.scale)||1);
   if(!(width>0&&Number.isFinite(width)))return [];
   const theta=(Number(ref.rotation)||0)*Math.PI/180;
-  const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
+  const ext=def.arq.ext,cx=(Number(ext?.x0??0)+Number(ext?.x1??def.arq.w))/2;
+  const center=(ref.flipBlockX?-1:1)*cx*(1000/U[state.unit])*(Number(ref.scale)||1);
+  const p=screen(P(ref.p.x+Math.cos(theta)*center,ref.p.y+Math.sin(theta)*center));
   const actions=['mirror',...(arq.door?['swing']:[]),'rotate','resize'];
   return actions.map((action,i)=>({action,x:p.x+(i-(actions.length-1)/2)*29,y:p.y-35}));
  }
@@ -2514,7 +2516,10 @@ function cadOpeningResizeEditor(ref,client){
  const width=cadOpeningWidthMeters(ref)*1000/U[state.unit];
  if(!(width>0&&Number.isFinite(width)))return;
  const theta=(Number(ref.rotation)||0)*Math.PI/180;
- const start=screen(ref.p),end=screen(P(ref.p.x+width*Math.cos(theta),ref.p.y+width*Math.sin(theta)));
+ const detailed=cadDetailedArqOpening(ref),ext=detailed?.def?.arq?.ext;
+ const first=detailed?(ref.flipBlockX?-Number(ext?.x1??detailed.def.arq.w):Number(ext?.x0??0))*(1000/U[state.unit])*(Number(ref.scale)||1):0;
+ const start=screen(P(ref.p.x+first*Math.cos(theta),ref.p.y+first*Math.sin(theta)));
+ const end=screen(P(ref.p.x+(first+width)*Math.cos(theta),ref.p.y+(first+width)*Math.sin(theta)));
  const dx=end.x-start.x,dy=end.y-start.y,len=Math.hypot(dx,dy);
  if(len<.1)return;
  const normal=P(dy/len,-dx/len),offset=58;
@@ -5583,7 +5588,8 @@ canvas.addEventListener('pointerup',ev=>{
   if(!ref)return;
   if(Math.hypot(raw.x-d.start.x,raw.y-d.start.y)<6){cadOpeningResizeEditor(ref,{x:ev.clientX,y:ev.clientY});return}
   const theta=(Number(ref.rotation)||0)*Math.PI/180,a=world(d.start),b=world(raw);
-  const width=d.startWidth+((b.x-a.x)*Math.cos(theta)+(b.y-a.y)*Math.sin(theta))*U[state.unit]/1000;
+  const mirrorSign=cadDetailedArqOpening(ref)&&ref.flipBlockX?-1:1;
+  const width=d.startWidth+mirrorSign*((b.x-a.x)*Math.cos(theta)+(b.y-a.y)*Math.sin(theta))*U[state.unit]/1000;
   const outcome=cadResizeOpening(ref,width);toast(outcome.ok?'Ancho: '+width.toFixed(2)+' m':outcome.reason);return;
  }
  if(d.type==='wallMiddleGrip'){
