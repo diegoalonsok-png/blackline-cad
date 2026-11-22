@@ -2491,6 +2491,28 @@ function cad3dSelectionTransform(command,values){
  if(!items.length){text(command.toUpperCase()+': seleccioná uno o más objetos');return;}
  var v=values.map(Number);
  if(v.some(function(n){return !Number.isFinite(n)})){text('Parámetros 3D inválidos');return;}
+ // A door/window is a parametric child of its wall, not a wall transform.
+ if(selectedOpeningId!=null&&items.length===1&&items[0].type==='wall'){
+  var wall=items[0],opening=wall.openings?.find(function(o){return o.id===selectedOpeningId;});
+  if(!opening){selectedOpeningId=null;return text('Abertura no encontrada');}
+  var trial=Object.assign({},opening);
+  if(command==='move'||command==='copy'){
+   var angle=(wall.rot||0)*Math.PI/180;
+   trial.offset+=(v[0]||0)*Math.cos(angle)+(v[1]||0)*Math.sin(angle);
+   trial.sill+=(v[2]||0);
+  }else if(command==='scale'){
+   if(v[0]<=0||v[0]>100)return text('SCALE: ingresá factor entre 0 y 100');
+   trial.w*=v[0];trial.h*=v[0];
+  }else{
+   return text(command.toUpperCase()+': seleccionaste una carpintería. Usá Properties o MOVE OPENING');
+  }
+  if(!openingFitsHost(wall,trial,command==='copy'?undefined:opening.id)){
+   return text('Cambio rechazado: vano fuera del muro o superpuesto a otra abertura');
+  }
+  if(command==='copy'){trial.id=serial++;wall.openings.push(trial);selectedOpeningId=trial.id;}
+  else Object.assign(opening,trial);
+  redraw();renderProps();text(command.toUpperCase()+' aplicada a la carpintería, no al muro');return;
+ }
  if(command==='scale'){
   var k=v[0];
   if(!(k>.001&&k<=1000)){text('SCALE: factor válido entre 0.001 y 1000');return;}
@@ -2624,6 +2646,19 @@ function action(a){
   return true;
  }
  if(['move','copy','rotate','erase'].includes(a)){
+  var focused=records.find(function(r){return selected.includes(r.id)&&r.type==='wall'&&(r.openings||[]).some(function(o){return o.id===selectedOpeningId;});});
+  if(focused){
+   if(a==='erase'){
+    focused.openings=focused.openings.filter(function(o){return o.id!==selectedOpeningId;});
+    selectedOpeningId=null;redraw();renderProps();text('Carpintería eliminada y vano cerrado');return true;
+   }
+   if(a==='move'){
+    openingTransfer={wallId:focused.id,openingId:selectedOpeningId};
+    text('MOVE OPENING: clic sobre otra pared para trasladar · o MOVE DX,DY,DZ en la misma pared');return true;
+   }
+   if(a==='copy'){text('COPY: escribí COPY DX,DY,DZ para duplicar la carpintería dentro del muro');return true;}
+   if(a==='rotate'){text('ROTATE: usá Open angle y Hinge en las propiedades de la carpintería');return true;}
+  }
   if(!selected.some(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});})){text('Seleccioná los objetos que querés modificar');return true;}
   if(a==='erase'){
    records=records.filter(function(r){return !selected.includes(r.id)||!editableRecord(r);});
