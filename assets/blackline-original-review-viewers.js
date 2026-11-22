@@ -111,7 +111,7 @@ function ensure(){
  openFile.onclick=()=>files.click();head.append(openFile,files);
  const close=make('button','','✕ Cerrar');close.onclick=()=>overlay.hidden=true;head.append(close);
  shell.append(head);
- shell.append(make('p','blrv-note','Criterio: dibujo correcto y nombre coincidente → GRATIS aunque sea sencillo; dibujo más detallado → PRO; nombre incorrecto o calidad insuficiente → DESCARTAR. Primero usá «Ver dibujo». Estas decisiones son propuestas de revisión, no publicación automática.'));
+ shell.append(make('p','blrv-note','Criterio: dibujo correcto y nombre coincidente → GRATIS aunque sea sencillo; dibujo más detallado → PRO; nombre incorrecto o calidad insuficiente → DESCARTAR. Primero usá «Ver dibujo». Estas decisiones son propuestas de revisión, no publicación automática. Todo bloque que se incorpore a las galerías se normalizará a capa 0, en blanco, sin deformar su dibujo.'));
  const main=make('div','blrv-main'),nav=make('nav','blrv-nav'),content=make('div','blrv-content');
  const tools=make('div','blrv-tools');
  const search=make('input');search.type='search';search.placeholder='Buscar por nombre...';
