@@ -1981,26 +1981,39 @@ function cadSketchPaperAndHatch(out,ctx,preset){
  // solids or shadows. Sample with one read, then draw a sparse ink layer.
  var pixels;
  try{pixels=ctx.getImageData(0,0,w,h).data;}catch(e){return;}
- var step=preset.stroke==='ink'?8:preset.stroke==='pencil'?11:14;
- var strength=preset.stroke==='ink'?.23:preset.stroke==='pencil'?.15:preset.stroke==='marker'?.12:.09;
+ var mode=preset.stroke;
+ var step=['etching','bluepen'].includes(mode)?7:mode==='ink'?8:mode==='gesture'?15:mode==='pencil'?11:14;
+ var strength=mode==='etching'?.55:mode==='bluepen'?.38:mode==='ink'?.23:mode==='gesture'?.44:mode==='pencil'?.15:mode==='duotone'?.31:mode==='marker'?.12:.09;
  var rr=(preset.edge>>16)&255,gg=(preset.edge>>8)&255,bb=preset.edge&255;
- ctx.save();ctx.strokeStyle='rgba('+rr+','+gg+','+bb+','+(strength*cadSketchTuning.roughness).toFixed(3)+')';
- ctx.lineWidth=Math.max(.5,Math.min(1.8,w/1800));
- ctx.beginPath();
- var segments=0,limit=180000;
+ ctx.save();
+ ctx.lineWidth=Math.max(.5,Math.min(mode==='gesture'?2.5:1.8,w/1800));
+ var segments=0,limit=180000,inkAlpha=Math.min(.85,strength*cadSketchTuning.roughness);
+ function hatch(x,y,len,angle){
+  var dx=Math.cos(angle)*len/2,dy=Math.sin(angle)*len/2;
+  ctx.moveTo(x-dx,y-dy);ctx.lineTo(x+dx,y+dy);segments++;
+ }
  for(var y=step;y<h-step&&segments<limit;y+=step){
   for(var x=step;x<w-step&&segments<limit;x+=step){
    var ix=(Math.floor(y)*w+Math.floor(x))*4;
    var l=(pixels[ix]*.2126+pixels[ix+1]*.7152+pixels[ix+2]*.0722)/255;
-   var density=(1-l)*Math.min(1,cadSketchTuning.roughness);
-   if(density<.16||random()>density*.84)continue;
-   var len=step*(.4+density*.65),slant=preset.stroke==='wash'?.3:1;
-   ctx.moveTo(x-len*.35,y+len*.35*slant);
-   ctx.lineTo(x+len*.35,y-len*.35*slant);
-   segments++;
+   var density=1-l;
+   if(density<.16||random()>density*.94)continue;
+   var color=mode==='duotone'&&((Math.floor(x/step)+Math.floor(y/step))%6<2)?[211,43,40]:[rr,gg,bb];
+   ctx.strokeStyle='rgba('+color[0]+','+color[1]+','+color[2]+','+inkAlpha.toFixed(3)+')';
+   var jitter=(random()-.5)*(mode==='gesture'?step*.8:step*.26);
+   var len=step*(mode==='gesture'?1.7:mode==='etching'?1.1:.7)*(.5+density);
+   var angle=mode==='bluepen'?-1.28:mode==='gesture'?-.8+(random()-.5)*1.9:mode==='wash'?-.15:-.9;
+   ctx.beginPath();hatch(x+jitter,y+jitter,len,angle);
+   if(['etching','bluepen'].includes(mode)&&density>.38&&random()<density)
+    hatch(x-jitter*.4,y+jitter*.4,len*.8,mode==='etching'?.65:-.62);
+   if(mode==='etching'&&density>.7&&random()<density*.6)
+    hatch(x+jitter*.2,y-jitter*.3,len*.67,.1);
+   if(mode==='gesture'&&density>.5&&random()<.3)
+    hatch(x+step*.24,y-step*.2,len*1.35,angle+(random()-.5)*.24);
+   ctx.stroke();
   }
  }
- ctx.stroke();ctx.restore();
+ ctx.restore();
 }
 function exportSketchPresentation(){
  if(!renderer&&!fallbackCanvas)return text('Abrí el visor 3D para generar el croquis');
