@@ -1359,6 +1359,25 @@ function hostHitAt(e,type){
  if(!hit)return null;
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
 }
+/* A single validation rule for insertion and later editing. An invalid change
+   must never leave a hole outside the host wall or overlap another opening. */
+function openingFitsHost(host,item,excludeId){
+ if(!host||!item||!Number.isFinite(item.offset)||!Number.isFinite(item.w)||item.w<=0)return false;
+ var half=host.w/2,tol=.00001;
+ if(item.offset-item.w/2 < -half-tol||item.offset+item.w/2 > half+tol)return false;
+ if(host.type==='slab'){
+  if(!Number.isFinite(item.offsetY)||!Number.isFinite(item.d)||item.d<=0)return false;
+  if(Math.abs(item.offsetY)+item.d/2>host.d/2+tol)return false;
+ }else{
+  if(!Number.isFinite(item.sill)||!Number.isFinite(item.h)||item.h<=0||item.sill<0||item.sill+item.h>host.h+tol)return false;
+ }
+ return !(host.openings||[]).some(function(other){
+  if(other===item||other.id===excludeId)return false;
+  if(Math.abs(other.offset-item.offset)>=(other.w+item.w)/2+.015)return false;
+  if(host.type==='slab')return Math.abs((other.offsetY||0)-(item.offsetY||0))<((other.d||0)+item.d)/2+.015;
+  return Math.max(other.sill||0,item.sill)<Math.min((other.sill||0)+(other.h||0),item.sill+item.h)+.015;
+ });
+}
 function placeOpening(e){
  var kind=placing,style=archStyle(kind,activePreset[kind]),type=style.host||'wall';
  var hit=hostHitAt(e,type);
@@ -1378,13 +1397,7 @@ function placeOpening(e){
  }else{
   op.h=span;op.sill=Math.min(style.sill,rec.h-span);
  }
- var overlaps=(rec.openings||[]).some(function(other){
-  var left=Math.abs(other.offset-op.offset)<(other.w+op.w)/2+.015;
-  if(!left)return false;
-  if(slab)return Math.abs((other.offsetY||0)-(op.offsetY||0))<((other.d||0)+(op.d||0))/2+.015;
-  return Math.max(other.sill||0,op.sill||0)<Math.min((other.sill||0)+(other.h||0),(op.sill||0)+op.h)+.015;
- });
- if(overlaps){text('La abertura se superpone a otra existente. Elegí otro lugar del muro.');return;}
+ if(!openingFitsHost(rec,op)){text('La abertura no entra en el elemento o se superpone a otra. Elegí otro lugar.');return;}
  rec.openings.push(op);selected=[rec.id];redraw();renderProps();
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
@@ -1989,7 +2002,9 @@ function change(e){
     Math.max(other.sill||0,nextSill)<Math.min((other.sill||0)+(other.h||0),nextSill+preset.h)+.015;
   });
   if(collision){renderProps();text('La carpintería se superpone a otro vano');return;}
-  Object.assign(item,{styleId:preset.id,w:preset.w,h:preset.h,sill:nextSill,offset:nextOffset,shape:preset.shape||'rect'});
+  var replacement=Object.assign({},item,{styleId:preset.id,w:preset.w,h:preset.h,sill:nextSill,offset:nextOffset,shape:preset.shape||'rect'});
+  if(!openingFitsHost(r,replacement,item.id)){renderProps();text('La carpintería no cabe en el muro');return;}
+  Object.assign(item,replacement);
   redraw();renderProps();text('Modelo actualizado y vano regenerado');return;
  }
  if(input.dataset.openingShape){
@@ -2011,6 +2026,10 @@ function change(e){
   if(key==='w'||key==='h'||key==='d')val=clamp(val,.05,1000);
   else if(key==='sill')val=clamp(val,0,1000);
   else val=clamp(val,-10000,10000);
+  var proposal=Object.assign({},o);proposal[key]=val;
+  if(!openingFitsHost(r,proposal,o.id)){
+   renderProps();text('El vano no cabe en el muro o se cruza con otro. Cambio cancelado');return;
+  }
   o[key]=val;
  }else{
   var name=input.dataset.key;
@@ -2018,6 +2037,12 @@ function change(e){
   else if(name==='rot')val=clamp(val,-3600,3600);
   else if(name==='pitch')val=clamp(val,-45,45);
   else val=clamp(val,-10000,10000);
+  if((r.type==='wall'||r.type==='slab')&&['w','d','h'].includes(name)){
+   var hostPreview=Object.assign({},r,{[name]:val});
+   if((r.openings||[]).some(function(o){return !openingFitsHost(hostPreview,o,o.id);})){
+    renderProps();text('El nuevo tamaño dejaría vanos fuera del muro/losa. Cambio cancelado');return;
+   }
+  }
   r[name]=val;
  }
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
