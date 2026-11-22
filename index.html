@@ -9388,7 +9388,11 @@ function initPermanentBlockGallery(){
   if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
   // Library folder names are for browsing only, never drawing layers.
-  const key=x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id,already=Boolean(state.blocks[key]);
+  const legacyKey=x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id;
+  // Keep previously used colored definitions for existing drawings. Fresh picks
+  // use a distinct white layer-0 definition instead of rewriting those drawings.
+  const key=state.blocks[legacyKey]&&!state.blocks[legacyKey].libraryLayer0?legacyKey+' · Layer 0':legacyKey;
+  const already=Boolean(state.blocks[key]);
   let layer=state.layers.find(l=>l.id==='0'||l.name==='0');
   if(!layer||!already)saveHistory();
   if(!layer){
@@ -9433,7 +9437,9 @@ function initPermanentBlockGallery(){
    button.title=x.id+' · ancho '+x.w+' m · marco paramétrico 0,05 m · clic para insertar';
    button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.pro?'<span style="font-size:9px;color:#f2d38f">PRO · membresía</span>':x.free?'<span style="font-size:9px;color:#9fe0c4">FREE · PARAMÉTRICO</span>':x.kind?'<span style="font-size:9px;color:#9cdeed">↔ PARAMÉTRICO</span>':x.wholeRoom?'<span style="font-size:9px;color:#9cdeed">AMBIENTE · BLOQUE ÚNICO</span>':'');
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
-   button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{if(install(x)===false)return;for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
+   const baseName=x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id;
+   const chosenName=state.blocks[baseName]&&!state.blocks[baseName].libraryLayer0?baseName+' · Layer 0':baseName;
+   button.setAttribute('aria-pressed',String(select.value===chosenName));button.onclick=()=>{if(install(x)===false)return;for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
   }
  }
