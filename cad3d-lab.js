@@ -2498,10 +2498,12 @@ function setPlan2D(){
 function setViewPreset(key){
  var v=viewPresets.find(function(p){return p[0]===key;});
  if(!v)return;
- if(key!=='top')cadPlanClassic=false;
+ var leavingClassic=key!=='top'&&cadPlanClassic;
+ if(leavingClassic)cadPlanClassic=false;
  activeView=v[0];viewMode=v[2];orbit.az=v[3];orbit.el=v[4];
  if(viewMode==='walk')target.z=1.65;
  syncViewControls();applyViewCamera();
+ if(leavingClassic&&renderer)applyRenderStyle();
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
 }
