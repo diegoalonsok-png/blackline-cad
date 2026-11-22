@@ -16,7 +16,8 @@ test('Sun uses a lit WebGL ground receiver, separate from editable records',()=>
 test('Sun direction tracks geometry bounds, with ground and face toggles',()=>{
  assert(src.includes('sunLight.target.position.set(bounds.x,bounds.y,bounds.z)'));
  assert(src.includes('sunGround.visible=sunSettings.enabled&&sunSettings.onGround'));
- assert(src.includes('o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces'));
+ assert(src.includes('o.receiveShadow=opaque&&sunSettings.enabled&&sunSettings.onFaces'),'Opaque parts receive sunlight shadows');
+ assert(src.includes('var opaque=o.userData?.cadGlass!==true'),'Glass must not cast or receive opaque shadows');
  assert(src.includes("this.dataset.sunPreset"));
 });
 test('CAD3D view controls and differentiated floor/sun icons are implemented',()=>{

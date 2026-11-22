@@ -7,9 +7,10 @@ const source=fs.readFileSync('cad3d-lab.js','utf8');
 test('CAD3D JavaScript parses cleanly',()=>assert.doesNotThrow(()=>new vm.Script(source,{filename:'cad3d-lab.js'})));
 test('Door, window and opening tools remain armed after a successful insertion',()=>{
  const section=source.slice(source.indexOf('function placeOpening(e){'),source.indexOf('function placeAt(e){'));
- assert(section.includes('rec.openings.push(op);selected=[rec.id];redraw();renderProps();'));
+ assert(section.includes('rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();'), 'Newly placed opening must become directly editable');
  assert(!section.includes('setPlacement(null)'), 'An opening must not reset the active placement command');
- assert(section.includes('if(overlaps)'), 'Prevent overlapping architectural openings');
+ assert(section.includes('if(!openingFitsHost(rec,op))'), 'Prevent out-of-bounds or overlapping architectural openings');
+ assert(source.includes('function openingFitsHost('), 'Validation must cover insertion and editing');
 });
 test('Door and window libraries include multiple sizes and styles',()=>{
  const section=source.slice(source.indexOf('const ARCH_STYLES='),source.indexOf('function archStyle('));

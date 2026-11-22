@@ -13,7 +13,7 @@ function fakeLight(){
  return {position:{set(...v){this.xyz=v;}},target:{position:{set(...v){this.xyz=v;}},updateMatrixWorld(){this.updated=true;}},shadow:{mapSize:{set(...v){this.xy=v;}},camera},castShadow:false,intensity:0};
 }
 function setup(){
- const meshes=[{isMesh:true,castShadow:true,receiveShadow:true},{isMesh:true,castShadow:true,receiveShadow:true}];
+ const meshes=[{isMesh:true,userData:{},castShadow:true,receiveShadow:true},{isMesh:true,userData:{},castShadow:true,receiveShadow:true},{isMesh:true,userData:{cadGlass:true},castShadow:false,receiveShadow:false}];
  const sunLight=fakeLight(), sunGround={visible:false,receiveShadow:true},sunAmbient={intensity:1.3},sunFill={intensity:.7};
  const sunSettings={enabled:true,azimuth:135,elevation:45,onGround:true,onFaces:true};
  const modelRoot={traverse(fn){meshes.forEach(fn);}};
@@ -24,7 +24,7 @@ function setup(){
  }};
  const ctx={root,sunSettings,sunGround,sunAmbient,sunFill,modelRoot,sunLight,renderer,scene,T:{},renderStyle:'shaded-edges',
   records:[{id:1,type:'box',x:1,y:2,z:0,w:2,d:2,h:2}],
-  visibleRecord:()=>true,Math,Number,Infinity};
+  visibleRecord:()=>true,isCad3DSketch:mode=>mode.startsWith('sketch'),Math,Number,Infinity};
  vm.runInNewContext(extract('function cad3dBounds(){','function renderDraftModes(){'),ctx);
  return {ctx,meshes,sunLight,sunGround,renderer,sunSettings};
 }
@@ -34,7 +34,8 @@ test('Sun actually enables real casting light, face receiving, and ground receiv
  assert.equal(sunLight.castShadow,true);
  assert.equal(sunGround.visible,true);
  assert.equal(sunGround.receiveShadow,true);
- assert(meshes.every(m=>m.castShadow&&m.receiveShadow));
+ assert(meshes.filter(m=>!m.userData.cadGlass).every(m=>m.castShadow&&m.receiveShadow));
+ assert(meshes.filter(m=>m.userData.cadGlass).every(m=>!m.castShadow&&!m.receiveShadow),'Glass must transmit sunlight');
  assert.deepEqual(Array.from(sunLight.shadow.mapSize.xy),[2048,2048]);
  assert(sunLight.shadow.camera.updated);
  assert(sunLight.target.updated);
@@ -45,7 +46,7 @@ test('Sun actually enables real casting light, face receiving, and ground receiv
 test('Ground and face shadow settings are independent',()=>{
  const {ctx,meshes,sunLight,sunGround,sunSettings}=setup();
  sunSettings.onGround=false;sunSettings.onFaces=true;ctx.applySunSettings();
- assert.equal(sunGround.visible,false);assert(meshes.every(m=>m.receiveShadow));assert(sunLight.castShadow);
+ assert.equal(sunGround.visible,false);assert(meshes.filter(m=>!m.userData.cadGlass).every(m=>m.receiveShadow));assert(sunLight.castShadow);
  sunSettings.onGround=true;sunSettings.onFaces=false;ctx.applySunSettings();
  assert.equal(sunGround.visible,true);assert(meshes.every(m=>!m.receiveShadow));assert(sunLight.castShadow);
 });
@@ -53,16 +54,21 @@ test('Disabling Sun disables casting and receivers without deleting objects',()=
  const {ctx,meshes,sunLight,sunGround,sunSettings}=setup();
  sunSettings.enabled=false;ctx.applySunSettings();
  assert.equal(sunLight.castShadow,false);assert.equal(sunGround.visible,false);
- assert(meshes.every(m=>m.castShadow&&!m.receiveShadow));
+ assert(meshes.filter(m=>!m.userData.cadGlass).every(m=>m.castShadow&&!m.receiveShadow));
+ assert(meshes.filter(m=>m.userData.cadGlass).every(m=>!m.castShadow&&!m.receiveShadow));
  assert.equal(ctx.records.length,1);
 });
-test('Every CAD3D mesh is configured to cast a shadow',()=>{
+test('Opaque CAD3D meshes cast shadows while glass meshes transmit sunlight',()=>{
  const code=extract('function addMesh(','/* Partition the wall elevation');
  const objects=[];
- const ctx={T:{MeshStandardMaterial:class{constructor(p){this.options=p}},Mesh:class{constructor(geometry,mat){this.geometry=geometry;this.material=mat;this.userData={};this.position={set(){}};objects.push(this);}},DoubleSide:2},sunSettings:{onFaces:true}};
+ const ctx={T:{MeshStandardMaterial:class{constructor(p){this.options=p}},Mesh:class{constructor(geometry,mat){this.geometry=geometry;this.material=mat;this.userData={};this.position={set(){}};objects.push(this);}},DoubleSide:2},sunSettings:{onFaces:true},clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),finite:(x,d)=>Number.isFinite(Number(x))?Number(x):d};
  vm.runInNewContext(code,ctx);
  const parent={add(obj){this.object=obj;}};
  ctx.addMesh({isGeometry:true},0xffffff,4,parent);
  assert.equal(parent.object.castShadow,true);
  assert.equal(parent.object.receiveShadow,true);
+ ctx.addMesh({isGeometry:true},0xaaccff,5,parent,0,0,0,true,.4);
+ assert.equal(parent.object.castShadow,false);
+ assert.equal(parent.object.receiveShadow,false);
+ assert.equal(parent.object.material.options.opacity,.4);
 });
