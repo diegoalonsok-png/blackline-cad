@@ -807,6 +807,12 @@ function build(){
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
+ root.querySelector('#cad3dCommand').addEventListener('input',function(){
+  // TOP is unambiguous; L and Z fire as one-key aliases while the field is empty.
+  var value=this.value.trim().toUpperCase();
+  if(value==='TOP'){this.value='';cad3DImmediateCommand('TOP');}
+  else if(value==='L'||value==='Z'){this.value='';cad3DImmediateCommand(value);}
+ });
  root.querySelector('.draftBar').addEventListener('click',function(e){
   var mode=e.target.closest('[data-draft-mode]');
   if(mode)toggleDraftMode(mode.dataset.draftMode);
@@ -1007,6 +1013,7 @@ function toggleDraftMode(mode){
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
+ if(which)cad3DExitZoom();
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
  root.querySelectorAll('.solidTools button').forEach(function(b){
@@ -1386,6 +1393,22 @@ function showObjectContextMenu(e){
  menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
  menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
 }
+var cad3DZoomMode=false;
+function cad3DStartZoom(){
+ setPlacement(null);cad3DZoomMode=true;
+ var canvas=renderer?.domElement||fallbackCanvas;
+ canvas?.focus({preventScroll:true});
+ root.querySelector('.view').style.cursor='zoom-in';
+ text('ZOOM · arrastrá para acercar/alejar · clic acerca · Shift+clic aleja · Esc termina');
+}
+function cad3DExitZoom(){cad3DZoomMode=false;if(root)root.querySelector('.view').style.cursor='';}
+function cad3DImmediateCommand(raw){
+ var key=String(raw||'').trim().toUpperCase();
+ if(key==='L'){cad3DExitZoom();setViewPreset('left');return true;}
+ if(key==='TOP'){cad3DExitZoom();setViewPreset('top');return true;}
+ if(key==='Z'){cad3DStartZoom();return true;}
+ return false;
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
@@ -1395,15 +1418,35 @@ function bindCanvas(el){
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
   e.preventDefault();el.focus({preventScroll:true});
+  // While placing geometry, unmodified primary-button input belongs to DRAW,
+  // not to camera orbit. Alt+left / middle / right remain navigation gestures.
+  if(cad3DZoomMode&&e.button===0&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,zoom:true};
+   el.dataset.navigationDrag='false';el.setPointerCapture(e.pointerId);return;
+  }
+  var placementClick=e.button===0&&!!placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey;
   var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho'&&!placing);
-  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan};
+  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan,placementClick:placementClick};
   el.dataset.navigationDrag='false';
   el.setPointerCapture(e.pointerId);
  });
  el.addEventListener('pointermove',function(e){
   if(dragging&&dragging.id===e.pointerId){
+   if(dragging.zoom){
+    var dy=e.clientY-dragging.lastY;
+    if(Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>4)dragging.moved=true;
+    if(dragging.moved&&Math.abs(dy)>.01){
+     orbit.dist=clamp(orbit.dist*Math.exp(dy*.012),1.4,450);
+     dragging.lastY=e.clientY;applyViewCamera();
+    }
+    return;
+   }
+   if(dragging.placementClick){
+    // Keep preview moving but never orbit/pan while the user is picking a wall point.
+    updatePlacementGuide(e);updateDynamicReadout(e);return;
+   }
    var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
-   if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>5){
+   if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>(placing?12:5)){
     hideObjectContextMenu();
     dragging.moved=true;dragging.lastX=e.clientX;dragging.lastY=e.clientY;
     el.dataset.navigationDrag='true';
@@ -1420,9 +1463,17 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
+  if(dragging.zoom){
+   var wasClick=!dragging.moved;
+   dragging=null;delete el.dataset.navigationDrag;
+   if(wasClick){orbit.dist=clamp(orbit.dist*(e.shiftKey?1.25:.8),1.4,450);applyViewCamera();}
+   return;
+  }
+  var drawClick=dragging.placementClick&&e.button===0;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;delete el.dataset.navigationDrag;
-  if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
+  if(drawClick){hideObjectContextMenu();placeAt(e);}
+  else if(click&&e.button===0&&!placing){hideObjectContextMenu();selectAt(e);}
   if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
   if(draftModes.dyn)updateDynamicReadout(e);
  });
@@ -1480,6 +1531,7 @@ function hostHitAt(e,type){
    group.traverse(function(o){if(o.isMesh)meshes.push(o);});
   }
  });
+ modelRoot.updateMatrixWorld(true);
  var hit=raycaster.intersectObjects(meshes,false)[0];
  if(!hit)return null;
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
@@ -1504,7 +1556,7 @@ function openingFitsCADHost(host,item,excludeId){
 function placeOpening(e){
  var kind=placing,style=archStyle(kind,activePreset[kind]),type=style.host||'wall';
  var hit=hostHitAt(e,type);
- if(!hit){text('Hacé clic sobre '+(type==='slab'?'una losa':'un muro')+' para colocar el vano');return;}
+ if(!hit){text('No se detectó '+(type==='slab'?'una losa':'un muro')+' bajo el cursor. Verificá que la capa esté visible y desbloqueada y hacé clic sobre la superficie del elemento.');return;}
  var rec=hit.host,slab=type==='slab';
  var span=slab?style.d:style.h;
  if(style.w>rec.w||span>(slab?rec.d:rec.h)){
@@ -1537,7 +1589,7 @@ function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
  if(['door','window','opening'].includes(placing)){placeOpening(e);return;}
  if(placing==='rotate'){root.querySelector('#cad3dCommand').focus();return;}
- var pt=groundAt(e);if(!pt){text('Elegí Planta o Isométrica para trabajar sobre Z=0');return;}
+ var pt=groundAt(e);if(!pt){text('No se pudo ubicar el punto sobre el plano Z=0 en esta vista. Cambiá a Top o Iso y volvé a intentar.');return;}
  placePoint(assistedPoint(pt,root.querySelector('.view')));updatePlacementGuide(e);
 }
 function placePoint(pt){
@@ -2805,6 +2857,7 @@ function updateDynamicReadout(e){
 }
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
+ if(cad3DImmediateCommand(raw))return;
  if(!raw){
   if(['wall','door','window','opening'].includes(placing)){
    var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
@@ -3101,6 +3154,7 @@ window.addEventListener('keydown',function(ev){
  }
  if(ev.key==='Escape'){
   ev.preventDefault();ev.stopImmediatePropagation();
+  cad3DExitZoom();
   if(dragging){
    var canvas=renderer?.domElement||fallbackCanvas;
    if(canvas){delete canvas.dataset.navigationDrag;try{if(canvas.hasPointerCapture(dragging.id))canvas.releasePointerCapture(dragging.id);}catch(_e){}}
@@ -3132,7 +3186,12 @@ window.addEventListener('keydown',function(ev){
  }
  if(/^[a-z0-9@.,-]$/i.test(ev.key)){
   ev.preventDefault();ev.stopImmediatePropagation();
-  var input=root.querySelector('#cad3dCommand');input.focus({preventScroll:true});input.value+=ev.key;
+  var input=root.querySelector('#cad3dCommand');
+  // Single-key commands act instantly; TOP is recognized as the user types.
+  if(ev.key.toUpperCase()==='L'&&input.value.trim()===''){cad3DImmediateCommand('L');return;}
+  if(ev.key.toUpperCase()==='Z'&&input.value.trim()===''){cad3DImmediateCommand('Z');return;}
+  input.focus({preventScroll:true});input.value+=ev.key;
+  if(input.value.trim().toUpperCase()==='TOP'){input.value='';cad3DImmediateCommand('TOP');}
  }
 },true);
 
