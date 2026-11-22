@@ -6,8 +6,8 @@ const src=fs.readFileSync('cad3d-lab.js','utf8');
 const start=src.indexOf('const CAD3D_SKETCH_PRESETS='),end=src.indexOf('function renderStyleControls()',start);
 assert(start>=0&&end>start);
 const presets=vm.runInNewContext(src.slice(start,end)+'\nCAD3D_SKETCH_PRESETS', {});
-test('All seven Croquis modes have independent line weight, material wash and paper profiles',()=>{
- assert.equal(Object.keys(presets).length,7);
+test('All eleven Croquis modes have independent line weight, material wash and paper profiles',()=>{
+ assert.equal(Object.keys(presets).length,11);
  const profiles=new Set();
  for(const [key,s] of Object.entries(presets)){
   assert(s.width>0&&s.width<.1,key+' profile thickness');
@@ -17,7 +17,7 @@ test('All seven Croquis modes have independent line weight, material wash and pa
   assert(s.paper);
   profiles.add([s.stroke,s.width,s.jitter,s.paper,s.passes].join('-'));
  }
- assert.equal(profiles.size,7,'Each mode must have distinctive drawing behavior, not a color-only change');
+ assert.equal(profiles.size,11,'Each mode must have distinctive drawing behavior, not a color-only change');
 });
 const ribbonCode=src.slice(src.indexOf('function cadSketchRibbonGeometry('),src.indexOf('function applyRenderStyle(){'));
 class Geometry {
