@@ -2098,6 +2098,17 @@ function renderProps(){
      }
     }
    }
+   if(r.type==='wall'){
+    html+='<div class="detail"><strong>Quick grips</strong><div class="openingQuickTools">'+
+     '<button type="button" class="btn" data-opening-quick="shift-left" data-opening-id="'+o.id+'">← 0.10 m</button>'+
+     '<button type="button" class="btn" data-opening-quick="shift-right" data-opening-id="'+o.id+'">0.10 m →</button>'+
+     '<button type="button" class="btn" data-opening-quick="narrow" data-opening-id="'+o.id+'">Width −</button>'+
+     '<button type="button" class="btn" data-opening-quick="widen" data-opening-id="'+o.id+'">Width +</button>';
+    if(o.kind!=='opening'&&openingMotionType(o)!=='fixed')
+     html+='<button type="button" class="btn" data-opening-quick="flip-hinge" data-opening-id="'+o.id+'">Flip Hinge</button>'+
+      '<button type="button" class="btn" data-opening-quick="flip-swing" data-opening-id="'+o.id+'">Flip Swing</button>';
+    html+='</div></div>';
+   }
    if(r.type==='wall'&&openingIsGlass(o))
     html+='<label>Glass opacity <input type="number" min="0.08" max="0.85" step="0.05" data-glass-opacity="'+o.id+'" value="'+glazingOpacity(o)+'"></label>';
    if(r.type==='wall')html+='<label>Void shape <select data-opening-shape="'+o.id+'">'+
@@ -2233,6 +2244,23 @@ function addWallExtrusion(btn){
  redraw();renderProps();text('Extruded profile attached to wall');
 }
 function clickProps(e){
+ var quick=e.target.closest('[data-opening-quick]');
+ if(quick){
+  var wall=records.find(function(r){return selected.includes(r.id)&&r.type==='wall'&&editableRecord(r);});
+  var op=wall?.openings?.find(function(o){return o.id===Number(quick.dataset.openingId);});
+  if(!op)return;
+  var edit=Object.assign({},op),kind=quick.dataset.openingQuick;
+  if(kind==='shift-left')edit.offset-=.1;
+  else if(kind==='shift-right')edit.offset+=.1;
+  else if(kind==='narrow')edit.w=Math.max(.05,edit.w-.1);
+  else if(kind==='widen')edit.w+=.1;
+  else if(kind==='flip-hinge')edit.hingeSide=edit.hingeSide==='right'?'left':'right';
+  else if(kind==='flip-swing')edit.openDirection=edit.openDirection===-1?1:-1;
+  else return;
+  if(!openingFitsHost(wall,edit,op.id)){text('Quick grip: el vano excede el muro o se superpone a otro');return;}
+  Object.assign(op,edit);selectedOpeningId=op.id;redraw();renderProps();
+  text('Quick grip · '+kind+' · abertura paramétrica actualizada');return;
+ }
  var transferButton=e.target.closest('[data-transfer-opening]');
  if(transferButton){
   var wall=records.find(function(r){return selected.includes(r.id)&&r.type==='wall'&&editableRecord(r);});
