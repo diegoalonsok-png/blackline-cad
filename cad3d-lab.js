@@ -828,6 +828,12 @@ function build(){
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
+ root.querySelector('#cad3dCommand').addEventListener('input',function(){
+  var value=this.value.trim().toUpperCase();
+  if(['T','L','R','B','Z','TOP','LEFT','RIGHT','BACK','ZOOM'].includes(value)){
+   this.value='';cad3dViewAlias(value);
+  }
+ });
  root.querySelector('.draftBar').addEventListener('click',function(e){
   var mode=e.target.closest('[data-draft-mode]');
   if(mode)toggleDraftMode(mode.dataset.draftMode);
@@ -1028,6 +1034,7 @@ function toggleDraftMode(mode){
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
+ if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
  root.querySelectorAll('.solidTools button, .cad3dBasicBars button').forEach(function(b){
@@ -1407,6 +1414,29 @@ function showObjectContextMenu(e){
  menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
  menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
 }
+
+// Max/3ds-style view aliases. These control camera only, never mutate CAD records.
+// T=Top, L=Left, R=Right, B=Back, Z=Zoom.
+var cad3dZoomActive=false;
+function cad3dEndZoom(){
+ cad3dZoomActive=false;
+ if(root)root.querySelector('.view').style.cursor='';
+}
+function cad3dStartZoom(){
+ setPlacement(null);
+ cad3dZoomActive=true;
+ root.querySelector('.view').style.cursor='zoom-in';
+ text('ZOOM · clic para acercar · Shift+clic para alejar · arrastrar verticalmente para zoom · Esc para salir');
+}
+function cad3dViewAlias(word){
+ var aliases={T:'top',TOP:'top',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back'};
+ var key=String(word||'').trim().toUpperCase();
+ if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
+ if(!Object.prototype.hasOwnProperty.call(aliases,key))return false;
+ cad3dEndZoom();
+ setViewPreset(aliases[key]);
+ return true;
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
@@ -1419,6 +1449,10 @@ function bindCanvas(el){
   // Drawing takes precedence over navigation. Commit a point at pointerdown,
   // so a slight mouse movement or a lost pointerup cannot pan/orbit instead.
   // Alt+left, middle and right buttons remain available for navigation.
+  if(e.button===0&&cad3dZoomActive&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,zoom:true};
+   el.setPointerCapture(e.pointerId);return;
+  }
   if(e.button===0&&placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
    hideObjectContextMenu();
    placeAt(e);
@@ -1431,6 +1465,15 @@ function bindCanvas(el){
  });
  el.addEventListener('pointermove',function(e){
   if(dragging&&dragging.id===e.pointerId){
+   if(dragging.zoom){
+    var delta=e.clientY-dragging.lastY;
+    if(Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>4)dragging.moved=true;
+    if(dragging.moved&&Math.abs(delta)>.01){
+     orbit.dist=clamp(orbit.dist*Math.exp(delta*.012),1.4,450);
+     dragging.lastY=e.clientY;applyViewCamera();
+    }
+    return;
+   }
    var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
    if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>5){
     hideObjectContextMenu();
@@ -1449,6 +1492,12 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
+  if(dragging.zoom){
+   var zoomClick=!dragging.moved;
+   dragging=null;
+   if(zoomClick){orbit.dist=clamp(orbit.dist*(e.shiftKey?1.25:.8),1.4,450);applyViewCamera();}
+   return;
+  }
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;delete el.dataset.navigationDrag;
   if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
@@ -2836,6 +2885,7 @@ function updateDynamicReadout(e){
 }
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
+ if(cad3dViewAlias(raw))return;
  if(!raw){
   if(['wall','door','window','opening'].includes(placing)){
    var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
@@ -3133,6 +3183,7 @@ window.addEventListener('keydown',function(ev){
  }
  if(ev.key==='Escape'){
   ev.preventDefault();ev.stopImmediatePropagation();
+  cad3dEndZoom();
   if(dragging){
    var canvas=renderer?.domElement||fallbackCanvas;
    if(canvas){delete canvas.dataset.navigationDrag;try{if(canvas.hasPointerCapture(dragging.id))canvas.releasePointerCapture(dragging.id);}catch(_e){}}
@@ -3164,6 +3215,9 @@ window.addEventListener('keydown',function(ev){
  }
  if(/^[a-z0-9@.,-]$/i.test(ev.key)){
   ev.preventDefault();ev.stopImmediatePropagation();
+  if(['T','L','R','Z','B'].includes(ev.key.toUpperCase())){
+   cad3dViewAlias(ev.key);return;
+  }
   var input=root.querySelector('#cad3dCommand');input.focus({preventScroll:true});input.value+=ev.key;
  }
 },true);
