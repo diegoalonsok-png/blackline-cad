@@ -38,6 +38,7 @@ var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 cad3dHistoryNow=cad3dSnapshot();
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:true,azimuth:135,elevation:45,softness:2.5,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
+var cadPlanClassic=false;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -1962,7 +1963,7 @@ function addDoorPlanSymbols(wall,group){
    var phi=Math.PI*i/48;
    pts.push(new T.Vector3(pivot+hingeSign*reach*Math.cos(phi),dir*reach*Math.sin(phi),.025));
   }
-  var mat=new T.LineBasicMaterial({color:0x1d3d4e,depthTest:false,depthWrite:false});
+  var mat=new T.LineBasicMaterial({color:cadPlanClassic?0xd9e9f4:0x1d3d4e,depthTest:false,depthWrite:false});
   var arc=new T.Line(new T.BufferGeometry().setFromPoints(pts),mat);
   arc.userData.owner=wall.id;arc.userData.openingId=o.id;symbol.add(arc);
   var leaf=new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(pivot,0,.025),pts[pts.length-1]]),mat.clone());
@@ -2331,7 +2332,7 @@ function applyRenderStyle(){
  if(!T)return;
  var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
+ if(scene)scene.background=new T.Color(cadPlanClassic&&renderStyle==='wire2d'?0x151d27:sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
  if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:0x9ba5a8);
  if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
  if(axesHelper)axesHelper.visible=!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
@@ -2361,7 +2362,7 @@ function applyRenderStyle(){
   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines&&!isGlass;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
-   var colorEdge=sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
+   var colorEdge=cadPlanClassic&&renderStyle==='wire2d'?0xcfe3ed:sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
     color:colorEdge,depthTest:depthTest,depthWrite:false,
@@ -2373,6 +2374,7 @@ function applyRenderStyle(){
 }
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
+ if(mode!=='wire2d')cadPlanClassic=false;
  renderStyle=mode;
  if(renderer){applyRenderStyle();applySunSettings();}
  else renderStyleControls();
@@ -2489,13 +2491,14 @@ function syncViewControls(){
 }
 function setPlan2D(){
  setPlacement(null);openingTransfer=null;
- setViewPreset('top');setVisualStyle('wire2d');
+ setViewPreset('top');cadPlanClassic=true;setVisualStyle('wire2d');redraw();
  if(!draftModes.osnap){draftModes.osnap=true;renderDraftModes();}
  text('PLAN 2D · Planta ortográfica CAD · regla X/Y en metros · OSNAP activo · DIST para medir · Iso / 3D para volver');
 }
 function setViewPreset(key){
  var v=viewPresets.find(function(p){return p[0]===key;});
  if(!v)return;
+ if(key!=='top')cadPlanClassic=false;
  activeView=v[0];viewMode=v[2];orbit.az=v[3];orbit.el=v[4];
  if(viewMode==='walk')target.z=1.65;
  syncViewControls();applyViewCamera();
