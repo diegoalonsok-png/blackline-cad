@@ -3263,7 +3263,7 @@ function applyRenderStyle(){
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
-  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(!m.isMesh||!m.material||!m.geometry||m.userData.cadProfileFace)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
@@ -3336,7 +3336,7 @@ function setVisualStyle(mode){
   target:target?{x:target.x,y:target.y,z:target.z}:null};
  renderStyle=mode;
  if(isCad3DSketch(mode)){sunSettings.enabled=true;sunSettings.onGround=true;sunSettings.onFaces=true;}
- if(renderer)applyRenderStyle();
+ if(renderer){applyRenderStyle();highlight();}
  else renderStyleControls();
  if(isCad3DSketch(mode))applySunSettings();
  // A visual style is a material operation, never a camera preset.
