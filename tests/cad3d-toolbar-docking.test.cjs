@@ -67,9 +67,19 @@ test('real browser: toolbars compact, drag to bottom, re-dock to top and keep co
    const grip2=el.querySelector('.cad3dToolbarGrip'),p2=grip2.getBoundingClientRect(),xx=p2.left+p2.width/2,yy=p2.top+p2.height/2;
    ev('pointerdown',xx,yy,grip2);ev('pointermove',xx+20,yy-50,window);
    const tp=top.getBoundingClientRect();ev('pointermove',tp.left+40,tp.top+15,window);ev('pointerup',tp.left+40,tp.top+15,window);
-   return {docked,commandWorked,returned:el.parentNode.dataset.dockZone,saved:!!localStorage.getItem('blackline-cad3d-dock-layout-v2')};
+   const returned=el.parentNode.dataset.dockZone;
+   const g3=el.querySelector('.cad3dToolbarGrip'),p3=g3.getBoundingClientRect(),x3=p3.left+p3.width/2,y3=p3.top+p3.height/2;
+   ev('pointerdown',x3,y3,g3);ev('pointermove',x3+20,y3+55,window);
+   const body=r.querySelector('.body').getBoundingClientRect();
+   ev('pointermove',body.left+18,body.top+Math.min(130,body.height/2),window);
+   ev('pointerup',body.left+18,body.top+Math.min(130,body.height/2),window);
+   const lateral=el.parentNode.dataset.dockZone;
+   g3.dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));
+   return {docked,commandWorked,returned,lateral,reset:el.parentNode.dataset.dockZone,
+    saved:!!localStorage.getItem('blackline-cad3d-dock-layout-v2')};
   })()`);
   assert.equal(result.docked,'bottom');assert.equal(result.commandWorked,true);
-  assert.equal(result.returned,'top');assert.equal(result.saved,true);
+  assert.equal(result.returned,'top');assert.equal(result.lateral,'left');
+  assert.equal(result.reset,'top');assert.equal(result.saved,true);
  }finally{try{ws?.close();}catch(_){}proc.kill('SIGTERM');server.close();try{fs.rmSync(tmp,{recursive:true,force:true,maxRetries:8,retryDelay:100});}catch(_){} }
 });
