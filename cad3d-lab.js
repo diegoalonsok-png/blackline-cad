@@ -669,6 +669,14 @@ var CAD3D_RIBBON_NAMES={line:'Line',polyline:'Polyline',polygon:'Polygon',rect:'
  box:'Box',sphere:'Sphere',cylinder:'Cylinder',cone:'Cone',select:'Select',move:'Move',copy:'Copy',rotate:'Rotate',scale:'Scale',mirror:'Mirror',
  offset:'Offset',trim:'Trim',extend:'Extend',fillet:'Fillet',chamfer:'Chamfer',erase:'Erase',array:'Array',join:'Join',explode:'Explode',
  union:'Union',subtract:'Subtract',intersect:'Intersect'};
+var CAD3D_BLOCK_CURRENT='chair-1';
+var CAD3D_BLOCKS={
+ 'chair-1':{name:'Silla 1',w:.55,d:.55,h:.91,parts:[[0,0,.45,.53,.53,.09,0xa7825c],[0,.23,.68,.53,.07,.46,0xa7825c],[-.20,-.20,.21,.06,.06,.42,0x47545c],[.20,-.20,.21,.06,.06,.42,0x47545c],[-.20,.20,.21,.06,.06,.42,0x47545c],[.20,.20,.21,.06,.06,.42,0x47545c]]},
+ 'table-1':{name:'Mesa 1',w:1.60,d:.90,h:.76,parts:[[0,0,.72,1.60,.90,.08,0xa78965],[-.65,-.32,.35,.07,.07,.70,0x48565b],[.65,-.32,.35,.07,.07,.70,0x48565b],[-.65,.32,.35,.07,.07,.70,0x48565b],[.65,.32,.35,.07,.07,.70,0x48565b]]},
+ 'sofa-1':{name:'Sofá 1',w:2.20,d:.90,h:.90,parts:[[0,0,.30,2.20,.90,.40,0x8999a0],[0,.36,.62,2.20,.18,.54,0x687b85],[-1.03,0,.53,.14,.90,.48,0x687b85],[1.03,0,.53,.14,.90,.48,0x687b85],[-.50,-.08,.54,.90,.58,.12,0xaeb7bd],[.50,-.08,.54,.90,.58,.12,0xaeb7bd]]},
+ 'bed-1':{name:'Cama 1',w:2,d:2.1,h:.96,parts:[[0,0,.21,2,2.1,.42,0x79695f],[0,-.04,.47,1.92,1.91,.19,0xd9d7ce],[0,.99,.63,2,.12,.66,0x79695f],[-.45,.65,.61,.78,.37,.11,0xf1ede5],[.45,.65,.61,.78,.37,.11,0xf1ede5]]},
+ 'shelf-1':{name:'Estante 1',w:1.4,d:.38,h:2,parts:[[-.67,0,1,.06,.38,2,0x82715e],[.67,0,1,.06,.38,2,0x82715e],[0,0,.05,1.35,.38,.10,0x82715e],[0,0,.56,1.35,.38,.07,0x82715e],[0,0,1.07,1.35,.38,.07,0x82715e],[0,0,1.58,1.35,.38,.07,0x82715e],[0,0,1.96,1.35,.38,.07,0x82715e]]}
+};
 var CAD3D_RIBBON_ACTIVE=new Set(['select','move','copy','rotate','erase','box','sphere','cylinder','cone','union','subtract','intersect']);
 function cad3DRibbonMarkup(){
  return '<div class="cad3dRibbon" role="group" aria-label="CAD2D Draw and Modify inside CAD3D">'+
@@ -679,7 +687,9 @@ function cad3DRibbonMarkup(){
      return '<button type="button" class="btn" data-action="'+id+'"'+(enabled?'':' disabled aria-disabled="true"')+
       ' title="'+name+(enabled?' · CAD3D':' · pendiente de adaptar al plano 3D')+'">'+name+'</button>';
     }).join('')+'</div>';
-  }).join('')+'<span class="cad3dRibbonNote">Comandos grises: aún no implementados en CAD3D</span></div>';
+  }).join('')+'<div class="cad3dRibbonGroup" role="toolbar" aria-label="Biblioteca de bloques 3D"><strong>3D BLOCKS</strong>'+
+  Object.keys(CAD3D_BLOCKS).map(function(id){return '<button type="button" class="btn" data-action="block:'+id+'" title="Insertar '+CAD3D_BLOCKS[id].name+' como bloque 3D editable">'+CAD3D_BLOCKS[id].name+'</button>';}).join('')+'</div>'+
+  '<span class="cad3dRibbonNote">Comandos grises: aún no implementados en CAD3D</span></div>';
 }
 
 function build(){
@@ -1245,8 +1255,8 @@ function fallbackDraw(){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
    });
-  }else if(rec.type==='box'){
-   fallbackBox(projection,rec,rec.w,rec.d,rec.h,0,0,0,'#648b9f');
+  }else if(rec.type==='box'||rec.type==='block3d'){
+   fallbackBox(projection,rec,rec.w,rec.d,rec.h,0,0,0,rec.type==='block3d'?'#9b846f':'#648b9f');
   }else if(rec.type==='sphere'){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
@@ -1628,6 +1638,9 @@ function placePoint(pt){
   Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
    w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
    x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:slabStyle.slabKind==='roof'?2.8:0});
+ }else if(kind==='block3d'){
+  var definition=CAD3D_BLOCKS[CAD3D_BLOCK_CURRENT];if(!definition)return;
+  rec=newRecord('block3d');Object.assign(rec,{x:pt.x,y:pt.y,blockId:CAD3D_BLOCK_CURRENT,w:definition.w,d:definition.d,h:definition.h});
  }else if(['box','sphere','cylinder','cone'].includes(kind)){
   rec=newRecord(kind);rec.x=pt.x;rec.y=pt.y;
  }
@@ -2130,6 +2143,10 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
+ if(r.type==='block3d'&&CAD3D_BLOCKS[r.blockId]){
+  var definition=CAD3D_BLOCKS[r.blockId];
+  definition.parts.forEach(function(part){var g=boxGeom(part[3],part[4],part[5]);addMesh(g,part[6],r.id,group,part[0],part[1],part[2]-part[5]/2);});
+ }
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
  if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
   var g=boxGeom(w,d,h);
@@ -2206,6 +2223,7 @@ function renderProps(){
  var keys=focus?[]:['x','y','z'];
  if(!focus&&r.type!=='boolean')keys.push('rot');
  if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'))keys.push('w','d','h');
+ if(!focus&&r.type==='block3d')html+='<div class="detail">Bloque 3D: '+escapeHtml(CAD3D_BLOCKS[r.blockId]?.name||r.blockId)+' · mover, copiar y rotar; dimensiones de catálogo</div>';
  if(!focus&&r.type==='slab')keys.push('pitch');
  if(!focus&&r.type==='sphere')keys.push('radius');
  if(!focus&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
@@ -2933,6 +2951,10 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
+ if(a.startsWith('block:')){
+  var id=a.slice(6);if(!CAD3D_BLOCKS[id])return false;
+  CAD3D_BLOCK_CURRENT=id;setPlacement('block3d');text('Bloque '+CAD3D_BLOCKS[id].name+' · clic en el plano para colocarlo');return true;
+ }
  if(a==='select'){setPlacement(null);text('Select · clic sobre un objeto para seleccionarlo');return true;}
  if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
