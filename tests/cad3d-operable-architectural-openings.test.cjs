@@ -60,7 +60,7 @@ test('Right-side Properties has leaves, operation, hinge, swing, open and close 
   assert(panel.innerHTML.includes(token),token);
 });
 test('Opening selections are saved and sanitized on import of 3DJSON',()=>{
- const importCode=extract('async function readJSON(e){','function download(');
+ const importCode=source.slice(source.indexOf('async function readJSON(e){'));
  for(const field of ['op.openAngle=clamp','op.openPercent=clamp','op.leaves=clamp','op.hinge=','op.swing=','op.operation='])
   assert(importCode.includes(field),field);
 });
