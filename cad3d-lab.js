@@ -50,7 +50,14 @@ var icons={
  dist:'<path d="M3 16 16 3l5 5L8 21zM8 11l2 2m1-5 2 2m1-5 2 2"/>',
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
-var css=`
+var css=`/* CAD3D own basic Draw + Modify ribbons, preserving CAD2D. */
+#cad3dLab .cad3dBasicBars{display:flex;align-items:center;gap:8px;flex:none;overflow-x:auto;scrollbar-width:thin;padding:5px 9px;background:#172530;border-bottom:1px solid #4c6576;min-height:42px}
+#cad3dLab .cad3dBasicBars .cad3dBar{display:flex;align-items:center;gap:3px;flex:none}
+#cad3dLab .cad3dBasicBars .cad3dBar strong{font:700 10px Inter,Arial,sans-serif;color:#b9c8d3;margin:0 5px 0 2px}
+#cad3dLab .cad3dBasicBars .btn{padding:5px 7px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:28px;font-size:11px}
+#cad3dLab .cad3dBasicBars svg{width:16px;height:16px;flex:none}
+#cad3dLab .cad3dBasicBars .armed{background:#31536a;outline:1px solid #98d9f1}
+
 .app .tabbar #cad3dOpen {
  align-self:center; justify-content:center; flex:none; min-width:54px; height:24px!important;
  padding:0 15px!important; border:1px solid var(--cad-ui-edge)!important; border-radius:6px!important;
@@ -631,12 +638,26 @@ function launch(){
  var toolStatus=bar.querySelector('#blToolStatus');bar.insertBefore(b,toolStatus||null);
  b.addEventListener('click',open);
 }
+function cad3dBasicBars(){
+ return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
+  '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
+   tool('wall','Wall','wall')+tool('slab','Slab','slab')+tool('floor','Floor','floor')+
+   tool('door','Door','door')+tool('window','Window','window')+
+   tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
+   tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
+  '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
+   tool('select','Select','cube')+tool('move','Move','move')+tool('copy','Copy','copy')+
+   tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+
+   tool('union','Union','union')+tool('subtract','Subtract','subtract')+
+   tool('intersect','Intersect','intersect')+'</div></div>';
+}
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
  root.innerHTML='<div class="head"><strong>BLACKLINE · CAD3D</strong><div class="stretch"></div>'+
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
+ cad3dBasicBars()+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
  '<div class="solidTools" role="toolbar" aria-label="Architectural modeling, Draw and Modify">'+
  '<div class="toolGroup" role="group" aria-label="Architectural 3D"><strong>Architecture</strong>'+
@@ -766,7 +787,7 @@ function build(){
  root.querySelector('.edgeResizeR').addEventListener('pointerdown',beginResize);
  root.querySelector('.edgeResizeB').addEventListener('pointerdown',beginResize);
  root.addEventListener('click',function(e){
-  var button=e.target.closest('.tools [data-action]'), menu=e.target.closest('.ioMenu');
+  var button=e.target.closest('.tools [data-action], .cad3dBasicBars [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
@@ -1009,7 +1030,7 @@ function toggleDraftMode(mode){
 function setPlacement(which){
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
- root.querySelectorAll('.solidTools button').forEach(function(b){
+ root.querySelectorAll('.solidTools button, .cad3dBasicBars button').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
@@ -2852,6 +2873,7 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
+ if(a==='select'){setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
