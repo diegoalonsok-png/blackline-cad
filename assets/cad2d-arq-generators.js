@@ -767,6 +767,151 @@ one('pv-parada-falda-fre','Persona con falda · vista frontal',PV,.60,1.70,(b,W,
 one('pv-brazos-cruzados-fre','Persona con manos adelante · vista frontal',PV,.60,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:W/2,armsIn:true})},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.9,dMax:2.1});
 one('pv-sentado-fre','Persona sentada · vista frontal',PV,.60,1.30,(b,W,D)=>{const s=D/1.30;frontal(b,s,{x:W/2,sit:true});b.rect(W/2-.24*s,.43*s,.48*s,.04*s)},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.8,dMax:1.6});
 one('pv-grupo-fre','Grupo de tres personas · vista frontal',PV,1.70,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:.32*s});frontal(b,s*.96,{x:.85*s,skirt:true});frontal(b,s*.62,{x:1.35*s})},{family:'pers-vista',wMin:1.2,wMax:2.4,dMin:1.2,dMax:2.1});
+
+/* Diseño contemporáneo 2026: biblioteca original de equipamiento en planta.
+ * Cada objeto se regenera al modificar W/D (pinzas ARQ), en metros y con detalles reales
+ * de planta. No se incluyen bloques ni marcas de terceros. */
+const MOD='Diseño contemporáneo',MOD_ARQ='Carpintería contemporánea',MOD_EXT='Paisajismo contemporáneo';
+const modRange=(family,wMin,wMax,dMin,dMax)=>({family,wMin,wMax,dMin,dMax});
+const ellipseSeat=(b,x,y,rx,ry)=>{b.ellipse(x,y,rx,ry);b.ellipse(x,y,rx*.86,ry*.82)};
+const barLine=(b,x,y,w,h)=>b.rrect(x,y,w,h,Math.min(.03,h/2,w/2));
+one('modern-sofa-3','Sofá modular de 3 cuerpos',MOD,2.70,1.05,(b,W,D)=>{
+ b.rrect(0,0,W,D,.09);b.rrect(.09,.10,W-.18,D-.29,.07);
+ b.rrect(.02,.10,.17,D-.18,.04);b.rrect(W-.19,.10,.17,D-.18,.04);
+ b.rrect(.16,D-.25,W-.32,.20,.07);
+ for(let i=1;i<3;i++)b.line(.17+(W-.34)*i/3,.14,.17+(W-.34)*i/3,D-.26);
+},modRange('modern-sofa',2.00,3.50,.88,1.20));
+one('modern-sofa-chaise','Sofá con chaise longue',MOD,3.00,1.70,(b,W,D)=>{
+ const ch=Math.min(1.02,W*.34),base=Math.min(1.02,D*.65);
+ b.rrect(0,0,W,base,.075);b.rrect(0,base-.09,ch,D-base+.09,.06);
+ b.rrect(.07,.09,W-.14,base-.28,.05);b.rrect(.08,base+.03,ch-.16,D-base-.12,.06);
+ b.rrect(.08,.02,.13,base-.04,.035);b.rrect(W-.21,.02,.13,base-.04,.035);
+ b.rrect(.18,base-.18,W-.36,.12,.035);
+ for(let i=1;i<=2;i++){const x=ch+(W-ch)*i/3;b.line(x,.15,x,base-.19)}
+},modRange('modern-sofa',2.50,3.80,1.35,2.00));
+one('modern-sofa-curvo','Sofá curvo de diseño',MOD,2.50,1.15,(b,W,D)=>{
+ const n=24,outer=[],inner=[];for(let i=0;i<=n;i++){
+  const t=Math.PI*i/n,x=.12+(W-.24)*i/n,y=D*.37+Math.sin(t)*D*.53;
+  outer.push([x,y]);inner.push([x,D*.19+Math.sin(t)*D*.32]);
+ }
+ b.poly(outer.concat(inner.reverse()),true);b.poly(outer,false);b.line(.12,D*.20,W-.12,D*.20);
+ for(let i=1;i<=3;i++){const x=.12+(W-.24)*i/4;b.line(x,D*.25,x,D*.35+Math.sin(Math.PI*i/4)*D*.35)}
+},modRange('modern-sofa',2.10,3.30,.95,1.45));
+one('modern-sillon-organico','Sillón lounge orgánico',MOD,.90,.90,(b,W,D)=>{
+ ellipseSeat(b,W/2,D*.50,W*.43,D*.43);b.arc(W/2,D*.57,Math.min(W,D)*.34,18,162);
+ b.ellipse(W*.11,D*.49,W*.08,D*.20);b.ellipse(W*.89,D*.49,W*.08,D*.20);
+},modRange('modern-lounge',.75,1.20,.75,1.15));
+one('modern-silla-carcasa','Silla de carcasa curvada',MOD,.56,.54,(b,W,D)=>{
+ b.rrect(.04,.04,W-.08,D-.08,.08);b.rrect(.08,.09,W-.16,D*.55,.08);
+ b.arc(W/2,D*.58,Math.min(W*.42,D*.38),5,175);
+ b.line(.10,D-.06,W-.10,D-.06);
+},modRange('modern-silla',.48,.70,.48,.70));
+one('modern-silla-cantilever','Silla de diseño en voladizo',MOD,.55,.60,(b,W,D)=>{
+ b.rrect(.06,.06,W-.12,D-.14,.07);b.rrect(.08,D*.68,W-.16,D*.20,.04);
+ b.line(.10,.08,.10,D-.10);b.line(W-.10,.08,W-.10,D-.10);
+ b.line(.10,.08,W-.10,.08);
+},modRange('modern-silla',.49,.75,.55,.75));
+one('modern-mesa-oval','Mesa comedor ovalada',MOD,2.20,1.00,(b,W,D)=>{
+ b.ellipse(W/2,D/2,W/2-.02,D/2-.02);b.ellipse(W/2,D/2,W/2-.085,D/2-.085);
+ b.circle(W/2,D/2,.08);b.line(W/2-.28,D/2,W/2+.28,D/2);
+},modRange('modern-mesa-comedor',1.60,3.20,.80,1.30));
+one('modern-mesa-pedestal','Mesa redonda con pedestal',MOD,1.30,1.30,(b,W,D)=>{
+ const r=Math.min(W,D)/2-.025;b.circle(W/2,D/2,r);b.circle(W/2,D/2,r-.045);
+ b.circle(W/2,D/2,Math.min(.22,r*.45));b.circle(W/2,D/2,.055);
+},modRange('modern-mesa-comedor',.90,1.80,.90,1.80));
+one('modern-banco','Banco tapizado contemporáneo',MOD,1.80,.52,(b,W,D)=>{
+ b.rrect(0,0,W,D,.05);b.rrect(.06,.07,W-.12,D-.14,.05);
+ for(let i=1;i<4;i++)b.line(W*i/4,.08,W*i/4,D-.08);
+},modRange('modern-banco',1.10,2.80,.44,.70));
+one('modern-mesas-nido','Mesas ratonas anidadas',MOD,1.30,.85,(b,W,D)=>{
+ b.ellipse(W*.34,D*.49,W*.31,D*.44);b.ellipse(W*.73,D*.46,W*.24,D*.34);
+ b.ellipse(W*.34,D*.49,W*.265,D*.37);b.ellipse(W*.73,D*.46,W*.195,D*.29);
+},modRange('modern-mesas-nido',1.05,1.90,.70,1.20));
+one('modern-buffet','Aparador bajo de diseño',MOD,2.10,.48,(b,W,D)=>{
+ b.rrect(0,0,W,D,.025);b.rrect(.03,.04,W-.06,D-.08,.02);
+ for(let i=1;i<4;i++)b.line(W*i/4,.04,W*i/4,D-.04);
+ for(let i=0;i<4;i++)barLine(b,W*(i+.5)/4-.055,D*.70,.11,.018);
+},modRange('modern-guardado',1.20,3.00,.40,.65));
+one('modern-mueble-tv','Consola multimedia flotante',MOD,2.20,.45,(b,W,D)=>{
+ b.rrect(0,0,W,D,.02);b.line(.06,D*.5,W-.06,D*.5);
+ for(let i=1;i<3;i++)b.line(W*i/3,.03,W*i/3,D-.03);
+ for(let i=0;i<3;i++)barLine(b,W*(i+.5)/3-.05,D*.65,.10,.016);
+},modRange('modern-guardado',1.30,3.40,.36,.65));
+one('modern-escritorio','Escritorio moderno con gestión de cables',MOD,1.60,.75,(b,W,D)=>{
+ b.rrect(0,0,W,D,.035);b.rrect(.04,.04,W-.08,D-.08,.025);
+ b.rect(W-.44,.08,.34,D-.16);b.circle(W*.55,D-.09,.032);
+ for(let i=0;i<2;i++)barLine(b,W-.395,D*.30+i*.20,.22,.015);
+},modRange('modern-escritorio',1.20,2.40,.65,1.00));
+one('modern-puestos-4','Cowork · cuatro estaciones',MOD,3.20,1.75,(b,W,D)=>{
+ b.rrect(.10,.10,W-.20,D-.20,.03);b.line(W/2,.10,W/2,D-.10);b.line(.10,D/2,W-.10,D/2);
+ for(let j=0;j<2;j++)for(let i=0;i<2;i++){
+  const cx=W*(i+.25)/2,cy=D*(j+.25)/2;
+  b.rrect(cx-.18,cy-.08,.36,.16,.02);b.circle(cx,cy+.15,.035);
+ }
+},modRange('modern-cowork',2.80,4.60,1.50,2.20));
+one('modern-cama-plataforma','Cama plataforma contemporánea',MOD,1.90,2.20,(b,W,D)=>{
+ b.rrect(0,0,W,D,.035);b.rrect(.09,.12,W-.18,D-.26,.06);
+ b.rrect(.06,D-.23,W-.12,.18,.045);b.line(W/2,.14,W/2,D-.24);
+ for(let i=0;i<2;i++)b.rrect(.14+i*(W-.28)/2,D*.68,(W-.30)/2,D*.18,.07);
+},modRange('modern-cama',1.55,2.40,2.05,2.55));
+one('modern-placard','Placard contemporáneo de hojas corredizas',MOD,2.40,.65,(b,W,D)=>{
+ b.rect(0,0,W,D);b.rect(.035,.035,W-.07,D-.07);
+ b.line(W/2,.035,W/2,D-.035);b.line(.035,D*.28,W-.035,D*.28);
+ b.line(.035,D*.72,W-.035,D*.72);
+ barLine(b,W/2-.17,D*.35,.11,.018);barLine(b,W/2+.06,D*.59,.11,.018);
+},modRange('modern-placard',1.40,4.00,.55,.80));
+one('modern-isla-cocina','Isla de cocina con 3 banquetas',MOD,2.40,1.35,(b,W,D)=>{
+ const dep=D*.68;b.rrect(.07,.06,W-.14,dep-.10,.04);
+ b.rrect(.15,.13,W*.42,dep-.25,.07);b.circle(W*.36,dep*.43,.028);
+ for(let j=0;j<4;j++){const x=W*.67+(j%2)*W*.10,y=dep*.30+Math.floor(j/2)*dep*.23;b.circle(x,y,.055);b.circle(x,y,.025)}
+ for(let i=1;i<=3;i++)ellipseSeat(b,W*i/4,D*.83,.19,.17);
+},modRange('modern-cocina',1.80,3.80,1.15,1.70));
+one('modern-peninsula','Península de cocina con barra',MOD,2.40,1.00,(b,W,D)=>{
+ b.rrect(0,0,W,D*.67,.035);b.rrect(.08,.08,W*.40,D*.67-.16,.05);
+ for(let i=1;i<=3;i++)ellipseSeat(b,W*i/4,D*.84,.16,.12);
+ b.line(.035,D*.61,W-.035,D*.61);
+},modRange('modern-cocina',1.75,3.70,.85,1.40));
+one('modern-vanitory','Vanitory suspendido de doble bacha',MOD,1.50,.53,(b,W,D)=>{
+ b.rrect(0,0,W,D,.035);b.line(.05,.06,W-.05,.06);
+ for(let i=0;i<2;i++){const x=W*(i+.5)/2;b.ellipse(x,D*.56,Math.min(.21,W*.17),D*.25);b.circle(x,D*.56,.02);b.circle(x,.08,.014)}
+},modRange('modern-bano',1.10,2.40,.45,.62));
+one('modern-ducha','Ducha walk-in con mampara',MOD,1.50,.95,(b,W,D)=>{
+ b.rect(0,0,W,D);b.line(.04,.04,W-.04,D-.04,{dashed:true});b.line(.04,D-.04,W-.04,.04,{dashed:true});
+ b.circle(W*.20,D*.80,.055);barLine(b,W*.70,.07,W*.20,.035);
+ b.line(0,D,W*.72,D,{width:.20});
+},modRange('modern-bano',1.10,2.10,.85,1.30));
+one('modern-banera','Bañera exenta ovalada',MOD,1.80,.80,(b,W,D)=>{
+ b.ellipse(W/2,D/2,W/2-.02,D/2-.02);b.ellipse(W/2,D/2,W/2-.10,D/2-.10);
+ b.circle(W*.81,D/2,.035);b.circle(W*.88,D/2,.018);
+},modRange('modern-bano',1.50,2.20,.70,1.00));
+one('modern-macetero','Macetero lineal con vegetación',MOD_EXT,2.00,.60,(b,W,D)=>{
+ b.rrect(0,0,W,D,.05);b.rrect(.04,.04,W-.08,D-.08,.045);
+ const n=Math.max(2,Math.floor(W/.32));for(let i=0;i<n;i++){
+  const x=W*(i+.5)/n; b.circle(x,D/2,Math.min(D*.28,W/n*.30));b.circle(x,D/2,.045)
+ }
+},modRange('modern-macetero',1.00,4.50,.45,.90));
+one('modern-pergola','Pérgola contemporánea · lamas',MOD_EXT,4.00,2.80,(b,W,D)=>{
+ b.rect(0,0,W,D);
+ for(let i=0;i<4;i++)b.rect(.08+i*(W-.25)/3-.04,.08,.08,D-.16);
+ for(let j=0;j<Math.max(3,Math.round(D/.35));j++){const y=D*(j+.5)/Math.max(3,Math.round(D/.35));b.line(.06,y,W-.06,y,{width:.12})}
+ for(const x of[.10,W-.10])for(const y of[.10,D-.10])b.circle(x,y,.045);
+},modRange('modern-pergola',2.40,8.00,2.00,5.00));
+one('modern-arbol-irregular','Árbol frondoso · copa natural',MOD_EXT,3.80,3.80,(b,W,D)=>{
+ const cx=W/2,cy=D/2,n=40,pts=[];for(let i=0;i<n;i++){const a=i/n*2*Math.PI,r=(.41+.035*Math.sin(i*2.7)+.025*Math.cos(i*4.1));pts.push([cx+W*r*Math.cos(a),cy+D*r*Math.sin(a)])}
+ b.poly(pts,true);b.circle(cx,cy,.16);for(let i=0;i<8;i++){const a=i*Math.PI/4;b.line(cx,cy,cx+W*.31*Math.cos(a),cy+D*.31*Math.sin(a))}
+},modRange('modern-arbol',2.50,6.50,2.50,6.50));
+one('modern-puerta-pivot','Puerta pivotante de acceso · planta',MOD_ARQ,1.30,.98,(b,W,D)=>{
+ b.rect(0,0,.06,.17);b.rect(W-.06,0,.06,.17);
+ const pivot=.25;b.circle(pivot,.12,.025);b.line(pivot,.12,W-.08,.12);
+ b.arc(pivot,.12,Math.min(W*.65,D*.75),0,86,{dashed:true});
+},modRange('modern-puerta',1.10,1.80,.90,1.60));
+one('modern-puerta-triple','Corredera triple · planta',MOD_ARQ,3.60,.26,(b,W,D)=>{
+ b.rect(0,0,W,D);for(let j=0;j<3;j++){
+  const y=D*(j+.5)/3;b.line(.06,y,W-.06,y);
+  b.line(.06+(W-.12)*j/3,y,.06+(W-.12)*(j+1)/3,y,{width:.16});
+ }
+},modRange('modern-corredera',2.40,6.50,.20,.40));
+
 const api={library:LIB,build,bounds,categories:[...new Set(LIB.map(x=>x.cat))],Builder,F};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.CAD2D_ARQ_LIBRARY=api;
