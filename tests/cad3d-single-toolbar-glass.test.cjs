@@ -10,7 +10,7 @@ function section(a,b){
 }
 test('CAD3D source compiles and has one active Draw/Modify ribbon',()=>{
  assert.doesNotThrow(()=>new vm.Script(src));
- const build=section('function build(){','function renderArchPalette()');
+ const build=section('function build(){','function moveWindow(e)');
  assert(build.includes('cad3dBasicBars()+'));
  assert(!build.includes("'<div class=\"solidTools\""));
  const bars=section('function cad3dBasicBars(){','function build(){');
