@@ -1619,6 +1619,41 @@ function addWallAttachments(wall,group){
   mesh.userData.owner=wall.id;mesh.castShadow=true;mesh.receiveShadow=sunSettings.onFaces;group.add(mesh);
  });
 }
+/* Schematic frames and infill for non-rectangular openings.
+   The host and its attached extrusions remain genuinely cut, while doors and
+   glazed windows retain a readable architectural appearance. */
+function addShapedOpenings(wall,group){
+ (wall.openings||[]).forEach(function(o){
+  if(!o||!['round','arch','segment','triangle','pointed'].includes(o.shape))return;
+  var points=[],n=48,left=o.offset-o.w/2,right=o.offset+o.w/2;
+  for(var i=0;i<=n;i++){
+   var x=left+(right-left)*i/n,span=openingSpanAtX(o,x+(i===0?1e-7:i===n?-1e-7:0));
+   if(span)points.push([x,span[1]]);
+  }
+  for(var j=n;j>=0;j--){
+   var bx=left+(right-left)*j/n,lower=openingSpanAtX(o,bx+(j===0?1e-7:j===n?-1e-7:0));
+   if(lower)points.push([bx,lower[0]]);
+  }
+  if(points.length<4)return;
+  var outline=new T.Shape();
+  points.forEach(function(p,i){if(i)outline.lineTo(p[0],p[1]);else outline.moveTo(p[0],p[1]);});
+  outline.closePath();
+  if(o.kind!=='opening'&&o.styleId!=='open-door'){
+   var mesh=new T.Mesh(new T.ExtrudeGeometry(outline,{depth:.025,bevelEnabled:false,steps:1}),new T.MeshStandardMaterial({
+    color:o.kind==='window'?0x5794a8:0x987e66,
+    transparent:o.kind==='window',opacity:o.kind==='window'?.55:1,roughness:o.kind==='window'?.18:.7,side:T.DoubleSide
+   }));
+   mesh.rotation.x=Math.PI/2;mesh.position.y=.0125;mesh.userData.owner=wall.id;
+   mesh.castShadow=true;mesh.receiveShadow=sunSettings.onFaces;group.add(mesh);
+  }
+  for(var side of [-1,1]){
+   var path=points.map(function(p){return new T.Vector3(p[0],side*(wall.d/2+.012),p[1]);});
+   var line=new T.LineLoop(new T.BufferGeometry().setFromPoints(path),
+    new T.LineBasicMaterial({color:0x788993}));
+   line.userData.owner=wall.id;group.add(line);
+  }
+ });
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
@@ -1634,6 +1669,7 @@ function buildObject(r){
   addMesh(g,color,r.id,group,x,y,z);
  });
  if(r.type==='wall')addWallAttachments(r,group);
+ if(r.type==='wall')addShapedOpenings(r,group);
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
   var cone=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);
