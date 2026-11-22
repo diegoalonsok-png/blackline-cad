@@ -5,6 +5,34 @@ if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
+/* CAD2D-style reversible record history (bounded to avoid memory growth).
+   Tracks parametric records, layers and layer selection, not camera moves. */
+var cad3dUndo=[],cad3dRedo=[],cad3dHistoryNow=null,cad3dHistoryRestoring=false;
+function cad3dSnapshot(){
+ return JSON.stringify({records:records,layers:layers,currentLayer:currentLayer});
+}
+function cad3dTrackChange(){
+ var next=cad3dSnapshot();
+ if(cad3dHistoryNow===null){cad3dHistoryNow=next;return;}
+ if(cad3dHistoryRestoring||next===cad3dHistoryNow)return;
+ cad3dUndo.push(cad3dHistoryNow);
+ if(cad3dUndo.length>80)cad3dUndo.shift();
+ cad3dHistoryNow=next;cad3dRedo.length=0;
+}
+function cad3dHistoryStep(backward){
+ var source=backward?cad3dUndo:cad3dRedo,other=backward?cad3dRedo:cad3dUndo;
+ if(!source.length){text(backward?'UNDO: no hay cambios para deshacer':'REDO: no hay cambios para rehacer');return;}
+ other.push(cad3dSnapshot());if(other.length>80)other.shift();
+ var data=JSON.parse(source.pop());
+ cad3dHistoryRestoring=true;
+ try{
+  records=data.records;layers=data.layers;currentLayer=data.currentLayer;
+  cad3dHistoryNow=cad3dSnapshot();selected=[];
+  setPlacement(null);renderLayerPanel();redraw();renderProps();
+ }finally{cad3dHistoryRestoring=false;}
+ text(backward?'UNDO: cambio revertido':'REDO: cambio restaurado');
+}
+
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:true,azimuth:135,elevation:45,softness:2.5,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
@@ -1800,6 +1828,7 @@ function visitMeshes(visitor){
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
+ cad3dTrackChange();
  if(fallbackCanvas){fallbackDraw();return;}
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
@@ -2291,10 +2320,31 @@ function run3DCommand(){
   if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
   placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
  }
- var aliases={MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
+ var aliases={
+ MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',
+ VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',
+ DI:'dist',U:'undo',DESHACER:'undo',REHACER:'redo',RE:'regen',
+ SELECCIONARTODO:'selectall',TODO:'selectall',BORRAR:'erase',
+ GUARDAR:'save',GUARDARCOMO:'save',QSAVE:'save',SAVEAS:'save',SAVE:'save',
+ ABRIR:'open',OPEN:'open',EXPORTAR:'export',EXPORT:'export',
+ REGENERAR:'regen',REDRAW:'regen',REGENALL:'regen',
+ ENCUADRAR:'zoom',ZE:'zoom',ZOOMEXTENTS:'zoom'
+};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
+ if(command==='undo'){cad3dHistoryStep(true);return;}
+ if(command==='redo'){cad3dHistoryStep(false);return;}
+ if(command==='selectall'||command==='all'){
+  selected=records.filter(editableRecord).map(function(r){return r.id;});
+  renderProps();highlight();text(selected.length+' objetos seleccionados');return;
+ }
+ if(command==='regen'||command==='re'){
+  redraw();renderProps();text('REGEN: vista y sólidos 3D regenerados');return;
+ }
+ if(command==='save'||command==='qsave'||command==='saveas'){exportJSON();return;}
+ if(command==='open'){root.querySelector('.fileInput').click();return;}
+ if(command==='export'){exportDXF();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
  if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
@@ -2576,6 +2626,10 @@ window.addEventListener('keydown',function(ev){
   if(placing){ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');}
   else if(!root.querySelector('.archPalette').hidden){ev.preventDefault();ev.stopImmediatePropagation();showArchPalette(false);}
   return;
+ }
+ if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&['z','y'].includes(ev.key.toLowerCase())&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  cad3dHistoryStep(ev.key.toLowerCase()==='y'||ev.shiftKey?false:true);return;
  }
  if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
  var key=ev.key.toLowerCase();
