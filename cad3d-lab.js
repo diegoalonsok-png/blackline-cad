@@ -3,6 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
+var selectedOpeningId=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
@@ -1223,7 +1224,7 @@ function placeOpening(e){
   return Math.max(other.sill||0,op.sill||0)<Math.min((other.sill||0)+(other.h||0),(op.sill||0)+op.h)+.015;
  });
  if(overlaps){text('La abertura se superpone a otra existente. Elegí otro lugar del muro.');return;}
- rec.openings.push(op);selected=[rec.id];redraw();renderProps();
+ rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
   ' · '+rec.openings.length+' abertura(s) en este elemento · clic para colocar otra · Enter / Esc termina');
@@ -1295,6 +1296,7 @@ function selectAt(e){
    if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
   });
   var id=wallOrSlab?.host.id??best?.id;
+  selectedOpeningId=null;
   if(id==null){if(!e.shiftKey)selected=[];}
   else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
   else selected=[id];
@@ -1306,15 +1308,26 @@ function selectAt(e){
  raycaster.setFromCamera(p,camera);
  var hits=[];modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
- var hit=intersects.find(function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});});
- var id=hit?hit.object.userData.owner:null;
- if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
- renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
+ var eligible=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
+ var visibleHits=intersects.filter(eligible),front=visibleHits[0]||null;
+ var tagged=front&&visibleHits.find(function(item){
+  if(item.object.userData.openingId==null||item.object.userData.owner!==front.object.userData.owner)return false;
+  var host=records.find(function(r){return r.id===item.object.userData.owner;});
+  return item.distance<=front.distance+Math.max(.12,Math.min(.7,(host?.d||.2)*2+.2));
+ });
+ var hit=tagged||front,id=hit?hit.object.userData.owner:null;
+ if(id===null){if(!e.shiftKey)selected=[];selectedOpeningId=null;}
+ else if(e.shiftKey){
+  var already=selected.includes(id);
+  selected=already?selected.filter(function(n){return n!==id;}):selected.concat(id);
+  selectedOpeningId=already?null:(hit.object.userData.openingId??null);
+ }else{selected=[id];selectedOpeningId=hit.object.userData.openingId??null;}
+ renderProps();highlight();text(selectedOpeningId!=null?'Carpintería seleccionada: Model, Width, Height y Sill en Properties':selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);
+ m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);return m;
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
@@ -1338,6 +1351,7 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
+  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
   if(opening.kind==='opening'||opening.styleId==='open-door')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
@@ -1347,32 +1361,32 @@ function architectureParts(r,part){
    var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
    var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
    // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   part(panelW,depth,panelH,x,0,z,leafColor,0);
-   part(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
+   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
+   carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
    if(doubleDoor||sliding){
-    part(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
+    carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
    }
    if(doorType==='garage-door'){
-    for(var rail=1;rail<5;rail++)part(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
+    for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
    }
    if(glazed){
-    part(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
+    carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
    }
    if(doorType==='pivot-door'){
-    part(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
+    carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
    }
   }else{
    var d=thickness+.03,windowType=opening.styleId||'';
-   part(w,d,frame,x,0,z,0xb5c4cc,0);
-   part(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
-   part(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
-   part(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   part(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
+   carpPart(w,d,frame,x,0,z,0xb5c4cc,0);
+   carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
+   carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
+   carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
+   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
    if(/double|sliding|two-leaf/.test(windowType)){
-    part(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
+    carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
    }
    if(/awning|hopper|clerestory|ribbon/.test(windowType)){
-    part(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
+    carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
    }
   }
  });
@@ -1461,7 +1475,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1469,7 +1483,8 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  addMesh(g,color,r.id,group,x,y,z);
+  var component=addMesh(g,color,r.id,group,x,y,z);
+  if(openingId!=null)component.userData.openingId=openingId;
  });
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
@@ -1501,7 +1516,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
