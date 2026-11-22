@@ -1963,13 +1963,15 @@ function architectureParts(r,part){
   var innerW=Math.max(.06,w-2*frame),leafW=innerW/leaves,leafH=Math.max(.06,h-2*frame);
   var left=o.left+frame,door=opening.kind==='door';
   var color=door?0x88745e:0x528a9b;
-  // The fixed frame remains in the wall void even while the leaves rotate or slide.
-  carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x9aafb9,0);
-  if(!door){
-   carpPart(w,thickness+.02,frame,x,0,z,0xa9bec7,0);
-   carpPart(frame,thickness+.03,h,o.left+frame/2,0,z,0xa9bec7,0);
-   carpPart(frame,thickness+.03,h,o.right-frame/2,0,z,0xa9bec7,0);
-  }
+  // The fixed perimeter frame belongs to both doors and windows.
+  // Keep it separate from leaf motion so opening/closing never removes the jambs.
+  var frameColor=door?0xb4bec5:0xa9bec7;
+  var frameDepth=thickness+.04;
+  carpPart(w,frameDepth,frame,x,0,z+h-frame,frameColor,0);
+  if(!door)carpPart(w,frameDepth,frame,x,0,z,frameColor,0);
+  // Full-height side jambs are intentionally present on doors, too.
+  carpPart(frame,frameDepth,h-frame,o.left+frame/2,0,z,frameColor,0);
+  carpPart(frame,frameDepth,h-frame,o.right-frame/2,0,z,frameColor,0);
   for(var leaf=0;leaf<leaves;leaf++){
    var x0=left+leaf*leafW,x1=x0+leafW,leafCenter=(x0+x1)/2;
    var motion=typeof cad3DLeafMotion==='function'?
