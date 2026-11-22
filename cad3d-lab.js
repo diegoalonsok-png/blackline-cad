@@ -763,7 +763,7 @@ function applySunSettings(){
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){var solid=!o.userData.cadGlass;o.receiveShadow=solid&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=solid&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){var solid=!o.userData.cadGlass&&!o.userData.cadPickProxy;o.receiveShadow=solid&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=solid&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
@@ -1563,6 +1563,62 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
  }
  positions.needsUpdate=true;g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
 }
+/* Real moving sash assemblies. The opening stays inside its original host wall;
+   all panels carry their own opening ID, including invisible selection surfaces. */
+function addCadOpeningLeaves(wall,group){
+ (wall.openings||[]).forEach(function(o){
+  if(o.kind!=='door'&&o.kind!=='window')return;
+  var motion=cadOpeningMotion(o),active=cadOpeningActive(o),clear=cadOpeningIsGlass(o);
+  var margin=Math.min(.045,o.w/10,o.h/10);
+  // A transparent hit face on both sides makes the object selectable even
+  // when the surface is inset, or when the leaf has been opened.
+  for(var face of [-1,1]){
+   var proxy=new T.Mesh(boxGeom(Math.max(.03,o.w-2*margin),.006,Math.max(.03,o.h-2*margin)),
+    new T.MeshBasicMaterial({color:0xffffff,side:T.DoubleSide,colorWrite:false,depthWrite:false,transparent:true,opacity:0}));
+   proxy.position.set(o.offset,face*(wall.d/2+.025),o.sill+margin);
+   proxy.userData.owner=wall.id;proxy.userData.openingId=o.id;proxy.userData.cadPickProxy=true;
+   proxy.castShadow=false;proxy.receiveShadow=false;group.add(proxy);
+  }
+  if(motion==='fixed'||!active)return;
+  var totalW=Math.max(.08,o.w-2*margin),totalH=Math.max(.08,o.h-2*margin);
+  var n=motion==='slide'||/double|french/.test(o.styleId||'')?2:1;
+  var w=totalW/n;
+  function panel(parent,xLeft,xRight,z0,h){
+   var pw=xRight-xLeft,mid=(xLeft+xRight)/2,lip=Math.min(.038,pw/10,h/10);
+   function piece(dx,dy,dz,x,y,z,color,glass){
+    var m=addMesh(boxGeom(dx,dy,dz),color,wall.id,parent,x,y,z,glass,cadGlassOpacity(o));
+    m.userData.openingId=o.id;return m;
+   }
+   if(clear){
+    piece(pw,.045,lip,mid,0,z0,0x93a8b2,false);
+    piece(pw,.045,lip,mid,0,z0+h-lip,0x93a8b2,false);
+    piece(lip,.045,h,xLeft+lip/2,0,z0,0x93a8b2,false);
+    piece(lip,.045,h,xRight-lip/2,0,z0,0x93a8b2,false);
+    piece(Math.max(.02,pw-2*lip),.015,Math.max(.02,h-2*lip),mid,0,z0+lip,0x54889d,true);
+   }else piece(pw,.048,h,mid,0,z0,0x8b725e,false);
+  }
+  for(var i=0;i<n;i++){
+   var sash=new T.Group(),left=o.offset-totalW/2+i*w,right=left+w;
+   if(motion==='slide'){
+    var shift=i===1?(o.hingeSide==='right'?1:-1)*w*clamp(finite(o.openFraction,0),0,1):0;
+    sash.position.set(0,i===0?-.028:.028,o.sill+margin);
+    panel(sash,left+shift,right+shift,0,totalH);
+   }else if(motion==='tilt'){
+    // Awning pivots along its top rail; hopper pivots along its bottom rail.
+    var top=/awning/.test(o.styleId||''),pivotZ=o.sill+margin+(top?totalH:0);
+    sash.position.set(o.offset,0,pivotZ);
+    sash.rotation.x=(o.openDirection===-1?-1:1)*(top?1:-1)*clamp(finite(o.openAngle,0),0,90)*Math.PI/180;
+    panel(sash,-totalW/2,totalW/2,top?-totalH:0,totalH);
+   }else{
+    var rightHinge=n===2?i===1:o.hingeSide==='right',pivot=rightHinge?right:left;
+    sash.position.set(pivot,0,o.sill+margin);
+    sash.rotation.z=(o.openDirection===-1?-1:1)*(rightHinge?-1:1)*clamp(finite(o.openAngle,0),0,170)*Math.PI/180;
+    panel(sash,rightHinge?-w:0,rightHinge?0:w,0,totalH);
+   }
+   group.add(sash);
+  }
+ });
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
@@ -1594,7 +1650,7 @@ function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
  if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
- try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
+ try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadPickProxy)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
@@ -1609,7 +1665,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh&&o.material?.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
@@ -1802,7 +1858,7 @@ function applyRenderStyle(){
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
-  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(!m.isMesh||!m.material||!m.geometry||m.userData.cadPickProxy)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
