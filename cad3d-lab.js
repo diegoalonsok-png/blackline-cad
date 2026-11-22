@@ -1513,9 +1513,13 @@ function selectAt(e){
  var box=renderer.domElement.getBoundingClientRect();
  var p=new T.Vector2(2*(e.clientX-box.left)/box.width-1,-2*(e.clientY-box.top)/box.height+1);
  raycaster.setFromCamera(p,camera);
- var hits=[];modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
+ var plan=activeView==='top'&&viewMode==='ortho';
+ if(plan)raycaster.params.Line.threshold=clamp(worldPerPixel(root.querySelector('.view'))*7,.02,.6);
+ var hits=[];modelRoot.traverse(function(o){if(o.isMesh||(plan&&o.isLine&&o.userData.openingId!=null))hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
- var hit=intersects.find(function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});});
+ var allowed=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
+ // Architectural plan symbols are selectable even when a wall surface sits above them.
+ var hit=plan?intersects.find(function(item){return item.object.userData.openingId!=null&&allowed(item);})||intersects.find(allowed):intersects.find(allowed);
  var id=hit?hit.object.userData.owner:null;
  selectedOpeningId=hit?.object.userData.openingId??null;
  if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
