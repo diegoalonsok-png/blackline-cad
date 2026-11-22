@@ -807,6 +807,12 @@ function build(){
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
+ root.querySelector('#cad3dCommand').addEventListener('input',function(){
+  // TOP is unambiguous; L and Z fire as one-key aliases while the field is empty.
+  var value=this.value.trim().toUpperCase();
+  if(value==='TOP'){this.value='';cad3DImmediateCommand('TOP');}
+  else if(value==='L'||value==='Z'){this.value='';cad3DImmediateCommand(value);}
+ });
  root.querySelector('.draftBar').addEventListener('click',function(e){
   var mode=e.target.closest('[data-draft-mode]');
   if(mode)toggleDraftMode(mode.dataset.draftMode);
@@ -1007,6 +1013,7 @@ function toggleDraftMode(mode){
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
+ if(which)cad3DExitZoom();
  placing=which;firstPoint=null;cursorPoint=null;
  if(!root)return;
  root.querySelectorAll('.solidTools button').forEach(function(b){
