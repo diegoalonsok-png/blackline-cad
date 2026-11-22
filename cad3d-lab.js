@@ -1272,7 +1272,7 @@ function build(){
  });
  root.querySelector('#cad3dCommand').addEventListener('input',function(){
   var value=this.value.trim().toUpperCase();
-  if(['T','L','R','B','Z','TOP','LEFT','RIGHT','BACK','ZOOM'].includes(value)){
+  if(['T','F','L','R','B','Z','V','P','I','O','TOP','FRONT','LEFT','RIGHT','BACK','ZOOM'].includes(value)){
    this.value='';cad3dViewAlias(value);
   }
  });
@@ -1889,12 +1889,29 @@ function cad3dZoomStep(direction){
  applyViewCamera();
  text('Zoom '+(direction>0?'+':'−')+' · '+(viewMode==='ortho'?'ortogonal':viewMode==='walk'?'peatonal':'perspectiva'));
 }
+function cad3dViewMenu(){
+ var picker=root&&root.querySelector('.cad3dViewSelect');
+ if(!picker)return false;
+ picker.focus({preventScroll:true});
+ if(typeof picker.showPicker==='function'){try{picker.showPicker();return true;}catch(_err){}}
+ // Accessibility fallback: an expanded native select, restored on selection/blur.
+ picker.size=viewPresets.length+1;picker.style.position='absolute';picker.style.zIndex='60';
+ function closePicker(){picker.removeAttribute('size');picker.style.position='';picker.style.zIndex='';}
+ picker.addEventListener('change',closePicker,{once:true});
+ picker.addEventListener('blur',closePicker,{once:true});
+ return true;
+}
+function cad3dOrthographicView(){
+ viewMode='ortho';activeView='orbit';syncViewControls();applyViewCamera();
+ text('Orthographic · proyección paralela con orientación conservada');return true;
+}
 function cad3dViewAlias(word){
  var aliases={T:'top',TOP:'top',F:'front',FRONT:'front',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back',
-  P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso',O:'axo',ORTHO:'axo'};
+  P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso'};
  var key=String(word||'').trim().toUpperCase();
  if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
- if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA'){var picker=root.querySelector('.cad3dViewSelect');picker.focus();picker.click();return true;}
+ if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA')return cad3dViewMenu();
+ if(key==='O'||key==='ORTHO'||key==='ORTHOGRAPHIC')return cad3dOrthographicView();
  if(key==='+'||key==='PLUS'||key==='ZOOMIN'){cad3dZoomStep(1);return true;}
  if(key==='-'||key==='MINUS'||key==='ZOOMOUT'){cad3dZoomStep(-1);return true;}
  if(!Object.prototype.hasOwnProperty.call(aliases,key))return false;
@@ -3867,17 +3884,17 @@ async function readJSON(e){
 }
 window.addEventListener('keydown',function(ev){
  if(!root||root.hidden||!root.contains(document.activeElement))return;
- // CAD3D-specific viewport styles: plain F3 switches to 2D Wireframe; F4 to shaded.
- // Ctrl/Cmd+F3 is also accepted when the browser delivers it. Shift+F3 preserves OSNAP.
- if(ev.key==='F3'&&ev.shiftKey){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode('osnap');return;}
- if(ev.key==='F3'||ev.key==='F4'){
+ // 3ds Max-like shortcuts: F3 = 3D wireframe, F4 = shaded solids.
+ // Only intercept within CAD3D, never while a text input is being edited.
+ if((ev.key==='F3'||ev.key==='F4')&&!ev.isComposing&&!ev.altKey&&!ev.ctrlKey&&!ev.metaKey){
   ev.preventDefault();ev.stopImmediatePropagation();
-  setVisualStyle(ev.key==='F3'?'wire2d':'shaded-edges');return;
+  setVisualStyle(ev.key==='F3'?'wire3d':'shaded');return;
  }
  var mode={F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
  if(ev.key==='Enter'&&['wall','door','window','opening','line','polyline'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
   ev.preventDefault();ev.stopImmediatePropagation();
+  if(['line','polyline'].includes(placing)){cad3dFinishPolyline();return;}
   var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
   return;
  }
@@ -3896,8 +3913,11 @@ window.addEventListener('keydown',function(ev){
   text('Comando cancelado · Selection ready');
   return;
  }
- if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
+ if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.isComposing||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
  var key=ev.key.toLowerCase();
+ if(['t','l','r','v','p','o'].includes(key)&&!ev.repeat){
+  ev.preventDefault();ev.stopImmediatePropagation();cad3dViewAlias(key);return;
+ }
  if(viewMode==='walk'&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){
   ev.preventDefault();ev.stopImmediatePropagation();
   var step=ev.shiftKey?1:.25;
