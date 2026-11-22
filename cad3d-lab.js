@@ -216,27 +216,32 @@ var css=`
  content:""; position:absolute; top:-4px; left:-3px; width:7px; height:7px;
  border:1px solid #ffe0a0; border-radius:50%; background:#26333d;
 }
+#cad3dLab .styleTuning{border-top:1px solid #566a78;margin-top:9px;padding-top:9px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#cad3dLab .styleTuning[hidden]{display:none!important}
+#cad3dLab .styleTuning label{font:11px Inter,Arial,sans-serif;color:var(--cad-ui-text,#d8e4ef);display:grid;gap:3px}
+#cad3dLab .styleTuning input[type="range"]{width:100%;accent-color:#9bc9d7}
+#cad3dLab .styleTuning output{font-size:10px;color:var(--cad-ui-muted,#a6bac9)}
 #cad3dLab .view.sketchView { background:#f0eee6 }
 #cad3dLab .view.sketchView::after{
- content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.17;
+ content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:calc(var(--cad3d-paper-strength,.45) * .35);
  background-image:repeating-linear-gradient(14deg,#6d5c3a0c 0px,#6d5c3a0c 1px,transparent 1px,transparent 7px),
  repeating-linear-gradient(93deg,#77674c11 0px,#77674c11 1px,transparent 1px,transparent 11px);
  mix-blend-mode:multiply
 }
 #cad3dLab .view.sketchView[data-sketch-paper="pencil"]::after{
- opacity:.36;background-image:repeating-linear-gradient(18deg,#554f4015 0px,#554f4015 1px,transparent 1px,transparent 3px)
+ opacity:calc(var(--cad3d-paper-strength,.45) * .8);background-image:repeating-linear-gradient(18deg,#554f4015 0px,#554f4015 1px,transparent 1px,transparent 3px)
 }
-#cad3dLab .view.sketchView[data-sketch-paper="ink"]::after{opacity:.08}
+#cad3dLab .view.sketchView[data-sketch-paper="ink"]::after{opacity:calc(var(--cad3d-paper-strength,.45) * .18)}
 #cad3dLab .view.sketchView[data-sketch-paper="marker"]::after{
- opacity:.23;background-image:repeating-linear-gradient(145deg,#69594c18 0px,#69594c18 4px,transparent 4px,transparent 14px)
+ opacity:calc(var(--cad3d-paper-strength,.45) * .51);background-image:repeating-linear-gradient(145deg,#69594c18 0px,#69594c18 4px,transparent 4px,transparent 14px)
 }
 #cad3dLab .view.sketchView[data-sketch-paper="watercolor"]::after{
- opacity:.25;background-image:radial-gradient(ellipse at 23% 38%,#9faea633,transparent 37%),
+ opacity:calc(var(--cad3d-paper-strength,.45) * .56);background-image:radial-gradient(ellipse at 23% 38%,#9faea633,transparent 37%),
  radial-gradient(ellipse at 71% 64%,#b9a98e33,transparent 45%),
  repeating-linear-gradient(18deg,#807d7110 0px,#807d7110 2px,transparent 2px,transparent 9px)
 }
 #cad3dLab .view.sketchView[data-sketch-paper="blueprint"]::after{
- opacity:.22;mix-blend-mode:screen;background-image:repeating-linear-gradient(0deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px),
+ opacity:calc(var(--cad3d-paper-strength,.45) * .49);mix-blend-mode:screen;background-image:repeating-linear-gradient(0deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px),
  repeating-linear-gradient(90deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px)
 }
 #cad3dLab .viewNav {
@@ -525,7 +530,12 @@ function build(){
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
  [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
- }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
+ }).join('')+'</div><div class="styleTuning" hidden>'+
+ '<label>Edge weight <input type="range" data-sketch-adjust="weight" min="0.5" max="2.5" step="0.1" value="1"><output data-sketch-value="weight">1.0×</output></label>'+
+ '<label>Hand-drawn texture <input type="range" data-sketch-adjust="roughness" min="0" max="2" step="0.1" value="1"><output data-sketch-value="roughness">1.0×</output></label>'+
+ '<label>Color wash <input type="range" data-sketch-adjust="wash" min="0" max="1" step="0.05" value="0.65"><output data-sketch-value="wash">65%</output></label>'+
+ '<label>Paper texture <input type="range" data-sketch-adjust="paper" min="0" max="1" step="0.05" value="0.45"><output data-sketch-value="paper">45%</output></label>'+
+ '</div><small>Architectural illustration: model geometry stays editable.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
@@ -609,6 +619,13 @@ function build(){
  root.querySelector('.styleLaunch').addEventListener('click',function(){
   var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
   this.setAttribute('aria-expanded',String(!panel.hidden));
+ });
+ root.querySelector('.stylePanel').addEventListener('input',function(e){
+  var input=e.target.closest('[data-sketch-adjust]');if(!input||!isCad3DSketch(renderStyle))return;
+  var key=input.dataset.sketchAdjust,value=Number(input.value);
+  if(!Object.prototype.hasOwnProperty.call(cadSketchTuning,key)||!Number.isFinite(value))return;
+  cadSketchTuning[key]=value;renderStyleControls();
+  if(renderer)applyRenderStyle();else fallbackDraw();
  });
  root.querySelector('.styleGrid').addEventListener('click',function(e){
   var button=e.target.closest('[data-render-style]');if(!button)return;
@@ -1783,6 +1800,16 @@ const CAD3D_SKETCH_PRESETS={
  'sketch-mono':{bg:0xf7f7f4,ground:0xe8e8e3,fill:0xdcdedc,edge:0x262e33,alpha:.9,width:.0044,jitter:0,passes:1,fillMix:.84,stroke:'clean',paper:'ink'},
  'sketch-blueprint':{bg:0x23415b,ground:0x456379,fill:0x54758c,edge:0xe0f4ff,alpha:.96,width:.004,jitter:0,passes:2,fillMix:.8,stroke:'blueprint',paper:'blueprint'}
 };
+const cadSketchTuning={weight:1,roughness:1,wash:.65,paper:.45};
+function cadEffectiveSketch(mode){
+ var preset=CAD3D_SKETCH_PRESETS[mode];
+ if(!preset)return null;
+ return Object.assign({},preset,{
+  width:preset.width*cadSketchTuning.weight,
+  jitter:preset.jitter*cadSketchTuning.roughness,
+  fillMix:clamp(preset.fillMix+(cadSketchTuning.wash-.65)*.7,.03,1)
+ });
+}
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
 function renderStyleControls(){
@@ -1795,9 +1822,19 @@ function renderStyleControls(){
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
  var view=root.querySelector('.view');
+ var tuning=root.querySelector('.styleTuning');
+ if(tuning)tuning.hidden=!isCad3DSketch(renderStyle);
+ root.querySelectorAll('[data-sketch-adjust]').forEach(function(input){
+  var key=input.dataset.sketchAdjust;input.value=String(cadSketchTuning[key]);
+  var output=root.querySelector('[data-sketch-value="'+key+'"]');
+  if(output)output.textContent=key==='wash'||key==='paper'?Math.round(cadSketchTuning[key]*100)+'%':cadSketchTuning[key].toFixed(1)+'×';
+ });
  if(view){view.classList.toggle('sketchView',isCad3DSketch(renderStyle));
-  if(isCad3DSketch(renderStyle))view.dataset.sketchPaper=CAD3D_SKETCH_PRESETS[renderStyle].paper;
-  else delete view.dataset.sketchPaper;
+  if(isCad3DSketch(renderStyle)){
+   view.dataset.sketchPaper=CAD3D_SKETCH_PRESETS[renderStyle].paper;
+   view.style.setProperty('--cad3d-paper-strength',String(cadSketchTuning.paper));
+  }
+  else {delete view.dataset.sketchPaper;view.style.removeProperty('--cad3d-paper-strength');}
  }
 }
 /* Three.js ignores most WebGL lineWidth requests. Make actual ribbon
@@ -1846,7 +1883,7 @@ function cadSketchRibbonGeometry(edges,sketch,scale){
 function applyRenderStyle(){
  renderStyleControls();
  if(!T)return;
- var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
+ var sketch=cadEffectiveSketch(renderStyle);
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
  if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
  if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:0x9ba5a8);
