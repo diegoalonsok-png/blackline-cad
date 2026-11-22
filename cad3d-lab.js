@@ -800,7 +800,7 @@ function applySunSettings(){
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=!o.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!o.userData.cadGlass&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  // Fit the directional shadow frustum to the current model. The previous 30-unit
@@ -1386,9 +1386,12 @@ function selectAt(e){
  renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
-function addMesh(g,color,id,parent,x,y,z){
- var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);
+function addMesh(g,color,id,parent,x,y,z,glass){
+ var clear=glass===true;
+ var mat=new T.MeshStandardMaterial({color:color,roughness:clear?.12:.8,metalness:clear?.05:.04,side:T.DoubleSide,transparent:clear,opacity:clear?.24:1,depthWrite:!clear});
+ var m=new T.Mesh(g,mat);m.userData.owner=id;m.userData.cadGlass=clear;
+ if(x!==undefined)m.position.set(x,y,z);
+ m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);
 }
 /* Shared wall-local void silhouette for walls and wall-mounted extrusions. */
 function openingSpanAtX(o,x){
@@ -1501,9 +1504,15 @@ function architectureParts(r,part){
    for(var leaf=0;leaf<panels;leaf++){
     var cx=o.left+frameW+leafW*(leaf+.5);
     var inset=Math.min(.022,leafW/10),height=Math.max(.1,h-2*frameW);
-    part(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
     if(glazed){
-     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0);
+     // The central glazed area must not be backed by an opaque door slab.
+     part(Math.max(.04,leafW-2*inset),.035,Math.max(.10,height*.20),cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
+     part(.025,.05,height,cx-leafW/2+inset,0,z+frameW,0x607783,0);
+     part(.025,.05,height,cx+leafW/2-inset,0,z+frameW,0x607783,0);
+     part(Math.max(.04,leafW-.02),.05,.028,cx,0,z+frameW+height-.028,0x607783,0);
+    }else part(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
+    if(glazed){
+     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0,true);
      part(Math.max(.03,leafW-.08),.055,.025,cx,0,z+frameW+height*.52,0xa5b5be,0);
     }
     // Door leaf side rails / panel divisions.
@@ -1525,7 +1534,7 @@ function architectureParts(r,part){
    part(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
    part(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
    part(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
-   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0);
+   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true);
    for(var pane=1;pane<n;pane++)
     part(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
    if(/french|glass-block/.test(id)){
@@ -1705,10 +1714,12 @@ function addShapedOpenings(wall,group){
   if(o.kind!=='opening'&&o.styleId!=='open-door'){
    var mesh=new T.Mesh(new T.ExtrudeGeometry(outline,{depth:.025,bevelEnabled:false,steps:1}),new T.MeshStandardMaterial({
     color:o.kind==='window'?0x5794a8:0x987e66,
-    transparent:o.kind==='window',opacity:o.kind==='window'?.55:1,roughness:o.kind==='window'?.18:.7,side:T.DoubleSide
+    transparent:o.kind==='window',opacity:o.kind==='window'?.24:1,roughness:o.kind==='window'?.18:.7,side:T.DoubleSide
    }));
    mesh.rotation.x=Math.PI/2;mesh.position.y=.0125;mesh.userData.owner=wall.id;
-   mesh.castShadow=true;mesh.receiveShadow=sunSettings.onFaces;group.add(mesh);
+   mesh.userData.cadGlass=o.kind==='window';mesh.castShadow=!mesh.userData.cadGlass;
+   mesh.receiveShadow=sunSettings.onFaces&&!mesh.userData.cadGlass;
+   mesh.material.depthWrite=!mesh.userData.cadGlass;group.add(mesh);
   }
   for(var side of [-1,1]){
    var path=points.map(function(p){return new T.Vector3(p[0],side*(wall.d/2+.012),p[1]);});
@@ -1722,7 +1733,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,glass){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1730,7 +1741,7 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  addMesh(g,color,r.id,group,x,y,z);
+  addMesh(g,color,r.id,group,x,y,z,glass);
  });
  if(r.type==='wall')addWallAttachments(r,group);
  if(r.type==='wall')addShapedOpenings(r,group);
@@ -2010,14 +2021,15 @@ function applyRenderStyle(){
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
-  mat.depthWrite=renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
+  mat.depthWrite=!m.userData.cadGlass&&(renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray'));
   mat.depthTest=true;
-  mat.transparent=renderStyle==='xray';
-  mat.opacity=renderStyle==='xray'?.23:1;
-  mat.roughness=renderStyle==='realistic'?.54:.8;
-  mat.metalness=renderStyle==='realistic'?.10:.04;
-  m.castShadow=!plainLines;
-  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  var isGlass=m.userData.cadGlass===true;
+  mat.transparent=isGlass||renderStyle==='xray';
+  mat.opacity=renderStyle==='xray'?.16:isGlass?.24:1;
+  mat.roughness=isGlass?.12:renderStyle==='realistic'?.54:.8;
+  mat.metalness=isGlass?.05:renderStyle==='realistic'?.10:.04;
+  m.castShadow=!plainLines&&!isGlass;
+  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines&&!isGlass;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=renderStyle==='sketch'?0x22282c:renderStyle==='shaded-edges'?0x394954:0x43535e;
