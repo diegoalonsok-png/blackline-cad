@@ -27,6 +27,8 @@ var viewPresets=[
  ['walk','Peatonal 1,65 m','walk',-Math.PI/2,.02]
 ];
 var icons={
+ extrude:'<path d="M4 19 4 9 12 5 20 9 20 19 12 23zM4 9l8 5 8-5M12 14v9M12 1v5m-3-3 3-3 3 3"/>',
+ extrudeface:'<path d="M4 15 12 19 20 15M4 15 12 11 20 15M12 11V3m-4 4 4-4 4 4M4 15v5l8 4 8-4v-5"/>',
  line:'<path d="M4 19 20 5"/><circle cx="4" cy="19" r="2" fill="currentColor" stroke="none"/><circle cx="20" cy="5" r="2" fill="currentColor" stroke="none"/>',
  polyline:'<path d="M3 19 9 8 15 14 21 4"/><circle cx="3" cy="19" r="1.5"/><circle cx="9" cy="8" r="1.5"/><circle cx="15" cy="14" r="1.5"/><circle cx="21" cy="4" r="1.5"/>',
  rectangle:'<rect x="4" y="6" width="16" height="12" rx=".3"/>',
@@ -1021,7 +1023,7 @@ function cad3dRefreshBlockCatalog(){
  if(cad3dBlockView!=='photo')cad3dBlockCatalogItems();
 }
 function cad3DBlockCatalog(){
- return '<details class="block3DMenu"><summary class="btn">3D Blocks ▾</summary><div class="block3DPanel">'+
+ return '<details class="block3DMenu"><summary class="btn" aria-label="3D Blocks" title="3D Blocks">'+ico('cube')+'<span>3D Blocks</span></summary><div class="block3DPanel">'+
  '<strong>COMPONENT LIBRARY</strong><small>Elegí el tipo de objeto y después la categoría</small>'+
  '<div class="cad3dBlockTabs" role="tablist" aria-label="Tipo de componente">'+
  '<button type="button" class="cad3dBlockTab" role="tab" data-block-kind="3d" aria-selected="true">3D Models</button>'+
@@ -1485,13 +1487,13 @@ function build(){
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
  '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="-1000" max="1000" step="0.1" value="2.8" aria-label="Extrude height or signed face distance in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
- '<button type="button" class="btn" data-solid-command="extrude" title="Extrude selected closed profile, box or slab · E Enter">Extrude · E</button>'+
- '<button type="button" class="btn" data-solid-command="extrudeface" title="Push/Pull a face on an axis-aligned or rotated BOX using Height (m)">Extrude Face</button>'+
- '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">Union</button>'+
- '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">Subtract</button>'+
- '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">Intersect</button>'+
+ '<button type="button" class="btn" data-solid-command="extrude" title="Extrude · E + Enter" aria-label="Extrude">'+ico('extrude')+'<span>Extrude</span></button>'+
+ '<button type="button" class="btn" data-solid-command="extrudeface" title="Extrude Face · empujar o tirar una cara" aria-label="Extrude Face">'+ico('extrudeface')+'<span>Extrude Face</span></button>'+
+ '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">'+ico('union')+'<span>Union</span></button>'+
+ '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">'+ico('subtract')+'<span>Subtract</span></button>'+
+ '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Importar modelo OBJ exportado desde SketchUp">Import 3D<input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+cad3DBlockCatalog()+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Parametric 3D" aria-label="Parametric 3D">'+ico('wall')+'<span>Parametric 3D</span></button>'+cad3DBlockCatalog()+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
@@ -1503,7 +1505,7 @@ function build(){
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
- '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
+ '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style" aria-label="Visual Style">'+ico('view')+'<span>Visual Style</span></button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D <small>SketchUp-inspired workspace</small></header>'+
  '<div class="styleGalleryControls"><input class="styleGallerySearch" type="search" aria-label="Buscar estilo visual" placeholder="Buscar estilo…">'+
  '<span class="styleGalleryCount"></span></div>'+
@@ -1529,9 +1531,9 @@ function build(){
  ['Urbano','sketch-urban','Urbano rápido','Líneas y tramas'],['Urbano','sketch-blueprint','Blueprint','Azul técnico']
  ].map(function(st){return '<button type="button" data-render-family="'+st[0]+'" data-render-style="'+st[1]+'" aria-pressed="false" title="'+st[2]+' · '+st[3]+'"><span class="styleThumb" data-kind="'+st[1]+'"></span><span><strong>'+st[2]+'</strong><small>'+st[3]+'</small></span></button>';}).join('')+
  '</div></div><small class="styleGalleryNote">Los croquis usan sol, luz y sombras cuando WebGL está disponible. Los estilos no cambian la geometría.</small></div></div>'+
- '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
+ '<details class="ioMenu"><summary class="btn" title="Import" aria-label="Import">'+ico('folder')+'<span>Import</span></summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
- '<details class="viewSaveMenu"><summary class="btn" title="Guardar esta vista en PNG, JPG o PDF">Guardar vista ▾</summary>'+
+ '<details class="viewSaveMenu"><summary class="btn" title="Guardar vista en PNG, JPG o PDF" aria-label="Save view">'+ico('export')+'<span>Save view</span></summary>'+
  '<div class="viewSavePanel" role="group" aria-label="Exportar vista 3D">'+
  '<label>Formato<select data-save-format><option value="png">PNG</option><option value="jpg">JPG</option><option value="pdf">PDF</option></select></label>'+
  '<label>Tamaño<select data-save-size><option value="viewport">Vista actual</option><option value="hd">1920 × 1080 px</option><option value="2k">2560 × 1440 px</option><option value="4k">3840 × 2160 px</option><option value="a4">A4 horizontal</option><option value="a3">A3 horizontal</option><option value="a2">A2 horizontal</option><option value="custom">Personalizado (píxeles)</option></select></label>'+
@@ -1541,7 +1543,7 @@ function build(){
  '<output class="saveViewInfo">1920 × 1080 píxeles</output>'+
  '<button type="button" class="btn" data-save-go>Guardar imagen / PDF</button>'+
  '</div></details>'+
- '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
+ '<details class="ioMenu"><summary class="btn" title="Export" aria-label="Export">'+ico('export')+'<span>Export</span></summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
  '<div class="body">'+
@@ -3547,7 +3549,10 @@ function renderStyleControls(){
   button.setAttribute('aria-pressed',String(button.dataset.renderStyle===renderStyle));
  });
  var launcher=root.querySelector('.styleLaunch');
- if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
+ if(launcher){launcher.innerHTML=ico('view')+'<span>Visual Style</span>';
+  launcher.title='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded');
+  launcher.setAttribute('aria-label',launcher.title);
+ }
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
  root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
