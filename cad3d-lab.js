@@ -194,6 +194,24 @@ var css=`
 #cad3dLab .styleThumb[data-kind="sketch-mono"]::before{background:#d7d7d5}
 #cad3dLab .styleThumb[data-kind="sketch-blueprint"]{background:#30506a;border-color:#7798b3}
 #cad3dLab .styleThumb[data-kind="sketch-blueprint"]::before{background:#456b82;border-color:#e3f3fa}
+#cad3dLab .stylePanel{width:min(520px,90vw);max-height:min(75vh,670px);display:flex;flex-direction:column}
+#cad3dLab .stylePanel[hidden]{display:none!important}
+#cad3dLab .stylePanel header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#cad3dLab .stylePanel header small{font-size:10px;font-weight:400;color:#9bb3c0;letter-spacing:0}
+#cad3dLab .styleGalleryControls{display:flex;align-items:center;gap:10px;margin:8px 0}
+#cad3dLab .styleGallerySearch{min-width:0;flex:1;border:1px solid #476075;border-radius:6px;background:#0e1922;color:#edf4f7;padding:9px;font-size:12px}
+#cad3dLab .styleGalleryCount{font-size:10px;color:#a7c0cd;white-space:nowrap}
+#cad3dLab .styleGalleryScroll{min-height:0;overflow:auto;overscroll-behavior:contain}
+#cad3dLab .styleGrid [data-render-style][hidden]{display:none!important}
+#cad3dLab .styleGrid button{min-height:58px}
+#cad3dLab .styleGalleryNote{display:block;margin-top:8px;color:#96aab7;font-size:10px;line-height:1.5}
+#cad3dLab .styleThumb[data-kind="sketch-blue-engraving"],#cad3dLab .styleThumb[data-kind="sketch-comic-teal"]{background:repeating-linear-gradient(135deg,#f6edda 0 3px,#92abbc 3px 4px)}
+#cad3dLab .styleThumb[data-kind="sketch-red-ochre"],#cad3dLab .styleThumb[data-kind="sketch-technical-red"]{background:linear-gradient(125deg,#c65e43 0 38%,#f1dcb8 38% 100%)}
+#cad3dLab .styleThumb[data-kind="sketch-vintage-print"],#cad3dLab .styleThumb[data-kind="sketch-engraving"]{background:repeating-linear-gradient(145deg,#f5ebd5 0 4px,#b1a895 4px 5px)}
+#cad3dLab .styleThumb[data-kind="sketch-sunlit"],#cad3dLab .styleThumb[data-kind="sketch-sunset"]{background:linear-gradient(135deg,#fff9e7 0 48%,#dfc09a 48%)}
+#cad3dLab .styleThumb[data-kind="sketch-watercolor-warm"]{background:linear-gradient(130deg,#e2bc99,#faf0d8)}
+#cad3dLab .styleThumb[data-kind="sketch-watercolor-cool"]{background:linear-gradient(130deg,#a7cbc6,#f7f6e8)}
+@media(max-width:640px){#cad3dLab .stylePanel{width:min(92vw,420px)}#cad3dLab .styleGrid{grid-template-columns:1fr}}
 #cad3dLab .sunControl {position:relative;flex:none}
 #cad3dLab .sunPanel {position:absolute;top:calc(100% + 6px);right:0;z-index:30;width:220px;padding:12px;display:grid;gap:9px;background:var(--cad-ui-base,#17212a);border:1px solid var(--cad-ui-edge,#526579);border-radius:10px;box-shadow:0 12px 35px #0009;color:var(--cad-ui-text,#e9eef4)}
 #cad3dLab .sunPanel[hidden]{display:none!important}
@@ -645,10 +663,31 @@ function build(){
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
- '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-charcoal','Carbón','Carboncillo arquitectónico'],['sketch-sepia','Sepia','Plumilla y tinta sepia'],['sketch-bluewash','Lavado azul','Lámina azulada'],['sketch-presentation','Presentación','Croquis suave de proyecto'],['sketch-engraving','Grabado','Tramas de líneas finas'],['sketch-urban','Croquis urbano','Líneas rápidas y tramas'],['sketch-graphic','Gráfico rojo/azul','Ilustración arquitectónica'],['sketch-comic','Historieta','Tinta y sombreado']].map(function(st){
- return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
- }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
+ '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D <small>SketchUp-inspired workspace</small></header>'+
+ '<div class="styleGalleryControls"><input class="styleGallerySearch" type="search" aria-label="Buscar estilo visual" placeholder="Buscar estilo…">'+
+ '<span class="styleGalleryCount"></span></div>'+
+ '<div class="styleGalleryScroll"><div class="styleGrid" role="group" aria-label="Galería de estilos visuales">'+
+ [
+ ['Técnico','wire2d','2D Wireframe','Líneas negras'],['Técnico','wire3d','3D Wireframe','Aristas'],['Técnico','hidden','Ocultas','Líneas visibles'],
+ ['Técnico','shaded','Sombreado','Colores sólidos'],['Técnico','shaded-edges','Sólido + aristas','Arquitectura'],['Técnico','realistic','Realista','Materiales'],
+ ['Técnico','monochrome','Monocromo','Blanco neutro'],['Técnico','xray','Rayos X','Transparencia'],
+ ['Luz y presentación','sketch-sunlit','Interior soleado','Sol y sombras'],['Luz y presentación','sketch-sunset','Atardecer ilustrado','Luz cálida'],
+ ['Luz y presentación','sketch-white-model','Maqueta blanca','Volumen y sombra'],['Luz y presentación','sketch-presentation','Presentación','Líneas y luz'],
+ ['Luz y presentación','sketch-concept','Conceptual','Croquis de proyecto'],['Luz y presentación','sketch','Técnico ilustrado','Tinta y sol'],
+ ['Lápiz y tinta','sketch-pencil','Lápiz','Grafito'],['Lápiz y tinta','sketch-pencil-soft','Lápiz suave','Trazo tenue'],
+ ['Lápiz y tinta','sketch-pencil-bold','Grafito intenso','Sombreado tramado'],['Lápiz y tinta','sketch-charcoal','Carbón','Carboncillo'],
+ ['Lápiz y tinta','sketch-ink','Tinta negra','Contornos definidos'],['Lápiz y tinta','sketch-ink-light','Tinta fina','Plumilla ligera'],
+ ['Lápiz y tinta','sketch-sepia','Plumilla sepia','Papel cálido'],['Lápiz y tinta','sketch-mono','Gris suave','Dibujo monocromo'],
+ ['Grabados y editorial','sketch-engraving','Grabado lineal','Tramas finas'],['Grabados y editorial','sketch-blue-engraving','Grabado azul','Tinta azul y tramas'],
+ ['Grabados y editorial','sketch-monochrome-contrast','Grabado monocromo','Negro y blanco'],['Grabados y editorial','sketch-vintage-print','Impresión vintage','Tinta envejecida'],
+ ['Grabados y editorial','sketch-comic','Historieta','Tinta editorial'],['Grabados y editorial','sketch-comic-teal','Historieta turquesa','Líneas azules'],
+ ['Color y acuarela','sketch-marker','Marcadores','Colores suaves'],['Color y acuarela','sketch-watercolor','Acuarela','Lavado de color'],
+ ['Color y acuarela','sketch-watercolor-warm','Acuarela cálida','Ocres'],['Color y acuarela','sketch-watercolor-cool','Acuarela fría','Tonos verdosos'],
+ ['Color y acuarela','sketch-bluewash','Lavado azul','Tonos fríos'],['Color y acuarela','sketch-red-ochre','Rojo y ocre','Lámina cálida'],
+ ['Color y acuarela','sketch-graphic','Rojo y azul','Ilustración gráfica'],['Color y acuarela','sketch-technical-red','Tinta roja','Plano ilustrado'],
+ ['Urbano','sketch-urban','Urbano rápido','Líneas y tramas'],['Urbano','sketch-blueprint','Blueprint','Azul técnico']
+ ].map(function(st){return '<button type="button" data-render-family="'+st[0]+'" data-render-style="'+st[1]+'" aria-pressed="false" title="'+st[2]+' · '+st[3]+'"><span class="styleThumb" data-kind="'+st[1]+'"></span><span><strong>'+st[2]+'</strong><small>'+st[3]+'</small></span></button>';}).join('')+
+ '</div></div><small class="styleGalleryNote">Los croquis usan sol, luz y sombras cuando WebGL está disponible. Los estilos no cambian la geometría.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
@@ -736,6 +775,16 @@ function build(){
   var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
   this.setAttribute('aria-expanded',String(!panel.hidden));
  });
+ var gallerySearch=root.querySelector('.styleGallerySearch');
+ gallerySearch.addEventListener('input',function(){
+  var needle=this.value.toLocaleLowerCase().trim(),visible=0;
+  root.querySelectorAll('.styleGrid [data-render-style]').forEach(function(b){
+   var show=(b.textContent+' '+b.dataset.renderFamily).toLocaleLowerCase().includes(needle);
+   b.hidden=!show;if(show)visible++;
+  });
+  root.querySelector('.styleGalleryCount').textContent=visible+' estilos';
+ });
+ gallerySearch.dispatchEvent(new Event('input'));
  root.querySelector('.styleGrid').addEventListener('click',function(e){
   var button=e.target.closest('[data-render-style]');if(!button)return;
   setVisualStyle(button.dataset.renderStyle);root.querySelector('.stylePanel').hidden=true;
@@ -2292,7 +2341,10 @@ const CAD3D_VISUAL_STYLES={
  'sketch-pencil':'Croquis lápiz','sketch-ink':'Croquis tinta','sketch-marker':'Croquis marcador',
  'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint',
  'sketch-charcoal':'Carbón arquitectónico','sketch-sepia':'Plumilla sepia','sketch-bluewash':'Lavado azul','sketch-presentation':'Croquis presentación',
- 'sketch-engraving':'Grabado lineal','sketch-urban':'Croquis urbano rápido','sketch-graphic':'Lámina gráfica roja y azul','sketch-comic':'Tinta de historieta'
+ 'sketch-engraving':'Grabado lineal','sketch-urban':'Croquis urbano rápido','sketch-graphic':'Lámina gráfica roja y azul','sketch-comic':'Tinta de historieta',
+ 'sketch-sunlit':'Interior soleado','sketch-pencil-soft':'Lápiz suave','sketch-pencil-bold':'Grafito intenso','sketch-blue-engraving':'Grabado azul','sketch-red-ochre':'Rojo y ocre',
+ 'sketch-comic-teal':'Historieta turquesa','sketch-ink-light':'Tinta fina','sketch-concept':'Croquis conceptual','sketch-watercolor-warm':'Acuarela cálida','sketch-watercolor-cool':'Acuarela fría',
+ 'sketch-monochrome-contrast':'Grabado monocromo','sketch-technical-red':'Plano tinta roja','sketch-vintage-print':'Impresión vintage','sketch-sunset':'Atardecer ilustrado','sketch-white-model':'Maqueta blanca'
 };
 const CAD3D_SKETCH_PRESETS={
  sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
@@ -2309,7 +2361,22 @@ const CAD3D_SKETCH_PRESETS={
  'sketch-engraving':{bg:0xfff8e5,ground:0xeee5cf,fill:0xf5e9d5,edge:0x233c57,alpha:.98,hatch:true,hatchColor:0x31455e,hatchDensity:1.7},
  'sketch-urban':{bg:0xfffdf8,ground:0xf5f0e7,fill:0xfaf7ef,edge:0x323838,alpha:.79,hatch:true,hatchColor:0x697075,hatchDensity:.75},
  'sketch-graphic':{bg:0xfff8e9,ground:0xf4e6cf,fill:0xf3c4aa,edge:0x1f4b78,alpha:.95,hatch:true,hatchColor:0x1a557f,hatchDensity:1},
- 'sketch-comic':{bg:0xfff9ed,ground:0xe6e0d3,fill:0xbed5d3,edge:0x25323a,alpha:1,hatch:true,hatchColor:0x48565d,hatchDensity:1.25}
+ 'sketch-comic':{bg:0xfff9ed,ground:0xe6e0d3,fill:0xbed5d3,edge:0x25323a,alpha:1,hatch:true,hatchColor:0x48565d,hatchDensity:1.25},
+ 'sketch-sunlit':{bg:0xfffbef,ground:0xece4d4,fill:0xe7e6db,edge:0x3d4b54,alpha:.78},
+ 'sketch-pencil-soft':{bg:0xf9f8f2,ground:0xeceae4,fill:0xf2f0e8,edge:0x969490,alpha:.58},
+ 'sketch-pencil-bold':{bg:0xf4f1e8,ground:0xe5e1d9,fill:0xe8e5db,edge:0x39383a,alpha:1,hatch:true,hatchColor:0x55545a,hatchDensity:.7},
+ 'sketch-blue-engraving':{bg:0xfff4da,ground:0xeee0be,fill:0xf6ecd1,edge:0x153d64,alpha:1,hatch:true,hatchColor:0x244a6f,hatchDensity:2.15},
+ 'sketch-red-ochre':{bg:0xfff7e4,ground:0xf2dfc7,fill:0xda7454,edge:0x392d35,alpha:.94,hatch:true,hatchColor:0x883b35,hatchDensity:.85},
+ 'sketch-comic-teal':{bg:0xf5edd9,ground:0xe5decb,fill:0x8fb7b7,edge:0x1f303c,alpha:1,hatch:true,hatchColor:0x213d49,hatchDensity:1.6},
+ 'sketch-ink-light':{bg:0xfffefa,ground:0xf4f1ed,fill:0xfaf9f3,edge:0x525b62,alpha:.62},
+ 'sketch-concept':{bg:0xfaf7f2,ground:0xe9e6e0,fill:0xe9ebe7,edge:0x4e6373,alpha:.82},
+ 'sketch-watercolor-warm':{bg:0xfff8e9,ground:0xe9dfc8,fill:0xe1cdb3,edge:0x856758,alpha:.62},
+ 'sketch-watercolor-cool':{bg:0xf4f9f5,ground:0xdce9e5,fill:0xb5cdcb,edge:0x46767c,alpha:.64},
+ 'sketch-monochrome-contrast':{bg:0xffffff,ground:0xddddda,fill:0xb2b2af,edge:0x1a1a1a,alpha:1,hatch:true,hatchColor:0x4e4e4e,hatchDensity:1.2},
+ 'sketch-technical-red':{bg:0xfffaf3,ground:0xf2eae3,fill:0xf4d4ce,edge:0x983d45,alpha:.92},
+ 'sketch-vintage-print':{bg:0xf1e7cc,ground:0xe7d8b9,fill:0xb8bdab,edge:0x353f36,alpha:.92,hatch:true,hatchColor:0x565c4f,hatchDensity:1.2},
+ 'sketch-sunset':{bg:0xfce9d0,ground:0xeacdad,fill:0xc5b0a5,edge:0x594a58,alpha:.78},
+ 'sketch-white-model':{bg:0xfcfcfc,ground:0xeeeeee,fill:0xf9f9f8,edge:0x7b838a,alpha:.7}
 };
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
@@ -2443,7 +2510,7 @@ function applyRenderStyle(){
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
  renderStyle=mode;
- if(isCad3DSketch(mode)&&!sunSettings.enabled){sunSettings.enabled=true;sunSettings.onGround=true;}
+ if(isCad3DSketch(mode)){sunSettings.enabled=true;sunSettings.onGround=true;sunSettings.onFaces=true;}
  if(renderer)applyRenderStyle();
  else renderStyleControls();
  if(isCad3DSketch(mode))applySunSettings();
