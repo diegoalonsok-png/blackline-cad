@@ -1679,7 +1679,7 @@ function buildObject(r){
  return group;
 }
 function disposeMeshes(group){
- group.traverse(function(o){if(o.isMesh||o.userData?.cadSketch){o.geometry.dispose();o.material.dispose();}});
+ group.traverse(function(o){if(o.isMesh||o.isLine||o.userData?.cadSketch){o.geometry.dispose();o.material.dispose();}});
 }
 function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
