@@ -2022,9 +2022,14 @@ function exportSketchPresentation(){
   text('No se pudo renderizar el croquis: '+(e.message||e));return;
  }finally{
   if(renderer){
-   renderer.setPixelRatio(oldPixel);
-   renderer.setSize(oldSize.x,oldSize.y,false);
-   renderer.render(scene,camera);
+   try{
+    renderer.setPixelRatio(oldPixel);
+    renderer.setSize(oldSize.x,oldSize.y,false);
+    renderer.render(scene,camera);
+   }catch(restoreError){
+    // Retain the original export failure and avoid breaking the CAD UI.
+    text('Aviso: no se pudo restaurar la vista 3D · '+(restoreError.message||restoreError));
+   }
   }
  }
  cadSketchPaperAndHatch(canvas,ctx,cadEffectiveSketch(renderStyle));
