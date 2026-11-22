@@ -3,6 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
+var selectedOpeningId=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
@@ -1197,6 +1198,23 @@ function hostHitAt(e,type){
  if(!hit)return null;
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
 }
+/* Validate architectural opening edits before changing the wall geometry. */
+function openingFitsCADHost(host,item,excludeId){
+ if(!host||!Number.isFinite(item.offset)||!Number.isFinite(item.w)||item.w<=0)return false;
+ if(Math.abs(item.offset)+item.w/2>host.w/2+1e-6)return false;
+ if(host.type==='wall'){
+  if(!Number.isFinite(item.sill)||!Number.isFinite(item.h)||item.h<=0||item.sill<0||item.sill+item.h>host.h+1e-6)return false;
+ }else if(host.type==='slab'){
+  if(!Number.isFinite(item.offsetY)||!Number.isFinite(item.d)||item.d<=0||Math.abs(item.offsetY)+item.d/2>host.d/2+1e-6)return false;
+ }
+ return !(host.openings||[]).some(function(other){
+  if(other.id===excludeId)return false;
+  if(Math.abs(other.offset-item.offset)>=(other.w+item.w)/2+.015)return false;
+  return host.type==='wall'?
+   Math.max(other.sill,item.sill)<Math.min(other.sill+other.h,item.sill+item.h)+.015:
+   Math.abs(other.offsetY-item.offsetY)<(other.d+item.d)/2+.015;
+ });
+}
 function placeOpening(e){
  var kind=placing,style=archStyle(kind,activePreset[kind]),type=style.host||'wall';
  var hit=hostHitAt(e,type);
@@ -1223,7 +1241,7 @@ function placeOpening(e){
   return Math.max(other.sill||0,op.sill||0)<Math.min((other.sill||0)+(other.h||0),(op.sill||0)+op.h)+.015;
  });
  if(overlaps){text('La abertura se superpone a otra existente. Elegí otro lugar del muro.');return;}
- rec.openings.push(op);selected=[rec.id];redraw();renderProps();
+ rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
   ' · '+rec.openings.length+' abertura(s) en este elemento · clic para colocar otra · Enter / Esc termina');
@@ -1295,6 +1313,7 @@ function selectAt(e){
    if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
   });
   var id=wallOrSlab?.host.id??best?.id;
+  selectedOpeningId=null;
   if(id==null){if(!e.shiftKey)selected=[];}
   else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
   else selected=[id];
@@ -1306,15 +1325,26 @@ function selectAt(e){
  raycaster.setFromCamera(p,camera);
  var hits=[];modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
- var hit=intersects.find(function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});});
- var id=hit?hit.object.userData.owner:null;
- if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
- renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
+ var eligible=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
+ var visibleHits=intersects.filter(eligible),front=visibleHits[0]||null;
+ var tagged=front&&visibleHits.find(function(item){
+  if(item.object.userData.openingId==null||item.object.userData.owner!==front.object.userData.owner)return false;
+  var host=records.find(function(r){return r.id===item.object.userData.owner;});
+  return item.distance<=front.distance+Math.max(.12,Math.min(.7,(host?.d||.2)*2+.2));
+ });
+ var hit=tagged||front,id=hit?hit.object.userData.owner:null;
+ if(id===null){if(!e.shiftKey)selected=[];selectedOpeningId=null;}
+ else if(e.shiftKey){
+  var already=selected.includes(id);
+  selected=already?selected.filter(function(n){return n!==id;}):selected.concat(id);
+  selectedOpeningId=already?null:(hit.object.userData.openingId??null);
+ }else{selected=[id];selectedOpeningId=hit.object.userData.openingId??null;}
+ renderProps();highlight();text(selectedOpeningId!=null?'Carpintería seleccionada: Model, Width, Height y Sill en Properties':selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);
+ m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);return m;
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
@@ -1338,6 +1368,7 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
+  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
   if(opening.kind==='opening'||opening.styleId==='open-door')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
@@ -1347,32 +1378,32 @@ function architectureParts(r,part){
    var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
    var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
    // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   part(panelW,depth,panelH,x,0,z,leafColor,0);
-   part(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
+   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
+   carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
    if(doubleDoor||sliding){
-    part(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
+    carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
    }
    if(doorType==='garage-door'){
-    for(var rail=1;rail<5;rail++)part(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
+    for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
    }
    if(glazed){
-    part(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
+    carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
    }
    if(doorType==='pivot-door'){
-    part(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
+    carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
    }
   }else{
    var d=thickness+.03,windowType=opening.styleId||'';
-   part(w,d,frame,x,0,z,0xb5c4cc,0);
-   part(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
-   part(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
-   part(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   part(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
+   carpPart(w,d,frame,x,0,z,0xb5c4cc,0);
+   carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
+   carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
+   carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
+   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
    if(/double|sliding|two-leaf/.test(windowType)){
-    part(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
+    carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
    }
    if(/awning|hopper|clerestory|ribbon/.test(windowType)){
-    part(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
+    carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
    }
   }
  });
@@ -1461,7 +1492,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1469,7 +1500,8 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  addMesh(g,color,r.id,group,x,y,z);
+  var component=addMesh(g,color,r.id,group,x,y,z);
+  if(openingId!=null)component.userData.openingId=openingId;
  });
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
@@ -1501,7 +1533,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
@@ -1518,37 +1550,53 @@ function renderProps(){
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
- var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
+ var focus=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
+ var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
+ '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
- if(host)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
- var keys=['x','y','z'];
- if(r.type!=='boolean')keys.push('rot');
- if(r.type==='box'||r.type==='wall'||r.type==='slab')keys.push('w','d','h');
- if(r.type==='slab')keys.push('pitch');
- if(r.type==='sphere')keys.push('radius');
- if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
+ if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
+ var keys=focus?[]:['x','y','z'];
+ if(!focus&&r.type!=='boolean')keys.push('rot');
+ if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'))keys.push('w','d','h');
+ if(!focus&&r.type==='slab')keys.push('pitch');
+ if(!focus&&r.type==='sphere')keys.push('radius');
+ if(!focus&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
-  r.openings.forEach(function(o,i){
-   html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>';
+  r.openings.filter(function(o){return !focus||o.id===focus.id;}).forEach(function(o,i){
+   html+='<div class="detail"><button type="button" class="btn" data-select-opening-id="'+o.id+'">'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+' · Edit</button>';
    var fields=r.type==='wall'?[['offset','Offset X'],['w','Width'],['h','Height'],['sill','Sill']]:
     [['offset','Offset X'],['offsetY','Offset Y'],['w','Width'],['d','Depth']];
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
+   if(r.type==='wall'){
+    var available=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host!=='slab';}):ARCH_STYLES[o.kind];
+    if(available)html+='<label>Model <select data-opening-style="'+o.id+'">'+available.map(function(st){return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';}).join('')+'</select></label>';
+   }
    html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
- html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
+ if(!focus)html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
  p.innerHTML=html;
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('select[data-opening-style]')){
+  var opening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
+  var style=opening&&(ARCH_STYLES[opening.kind]||[]).find(function(st){return st.id===input.value;});
+  if(!opening||!style)return;
+  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w});
+  if(r.type==='wall'){candidate.h=style.h;candidate.sill=Math.min(style.sill,Math.max(0,r.h-style.h));}
+  else candidate.d=style.d;
+  if(!openingFitsCADHost(r,candidate,opening.id)){renderProps();text('El modelo elegido no entra en el muro o se superpone a otro vano');return;}
+  Object.assign(opening,candidate);selectedOpeningId=opening.id;redraw();renderProps();text('Modelo de carpintería actualizado');return;
+ }
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
   if(!editableRecord(r))selected=[];
@@ -1571,6 +1619,8 @@ function change(e){
   if(key==='w'||key==='h'||key==='d')val=clamp(val,.05,1000);
   else if(key==='sill')val=clamp(val,0,1000);
   else val=clamp(val,-10000,10000);
+  var proposal=Object.assign({},o,{[key]:val});
+  if(!openingFitsCADHost(r,proposal,o.id)){renderProps();text('La abertura no entra en el muro o se superpone a otra');return;}
   o[key]=val;
  }else{
   var name=input.dataset.key;
@@ -1583,14 +1633,17 @@ function change(e){
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
 }
 function clickProps(e){
+ var chosen=e.target.closest('[data-select-opening-id]');
+ if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
+ if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
  var o=e.target.closest('[data-remove-opening]');if(o){
   var host=records.find(function(r){return selected.includes(r.id)&&(r.type==='wall'||r.type==='slab');});if(!host)return;
-  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});
+  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});selectedOpeningId=null;
   redraw();renderProps();text('Abertura desvinculada y vano cerrado');return;
  }
  var del=e.target.closest('[data-remove-object]');if(del){
   records=records.filter(function(r){return r.id!==Number(del.dataset.removeObject);});
-  selected=[];redraw();renderProps();text('Objeto eliminado');
+  selected=[];selectedOpeningId=null;redraw();renderProps();text('Objeto eliminado');
  }
 }
 /* Exact axis-aligned box boolean prototype: partition at all six cutting planes.
