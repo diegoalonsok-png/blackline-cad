@@ -2046,12 +2046,15 @@ function renderProps(){
      '<label>Opening direction <select data-opening-param="'+o.id+'" data-param="swing">'+
      [['in','Inward'],['out','Outward']].map(function(a){return '<option value="'+a[0]+'"'+optValue('swing',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>';
     var horizontal=cfg.operation==='sliding'||cfg.operation==='sectional';
-    var prop=horizontal?'openPercent':'openAngle',max=horizontal?100:120;
-    html+='<label>'+(horizontal?'Opening (%)':'Opening angle (°)')+
-     '<input type="range" min="0" max="'+max+'" step="1" data-opening-param="'+o.id+'" data-param="'+prop+
-     '" value="'+cfg[prop]+'"><output data-opening-value="'+o.id+'">'+cfg[prop]+(horizontal?'%':'°')+'</output></label>'+
-     '<div class="detail"><button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="open">Open</button> '+
-     '<button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="close">Close</button></div></div>';
+    if(cfg.operation==='fixed')html+='<small>Fixed glazing · choose an operable system to open this sash.</small></div>';
+    else{
+     var prop=horizontal?'openPercent':'openAngle',max=horizontal?100:120;
+     html+='<label>'+(horizontal?'Opening (%)':'Opening angle (°)')+
+      '<input type="range" min="0" max="'+max+'" step="1" data-opening-param="'+o.id+'" data-param="'+prop+
+      '" value="'+cfg[prop]+'"><output data-opening-value="'+o.id+'">'+cfg[prop]+(horizontal?'%':'°')+'</output></label>'+
+      '<div class="detail"><button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="open">Open</button> '+
+      '<button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="close">Close</button></div></div>';
+    }
    }
    html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
@@ -2135,6 +2138,7 @@ function clickProps(e){
   var op=(host?.openings||[]).find(function(o){return o.id===Number(motion.dataset.openingMotion);});
   if(!op)return;
   var cfg=cad3DOpeningConfig(op),horizontal=['sliding','sectional'].includes(cfg.operation);
+  if(cfg.operation==='fixed')return text('Paño fijo: elegí batiente, corrediza o basculante para abrirlo');
   op[horizontal?'openPercent':'openAngle']=motion.dataset.motion==='close'?0:horizontal?100:90;
   redraw();renderProps();text('Carpintería '+(motion.dataset.motion==='close'?'cerrada':'abierta')+' en 3D');return;
  }
