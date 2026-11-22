@@ -1558,7 +1558,8 @@ function get3DGripDefinitions(r,openingId){
   }else{
    add('opening-height','Altura de puerta o ventana',o.offset,0,o.sill+o.h,'z');
    add('opening-sill','Antepecho / solera',o.offset,0,o.sill,'z');
-   if(['door','window'].includes(o.kind)&&cad3DOpeningConfig(o).operation!=='fixed')
+   if(['door','window'].includes(o.kind)&&
+    (typeof cad3DOpeningConfig!=='function'||cad3DOpeningConfig(o).operation!=='fixed'))
     add('opening-motion','Abrir/cerrar hojas 3D',o.offset+o.w*.35,0,o.sill+o.h*.45,'motion');
   }
   return grips;
