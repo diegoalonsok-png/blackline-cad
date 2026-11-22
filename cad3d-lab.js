@@ -1486,37 +1486,65 @@ function architectureParts(r,part){
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
   if(opening.kind==='door'){
-   var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
-   var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
-   var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
-   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
-   // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   part(panelW,depth,panelH,x,0,z,leafColor,0);
-   part(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
-   if(doubleDoor||sliding){
-    part(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
+   var id=opening.styleId||'',frameDepth=thickness+.03;
+   var doubleLeaf=/double|french|terrace|bifold|folding|industrial|revolving/.test(id);
+   var panels=/garage/.test(id)?1:/bifold|folding/.test(id)?4:doubleLeaf?2:1;
+   var sliding=/sliding|pocket|barn|terrace/.test(id);
+   var glazed=/french|terrace|industrial/.test(id);
+   var frameW=Math.min(.065,w/10),usable=Math.max(.05,w-2*frameW);
+   var leafColor=glazed?0x598fa4:/fire-rated|industrial/.test(id)?0x8296a0:0x997a63;
+   // Perimeter frame, head and both jambs, remain attached to the host.
+   part(w,frameDepth,frameW,x,0,z+h-frameW,0x73848d,0);
+   part(frameW,frameDepth,h,o.left+frameW/2,0,z,0x73848d,0);
+   part(frameW,frameDepth,h,o.right-frameW/2,0,z,0x73848d,0);
+   var leafW=usable/panels;
+   for(var leaf=0;leaf<panels;leaf++){
+    var cx=o.left+frameW+leafW*(leaf+.5);
+    var inset=Math.min(.022,leafW/10),height=Math.max(.1,h-2*frameW);
+    part(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
+    if(glazed){
+     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0);
+     part(Math.max(.03,leafW-.08),.055,.025,cx,0,z+frameW+height*.52,0xa5b5be,0);
+    }
+    // Door leaf side rails / panel divisions.
+    part(Math.min(.035,leafW/8),.051,height,o.left+frameW+leafW*leaf+.022,0,z+frameW,0x607783,0);
    }
-   if(doorType==='garage-door'){
-    for(var rail=1;rail<5;rail++)part(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
+   if(sliding){
+    part(w,.075,.018,x,-frameDepth/2,z+.005,0x697b85,0);
+    part(w,.075,.018,x,-frameDepth/2,z+h-.028,0x697b85,0);
    }
-   if(glazed){
-    part(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
-   }
-   if(doorType==='pivot-door'){
-    part(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
-   }
+   if(/garage/.test(id))for(var rail=1;rail<6;rail++)part(usable,.055,.018,x,0,z+h*rail/6,0x596d7b,0);
+   if(/barn/.test(id))part(w+.14,.1,.035,x,0,z+h+.065,0x394b55,0);
   }else{
-   var d=thickness+.03,windowType=opening.styleId||'';
-   part(w,d,frame,x,0,z,0xb5c4cc,0);
-   part(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
-   part(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
-   part(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   part(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
-   if(/double|sliding|two-leaf/.test(windowType)){
-    part(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
+   var id=opening.styleId||'',d=thickness+.035;
+   var frameW=Math.min(.055,w/10,h/10),innerW=Math.max(.04,w-2*frameW),innerH=Math.max(.04,h-2*frameW);
+   var sliding=/sliding/.test(id),n=/double|two-leaf|sliding|bay/.test(id)?2:/ribbon/.test(id)?3:1;
+   var glazingColor=/glass-block/.test(id)?0x9ec8d3:0x548b9e;
+   // Full perimeter with clear glazing to distinguish windows from solid doors.
+   part(w,d,frameW,x,0,z,0x9babb5,0);
+   part(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
+   part(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
+   part(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
+   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0);
+   for(var pane=1;pane<n;pane++)
+    part(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
+   if(/french|glass-block/.test(id)){
+    for(var grid=1;grid<4;grid++)
+     part(innerW,.038,.018,x,0,z+frameW+innerH*grid/4,0xb9c7cd,0);
+    for(var col=1;col<4;col++)
+     part(.020,.038,innerH,o.left+frameW+innerW*col/4,0,z+frameW,0xb9c7cd,0);
    }
-   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
-    part(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
+   if(/awning|hopper|tilt-turn|clerestory|ribbon|guillotine/.test(id))
+    part(innerW,d+.024,.022,x,0,z+frameW+innerH*(/awning|clerestory|ribbon/.test(id)?.67:.5),0xd6e0e5,0);
+   if(/louver/.test(id))for(var blade=1;blade<9;blade++)
+    part(innerW,d+.06,.026,x,0,z+frameW+innerH*blade/9,0x809ba9,0);
+   if(sliding){
+    part(w,.08,.02,x,0,z+.01,0x718694,0);
+    part(w,.08,.02,x,0,z+h-.03,0x718694,0);
+   }
+   if(/bay/.test(id)){
+    part(.048,.16,innerH,o.left+frameW,0,z+frameW,0x9aadb7,0);
+    part(.048,.16,innerH,o.right-frameW,0,z+frameW,0x9aadb7,0);
    }
   }
  });
