@@ -265,6 +265,28 @@ var css=`
 #cad3dLab .orbitBall[data-drag-mode=pan] svg .orbitCore{fill:#64889d}
 #cad3dLab .orbitBall:focus-visible{outline:2px solid #a8def6;outline-offset:2px}
 #cad3dLab .view.planRulers .viewNav{top:23px;left:26px}
+
+/* Parametric grip layer: anchored AEC elements and editable solids. */
+#cad3dLab .cad3dGripLayer{position:absolute;inset:0;z-index:5;pointer-events:none;overflow:hidden}
+#cad3dLab .cad3dGrip{
+ position:absolute;transform:translate(-50%,-50%);width:14px;height:14px;min-width:0;
+ padding:0;border:1.5px solid #1d3d4c;border-radius:3px;
+ pointer-events:auto;cursor:move;touch-action:none;user-select:none;
+ background:#8fdaf5;box-shadow:0 1px 5px #000e,inset 0 1px 0 #f9fdffb0;
+}
+#cad3dLab .cad3dGrip[data-kind^=opening]{border-radius:50%;background:#f1c36f;border-color:#684c21}
+#cad3dLab .cad3dGrip[data-kind=move]{width:16px;height:16px;background:#c1a3ed;border-radius:50%}
+#cad3dLab .cad3dGrip[data-kind=rotate]{background:#c0e6bd;border-radius:50%;cursor:crosshair}
+#cad3dLab .cad3dGrip:hover,#cad3dLab .cad3dGrip:focus-visible,#cad3dLab .cad3dGrip[data-active=true]{
+ width:18px;height:18px;outline:2px solid #f7f8fa;outline-offset:1px;
+ box-shadow:0 2px 9px #000c,0 0 11px #83d5f7;
+}
+#cad3dLab .cad3dGripHint{
+ position:absolute;z-index:1;max-width:230px;padding:5px 8px;transform:translate(0,-100%);
+ color:#fff;font:600 11px Inter,Arial,sans-serif;white-space:nowrap;
+ border:1px solid #678ba0;border-radius:6px;background:#162735e8;
+ box-shadow:0 4px 14px #000a;pointer-events:none;
+}
 #cad3dLab .rulerX, #cad3dLab .rulerY {
  position:absolute; z-index:1; overflow:hidden; pointer-events:none;
  background:var(--cad-ui-toolbar); color:var(--cad-ui-muted); font:9px Inter,Arial,sans-serif;
@@ -546,7 +568,7 @@ function build(){
   return '<div class="archGrip '+d+'" data-arch-grip="'+d+'" title="Arrastrá para cambiar el tamaño" aria-hidden="true"></div>';
  }).join('')+'</aside>'+
  '<div class="view"><div class="rulerX" hidden aria-hidden="true"></div><div class="rulerY" hidden aria-hidden="true"></div>'+
- '<div class="snapMarker" hidden aria-hidden="true"></div><nav class="viewNav" aria-label="Vistas 3D">'+
+ '<div class="snapMarker" hidden aria-hidden="true"></div><div class="cad3dGripLayer" aria-label="Pinzamientos paramétricos 3D"></div><nav class="viewNav" aria-label="Vistas 3D">'+
  '<div class="viewNavTop"><div class="viewCube" tabindex="0" role="group" aria-label="Cubo de vistas 3D: clic en caras, aristas o esquinas; arrastrar para orbitar. Flechas para giro fino" title="ViewCube · Faces, edges, corners · Drag to orbit">'+
  '<svg class="cubeScene" viewBox="0 0 100 100" aria-hidden="true"></svg>'+
  '</div><button type="button" class="orbitBall" aria-label="Órbita: arrastrar el anillo para girar, arrastrar el centro para desplazar y rueda para zoom" title="Orbit ring · Center pan · Wheel zoom"><svg viewBox="0 0 72 72" aria-hidden="true">'+
@@ -647,6 +669,7 @@ function build(){
  renderDraftModes();renderLayerPanel();
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
+ bind3DGripOverlay(root.querySelector('.cad3dGripLayer'));
  root.querySelector('.cad3dContextMenu').addEventListener('click',function(e){
   var cmd=e.target.closest('[data-context-action]')?.dataset.contextAction;
   if(!cmd)return;
@@ -1100,7 +1123,7 @@ function init(){
 }
 function updateCamera(){
  renderNavigationCube();
- if(!camera){scheduleFallbackDraw();return;}
+ if(!camera){scheduleFallbackDraw();render3DGrips();return;}
  camera.up.set(0,0,1);
  if(Math.abs(orbit.el)===Math.PI/2)camera.up.set(0,1,0);
  if(viewMode==='walk'){
@@ -1111,7 +1134,7 @@ function updateCamera(){
    target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
   camera.lookAt(target);
  }
- camera.updateMatrixWorld();renderRulers();
+ camera.updateMatrixWorld();renderRulers();render3DGrips();
  if(fallbackCanvas)fallbackDraw();
 }
 function applyViewCamera(){
@@ -1426,6 +1449,248 @@ function selectAt(e){
  }else{selected=[id];selectedOpeningId=hit.object.userData.openingId??null;}
  renderProps();highlight();text(selectedOpeningId!=null?'Carpintería seleccionada: Model, Width, Height y Sill en Properties':selected.length+' seleccionados · '+records.length+' objetos');
 }
+
+/* Parametric 3D grips: edit record dimensions, with hosted door/window voids preserved. */
+var active3DGrip=null;
+function grip3DWorldPoint(r,x,y,z){
+ var a=(r.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ return {x:r.x+c*x-s*y,y:r.y+s*x+c*y,z:(r.z||0)+z};
+}
+function get3DGripDefinitions(r,openingId){
+ var grips=[],opening=(r.openings||[]).find(function(o){return o.id===openingId;});
+ function add(kind,label,x,y,z,axis){
+  grips.push({kind:kind,label:label,point:grip3DWorldPoint(r,x,y,z),axis:axis});
+ }
+ if(opening&&(r.type==='wall'||r.type==='slab')){
+  var o=opening,s=r.type==='slab',z=s?r.h:o.sill;
+  add('opening-offset','Desplazar abertura',o.offset,s?o.offsetY:0,s?r.h:o.sill+o.h*.5,'x');
+  add('opening-start','Jamba izquierda · ancho',o.offset-o.w/2,s?o.offsetY:0,s?r.h:o.sill+o.h*.5,'x');
+  add('opening-end','Jamba derecha · ancho',o.offset+o.w/2,s?o.offsetY:0,s?r.h:o.sill+o.h*.5,'x');
+  if(s){
+   add('opening-depth-start','Profundidad inferior',o.offset,o.offsetY-o.d/2,r.h,'y');
+   add('opening-depth-end','Profundidad superior',o.offset,o.offsetY+o.d/2,r.h,'y');
+   add('opening-offset-y','Desplazar abertura en Y',o.offset,o.offsetY,r.h,'y');
+  }else{
+   add('opening-height','Altura de puerta o ventana',o.offset,0,o.sill+o.h,'z');
+   add('opening-sill','Antepecho / solera',o.offset,0,o.sill,'z');
+  }
+  return grips;
+ }
+ var height=r.type==='sphere'?(r.radius||1)*2:(r.h||1);
+ add('move','Mover elemento',0,0,height*.5,'xy');
+ if(r.type==='boolean')return grips;
+ add('rotate','Girar elemento',(r.w||r.radius*2||2)/2+.55,(r.d||0)/2,height*.55,'rotate');
+ if(['wall','slab','box'].includes(r.type)){
+  add('length-start','Estirar extremo inicial',-r.w/2,0,height*.55,'x');
+  add('length-end','Estirar extremo final',r.w/2,0,height*.55,'x');
+  if(r.type==='wall')add('thickness','Espesor de muro',0,r.d/2,height*.55,'y');
+  else {
+   add('depth-start','Estirar profundidad inicial',0,-r.d/2,height*.55,'y');
+   add('depth-end','Estirar profundidad final',0,r.d/2,height*.55,'y');
+  }
+  add('height','Altura / espesor',0,0,r.h,'z');
+ }else if(r.type==='sphere'){
+  add('radius','Radio de esfera',r.radius,0,r.radius,'x');
+ }else if(r.type==='cone'||r.type==='cylinder'){
+  add('radius','Radio de sólido',r.radius,0,r.h*.5,'x');
+  add('height','Altura de sólido',0,0,r.h,'z');
+ }
+ return grips;
+}
+function valid3DGripCandidate(r){
+ if(!Number.isFinite(r.x+r.y+r.z+(r.rot||0)))return false;
+ var keys=['w','d','h','radius'];
+ for(var k of keys)if(r[k]!=null&&(!Number.isFinite(r[k])||r[k]<.01||r[k]>1000))return false;
+ if((r.type==='wall'||r.type==='slab')&&(r.openings||[]).some(function(o){
+  return !openingFitsCADHost(r,o,o.id);
+ }))return false;
+ return true;
+}
+function apply3DGripCandidate(original,kind,delta,openingId){
+ var r=JSON.parse(JSON.stringify(original));
+ if(kind==='move'){
+  if(!delta||!Number.isFinite(delta.x+delta.y))return null;
+  r.x=original.x+delta.x;r.y=original.y+delta.y;
+  return valid3DGripCandidate(r)?r:null;
+ }
+ if(!Number.isFinite(delta))return null;
+ if(kind==='rotate'){r.rot=((original.rot||0)+delta)%360;return valid3DGripCandidate(r)?r:null;}
+ var o=(r.openings||[]).find(function(v){return v.id===openingId;});
+ if(kind.startsWith('opening-')){
+  if(!o)return null;
+  if(kind==='opening-offset')o.offset+=delta;
+  else if(kind==='opening-start'){o.w-=delta;o.offset+=delta/2;}
+  else if(kind==='opening-end'){o.w+=delta;o.offset+=delta/2;}
+  else if(kind==='opening-height'&&r.type==='wall')o.h+=delta;
+  else if(kind==='opening-sill'&&r.type==='wall')o.sill+=delta;
+  else if(kind==='opening-depth-start'&&r.type==='slab'){o.d-=delta;o.offsetY+=delta/2;}
+  else if(kind==='opening-depth-end'&&r.type==='slab'){o.d+=delta;o.offsetY+=delta/2;}
+  else if(kind==='opening-offset-y'&&r.type==='slab')o.offsetY+=delta;
+  else return null;
+  if(!Number.isFinite(o.w)||o.w<.05||o.w>1000)return null;
+  if(r.type==='wall'&&(!Number.isFinite(o.h)||o.h<.05))return null;
+  if(r.type==='slab'&&(!Number.isFinite(o.d)||o.d<.05))return null;
+  return valid3DGripCandidate(r)?r:null;
+ }
+ var a=(original.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ if(kind==='length-start'||kind==='length-end'){
+  var change=kind==='length-start'?-delta:delta,shift=delta/2;
+  r.w=original.w+change;r.x=original.x+c*shift;r.y=original.y+s*shift;
+  if(r.openings)r.openings.forEach(function(op){op.offset-=shift;});
+ }else if(kind==='depth-start'||kind==='depth-end'){
+  var diff=kind==='depth-start'?-delta:delta,advance=delta/2;
+  r.d=original.d+diff;r.x=original.x-s*advance;r.y=original.y+c*advance;
+  if(r.openings)r.openings.forEach(function(op){if(op.offsetY!=null)op.offsetY-=advance;});
+ }else if(kind==='thickness'&&r.type==='wall')r.d=original.d+2*delta;
+ else if(kind==='height')r.h=original.h+delta;
+ else if(kind==='radius')r.radius=original.radius+delta;
+ else return null;
+ if(!valid3DGripCandidate(r))return null;
+ return r;
+}
+function grip3DAxisVector(r,axis){
+ var a=(r.rot||0)*Math.PI/180;
+ if(axis==='z')return {x:0,y:0,z:1};
+ if(axis==='y')return {x:-Math.sin(a),y:Math.cos(a),z:0};
+ return {x:Math.cos(a),y:Math.sin(a),z:0};
+}
+function grip3DDragMeters(source,def,dx,dy){
+ var view=root.querySelector('.view'),screen=pointOnScreen(def.point,view);
+ if(def.axis==='xy'){
+  var px=pointOnScreen({x:def.point.x+1,y:def.point.y,z:def.point.z},view),
+      py=pointOnScreen({x:def.point.x,y:def.point.y+1,z:def.point.z},view);
+  var ax=px.x-screen.x,ay=px.y-screen.y,bx=py.x-screen.x,by=py.y-screen.y;
+  var det=ax*by-ay*bx;
+  if(Math.abs(det)>5)return {x:clamp((dx*by-dy*bx)/det,-1000,1000),y:clamp((dy*ax-dx*ay)/det,-1000,1000)};
+  var xa=ax*ax+ay*ay,ya=bx*bx+by*by;
+  if(xa>ya&&xa>.001)return {x:clamp((dx*ax+dy*ay)/xa,-1000,1000),y:0};
+  if(ya>.001)return {x:0,y:clamp((dx*bx+dy*by)/ya,-1000,1000)};
+  return null;
+ }
+ var axis=grip3DAxisVector(source,def.axis);
+ var projected=pointOnScreen({x:def.point.x+axis.x,y:def.point.y+axis.y,z:def.point.z+axis.z},view);
+ var ux=projected.x-screen.x,uy=projected.y-screen.y,length2=ux*ux+uy*uy;
+ if(length2<3)return null;
+ return clamp((dx*ux+dy*uy)/length2,-1000,1000);
+}
+function grip3DValue(r,kind,openingId){
+ var o=(r.openings||[]).find(function(v){return v.id===openingId;});
+ var obj=kind.startsWith('opening-')?o:r;if(!obj)return '';
+ var field=kind.startsWith('opening-')?
+  ({'opening-offset':'offset','opening-start':'w','opening-end':'w','opening-height':'h','opening-sill':'sill',
+   'opening-depth-start':'d','opening-depth-end':'d','opening-offset-y':'offsetY'})[kind]:
+  ({'length-start':'w','length-end':'w','depth-start':'d','depth-end':'d','thickness':'d',
+   'height':'h','radius':'radius','rotate':'rot'})[kind];
+ if(kind==='move')return 'X '+r.x.toFixed(3)+' · Y '+r.y.toFixed(3);
+ return field?Number(obj[field]).toFixed(3)+(field==='rot'?'°':' m'):'';
+}
+function render3DGrips(){
+ if(!root)return;
+ var layer=root.querySelector('.cad3dGripLayer');
+ if(!layer||active3DGrip)return;
+ if(!camera&&!fallbackCanvas||selected.length!==1||placing){layer.replaceChildren();return;}
+ var r=records.find(function(v){return v.id===selected[0]&&editableRecord(v);});
+ if(!r){layer.replaceChildren();return;}
+ var view=root.querySelector('.view');
+ var html='';
+ get3DGripDefinitions(r,selectedOpeningId).forEach(function(def){
+  var p=pointOnScreen(def.point,view);
+  if(!Number.isFinite(p.x+p.y)||p.x<6||p.x>view.clientWidth-6||p.y<6||p.y>view.clientHeight-6)return;
+  html+='<button type="button" class="cad3dGrip" style="left:'+p.x.toFixed(1)+'px;top:'+p.y.toFixed(1)+'px" data-kind="'+def.kind+
+   '" title="'+escapeHtml(def.label)+' · Arrastrá o clic para ingresar valor" aria-label="'+escapeHtml(def.label)+'" ></button>';
+ });
+ layer.innerHTML=html;
+}
+function numeric3DGripAdjustment(r,kind,openingId){
+ if(kind==='move')return null;
+ var o=(r.openings||[]).find(function(x){return x.id===openingId;});
+ var current=kind.startsWith('opening-')?o:r;
+ if(!current)return null;
+ var field=kind.startsWith('opening-')?({'opening-offset':'offset','opening-start':'w','opening-end':'w','opening-height':'h','opening-sill':'sill',
+ 'opening-depth-start':'d','opening-depth-end':'d','opening-offset-y':'offsetY'})[kind]:
+ ({'length-start':'w','length-end':'w','depth-start':'d','depth-end':'d','thickness':'d','height':'h','radius':'radius','rotate':'rot'})[kind];
+ if(!field)return null;
+ var value=Number(window.prompt('Nuevo valor '+field+(field==='rot'?' (grados)':' (metros)'),String(current[field])));
+ if(!Number.isFinite(value))return null;
+ var d=value-current[field];
+ if(kind==='length-start'||kind==='depth-start'||kind==='opening-start'||kind==='opening-depth-start')d=-d;
+ if(kind==='thickness')d/=2;
+ return d;
+}
+function bind3DGripOverlay(layer){
+ if(!layer)return;
+ var hint=null,drag=null;
+ function show(def,r,p){
+  if(!hint){hint=document.createElement('output');hint.className='cad3dGripHint';layer.appendChild(hint);}
+  hint.textContent=def.label+' · '+grip3DValue(r,def.kind,drag?.openingId);
+  hint.style.left=clamp(p.x+13,4,Math.max(4,layer.clientWidth-160))+'px';
+  hint.style.top=clamp(p.y-10,20,Math.max(20,layer.clientHeight-20))+'px';
+ }
+ function cleanup(){active3DGrip=null;drag=null;hint?.remove();hint=null;render3DGrips();}
+ layer.addEventListener('pointerdown',function(e){
+  var btn=e.target.closest('.cad3dGrip');
+  if(!btn||e.button!==0||drag)return;
+  var r=records.find(function(v){return selected.length===1&&v.id===selected[0]&&editableRecord(v);});
+  if(!r||placing)return;
+  var def=get3DGripDefinitions(r,selectedOpeningId).find(function(g){return g.kind===btn.dataset.kind;});
+  if(!def)return;
+  e.preventDefault();e.stopPropagation();btn.focus({preventScroll:true});
+  var original=JSON.parse(JSON.stringify(r));
+  var center=pointOnScreen(grip3DWorldPoint(r,0,0,(r.h||r.radius*2||2)/2),root.querySelector('.view'));
+  var centerPage=root.querySelector('.view').getBoundingClientRect();
+  drag={id:e.pointerId,r:r,original:original,def:def,openingId:selectedOpeningId,x:e.clientX,y:e.clientY,moved:false,
+   centerX:centerPage.left+center.x,centerY:centerPage.top+center.y,
+   angle:Math.atan2(e.clientY-centerPage.top-center.y,e.clientX-centerPage.left-center.x)};
+  active3DGrip=drag;
+  btn.dataset.active='true';layer.setPointerCapture(e.pointerId);
+  show(def,r,pointOnScreen(def.point,root.querySelector('.view')));
+ });
+ layer.addEventListener('pointermove',function(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(Math.hypot(dx,dy)<3&&!drag.moved)return;
+  e.preventDefault();e.stopPropagation();drag.moved=true;
+  var delta=drag.def.kind==='rotate'?
+   (Math.atan2(e.clientY-drag.centerY,e.clientX-drag.centerX)-drag.angle)*180/Math.PI:
+   grip3DDragMeters(drag.original,drag.def,dx,dy);
+  if(delta==null)return;
+  var next=apply3DGripCandidate(drag.original,drag.def.kind,delta,drag.openingId);
+  if(!next){if(hint)hint.textContent='Límite paramétrico · sin cambios';return;}
+  Object.assign(drag.r,next);
+  redraw();
+  var p=pointOnScreen(drag.def.point,root.querySelector('.view'));
+  show(drag.def,drag.r,p);
+ });
+ function finish(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var state=drag;hint?.remove();hint=null;
+  if(layer.hasPointerCapture(e.pointerId))layer.releasePointerCapture(e.pointerId);
+  if(e.type==='pointercancel'){
+   Object.assign(state.r,state.original);
+  }else if(!state.moved){
+   var delta=numeric3DGripAdjustment(state.original,state.def.kind,state.openingId);
+   if(delta!=null){
+    var next=apply3DGripCandidate(state.original,state.def.kind,delta,state.openingId);
+    if(next)Object.assign(state.r,next);
+    else text('Valor rechazado: la pieza o el vano no cabe en su elemento anfitrión');
+   }
+  }
+  cleanup();redraw();renderProps();
+  if(e.type==='pointerup')text('Bloque 3D paramétrico actualizado · geometría y vano regenerados');
+  e.preventDefault();e.stopPropagation();
+ }
+ layer.addEventListener('pointerup',finish);
+ layer.addEventListener('pointercancel',finish);
+ layer.addEventListener('lostpointercapture',function(){if(drag){drag=null;active3DGrip=null;hint?.remove();hint=null;render3DGrips();}});
+ root.addEventListener('keydown',function(e){
+  if(!drag||e.key!=='Escape')return;
+  e.preventDefault();e.stopPropagation();
+  Object.assign(drag.r,drag.original);
+  var id=drag.id;cleanup();if(layer.hasPointerCapture(id))layer.releasePointerCapture(id);
+  redraw();renderProps();text('Edición con pinzamiento cancelada');
+ },true);
+}
+
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function addMesh(g,color,id,parent,x,y,z){
  var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
@@ -1607,11 +1872,11 @@ function visitMeshes(visitor){
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
- if(fallbackCanvas){fallbackDraw();return;}
+ if(fallbackCanvas){fallbackDraw();render3DGrips();return;}
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
  modelRoot.clear();records.filter(visibleRecord).forEach(function(record){modelRoot.add(buildObject(record));});
- modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();
+ modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();render3DGrips();
 }
 function highlight(){
  if(fallbackCanvas){fallbackDraw();return;}
@@ -1632,6 +1897,7 @@ function styleOptions(kind,id){
 }
 function renderProps(){
  if(!root)return;var p=root.querySelector('.props');
+ render3DGrips();
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
