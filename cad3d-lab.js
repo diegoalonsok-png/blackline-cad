@@ -216,7 +216,34 @@ var css=`
  content:""; position:absolute; top:-4px; left:-3px; width:7px; height:7px;
  border:1px solid #ffe0a0; border-radius:50%; background:#26333d;
 }
+#cad3dLab .styleTuning{border-top:1px solid #566a78;margin-top:9px;padding-top:9px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#cad3dLab .styleTuning[hidden]{display:none!important}
+#cad3dLab .styleTuning label{font:11px Inter,Arial,sans-serif;color:var(--cad-ui-text,#d8e4ef);display:grid;gap:3px}
+#cad3dLab .styleTuning input[type="range"]{width:100%;accent-color:#9bc9d7}
+#cad3dLab .styleTuning output{font-size:10px;color:var(--cad-ui-muted,#a6bac9)}
 #cad3dLab .view.sketchView { background:#f0eee6 }
+#cad3dLab .view.sketchView::after{
+ content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:calc(var(--cad3d-paper-strength,.45) * .35);
+ background-image:repeating-linear-gradient(14deg,#6d5c3a0c 0px,#6d5c3a0c 1px,transparent 1px,transparent 7px),
+ repeating-linear-gradient(93deg,#77674c11 0px,#77674c11 1px,transparent 1px,transparent 11px);
+ mix-blend-mode:multiply
+}
+#cad3dLab .view.sketchView[data-sketch-paper="pencil"]::after{
+ opacity:calc(var(--cad3d-paper-strength,.45) * .8);background-image:repeating-linear-gradient(18deg,#554f4015 0px,#554f4015 1px,transparent 1px,transparent 3px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="ink"]::after{opacity:calc(var(--cad3d-paper-strength,.45) * .18)}
+#cad3dLab .view.sketchView[data-sketch-paper="marker"]::after{
+ opacity:calc(var(--cad3d-paper-strength,.45) * .51);background-image:repeating-linear-gradient(145deg,#69594c18 0px,#69594c18 4px,transparent 4px,transparent 14px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="watercolor"]::after{
+ opacity:calc(var(--cad3d-paper-strength,.45) * .56);background-image:radial-gradient(ellipse at 23% 38%,#9faea633,transparent 37%),
+ radial-gradient(ellipse at 71% 64%,#b9a98e33,transparent 45%),
+ repeating-linear-gradient(18deg,#807d7110 0px,#807d7110 2px,transparent 2px,transparent 9px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="blueprint"]::after{
+ opacity:calc(var(--cad3d-paper-strength,.45) * .49);mix-blend-mode:screen;background-image:repeating-linear-gradient(0deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px),
+ repeating-linear-gradient(90deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px)
+}
 #cad3dLab .viewNav {
  position:absolute; top:8px; left:8px; z-index:1; width:101px;
  display:grid; justify-items:start; gap:4px; pointer-events:none;
@@ -498,17 +525,22 @@ function build(){
  '<button type="button" class="btn" data-check-shadows title="Compare render with shadows on and off">Check visible shadows</button>'+
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
- tool('sketch','Croquis','view')+
+ tool('sketch','Croquis','view')+tool('renderSketch','Render Croquis HQ','export','Exportar un croquis a alta resolución, sin servidor')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico']].map(function(st){
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-etching','Grabado a plumín','Rayado fino editorial'],['sketch-bluepen','Plumín azul','Tinta azul y fondo marfil'],['sketch-gesture','Croquis gestual','Líneas de boceto a mano'],['sketch-duotone','Marcador bicolor','Azul y rojo de presentación']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
- }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
+ }).join('')+'</div><div class="styleTuning" hidden>'+
+ '<label>Edge weight <input type="range" data-sketch-adjust="weight" min="0.5" max="2.5" step="0.1" value="1"><output data-sketch-value="weight">1.0×</output></label>'+
+ '<label>Hand-drawn texture <input type="range" data-sketch-adjust="roughness" min="0" max="2" step="0.1" value="1"><output data-sketch-value="roughness">1.0×</output></label>'+
+ '<label>Color wash <input type="range" data-sketch-adjust="wash" min="0" max="1" step="0.05" value="0.65"><output data-sketch-value="wash">65%</output></label>'+
+ '<label>Paper texture <input type="range" data-sketch-adjust="paper" min="0" max="1" step="0.05" value="0.45"><output data-sketch-value="paper">45%</output></label>'+
+ '</div><small>Architectural illustration: model geometry stays editable.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
- tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
+ tool('shot','PNG','export')+tool('renderSketch','Croquis HQ PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
  '<div class="body">'+
  '<aside id="cad3dArchPalette" class="archPalette" aria-label="Galería paramétrica 3D" hidden>'+
  '<header class="archTitle"><h2>PARAMETRIC 3D GALLERY</h2>'+
@@ -587,6 +619,13 @@ function build(){
  root.querySelector('.styleLaunch').addEventListener('click',function(){
   var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
   this.setAttribute('aria-expanded',String(!panel.hidden));
+ });
+ root.querySelector('.stylePanel').addEventListener('input',function(e){
+  var input=e.target.closest('[data-sketch-adjust]');if(!input||!isCad3DSketch(renderStyle))return;
+  var key=input.dataset.sketchAdjust,value=Number(input.value);
+  if(!Object.prototype.hasOwnProperty.call(cadSketchTuning,key)||!Number.isFinite(value))return;
+  cadSketchTuning[key]=value;renderStyleControls();
+  if(renderer)applyRenderStyle();else fallbackDraw();
  });
  root.querySelector('.styleGrid').addEventListener('click',function(e){
   var button=e.target.closest('[data-render-style]');if(!button)return;
@@ -1578,7 +1617,7 @@ function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
  if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
- try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
+ try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadSketch)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
@@ -1593,7 +1632,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh&&o.material?.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
@@ -1748,17 +1787,35 @@ const CAD3D_VISUAL_STYLES={
  shaded:'Shaded','shaded-edges':'Solid + Edges',realistic:'Realistic',
  monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis técnico',
  'sketch-pencil':'Croquis lápiz','sketch-ink':'Croquis tinta','sketch-marker':'Croquis marcador',
- 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint'
+ 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint',
+ 'sketch-etching':'Grabado a plumín','sketch-bluepen':'Plumín azul',
+ 'sketch-gesture':'Croquis gestual','sketch-duotone':'Marcador bicolor'
 };
 const CAD3D_SKETCH_PRESETS={
- sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
- 'sketch-pencil':{bg:0xf2f0e7,ground:0xe3e1da,fill:0xf2efe8,edge:0x64696b,alpha:.78},
- 'sketch-ink':{bg:0xfaf9f3,ground:0xf0eee8,fill:0xfaf9f4,edge:0x202629,alpha:1},
- 'sketch-marker':{bg:0xf0eee5,ground:0xe5e1d7,fill:0xd2d2cb,edge:0x4e6269,alpha:.76},
- 'sketch-watercolor':{bg:0xf5f1e9,ground:0xe5e3de,fill:0xdadcd7,edge:0x667a7f,alpha:.66},
- 'sketch-mono':{bg:0xf2f2f0,ground:0xe5e5e1,fill:0xe9e9e5,edge:0x424546,alpha:.88},
- 'sketch-blueprint':{bg:0x344e66,ground:0x647f92,fill:0x8ca6b5,edge:0xe4f2fa,alpha:.92}
+ // width is the profile width relative to object dimension; jitter varies
+ // the actual edge strokes, while fillMix keeps authentic material identity.
+ sketch:{bg:0xf5f3eb,ground:0xe8e4d8,fill:0xf0ede4,edge:0x33343a,alpha:.96,width:.0036,jitter:0,passes:1,fillMix:.8,stroke:'clean',paper:'ink'},
+ 'sketch-pencil':{bg:0xf1eee4,ground:0xe6e3db,fill:0xece9e1,edge:0x5d5a55,alpha:.63,width:.003,jitter:.3,passes:3,fillMix:.85,stroke:'pencil',paper:'pencil'},
+ 'sketch-ink':{bg:0xfffdf8,ground:0xf1eee7,fill:0xfcfaf5,edge:0x23272a,alpha:1,width:.0055,jitter:.1,passes:2,fillMix:.92,stroke:'ink',paper:'ink'},
+ 'sketch-marker':{bg:0xf5f1e8,ground:0xe8e3d8,fill:0xd1d7d2,edge:0x334952,alpha:.86,width:.0065,jitter:.17,passes:2,fillMix:.55,stroke:'marker',paper:'marker'},
+ 'sketch-watercolor':{bg:0xf8f3ea,ground:0xe5e1d8,fill:0xcfdcd4,edge:0x687982,alpha:.62,width:.003,jitter:.28,passes:3,fillMix:.48,stroke:'wash',paper:'watercolor'},
+ 'sketch-mono':{bg:0xf7f7f4,ground:0xe8e8e3,fill:0xdcdedc,edge:0x262e33,alpha:.9,width:.0044,jitter:0,passes:1,fillMix:.84,stroke:'clean',paper:'ink'},
+ 'sketch-blueprint':{bg:0x23415b,ground:0x456379,fill:0x54758c,edge:0xe0f4ff,alpha:.96,width:.004,jitter:0,passes:2,fillMix:.8,stroke:'blueprint',paper:'blueprint'},
+ 'sketch-etching':{bg:0xfffcf4,ground:0xf1ecdd,fill:0xf4f0e5,edge:0x222f35,alpha:.94,width:.0024,jitter:.14,passes:3,fillMix:.9,stroke:'etching',paper:'ink'},
+ 'sketch-bluepen':{bg:0xfff4d5,ground:0xefe4c8,fill:0xd9d2bd,edge:0x203d6b,alpha:.95,width:.003,jitter:.17,passes:3,fillMix:.68,stroke:'bluepen',paper:'pencil'},
+ 'sketch-gesture':{bg:0xfffdfa,ground:0xf1eee8,fill:0xfaf9f3,edge:0x323333,alpha:.85,width:.0041,jitter:.54,passes:4,fillMix:.95,stroke:'gesture',paper:'pencil'},
+ 'sketch-duotone':{bg:0xf8f2e3,ground:0xf0eadc,fill:0xf6f0e2,edge:0x255c9a,alpha:.85,width:.005,jitter:.35,passes:3,fillMix:.59,stroke:'duotone',paper:'marker'}
 };
+const cadSketchTuning={weight:1,roughness:1,wash:.65,paper:.45};
+function cadEffectiveSketch(mode){
+ var preset=CAD3D_SKETCH_PRESETS[mode];
+ if(!preset)return null;
+ return Object.assign({},preset,{
+  width:preset.width*cadSketchTuning.weight,
+  jitter:preset.jitter*cadSketchTuning.roughness,
+  fillMix:clamp(preset.fillMix+(cadSketchTuning.wash-.65)*.7,.03,1)
+ });
+}
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
 function renderStyleControls(){
@@ -1770,12 +1827,69 @@ function renderStyleControls(){
  if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
- root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+ var view=root.querySelector('.view');
+ var tuning=root.querySelector('.styleTuning');
+ if(tuning)tuning.hidden=!isCad3DSketch(renderStyle);
+ root.querySelectorAll('[data-sketch-adjust]').forEach(function(input){
+  var key=input.dataset.sketchAdjust;input.value=String(cadSketchTuning[key]);
+  var output=root.querySelector('[data-sketch-value="'+key+'"]');
+  if(output)output.textContent=key==='wash'||key==='paper'?Math.round(cadSketchTuning[key]*100)+'%':cadSketchTuning[key].toFixed(1)+'×';
+ });
+ if(view){view.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+  if(isCad3DSketch(renderStyle)){
+   view.dataset.sketchPaper=CAD3D_SKETCH_PRESETS[renderStyle].paper;
+   view.style.setProperty('--cad3d-paper-strength',String(cadSketchTuning.paper));
+  }
+  else {delete view.dataset.sketchPaper;view.style.removeProperty('--cad3d-paper-strength');}
+ }
+}
+/* Three.js ignores most WebGL lineWidth requests. Make actual ribbon
+   geometry for architectural profile weight and hand-drawn stroke breakup,
+   so that every Croquis preset changes the rendered model, not just colors. */
+function cadSketchRibbonGeometry(edges,sketch,scale){
+ var a=edges.getAttribute('position'),out=[];
+ if(!a||!a.count)return new T.BufferGeometry();
+ var count=Math.min(Math.floor(a.count/2),360),stroke=sketch.stroke;
+ var width=clamp(scale*sketch.width,.0015,.065);
+ function rand(seed){var t=Math.sin(seed*127.1+19.87)*43758.5453;return t-Math.floor(t);}
+ function quad(x0,y0,z0,x1,y1,z1,nx,ny,nz,half){
+  out.push(x0+nx*half,y0+ny*half,z0+nz*half,
+    x0-nx*half,y0-ny*half,z0-nz*half,x1+nx*half,y1+ny*half,z1+nz*half,
+    x0-nx*half,y0-ny*half,z0-nz*half,
+    x1-nx*half,y1-ny*half,z1-nz*half,x1+nx*half,y1+ny*half,z1+nz*half);
+ }
+ for(var i=0;i<count;i++){
+  var ax=a.getX(i*2),ay=a.getY(i*2),az=a.getZ(i*2);
+  var bx=a.getX(i*2+1),by=a.getY(i*2+1),bz=a.getZ(i*2+1);
+  var dx=bx-ax,dy=by-ay,dz=bz-az,length=Math.hypot(dx,dy,dz);
+  if(length<.0005)continue;
+  var ux=dx/length,uy=dy/length,uz=dz/length;
+  var nx=-uy,ny=ux,nz=0;
+  if(Math.hypot(nx,ny)<.01){nx=1;ny=0;}
+  var nlen=Math.hypot(nx,ny,nz);nx/=nlen;ny/=nlen;nz/=nlen;
+  var vx=uy*nz-uz*ny,vy=uz*nx-ux*nz,vz=ux*ny-uy*nx;
+  var passes=sketch.passes||1;
+  for(var p=0;p<passes;p++){
+   var noise=(rand(i*5+p*3)-.5)*2,rough=sketch.jitter||0;
+   var j=noise*rough*width*(p===0?.4:1.2);
+   var start=(p>0&&['pencil','gesture','bluepen'].includes(stroke))?rand(i+p*.4)*(stroke==='gesture'?.35:.15):0;
+   var end=(p>0&&stroke==='wash')?.65+rand(i+p)*.3:(stroke==='gesture'?1+(rand(i+p*1.9)-.5)*.34:1);
+   var weight=width*(p===0?1:['marker','duotone'].includes(stroke)?.55:.31)*(1+noise*.22);
+   var x0=ax+dx*start+nx*j,y0=ay+dy*start+ny*j,z0=az+dz*start+nz*j;
+   var x1=ax+dx*end+nx*j,y1=ay+dy*end+ny*j,z1=az+dz*end+nz*j;
+   quad(x0,y0,z0,x1,y1,z1,nx,ny,nz,weight/2);
+   // Crossed ribbon ensures consistent stroke width in front/side views.
+   quad(x0,y0,z0,x1,y1,z1,vx,vy,vz,weight/2);
+  }
+ }
+ var geo=new T.BufferGeometry();
+ geo.setAttribute('position',new T.Float32BufferAttribute(out,3));
+ return geo;
 }
 function applyRenderStyle(){
  renderStyleControls();
  if(!T)return;
- var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
+ var sketch=cadEffectiveSketch(renderStyle);
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
  if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
  if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:0x9ba5a8);
@@ -1786,13 +1900,13 @@ function applyRenderStyle(){
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
-  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(!m.isMesh||!m.material||!m.geometry||m.userData?.cadSketch||m.userData?.cadPickProxy)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
   });
   var mat=m.material,base=m.userData.cadBaseColor;
-  var color=sketch?sketch.fill:renderStyle==='monochrome'?0xe8e8e3:
+  var color=sketch?new T.Color(base).lerp(new T.Color(sketch.fill),sketch.fillMix).getHex():renderStyle==='monochrome'?0xe8e8e3:
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
@@ -1813,6 +1927,18 @@ function applyRenderStyle(){
     transparent:!!sketch||renderStyle==='shaded-edges',opacity:sketch?sketch.alpha:renderStyle==='shaded-edges'?.68:1
    }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
+   if(sketch){
+    m.geometry.computeBoundingBox();
+    var bb=m.geometry.boundingBox,span=bb?Math.max(bb.max.x-bb.min.x,bb.max.y-bb.min.y,bb.max.z-bb.min.z):1;
+    var ribbons=cadSketchRibbonGeometry(edge,sketch,span);
+    var ink=new T.Mesh(ribbons,new T.MeshBasicMaterial({
+     color:sketch.edge,transparent:true,opacity:sketch.alpha*.88,
+     depthWrite:false,depthTest:true,side:T.DoubleSide,
+     polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2
+    }));
+    ink.userData.cadSketch=true;ink.userData.cadRibbon=true;
+    ink.castShadow=false;ink.receiveShadow=false;ink.renderOrder=6;m.add(ink);
+   }
   }
  });
 }
@@ -1831,6 +1957,115 @@ function setVisualStyle(mode){
 }
 function setSketchStyle(mode){
  setVisualStyle(isCad3DSketch(mode)?mode:'shaded-edges');
+}
+/* Browser-only high-resolution architectural illustration export.
+   The viewer is restored even when GPU capture fails. The PNG includes
+   ink hatching and paper grain, which CSS overlays alone cannot export. */
+function cadSketchPaperAndHatch(out,ctx,preset){
+ var w=out.width,h=out.height,seed=48721;
+ function random(){seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;}
+ var paper=clamp(cadSketchTuning.paper,0,1);
+ if(paper>.001){
+  ctx.save();
+  // Tiny pigment fibers distributed throughout the actual exported image.
+  var n=Math.min(220000,Math.ceil(w*h*.011*paper));
+  for(var i=0;i<n;i++){
+   var x=random()*w,y=random()*h;
+   ctx.fillStyle=random()>.5?'rgba(75,69,59,.055)':'rgba(255,255,255,.08)';
+   ctx.fillRect(x,y,.5+random()*1.6,.5+random()*2.1);
+  }
+  ctx.restore();
+ }
+ if(!preset||preset.stroke==='clean'||preset.stroke==='blueprint')return;
+ // Tonal hatch extracted from the rendered view; this never changes CAD
+ // solids or shadows. Sample with one read, then draw a sparse ink layer.
+ var pixels;
+ try{pixels=ctx.getImageData(0,0,w,h).data;}catch(e){return;}
+ var mode=preset.stroke;
+ var step=['etching','bluepen'].includes(mode)?7:mode==='ink'?8:mode==='gesture'?15:mode==='pencil'?11:14;
+ var strength=mode==='etching'?.55:mode==='bluepen'?.38:mode==='ink'?.23:mode==='gesture'?.44:mode==='pencil'?.15:mode==='duotone'?.31:mode==='marker'?.12:.09;
+ var rr=(preset.edge>>16)&255,gg=(preset.edge>>8)&255,bb=preset.edge&255;
+ ctx.save();
+ ctx.lineWidth=Math.max(.5,Math.min(mode==='gesture'?2.5:1.8,w/1800));
+ var segments=0,limit=180000,inkAlpha=Math.min(.85,strength*cadSketchTuning.roughness);
+ function hatch(x,y,len,angle){
+  var dx=Math.cos(angle)*len/2,dy=Math.sin(angle)*len/2;
+  ctx.moveTo(x-dx,y-dy);ctx.lineTo(x+dx,y+dy);segments++;
+ }
+ for(var y=step;y<h-step&&segments<limit;y+=step){
+  for(var x=step;x<w-step&&segments<limit;x+=step){
+   var ix=(Math.floor(y)*w+Math.floor(x))*4;
+   var l=(pixels[ix]*.2126+pixels[ix+1]*.7152+pixels[ix+2]*.0722)/255;
+   var density=1-l;
+   if(density<.16||random()>density*.94)continue;
+   var color=mode==='duotone'&&((Math.floor(x/step)+Math.floor(y/step))%6<2)?[211,43,40]:[rr,gg,bb];
+   ctx.strokeStyle='rgba('+color[0]+','+color[1]+','+color[2]+','+inkAlpha.toFixed(3)+')';
+   var jitter=(random()-.5)*(mode==='gesture'?step*.8:step*.26);
+   var len=step*(mode==='gesture'?1.7:mode==='etching'?1.1:.7)*(.5+density);
+   var angle=mode==='bluepen'?-1.28:mode==='gesture'?-.8+(random()-.5)*1.9:mode==='wash'?-.15:-.9;
+   ctx.beginPath();hatch(x+jitter,y+jitter,len,angle);
+   if(['etching','bluepen'].includes(mode)&&density>.38&&random()<density)
+    hatch(x-jitter*.4,y+jitter*.4,len*.8,mode==='etching'?.65:-.62);
+   if(mode==='etching'&&density>.7&&random()<density*.6)
+    hatch(x+jitter*.2,y-jitter*.3,len*.67,.1);
+   if(mode==='gesture'&&density>.5&&random()<.3)
+    hatch(x+step*.24,y-step*.2,len*1.35,angle+(random()-.5)*.24);
+   ctx.stroke();
+  }
+ }
+ ctx.restore();
+}
+function exportSketchPresentation(){
+ if(!renderer&&!fallbackCanvas)return text('Abrí el visor 3D para generar el croquis');
+ if(!isCad3DSketch(renderStyle))return text('Seleccioná primero un estilo Croquis en Visual Style');
+ var view=root.querySelector('.view');
+ var vw=Math.max(1,view.clientWidth),vh=Math.max(1,view.clientHeight);
+ // Maintain camera aspect and respect GPU/browser memory limits.
+ var scale=Math.min(3,4096/Math.max(vw,vh),Math.sqrt(11000000/(vw*vh)));
+ var w=Math.max(1,Math.round(vw*scale)),h=Math.max(1,Math.round(vh*scale));
+ var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
+ var ctx=canvas.getContext('2d',{alpha:false});
+ if(!ctx)return text('No se pudo crear el lienzo de exportación');
+ var oldPixel=renderer?.getPixelRatio(),oldSize=renderer?renderer.getSize(new T.Vector2()):null;
+ try{
+  if(renderer){
+   renderer.setPixelRatio(1);
+   renderer.setSize(w,h,false);
+   renderer.render(scene,camera);
+   ctx.drawImage(renderer.domElement,0,0,w,h);
+  }else{
+   fallbackDraw();
+   ctx.drawImage(fallbackCanvas,0,0,w,h);
+  }
+ }catch(e){
+  text('No se pudo renderizar el croquis: '+(e.message||e));return;
+ }finally{
+  if(renderer){
+   try{
+    renderer.setPixelRatio(oldPixel);
+    renderer.setSize(oldSize.x,oldSize.y,false);
+    renderer.render(scene,camera);
+   }catch(restoreError){
+    // Retain the original export failure and avoid breaking the CAD UI.
+    text('Aviso: no se pudo restaurar la vista 3D · '+(restoreError.message||restoreError));
+   }
+  }
+ }
+ cadSketchPaperAndHatch(canvas,ctx,cadEffectiveSketch(renderStyle));
+ var filename='blackline-'+renderStyle+'-'+w+'x'+h+'.png';
+ function finish(blob){
+  if(!blob){text('No se pudo generar el PNG del croquis');return;}
+  var url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  text('Croquis de presentación '+w+' × '+h+' px · generado en tu navegador');
+ }
+ if(canvas.toBlob)canvas.toBlob(finish,'image/png');
+ else{
+  var url=canvas.toDataURL('image/png'),a=document.createElement('a');
+  a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
+  text('Croquis de presentación '+w+' × '+h+' px · generado en tu navegador');
+ }
 }
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
@@ -2062,6 +2297,7 @@ function action(a){
  if(a==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();text('Sun / Shadows '+(sunSettings.enabled?'ON':'OFF'));return true;}
  if(a==='sketch')setSketchStyle(isCad3DSketch(renderStyle)?'shaded-edges':'sketch');
  else if(a==='shot')exportViewPNG();
+ else if(a==='renderSketch')exportSketchPresentation();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
  else if(a==='dxf')exportDXF();
