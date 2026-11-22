@@ -1386,6 +1386,22 @@ function showObjectContextMenu(e){
  menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
  menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
 }
+var cad3DZoomMode=false;
+function cad3DStartZoom(){
+ setPlacement(null);cad3DZoomMode=true;
+ var canvas=renderer?.domElement||fallbackCanvas;
+ canvas?.focus({preventScroll:true});
+ root.querySelector('.view').style.cursor='zoom-in';
+ text('ZOOM · arrastrá para acercar/alejar · clic acerca · Shift+clic aleja · Esc termina');
+}
+function cad3DExitZoom(){cad3DZoomMode=false;if(root)root.querySelector('.view').style.cursor='';}
+function cad3DImmediateCommand(raw){
+ var key=String(raw||'').trim().toUpperCase();
+ if(key==='L'){cad3DExitZoom();setViewPreset('left');return true;}
+ if(key==='TOP'){cad3DExitZoom();setViewPreset('top');return true;}
+ if(key==='Z'){cad3DStartZoom();return true;}
+ return false;
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
@@ -1397,6 +1413,10 @@ function bindCanvas(el){
   e.preventDefault();el.focus({preventScroll:true});
   // While placing geometry, unmodified primary-button input belongs to DRAW,
   // not to camera orbit. Alt+left / middle / right remain navigation gestures.
+  if(cad3DZoomMode&&e.button===0&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,zoom:true};
+   el.dataset.navigationDrag='false';el.setPointerCapture(e.pointerId);return;
+  }
   var placementClick=e.button===0&&!!placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey;
   var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho'&&!placing);
   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan,placementClick:placementClick};
@@ -1405,6 +1425,15 @@ function bindCanvas(el){
  });
  el.addEventListener('pointermove',function(e){
   if(dragging&&dragging.id===e.pointerId){
+   if(dragging.zoom){
+    var dy=e.clientY-dragging.lastY;
+    if(Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>4)dragging.moved=true;
+    if(dragging.moved&&Math.abs(dy)>.01){
+     orbit.dist=clamp(orbit.dist*Math.exp(dy*.012),1.4,450);
+     dragging.lastY=e.clientY;applyViewCamera();
+    }
+    return;
+   }
    if(dragging.placementClick){
     // Keep preview moving but never orbit/pan while the user is picking a wall point.
     updatePlacementGuide(e);updateDynamicReadout(e);return;
@@ -1427,6 +1456,12 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
+  if(dragging.zoom){
+   var wasClick=!dragging.moved;
+   dragging=null;delete el.dataset.navigationDrag;
+   if(wasClick){orbit.dist=clamp(orbit.dist*(e.shiftKey?1.25:.8),1.4,450);applyViewCamera();}
+   return;
+  }
   var drawClick=dragging.placementClick&&e.button===0;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;delete el.dataset.navigationDrag;
@@ -2815,6 +2850,7 @@ function updateDynamicReadout(e){
 }
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
+ if(cad3DImmediateCommand(raw))return;
  if(!raw){
   if(['wall','door','window','opening'].includes(placing)){
    var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
@@ -3111,6 +3147,7 @@ window.addEventListener('keydown',function(ev){
  }
  if(ev.key==='Escape'){
   ev.preventDefault();ev.stopImmediatePropagation();
+  cad3DExitZoom();
   if(dragging){
    var canvas=renderer?.domElement||fallbackCanvas;
    if(canvas){delete canvas.dataset.navigationDrag;try{if(canvas.hasPointerCapture(dragging.id))canvas.releasePointerCapture(dragging.id);}catch(_e){}}
@@ -3142,7 +3179,12 @@ window.addEventListener('keydown',function(ev){
  }
  if(/^[a-z0-9@.,-]$/i.test(ev.key)){
   ev.preventDefault();ev.stopImmediatePropagation();
-  var input=root.querySelector('#cad3dCommand');input.focus({preventScroll:true});input.value+=ev.key;
+  var input=root.querySelector('#cad3dCommand');
+  // Single-key commands act instantly; TOP is recognized as the user types.
+  if(ev.key.toUpperCase()==='L'&&input.value.trim()===''){cad3DImmediateCommand('L');return;}
+  if(ev.key.toUpperCase()==='Z'&&input.value.trim()===''){cad3DImmediateCommand('Z');return;}
+  input.focus({preventScroll:true});input.value+=ev.key;
+  if(input.value.trim().toUpperCase()==='TOP'){input.value='';cad3DImmediateCommand('TOP');}
  }
 },true);
 
