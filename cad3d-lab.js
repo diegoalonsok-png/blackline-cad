@@ -646,7 +646,7 @@ function build(){
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-charcoal','Carbón','Carboncillo arquitectónico'],['sketch-sepia','Sepia','Plumilla y tinta sepia'],['sketch-bluewash','Lavado azul','Lámina azulada'],['sketch-presentation','Presentación','Croquis suave de proyecto']].map(function(st){
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-charcoal','Carbón','Carboncillo arquitectónico'],['sketch-sepia','Sepia','Plumilla y tinta sepia'],['sketch-bluewash','Lavado azul','Lámina azulada'],['sketch-presentation','Presentación','Croquis suave de proyecto'],['sketch-engraving','Grabado','Tramas de líneas finas'],['sketch-urban','Croquis urbano','Líneas rápidas y tramas'],['sketch-graphic','Gráfico rojo/azul','Ilustración arquitectónica'],['sketch-comic','Historieta','Tinta y sombreado']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
  }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
@@ -1117,7 +1117,8 @@ function fallbackDraw(){
  if(w<=0||h<=0)return;
  var projection=fallbackProjector();
  ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#f6f5f1':
-  ['sketch','hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
+  CAD3D_SKETCH_PRESETS[renderStyle]?'#'+CAD3D_SKETCH_PRESETS[renderStyle].bg.toString(16).padStart(6,'0'):
+  ['hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
  if(draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle))for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
@@ -2290,7 +2291,8 @@ const CAD3D_VISUAL_STYLES={
  monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis técnico',
  'sketch-pencil':'Croquis lápiz','sketch-ink':'Croquis tinta','sketch-marker':'Croquis marcador',
  'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint',
- 'sketch-charcoal':'Carbón arquitectónico','sketch-sepia':'Plumilla sepia','sketch-bluewash':'Lavado azul','sketch-presentation':'Croquis presentación'
+ 'sketch-charcoal':'Carbón arquitectónico','sketch-sepia':'Plumilla sepia','sketch-bluewash':'Lavado azul','sketch-presentation':'Croquis presentación',
+ 'sketch-engraving':'Grabado lineal','sketch-urban':'Croquis urbano rápido','sketch-graphic':'Lámina gráfica roja y azul','sketch-comic':'Tinta de historieta'
 };
 const CAD3D_SKETCH_PRESETS={
  sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
@@ -2303,7 +2305,11 @@ const CAD3D_SKETCH_PRESETS={
  'sketch-charcoal':{bg:0xe9e7df,ground:0xdad7cd,fill:0xcac9c3,edge:0x303235,alpha:.90},
  'sketch-sepia':{bg:0xf5ead3,ground:0xe7dac2,fill:0xf0e4cb,edge:0x70553d,alpha:.95},
  'sketch-bluewash':{bg:0xf0f5f6,ground:0xd9e5e8,fill:0xc2d7df,edge:0x455b70,alpha:.82},
- 'sketch-presentation':{bg:0xfcfaf3,ground:0xe8e7de,fill:0xd7ddd5,edge:0x344953,alpha:.80}
+ 'sketch-presentation':{bg:0xfcfaf3,ground:0xe8e7de,fill:0xd7ddd5,edge:0x344953,alpha:.80},
+ 'sketch-engraving':{bg:0xfff8e5,ground:0xeee5cf,fill:0xf5e9d5,edge:0x233c57,alpha:.98,hatch:true,hatchColor:0x31455e,hatchDensity:1.7},
+ 'sketch-urban':{bg:0xfffdf8,ground:0xf5f0e7,fill:0xfaf7ef,edge:0x323838,alpha:.79,hatch:true,hatchColor:0x697075,hatchDensity:.75},
+ 'sketch-graphic':{bg:0xfff8e9,ground:0xf4e6cf,fill:0xf3c4aa,edge:0x1f4b78,alpha:.95,hatch:true,hatchColor:0x1a557f,hatchDensity:1},
+ 'sketch-comic':{bg:0xfff9ed,ground:0xe6e0d3,fill:0xbed5d3,edge:0x25323a,alpha:1,hatch:true,hatchColor:0x48565d,hatchDensity:1.25}
 };
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
@@ -2317,6 +2323,56 @@ function renderStyleControls(){
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
  root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+}
+/* Lightweight, deterministic hatch strokes drawn on visible box faces.
+   Presentation-only THREE.LineSegments. CAD model geometry and opening records remain untouched. */
+function cad3DSketchHatch(mesh,preset){
+ if(!preset?.hatch||!mesh.geometry?.isBufferGeometry)return;
+ var base=mesh.userData.cadBaseColor;
+ // Avoid a dense crosshatch on glass, mullions, handles and tiny mechanical details.
+ if(![0xaab0b5,0xb5bdc3,0x89939a,0x9ea9b4,0x8fa9bc].includes(base))return;
+ var g=mesh.geometry;
+ if(!g.boundingBox)g.computeBoundingBox();
+ var box=g.boundingBox,min=box.min,max=box.max;
+ var dx=max.x-min.x,dy=max.y-min.y,dz=max.z-min.z;
+ if(dx<.15||dz<.14||dy<.045)return;
+ var spacing=.20/Math.max(.4,preset.hatchDensity||1);
+ var pairs=[],limit=90,eps=.0025;
+ function stroke(ax,ay,az,bx,by,bz){
+  if(pairs.length/6>=limit)return;
+  pairs.push(ax,ay,az,bx,by,bz);
+ }
+ // The two Y-facing elevations: diagonal segments clipped to the face rectangle.
+ // Reuse identical strokes in local mesh coordinates for stable orbiting and export.
+ var rise=.19,slope=.46;
+ for(var side=0;side<2;side++){
+  var yy=side?max.y+eps:min.y-eps;
+  for(var x=min.x-dz/slope;x<max.x;x+=spacing){
+   var xa=Math.max(min.x,x),xb=Math.min(max.x,x+dz/slope);
+   if(xb<=xa)continue;
+   var za=min.z+(xa-x)*slope,zb=min.z+(xb-x)*slope;
+   if(zb<min.z||za>max.z)continue;
+   stroke(xa,yy,Math.min(max.z,Math.max(min.z,za)),xb,yy,Math.min(max.z,Math.max(min.z,zb)));
+  }
+ }
+ // A light secondary hatch on the short returns improves legibility of wall thickness.
+ if(dy>.12&&dz>.4){
+  for(var sideX=0;sideX<2;sideX++){
+   var xx=sideX?max.x+eps:min.x-eps;
+   for(var z=min.z+spacing;z<max.z&&pairs.length/6<limit;z+=spacing){
+    stroke(xx,min.y-eps,z,xx,max.y+eps,Math.min(max.z,z+dy*.22));
+   }
+  }
+ }
+ if(!pairs.length)return;
+ var linesGeom=new T.BufferGeometry();
+ linesGeom.setAttribute('position',new T.Float32BufferAttribute(pairs,3));
+ var lines=new T.LineSegments(linesGeom,new T.LineBasicMaterial({
+  color:preset.hatchColor||preset.edge,transparent:true,opacity:.35,
+  depthTest:true,depthWrite:false
+ }));
+ lines.userData.cadSketch=true;lines.renderOrder=6;
+ mesh.add(lines);
 }
 function applyRenderStyle(){
  renderStyleControls();
@@ -2361,6 +2417,7 @@ function applyRenderStyle(){
     transparent:!!sketch||renderStyle==='shaded-edges',opacity:sketch?sketch.alpha:renderStyle==='shaded-edges'?.68:1
    }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
+   if(sketch?.hatch)cad3DSketchHatch(m,sketch);
    // 2D Wireframe: crisp black edge lines with visible geometric vertices.
    // These points are presentation-only, never editable drawing records.
    if(renderStyle==='wire2d'){
