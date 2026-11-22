@@ -230,8 +230,9 @@ function dxfGeometry(dxf){
  let box;try{box=g.getBBox()}finally{svg.remove()}
  if(!box||!(box.width>0||box.height>0))throw Error('No se pudieron calcular los límites del dibujo.');
  const size=Math.max(box.width,box.height,1),pad=size*.06;
- svg.setAttribute('viewBox',[box.x-pad,box.y-pad,Math.max(box.width+pad*2,size*.15),Math.max(box.height+pad*2,size*.15)].join(' '));
- svg.style.cssText='height:100%;width:100%;transform:scale(1,-1)';
+ // The vector group flips Y for CAD coordinates; viewBox must use the flipped bounds.
+ svg.setAttribute('viewBox',[box.x-pad,-(box.y+box.height)-pad,Math.max(box.width+pad*2,size*.15),Math.max(box.height+pad*2,size*.15)].join(' '));
+ svg.style.cssText='height:100%;width:100%';
  return {svg,objects:total,unsupported};
 }
 async function preview(item,art,btn){
