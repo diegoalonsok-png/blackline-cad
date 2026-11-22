@@ -1979,10 +1979,15 @@ function cad3dViewMenu(){
  picker.addEventListener('blur',closePicker,{once:true});
  return true;
 }
-function cad3dOrthographicView(){
- viewMode='ortho';activeView='orbit';syncViewControls();applyViewCamera();
- text('Orthographic · proyección paralela con orientación conservada');return true;
+function cad3dSetProjection(mode){
+ if(mode!=='ortho'&&mode!=='perspective')return false;
+ if(viewMode==='walk')viewMode='perspective';
+ viewMode=mode;activeView=mode==='perspective'?'perspective':'orbit';
+ syncViewControls();applyViewCamera();
+ text(mode==='ortho'?'Orthographic · proyección paralela con orientación conservada':'Perspective · proyección cónica con orientación conservada');
+ return true;
 }
+function cad3dOrthographicView(){return cad3dSetProjection('ortho');}
 function cad3dViewAlias(word){
  var aliases={T:'top',TOP:'top',F:'front',FRONT:'front',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back',
   P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso'};
@@ -1990,6 +1995,7 @@ function cad3dViewAlias(word){
  if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
  if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA')return cad3dViewMenu();
  if(key==='O'||key==='ORTHO'||key==='ORTHOGRAPHIC')return cad3dOrthographicView();
+ if(key==='P'||key==='PERSPECTIVE'||key==='PERSPECTIVA')return cad3dSetProjection('perspective');
  if(key==='+'||key==='PLUS'||key==='ZOOMIN'){cad3dZoomStep(1);return true;}
  if(key==='-'||key==='MINUS'||key==='ZOOMOUT'){cad3dZoomStep(-1);return true;}
  if(!Object.prototype.hasOwnProperty.call(aliases,key))return false;
