@@ -679,6 +679,7 @@ function build(){
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
+ '<button type="button" class="btn" data-action="artisticShot" title="Experimental ink render: exports a separate PNG without changing CAD geometry">Ink Preview PNG</button>'+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D <small>SketchUp-inspired workspace</small></header>'+
  '<div class="styleGalleryControls"><input class="styleGallerySearch" type="search" aria-label="Buscar estilo visual" placeholder="Buscar estilo…">'+
@@ -2549,6 +2550,35 @@ function setVisualStyle(mode){
 function setSketchStyle(mode){
  setVisualStyle(isCad3DSketch(mode)?mode:'shaded-edges');
 }
+function loadArtisticSnapshot(){
+ if(window.BlacklineArtisticSnapshot)return Promise.resolve(window.BlacklineArtisticSnapshot);
+ if(window.__blacklineArtisticPromise)return window.__blacklineArtisticPromise;
+ window.__blacklineArtisticPromise=new Promise(function(resolve,reject){
+  var script=document.createElement('script');
+  script.src='./cad3d-artistic-snapshot.js';
+  script.onload=function(){window.BlacklineArtisticSnapshot?resolve(window.BlacklineArtisticSnapshot):reject(Error('Artistic module unavailable'));};
+  script.onerror=function(){reject(Error('Could not load artistic renderer'));};
+  document.head.appendChild(script);
+ }).catch(function(err){window.__blacklineArtisticPromise=null;throw err;});
+ return window.__blacklineArtisticPromise;
+}
+async function exportArtisticShot(){
+ var canvas=renderer?.domElement||fallbackCanvas;
+ if(!canvas)return text('Primero abrí el visor 3D');
+ try{
+  if(renderer)renderer.render(scene,camera);
+  else fallbackDraw();
+  var engine=await loadArtisticSnapshot();
+  // One-shot postprocessing only: the WebGL renderer, camera and geometry remain untouched.
+  // A fresh render immediately before capture avoids relying on preserveDrawingBuffer.
+  if(renderer)renderer.render(scene,camera);
+  var result=engine.render(canvas,{mode:'ink'});
+  var a=document.createElement('a');
+  a.href=result.toDataURL('image/png');a.download='blackline-cad3d-ink-preview.png';
+  document.body.appendChild(a);a.click();a.remove();
+  text('Ink Preview experimental exportado · no modifica el modelo CAD3D');
+ }catch(err){text('Ink Preview no disponible: '+(err.message||err));}
+}
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
  if(!canvas)return text('Primero abrí el visor 3D');
@@ -2890,6 +2920,7 @@ function action(a){
   if(!CAD3D_LEGACY_ARTISTIC_STYLES_ENABLED)text('Croquis artístico en reconstrucción; el modo CAD3D técnico sigue disponible.');
   else setSketchStyle(isCad3DSketch(renderStyle)?'shaded-edges':'sketch');
  }
+ else if(a==='artisticShot')exportArtisticShot();
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
