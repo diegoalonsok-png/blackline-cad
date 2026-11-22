@@ -34,6 +34,7 @@ function cad3dHistoryStep(backward){
 }
 
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
+cad3dHistoryNow=cad3dSnapshot();
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:true,azimuth:135,elevation:45,softness:2.5,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
@@ -2339,6 +2340,7 @@ function run3DCommand(){
   selected=records.filter(editableRecord).map(function(r){return r.id;});
   renderProps();highlight();text(selected.length+' objetos seleccionados');return;
  }
+ if(['zoom','zoomextents'].includes(command)){fit3DModel();return;}
  if(command==='regen'||command==='re'){
   redraw();renderProps();text('REGEN: vista y sólidos 3D regenerados');return;
  }
