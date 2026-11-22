@@ -17,6 +17,24 @@ const CATS=[
 ];
 const CATLABEL=Object.fromEntries(CATS.map(c=>[c[0],c[1]]));
 const FILES=new Map(),APPROVED_KEY='blackline-original-review-decisions-v1';
+let catalogTask=null;
+function normPath(value){return String(value||'').replace(/\\/g,'/').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function preloadCatalog(){
+ if(catalogTask)return catalogTask;
+ catalogTask=fetch('assets/blackline-original-review-manifest.json?v=20261122-1',{cache:'no-cache'})
+  .then(response=>{if(!response.ok)throw Error('Inventario no disponible: '+response.status);return response.json()})
+  .then(data=>{
+   if(data?.schema!=='blackline-original-review-v1'||!Array.isArray(data.blocks))throw Error('Formato de inventario incorrecto');
+   for(const e of data.blocks){
+    if(!CATLABEL[e.cat])continue;
+    const key='manifest:'+e.id;
+    if(!FILES.has(key))FILES.set(key,{key,cat:e.cat,label:e.label,zip:e.zip,sourceZip:e.zip,
+     sourcePath:e.sourcePath,stagedPath:e.stagedPath,format:'dwg',size:e.bytes,state:'unloaded'});
+   }
+   draw();return FILES.size;
+  }).catch(err=>{report('No se pudo cargar el inventario: '+err.message);return 0});
+ return catalogTask;
+}
 let decisions={};try{decisions=JSON.parse(localStorage.getItem(APPROVED_KEY)||'{}')||{}}catch(e){}
 let current='kitchen',filter='',overlay=null,consent=false,loaded=0;
 function catFor(path,archive){
@@ -109,14 +127,18 @@ function report(s){const el=document.getElementById('blrvStatus');if(el)el.textC
 function keyFor(name,zip,crc){return [zip,name,String(crc)].join('|')}
 async function ingest(inputs){
  if(!inputs.length)return;
+ await preloadCatalog();
  let added=0,issues=[];
  for(const f of inputs){
   try{
    if(/\.zip$/i.test(f.name)){added+=await unpackZip(f)}
    else if(/\.(?:dwg|dxf)$/i.test(f.name)){
     const cat=catFor(f.webkitRelativePath||f.name,f.name)||current;
-    const k=keyFor(f.name,f.name,f.size);
-    if(!FILES.has(k)){FILES.set(k,{key:k,cat,label:f.name.replace(/\.(?:dwg|dxf)$/i,''),zip:f.name,file:f,format:f.name.toLowerCase().endsWith('.dxf')?'dxf':'dwg',state:'local'});added++}
+    const label=f.name.replace(/\.(?:dwg|dxf)$/i,'');
+    const known=[...FILES.values()].find(x=>x.state==='unloaded'&&x.cat===cat&&normPath(x.label)===normPath(label));
+    if(known){known.file=f;known.format=/\.dxf$/i.test(f.name)?'dxf':'dwg';known.state='local';added++}
+    else {const k=keyFor(f.name,f.name,f.size);
+     if(!FILES.has(k)){FILES.set(k,{key:k,cat,label,zip:f.name,file:f,format:/\.dxf$/i.test(f.name)?'dxf':'dwg',state:'local'});added++}}
    }
   }catch(e){issues.push(f.name+': '+e.message)}
  }
@@ -140,7 +162,14 @@ async function unpackZip(file){
   if(view.getUint32(offset,true)!==0x04034b50)continue;
   const dataStart=offset+30+view.getUint16(offset+26,true)+view.getUint16(offset+28,true);
   if(dataStart+csize>b.byteLength)continue;
-  const k=keyFor(name,file.name,crc);if(FILES.has(k))continue;
+  const k=keyFor(name,file.name,crc);
+  const known=[...FILES.values()].find(x=>x.cat===cat&&x.state==='unloaded'&&
+   (normPath(x.stagedPath)===normPath(name)||(normPath(x.sourceZip)===normPath(file.name)&&normPath(x.sourcePath)===normPath(name))));
+  if(known){
+   known.packed=bytes.slice(dataStart,dataStart+csize);known.method=method;known.size=usize;known.crc=crc;
+   known.format=/\.dxf$/i.test(name)?'dxf':'dwg';known.state='local';added++;continue;
+  }
+  if(FILES.has(k))continue;
   const cleaned=name.split('/').pop().replace(/__[a-f0-9]{10}(?=\.dwg$)/i,'').replace(/\.(dwg|dxf)$/i,'');
   FILES.set(k,{key:k,cat,label:cleaned,zip:file.name,format:/\.dxf$/i.test(name)?'dxf':'dwg',
    packed:bytes.slice(dataStart,dataStart+csize),method,size:usize,crc,state:'local'});
@@ -237,6 +266,8 @@ function dxfGeometry(dxf){
 }
 async function preview(item,art,btn){
  if(item.cached){art.replaceChildren(item.cached.svg.cloneNode(true));return}
+ if(!item.file&&!item.packed){report('El archivo '+item.label+' está catalogado pero aún no cargado. Elegí el ZIP original para obtener su vista real.');
+  overlay.querySelector('input[type=file]')?.click();return}
  if(item.busy)return;
  item.busy=true;btn.disabled=true;report('Leyendo '+item.label+'…');
  try{
@@ -277,12 +308,12 @@ function draw(){
  const grid=document.getElementById('blrvGrid');grid.replaceChildren();
  const shown=[...FILES.values()].filter(x=>x.cat===current&&(!filter||x.label.toLowerCase().includes(filter)));
  if(!shown.length){
-  const empty=make('div','blrv-tile','Carpeta '+CATLABEL[current]+': sin archivos locales cargados. Importá tus ZIP para habilitar las vistas reales.');
+  const empty=make('div','blrv-tile','Carpeta '+CATLABEL[current]+': cargando nombres originales o sin archivos coincidentes. Importá ZIP para habilitar las vistas reales.');
   grid.append(empty);return;
  }
  const fragment=document.createDocumentFragment();
  for(const it of shown){
-  const card=make('article','blrv-tile'),art=make('div','blrv-art','DWG original · sin vista previa');
+  const card=make('article','blrv-tile'),art=make('div','blrv-art',it.state==='unloaded'?'DWG catalogado · cargar ZIP para ver dibujo':'DWG original · sin vista previa');
   if(it.cached)art.replaceChildren(it.cached.svg.cloneNode(true));
   card.append(art,make('div','blrv-title',it.label));
   const meta=make('div','blrv-meta',it.zip+' · '+(decisions[it.key]||'pendiente'));card.append(meta);
@@ -296,7 +327,7 @@ function draw(){
  }
  grid.append(fragment);
 }
-function launch(){ensure();overlay.hidden=false;draw()}
+function launch(){ensure();overlay.hidden=false;draw();preloadCatalog()}
 function addButton(){
  if(document.getElementById('blrvOpen'))return;
  const header=document.querySelector('#arqModal .arq-box > header');
