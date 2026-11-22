@@ -2293,6 +2293,56 @@ function updateDynamicReadout(e){
  el.style.top=clamp(e.clientY-rect.top+16,8,Math.max(8,rect.height-34))+'px';
  el.dataset.show='true';
 }
+/* Exact numeric 3D transforms matching CAD2D command entry conventions.
+   Parametric openings and wall attachments remain editable when scaled/copied. */
+function cad3dSelectionTransform(command,values){
+ var items=records.filter(function(r){return selected.includes(r.id)&&editableRecord(r);});
+ if(!items.length){text(command.toUpperCase()+': seleccioná uno o más objetos');return;}
+ var v=values.map(Number);
+ if(v.some(function(n){return !Number.isFinite(n)})){text('Parámetros 3D inválidos');return;}
+ if(command==='scale'){
+  var k=v[0];
+  if(!(k>.001&&k<=1000)){text('SCALE: factor válido entre 0.001 y 1000');return;}
+  if(items.some(function(r){return r.type==='boolean'})){text('SCALE: booleanos triangulados no admiten escalado paramétrico');return;}
+  var center={x:0,y:0,z:0};
+  items.forEach(function(r){center.x+=r.x;center.y+=r.y;center.z+=r.z;});
+  center.x/=items.length;center.y/=items.length;center.z/=items.length;
+  items.forEach(function(r){
+   r.x=center.x+(r.x-center.x)*k;r.y=center.y+(r.y-center.y)*k;r.z=center.z+(r.z-center.z)*k;
+   ['w','d','h','radius'].forEach(function(key){if(Number.isFinite(r[key]))r[key]=clamp(r[key]*k,.01,1000);});
+   (r.openings||[]).forEach(function(o){['offset','offsetY','w','h','sill','d'].forEach(function(key){if(Number.isFinite(o[key]))o[key]*=k;});});
+   (r.attachments||[]).forEach(function(a){['offset','sill','w','h','depth'].forEach(function(key){if(Number.isFinite(a[key]))a[key]*=k;});});
+  });
+ }else if(command==='array'){
+  var count=v[0],dx=v[1],dy=v[2],dz=v[3]||0;
+  if(!Number.isInteger(count)||count<2||count>50||items.length*(count-1)>500||records.length+items.length*(count-1)>1000){
+   text('ARRAY: cantidad entre 2 y 50, máximo 1000 objetos en el modelo');return;
+  }
+  var out=[];
+  for(var i=1;i<count;i++)items.forEach(function(r){
+   var dup=JSON.parse(JSON.stringify(r));dup.id=serial++;
+   dup.x+=dx*i;dup.y+=dy*i;dup.z+=dz*i;
+   (dup.openings||[]).forEach(function(o){o.id=serial++;});
+   (dup.attachments||[]).forEach(function(a){a.id=serial++;});
+   records.push(dup);out.push(dup.id);
+  });
+  selected=out;
+ }else if(command==='move'||command==='copy'){
+  var moved=[];
+  items.forEach(function(r){
+   var item=command==='copy'?JSON.parse(JSON.stringify(r)):r;
+   if(command==='copy'){
+    item.id=serial++;(item.openings||[]).forEach(function(o){o.id=serial++;});
+    (item.attachments||[]).forEach(function(a){a.id=serial++;});records.push(item);
+   }
+   item.x+=v[0];item.y+=v[1];item.z+=(v[2]||0);moved.push(item.id);
+  });
+  selected=moved;
+ }else if(command==='rotate'){
+  items.forEach(function(r){r.rot=((r.rot||0)+v[0])%360;});
+ }else return;
+ redraw();renderProps();text(command.toUpperCase()+' · '+items.length+' objeto(s) · 3D');
+}
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  if(!raw){
@@ -2302,6 +2352,17 @@ function run3DCommand(){
   return;
  }
  var upper=raw.toUpperCase(),number=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+ var transform=/^(SCALE|ARRAY|MOVE|COPY|ROTATE)\s+(.+)$/i.exec(raw);
+ if(transform){
+  var op=transform[1].toLowerCase(),args=transform[2].trim().split(/[\s,;]+/);
+  var expected=op==='scale'||op==='rotate'?1:op==='array'?4:3;
+  if(op==='array'&&args.length===3)args.push('0');
+  if(['move','copy'].includes(op)&&args.length===2)args.push('0');
+  if(args.length!==expected||args.some(function(v){return !number.test(v)})){
+   text(op.toUpperCase()+': ingresá '+(op==='scale'?'factor':op==='rotate'?'grados':op==='array'?'cantidad,DX,DY[,DZ]':'DX,DY[,DZ]'));return;
+  }
+  cad3dSelectionTransform(op,args.map(Number));return;
+ }
  if(placing==='rotate'&&number.test(raw)){
   var angle=Number(raw);
   if(!Number.isFinite(angle))return text('Ingresá un ángulo válido');
@@ -2336,6 +2397,7 @@ function run3DCommand(){
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(command==='undo'){cad3dHistoryStep(true);return;}
  if(command==='redo'){cad3dHistoryStep(false);return;}
+ if(['scale','array'].includes(command)){text(command.toUpperCase()+': escribí '+(command==='scale'?'SCALE 2':'ARRAY 4 1.5 0'));return;}
  if(command==='selectall'||command==='all'){
   selected=records.filter(editableRecord).map(function(r){return r.id;});
   renderProps();highlight();text(selected.length+' objetos seleccionados');return;
