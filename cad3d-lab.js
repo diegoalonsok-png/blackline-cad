@@ -3,6 +3,7 @@
 'use strict';
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
+var selectedOpeningId=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 /* CAD2D-style reversible record history (bounded to avoid memory growth).
@@ -1398,7 +1399,7 @@ function placeOpening(e){
   op.h=span;op.sill=Math.min(style.sill,rec.h-span);
  }
  if(!openingFitsHost(rec,op)){text('La abertura no entra en el elemento o se superpone a otra. Elegí otro lugar.');return;}
- rec.openings.push(op);selected=[rec.id];redraw();renderProps();
+ rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
   ' · '+rec.openings.length+' abertura(s) en este elemento · clic para colocar otra · Enter / Esc termina');
@@ -1462,6 +1463,7 @@ function placePoint(pt){
 }
 function selectAt(e){
  if(fallbackCanvas){
+  selectedOpeningId=null;
   var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34,projection=fallbackProjector();
   var wallOrSlab=fallbackHostHit(e,'wall')||fallbackHostHit(e,'slab');
   records.filter(editableRecord).forEach(function(rec){
@@ -1483,6 +1485,7 @@ function selectAt(e){
  var intersects=raycaster.intersectObjects(hits,false);
  var hit=intersects.find(function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});});
  var id=hit?hit.object.userData.owner:null;
+ selectedOpeningId=hit?.object.userData.openingId??null;
  if(id===null){if(!e.shiftKey)selected=[];}else if(e.shiftKey){selected=selected.includes(id)?selected.filter(function(n){return n!==id;}):selected.concat(id);}else selected=[id];
  renderProps();highlight();text(selected.length+' seleccionados · '+records.length+' objetos');
 }
@@ -1506,7 +1509,7 @@ function addMesh(g,color,id,parent,x,y,z,glass,opacity){
  var m=new T.Mesh(g,mat);m.userData.owner=id;m.userData.cadGlass=clear;
  if(clear)m.userData.cadGlassOpacity=mat.opacity;
  if(x!==undefined)m.position.set(x,y,z);
- m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);
+ m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);return m;
 }
 /* Shared wall-local void silhouette for walls and wall-mounted extrusions. */
 function openingSpanAtX(o,x){
@@ -1600,6 +1603,7 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
+  var carpPart=function(w,d,h,x,y,z,color,slope,glass,opacity){part(w,d,h,x,y,z,color,slope,glass,opacity,opening.id);};
   if(opening.kind==='opening'||opening.styleId==='open-door'||(opening.shape||'rect')!=='rect')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
@@ -1612,63 +1616,63 @@ function architectureParts(r,part){
    var frameW=Math.min(.065,w/10),usable=Math.max(.05,w-2*frameW);
    var leafColor=glazed?0x598fa4:/fire-rated|industrial/.test(id)?0x8296a0:0x997a63;
    // Perimeter frame, head and both jambs, remain attached to the host.
-   part(w,frameDepth,frameW,x,0,z+h-frameW,0x73848d,0);
-   part(frameW,frameDepth,h,o.left+frameW/2,0,z,0x73848d,0);
-   part(frameW,frameDepth,h,o.right-frameW/2,0,z,0x73848d,0);
+   carpPart(w,frameDepth,frameW,x,0,z+h-frameW,0x73848d,0);
+   carpPart(frameW,frameDepth,h,o.left+frameW/2,0,z,0x73848d,0);
+   carpPart(frameW,frameDepth,h,o.right-frameW/2,0,z,0x73848d,0);
    var leafW=usable/panels;
    for(var leaf=0;leaf<panels;leaf++){
     var cx=o.left+frameW+leafW*(leaf+.5);
     var inset=Math.min(.022,leafW/10),height=Math.max(.1,h-2*frameW);
     if(glazed){
      // The central glazed area must not be backed by an opaque door slab.
-     part(Math.max(.04,leafW-2*inset),.035,Math.max(.10,height*.20),cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
-     part(.025,.05,height,cx-leafW/2+inset,0,z+frameW,0x607783,0);
-     part(.025,.05,height,cx+leafW/2-inset,0,z+frameW,0x607783,0);
-     part(Math.max(.04,leafW-.02),.05,.028,cx,0,z+frameW+height-.028,0x607783,0);
-    }else part(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
+     carpPart(Math.max(.04,leafW-2*inset),.035,Math.max(.10,height*.20),cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
+     carpPart(.025,.05,height,cx-leafW/2+inset,0,z+frameW,0x607783,0);
+     carpPart(.025,.05,height,cx+leafW/2-inset,0,z+frameW,0x607783,0);
+     carpPart(Math.max(.04,leafW-.02),.05,.028,cx,0,z+frameW+height-.028,0x607783,0);
+    }else carpPart(Math.max(.04,leafW-2*inset),.035,height,cx,sliding&&leaf%2?.028:-.015,z+frameW,leafColor,0);
     if(glazed){
-     part(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0,true,glazingOpacity(opening));
-     part(Math.max(.03,leafW-.08),.055,.025,cx,0,z+frameW+height*.52,0xa5b5be,0);
+     carpPart(Math.max(.03,leafW-.1),.041,Math.max(.08,height*.66),cx,sliding&&leaf%2?.028:-.015,z+frameW+height*.20,0x4b8999,0,true,glazingOpacity(opening));
+     carpPart(Math.max(.03,leafW-.08),.055,.025,cx,0,z+frameW+height*.52,0xa5b5be,0);
     }
     // Door leaf side rails / panel divisions.
-    part(Math.min(.035,leafW/8),.051,height,o.left+frameW+leafW*leaf+.022,0,z+frameW,0x607783,0);
+    carpPart(Math.min(.035,leafW/8),.051,height,o.left+frameW+leafW*leaf+.022,0,z+frameW,0x607783,0);
    }
    if(sliding){
-    part(w,.075,.018,x,-frameDepth/2,z+.005,0x697b85,0);
-    part(w,.075,.018,x,-frameDepth/2,z+h-.028,0x697b85,0);
+    carpPart(w,.075,.018,x,-frameDepth/2,z+.005,0x697b85,0);
+    carpPart(w,.075,.018,x,-frameDepth/2,z+h-.028,0x697b85,0);
    }
-   if(/garage/.test(id))for(var rail=1;rail<6;rail++)part(usable,.055,.018,x,0,z+h*rail/6,0x596d7b,0);
-   if(/barn/.test(id))part(w+.14,.1,.035,x,0,z+h+.065,0x394b55,0);
+   if(/garage/.test(id))for(var rail=1;rail<6;rail++)carpPart(usable,.055,.018,x,0,z+h*rail/6,0x596d7b,0);
+   if(/barn/.test(id))carpPart(w+.14,.1,.035,x,0,z+h+.065,0x394b55,0);
   }else{
    var id=opening.styleId||'',d=thickness+.035;
    var frameW=Math.min(.055,w/10,h/10),innerW=Math.max(.04,w-2*frameW),innerH=Math.max(.04,h-2*frameW);
    var sliding=/sliding/.test(id),n=/quad-fixed/.test(id)?4:/triple-sliding/.test(id)?3:/double|two-leaf|sliding|bay|french/.test(id)?2:/ribbon/.test(id)?3:1;
    var glazingColor=/glass-block/.test(id)?0x9ec8d3:0x548b9e;
    // Full perimeter with clear glazing to distinguish windows from solid doors.
-   part(w,d,frameW,x,0,z,0x9babb5,0);
-   part(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
-   part(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
-   part(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
-   part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true,glazingOpacity(opening));
+   carpPart(w,d,frameW,x,0,z,0x9babb5,0);
+   carpPart(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
+   carpPart(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
+   carpPart(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
+   carpPart(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true,glazingOpacity(opening));
    for(var pane=1;pane<n;pane++)
-    part(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
+    carpPart(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
    if(/french|glass-block|quad-fixed/.test(id)){
     for(var grid=1;grid<4;grid++)
-     part(innerW,.038,.018,x,0,z+frameW+innerH*grid/4,0xb9c7cd,0);
+     carpPart(innerW,.038,.018,x,0,z+frameW+innerH*grid/4,0xb9c7cd,0);
     for(var col=1;col<4;col++)
-     part(.020,.038,innerH,o.left+frameW+innerW*col/4,0,z+frameW,0xb9c7cd,0);
+     carpPart(.020,.038,innerH,o.left+frameW+innerW*col/4,0,z+frameW,0xb9c7cd,0);
    }
    if(/awning|hopper|tilt-turn|clerestory|ribbon|guillotine/.test(id))
-    part(innerW,d+.024,.022,x,0,z+frameW+innerH*(/awning|clerestory|ribbon/.test(id)?.67:.5),0xd6e0e5,0);
+    carpPart(innerW,d+.024,.022,x,0,z+frameW+innerH*(/awning|clerestory|ribbon/.test(id)?.67:.5),0xd6e0e5,0);
    if(/louver/.test(id))for(var blade=1;blade<9;blade++)
-    part(innerW,d+.06,.026,x,0,z+frameW+innerH*blade/9,0x809ba9,0);
+    carpPart(innerW,d+.06,.026,x,0,z+frameW+innerH*blade/9,0x809ba9,0);
    if(sliding){
-    part(w,.08,.02,x,0,z+.01,0x718694,0);
-    part(w,.08,.02,x,0,z+h-.03,0x718694,0);
+    carpPart(w,.08,.02,x,0,z+.01,0x718694,0);
+    carpPart(w,.08,.02,x,0,z+h-.03,0x718694,0);
    }
    if(/bay/.test(id)){
-    part(.048,.16,innerH,o.left+frameW,0,z+frameW,0x9aadb7,0);
-    part(.048,.16,innerH,o.right-frameW,0,z+frameW,0x9aadb7,0);
+    carpPart(.048,.16,innerH,o.left+frameW,0,z+frameW,0x9aadb7,0);
+    carpPart(.048,.16,innerH,o.right-frameW,0,z+frameW,0x9aadb7,0);
    }
   }
  });
@@ -1832,7 +1836,7 @@ function addShapedOpenings(wall,group){
     color:clear?0x5794a8:0x987e66,
     transparent:clear,opacity:clear?glazingOpacity(o):1,roughness:clear?.18:.7,side:T.DoubleSide
    }));
-   mesh.rotation.x=Math.PI/2;mesh.position.y=.0125;mesh.userData.owner=wall.id;
+   mesh.rotation.x=Math.PI/2;mesh.position.y=.0125;mesh.userData.owner=wall.id;mesh.userData.openingId=o.id;
    mesh.userData.cadGlass=clear;if(clear)mesh.userData.cadGlassOpacity=glazingOpacity(o);
    mesh.castShadow=!mesh.userData.cadGlass;
    mesh.receiveShadow=sunSettings.onFaces&&!mesh.userData.cadGlass;
@@ -1851,14 +1855,14 @@ function addShapedOpenings(wall,group){
     if(!rimPath.curves.length)continue;
     var rim=new T.Mesh(new T.TubeGeometry(rimPath,Math.min(192,Math.max(64,points.length*2)),.024,5,false),
      new T.MeshStandardMaterial({color:0x697f8c,roughness:.78,metalness:.1}));
-    rim.userData.owner=wall.id;rim.castShadow=true;rim.receiveShadow=sunSettings.onFaces;group.add(rim);
+    rim.userData.owner=wall.id;rim.userData.openingId=o.id;rim.castShadow=true;rim.receiveShadow=sunSettings.onFaces;group.add(rim);
    }
   }
   for(var side of [-1,1]){
    var path=points.map(function(p){return new T.Vector3(p[0],side*(wall.d/2+.012),p[1]);});
    var line=new T.LineLoop(new T.BufferGeometry().setFromPoints(path),
     new T.LineBasicMaterial({color:0x788993}));
-   line.userData.owner=wall.id;group.add(line);
+   line.userData.owner=wall.id;line.userData.openingId=o.id;group.add(line);
   }
  });
 }
@@ -1866,7 +1870,7 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,glass,opacity){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,glass,opacity,openingId){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1874,7 +1878,8 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  addMesh(g,color,r.id,group,x,y,z,glass,opacity);
+  var piece=addMesh(g,color,r.id,group,x,y,z,glass,opacity);
+   if(openingId!=null)piece.userData.openingId=openingId;
  });
  if(r.type==='wall')addWallAttachments(r,group);
  if(r.type==='wall')addShapedOpenings(r,group);
@@ -1909,7 +1914,10 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh&&o.material?.emissive){
+   var match=selectedOpeningId==null||o.userData.openingId===selectedOpeningId;
+   o.material.emissive.setHex(active&&match?0x183848:0x000000);
+  }});
  });
 }
 function newRecord(type){
@@ -1926,11 +1934,13 @@ function renderProps(){
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
- var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
+ var focusOpening=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
+ var html=focusOpening?'<strong>'+escapeHtml(focusOpening.kind.toUpperCase()+' #'+focusOpening.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
+ '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
  if(host)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
- var keys=['x','y','z'];
+ var keys=focusOpening?[]:['x','y','z'];
  if(r.type!=='boolean')keys.push('rot');
  if(r.type==='box'||r.type==='wall'||r.type==='slab')keys.push('w','d','h');
  if(r.type==='slab')keys.push('pitch');
@@ -1938,7 +1948,7 @@ function renderProps(){
  if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
- if(r.type==='wall'){
+ if(r.type==='wall'&&!focusOpening){
   html+='<div class="detail"><strong>WALL EXTRUSIONS</strong> '+
    '<button class="btn" type="button" data-add-extrusion="rect">+ Rectangle</button> '+
    '<button class="btn" type="button" data-add-extrusion="circle">+ Circle</button> '+
@@ -1955,7 +1965,7 @@ function renderProps(){
  }
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
-  r.openings.forEach(function(o,i){
+  r.openings.filter(function(o){return !focusOpening||o.id===focusOpening.id;}).forEach(function(o,i){
    html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>';
    var fields=r.type==='wall'?[['offset','Offset X'],['w','Width'],['h','Height'],['sill','Sill']]:
     [['offset','Offset X'],['offsetY','Offset Y'],['w','Width'],['d','Depth']];
@@ -1987,7 +1997,7 @@ function renderProps(){
     html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
- html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
+ if(!focusOpening)html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
  p.innerHTML=html;
 }
 function change(e){
@@ -2114,6 +2124,7 @@ function addWallExtrusion(btn){
  redraw();renderProps();text('Extruded profile attached to wall');
 }
 function clickProps(e){
+ if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
  var add=e.target.closest('[data-add-extrusion]');
  if(add){addWallExtrusion(add);return;}
  var delAttachment=e.target.closest('[data-del-extrusion]');
@@ -2125,7 +2136,7 @@ function clickProps(e){
  }
  var o=e.target.closest('[data-remove-opening]');if(o){
   var host=records.find(function(r){return selected.includes(r.id)&&(r.type==='wall'||r.type==='slab');});if(!host)return;
-  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});
+  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});selectedOpeningId=null;
   redraw();renderProps();text('Abertura desvinculada y vano cerrado');return;
  }
  var del=e.target.closest('[data-remove-object]');if(del){
