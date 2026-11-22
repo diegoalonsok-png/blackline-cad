@@ -1265,7 +1265,7 @@ function placePoint(pt){
   records.filter(function(r){return ids.has(r.id)&&editableRecord(r);}).forEach(function(r){
    var dest=kind==='copy'?JSON.parse(JSON.stringify(r)):r;
    if(kind==='copy'){
-    dest.id=serial++;dest.openings?.forEach(function(o){o.id=serial++;});records.push(dest);
+    dest.id=serial++;dest.openings?.forEach(function(o){o.id=serial++;});dest.attachments?.forEach(function(a){a.id=serial++;});records.push(dest);
    }
    dest.x+=dx;dest.y+=dy;moved.push(dest.id);
   });
@@ -2218,6 +2218,19 @@ async function readJSON(e){
      return op;
     });
    }
+   if(r.type==='wall'&&Array.isArray(r.attachments)){
+    o.attachments=r.attachments.slice(0,100).filter(function(a){return a&&['rect','circle','polyline'].includes(a.shape);}).map(function(a){
+     var pts=null;
+     if(a.shape==='polyline'){
+      if(!Array.isArray(a.points))return null;
+      pts=a.points.slice(0,64).filter(function(p){return Array.isArray(p)&&p.length===2&&p.every(function(v){return typeof v==='number'&&Number.isFinite(v)&&Math.abs(v)<=10;});});
+      if(pts.length<3)return null;
+     }
+     return {id:finite(a.id,0),shape:a.shape,points:pts,offset:clamp(finite(a.offset,0),-10000,10000),
+      sill:clamp(finite(a.sill,.5),-10000,10000),w:clamp(finite(a.w,.6),.03,100),h:clamp(finite(a.h,.6),.03,100),
+      depth:clamp(finite(a.depth,.12),.01,3),side:a.side===1?1:-1};
+    }).filter(Boolean);
+   }
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
@@ -2231,7 +2244,7 @@ async function readJSON(e){
   setPlacement(null);showArchPalette(false);
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
-  var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));}));
+  var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;})).concat((r.attachments||[]).map(function(a){return a.id;}));}));
   serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
