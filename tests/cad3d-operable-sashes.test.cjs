@@ -18,7 +18,7 @@ function makeEnv(opts={}){
  const context={
   T:Three,activeView:opts.activeView||'top',viewMode:opts.viewMode||'ortho',cadPlanClassic:true,
   clamp:(n,a,b)=>Math.min(b,Math.max(a,n)),finite:(n,d)=>Number.isFinite(Number(n))?Number(n):d,
-  openingMotionType:o=>/sliding|terrace|patio/.test(o.styleId||'')?'sliding':/fixed/.test(o.styleId||'')?'fixed':'hinged',
+  openingMotionType:o=>/sliding|terrace|patio|guillotine/.test(o.styleId||'')?'sliding':/fixed/.test(o.styleId||'')?'fixed':'hinged',
   openingIsGlass:o=>o.kind==='window'||/french|terrace/.test(o.styleId||''),
   glazingOpacity:()=>.24,boxGeom:(w,d,h)=>({w,d,h}),
   addMesh:(geom,color,id,parent,x,y,z,glass)=>{
