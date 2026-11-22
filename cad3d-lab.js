@@ -1106,8 +1106,20 @@ function cad3dBuildProfile(r,group){
  var pts=r.profilePoints||[];if(pts.length<2)return;
  var vertices=pts.map(p=>new T.Vector3(p[0],p[1],0));
  if(r.profileClosed)vertices.push(vertices[0].clone());
- var outline=new T.Line(new T.BufferGeometry().setFromPoints(vertices),new T.LineBasicMaterial({color:0x82c6df,linewidth:1}));
- outline.userData.owner=r.id;group.add(outline);
+ var outline=new T.Line(new T.BufferGeometry().setFromPoints(vertices),
+  new T.LineBasicMaterial({color:0x82c6df,depthTest:true,depthWrite:false}));
+ outline.userData.owner=r.id;outline.userData.cadProfileOutline=true;group.add(outline);
+ if(r.profileClosed&&pts.length>=3){
+  var shape2d=new T.Shape();shape2d.moveTo(pts[0][0],pts[0][1]);pts.slice(1).forEach(p=>shape2d.lineTo(p[0],p[1]));shape2d.closePath();
+  // Transparent selectable surface: a rectangle is selectable by its interior, not only 1px edges.
+  var hitFace=new T.Mesh(new T.ShapeGeometry(shape2d),
+   new T.MeshBasicMaterial({color:0x78c7e8,transparent:true,opacity:.018,depthWrite:false,side:T.DoubleSide}));
+  hitFace.position.z=.001;hitFace.userData.owner=r.id;hitFace.userData.cadProfileFace=true;
+  hitFace.renderOrder=3;group.add(hitFace);
+ }
+ var handles=new T.Points(new T.BufferGeometry().setFromPoints(vertices.slice(0,r.profileClosed?-1:undefined)),
+  new T.PointsMaterial({color:0xffce68,size:7,sizeAttenuation:false,depthTest:false,depthWrite:false}));
+ handles.userData.cadProfileHandles=true;handles.visible=false;handles.renderOrder=8;group.add(handles);
  if(r.profileClosed&&r.extrudedHeight>0&&pts.length>=3){
   var shape=new T.Shape();shape.moveTo(pts[0][0],pts[0][1]);
   pts.slice(1).forEach(p=>shape.lineTo(p[0],p[1]));shape.closePath();
@@ -1755,7 +1767,10 @@ function fallbackDraw(){
    var points=rec.profilePoints||[],angle=(rec.rot||0)*Math.PI/180,c=Math.cos(angle),sn=Math.sin(angle);
    ctx.beginPath();points.forEach(function(p,i){var x=rec.x+c*p[0]-sn*p[1],y=rec.y+sn*p[0]+c*p[1],v=projection(x,y,rec.z||0);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});
    if(rec.profileClosed)ctx.closePath();
-   ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#82c6df';ctx.lineWidth=1.6;ctx.stroke();
+   var active=selected.includes(rec.id);
+   if(active&&rec.profileClosed){ctx.fillStyle='rgba(255,205,96,.19)';ctx.fill();}
+   ctx.strokeStyle=active?'#ffcf60':'#82c6df';ctx.lineWidth=active?2.6:1.6;ctx.stroke();
+   if(active)points.forEach(function(p){var x=rec.x+c*p[0]-sn*p[1],y=rec.y+sn*p[0]+c*p[1],v=projection(x,y,rec.z||0);ctx.fillStyle='#ffcf60';ctx.fillRect(v.x-3.5,v.y-3.5,7,7);});
   }else if(rec.type==='wall'||rec.type==='slab'){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
@@ -2256,8 +2271,17 @@ function selectAt(e){
   var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34,projection=fallbackProjector();
   var wallOrSlab=fallbackHostHit(e,'wall')||fallbackHostHit(e,'slab');
   records.filter(editableRecord).forEach(function(rec){
-   var p=projection(rec.x,rec.y,rec.z+(rec.h||rec.radius||1)*.5);
+   var p=projection(rec.x,rec.y,rec.type==='profile2d'?(rec.z||0):rec.z+(rec.h||rec.radius||1)*.5);
    var distance=Math.hypot((e.clientX-r.left)-p.x,(e.clientY-r.top)-p.y);
+   if(rec.type==='profile2d'&&rec.profilePoints?.length){
+    var pts=rec.profilePoints.map(function(v){var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+     return projection(rec.x+c*v[0]-s*v[1],rec.y+s*v[0]+c*v[1],rec.z||0);});
+    for(var j=0;j<pts.length-(rec.profileClosed?0:1);j++){
+     var a=pts[j],b=pts[(j+1)%pts.length],dx=b.x-a.x,dy=b.y-a.y,dd=dx*dx+dy*dy;
+     var t=dd?Math.max(0,Math.min(1,((e.clientX-r.left-a.x)*dx+(e.clientY-r.top-a.y)*dy)/dd)):0;
+     distance=Math.min(distance,Math.hypot(e.clientX-r.left-a.x-t*dx,e.clientY-r.top-a.y-t*dy));
+    }
+   }
    if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
   });
   var id=wallOrSlab?.host.id??best?.id;
@@ -2272,7 +2296,7 @@ function selectAt(e){
  var p=new T.Vector2(2*(e.clientX-box.left)/box.width-1,-2*(e.clientY-box.top)/box.height+1);
  raycaster.setFromCamera(p,camera);
  raycaster.params.Line.threshold=.16;
- var hits=[];modelRoot.traverse(function(o){if(o.isMesh||(o.isLine&&!o.userData.cadSketch))hits.push(o);});
+ var hits=[];modelRoot.traverse(function(o){if((o.isMesh||(o.isLine&&!o.userData.cadSketch))&&!o.userData.cadProfileHandles)hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
  var eligible=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
  var visibleHits=intersects.filter(eligible),front=visibleHits[0]||null;
@@ -2784,7 +2808,7 @@ function buildObject(r){
  return group;
 }
 function disposeMeshes(group){
- group.traverse(function(o){if(o.isMesh||o.userData?.cadSketch){
+ group.traverse(function(o){if(o.isMesh||o.isLine||o.isPoints||o.userData?.cadSketch){
   if(o.geometry)o.geometry.dispose();
   var materials=Array.isArray(o.material)?o.material:[o.material];
   materials.forEach(function(m){if(!m)return;if(m.map&&m.map.isCanvasTexture)m.map.dispose();m.dispose();});
@@ -2809,7 +2833,12 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh&&o.material.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
+  g.traverse(function(o){
+   if(o.isMesh&&o.material.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);
+   if(o.userData.cadProfileOutline)o.material.color.setHex(active?0xffcb52:0x82c6df);
+   if(o.userData.cadProfileFace){o.material.opacity=active?.18:.018;o.material.color.setHex(active?0xffce68:0x78c7e8);}
+   if(o.userData.cadProfileHandles)o.visible=active;
+  });
  });
 }
 function newRecord(type){
