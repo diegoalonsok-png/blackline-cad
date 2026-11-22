@@ -1403,7 +1403,7 @@ function bindCanvas(el){
  el.addEventListener('pointermove',function(e){
   if(dragging&&dragging.id===e.pointerId){
    var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
-   if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>5){
+   if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>(placing?12:5)){
     hideObjectContextMenu();
     dragging.moved=true;dragging.lastX=e.clientX;dragging.lastY=e.clientY;
     el.dataset.navigationDrag='true';
@@ -1420,7 +1420,7 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
-  var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
+  var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=(placing?12:5);
   dragging=null;delete el.dataset.navigationDrag;
   if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
   if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
@@ -1480,6 +1480,7 @@ function hostHitAt(e,type){
    group.traverse(function(o){if(o.isMesh)meshes.push(o);});
   }
  });
+ modelRoot.updateMatrixWorld(true);
  var hit=raycaster.intersectObjects(meshes,false)[0];
  if(!hit)return null;
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
@@ -1504,7 +1505,7 @@ function openingFitsCADHost(host,item,excludeId){
 function placeOpening(e){
  var kind=placing,style=archStyle(kind,activePreset[kind]),type=style.host||'wall';
  var hit=hostHitAt(e,type);
- if(!hit){text('Hacé clic sobre '+(type==='slab'?'una losa':'un muro')+' para colocar el vano');return;}
+ if(!hit){text('No se detectó '+(type==='slab'?'una losa':'un muro')+' bajo el cursor. Verificá que la capa esté visible y desbloqueada y hacé clic sobre la superficie del elemento.');return;}
  var rec=hit.host,slab=type==='slab';
  var span=slab?style.d:style.h;
  if(style.w>rec.w||span>(slab?rec.d:rec.h)){
@@ -1537,7 +1538,7 @@ function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
  if(['door','window','opening'].includes(placing)){placeOpening(e);return;}
  if(placing==='rotate'){root.querySelector('#cad3dCommand').focus();return;}
- var pt=groundAt(e);if(!pt){text('Elegí Planta o Isométrica para trabajar sobre Z=0');return;}
+ var pt=groundAt(e);if(!pt){text('No se pudo ubicar el punto sobre el plano Z=0 en esta vista. Cambiá a Top o Iso y volvé a intentar.');return;}
  placePoint(assistedPoint(pt,root.querySelector('.view')));updatePlacementGuide(e);
 }
 function placePoint(pt){
