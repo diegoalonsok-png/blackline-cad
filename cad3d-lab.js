@@ -763,7 +763,7 @@ function applySunSettings(){
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
- if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){var solid=!o.userData?.cadGlass&&!o.userData?.cadPickProxy;o.receiveShadow=solid&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=solid&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
@@ -1162,11 +1162,31 @@ function showObjectContextMenu(e){
  menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
  menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
 }
+/* Existing apertures can be selected while the Door/Window insertion tool
+   remains armed, without accidentally creating another opening on top. */
+function cadHitExistingOpeningAt(e){
+ if(!renderer||!modelRoot||!raycaster||!camera)return false;
+ rayAt(e);
+ var hits=[];
+ modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
+ var candidates=raycaster.intersectObjects(hits,false).filter(function(i){
+  return records.some(function(r){return r.id===i.object.userData.owner&&editableRecord(r);});
+ });
+ var front=candidates[0];if(!front)return false;
+ return candidates.some(function(i){
+  if(i.object.userData.openingId==null||i.object.userData.owner!==front.object.userData.owner)return false;
+  var host=records.find(function(r){return r.id===front.object.userData.owner;});
+  return i.distance<=front.distance+Math.max(.12,Math.min(.7,(host?.d||.2)*2+.2));
+ });
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
   e.preventDefault();
-  if(!dragging&&!placing){selectAt(e);showObjectContextMenu(e);}
+  if(!dragging){
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e))setPlacement(null);
+   if(!placing){selectAt(e);showObjectContextMenu(e);}
+  }
  });
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
@@ -1196,8 +1216,16 @@ function bindCanvas(el){
   if(!dragging||dragging.id!==e.pointerId)return;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;
-  if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
-  if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
+  if(click&&e.button===0){
+   hideObjectContextMenu();
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e)){
+    setPlacement(null);selectAt(e);
+   }else if(placing)placeAt(e);else selectAt(e);
+  }
+  if(click&&e.button===2){
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e))setPlacement(null);
+   if(!placing){selectAt(e);showObjectContextMenu(e);}
+  }
   if(draftModes.dyn)updateDynamicReadout(e);
  });
  el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId)dragging=null;});
@@ -1287,7 +1315,7 @@ function placeOpening(e){
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
- var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
+ var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w,openAngle:0,openFraction:0,hingeSide:'left',openDirection:1,glassOpacity:.24};
  if(slab){
   var maxY=(rec.d-span)/2;
   op.offsetY=clamp(-dx*s+dy*c,-maxY,maxY);op.d=span;
@@ -1402,9 +1430,24 @@ function selectAt(e){
  renderProps();highlight();text(selectedOpeningId!=null?'Carpintería seleccionada: Model, Width, Height y Sill en Properties':selected.length+' seleccionados · '+records.length+' objetos');
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
-function addMesh(g,color,id,parent,x,y,z){
- var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:.8,metalness:.04,side:T.DoubleSide}));
- m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);return m;
+function cadOpeningMotion(o){
+ if(!o||o.kind==='opening'||o.styleId==='open-door')return 'fixed';
+ var id=o.styleId||'';
+ if(/sliding|pocket|terrace/.test(id))return 'slide';
+ if(/awning|hopper/.test(id))return 'tilt';
+ if(/fixed|picture|corner|clerestory|ribbon|floor-to-ceiling|garage/.test(id))return 'fixed';
+ return o.kind==='window'||o.kind==='door'?'hinge':'fixed';
+}
+function cadOpeningIsGlass(o){return o.kind==='window'||(o.kind==='door'&&/french|terrace/.test(o.styleId||''));}
+function cadOpeningActive(o){return cadOpeningMotion(o)==='slide'?Number(o.openFraction)>0:Number(o.openAngle)>0;}
+function cadGlassOpacity(o){return clamp(finite(o.glassOpacity,.24),.08,.85);}
+function addMesh(g,color,id,parent,x,y,z,glass,opacity){
+ var clear=glass===true;
+ var m=new T.Mesh(g,new T.MeshStandardMaterial({color:color,roughness:clear?.14:.8,metalness:clear?0:.04,side:T.DoubleSide,transparent:clear,opacity:clear?clamp(finite(opacity,.24),.08,.85):1,depthWrite:!clear}));
+ m.userData.owner=id;m.userData.cadGlass=clear;
+ if(clear)m.userData.cadGlassOpacity=m.material.opacity;
+ if(x!==undefined)m.position.set(x,y,z);
+ m.castShadow=!clear;m.receiveShadow=!clear&&sunSettings.onFaces;parent.add(m);return m;
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
 function architectureParts(r,part){
@@ -1428,7 +1471,7 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
-  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
+  function carpPart(w,d,h,x,y,z,color,slope,glass){part(w,d,h,x,y,z,color,slope,opening.id,glass,cadGlassOpacity(opening));}
   if(opening.kind==='opening'||opening.styleId==='open-door')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
@@ -1436,20 +1479,20 @@ function architectureParts(r,part){
    var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
    var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
    var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
-   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
+   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame),moving=cadOpeningActive(opening);
    // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
+   if(!moving)carpPart(panelW,depth,panelH,x,0,z,leafColor,0,glazed);
    carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
-   if(doubleDoor||sliding){
+   if(!moving&&(doubleDoor||sliding)){
     carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
    }
-   if(doorType==='garage-door'){
+   if(!moving&&doorType==='garage-door'){
     for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
    }
-   if(glazed){
+   if(!moving&&glazed){
     carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
    }
-   if(doorType==='pivot-door'){
+   if(!moving&&doorType==='pivot-door'){
     carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
    }
   }else{
@@ -1458,11 +1501,11 @@ function architectureParts(r,part){
    carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
    carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
    carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
-   if(/double|sliding|two-leaf/.test(windowType)){
+   if(!cadOpeningActive(opening))carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0,true);
+   if(!cadOpeningActive(opening)&&/double|sliding|two-leaf/.test(windowType)){
     carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
    }
-   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
+   if(!cadOpeningActive(opening)&&/awning|hopper|clerestory|ribbon/.test(windowType)){
     carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
    }
   }
@@ -1548,11 +1591,67 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
  }
  positions.needsUpdate=true;g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
 }
+/* Real moving sash assemblies. The opening stays inside its original host wall;
+   all panels carry their own opening ID, including invisible selection surfaces. */
+function addCadOpeningLeaves(wall,group){
+ (wall.openings||[]).forEach(function(o){
+  if(o.kind!=='door'&&o.kind!=='window')return;
+  var motion=cadOpeningMotion(o),active=cadOpeningActive(o),clear=cadOpeningIsGlass(o);
+  var margin=Math.min(.045,o.w/10,o.h/10);
+  // A transparent hit face on both sides makes the object selectable even
+  // when the surface is inset, or when the leaf has been opened.
+  for(var face of [-1,1]){
+   var proxy=new T.Mesh(boxGeom(Math.max(.03,o.w-2*margin),.006,Math.max(.03,o.h-2*margin)),
+    new T.MeshBasicMaterial({color:0xffffff,side:T.DoubleSide,colorWrite:false,depthWrite:false,transparent:true,opacity:0}));
+   proxy.position.set(o.offset,face*(wall.d/2+.025),o.sill+margin);
+   proxy.userData.owner=wall.id;proxy.userData.openingId=o.id;proxy.userData.cadPickProxy=true;
+   proxy.castShadow=false;proxy.receiveShadow=false;group.add(proxy);
+  }
+  if(motion==='fixed'||!active)return;
+  var totalW=Math.max(.08,o.w-2*margin),totalH=Math.max(.08,o.h-2*margin);
+  var n=motion==='slide'||/double|french/.test(o.styleId||'')?2:1;
+  var w=totalW/n;
+  function panel(parent,xLeft,xRight,z0,h){
+   var pw=xRight-xLeft,mid=(xLeft+xRight)/2,lip=Math.min(.038,pw/10,h/10);
+   function piece(dx,dy,dz,x,y,z,color,glass){
+    var m=addMesh(boxGeom(dx,dy,dz),color,wall.id,parent,x,y,z,glass,cadGlassOpacity(o));
+    m.userData.openingId=o.id;return m;
+   }
+   if(clear){
+    piece(pw,.045,lip,mid,0,z0,0x93a8b2,false);
+    piece(pw,.045,lip,mid,0,z0+h-lip,0x93a8b2,false);
+    piece(lip,.045,h,xLeft+lip/2,0,z0,0x93a8b2,false);
+    piece(lip,.045,h,xRight-lip/2,0,z0,0x93a8b2,false);
+    piece(Math.max(.02,pw-2*lip),.015,Math.max(.02,h-2*lip),mid,0,z0+lip,0x54889d,true);
+   }else piece(pw,.048,h,mid,0,z0,0x8b725e,false);
+  }
+  for(var i=0;i<n;i++){
+   var sash=new T.Group(),left=o.offset-totalW/2+i*w,right=left+w;
+   if(motion==='slide'){
+    var shift=i===1?(o.hingeSide==='right'?1:-1)*w*clamp(finite(o.openFraction,0),0,1):0;
+    sash.position.set(0,i===0?-.028:.028,o.sill+margin);
+    panel(sash,left+shift,right+shift,0,totalH);
+   }else if(motion==='tilt'){
+    // Awning pivots along its top rail; hopper pivots along its bottom rail.
+    var top=/awning/.test(o.styleId||''),pivotZ=o.sill+margin+(top?totalH:0);
+    sash.position.set(o.offset,0,pivotZ);
+    sash.rotation.x=(o.openDirection===-1?-1:1)*(top?1:-1)*clamp(finite(o.openAngle,0),0,90)*Math.PI/180;
+    panel(sash,-totalW/2,totalW/2,top?-totalH:0,totalH);
+   }else{
+    var rightHinge=n===2?i===1:o.hingeSide==='right',pivot=rightHinge?right:left;
+    sash.position.set(pivot,0,o.sill+margin);
+    sash.rotation.z=(o.openDirection===-1?-1:1)*(rightHinge?-1:1)*clamp(finite(o.openAngle,0),0,170)*Math.PI/180;
+    panel(sash,rightHinge?-w:0,rightHinge?0:w,0,totalH);
+   }
+   group.add(sash);
+  }
+ });
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,glass,opacity){
   var g=boxGeom(w,d,h);
   if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -1560,10 +1659,11 @@ function buildObject(r){
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
   }
-  var component=addMesh(g,color,r.id,group,x,y,z);
+  var component=addMesh(g,color,r.id,group,x,y,z,glass,opacity);
   if(openingId!=null)component.userData.openingId=openingId;
  });
- if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
+ if(r.type==='wall')addCadOpeningLeaves(r,group);
+  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
   var cone=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);
   cone.rotateX(Math.PI/2);cone.translate(0,0,r.h/2);addMesh(cone,0x8fa9bc,r.id,group);
@@ -1578,7 +1678,7 @@ function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
  if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
- try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
+ try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadPickProxy)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
@@ -1593,7 +1693,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh&&o.material?.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
@@ -1633,6 +1733,19 @@ function renderProps(){
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
+   if(r.type==='wall'&&o.kind!=='opening'){
+    var motion=cadOpeningMotion(o);
+    if(motion!=='fixed'){
+     html+='<label>Open / Close <select data-opening-preset="'+o.id+'">'+
+      '<option value="0"'+(!cadOpeningActive(o)?' selected':'')+'>Closed</option>'+
+      '<option value="50">Half open</option><option value="100">Fully open</option></select></label>';
+     if(motion==='slide')html+='<label>Slide (%) <input type="number" min="0" max="100" step="5" data-opening-slide="'+o.id+'" value="'+Math.round(clamp(finite(o.openFraction,0),0,1)*100)+'"></label>';
+     else html+='<label>Open angle (°) <input type="number" min="0" max="'+(motion==='tilt'?90:170)+'" step="5" data-opening-angle="'+o.id+'" value="'+clamp(finite(o.openAngle,0),0,motion==='tilt'?90:170)+'"></label>';
+     if(motion!=='tilt')html+='<label>Hinge / Slide side <select data-opening-hinge="'+o.id+'"><option value="left"'+(o.hingeSide!=='right'?' selected':'')+'>Left</option><option value="right"'+(o.hingeSide==='right'?' selected':'')+'>Right</option></select></label>';
+     html+='<label>Opening direction <select data-opening-direction="'+o.id+'"><option value="1"'+(o.openDirection!==-1?' selected':'')+'>Inward</option><option value="-1"'+(o.openDirection===-1?' selected':'')+'>Outward</option></select></label>';
+    }
+    if(cadOpeningIsGlass(o))html+='<label>Glass transparency <input type="number" min="0.08" max="0.85" step="0.05" data-opening-glass="'+o.id+'" value="'+cadGlassOpacity(o)+'"></label>';
+   }
    if(r.type==='wall'){
     var available=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host!=='slab';}):ARCH_STYLES[o.kind];
     if(available)html+='<label>Model <select data-opening-style="'+o.id+'">'+available.map(function(st){return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';}).join('')+'</select></label>';
@@ -1645,13 +1758,33 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],select[data-opening-preset],input[data-opening-angle],input[data-opening-slide],select[data-opening-hinge],select[data-opening-direction],input[data-opening-glass]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('[data-opening-preset],[data-opening-angle],[data-opening-slide],[data-opening-hinge],[data-opening-direction],[data-opening-glass]')){
+  var key=Number(input.dataset.openingPreset||input.dataset.openingAngle||input.dataset.openingSlide||input.dataset.openingHinge||input.dataset.openingDirection||input.dataset.openingGlass);
+  var moving=(r.openings||[]).find(function(o){return o.id===key;});
+  if(!moving||moving.kind==='opening')return;
+  var motion=cadOpeningMotion(moving),v=Number(input.value);
+  if(input.dataset.openingGlass){
+   if(!Number.isFinite(v))return;moving.glassOpacity=clamp(v,.08,.85);
+  }else{
+   if(motion==='fixed')return;
+   if(input.dataset.openingPreset){
+    if(!Number.isFinite(v))return;
+    if(motion==='slide')moving.openFraction=clamp(v/100,0,1);
+    else moving.openAngle=clamp(v/100*(motion==='tilt'?65:90),0,motion==='tilt'?90:170);
+   }else if(input.dataset.openingSlide){if(!Number.isFinite(v))return;moving.openFraction=clamp(v/100,0,1);}
+   else if(input.dataset.openingAngle){if(!Number.isFinite(v))return;moving.openAngle=clamp(v,0,motion==='tilt'?90:170);}
+   else if(input.dataset.openingHinge)moving.hingeSide=input.value==='right'?'right':'left';
+   else if(input.dataset.openingDirection)moving.openDirection=input.value==='-1'?-1:1;
+  }
+  selectedOpeningId=moving.id;redraw();renderProps();text('Apertura paramétrica actualizada');return;
+ }
  if(input.matches('select[data-opening-style]')){
   var opening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
   var style=opening&&(ARCH_STYLES[opening.kind]||[]).find(function(st){return st.id===input.value;});
   if(!opening||!style)return;
-  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w});
+  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w,openAngle:0,openFraction:0});
   if(r.type==='wall'){candidate.h=style.h;candidate.sill=Math.min(style.sill,Math.max(0,r.h-style.h));}
   else candidate.d=style.d;
   if(!openingFitsCADHost(r,candidate,opening.id)){renderProps();text('El modelo elegido no entra en el muro o se superpone a otro vano');return;}
@@ -1786,7 +1919,7 @@ function applyRenderStyle(){
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
-  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(!m.isMesh||!m.material||!m.geometry||m.userData.cadPickProxy)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
@@ -1796,14 +1929,14 @@ function applyRenderStyle(){
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
-  mat.depthWrite=renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
+  mat.depthWrite=!m.userData.cadGlass&&(renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray'));
   mat.depthTest=true;
-  mat.transparent=renderStyle==='xray';
-  mat.opacity=renderStyle==='xray'?.23:1;
+  mat.transparent=renderStyle==='xray'||m.userData.cadGlass===true;
+   mat.opacity=renderStyle==='xray'?.23:m.userData.cadGlass?clamp(finite(m.userData.cadGlassOpacity,.24),.08,.85):1;
   mat.roughness=renderStyle==='realistic'?.54:.8;
   mat.metalness=renderStyle==='realistic'?.10:.04;
-  m.castShadow=!plainLines;
-  m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  m.castShadow=!plainLines&&!m.userData.cadGlass;
+   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines&&!m.userData.cadGlass;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
@@ -2257,7 +2390,10 @@ async function readJSON(e){
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
-     if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
+     if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);
+      op.openAngle=clamp(finite(v.openAngle,0),0,170);op.openFraction=clamp(finite(v.openFraction,0),0,1);
+      op.hingeSide=v.hingeSide==='right'?'right':'left';op.openDirection=v.openDirection===-1?-1:1;
+      op.glassOpacity=clamp(finite(v.glassOpacity,.24),.08,.85);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
      return op;
     });
@@ -2276,7 +2412,7 @@ async function readJSON(e){
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
   var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));}));
-  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
+  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];selectedOpeningId=null;redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){

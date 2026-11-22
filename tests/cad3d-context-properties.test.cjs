@@ -25,7 +25,8 @@ test('Unselected right click does not display an object menu',()=>{
 });
 test('Secondary click selects and opens Properties, right-drag still pans',()=>{
  const bind=source.slice(source.indexOf('function bindCanvas(el){'),source.indexOf('function rayAt(e){'));
- assert(bind.includes("if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}"));
+ assert(bind.includes("if(click&&e.button===2){"),"Right-click selection works even after placing a door/window");
+ assert(bind.includes("if(!placing){selectAt(e);showObjectContextMenu(e);}"));
  assert(bind.includes("if(dragging.pan)panView(dx,dy,el)"));
  assert(bind.includes('hideObjectContextMenu()'));
  assert(bind.includes("el.addEventListener('contextmenu'"));
