@@ -588,7 +588,7 @@ function build(){
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent']].map(function(st){
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Technical Sketch','Sun shadows'],['sketch-pencil','Pencil','Graphite'],['sketch-ink','Ink','Ink and shadows'],['sketch-marker','Marker','Marker wash'],['sketch-watercolor','Watercolor','Soft wash'],['sketch-mono','Monochrome Sketch','Gray study'],['sketch-blueprint','Blueprint','Blue technical']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
  }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
@@ -857,7 +857,7 @@ function applySunSettings(){
    root.querySelector('[data-sun-softness]').textContent=String(sunSettings.softness);
    root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=!o.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!o.userData.cadGlass&&!['wire2d','wire3d','hidden'].includes(renderStyle);}});
@@ -1029,7 +1029,7 @@ function fallbackPolygon(points,fill,stroke,width){
  var g=fallbackCtx;if(!points.length)return;
  g.beginPath();g.moveTo(points[0].x,points[0].y);for(var i=1;i<points.length;i++)g.lineTo(points[i].x,points[i].y);g.closePath();
  var wire=['wire2d','wire3d'].includes(renderStyle);
- g.fillStyle=renderStyle==='sketch'||renderStyle==='hidden'?'#f8f6ef':
+ g.fillStyle=isCad3DSketch(renderStyle)||renderStyle==='hidden'?'#f8f6ef':
   renderStyle==='monochrome'?'#e1e3e4':renderStyle==='realistic'?'#aa9b86':fill;
  if(!wire){g.globalAlpha=renderStyle==='xray'?.26:1;g.fill();g.globalAlpha=1;}
  g.strokeStyle=['sketch','hidden','wire2d','wire3d'].includes(renderStyle)?'#303537':stroke;
@@ -1059,12 +1059,12 @@ function fallbackDraw(){
  var projection=fallbackProjector();
  ctx.clearRect(0,0,w,h);ctx.fillStyle=['sketch','hidden','monochrome','wire2d'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
- if(draftModes.grid&&!['sketch','hidden','wire2d'].includes(renderStyle))for(var i=-20;i<=20;i++){
+ if(draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle))for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
  var origin=projection(0,0,0);
- ctx.strokeStyle=renderStyle==='sketch'?'#8d918e':'#7191a2';ctx.lineWidth=1;
+ ctx.strokeStyle=isCad3DSketch(renderStyle)?'#8d918e':'#7191a2';ctx.lineWidth=1;
  ctx.beginPath();ctx.moveTo(origin.x-4,origin.y);ctx.lineTo(origin.x+4,origin.y);ctx.moveTo(origin.x,origin.y-4);ctx.lineTo(origin.x,origin.y+4);ctx.stroke();
  if(underlay?.segments?.length){
   ctx.strokeStyle='#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
@@ -1086,16 +1086,16 @@ function fallbackDraw(){
   }else if(rec.type==='sphere'){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
-   ctx.fillStyle=renderStyle==='sketch'?'#f7f5ee':grad;ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
+   ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':grad;ctx.strokeStyle=isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.stroke();
   }else if(rec.type==='cylinder'||rec.type==='cone'){
    var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
-   ctx.fillStyle=renderStyle==='sketch'?'#f7f5ee':'#547b91';ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
+   ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':'#547b91';ctx.strokeStyle=isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
    ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();ctx.fill();ctx.stroke();
    ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
   }else if(rec.type==='boolean'&&rec.triangles?.length){
    var p=rec.triangles,angle=(rec.rot||0)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
    var vertex=function(i){return projection(rec.x+p[i]*cos-p[i+1]*sin,rec.y+p[i]*sin+p[i+1]*cos,rec.z+p[i+2]);};
-   ctx.strokeStyle=renderStyle==='sketch'?'#2e3334':'#789ab3';ctx.lineWidth=1;
+   ctx.strokeStyle=isCad3DSketch(renderStyle)?'#2e3334':'#789ab3';ctx.lineWidth=1;
    for(var i=0;i+8<p.length;i+=9){
     var a=vertex(i),b=vertex(i+3),c=vertex(i+6);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
@@ -2052,8 +2052,19 @@ function booleanBox(kind){
 const CAD3D_VISUAL_STYLES={
  wire2d:'2D Wireframe',wire3d:'3D Wireframe',hidden:'Hidden',
  shaded:'Shaded','shaded-edges':'Solid + Edges',realistic:'Realistic',
- monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis'
+ monochrome:'Monochrome',xray:'X-Ray',sketch:'Technical Sketch',
+ 'sketch-pencil':'Pencil Sketch','sketch-ink':'Ink Sketch','sketch-marker':'Marker Sketch','sketch-watercolor':'Watercolor Sketch','sketch-mono':'Monochrome Sketch','sketch-blueprint':'Blueprint Sketch'
 };
+const CAD3D_SKETCH_PRESETS={
+ sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
+ 'sketch-pencil':{bg:0xf2f0e7,ground:0xe3e1da,fill:0xf2efe8,edge:0x64696b,alpha:.78},
+ 'sketch-ink':{bg:0xfaf9f3,ground:0xf0eee8,fill:0xfaf9f4,edge:0x202629,alpha:1},
+ 'sketch-marker':{bg:0xf0eee5,ground:0xe5e1d7,fill:0xd2d2cb,edge:0x4e6269,alpha:.76},
+ 'sketch-watercolor':{bg:0xf5f1e9,ground:0xe5e3de,fill:0xdadcd7,edge:0x667a7f,alpha:.66},
+ 'sketch-mono':{bg:0xf2f2f0,ground:0xe5e5e1,fill:0xe9e9e5,edge:0x424546,alpha:.88},
+ 'sketch-blueprint':{bg:0x344e66,ground:0x647f92,fill:0x8ca6b5,edge:0xe4f2fa,alpha:.92}
+};
+function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 function renderStyleControls(){
  if(!root)return;
  root.querySelectorAll('[data-render-style]').forEach(function(button){
@@ -2062,20 +2073,22 @@ function renderStyleControls(){
  var launcher=root.querySelector('.styleLaunch');
  if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
  var sketchButton=root.querySelector('[data-action="sketch"]');
- if(sketchButton)sketchButton.classList.toggle('sketchActive',renderStyle==='sketch');
- root.querySelector('.view')?.classList.toggle('sketchView',renderStyle==='sketch');
+ if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
+ root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
 }
 function applyRenderStyle(){
  renderStyleControls();
  if(!T)return;
- var lightPaper=['sketch','hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(lightPaper?0xf3f1e8:MODEL_BACKGROUND);
- if(gridHelper)gridHelper.visible=draftModes.grid&&!['sketch','hidden','wire2d'].includes(renderStyle);
- if(axesHelper)axesHelper.visible=!['sketch','hidden','wire2d'].includes(renderStyle);
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
+ var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
+ var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
+ if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
+ if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:0x9ba5a8);
+ if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
+ if(axesHelper)axesHelper.visible=!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
+ if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
  if(!modelRoot)return;
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
- var withEdges=['wire2d','wire3d','hidden','shaded-edges','monochrome','sketch'].includes(renderStyle);
+ var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
   if(!m.isMesh||!m.material||!m.geometry)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
@@ -2083,7 +2096,7 @@ function applyRenderStyle(){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
   });
   var mat=m.material,base=m.userData.cadBaseColor;
-  var color=renderStyle==='monochrome'?0xe8e8e3:renderStyle==='sketch'?0xf7f4eb:
+  var color=sketch?(m.userData.cadGlass?base:sketch.fill):renderStyle==='monochrome'?0xe8e8e3:
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
@@ -2098,11 +2111,11 @@ function applyRenderStyle(){
   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines&&!isGlass;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
-   var colorEdge=renderStyle==='sketch'?0x22282c:renderStyle==='shaded-edges'?0x394954:0x43535e;
+   var colorEdge=sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
     color:colorEdge,depthTest:depthTest,depthWrite:false,
-    transparent:renderStyle==='shaded-edges',opacity:renderStyle==='shaded-edges'?.68:1
+    transparent:!!sketch||renderStyle==='shaded-edges',opacity:sketch?sketch.alpha:renderStyle==='shaded-edges'?.68:1
    }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
   }
@@ -2114,13 +2127,13 @@ function setVisualStyle(mode){
  if(renderer)applyRenderStyle();
  else renderStyleControls();
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&
-  !['sketch','hidden','wire2d','wire3d'].includes(renderStyle);
+  !['hidden','wire2d','wire3d'].includes(renderStyle);
  if(fallbackCanvas)fallbackDraw();
  text('Visual Style: '+CAD3D_VISUAL_STYLES[mode]+' · cámara y geometría conservadas');
  return true;
 }
 function setSketchStyle(mode){
- setVisualStyle(mode==='sketch'?'sketch':'shaded-edges');
+ setVisualStyle(isCad3DSketch(mode)?mode:'shaded-edges');
 }
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
@@ -2130,9 +2143,9 @@ function exportViewPNG(){
   else fallbackDraw();
   var url=canvas.toDataURL('image/png');
   if(!url||url==='data:,')throw Error('El navegador no pudo capturar el visor');
-  var a=document.createElement('a');a.href=url;a.download='blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+(renderStyle==='sketch'?'-croquis':'')+'.png';
+  var a=document.createElement('a');a.href=url;a.download='blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+(isCad3DSketch(renderStyle)?'-croquis':'')+'.png';
   document.body.appendChild(a);a.click();a.remove();
-  text('Vista '+(renderStyle==='sketch'?'tipo croquis ':'')+'exportada a PNG');
+  text('Vista '+(isCad3DSketch(renderStyle)?'tipo croquis ':'')+'exportada a PNG');
  }catch(e){text('No se pudo exportar PNG: '+(e.message||e));}
 }
 function exportSketchSVG(){
@@ -2444,7 +2457,7 @@ function action(a){
  }
  if(['union','subtract','intersect'].includes(a)){setPlacement(null);booleanBox(a);return true;}
  if(a==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();text('Sun / Shadows '+(sunSettings.enabled?'ON':'OFF'));return true;}
- if(a==='sketch')setSketchStyle(renderStyle==='sketch'?'shaded-edges':'sketch');
+ if(a==='sketch')setSketchStyle(isCad3DSketch(renderStyle)?'shaded-edges':'sketch');
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
