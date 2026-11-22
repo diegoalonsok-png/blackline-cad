@@ -373,7 +373,7 @@
    const id='atelier-'+key+'-'+String(v+1).padStart(2,'0');
    if(available.has(id))return;
    const entry={id,name,cat:C[key],family:'atelier-'+key,
-    w,d,wMin,wMax,dMin,dMax,dynamicActions:true,
+    w,d,wMin,wMax,dMin,dMax,dynamicActions:true,pro:true,
     gen:function(builder,W,D){DRAW[key](builder,W,D,v);}
    };
    api.library.push(entry);available.add(id);count++;
