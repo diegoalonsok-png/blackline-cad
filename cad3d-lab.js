@@ -2939,20 +2939,35 @@ function applyRenderStyle(){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
   });
   var mat=m.material,base=m.userData.cadBaseColor;
+  // Preserve immutable original material properties across all style transitions.
+  // Transparent 2.5D people/trees must never turn into opaque rectangles.
+  if(!m.userData.cadOriginalMaterial){
+   m.userData.cadOriginalMaterial={
+    transparent:!!mat.transparent,opacity:mat.opacity,depthWrite:mat.depthWrite,
+    alphaTest:mat.alphaTest||0,roughness:mat.roughness,metalness:mat.metalness,
+    isCutout:!!(mat.map&&mat.map.isCanvasTexture)
+   };
+  }
+  var original=m.userData.cadOriginalMaterial;
+  var cutout=original.isCutout,glass=!!m.userData.cadGlass;
   var color=sketch?sketch.fill:renderStyle==='monochrome'?0xe8e8e3:
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
-  mat.color.setHex(color);
-  if(m.userData.cadGlass&&!plainLines){mat.transparent=true;mat.opacity=.28;mat.depthWrite=false;}
+  // Cutout imagery retains its intended colors even in sketch and monochrome modes.
+  mat.color.setHex(cutout?base:color);
   mat.colorWrite=!plainLines;
-  mat.depthWrite=m.userData.cadGlass?false:renderStyle==='hidden'||(!plainLines&&renderStyle!=='xray');
   mat.depthTest=true;
-  mat.transparent=renderStyle==='xray'||!!m.userData.cadGlass;
-  mat.opacity=m.userData.cadGlass?.28:renderStyle==='xray'?.23:1;
-  mat.roughness=renderStyle==='realistic'?.54:.8;
-  mat.metalness=renderStyle==='realistic'?.10:.04;
-  m.castShadow=!m.userData.cadGlass&&!plainLines;
-  m.receiveShadow=!m.userData.cadGlass&&sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
-  if(withEdges){
+  mat.transparent=cutout||glass||renderStyle==='xray'||original.transparent;
+  mat.opacity=renderStyle==='xray'?(cutout?.5:.23):glass?.28:original.opacity;
+  mat.alphaTest=cutout?Math.max(.05,original.alphaTest):original.alphaTest;
+  // Hidden-line mode uses an invisible depth prepass for proper edge occlusion.
+  mat.depthWrite=plainLines?renderStyle==='hidden'&&!glass&&!cutout:
+   !glass&&!cutout&&renderStyle!=='xray'&&original.depthWrite;
+  if('roughness' in mat)mat.roughness=renderStyle==='realistic'?.54:original.roughness;
+  if('metalness' in mat)mat.metalness=renderStyle==='realistic'?.10:original.metalness;
+  m.castShadow=!glass&&!plainLines;
+  m.receiveShadow=!glass&&sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
+  mat.needsUpdate=true;
+  if(withEdges&&!cutout){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
     renderStyle==='wire3d'?0x191d21:renderStyle==='shaded-edges'?0x394954:0x43535e;
@@ -2987,11 +3002,19 @@ function applyRenderStyle(){
 }
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
+ var savedView={mode:viewMode,active:activeView,az:orbit.az,el:orbit.el,dist:orbit.dist,
+  target:target?{x:target.x,y:target.y,z:target.z}:null};
  renderStyle=mode;
  if(isCad3DSketch(mode)){sunSettings.enabled=true;sunSettings.onGround=true;sunSettings.onFaces=true;}
  if(renderer)applyRenderStyle();
  else renderStyleControls();
  if(isCad3DSketch(mode))applySunSettings();
+ // A visual style is a material operation, never a camera preset.
+ viewMode=savedView.mode;activeView=savedView.active;
+ orbit.az=savedView.az;orbit.el=savedView.el;orbit.dist=savedView.dist;
+ if(target&&savedView.target)target.set(savedView.target.x,savedView.target.y,savedView.target.z);
+ if(renderer){applyViewCamera();renderer.shadowMap.needsUpdate=true;}
+ syncViewControls();
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&
   !['hidden','wire2d','wire3d'].includes(renderStyle);
  if(fallbackCanvas)fallbackDraw();
