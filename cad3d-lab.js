@@ -701,17 +701,99 @@ var CAD3D_COMPONENTS={
  bollard:{name:'Bolardo 1',group:'Exterior',w:.28,d:.28,h:.88,parts:[
  [0,0,0,.2,.2,.83,0x515c63],[0,0,.81,.28,.28,.07,0xd1d5d4]]}
 };
+
+/* CAD3D_LIBRARY_PLUS_V1: lightweight native metric assets, no external downloads. */
+(function(){
+ const C=CAD3D_COMPONENTS;
+ function b(x,y,z,w,d,h,c){return [x,y,z,w,d,h,c];}
+ const wood=0x987456,steel=0x505d64,white=0xe5e4df,green=0x63885c,glass=0x8ca9bb,dark=0x30373e;
+ function legs(w,d,h){return [-1,1].flatMap(x=>[-1,1].map(y=>b(x*(w/2-.06),y*(d/2-.06),0,.07,.07,h,steel)));}
+ function table(w,d,h){return [b(0,0,h-.07,w,d,.07,wood),...legs(w,d,h-.07)];}
+ function chair(w,d){return [b(0,0,.42,w,d,.1,wood),b(0,d/2-.06,.44,w,.1,.45,green),...legs(w,d,.42)];}
+ function sofa(w,d){return [b(0,0,.16,w,d,.32,glass),b(0,d/2-.07,.42,w,.15,.45,green),b(-w/2+.1,0,.32,.2,d,.42,green),b(w/2-.1,0,.32,.2,d,.42,green)];}
+ function cabinet(w,d,h){return [b(0,0,0,w,d,h,wood),b(0,-d/2-.016,.1,w-.08,.03,h-.2,white)];}
+ function car(w,d,h,color){return [b(0,0,.24,w,d,.42,color),b(0,.06,.63,w*.65,d*.7,h-.63,color),b(0,-d*.34,.5,w*.55,.03,.35,glass),...[-1,1].flatMap(x=>[-1,1].map(y=>b(x*(w/2-.22),y*(d/2-.12),.08,.27,.2,.32,dark)))];}
+ function tree(h,w){return [b(0,0,0,.2,.2,h*.58,wood),b(0,0,h*.40,w,w,h*.35,green),b(-w*.22,0,h*.6,w*.7,w*.7,h*.28,0x476c4b),b(w*.20,0,h*.65,w*.65,w*.65,h*.25,0x7c9769)];}
+ const A=[
+ ['chair2','Silla 2','Muebles',.56,.56,.95,chair(.56,.56)],
+ ['chair3','Silla 3','Muebles',.65,.62,.95,chair(.65,.62)],
+ ['armchair1','Sillón 1','Muebles',1,.95,.9,sofa(1,.95)],
+ ['armchair2','Sillón 2','Muebles',1.1,.95,.9,sofa(1.1,.95)],
+ ['sofa2','Sofá 2','Muebles',2.5,.95,.9,sofa(2.5,.95)],
+ ['sofa3','Sofá 3','Muebles',3.1,1,.9,sofa(3.1,1)],
+ ['table2','Mesa 2','Muebles',1.8,.9,.78,table(1.8,.9,.78)],
+ ['table3','Mesa 3','Muebles',2.4,1,.78,table(2.4,1,.78)],
+ ['coffee1','Mesa baja 1','Muebles',1.2,.65,.45,table(1.2,.65,.45)],
+ ['stool1','Banqueta 1','Muebles',.45,.45,.77,table(.45,.45,.77)],
+ ['desk2','Escritorio 2','Muebles',1.7,.8,.76,table(1.7,.8,.76)],
+ ['wardrobe1','Placard 1','Muebles',2.4,.65,2.5,cabinet(2.4,.65,2.5)],
+ ['wardrobe2','Placard 2','Muebles',3,.65,2.5,cabinet(3,.65,2.5)],
+ ['kitchen1','Cocina 1','Cocinas',2.4,.65,.94,[...cabinet(2.4,.65,.9),b(0,0,.9,2.45,.7,.04,dark)]],
+ ['kitchen2','Cocina 2','Cocinas',3,.65,.94,[...cabinet(3,.65,.9),b(0,0,.9,3.05,.7,.04,white)]],
+ ['island1','Isla 1','Cocinas',2.1,1,.94,[b(0,0,0,1.95,.84,.9,white),b(0,0,.9,2.1,1,.04,wood)]],
+ ['fridge1','Heladera 1','Cocinas',.75,.7,1.9,[b(0,0,0,.75,.7,1.9,white),b(0,-.36,1.1,.07,.03,.42,steel)]],
+ ['basin1','Lavatorio 1','Baños',.7,.55,.88,[b(0,0,0,.7,.55,.88,white),b(0,0,.86,.55,.4,.02,glass)]],
+ ['basin2','Lavatorio 2','Baños',1.1,.55,.88,[b(0,0,0,1.1,.55,.88,white),b(0,0,.86,.95,.4,.02,glass)]],
+ ['toilet1','Inodoro 1','Baños',.42,.7,.78,[b(0,.22,0,.42,.2,.78,white),b(0,-.12,.12,.4,.55,.37,white)]],
+ ['bath1','Bañera 1','Baños',1.75,.8,.6,[b(0,0,0,1.75,.8,.6,white),b(0,0,.57,1.55,.58,.02,glass)]],
+ ['car1','Auto 1','Vehículos',4.2,1.8,1.5,car(4.2,1.8,1.5,0x8096a4)],
+ ['car2','Auto 2','Vehículos',4.7,1.9,1.55,car(4.7,1.9,1.55,0x526a7f)],
+ ['suv1','SUV 1','Vehículos',4.85,2,1.8,car(4.85,2,1.8,0x91958f)],
+ ['van1','Camioneta 1','Vehículos',5.1,2,2.15,car(5.1,2,2.15,white)],
+ ['truck1','Camión 1','Vehículos',7.5,2.5,3,[...car(3,2.4,2.8,steel),b(2,0,.45,4.25,2.4,2.3,white)]],
+ ['tree1','Árbol 1','Vegetación',2.6,2.6,5.5,tree(5.5,2.6)],
+ ['tree2','Árbol 2','Vegetación',3.4,3.4,7.5,tree(7.5,3.4)],
+ ['tree3','Árbol 3','Vegetación',4,4,9,tree(9,4)],
+ ['shrub1','Arbusto 1','Vegetación',1.2,1.2,1.3,tree(1.3,1.2)],
+ ['shrub2','Arbusto 2','Vegetación',1.8,1.8,1.8,tree(1.8,1.8)],
+ ['bench1','Banco 1','Exterior',1.8,.55,.9,chair(1.8,.55)],
+ ['lamp1','Farola 1','Exterior',.4,.4,3.5,[b(0,0,0,.1,.1,3.2,dark),b(0,0,3.2,.4,.4,.3,white)]],
+ ['pergola1','Pérgola 1','Exterior',4,3,2.8,[...[-1.85,1.85].flatMap(x=>[-1.35,1.35].map(y=>b(x,y,0,.13,.13,2.7,wood))),...[-1.2,-.6,0,.6,1.2].map(y=>b(0,y,2.7,4,.1,.1,wood))]]
+ ];
+ A.forEach(a=>C[a[0]]={name:a[1],group:a[2],w:a[3],d:a[4],h:a[5],parts:a[6]});
+ [['tree',3.2,6],['tree',4,8],['tree',2.5,4.5],['palm',3.8,7],['palm',3,5.5],['bush',2.1,1.6],['bush',2.8,2],['person',.6,1.75],['person',.55,1.65],['person',.6,1.82]].forEach((a,i)=>{
+  C['cutout'+(i+1)]={name:(a[0]==='person'?'Persona':a[0]==='palm'?'Palmera':a[0]==='bush'?'Arbusto':'Árbol')+' 2.5D '+(i+1),group:a[0]==='person'?'2.5D Personas':'2.5D Vegetación',w:a[1],d:.05,h:a[2],parts:[],cutout:a[0]};
+ });
+})();
+function cad3dCutoutTexture(kind,id){
+ var canvas=document.createElement('canvas');canvas.width=256;canvas.height=512;var ctx=canvas.getContext('2d');
+ function ellipse(x,y,w,h,color){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();}
+ function line(x,y,X,Y,width,color){ctx.lineWidth=width;ctx.strokeStyle=color;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(X,Y);ctx.stroke();}
+ if(kind==='person'){
+  line(105,310,93,488,24,'#363f44');line(151,310,161,488,24,'#363f44');
+  line(128,180,128,317,54,'#667e89');line(109,200,65,321,18,'#667e89');line(147,200,183,314,18,'#667e89');
+  ellipse(128,112,35,45,'#c79c79');ellipse(128,83,38,22,'#51463f');
+ }else{
+  var bush=kind==='bush',palm=kind==='palm',top=bush?320:130;
+  if(!bush)line(128,492,128,top+45,palm?17:28,'#80644d');
+  for(var i=0;i<12;i++){var a=i*2.399,rad=bush?74:palm?92:64;
+   ellipse(128+Math.cos(a)*rad,top+45+Math.sin(a)*rad*.75,palm?60:48,palm?15:49,['#426e4e','#648757','#829968','#527b55'][i%4]);}
+ }
+ var tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;return tex;
+}
+
 var activeCAD3DBlock='chair';
 function cad3DBlockCatalog(){
  return '<details class="block3DMenu"><summary class="btn">3D Blocks ▾</summary><div class="block3DPanel">'+
  '<strong>3D COMPONENTS</strong><small>Geometrías originales en metros · seleccionables y editables</small>'+
- Object.keys(CAD3D_COMPONENTS).map(function(id){var spec=CAD3D_COMPONENTS[id];
-  return '<button type="button" class="btn" data-3d-block="'+id+'">'+spec.name+'</button>';
+ [...new Set(Object.keys(CAD3D_COMPONENTS).map(function(id){return CAD3D_COMPONENTS[id].group;}))].map(function(group){
+ return '<div class="cad3dBlockCategory"><strong style="display:block;margin:6px 0">'+group+'</strong>'+
+ Object.keys(CAD3D_COMPONENTS).filter(function(id){return CAD3D_COMPONENTS[id].group===group;}).map(function(id){
+ return '<button type="button" class="btn" data-3d-block="'+id+'">'+CAD3D_COMPONENTS[id].name+'</button>';
+ }).join('')+'</div>';
  }).join('')+'</div></details>';
 }
 function buildCAD3DBlock(record,group){
  var def=CAD3D_COMPONENTS[record.blockId];if(!def)return;
  var sx=record.w/def.w,sy=record.d/def.d,sz=record.h/def.h;
+ if(def.cutout){
+  var material=new T.MeshBasicMaterial({map:cad3dCutoutTexture(def.cutout,record.blockId),transparent:true,alphaTest:.05,depthWrite:false,side:T.DoubleSide});
+  [0,Math.PI/2].forEach(function(angle){
+   var mesh=new T.Mesh(new T.PlaneGeometry(record.w,record.h),material);
+   mesh.rotation.set(Math.PI/2,0,angle);mesh.position.z=record.h/2;mesh.userData.owner=record.id;
+   mesh.castShadow=true;group.add(mesh);
+  });return;
+ }
  def.parts.forEach(function(p){
   var w=p[3]*sx,d=p[4]*sy,h=p[5]*sz,g=boxGeom(w,d,h);
   addMesh(g,p[6],record.id,group,p[0]*sx,p[1]*sy,p[2]*sz);
