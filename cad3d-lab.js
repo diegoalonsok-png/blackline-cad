@@ -51,6 +51,17 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+/* Native CAD3D view save dialog: preserves scene, camera and user project. */
+#cad3dLab .viewSaveMenu{position:relative;display:inline-flex;align-items:center;flex:none}
+#cad3dLab .viewSaveMenu>summary{list-style:none;cursor:pointer;white-space:nowrap}
+#cad3dLab .viewSaveMenu>summary::-webkit-details-marker{display:none}
+#cad3dLab .viewSavePanel{position:absolute;right:0;top:calc(100% + 8px);z-index:100;display:grid;gap:9px;width:min(326px,85vw);padding:14px;border:1px solid #688ba0;border-radius:10px;background:#152330;box-shadow:0 13px 35px #000b;color:#e7f1f6}
+#cad3dLab .viewSavePanel label{font-size:11px;color:#bbccda;display:grid;gap:4px}
+#cad3dLab .viewSavePanel input,#cad3dLab .viewSavePanel select{box-sizing:border-box;width:100%;min-height:31px;background:#23313d;color:#eff8ff;border:1px solid #566f7e;border-radius:5px;padding:5px 7px}
+#cad3dLab .viewSavePanel .saveRow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+#cad3dLab .viewSavePanel output{font-size:11px;color:#afc5d0}
+#cad3dLab .viewSavePanel button{min-height:32px;cursor:pointer}
+
 /* Classic drafting / refined CAD3D navigator, isolated from CAD2D. */
 #cad3dLab .view.wire2dView{background:#fff!important}
 #cad3dLab .viewCube{border-radius:19px;border:1px solid #86a9bd;background:linear-gradient(150deg,#344b5b,#203444 42%,#101c28);box-shadow:inset 0 1px 0 #d9f1ff88,inset 0 -2px 7px #08111ca0,0 5px 15px #0007}
@@ -723,6 +734,16 @@ function build(){
  '</div></div><small class="styleGalleryNote">Los croquis usan sol, luz y sombras cuando WebGL está disponible. Los estilos no cambian la geometría.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
+ '<details class="viewSaveMenu"><summary class="btn" title="Guardar esta vista en PNG, JPG o PDF">Guardar vista ▾</summary>'+
+ '<div class="viewSavePanel" role="group" aria-label="Exportar vista 3D">'+
+ '<label>Formato<select data-save-format><option value="png">PNG</option><option value="jpg">JPG</option><option value="pdf">PDF</option></select></label>'+
+ '<label>Tamaño<select data-save-size><option value="viewport">Vista actual</option><option value="hd">1920 × 1080 px</option><option value="2k">2560 × 1440 px</option><option value="4k">3840 × 2160 px</option><option value="a4">A4 horizontal</option><option value="a3">A3 horizontal</option><option value="a2">A2 horizontal</option><option value="custom">Personalizado (píxeles)</option></select></label>'+
+ '<div class="saveRow"><label>Ancho (px)<input data-save-width type="number" min="128" max="8192" step="1" value="1920"></label>'+
+ '<label>Alto (px)<input data-save-height type="number" min="128" max="8192" step="1" value="1080"></label></div>'+
+ '<label>Resolución de impresión (DPI)<select data-save-dpi><option value="96">96</option><option value="150">150</option><option value="300" selected>300</option></select></label>'+
+ '<output class="saveViewInfo">1920 × 1080 píxeles</output>'+
+ '<button type="button" class="btn" data-save-go>Guardar imagen / PDF</button>'+
+ '</div></details>'+
  '<details class="ioMenu"><summary class="btn">Export</summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
@@ -839,6 +860,10 @@ function build(){
   if(!preset)return;sunSettings.azimuth=preset[0];sunSettings.elevation=preset[1];sunSettings.enabled=true;applySunSettings();
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
+ root.querySelector('.viewSaveMenu').addEventListener('change',updateSaveViewSettings);
+ root.querySelector('.viewSaveMenu').addEventListener('input',updateSaveViewSettings);
+ root.querySelector('[data-save-go]').addEventListener('click',saveCAD3DView);
+ updateSaveViewSettings();
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
  root.querySelector('#cad3dCommand').addEventListener('keydown',function(ev){
   // Immediate view shortcuts even with the Command field focused.
@@ -2624,6 +2649,115 @@ function setVisualStyle(mode){
 }
 function setSketchStyle(mode){
  setVisualStyle(isCad3DSketch(mode)?mode:'shaded-edges');
+}
+
+function saveViewSettings(){
+ var menu=root.querySelector('.viewSaveMenu');
+ var size=menu.querySelector('[data-save-size]').value;
+ var dpi=Number(menu.querySelector('[data-save-dpi]').value)||300;
+ var dims={hd:[1920,1080],'2k':[2560,1440],'4k':[3840,2160],
+  a4:[297,210],a3:[420,297],a2:[594,420]};
+ var w,h;
+ if(size==='viewport'){
+  var source=renderer?.domElement||fallbackCanvas;
+  w=source?.width||1280;h=source?.height||720;
+ }else if(['a4','a3','a2'].includes(size)){
+  w=Math.round(dims[size][0]*dpi/25.4);
+  h=Math.round(dims[size][1]*dpi/25.4);
+ }else if(dims[size]){w=dims[size][0];h=dims[size][1];}
+ else{w=Number(menu.querySelector('[data-save-width]').value);h=Number(menu.querySelector('[data-save-height]').value);}
+ return {size:size,dpi:dpi,w:Math.round(w),h:Math.round(h),
+  format:menu.querySelector('[data-save-format]').value};
+}
+function updateSaveViewSettings(){
+ var menu=root.querySelector('.viewSaveMenu'),settings=saveViewSettings();
+ if(settings.size!=='custom'&&Number.isFinite(settings.w)&&Number.isFinite(settings.h)){
+  menu.querySelector('[data-save-width]').value=settings.w;
+  menu.querySelector('[data-save-height]').value=settings.h;
+ }
+ var pixels=settings.w*settings.h,valid=Number.isInteger(settings.w)&&Number.isInteger(settings.h)&&
+  settings.w>=128&&settings.h>=128&&settings.w<=8192&&settings.h<=8192&&pixels<=24000000;
+ menu.querySelector('.saveViewInfo').textContent=valid?
+  settings.w+' × '+settings.h+' px · '+(pixels/1000000).toFixed(2)+' MP · '+settings.dpi+' DPI':
+  'Resolución inválida: máximo 8192 px por lado y 24 megapíxeles';
+ menu.querySelector('[data-save-go]').disabled=!valid;
+}
+function cad3dPDFfromJPEG(jpegDataUrl,w,h,dpi){
+ var binary=atob(jpegDataUrl.split(',')[1]);
+ var jpg=new Uint8Array(binary.length);for(var k=0;k<binary.length;k++)jpg[k]=binary.charCodeAt(k);
+ var enc=new TextEncoder(),chunks=[],offset=0,xref=[0];
+ function append(value){var bytes=typeof value==='string'?enc.encode(value):value;chunks.push(bytes);offset+=bytes.length;}
+ function object(n,header,stream){
+  xref[n]=offset;append(n+' 0 obj\n'+header);
+  if(stream){append('\nstream\n');append(stream);append('\nendstream');}
+  append('\nendobj\n');
+ }
+ var pw=(w*72/dpi).toFixed(3),ph=(h*72/dpi).toFixed(3);
+ append('%PDF-1.4\n');
+ object(1,'<< /Type /Catalog /Pages 2 0 R >>');
+ object(2,'<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+ object(3,'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 '+pw+' '+ph+
+  '] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>');
+ object(4,'<< /Type /XObject /Subtype /Image /Width '+w+' /Height '+h+
+  ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length '+jpg.length+' >>',jpg);
+ var cmds=enc.encode('q\n'+pw+' 0 0 '+ph+' 0 0 cm\n/Im0 Do\nQ\n');
+ object(5,'<< /Length '+cmds.length+' >>',cmds);
+ var xrefAt=offset;append('xref\n0 6\n0000000000 65535 f \n');
+ for(var n=1;n<=5;n++)append(String(xref[n]).padStart(10,'0')+' 00000 n \n');
+ append('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n'+xrefAt+'\n%%EOF');
+ return new Blob(chunks,{type:'application/pdf'});
+}
+async function saveCAD3DView(){
+ var o=saveViewSettings(),pixels=o.w*o.h;
+ if(!Number.isInteger(o.w)||!Number.isInteger(o.h)||o.w<128||o.h<128||o.w>8192||o.h>8192||pixels>24000000){
+  text('Elegí un tamaño entre 128 y 8192 píxeles por lado (máximo 24 MP)');return;
+ }
+ if(!renderer&&!fallbackCanvas)return text('El visor 3D aún no está disponible');
+ var view=root.querySelector('.view'),filename='blackline-cad3d-'+(activeView||'vista')+'-'+o.w+'x'+o.h;
+ var out=document.createElement('canvas');out.width=o.w;out.height=o.h;
+ var ctx=out.getContext('2d');if(!ctx)return text('No se pudo preparar la exportación');
+ var source=renderer?.domElement||fallbackCanvas;
+ var oldW=source.width,oldH=source.height,oldPixelRatio=renderer?.getPixelRatio();
+ var oldAspect=camera?.aspect,oldLeft=camera?.left,oldRight=camera?.right,oldTop=camera?.top,oldBottom=camera?.bottom;
+ try{
+  if(renderer){
+   // Temporarily render at requested pixel size, restore in finally.
+   var max=renderer.capabilities.maxTextureSize;
+   if(o.w>max||o.h>max)throw Error('La GPU admite como máximo '+max+' px por lado');
+   renderer.setPixelRatio(1);renderer.setSize(o.w,o.h,false);
+   if(camera.isPerspectiveCamera)camera.aspect=o.w/o.h;
+   else if(camera.isOrthographicCamera){
+    var centerX=(oldLeft+oldRight)/2,halfHeight=(oldTop-oldBottom)/2;
+    var halfWidth=halfHeight*o.w/o.h;
+    camera.left=centerX-halfWidth;camera.right=centerX+halfWidth;
+   }
+   camera.updateProjectionMatrix();renderer.render(scene,camera);
+   ctx.drawImage(renderer.domElement,0,0,o.w,o.h);
+  }else{
+   // Compatibility renderer is raster; upscaling cannot add detail.
+   fallbackDraw();ctx.drawImage(fallbackCanvas,0,0,o.w,o.h);
+  }
+  if(o.format==='pdf'){
+   var pdf=cad3dPDFfromJPEG(out.toDataURL('image/jpeg',.93),o.w,o.h,o.dpi);
+   download(filename+'.pdf',pdf,'application/pdf');
+  }else{
+   var type=o.format==='jpg'?'image/jpeg':'image/png';
+   var url=out.toDataURL(type,.94),a=document.createElement('a');
+   if(url==='data:,')throw Error('No se pudo generar la imagen');
+   a.href=url;a.download=filename+'.'+o.format;document.body.appendChild(a);a.click();a.remove();
+  }
+  text('Vista exportada '+o.w+' × '+o.h+' px · '+o.format.toUpperCase()+
+   (renderer?'':' · Vista de compatibilidad ampliada'));
+  root.querySelector('.viewSaveMenu').open=false;
+ }catch(err){text('No se pudo guardar la vista: '+(err.message||err));}
+ finally{
+  if(renderer){
+   renderer.setPixelRatio(oldPixelRatio);renderer.setSize(view.clientWidth,view.clientHeight,false);
+   camera.aspect=oldAspect;
+   if(camera.isOrthographicCamera){camera.left=oldLeft;camera.right=oldRight;camera.top=oldTop;camera.bottom=oldBottom;}
+   camera.updateProjectionMatrix();renderer.render(scene,camera);
+  }
+ }
 }
 function exportViewPNG(){
  var canvas=renderer?.domElement||fallbackCanvas;
