@@ -772,7 +772,7 @@ one('pv-grupo-fre','Grupo de tres personas · vista frontal',PV,1.70,1.75,(b,W,D
  * Cada objeto se regenera al modificar W/D (pinzas ARQ), en metros y con detalles reales
  * de planta. No se incluyen bloques ni marcas de terceros. */
 const MOD='Diseño contemporáneo',MOD_ARQ='Carpintería contemporánea',MOD_EXT='Paisajismo contemporáneo';
-const modRange=(family,wMin,wMax,dMin,dMax)=>({family,wMin,wMax,dMin,dMax});
+const modRange=(family,wMin,wMax,dMin,dMax)=>({family,wMin,wMax,dMin,dMax,pro:true});
 const ellipseSeat=(b,x,y,rx,ry)=>{b.ellipse(x,y,rx,ry);b.ellipse(x,y,rx*.86,ry*.82)};
 const barLine=(b,x,y,w,h)=>b.rrect(x,y,w,h,Math.min(.03,h/2,w/2));
 one('modern-sofa-3','Sofá modular de 3 cuerpos',MOD,2.70,1.05,(b,W,D)=>{
