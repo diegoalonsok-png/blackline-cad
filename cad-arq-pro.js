@@ -179,7 +179,7 @@ document.head.append(css);
 let activeCat='Baños completos',query='';
 function cardsFor(cat,q){
  const s=q.trim().toLowerCase();
- return LIB.library.filter(x=>(s?(x.name+' '+x.cat).toLowerCase().includes(s):(cat==='Todos'||x.cat===cat)));
+ return LIB.library.filter(x=>!x.hideFromGallery&&(s?(x.name+' '+x.cat).toLowerCase().includes(s):(cat==='Todos'||x.cat===cat)));
 }
 function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
@@ -190,7 +190,7 @@ function makeCard(item,height){
 }
 function chips(container,onPick){
  container.replaceChildren();
- const categories=['Todos',...(LIB.categories.includes('Blackline Select')?['Blackline Select']:[]),...LIB.categories.filter(c=>c!=='Blackline Select')];
+ const categories=['Todos',...LIB.categories.filter(c=>LIB.library.some(x=>x.cat===c&&!x.hideFromGallery))];
  for(const cat of categories){
   const b=document.createElement('button');b.type='button';b.className='btn slim';
   if(cat==='Blackline Select'){b.classList.add('bls-premium-tab');b.textContent='BLACKLINE SELECT · PRO'}
@@ -203,7 +203,7 @@ window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';rende
 function renderPanel(){
  const grid=$('arqPanelGrid');if(!grid)return;
  const sel=$('arqPanelCat');
- if(!sel.options.length){for(const cat of ['Todos',...(LIB.categories.includes('Blackline Select')?['Blackline Select']:[]),...LIB.categories.filter(c=>c!=='Blackline Select')]){const o=document.createElement('option');o.value=cat;o.textContent=(cat==='Blackline Select'?'BLACKLINE SELECT · PRO':cat)+' ('+(cat==='Todos'?LIB.library.length:LIB.library.filter(x=>x.cat===cat).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
+ if(!sel.options.length){for(const cat of ['Todos',...LIB.categories.filter(c=>LIB.library.some(x=>x.cat===c&&!x.hideFromGallery))]){const o=document.createElement('option');o.value=cat;o.textContent=cat+' ('+(cat==='Todos'?LIB.library.filter(x=>!x.hideFromGallery).length:LIB.library.filter(x=>x.cat===cat&&!x.hideFromGallery).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
  sel.value=activeCat;
  grid.replaceChildren(...cardsFor(activeCat,query).map(x=>makeCard(x,74)));
 }
@@ -250,7 +250,7 @@ function applySizeRow(){
 function buildModal(){
  if($('arqModal'))return;
  const m=document.createElement('div');m.id='arqModal';m.hidden=true;m.setAttribute('role','dialog');m.setAttribute('aria-modal','false');m.setAttribute('aria-label','Galería arquitectónica (ventana flotante)');
- m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><span class="arq-sizes" role="group" aria-label="Tamaño de la ventana"><button type="button" class="btn" data-size="s" title="Ventana chica al costado: el dibujo queda libre para arrastrar">▯ Chica</button><button type="button" class="btn" data-size="m" title="Mitad de pantalla">◧ Media</button><button type="button" class="btn" data-size="l" title="Grande">▣ Grande</button></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
+ m.innerHTML=`<div class="arq-box"><header><h2>GALERÍA ARQUITECTÓNICA · ${LIB.library.filter(x=>!x.hideFromGallery).length} BLOQUES DINÁMICOS</h2><span id="arqModalCount" style="font-size:11px;color:#9cb1bc"></span><span class="arq-sizes" role="group" aria-label="Tamaño de la ventana"><button type="button" class="btn" data-size="s" title="Ventana chica al costado: el dibujo queda libre para arrastrar">▯ Chica</button><button type="button" class="btn" data-size="m" title="Mitad de pantalla">◧ Media</button><button type="button" class="btn" data-size="l" title="Grande">▣ Grande</button></span><button type="button" class="btn" id="arqModalClose" aria-label="Cerrar">✕</button></header>
  <div class="arq-tools"><input type="search" id="arqModalSearch" placeholder="Buscar en toda la galería…" aria-label="Buscar en la galería"><div class="arq-chips" id="arqModalChips" role="group" aria-label="Categorías"></div></div>
  <div class="arq-grid" id="arqModalGrid"></div></div>`;
  document.body.append(m);
@@ -652,5 +652,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>(LAYERS[cat]||[])[0]||null,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>(LAYERS[cat]||[])[0]||null,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
