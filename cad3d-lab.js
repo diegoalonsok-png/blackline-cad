@@ -945,6 +945,88 @@ function buildCAD3DBlock(record,group){
   addMesh(g,p[6],record.id,group,p[0]*sx,p[1]*sy,p[2]*sz);
  });
 }
+
+/* CAD3D_PROFILE_DRAW_V1: native 2D profiles drawn on the XY workplane. */
+var cad3dDraftProfile=[];
+function cad3dProfileRecord(points,closed,label){
+ if(!Array.isArray(points)||points.length<2)return;
+ var minX=Math.min(...points.map(p=>p[0])),maxX=Math.max(...points.map(p=>p[0]));
+ var minY=Math.min(...points.map(p=>p[1])),maxY=Math.max(...points.map(p=>p[1]));
+ var cx=(minX+maxX)/2,cy=(minY+maxY)/2;
+ var rec=newRecord('profile2d');
+ Object.assign(rec,{x:cx,y:cy,z:0,w:Math.max(.01,maxX-minX),d:Math.max(.01,maxY-minY),h:0,
+  profilePoints:points.map(p=>[p[0]-cx,p[1]-cy]),profileClosed:!!closed,name:label,extrudedHeight:0});
+ records.push(rec);selected=[rec.id];selectedOpeningId=null;redraw();renderProps();
+ return rec;
+}
+function cad3dFinishPolyline(){
+ if(!['polyline','line'].includes(placing))return false;
+ if(cad3dDraftProfile.length>=2){
+  var closed=placing==='polyline'&&cad3dDraftProfile.length>=3;
+  // A polyline is open by default; clicking near its first point closes it.
+  cad3dProfileRecord(cad3dDraftProfile,!!cad3dDraftProfile.closed,placing==='line'?'Line':'Polyline');
+ }
+ cad3dDraftProfile=[];setPlacement(null);text('Dibujo 2D finalizado · perfiles cerrados pueden extrudarse');return true;
+}
+function cad3dPointOnCircle(center,r,angle){return [center.x+r*Math.cos(angle),center.y+r*Math.sin(angle)];}
+function cad3dThreePointArc(a,b,c){
+ var x1=a[0],y1=a[1],x2=b[0],y2=b[1],x3=c[0],y3=c[1];
+ var den=2*(x1*(y2-y3)+x2*(y3-y1)+x3*(y1-y2));
+ if(Math.abs(den)<1e-8)return null;
+ var ux=((x1*x1+y1*y1)*(y2-y3)+(x2*x2+y2*y2)*(y3-y1)+(x3*x3+y3*y3)*(y1-y2))/den;
+ var uy=((x1*x1+y1*y1)*(x3-x2)+(x2*x2+y2*y2)*(x1-x3)+(x3*x3+y3*y3)*(x2-x1))/den;
+ var center={x:ux,y:uy},r=Math.hypot(x1-ux,y1-uy);
+ var start=Math.atan2(y1-uy,x1-ux),mid=Math.atan2(y2-uy,x2-ux),end=Math.atan2(y3-uy,x3-ux);
+ var tau=Math.PI*2,positive=(x)=>(x%tau+tau)%tau;
+ var sweep=positive(end-start),middle=positive(mid-start);
+ if(middle>sweep)sweep-=tau;
+ var points=[];
+ for(var i=0;i<=48;i++)points.push(cad3dPointOnCircle(center,r,start+sweep*i/48));
+ return points;
+}
+function cad3dDrawProfilePoint(pt){
+ var kind=placing,p=[pt.x,pt.y];
+ if(kind==='line'||kind==='polyline'){
+  if(cad3dDraftProfile.length&&Math.hypot(p[0]-cad3dDraftProfile[0][0],p[1]-cad3dDraftProfile[0][1])<.1&&kind==='polyline'&&cad3dDraftProfile.length>=3){
+   var closePoints=cad3dDraftProfile.slice();cad3dProfileRecord(closePoints,true,'Closed polyline');
+   cad3dDraftProfile=[];setPlacement(null);text('Polilínea cerrada · seleccioná Extrude para crear un sólido');return;
+  }
+  if(kind==='line'&&cad3dDraftProfile.length){
+   cad3dProfileRecord([cad3dDraftProfile[0],p],false,'Line');
+   cad3dDraftProfile=[p];text('Línea creada · siguiente punto / Enter finaliza');return;
+  }
+  cad3dDraftProfile.push(p);text(kind==='polyline'?'Polilínea: siguiente vértice · clic cerca del inicio para cerrar · Enter termina':'Línea: siguiente punto · Enter termina');return;
+ }
+ if(!cad3dDraftProfile.length){cad3dDraftProfile=[p];text(kind==='arc'?'Arco: indicá punto intermedio y final':'Indicá el segundo punto');return;}
+ if(kind==='arc'&&cad3dDraftProfile.length===1){cad3dDraftProfile.push(p);text('Arco: indicá punto final');return;}
+ var start=cad3dDraftProfile[0],points,closed=true;
+ if(kind==='rectangle'){
+  if(Math.hypot(p[0]-start[0],p[1]-start[1])<.01)return;
+  points=[start,[p[0],start[1]],p,[start[0],p[1]]];
+ }else if(kind==='circle'){
+  var radius=Math.hypot(p[0]-start[0],p[1]-start[1]);if(radius<.01)return;
+  points=Array.from({length:64},(_,i)=>[start[0]+radius*Math.cos(i*Math.PI/32),start[1]+radius*Math.sin(i*Math.PI/32)]);
+ }else if(kind==='arc'){
+  points=cad3dThreePointArc(start,cad3dDraftProfile[1],p);closed=false;
+  if(!points){text('Los tres puntos del arco no pueden ser colineales');return;}
+ }
+ if(points)cad3dProfileRecord(points,closed,kind);
+ cad3dDraftProfile=[];setPlacement(null);text(kind+' creado'+(closed?' · listo para Extrude':''));
+}
+function cad3dBuildProfile(r,group){
+ var pts=r.profilePoints||[];if(pts.length<2)return;
+ var vertices=pts.map(p=>new T.Vector3(p[0],p[1],0));
+ if(r.profileClosed)vertices.push(vertices[0].clone());
+ var outline=new T.Line(new T.BufferGeometry().setFromPoints(vertices),new T.LineBasicMaterial({color:0x82c6df,linewidth:1}));
+ outline.userData.owner=r.id;group.add(outline);
+ if(r.profileClosed&&r.extrudedHeight>0&&pts.length>=3){
+  var shape=new T.Shape();shape.moveTo(pts[0][0],pts[0][1]);
+  pts.slice(1).forEach(p=>shape.lineTo(p[0],p[1]));shape.closePath();
+  var geom=new T.ExtrudeGeometry(shape,{depth:r.extrudedHeight,steps:1,bevelEnabled:false,curveSegments:24});
+  addMesh(geom,0x9ea9b4,r.id,group);
+ }
+}
+
 function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
@@ -963,6 +1045,10 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
+ '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
+ '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
+ tool('line','Line','line')+tool('polyline','Polyline','line')+tool('rectangle','Rectangle','cube')+
+ tool('circle','Circle','sphere')+tool('arc','Arc','rotate')+'</div>'+
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
  '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="0.01" max="1000" step="0.1" value="2.8" aria-label="Extrude height in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
@@ -1104,6 +1190,9 @@ function build(){
   var button=e.target.closest('.tools [data-action], .cad3dBasicBars [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
+ });
+ root.querySelector('.cad3dProfileTools').addEventListener('click',function(e){
+  var button=e.target.closest('[data-action]');if(button)action(button.dataset.action);
  });
  root.querySelector('.cad3dModelTools').addEventListener('click',function(e){
   var button=e.target.closest('[data-solid-command]');if(!button)return;
@@ -1393,9 +1482,9 @@ function toggleDraftMode(mode){
 }
 function setPlacement(which){
  if(which)cad3dEndZoom();
- placing=which;firstPoint=null;cursorPoint=null;
+ placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
  if(!root)return;
- root.querySelectorAll('.cad3dBasicBars button').forEach(function(b){
+ root.querySelectorAll('.cad3dBasicBars button,.cad3dProfileTools button').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
@@ -1573,7 +1662,12 @@ function fallbackDraw(){
   ctx.stroke();
  }
  records.filter(visibleRecord).forEach(function(rec){
-  if(rec.type==='wall'||rec.type==='slab'){
+  if(rec.type==='profile2d'){
+   var points=rec.profilePoints||[],angle=(rec.rot||0)*Math.PI/180,c=Math.cos(angle),sn=Math.sin(angle);
+   ctx.beginPath();points.forEach(function(p,i){var x=rec.x+c*p[0]-sn*p[1],y=rec.y+sn*p[0]+c*p[1],v=projection(x,y,rec.z||0);if(i)ctx.lineTo(v.x,v.y);else ctx.moveTo(v.x,v.y);});
+   if(rec.profileClosed)ctx.closePath();
+   ctx.strokeStyle=selected.includes(rec.id)?'#efc978':'#82c6df';ctx.lineWidth=1.6;ctx.stroke();
+  }else if(rec.type==='wall'||rec.type==='slab'){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
    });
@@ -1991,6 +2085,7 @@ function placeAt(e){
 }
 function placePoint(pt){
  var kind=placing;
+ if(['line','polyline','rectangle','circle','arc'].includes(kind)){cad3dDrawProfilePoint(pt);return;}
  if(['wall','slab','floor','move','copy','dist'].includes(kind)&&!firstPoint){
   firstPoint=pt;
   text(kind==='wall'?'Muro: indicá el extremo final':kind==='slab'||kind==='floor'?'Piso: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
@@ -2063,7 +2158,8 @@ function selectAt(e){
  var box=renderer.domElement.getBoundingClientRect();
  var p=new T.Vector2(2*(e.clientX-box.left)/box.width-1,-2*(e.clientY-box.top)/box.height+1);
  raycaster.setFromCamera(p,camera);
- var hits=[];modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
+ raycaster.params.Line.threshold=.16;
+ var hits=[];modelRoot.traverse(function(o){if(o.isMesh||(o.isLine&&!o.userData.cadSketch))hits.push(o);});
  var intersects=raycaster.intersectObjects(hits,false);
  var eligible=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
  var visibleHits=intersects.filter(eligible),front=visibleHits[0]||null;
@@ -2539,6 +2635,7 @@ function buildObject(r){
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  if(r.type==='block3d')buildCAD3DBlock(r,group);
  if(r.type==='imported3d')cad3dBuildImportedMesh(r,group);
+ if(r.type==='profile2d')cad3dBuildProfile(r,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
  if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
   var g=boxGeom(w,d,h);
@@ -2623,6 +2720,9 @@ function renderProps(){
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
+ if(!focus&&r.type==='profile2d')html+='<div class="detail">2D PROFILE: '+escapeHtml(r.name||'Profile')+
+  ' · '+(r.profileClosed?'Closed':'Open')+' · '+(r.profilePoints||[]).length+' vertices'+
+  (r.extrudedHeight?' · extruded '+r.extrudedHeight+' m':'')+'</div>';
  if(!focus&&r.type==='block3d')html+='<div class="detail">3D Block: '+escapeHtml(CAD3D_COMPONENTS[r.blockId]?.name||r.blockId)+'</div>';
  if(!focus&&r.type==='imported3d')html+='<div class="detail"><strong>Imported model:</strong> '+escapeHtml(r.name||'3D mesh')+
  ' · '+Math.floor((r.meshVertices||[]).length/9)+' triangles</div>'+
@@ -2808,10 +2908,14 @@ function clickProps(e){
 function cad3dExtrudeSelection(){
  if(selected.length!==1){text('Extrude: seleccioná un BOX o una losa 3D');return false;}
  var rec=records.find(function(r){return r.id===selected[0]&&editableRecord(r);});
- if(!rec||!['box','slab'].includes(rec.type)){text('Extrude admite BOX o SLAB; perfiles 2D libres todavía no están disponibles');return false;}
+ if(!rec||!['box','slab','profile2d'].includes(rec.type)){text('Extrude: seleccioná un BOX, SLAB o perfil cerrado');return false;}
  var input=root.querySelector('.cad3dExtrudeHeight');
  var height=Number(input&&input.value);
  if(!Number.isFinite(height)||height<.01||height>1000){text('Ingresá una altura entre 0,01 y 1000 metros');return false;}
+ if(rec.type==='profile2d'){
+  if(!rec.profileClosed||!Array.isArray(rec.profilePoints)||rec.profilePoints.length<3){text('Extrude requiere un perfil cerrado con al menos 3 vértices');return false;}
+  rec.extrudedHeight=height;rec.h=height;redraw();renderProps();text('Perfil extrudado · '+height.toFixed(2)+' m');return true;
+ }
  if(rec.type==='slab'){
   if((rec.openings||[]).length){text('La losa tiene aberturas: extrusión directa no disponible');return false;}
   rec.type='box';rec.pitch=0;rec.styleId='';
@@ -3466,8 +3570,10 @@ function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  if(cad3dViewAlias(raw))return;
  if(!raw){
+  if(['line','polyline'].includes(placing)){cad3dFinishPolyline();return;}
   if(['wall','door','window','opening'].includes(placing)){
-   var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
+   if(['line','polyline'].includes(placing)){cad3dFinishPolyline();return;}
+  var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
   }
   return;
  }
@@ -3504,7 +3610,7 @@ function run3DCommand(){
 function action(a){
  if(a==='select'){setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
- if(['box','sphere','cylinder','cone','dist','floor'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
+ if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
   return true;
@@ -3708,12 +3814,18 @@ async function readJSON(e){
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
-  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d'];
+  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d','profile2d'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
    var o={id:finite(r.id,0),type:r.type,layerId:importedLayers.some(function(l){return l.id===r.layerId;})?r.layerId:'0',x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
     styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
+   if(r.type==='profile2d'){
+    o.profilePoints=Array.isArray(r.profilePoints)?r.profilePoints.slice(0,512).filter(p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<10000)):[];
+    o.profileClosed=!!r.profileClosed;
+    o.extrudedHeight=o.profileClosed?clamp(finite(r.extrudedHeight,0),0,1000):0;
+    o.h=o.extrudedHeight;o.name=String(r.name||'2D profile').slice(0,80);
+   }
    if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
    if((r.type==='wall'||r.type==='slab')&&Array.isArray(r.openings)){
     var kinds=r.type==='wall'?['door','window','opening']:['opening'];
@@ -3764,7 +3876,7 @@ window.addEventListener('keydown',function(ev){
  }
  var mode={F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
- if(ev.key==='Enter'&&['wall','door','window','opening'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
+ if(ev.key==='Enter'&&['wall','door','window','opening','line','polyline'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
   ev.preventDefault();ev.stopImmediatePropagation();
   var finished=placing;setPlacement(null);text(finished.toUpperCase()+' finalizado');
   return;
