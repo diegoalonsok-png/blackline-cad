@@ -86,12 +86,12 @@ test('Tuning affects stroke width, jitter and watercolor fill intensity independ
  const a=src.indexOf('const cadSketchTuning='),b=src.indexOf('function renderStyleControls()',a);
  assert(a>=0&&b>a);
  const ctx={clamp:(x,a,b)=>Math.max(a,Math.min(x,b))};
- vm.runInNewContext(src.slice(start,b),ctx);
- const first=ctx.cadEffectiveSketch('sketch-watercolor');
- ctx.cadSketchTuning.weight=2;
- ctx.cadSketchTuning.roughness=0;
- ctx.cadSketchTuning.wash=.9;
- const second=ctx.cadEffectiveSketch('sketch-watercolor');
+ const api=vm.runInNewContext(src.slice(start,b)+'\n({cadSketchTuning,cadEffectiveSketch})',ctx);
+ const first=api.cadEffectiveSketch('sketch-watercolor');
+ api.cadSketchTuning.weight=2;
+ api.cadSketchTuning.roughness=0;
+ api.cadSketchTuning.wash=.9;
+ const second=api.cadEffectiveSketch('sketch-watercolor');
  assert.equal(second.width,first.width*2);
  assert.equal(second.jitter,0);
  assert(second.fillMix>first.fillMix);
