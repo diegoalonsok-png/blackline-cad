@@ -1129,8 +1129,9 @@ function build(){
  tool('circle','Circle','sphere')+tool('arc','Arc','rotate')+'</div>'+
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
- '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="0.01" max="1000" step="0.1" value="2.8" aria-label="Extrude height in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
- '<button type="button" class="btn" data-solid-command="extrude" title="Extrude the selected box or slab to the specified total height">Extrude</button>'+
+ '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="-1000" max="1000" step="0.1" value="2.8" aria-label="Extrude height or signed face distance in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
+ '<button type="button" class="btn" data-solid-command="extrude" title="Extrude selected closed profile, box or slab · E Enter">Extrude · E</button>'+
+ '<button type="button" class="btn" data-solid-command="extrudeface" title="Push/Pull a face on an axis-aligned or rotated BOX using Height (m)">Extrude Face</button>'+
  '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">Union</button>'+
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">Subtract</button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">Intersect</button>'+
@@ -1276,6 +1277,7 @@ function build(){
   var button=e.target.closest('[data-solid-command]');if(!button)return;
   var command=button.dataset.solidCommand;
   if(command==='extrude')cad3dExtrudeSelection();
+  else if(command==='extrudeface')action('extrudeface');
   else if(['union','subtract','intersect'].includes(command))action(command);
  });
  root.querySelector('.cad3dOBJInput').addEventListener('change',async function(e){
@@ -1576,7 +1578,8 @@ function setPlacement(which){
   window:'Ventanas continuas: clic sobre cada muro · Enter o Esc termina',
   opening:'Vanos continuos: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' · Enter o Esc termina',
   move:'Move: elegí punto base y destino',copy:'Copy: elegí punto base y destino',
-  rotate:'Rotate: escribí los grados en Command y pulsá Enter',dist:'Distancia: elegí dos puntos'
+  rotate:'Rotate: escribí los grados en Command y pulsá Enter',dist:'Distancia: elegí dos puntos',
+  extrudeface:'Extrude Face: indicá la distancia en Height (m) y hacé clic en una cara de BOX · Esc cancela'
  };
  text((instructions[which]||which.toUpperCase()+': clic en el plano de trabajo para colocar')+' · Esc cancela');
 }
@@ -2172,6 +2175,7 @@ function placeAt(e){
  if(!renderer&&!fallbackCanvas)return;
  if(['door','window','opening'].includes(placing)){placeOpening(e);return;}
  if(placing==='rotate'){root.querySelector('#cad3dCommand').focus();return;}
+ if(placing==='extrudeface'){cad3dExtrudeFaceAt(e);return;}
  var pt=groundAt(e);if(!pt){text('Elegí Planta o Isométrica para trabajar sobre Z=0');return;}
  placePoint(assistedPoint(pt,root.querySelector('.view')));updatePlacementGuide(e);
 }
@@ -2997,8 +3001,47 @@ function clickProps(e){
 /* Exact axis-aligned box boolean prototype: partition at all six cutting planes.
    It is intentionally limited to two unrotated boxes, not a general CSG solver. */
 /* Extrusion of native solid footprints. Free-form profile extrusion requires a dedicated profile engine. */
+/* Native BOX face push/pull: dimension changes keep the opposite face stationary.
+   The signed distance is measured along the clicked outward normal in metres. */
+function cad3dPushPullBoxFace(rec,normal,distance){
+ if(!rec||rec.type!=='box'||!Number.isFinite(distance)||!normal)return false;
+ var axis=Math.abs(normal.x)>.9?'x':Math.abs(normal.y)>.9?'y':Math.abs(normal.z)>.9?'z':null;
+ if(!axis)return false;
+ var sign=Math.sign(normal[axis]);if(!sign)return false;
+ var key=axis==='x'?'w':axis==='y'?'d':'h',newSize=rec[key]+distance;
+ if(newSize<.01||newSize>1000)return false;
+ if(axis==='z'){if(sign<0)rec.z-=distance;}
+ else{
+  var angle=(rec.rot||0)*Math.PI/180,shift=sign*distance*.5;
+  rec.x+=shift*(axis==='x'?Math.cos(angle):-Math.sin(angle));
+  rec.y+=shift*(axis==='x'?Math.sin(angle):Math.cos(angle));
+ }
+ rec[key]=newSize;return true;
+}
+function cad3dExtrudeFaceAt(e){
+ if(!renderer||!modelRoot||!T)return text('Extrude Face requiere WebGL activo');
+ var input=root.querySelector('.cad3dExtrudeHeight'),distance=Number(input&&input.value);
+ if(!Number.isFinite(distance)||distance===0||Math.abs(distance)>1000)return text('Ingresá distancia distinta de 0 en Height (m), entre -1000 y 1000');
+ var bounds=renderer.domElement.getBoundingClientRect();
+ var cursor=new T.Vector2((e.clientX-bounds.left)/bounds.width*2-1,-(e.clientY-bounds.top)/bounds.height*2+1);
+ raycaster.setFromCamera(cursor,camera);
+ var meshes=[];
+ modelRoot.traverse(function(o){if(o.isMesh&&o.userData.owner!=null)meshes.push(o);});
+ var hits=raycaster.intersectObjects(meshes,false);
+ for(var i=0;i<hits.length;i++){
+  var hit=hits[i],rec=records.find(r=>r.id===hit.object.userData.owner);
+  if(!rec||!editableRecord(rec))continue;
+  if(rec.type!=='box'){text('Extrude Face: solamente caras de BOX; seleccioná otra cara');return;}
+  if(!cad3dPushPullBoxFace(rec,hit.face&&hit.face.normal,distance)){
+   text('No se puede extruir esa cara con esta distancia');return;
+  }
+  selected=[rec.id];selectedOpeningId=null;redraw();renderProps();
+  text('Extrude Face aplicado · '+(distance>0?'+':'')+distance.toFixed(2)+' m');return;
+ }
+ text('Extrude Face: hacé clic sobre una cara de un BOX');
+}
 function cad3dExtrudeSelection(){
- if(selected.length!==1){text('Extrude: seleccioná un BOX o una losa 3D');return false;}
+ if(selected.length!==1){text('Extrude: seleccioná un perfil cerrado, BOX o losa 3D');return false;}
  var rec=records.find(function(r){return r.id===selected[0]&&editableRecord(r);});
  if(!rec||!['box','slab','profile2d'].includes(rec.type)){text('Extrude: seleccioná un BOX, SLAB o perfil cerrado');return false;}
  var input=root.querySelector('.cad3dExtrudeHeight');
@@ -3689,7 +3732,7 @@ function run3DCommand(){
   if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
   placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
  }
- var aliases={MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'erase',DI:'dist'};
+ var aliases={MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
@@ -3702,6 +3745,7 @@ function run3DCommand(){
 function action(a){
  if(a==='select'){setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
+ if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
