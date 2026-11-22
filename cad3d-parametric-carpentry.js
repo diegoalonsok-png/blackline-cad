@@ -66,8 +66,9 @@ function layout(host,o){
   }
  }else if(mode==='sliding'){
   const half=innerW/2,dir=config.hinge==='right'?1:-1;
-  leaf(-innerW/4,-panelD/2,0,0,0,face(half,innerH,0,0,baseZ));
-  leaf(innerW/4+dir*(half*pct),panelD/2,0,0,0,face(half,innerH,0,0,baseZ));
+  const fixedX=dir<0?-innerW/4:innerW/4;
+  leaf(fixedX,-panelD/2,0,0,0,face(half,innerH,0,0,baseZ));
+  leaf(-fixedX+dir*(half*pct),panelD/2,0,0,0,face(half,innerH,0,0,baseZ));
  }else if(mode==='pocket'){
   const hand=config.hinge==='right'?1:-1;
   leaf(hand*innerW*pct,0,0,0,0,face(innerW,innerH,0,0,baseZ));
