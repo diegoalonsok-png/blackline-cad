@@ -81,3 +81,24 @@ test('Render HQ action remains available without external service',()=>{
  assert(!code.includes('fetch('));
  assert(!code.includes('XMLHttpRequest'));
 });
+
+test('Human rendering presets add density-dependent engraved crosshatching and selective two-color pigment',()=>{
+ const s=makeScene(),segment=source.slice(source.indexOf('function cadSketchPaperAndHatch('),source.indexOf('function exportSketchPresentation(){'));
+ assert(segment.includes("mode==='etching'"),'engraving style missing');
+ assert(segment.includes("mode==='bluepen'"),'blue ink missing');
+ assert(segment.includes("mode==='duotone'"),'selective marker color missing');
+ assert(segment.includes("mode==='gesture'"),'human construction strokes missing');
+ assert(segment.includes('density>.38'),'deep tones need second engraving angle');
+ const colors=[],ctx=s.ctx;
+ let strokes=0;
+ ctx.getImageData=(x,y,w,h)=>({data:new Uint8ClampedArray(w*h*4).fill(0)});
+ ctx.stroke=function(){strokes++};
+ Object.defineProperty(ctx,'strokeStyle',{set(v){colors.push(v)},get(){return colors.at(-1)}});
+ const env={cadSketchTuning:{paper:.0,roughness:1},clamp:(x,a,b)=>Math.max(a,Math.min(b,x))};
+ vm.runInNewContext(segment,env);s.canvas.width=160;s.canvas.height=160;
+ env.cadSketchPaperAndHatch(s.canvas,ctx,{stroke:'etching',edge:0x223344});
+ assert(strokes>0,'Engraving generates strokes from dark regions');
+ env.cadSketchPaperAndHatch(s.canvas,ctx,{stroke:'duotone',edge:0x255c9a});
+ assert(colors.some(v=>v.includes('211,43,40')),'Red marker strokes rendered');
+ assert(colors.some(v=>v.includes('37,92,154')),'Blue marker strokes rendered');
+});
