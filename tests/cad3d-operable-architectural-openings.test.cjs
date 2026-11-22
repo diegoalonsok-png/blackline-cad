@@ -52,7 +52,8 @@ test('Right-side Properties has leaves, operation, hinge, swing, open and close 
  const wall={id:5,type:'wall',layerId:'0',openings:[
   {id:9,kind:'window',styleId:'casement',operation:'casement',offset:0,w:1.2,h:1.4,sill:.8}]};
  const vmCtx={root:{querySelector(){return panel;}},records:[wall],selected:[5],selectedOpeningId:9,
-  escapeHtml:String,ARCH_STYLES:{window:[{id:'fixed',name:'Fixed'}],opening:[]},render3DGrips(){}};
+  escapeHtml:String,ARCH_STYLES:{window:[{id:'casement',name:'Casement'}],opening:[]},render3DGrips(){},
+  cad3DOpeningConfig(){return {operation:'casement',leaves:1,hinge:'left',swing:'out',openAngle:0,openPercent:0};}};
  vm.runInNewContext(code,vmCtx);vmCtx.renderProps();
  for(const token of ['data-opening-param="9" data-param="operation"','data-param="leaves"','data-param="hinge"',
   'data-param="swing"','data-param="openAngle"','data-opening-motion="9" data-motion="open"',
