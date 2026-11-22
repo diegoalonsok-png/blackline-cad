@@ -5682,11 +5682,13 @@ canvas.addEventListener('contextmenu',ev=>{
  // Classic CAD gesture: Shift+right-click opens transient OSNAP choices.
  if(ev.shiftKey){openCadSnapOverrideMenu(ev.clientX,ev.clientY);return}
  const point=world(P(ev.offsetX,ev.offsetY));
- // Ctrl+right-click exposes the full menu, even during an active command.
- if(ev.ctrlKey){openCadContextMenu(ev.clientX,ev.clientY,point);return}
- if(state.tool==='select'&&!cad2dLastCommand&&!$('command').value.trim()){
-  const target=pick(point);
-  if(target||state.selected.length){openCadContextMenu(ev.clientX,ev.clientY,point);return}
+ // Preserve Enter for pending typed commands, but prioritize the selection context menu.
+ // A previous command must not suppress Properties on a multi-selection.
+ const pendingInput=Boolean($('command').value.trim()||cad2dLtscalePending||cad2dSavetimePending);
+ const hasSelection=state.selected.some(id=>state.entities.some(e=>e.id===id));
+ const selectionMenu=hasSelection&&(state.tool==='select'||state.tool==='pan'||state.stage.length===0);
+ if(ev.ctrlKey||(!pendingInput&&(selectionMenu||(state.tool==='select'&&pick(point))))){
+  openCadContextMenu(ev.clientX,ev.clientY,point);return;
  }
  cadRightClickEnter();
 });
@@ -8414,10 +8416,11 @@ function openCadContextMenu(x,y,worldPoint){
  const menu=$('cadContextMenu');menu.setAttribute('role','menu');
  const target=pick(worldPoint);
  // Right click on an unselected drawable makes that object available for contextual editing.
- if(target&&layerFor(target).visible&&!layerFor(target).locked&&!state.selected.includes(target.id)&&state.tool==='select'){
+ if(target&&layerFor(target).visible&&!layerFor(target).locked&&!state.selected.length&&state.tool==='select'){
   state.selected=[target.id];updateProps();schedule();
  }
- const count=state.selected.length,active=state.tool!=='select'&&state.tool!=='pan';
+ // Contextual editing wins when a selection exists and no drawing step is pending.
+ const count=state.selected.length,active=state.tool!=='select'&&state.tool!=='pan'&&(!count||state.stage.length>0);
  const blockTarget=target?.type==='blockRef'?target:cadActiveBlockRef();
  const title=active?(cad2dAliasLanguage==='en'?'Active command · ':'Comando activo · ')+state.tool:count?(cad2dAliasLanguage==='en'?'Selection · '+count+' object(s)':'Selección · '+count+' objeto(s)'):(cad2dAliasLanguage==='en'?'Model space':'Espacio modelo');
  const selectedText=count===1?state.entities.find(e=>e.id===state.selected[0]&&e.type==='text'):null;
@@ -8474,7 +8477,7 @@ function openCadContextMenu(x,y,worldPoint){
     command('Seleccionar similares','SELECTSIMILAR'),
     command('Invertir selección','SELECTINVERT'),
     command('Copiar a otra capa','COPYTOLAYER'),
-    command('Cambiar de capa','CHANGELAYER'),
+    item('Cambiar capa…',()=>{openCadQuickProperties();$('cadPropsLayer')?.focus()}),
     command('Igualar propiedades · MA','MATCHPROP'),
     item('Poner delante · BRINGTOFRONT',()=>cadDrawOrder('front')),
     item('Poner detrás · SENDTOBACK',()=>cadDrawOrder('back')),
@@ -10230,7 +10233,7 @@ function initCadHatchPalette(){
 }
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
- panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Enter confirma una medida. Aplicar guarda las propiedades generales. Ctrl+Z deshace los cambios.</div>';
+ panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Layer changes apply immediately without altering color or lineweight. Apply saves other properties. Ctrl+Z undoes.</div>';
  const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false')};
  $('cadPropsClose').onclick=close;
  const geometry=$('cadPropsGeometry');
@@ -10261,6 +10264,22 @@ function initCadQuickProperties(){
  };
  // Keep the layer choices synchronized with edits and new layers.
  const layerSelect=$('cadPropsLayer');
+ // Apply a layer change to the whole editable selection without resetting mixed properties.
+ layerSelect.addEventListener('change',()=>{
+  const selected=validEditSelection();
+  if(!selected.length)return toast('Select one or more editable objects first');
+  const target=state.layers.find(l=>l.id===layerSelect.value);
+  if(!target||target.locked){
+   refreshCadQuickProperties();
+   return toast('Destination layer is unavailable or locked');
+  }
+  const changed=selected.filter(e=>e.layer!==target.id);
+  if(!changed.length)return;
+  saveHistory();
+  for(const e of changed)e.layer=target.id;
+  updateAll();
+  toast('Layer '+target.name+' applied to '+changed.length+' object(s) · Ctrl+Z to undo');
+ });
  function sync(){const old=layerSelect.value;layerSelect.replaceChildren();for(const l of state.layers){const opt=document.createElement('option');opt.value=l.id;opt.textContent=l.name;layerSelect.append(opt)}if(state.layers.some(l=>l.id===old))layerSelect.value=old;else layerSelect.value=state.layerId}
  const previousUpdate=updateProps;
  updateProps=function(){previousUpdate();sync();if(!panel.hidden)refreshCadQuickProperties()};
