@@ -10,7 +10,7 @@ function extract(start,end){
 }
 test('Wall carpentry meshes are tagged with their own opening IDs',()=>{
  const code=extract('function openingSpanAtX(', '/* Build a true miter');
- const ctx={clamp:(n,a,b)=>Math.max(a,Math.min(n,b)),glazingOpacity:()=>.24};
+ const ctx={clamp:(n,a,b)=>Math.max(a,Math.min(n,b)),glazingOpacity:()=>.24,finite:(v,d)=>Number.isFinite(Number(v))?Number(v):d,openingMotionType:o=>/sliding/.test(o.styleId||'')?'sliding':'hinged'};
  vm.runInNewContext(code,ctx);
  for(const [kind,styleId] of [['door','single-swing'],['window','sliding-window'],['window','fixed']]){
   const objects=[];
@@ -24,7 +24,7 @@ test('Clicking a window mesh chooses its opening and host wall',()=>{
  const code=extract('function selectAt(e){','function boxGeom(');
  const mesh={isMesh:true,userData:{owner:10,openingId:42}};
  const ctx={
-  fallbackCanvas:null,selected:[],selectedOpeningId:null,records:[{id:10,type:'wall',openings:[{id:42,kind:'window'}]}],
+  fallbackCanvas:null,activeView:'perspective',viewMode:'perspective',selected:[],selectedOpeningId:null,records:[{id:10,type:'wall',openings:[{id:42,kind:'window'}]}],
   renderer:{domElement:{getBoundingClientRect:()=>({left:0,top:0,width:200,height:200})}},
   T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},
   modelRoot:{traverse(fn){fn(mesh)}},raycaster:{setFromCamera(){},intersectObjects(){return [{object:mesh}]}},camera:{},
