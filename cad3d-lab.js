@@ -9,7 +9,7 @@ var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
-var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
+var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',topStored3DStyle=null,perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
  ['iso','Isométrica','ortho',-Math.PI/4,Math.atan(1/Math.sqrt(2))],
@@ -556,6 +556,7 @@ function build(){
  '<div class="resizeGrip" data-resize="xy" title="Arrastrar la esquina para ajustar ancho y alto"></div>'+
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  (document.getElementById('cad3dOpen')?.closest('.app')||document.body).appendChild(root);
+ window.BlacklineCAD3DViewCube?.mount(root,{setPreset:setViewPreset,rotate:rotateViewCube});
  root.querySelector('[data-close]').addEventListener('click',close);
  var viewSelect=root.querySelector('.cad3dViewSelect');
  viewSelect.innerHTML='<option value="orbit" hidden>Órbita libre</option>'+
@@ -1184,7 +1185,7 @@ function bindCanvas(el){
     if(dragging.pan)panView(dx,dy,el);
     else{
      orbit.az-=dx*.007;orbit.el=clamp(orbit.el+dy*.007,-1.45,1.45);
-     if(viewMode==='ortho')activeView='orbit';
+     if(viewMode==='ortho'){var wasTop=activeView==='top';activeView='orbit';if(wasTop)restore3DStyleFromTop();}
      syncViewControls();
     }
     updateCamera();
@@ -1818,6 +1819,11 @@ function applyRenderStyle(){
 }
 function setVisualStyle(mode){
  if(!Object.prototype.hasOwnProperty.call(CAD3D_VISUAL_STYLES,mode))return false;
+ if(activeView==='top'&&mode!=='wire2d'){
+  topStored3DStyle=mode;
+  text('Top permanece alámbrico 2D · estilo '+CAD3D_VISUAL_STYLES[mode]+' guardado para la vista 3D');
+  return true;
+ }
  renderStyle=mode;
  if(isCad3DSketch(mode)&&!sunSettings.enabled){sunSettings.enabled=true;sunSettings.onGround=true;}
  if(renderer)applyRenderStyle();
@@ -1892,10 +1898,12 @@ function exportSketchSVG(){
 }
 function orbitCameraBy(dx,dy){
  if(!Number.isFinite(dx)||!Number.isFinite(dy))return;
+ var wasTop=activeView==='top';
  if(viewMode!=='perspective')viewMode='perspective';
  orbit.az-=dx*.010;
  orbit.el=clamp(orbit.el+dy*.010,-1.49,1.49);
  activeView='perspective';
+ if(wasTop)restore3DStyleFromTop();
  syncViewControls();
  applyViewCamera();
 }
@@ -1928,16 +1936,39 @@ function bindOrbitBall(ball){
   e.preventDefault();e.stopPropagation();orbitCameraBy(...vectors[e.key]);
  });
 }
+function restore3DStyleFromTop(){
+ if(!topStored3DStyle)return;
+ var previous=topStored3DStyle;topStored3DStyle=null;
+ setVisualStyle(previous);
+}
+function rotateViewCube(step){
+ if(!Number.isFinite(step)||!step)return;
+ if(activeView==='top'||activeView==='bottom'){setViewPreset(step>0?'se':'sw');return;}
+ orbit.az+=Math.sign(step)*Math.PI/2;
+ if(orbit.az>Math.PI)orbit.az-=2*Math.PI;
+ if(orbit.az<-Math.PI)orbit.az+=2*Math.PI;
+ if(viewMode==='walk')viewMode='perspective';
+ activeView='orbit';syncViewControls();applyViewCamera();
+ text('Cubo de vistas: giro de 90° · geometría conservada');
+}
 function syncViewControls(){
  root.querySelector('.cad3dViewSelect').value=activeView;
  root.querySelectorAll('[data-view-preset]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.viewPreset===activeView));
  });
+ window.BlacklineCAD3DViewCube?.sync(root,{az:orbit.az,activeView:activeView});
 }
 function setViewPreset(key){
  var v=viewPresets.find(function(p){return p[0]===key;});
  if(!v)return;
+ var wasTop=activeView==='top';
  activeView=v[0];viewMode=v[2];orbit.az=v[3];orbit.el=v[4];
+ if(key==='top'){
+  if(!wasTop)topStored3DStyle=renderStyle==='wire2d'?null:renderStyle;
+  if(renderStyle!=='wire2d')setVisualStyle('wire2d');
+ }else if(wasTop){
+  restore3DStyleFromTop();
+ }
  if(viewMode==='walk')target.z=1.65;
  syncViewControls();applyViewCamera();
  root.querySelector('.placementGuide').hidden=true;
