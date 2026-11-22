@@ -1,40 +1,42 @@
-const test=require('node:test');
-const assert=require('node:assert/strict');
-const fs=require('node:fs');
-const vm=require('node:vm');
-const source=fs.readFileSync('cad3d-lab.js','utf8');
-const begin=source.indexOf('const CAD3D_VISUAL_STYLES='),end=source.indexOf('function renderStyleControls()',begin);
-assert(begin>=0&&end>begin,'Missing Croquis preset registry');
-const ctx={};vm.runInNewContext(source.slice(begin,end),ctx);
-test('Seven Croquis presets are registered with selectable labels',()=>{
- const c=vm.runInNewContext(source.slice(begin,end)+'\n({CAD3D_SKETCH_PRESETS,CAD3D_VISUAL_STYLES,isCad3DSketch})',ctx);
- const names=Object.keys(c.CAD3D_SKETCH_PRESETS);
- assert.equal(names.length,7);
- for(const name of names){
-  assert(c.CAD3D_VISUAL_STYLES[name]);
-  assert.equal(c.isCad3DSketch(name),true);
-  const p=c.CAD3D_SKETCH_PRESETS[name];
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('cad3d-lab.js', 'utf8');
+function section(start, end) {
+ const a = source.indexOf(start);
+ const b = source.indexOf(end, a + start.length);
+ assert(a >= 0 && b > a, 'Missing source section: ' + start);
+ return source.slice(a, b);
+}
+const registry = section('const CAD3D_VISUAL_STYLES=', 'function renderStyleControls()');
+const presetApi = vm.runInNewContext(registry + '\n({CAD3D_SKETCH_PRESETS,CAD3D_VISUAL_STYLES,isCad3DSketch})', {});
+const names = ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint'];
+test('Seven Croquis presets registered with materials and labels', () => {
+ assert.equal(Object.keys(presetApi.CAD3D_SKETCH_PRESETS).length, 7);
+ for(const name of names) {
+  assert(presetApi.CAD3D_VISUAL_STYLES[name], name);
+  assert.equal(presetApi.isCad3DSketch(name), true);
+  const p = presetApi.CAD3D_SKETCH_PRESETS[name];
   assert([p.bg,p.ground,p.fill,p.edge,p.alpha].every(Number.isFinite));
  }
- assert.equal(c.isCad3DSketch('shaded'),false);
+ assert.equal(presetApi.isCad3DSketch('shaded'), false);
 });
-test('Visual Style toolbar exposes all seven selectable Croquis buttons',()=>{
- const toolbar=source.slice(source.indexOf("[['wire2d'"),source.indexOf("tool('shot'"));
- assert(toolbar.includes('data-render-style'), 'style button renderer missing');
- for(const name of ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint']){
-  assert(toolbar.includes("['"+name+"'"),name+' missing from toolbar');
- }
+test('Visual Style toolbar contains all seven Croquis buttons', () => {
+ const toolbar = section("[['wire2d'", "tool('shot'");
+ assert(toolbar.includes('data-render-style'));
+ for(const name of names) assert(toolbar.includes("['" + name + "'"), name);
 });
-test('Croquis keeps shadow-receiving ground enabled',()=>{
- const sun=source.slice(source.indexOf('function applySunSettings(){'),source.indexOf('function toggleDraftMode('));
- const style=source.slice(source.indexOf('function applyRenderStyle(){'),source.indexOf('function exportViewPNG()'));
- assert(!sun.includes("!['sketch','hidden','wire2d','wire3d'].includes(renderStyle)"));
- assert(!style.includes("!['sketch','hidden','wire2d','wire3d'].includes(renderStyle)"));
- assert(style.includes('isCad3DSketch(mode))applySunSettings()'));
+test('Croquis retains the solar shadow ground and turns on sun', () => {
+ const sunlight = section('function applySunSettings(){', 'function toggleDraftMode(');
+ const styles = section('function applyRenderStyle(){', 'function exportViewPNG()');
+ assert(!sunlight.includes("!['sketch','hidden','wire2d','wire3d'].includes(renderStyle)"));
+ assert(!styles.includes("!['sketch','hidden','wire2d','wire3d'].includes(renderStyle)"));
+ assert(styles.includes('isCad3DSketch(mode))applySunSettings()'));
 });
-test('Croquis preserves the user's 3D geometry while changing rendering',()=>{
- const style=source.slice(source.indexOf('function setVisualStyle('),source.indexOf('function exportViewPNG()'));
- assert(style.includes("renderStyle=mode"));
- assert(!style.includes("records.push("));
- assert(!style.includes("records.splice("));
+test('Changing Croquis style does not change CAD geometry', () => {
+ const setStyle = section('function setVisualStyle(', 'function exportViewPNG()');
+ assert(setStyle.includes('renderStyle=mode'));
+ assert(!setStyle.includes('records.push('));
+ assert(!setStyle.includes('records.splice('));
 });
