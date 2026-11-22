@@ -1966,7 +1966,7 @@ function renderProps(){
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
   r.openings.filter(function(o){return !focusOpening||o.id===focusOpening.id;}).forEach(function(o,i){
-   html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>';
+   html+='<div class="detail"><button type="button" class="btn" data-select-opening-id="'+o.id+'">'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+' · Edit</button>';
    var fields=r.type==='wall'?[['offset','Offset X'],['w','Width'],['h','Height'],['sill','Sill']]:
     [['offset','Offset X'],['offsetY','Offset Y'],['w','Width'],['d','Depth']];
    fields.forEach(function(k){
@@ -2124,6 +2124,8 @@ function addWallExtrusion(btn){
  redraw();renderProps();text('Extruded profile attached to wall');
 }
 function clickProps(e){
+ var chosen=e.target.closest('[data-select-opening-id]');
+ if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
  if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
  var add=e.target.closest('[data-add-extrusion]');
  if(add){addWallExtrusion(add);return;}
