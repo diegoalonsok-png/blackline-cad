@@ -728,6 +728,7 @@ function cad3dBounds(){
  var b={minX:Infinity,minY:Infinity,minZ:Infinity,maxX:-Infinity,maxY:-Infinity,maxZ:-Infinity};
  records.filter(visibleRecord).forEach(function(r){
   var halfW=(r.w||r.radius*2||2)/2,halfD=(r.d||r.radius*2||2)/2;
+  if(r.type==='wall')buildParametricCarpentry(r,group);
   if(r.type==='sphere'){halfW=halfD=r.radius||1;}
   var angle=(r.rot||0)*Math.PI/180;
   var ex=Math.abs(Math.cos(angle))*halfW+Math.abs(Math.sin(angle))*halfD;
@@ -1425,47 +1426,30 @@ function architectureParts(r,part){
   if(wall)part(x1-x0,thickness,y1-y0,x,0,y0,color,0);
   else part(x1-x0,y1-y0,thickness,x,y,0,color,slope);
  }
- if(!wall)return;
- cuts.forEach(function(o){
-  var opening=o.source;
-  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
-  if(opening.kind==='opening'||opening.styleId==='open-door')return;
-  var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
-  var frame=Math.min(.055,w/4,h/4);
-  if(opening.kind==='door'){
-   var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
-   var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
-   var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
-   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
-   // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
-   carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
-   if(doubleDoor||sliding){
-    carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
-   }
-   if(doorType==='garage-door'){
-    for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
-   }
-   if(glazed){
-    carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
-   }
-   if(doorType==='pivot-door'){
-    carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
-   }
-  }else{
-   var d=thickness+.03,windowType=opening.styleId||'';
-   carpPart(w,d,frame,x,0,z,0xb5c4cc,0);
-   carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
-   carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
-   carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
-   if(/double|sliding|two-leaf/.test(windowType)){
-    carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
-   }
-   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
-    carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
-   }
+ // Wall is cut at the clear opening. Frame and moving leaves are separate components.
+}
+function buildParametricCarpentry(host,group){
+ var engine=window.BlacklineCAD3DCarpentry;
+ if(!engine||host.type!=='wall')return;
+ (host.openings||[]).forEach(function(o){
+  if(o.kind!=='door'&&o.kind!=='window')return;
+  var design=engine.layout(host,o),assembly=new T.Group();
+  assembly.position.set(o.offset||0,0,o.sill||0);
+  assembly.userData.owner=host.id;assembly.userData.openingId=o.id;
+  group.add(assembly);
+  function addPart(p,parent){
+   var mesh=addMesh(boxGeom(p.w,p.d,p.h),p.color,host.id,parent,p.x,p.y,p.z);
+   mesh.userData.openingId=o.id;
   }
+  design.frame.forEach(function(part){addPart(part,assembly);});
+  design.leaves.forEach(function(leaf){
+   var pivot=new T.Group();
+   pivot.position.set(leaf.pivot.x,leaf.pivot.y,leaf.pivot.z);
+   pivot.rotation.set(leaf.rotation.x,leaf.rotation.y,leaf.rotation.z);
+   pivot.userData.owner=host.id;pivot.userData.openingId=o.id;
+   assembly.add(pivot);
+   leaf.boxes.forEach(function(part){addPart(part,pivot);});
+  });
  });
 }
 /* Build a true miter at two-wall L corners rather than overlapping capped boxes.
