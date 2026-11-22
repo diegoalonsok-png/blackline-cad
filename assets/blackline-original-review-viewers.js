@@ -36,7 +36,9 @@ function preloadCatalog(){
  return catalogTask;
 }
 let decisions={};try{decisions=JSON.parse(localStorage.getItem(APPROVED_KEY)||'{}')||{}}catch(e){}
-let current='kitchen',filter='',overlay=null,consent=false,loaded=0;
+let current='kitchen',filter='',stateFilter='todos',overlay=null,consent=false,loaded=0;
+const DECISION_LABELS={gratis:'GRATIS · candidata',pro:'PRO · candidata',descartado:'DESCARTADO',aprobado:'APROBADO ANTERIOR · sin categoría'};
+const statusFor=item=>typeof decisions[item.key]==='string'?decisions[item.key]:'pendiente';
 function catFor(path,archive){
  const s=(path||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  const a=(archive||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -100,18 +102,27 @@ function ensure(){
  const head=make('div','blrv-head');
  head.append(make('h2','','CARPETAS · ORIGINALES PARA REVISIÓN'));
  head.append(make('small','','522 DWG catalogados · 14 visores separados'));
+ const exportButton=make('button','','Exportar revisión');
+ exportButton.title='Exporta las decisiones, no los archivos DWG ni sus geometrías';
+ exportButton.onclick=exportReview;head.append(exportButton);
  const openFile=make('button','','Cargar ZIP o DWG');
  const files=make('input');files.type='file';files.accept='.zip,.dwg,.dxf';files.multiple=true;files.hidden=true;
  files.onchange=async()=>{await ingest([...files.files]);files.value=''};
  openFile.onclick=()=>files.click();head.append(openFile,files);
  const close=make('button','','✕ Cerrar');close.onclick=()=>overlay.hidden=true;head.append(close);
  shell.append(head);
- shell.append(make('p','blrv-note','Revisión de dibujos originales. Ninguna miniatura se inventa: elegí un ZIP local y pulsá «Ver dibujo» para convertir un DWG real. No se guarda ni publica automáticamente ningún archivo.'));
+ shell.append(make('p','blrv-note','Criterio: dibujo correcto y nombre coincidente → GRATIS aunque sea sencillo; dibujo más detallado → PRO; nombre incorrecto o calidad insuficiente → DESCARTAR. Primero usá «Ver dibujo». Estas decisiones son propuestas de revisión, no publicación automática.'));
  const main=make('div','blrv-main'),nav=make('nav','blrv-nav'),content=make('div','blrv-content');
  const tools=make('div','blrv-tools');
  const search=make('input');search.type='search';search.placeholder='Buscar por nombre...';
  search.oninput=()=>{filter=search.value.toLowerCase();draw()};
- const count=make('span');count.id='blrvCount';tools.append(search,count);
+ const selector=make('select');selector.setAttribute('aria-label','Filtrar por decisión');
+  selector.style.cssText='padding:7px;background:#0a131b;border:1px solid #3d5465;color:#fff;border-radius:7px';
+  for(const [value,label] of [['todos','Todos'],['pendiente','Pendientes'],['gratis','Gratis'],['pro','PRO'],['descartado','Descartados']]){
+   const option=make('option','',label);option.value=value;selector.append(option);
+  }
+  selector.onchange=()=>{stateFilter=selector.value;draw()};
+  const count=make('span');count.id='blrvCount';tools.append(search,selector,count);
  const grid=make('div','blrv-grid');grid.id='blrvGrid';
  content.append(tools,grid);main.append(nav,content);shell.append(main);
  const foot=make('div','blrv-foot');foot.id='blrvStatus';
@@ -124,6 +135,20 @@ function ensure(){
  return overlay;
 }
 function report(s){const el=document.getElementById('blrvStatus');if(el)el.textContent=s}
+function exportReview(){
+ const records=[...FILES.values()].filter(item=>['gratis','pro','descartado'].includes(statusFor(item))).map(item=>({
+  id:item.key,category:item.cat,name:item.label,sourceArchive:item.sourceZip||item.zip,
+  originalPath:item.sourcePath||'',decision:statusFor(item),
+  previewedThisSession:Boolean(item.cached),unsupportedPreviewEntities:item.cached?.unsupported??null
+ }));
+ const content=JSON.stringify({schema:'blackline-originals-review-v2',exportedAt:new Date().toISOString(),
+  note:'Propuestas manuales. No demuestra que se haya publicado o verificado el DWG completo.',records},null,2);
+ const blob=new Blob([content],{type:'application/json'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='blackline-revision-gratis-pro-descartados.json';a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+ report(records.length+' decisiones exportadas. Los originales no se incluyeron en este archivo.');
+}
 function keyFor(name,zip,crc){return [zip,name,String(crc)].join('|')}
 async function ingest(inputs){
  if(!inputs.length)return;
@@ -301,12 +326,17 @@ function drawCounters(){
   const base=CATS.find(x=>x[0]===id);
   button.textContent=base[1]+' · '+(qty?qty+' cargados':base[2]+' pendientes');
  }
- const count=document.getElementById('blrvCount');if(count)count.textContent=[...FILES.values()].filter(x=>x.cat===current).length+' archivos cargados';
+ const count=document.getElementById('blrvCount');if(count){
+  const items=[...FILES.values()].filter(x=>x.cat===current);
+  const reviewed=items.filter(x=>['gratis','pro','descartado'].includes(statusFor(x))).length;
+  count.textContent=items.length+' catalogados · '+reviewed+' revisados';
+ }
 }
 function draw(){
  if(!overlay)return;drawCounters();
  const grid=document.getElementById('blrvGrid');grid.replaceChildren();
- const shown=[...FILES.values()].filter(x=>x.cat===current&&(!filter||x.label.toLowerCase().includes(filter)));
+ const shown=[...FILES.values()].filter(x=>x.cat===current&&(!filter||x.label.toLowerCase().includes(filter))&&
+ (stateFilter==='todos'||(stateFilter==='pendiente'?!['gratis','pro','descartado'].includes(statusFor(x)):statusFor(x)===stateFilter)));
  if(!shown.length){
   const empty=make('div','blrv-tile','Carpeta '+CATLABEL[current]+': cargando nombres originales o sin archivos coincidentes. Importá ZIP para habilitar las vistas reales.');
   grid.append(empty);return;
@@ -316,14 +346,28 @@ function draw(){
   const card=make('article','blrv-tile'),art=make('div','blrv-art',it.state==='unloaded'?'DWG catalogado · cargar ZIP para ver dibujo':'DWG original · sin vista previa');
   if(it.cached)art.replaceChildren(it.cached.svg.cloneNode(true));
   card.append(art,make('div','blrv-title',it.label));
-  const meta=make('div','blrv-meta',it.zip+' · '+(decisions[it.key]||'pendiente'));card.append(meta);
+  const meta=make('div','blrv-meta',it.zip+' · '+(DECISION_LABELS[statusFor(it)]||'PENDIENTE'));card.append(meta);
   const acts=make('div','blrv-acts'),view=make('button','','Ver dibujo');
   view.onclick=()=>preview(it,art,view);
-  const yes=make('button','blrv-pass','Aprobar'),no=make('button','blrv-drop','Descartar');
-  const change=v=>{if(v==='aprobado'&&!it.cached){report('Primero comprobá la geometría: Ver dibujo');return}if(v==='aprobado'&&it.cached.unsupported){if(!confirm('La conversión tiene entidades no representadas. ¿Aprobar para revisión igualmente?'))return}
-   decisions[it.key]=v;save();meta.textContent=it.zip+' · '+v;report(it.label+': '+v+'. Decisión guardada en este navegador; el original no fue borrado.')};
-  yes.onclick=()=>change('aprobado');no.onclick=()=>change('descartado');
-  acts.append(view,yes,no);card.append(acts);fragment.append(card);
+  const free=make('button','blrv-pass','Gratis'),pro=make('button','blrv-pass','PRO');
+  const no=make('button','blrv-drop','Descartar');
+  const change=v=>{
+   if(v!=='descartado'){
+    if(!it.cached){report('Primero tenés que ver el dibujo real antes de asignar Gratis o PRO.');return}
+    if(it.cached.unsupported){
+     report('La vista tiene entidades omitidas; no se puede aprobar sin verificar la geometría completa.');
+     return;
+    }
+    const label=v==='gratis'?'gratuita':'PRO';
+    if(!confirm('¿Verificaste que el dibujo de «'+it.label+'» realmente coincide con su nombre, está bien trazado y debe proponerse para la galería '+label+'?'))return;
+   }
+   decisions[it.key]=v;save();
+   meta.textContent=it.zip+' · '+(DECISION_LABELS[v]||v);
+   drawCounters();
+   report(it.label+': '+(DECISION_LABELS[v]||v)+'. Guardado localmente; no se modificó ni publicó el original.');
+  };
+  free.onclick=()=>change('gratis');pro.onclick=()=>change('pro');no.onclick=()=>change('descartado');
+  acts.append(view,free,pro,no);card.append(acts);fragment.append(card);
  }
  grid.append(fragment);
 }
