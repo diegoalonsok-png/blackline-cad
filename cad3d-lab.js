@@ -217,6 +217,28 @@ var css=`
  border:1px solid #ffe0a0; border-radius:50%; background:#26333d;
 }
 #cad3dLab .view.sketchView { background:#f0eee6 }
+#cad3dLab .view.sketchView::after{
+ content:"";position:absolute;inset:0;z-index:2;pointer-events:none;opacity:.17;
+ background-image:repeating-linear-gradient(14deg,#6d5c3a0c 0px,#6d5c3a0c 1px,transparent 1px,transparent 7px),
+ repeating-linear-gradient(93deg,#77674c11 0px,#77674c11 1px,transparent 1px,transparent 11px);
+ mix-blend-mode:multiply
+}
+#cad3dLab .view.sketchView[data-sketch-paper="pencil"]::after{
+ opacity:.36;background-image:repeating-linear-gradient(18deg,#554f4015 0px,#554f4015 1px,transparent 1px,transparent 3px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="ink"]::after{opacity:.08}
+#cad3dLab .view.sketchView[data-sketch-paper="marker"]::after{
+ opacity:.23;background-image:repeating-linear-gradient(145deg,#69594c18 0px,#69594c18 4px,transparent 4px,transparent 14px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="watercolor"]::after{
+ opacity:.25;background-image:radial-gradient(ellipse at 23% 38%,#9faea633,transparent 37%),
+ radial-gradient(ellipse at 71% 64%,#b9a98e33,transparent 45%),
+ repeating-linear-gradient(18deg,#807d7110 0px,#807d7110 2px,transparent 2px,transparent 9px)
+}
+#cad3dLab .view.sketchView[data-sketch-paper="blueprint"]::after{
+ opacity:.22;mix-blend-mode:screen;background-image:repeating-linear-gradient(0deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px),
+ repeating-linear-gradient(90deg,#c5e1ed0b 0px,#c5e1ed0b 1px,transparent 1px,transparent 18px)
+}
 #cad3dLab .viewNav {
  position:absolute; top:8px; left:8px; z-index:1; width:101px;
  display:grid; justify-items:start; gap:4px; pointer-events:none;
@@ -1578,7 +1600,7 @@ function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
  if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
- try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
+ try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadSketch)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
@@ -1593,7 +1615,7 @@ function highlight(){
  if(!modelRoot)return;
  modelRoot.children.forEach(function(g){
   var active=selected.includes(g.userData.owner);
-  g.traverse(function(o){if(o.isMesh)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
+  g.traverse(function(o){if(o.isMesh&&o.material?.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);});
  });
 }
 function newRecord(type){
@@ -1751,13 +1773,15 @@ const CAD3D_VISUAL_STYLES={
  'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint'
 };
 const CAD3D_SKETCH_PRESETS={
- sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
- 'sketch-pencil':{bg:0xf2f0e7,ground:0xe3e1da,fill:0xf2efe8,edge:0x64696b,alpha:.78},
- 'sketch-ink':{bg:0xfaf9f3,ground:0xf0eee8,fill:0xfaf9f4,edge:0x202629,alpha:1},
- 'sketch-marker':{bg:0xf0eee5,ground:0xe5e1d7,fill:0xd2d2cb,edge:0x4e6269,alpha:.76},
- 'sketch-watercolor':{bg:0xf5f1e9,ground:0xe5e3de,fill:0xdadcd7,edge:0x667a7f,alpha:.66},
- 'sketch-mono':{bg:0xf2f2f0,ground:0xe5e5e1,fill:0xe9e9e5,edge:0x424546,alpha:.88},
- 'sketch-blueprint':{bg:0x344e66,ground:0x647f92,fill:0x8ca6b5,edge:0xe4f2fa,alpha:.92}
+ // width is the profile width relative to object dimension; jitter varies
+ // the actual edge strokes, while fillMix keeps authentic material identity.
+ sketch:{bg:0xf5f3eb,ground:0xe8e4d8,fill:0xf0ede4,edge:0x33343a,alpha:.96,width:.0036,jitter:0,passes:1,fillMix:.8,stroke:'clean',paper:'ink'},
+ 'sketch-pencil':{bg:0xf1eee4,ground:0xe6e3db,fill:0xece9e1,edge:0x5d5a55,alpha:.63,width:.003,jitter:.3,passes:3,fillMix:.85,stroke:'pencil',paper:'pencil'},
+ 'sketch-ink':{bg:0xfffdf8,ground:0xf1eee7,fill:0xfcfaf5,edge:0x23272a,alpha:1,width:.0055,jitter:.1,passes:2,fillMix:.92,stroke:'ink',paper:'ink'},
+ 'sketch-marker':{bg:0xf5f1e8,ground:0xe8e3d8,fill:0xd1d7d2,edge:0x334952,alpha:.86,width:.0065,jitter:.17,passes:2,fillMix:.55,stroke:'marker',paper:'marker'},
+ 'sketch-watercolor':{bg:0xf8f3ea,ground:0xe5e1d8,fill:0xcfdcd4,edge:0x687982,alpha:.62,width:.003,jitter:.28,passes:3,fillMix:.48,stroke:'wash',paper:'watercolor'},
+ 'sketch-mono':{bg:0xf7f7f4,ground:0xe8e8e3,fill:0xdcdedc,edge:0x262e33,alpha:.9,width:.0044,jitter:0,passes:1,fillMix:.84,stroke:'clean',paper:'ink'},
+ 'sketch-blueprint':{bg:0x23415b,ground:0x456379,fill:0x54758c,edge:0xe0f4ff,alpha:.96,width:.004,jitter:0,passes:2,fillMix:.8,stroke:'blueprint',paper:'blueprint'}
 };
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
@@ -1770,7 +1794,54 @@ function renderStyleControls(){
  if(launcher)launcher.textContent='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded')+' ▾';
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
- root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+ var view=root.querySelector('.view');
+ if(view){view.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+  if(isCad3DSketch(renderStyle))view.dataset.sketchPaper=CAD3D_SKETCH_PRESETS[renderStyle].paper;
+  else delete view.dataset.sketchPaper;
+ }
+}
+/* Three.js ignores most WebGL lineWidth requests. Make actual ribbon
+   geometry for architectural profile weight and hand-drawn stroke breakup,
+   so that every Croquis preset changes the rendered model, not just colors. */
+function cadSketchRibbonGeometry(edges,sketch,scale){
+ var a=edges.getAttribute('position'),out=[];
+ if(!a||!a.count)return new T.BufferGeometry();
+ var count=Math.min(Math.floor(a.count/2),360),stroke=sketch.stroke;
+ var width=clamp(scale*sketch.width,.0015,.065);
+ function rand(seed){var t=Math.sin(seed*127.1+19.87)*43758.5453;return t-Math.floor(t);}
+ function quad(x0,y0,z0,x1,y1,z1,nx,ny,nz,half){
+  out.push(x0+nx*half,y0+ny*half,z0+nz*half,
+    x0-nx*half,y0-ny*half,z0-nz*half,x1+nx*half,y1+ny*half,z1+nz*half,
+    x0-nx*half,y0-ny*half,z0-nz*half,
+    x1-nx*half,y1-ny*half,z1-nz*half,x1+nx*half,y1+ny*half,z1+nz*half);
+ }
+ for(var i=0;i<count;i++){
+  var ax=a.getX(i*2),ay=a.getY(i*2),az=a.getZ(i*2);
+  var bx=a.getX(i*2+1),by=a.getY(i*2+1),bz=a.getZ(i*2+1);
+  var dx=bx-ax,dy=by-ay,dz=bz-az,length=Math.hypot(dx,dy,dz);
+  if(length<.0005)continue;
+  var ux=dx/length,uy=dy/length,uz=dz/length;
+  var nx=-uy,ny=ux,nz=0;
+  if(Math.hypot(nx,ny)<.01){nx=1;ny=0;}
+  var nlen=Math.hypot(nx,ny,nz);nx/=nlen;ny/=nlen;nz/=nlen;
+  var vx=uy*nz-uz*ny,vy=uz*nx-ux*nz,vz=ux*ny-uy*nx;
+  var passes=sketch.passes||1;
+  for(var p=0;p<passes;p++){
+   var noise=(rand(i*5+p*3)-.5)*2,rough=sketch.jitter||0;
+   var j=noise*rough*width*(p===0?.4:1.2);
+   var start=(p>0&&stroke==='pencil')?rand(i+p*.4)*.15:0;
+   var end=(p>0&&stroke==='wash')?.65+rand(i+p)*.3:1;
+   var weight=width*(p===0?1:stroke==='marker'?.55:.31)*(1+noise*.22);
+   var x0=ax+dx*start+nx*j,y0=ay+dy*start+ny*j,z0=az+dz*start+nz*j;
+   var x1=ax+dx*end+nx*j,y1=ay+dy*end+ny*j,z1=az+dz*end+nz*j;
+   quad(x0,y0,z0,x1,y1,z1,nx,ny,nz,weight/2);
+   // Crossed ribbon ensures consistent stroke width in front/side views.
+   quad(x0,y0,z0,x1,y1,z1,vx,vy,vz,weight/2);
+  }
+ }
+ var geo=new T.BufferGeometry();
+ geo.setAttribute('position',new T.Float32BufferAttribute(out,3));
+ return geo;
 }
 function applyRenderStyle(){
  renderStyleControls();
@@ -1786,13 +1857,13 @@ function applyRenderStyle(){
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
  modelRoot.traverse(function(m){
-  if(!m.isMesh||!m.material||!m.geometry)return;
+  if(!m.isMesh||!m.material||!m.geometry||m.userData?.cadSketch||m.userData?.cadPickProxy)return;
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
   });
   var mat=m.material,base=m.userData.cadBaseColor;
-  var color=sketch?sketch.fill:renderStyle==='monochrome'?0xe8e8e3:
+  var color=sketch?new T.Color(base).lerp(new T.Color(sketch.fill),sketch.fillMix).getHex():renderStyle==='monochrome'?0xe8e8e3:
    renderStyle==='realistic'?(base===0xaab0b5?0xb9b7af:base===0x8b725e?0xa07852:base):base;
   mat.color.setHex(color);
   mat.colorWrite=!plainLines;
@@ -1813,6 +1884,18 @@ function applyRenderStyle(){
     transparent:!!sketch||renderStyle==='shaded-edges',opacity:sketch?sketch.alpha:renderStyle==='shaded-edges'?.68:1
    }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
+   if(sketch){
+    m.geometry.computeBoundingBox();
+    var bb=m.geometry.boundingBox,span=bb?Math.max(bb.max.x-bb.min.x,bb.max.y-bb.min.y,bb.max.z-bb.min.z):1;
+    var ribbons=cadSketchRibbonGeometry(edge,sketch,span);
+    var ink=new T.Mesh(ribbons,new T.MeshBasicMaterial({
+     color:sketch.edge,transparent:true,opacity:sketch.alpha*.88,
+     depthWrite:false,depthTest:true,side:T.DoubleSide,
+     polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-2
+    }));
+    ink.userData.cadSketch=true;ink.userData.cadRibbon=true;
+    ink.castShadow=false;ink.receiveShadow=false;ink.renderOrder=6;m.add(ink);
+   }
   }
  });
 }
