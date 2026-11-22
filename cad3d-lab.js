@@ -216,15 +216,15 @@ var css=`
  display:grid; justify-items:start; gap:4px; pointer-events:none;
 }
 #cad3dLab .viewNav button, #cad3dLab .viewNav select { pointer-events:auto }
-#cad3dLab .viewCube { position:relative; width:83px; height:81px; transform:scale(.69); transform-origin:top left; margin-bottom:-25px }
-#cad3dLab .viewNav {width:168px}
-#cad3dLab .viewNavTop {display:flex;gap:8px;align-items:flex-start;pointer-events:none;height:62px}
+#cad3dLab .viewCube { position:relative; width:83px; height:81px; transform:scale(.72); transform-origin:top left; margin-bottom:-23px;filter:drop-shadow(0 5px 5px #0b162a7c) }
+#cad3dLab .viewNav {width:218px;gap:7px;padding:8px;border:1px solid #6d8b9e66;border-radius:15px;background:#182936ab;box-shadow:0 7px 20px #09131e40;backdrop-filter:blur(5px)}
+#cad3dLab .viewNavTop {display:flex;gap:11px;align-items:flex-start;pointer-events:none;height:69px}
 #cad3dLab .viewNavTop > * {pointer-events:auto}
-#cad3dLab .orbitBall {width:48px;height:48px;margin-top:2px;border:1px solid #8ca9b9;border-radius:50%;color:#edf7fc;cursor:grab;touch-action:none;user-select:none;position:relative;flex:none;background:radial-gradient(circle at 30% 25%,#7294a8,#263c50 60%,#101d2a 94%);box-shadow:inset -5px -7px 9px #071521b0,0 2px 7px #0008}
+#cad3dLab .orbitBall {width:52px;height:52px;margin-top:1px;border:1px solid #aecce0;border-radius:50%;color:#effaff;cursor:grab;touch-action:none;user-select:none;position:relative;flex:none;background:radial-gradient(circle at 27% 19%,#a9d8e7,#416e87 33%,#203f56 67%,#14202e 96%);box-shadow:inset -5px -7px 10px #07152188,0 3px 8px #0007,0 0 0 3px #6ca7c322;transition:border-color .15s,box-shadow .15s}
 #cad3dLab .orbitBall:active,#cad3dLab .orbitBall[data-dragging=true]{cursor:grabbing;border-color:#bce6f5}
-#cad3dLab .orbitBall svg{width:34px;height:34px;position:absolute;left:6px;top:6px;fill:none;stroke:currentColor;stroke-width:1.25;pointer-events:none}
+#cad3dLab .orbitBall svg{width:36px;height:36px;position:absolute;left:7px;top:7px;fill:none;stroke:currentColor;stroke-width:1.3;pointer-events:none}
 #cad3dLab .orbitBall:focus-visible{outline:2px solid #a8def6;outline-offset:2px}
-#cad3dLab .orbitBall .orbitBallDot{position:absolute;left:21px;top:21px;width:5px;height:5px;border-radius:50%;background:#d9f3ff;pointer-events:none}
+#cad3dLab .orbitBall .orbitBallDot{position:absolute;left:23px;top:23px;width:5px;height:5px;border-radius:50%;background:#d9f3ff;pointer-events:none}
 #cad3dLab .view.planRulers .viewNav { top:23px; left:26px }
 #cad3dLab .rulerX, #cad3dLab .rulerY {
  position:absolute; z-index:1; overflow:hidden; pointer-events:none;
@@ -244,13 +244,27 @@ var css=`
 #cad3dLab .cubeFace[data-view-preset=front] { left:3px; top:21px; transform:matrix(.905,.5,0,.875,0,0) }
 #cad3dLab .cubeFace[data-view-preset=right] { left:41px; top:42px; transform:matrix(.905,-.5,0,.875,0,0) }
 #cad3dLab .cubeFace:hover, #cad3dLab .cubeFace[aria-pressed=true] {
- background:color-mix(in srgb,var(--cad-ui-raised),var(--bl-accent,#8bc7de) 26%);
- border-color:var(--bl-accent,#8bc7de);
+ background:#3e6075;
+ border-color:#bee5f7;color:#fff;
 }
 #cad3dLab .cad3dViewSelect {
- width:100%; min-width:0; height:26px; padding:1px 4px;
- border:1px solid var(--cad-ui-edge); font:11px Inter,Arial,sans-serif; cursor:pointer;
+ width:100%; min-width:0; height:33px; padding:4px 9px;
+ border:1px solid #8296a6; border-radius:10px;
+ background:linear-gradient(180deg,#293746,#1c2834); color:#f1f6fa;
+ font:500 12px Inter,Arial,sans-serif;cursor:pointer;
+ box-shadow:0 3px 8px #0810183b;outline-offset:2px;
 }
+#cad3dLab .cad3dViewSelect:hover {border-color:#b4d5e5;background:#34485a}
+#cad3dLab .viewZoomControls {display:flex;gap:5px;pointer-events:auto}
+#cad3dLab .viewZoomControls button{
+ min-width:35px;height:33px;border:1px solid #7c95a8;border-radius:9px;
+ background:linear-gradient(180deg,#344b5c,#1b2b37);color:#eff9ff;
+ font:700 18px Inter,Arial,sans-serif;cursor:pointer;
+ box-shadow:0 2px 6px #10182255;transition:background .15s,border-color .15s;
+}
+#cad3dLab .viewZoomControls button:last-child{font-size:11px;letter-spacing:.03em}
+#cad3dLab .viewZoomControls button:hover{background:#45647a;border-color:#c2e4f2}
+#cad3dLab .viewZoomControls button:focus-visible {outline:2px solid #a9dffa;outline-offset:2px}
 #cad3dLab .side { display:block; width:227px; min-width:0; max-width:54%; flex:0 0 auto; overflow:auto }
 #cad3dLab .side p { line-height:1.4; color:var(--cad-ui-muted); font-size:11px }
 #cad3dLab .side label { display:flex; align-items:center; justify-content:space-between; gap:4px; margin:7px 0; font-size:11px }
@@ -574,7 +588,7 @@ function build(){
  '<button type="button" class="cubeFace" data-view-preset="top" title="Planta" aria-label="Planta">TOP</button>'+
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
- '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
+ '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select><div class="viewZoomControls" role="group" aria-label="Zoom 3D"><button type="button" data-zoom3d="in" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-zoom3d="out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" data-zoom3d="extents" aria-label="Zoom extents" title="Fit model">Fit</button></div></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output>'+
  '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
@@ -612,6 +626,12 @@ function build(){
   if(key==='fit')fit3DModel();else setViewPreset(key);
  });
  bindOrbitBall(root.querySelector('.orbitBall'));
+ root.querySelector('.viewZoomControls').addEventListener('click',function(e){
+  var button=e.target.closest('[data-zoom3d]');if(!button)return;
+  var op=button.dataset.zoom3d;
+  if(op==='extents')fit3DModel();
+  else zoom3D(op==='in'?.75:1.3333333333);
+ });
  root.querySelector('.viewCube').addEventListener('click',function(e){
   var face=e.target.closest('[data-view-preset]');
   if(face)setViewPreset(face.dataset.viewPreset);
@@ -776,12 +796,23 @@ function cad3dBounds(){
  return {x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2,z:(b.minZ+b.maxZ)/2,
   span:Math.max(8,b.maxX-b.minX,b.maxY-b.minY,(b.maxZ-b.minZ)*2)};
 }
+function zoom3D(factor){
+ if(!Number.isFinite(factor)||factor<=0)return;
+ if(viewMode==='walk'){
+  // Walking has a position rather than a target-distance zoom.
+  var step=clamp(Math.abs(Math.log(factor))*3,.1,5);
+  target.x+=(factor<1?-1:1)*Math.cos(orbit.az)*step;
+  target.y+=(factor<1?-1:1)*Math.sin(orbit.az)*step;
+ }else orbit.dist=clamp(orbit.dist*factor,.35,10000);
+ applyViewCamera();
+ text('Zoom 3D · '+(factor<1?'acercar':'alejar')+' · rueda, + / − o ZOOM E');
+}
 function fit3DModel(){
  var b=cad3dBounds();
  if(target){target.x=b.x;target.y=b.y;target.z=b.z;}
  else if(T)target=new T.Vector3(b.x,b.y,b.z);
  else target={x:b.x,y:b.y,z:b.z};
- orbit.dist=clamp(b.span*1.7,8,450);applyViewCamera();
+ orbit.dist=clamp(b.span*1.7,1.4,10000);applyViewCamera();
  text('Vista ajustada a los objetos 3D');
 }
 function applySunSettings(){
@@ -1219,7 +1250,12 @@ function bindCanvas(el){
   if(viewMode==='walk'){
    var step=clamp(Math.abs(e.deltaY)*.004,.08,1.4)*(e.deltaY>0?1:-1);
    target.x+=Math.cos(orbit.az)*step;target.y+=Math.sin(orbit.az)*step;
-  }else orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),1.4,450);
+  }else{
+   // Normalize pixels, wheel-lines and wheel-pages: wheel works in perspective
+   // and orthographic cameras without swallowing tiny trackpad deltas.
+   var delta=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?el.clientHeight:1);
+   orbit.dist=clamp(orbit.dist*Math.exp(clamp(delta,-600,600)*.0015),.35,10000);
+  }
   applyViewCamera();updatePlacementGuide(e);
  },{passive:false});
 }
@@ -2263,6 +2299,16 @@ function run3DCommand(){
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
  if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
  if(command==='pan'){text('Paneo: arrastrá con el botón central o derecho');return;}
+ // Native CAD commands: ZOOM, Z, ZOOM E, ZOOM EXTENTS and ZOOM numeric factors.
+ if(/^(?:zoom|z)(?:\s+.*)?$/i.test(raw)){
+  var arg=raw.replace(/^(?:zoom|z)\s*/i,'').trim().toLowerCase();
+  if(!arg||arg==='e'||arg==='extents'||arg==='all'||arg==='a'){fit3DModel();return;}
+  if(arg==='in'||arg==='+'){zoom3D(.75);return;}
+  if(arg==='out'||arg==='-'){zoom3D(1.3333333333);return;}
+  var factorMatch=/^([0-9]+(?:\.[0-9]+)?)x?$/.exec(arg);
+  if(factorMatch&&Number(factorMatch[1])>0){zoom3D(1/Number(factorMatch[1]));return;}
+  text('ZOOM: usá E / Extents, In, Out o un factor (ej. ZOOM 2X)');return;
+ }
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
@@ -2546,7 +2592,7 @@ window.addEventListener('keydown',function(ev){
   ev.preventDefault();ev.stopImmediatePropagation();action('erase');return;
  }
  if(key==='+'||key==='-'){
-  ev.preventDefault();ev.stopImmediatePropagation();orbit.dist=clamp(orbit.dist*(key==='+'?.8:1.25),1.4,450);applyViewCamera();return;
+  ev.preventDefault();ev.stopImmediatePropagation();zoom3D(key==='+'?.8:1.25);return;
  }
  if(/^[a-z0-9@.,-]$/i.test(ev.key)){
   ev.preventDefault();ev.stopImmediatePropagation();
