@@ -257,6 +257,11 @@ var css=`
  width:100%; min-width:0; height:26px; padding:1px 4px;
  border:1px solid var(--cad-ui-edge); font:11px Inter,Arial,sans-serif; cursor:pointer;
 }
+#cad3dLab .cad3dContextMenu{position:absolute;z-index:30;min-width:170px;max-width:250px;padding:5px;border:1px solid #7993a7;border-radius:9px;background:#1d2a35;color:#ebf4fb;box-shadow:0 10px 25px #0009;font:12px Inter,Arial,sans-serif}
+#cad3dLab .cad3dContextMenu[hidden]{display:none!important}
+#cad3dLab .cad3dContextMenu button{display:block;width:100%;text-align:left;padding:9px;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+#cad3dLab .cad3dContextMenu button:hover{background:#3b566c}
+#cad3dLab .cad3dContextMenu .contextObject{display:block;padding:5px 9px;color:#aac8d8;font-size:10px}
 #cad3dLab .side { display:block; width:227px; min-width:0; max-width:54%; flex:0 0 auto; overflow:auto }
 #cad3dLab .side p { line-height:1.4; color:var(--cad-ui-muted); font-size:11px }
 #cad3dLab .side label { display:flex; align-items:center; justify-content:space-between; gap:4px; margin:7px 0; font-size:11px }
@@ -526,7 +531,7 @@ function build(){
  '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
  '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
  '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
- '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output>'+
+ '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output><div class="cad3dContextMenu" role="menu" aria-label="CAD3D context menu" hidden></div>'+
  '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
  '<aside class="side sidebar"><section class="panel"><header class="panel-title">Layers</header>'+
@@ -618,6 +623,16 @@ function build(){
  renderDraftModes();renderLayerPanel();
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
+ root.querySelector('.cad3dContextMenu').addEventListener('click',function(e){
+  var cmd=e.target.closest('[data-context-action]')?.dataset.contextAction;
+  if(!cmd)return;
+  hideObjectContextMenu();
+  if(cmd==='wall'){selectedOpeningId=null;renderProps();highlight();}
+  else if(cmd==='properties')focus3DProperties();
+ });
+ root.addEventListener('pointerdown',function(e){
+  if(!e.target.closest('.cad3dContextMenu'))hideObjectContextMenu();
+ });
  var palette=root.querySelector('.archPalette');
  palette.addEventListener('click',clickArchPalette);
  palette.addEventListener('pointerdown',beginArchGesture);
@@ -1032,7 +1047,7 @@ function close(){
  if(!root)return;
  var launcher=document.getElementById('cad3dOpen');
  var focused=root.contains(document.activeElement);
- root.hidden=true;launcher.setAttribute('aria-pressed','false');dragging=null;
+ hideObjectContextMenu();root.hidden=true;launcher.setAttribute('aria-pressed','false');dragging=null;
  if(focused)launcher.focus({preventScroll:true});
  if(frame)cancelAnimationFrame(frame);frame=0;
  if(fallbackFrame)cancelAnimationFrame(fallbackFrame);fallbackFrame=0;
@@ -1116,9 +1131,43 @@ function panView(dx,dy,canvas){
   target.z+=scale*(-dx*axes.right[2]+dy*axes.up[2]);
  }
 }
+function hideObjectContextMenu(){
+ if(!root)return;
+ var menu=root.querySelector('.cad3dContextMenu');
+ if(menu){menu.hidden=true;menu.innerHTML='';}
+}
+function focus3DProperties(){
+ if(!root||!selected.length)return;
+ renderProps();highlight();
+ var props=root.querySelector('.props');
+ var panel=props?.closest('.panel')||props;
+ if(panel&&typeof panel.scrollIntoView==='function')panel.scrollIntoView({block:'nearest'});
+ var control=props?.querySelector(selectedOpeningId!=null?'select[data-opening-style],input[data-opening]':'input[data-key],select[data-object-style]');
+ if(control&&typeof control.focus==='function')control.focus({preventScroll:true});
+}
+function showObjectContextMenu(e){
+ if(!root||!selected.length){hideObjectContextMenu();return;}
+ var menu=root.querySelector('.cad3dContextMenu'),view=root.querySelector('.view');
+ if(!menu||!view)return;
+ var host=records.find(function(r){return selected.includes(r.id);});
+ var opening=host?.openings?.find(function(o){return o.id===selectedOpeningId;});
+ var label=opening?(opening.kind==='door'?'Door':opening.kind==='window'?'Window':'Opening')+' #'+opening.id:
+  (host?.type||'Object').toUpperCase()+' #'+(host?.id||'?');
+ menu.innerHTML='<span class="contextObject">'+escapeHtml(label)+'</span>'+
+  '<button type="button" role="menuitem" data-context-action="properties">Properties</button>'+
+  (opening?'<button type="button" role="menuitem" data-context-action="wall">Select host wall</button>':'');
+ var rect=view.getBoundingClientRect();
+ menu.hidden=false;
+ var maxX=Math.max(4,rect.width-menu.offsetWidth-5),maxY=Math.max(4,rect.height-menu.offsetHeight-5);
+ menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
+ menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
+}
 function bindCanvas(el){
  el.tabIndex=0;
- el.addEventListener('contextmenu',function(e){e.preventDefault();});
+ el.addEventListener('contextmenu',function(e){
+  e.preventDefault();
+  if(!dragging&&!placing){selectAt(e);showObjectContextMenu(e);}
+ });
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
   e.preventDefault();el.focus({preventScroll:true});
@@ -1130,6 +1179,7 @@ function bindCanvas(el){
   if(dragging&&dragging.id===e.pointerId){
    var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
    if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>5){
+    hideObjectContextMenu();
     dragging.moved=true;dragging.lastX=e.clientX;dragging.lastY=e.clientY;
     if(dragging.pan)panView(dx,dy,el);
     else{
@@ -1146,7 +1196,8 @@ function bindCanvas(el){
   if(!dragging||dragging.id!==e.pointerId)return;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;
-  if(click&&e.button===0){if(placing)placeAt(e);else selectAt(e);}
+  if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
+  if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
   if(draftModes.dyn)updateDynamicReadout(e);
  });
  el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId)dragging=null;});
