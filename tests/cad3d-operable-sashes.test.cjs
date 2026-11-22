@@ -125,3 +125,20 @@ test('In plan view the door swing symbol takes picking priority over wall faces'
  assert.equal(ctx.selectedOpeningId,4);
  assert.deepEqual(Array.from(ctx.selected),[22]);
 });
+
+
+test('Guillotine window opens vertically with two full-width sashes',()=>{
+ const ctx=makeEnv();
+ const g=render(ctx,wall({kind:'window',styleId:'guillotine',w:1.2,h:1.4,sill:.7,openFraction:.8}));
+ assert.equal(g.length,2);
+ assert(g[0].position.z> .7);
+ assert(g[1].position.z>g[0].position.z);
+ assert(g[0].children.some(m=>m.glass===true));
+ assert.equal(g[0].children[0].geometry.w,g[1].children[0].geometry.w);
+});
+test('Sliding doors have parallel plan tracks rather than hinged arcs',()=>{
+ const symbol=render(makeEnv(),wall({styleId:'terrace-door',w:2.4}))[0];
+ assert.equal(symbol.userData.cadPlanSymbol,true);
+ assert.equal(symbol.children.length,3);
+ assert(symbol.children.every(line=>line.geometry.points.length===2));
+});
