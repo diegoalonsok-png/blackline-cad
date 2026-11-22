@@ -789,7 +789,7 @@ function cad3DBlockCatalog(){
 
 /* CAD3D_MESH_FORMATS_V2 — local mesh imports; no external upload or server dependency. */
 function cad3dImportTriangles(vertices,faces,fileName){
- if(!faces.length||faces.length>120000)throw Error('No hay triángulos válidos o el modelo supera 120.000 triángulos');
+ if(!faces.length||faces.length>120000)throw Error('No hay triángulos válidos o el modelo supera 120.000 caras');
  var min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity],triangles=[];
  faces.forEach(function(face){
   if(face.length<3||face.some(function(i){return !Number.isInteger(i)||i<0||i>=vertices.length;}))return;
@@ -797,6 +797,7 @@ function cad3dImportTriangles(vertices,faces,fileName){
  });
  if(!triangles.length||triangles.length>360000)throw Error('Malla inválida o demasiado grande');
  triangles.forEach(function(idx){var v=vertices[idx];for(var k=0;k<3;k++){min[k]=Math.min(min[k],v[k]);max[k]=Math.max(max[k],v[k]);}});
+ if(!min.every(Number.isFinite)||!max.every(Number.isFinite))throw Error('La malla contiene coordenadas inválidas');
  var size=max.map(function(v,k){return Math.max(.001,v-min[k]);});
  var coords=[];
  triangles.forEach(function(i){var v=vertices[i];for(var j=0;j<3;j++)coords.push((v[j]-(j===2?min[j]:(min[j]+max[j])/2))/size[j]);});
@@ -844,7 +845,7 @@ function cad3dParsePLY(textContent,name){
 function cad3dParseGLTFDocument(json,buffers,name){
  if(!json.meshes||!json.accessors||!json.bufferViews)throw Error('GLTF sin mallas');
  function access(index){
-  var a=json.accessors[index],v=json.bufferViews[a.bufferView];if(!a||!v||a.sparse)throw Error('Accessor GLTF no compatible');
+  var a=json.accessors[index];if(!a||a.bufferView==null||a.sparse)throw Error('Accessor GLTF no compatible');var v=json.bufferViews[a.bufferView];if(!v)throw Error('BufferView GLTF inválida');
   var bytes=buffers[v.buffer],count={SCALAR:1,VEC2:2,VEC3:3,VEC4:4}[a.type],size={5121:1,5123:2,5125:4,5126:4}[a.componentType];
   if(!bytes||!count||!size)throw Error('Tipo GLTF no compatible');
   var dv=new DataView(bytes),start=(v.byteOffset||0)+(a.byteOffset||0),stride=v.byteStride||count*size,out=[];
@@ -857,8 +858,9 @@ function cad3dParseGLTFDocument(json,buffers,name){
   if(prim.mode!=null&&prim.mode!==4)return;
   if(prim.attributes.POSITION==null)return;
   var position=access(prim.attributes.POSITION),indices=prim.indices==null?position.map((v,i)=>[i]):access(prim.indices);
-  var offset=verts.length;verts.push(...position);
-  for(var i=0;i+2<indices.length;i+=3)faces.push([offset+indices[i][0],offset+indices[i+1][0],offset+indices[i+2][0]]);
+  if(verts.length+position.length>400000)throw Error('Modelo GLTF demasiado grande');
+  var offset=verts.length;for(var pi=0;pi<position.length;pi++)verts.push(position[pi]);
+  for(var i=0;i+2<indices.length;i+=3){if(faces.length>=120000)throw Error('GLTF demasiado grande');faces.push([offset+indices[i][0],offset+indices[i+1][0],offset+indices[i+2][0]]);}
  });});
  // glTF uses Y-up; CAD3D uses Z-up.
  verts=verts.map(v=>[v[0],-v[2],v[1]]);
@@ -907,8 +909,10 @@ function cad3dImportOBJ(content,fileName){
   }
  });
  if(!tris.length)throw Error('El archivo OBJ no contiene caras válidas');
+ if(tris.length>360000)throw Error('OBJ supera el límite de 120.000 triángulos');
  var bounds=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
  tris.forEach(function(i){var v=verts[i];for(var a=0;a<3;a++){bounds[a]=Math.min(bounds[a],v[a]);max[a]=Math.max(max[a],v[a]);}});
+ if(!bounds.every(Number.isFinite)||!max.every(Number.isFinite))throw Error('OBJ contiene coordenadas inválidas');
  var size=max.map(function(n,i){return Math.max(.001,n-bounds[i]);});
  // OBJ models from SketchUp normally use Z as vertical axis. Local coordinates are Z-up.
  var normalized=tris.map(function(i){var v=verts[i];return [(v[0]-(max[0]+bounds[0])/2)/size[0],(v[1]-(max[1]+bounds[1])/2)/size[1],(v[2]-bounds[2])/size[2]];}).flat();
@@ -929,10 +933,10 @@ function buildCAD3DBlock(record,group){
  var def=CAD3D_COMPONENTS[record.blockId];if(!def)return;
  var sx=record.w/def.w,sy=record.d/def.d,sz=record.h/def.h;
  if(def.cutout){
-  var material=new T.MeshBasicMaterial({map:cad3dCutoutTexture(def.cutout,record.blockId),transparent:true,alphaTest:.05,depthWrite:false,side:T.DoubleSide});
   [0,Math.PI/2].forEach(function(angle){
+   var material=new T.MeshBasicMaterial({map:cad3dCutoutTexture(def.cutout,record.blockId),transparent:true,alphaTest:.05,depthWrite:false,side:T.DoubleSide});
    var mesh=new T.Mesh(new T.PlaneGeometry(record.w,record.h),material);
-   mesh.rotation.set(Math.PI/2,0,angle);mesh.position.z=record.h/2;mesh.userData.owner=record.id;
+   mesh.rotation.set(0,angle,0);mesh.position.z=record.h/2;mesh.userData.owner=record.id;
    mesh.castShadow=true;group.add(mesh);
   });return;
  }
@@ -2541,7 +2545,11 @@ function buildObject(r){
  return group;
 }
 function disposeMeshes(group){
- group.traverse(function(o){if(o.isMesh||o.userData?.cadSketch){o.geometry.dispose();o.material.dispose();}});
+ group.traverse(function(o){if(o.isMesh||o.userData?.cadSketch){
+  if(o.geometry)o.geometry.dispose();
+  var materials=Array.isArray(o.material)?o.material:[o.material];
+  materials.forEach(function(m){if(!m)return;if(m.map&&m.map.isCanvasTexture)m.map.dispose();m.dispose();});
+ }});
 }
 function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
