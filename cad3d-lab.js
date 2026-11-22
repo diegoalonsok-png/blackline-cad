@@ -828,6 +828,15 @@ function build(){
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
+ root.querySelector('#cad3dCommand').addEventListener('keydown',function(ev){
+  // Immediate view shortcuts even with the Command field focused.
+  // Do not intercept numeric dimensions or modifier combinations.
+  if(ev.isComposing||ev.ctrlKey||ev.metaKey||ev.altKey||ev.repeat)return;
+  var key=ev.key.toUpperCase();
+  if(this.value.trim()===''&&['T','L','R','B','Z'].includes(key)){
+   ev.preventDefault();ev.stopPropagation();cad3dViewAlias(key);
+  }
+ });
  root.querySelector('#cad3dCommand').addEventListener('input',function(){
   var value=this.value.trim().toUpperCase();
   if(['T','L','R','B','Z','TOP','LEFT','RIGHT','BACK','ZOOM'].includes(value)){
