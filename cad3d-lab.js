@@ -556,6 +556,7 @@ function build(){
  '<div class="resizeGrip" data-resize="xy" title="Arrastrar la esquina para ajustar ancho y alto"></div>'+
  '<input type="file" class="fileInput" accept=".3djson,.json" hidden><input type="file" class="cadInput" accept=".dwg,.dxf" hidden>';
  (document.getElementById('cad3dOpen')?.closest('.app')||document.body).appendChild(root);
+ window.BlacklineCAD3DViewCube?.mount(root,{setPreset:setViewPreset,rotate:rotateViewCube});
  root.querySelector('[data-close]').addEventListener('click',close);
  var viewSelect=root.querySelector('.cad3dViewSelect');
  viewSelect.innerHTML='<option value="orbit" hidden>Órbita libre</option>'+
@@ -1928,11 +1929,22 @@ function bindOrbitBall(ball){
   e.preventDefault();e.stopPropagation();orbitCameraBy(...vectors[e.key]);
  });
 }
+function rotateViewCube(step){
+ if(!Number.isFinite(step)||!step)return;
+ if(activeView==='top'||activeView==='bottom'){setViewPreset(step>0?'se':'sw');return;}
+ orbit.az+=Math.sign(step)*Math.PI/2;
+ if(orbit.az>Math.PI)orbit.az-=2*Math.PI;
+ if(orbit.az<-Math.PI)orbit.az+=2*Math.PI;
+ if(viewMode==='walk')viewMode='perspective';
+ activeView='orbit';syncViewControls();applyViewCamera();
+ text('Cubo de vistas: giro de 90° · geometría conservada');
+}
 function syncViewControls(){
  root.querySelector('.cad3dViewSelect').value=activeView;
  root.querySelectorAll('[data-view-preset]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.viewPreset===activeView));
  });
+ window.BlacklineCAD3DViewCube?.sync(root,{az:orbit.az,activeView:activeView});
 }
 function setViewPreset(key){
  var v=viewPresets.find(function(p){return p[0]===key;});
