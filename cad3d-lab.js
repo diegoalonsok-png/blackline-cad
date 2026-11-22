@@ -1162,11 +1162,31 @@ function showObjectContextMenu(e){
  menu.style.left=Math.min(Math.max(4,e.clientX-rect.left),maxX)+'px';
  menu.style.top=Math.min(Math.max(4,e.clientY-rect.top),maxY)+'px';
 }
+/* Existing apertures can be selected while the Door/Window insertion tool
+   remains armed, without accidentally creating another opening on top. */
+function cadHitExistingOpeningAt(e){
+ if(!renderer||!modelRoot||!raycaster||!camera)return false;
+ rayAt(e);
+ var hits=[];
+ modelRoot.traverse(function(o){if(o.isMesh)hits.push(o);});
+ var candidates=raycaster.intersectObjects(hits,false).filter(function(i){
+  return records.some(function(r){return r.id===i.object.userData.owner&&editableRecord(r);});
+ });
+ var front=candidates[0];if(!front)return false;
+ return candidates.some(function(i){
+  if(i.object.userData.openingId==null||i.object.userData.owner!==front.object.userData.owner)return false;
+  var host=records.find(function(r){return r.id===front.object.userData.owner;});
+  return i.distance<=front.distance+Math.max(.12,Math.min(.7,(host?.d||.2)*2+.2));
+ });
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
   e.preventDefault();
-  if(!dragging&&!placing){selectAt(e);showObjectContextMenu(e);}
+  if(!dragging){
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e))setPlacement(null);
+   if(!placing){selectAt(e);showObjectContextMenu(e);}
+  }
  });
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
@@ -1196,8 +1216,16 @@ function bindCanvas(el){
   if(!dragging||dragging.id!==e.pointerId)return;
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;
-  if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
-  if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
+  if(click&&e.button===0){
+   hideObjectContextMenu();
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e)){
+    setPlacement(null);selectAt(e);
+   }else if(placing)placeAt(e);else selectAt(e);
+  }
+  if(click&&e.button===2){
+   if(placing&&['door','window','opening'].includes(placing)&&cadHitExistingOpeningAt(e))setPlacement(null);
+   if(!placing){selectAt(e);showObjectContextMenu(e);}
+  }
   if(draftModes.dyn)updateDynamicReadout(e);
  });
  el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId)dragging=null;});
@@ -1453,7 +1481,7 @@ function architectureParts(r,part){
    var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
    var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame),moving=cadOpeningActive(opening);
    // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   if(!moving)carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
+   if(!moving)carpPart(panelW,depth,panelH,x,0,z,leafColor,0,glazed);
    carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
    if(!moving&&(doubleDoor||sliding)){
     carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
