@@ -19,9 +19,8 @@ test('Seven Croquis presets are registered with selectable labels',()=>{
  assert.equal(c.isCad3DSketch('shaded'),false);
 });
 test('Visual Style toolbar exposes all seven selectable Croquis buttons',()=>{
- const from=source.indexOf('data-render-style="'+ "'+st[0]+'" +'"');
- assert(from>=0);
- const toolbar=source.slice(source.indexOf("'Visual styles"),source.indexOf("tool('shot'"));
+ const toolbar=source.slice(source.indexOf("[['wire2d'"),source.indexOf("tool('shot'"));
+ assert(toolbar.includes('data-render-style'), 'style button renderer missing');
  for(const name of ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint']){
   assert(toolbar.includes("['"+name+"'"),name+' missing from toolbar');
  }
