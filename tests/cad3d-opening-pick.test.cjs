@@ -51,3 +51,55 @@ test('Direct opening Properties shows dimensions and not wall dimensions',()=>{
  assert.match(panel.innerHTML,/data-back-wall/);
  assert.doesNotMatch(panel.innerHTML,/data-key="w"/);
 });
+
+test('Picking a window through its front wall face focuses window Properties',()=>{
+ const code=extract('function selectAt(e){','function boxGeom(');
+ const wallMesh={isMesh:true,userData:{owner:10}};
+ const windowMesh={isMesh:true,userData:{owner:10,openingId:42}};
+ const host={id:10,type:'wall',d:.2,openings:[{id:42,kind:'window'}]};
+ const ctx={
+  fallbackCanvas:null,activeView:'perspective',viewMode:'perspective',selected:[],selectedOpeningId:null,
+  records:[host],renderer:{domElement:{getBoundingClientRect:()=>({left:0,top:0,width:200,height:200})}},
+  T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},
+  modelRoot:{traverse(fn){fn(wallMesh);fn(windowMesh)}},
+  raycaster:{setFromCamera(){},intersectObjects(){return [{object:wallMesh,distance:3},{object:windowMesh,distance:3.15}]}},
+  camera:{},editableRecord:()=>true,renderProps(){},highlight(){},text(){}
+ };
+ vm.runInNewContext(code,ctx);
+ ctx.selectAt({clientX:100,clientY:100,shiftKey:false});
+ assert.equal(ctx.selectedOpeningId,42);
+ assert.deepEqual(Array.from(ctx.selected),[10]);
+});
+test('Picking never selects a window behind a different foreground wall',()=>{
+ const code=extract('function selectAt(e){','function boxGeom(');
+ const foreground={isMesh:true,userData:{owner:1}};
+ const backWindow={isMesh:true,userData:{owner:2,openingId:42}};
+ const ctx={
+  fallbackCanvas:null,activeView:'perspective',viewMode:'perspective',
+  selected:[],selectedOpeningId:null,records:[{id:1,type:'wall',d:.2},{id:2,type:'wall',d:.2,openings:[{id:42,kind:'window'}]}],
+  renderer:{domElement:{getBoundingClientRect:()=>({left:0,top:0,width:200,height:200})}},
+  T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},
+  modelRoot:{traverse(fn){fn(foreground);fn(backWindow)}},
+  raycaster:{setFromCamera(){},intersectObjects(){return [{object:foreground,distance:2},{object:backWindow,distance:4}]}},
+  camera:{},editableRecord:()=>true,renderProps(){},highlight(){},text(){}
+ };
+ vm.runInNewContext(code,ctx);
+ ctx.selectAt({clientX:100,clientY:100,shiftKey:false});
+ assert.equal(ctx.selectedOpeningId,null);
+ assert.deepEqual(Array.from(ctx.selected),[1]);
+});
+test('Focused window Properties includes model, width, height and sill',()=>{
+ const code=extract('function renderProps(){','function change(e){');
+ const panel={innerHTML:''};
+ const host={id:12,type:'wall',layerId:'0',openings:[{id:41,kind:'window',styleId:'sliding-window',offset:0,w:1.6,h:1.2,sill:.85}]};
+ const ctx={root:{querySelector(){return panel}},selected:[12],selectedOpeningId:41,records:[host],
+ ARCH_STYLES:{window:[{id:'sliding-window',name:'Sliding'},{id:'fixed',name:'Fixed'}],opening:[]},
+ escapeHtml:v=>String(v),openingMotionType:()=> 'sliding',openingIsGlass:()=>true,
+ glazingOpacity:()=>.24,clamp:(n,a,b)=>Math.max(a,Math.min(n,b)),finite:(n,d)=>Number.isFinite(Number(n))?Number(n):d};
+ vm.runInNewContext(code,ctx);ctx.renderProps();
+ assert.match(panel.innerHTML,/WINDOW #41/);
+ assert.match(panel.innerHTML,/data-opening-style="41"/);
+ assert.match(panel.innerHTML,/data-opening="41" data-attr="w"/);
+ assert.match(panel.innerHTML,/data-opening="41" data-attr="h"/);
+ assert.match(panel.innerHTML,/data-opening="41" data-attr="sill"/);
+});
