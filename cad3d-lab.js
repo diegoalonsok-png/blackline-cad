@@ -1395,7 +1395,15 @@ function bindCanvas(el){
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
   e.preventDefault();el.focus({preventScroll:true});
-  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho'&&!placing);
+  // Drawing takes precedence over navigation. Commit a point at pointerdown,
+  // so a slight mouse movement or a lost pointerup cannot pan/orbit instead.
+  // Alt+left, middle and right buttons remain available for navigation.
+  if(e.button===0&&placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+   hideObjectContextMenu();
+   placeAt(e);
+   return;
+  }
+  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho');
   dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan};
   el.dataset.navigationDrag='false';
   el.setPointerCapture(e.pointerId);
