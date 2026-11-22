@@ -135,6 +135,8 @@ css.textContent=`
 #arqPanel .arq-chips{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0}
 #arqPanel .arq-chips button,#arqModal .arq-chips button{font-size:10px;padding:3px 7px;border-radius:10px}
 #arqPanel .arq-chips button[aria-pressed=true],#arqModal .arq-chips button[aria-pressed=true]{background:#385263;border-color:#91bfd5}
+#arqModal .arq-chips .bls-premium-tab{border-color:#ad843d;color:#f2d38f;font-weight:700}
+#arqModal .arq-chips .bls-premium-tab[aria-pressed=true]{background:#3a3122;border-color:#e2b65d;color:#fff1cf}
 #arqPanel .arq-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:340px;overflow-y:auto}
 .arq-card{color:#dce9f2;position:relative;padding:4px!important;min-width:0;white-space:normal!important;text-align:left;display:flex!important;flex-direction:column;gap:2px;height:auto!important}
 .arq-card .arq-name{font-size:10px;line-height:1.25;color:#e5eef7}
@@ -188,8 +190,11 @@ function makeCard(item,height){
 }
 function chips(container,onPick){
  container.replaceChildren();
- for(const cat of ['Todos',...LIB.categories]){
-  const b=document.createElement('button');b.type='button';b.className='btn slim';b.textContent=cat;
+ const categories=['Todos',...(LIB.categories.includes('Blackline Select')?['Blackline Select']:[]),...LIB.categories.filter(c=>c!=='Blackline Select')];
+ for(const cat of categories){
+  const b=document.createElement('button');b.type='button';b.className='btn slim';
+  if(cat==='Blackline Select'){b.classList.add('bls-premium-tab');b.textContent='BLACKLINE SELECT · PRO'}
+  else b.textContent=cat;
   b.setAttribute('aria-pressed',String(cat===activeCat));
   b.onclick=()=>{activeCat=cat;onPick()};container.append(b);
  }
@@ -198,7 +203,7 @@ window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';rende
 function renderPanel(){
  const grid=$('arqPanelGrid');if(!grid)return;
  const sel=$('arqPanelCat');
- if(!sel.options.length){for(const cat of ['Todos',...LIB.categories]){const o=document.createElement('option');o.value=cat;o.textContent=cat+' ('+(cat==='Todos'?LIB.library.length:LIB.library.filter(x=>x.cat===cat).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
+ if(!sel.options.length){for(const cat of ['Todos',...(LIB.categories.includes('Blackline Select')?['Blackline Select']:[]),...LIB.categories.filter(c=>c!=='Blackline Select')]){const o=document.createElement('option');o.value=cat;o.textContent=(cat==='Blackline Select'?'BLACKLINE SELECT · PRO':cat)+' ('+(cat==='Todos'?LIB.library.length:LIB.library.filter(x=>x.cat===cat).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
  sel.value=activeCat;
  grid.replaceChildren(...cardsFor(activeCat,query).map(x=>makeCard(x,74)));
 }
