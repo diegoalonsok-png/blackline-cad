@@ -32,3 +32,11 @@
 - Confirmar que las opciones artísticas heredadas no se seleccionan y que los modos técnicos siguen funcionando.
 - Probar puertas, ventanas, edición de parámetros, sombras, guardado, apertura y DXF/OBJ.
 - En la siguiente fase, comparar capturas con las referencias de croquis sobre la misma cámara y geometría, sin aprobar estilos que solo cambien color.
+
+## Prototipo incorporado a la rama (2026-11-22)
+
+- `cad3d-artistic-snapshot.js`: motor independiente de croquis basado en píxeles (Sobel, tinta, rayado de prueba).
+- `cad3d-lab.js`: botón `Ink Preview PNG` que carga el motor bajo demanda y descarga una imagen; no modifica `records`, `modelRoot` ni materiales de CAD.
+- Este experimento no sustituye todavía el motor NPR geométrico ni crea escenas ilustradas comparables a las referencias. Falta validación real en navegador.
+- Los modos `engraving` y `redblue` del prototipo están codificados pero no expuestos todavía en la UI para evitar presentar resultados no verificados como estilos acabados.
+- Conservar el feature flag de los 30 estilos anteriores hasta que el motor nuevo supere la comparación visual lado a lado.
