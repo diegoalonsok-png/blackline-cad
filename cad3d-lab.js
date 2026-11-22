@@ -56,6 +56,30 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+/* Dockable/floating CAD3D toolbars. The canvas and commands remain untouched. */
+#cad3dLab .cad3dToolbarGrip{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 22px!important;width:22px!important;min-width:22px!important;max-width:22px!important;height:28px!important;min-height:28px!important;margin:0 3px 0 0!important;padding:0!important;border:1px solid #557080!important;border-radius:5px!important;background:#253b49!important;color:#b8d2df!important;cursor:grab!important;touch-action:none;user-select:none}
+#cad3dLab .cad3dToolbarGrip:active{cursor:grabbing!important}
+#cad3dLab .cad3dToolbarGrip:focus-visible{outline:2px solid #a2d8ed}
+#cad3dLab .cad3dToolbarGrip svg{width:15px!important;height:15px!important;flex:none!important}
+#cad3dLab .cad3dBar{gap:4px}
+#cad3dLab .cad3dBar.cad3dDockFloating,
+#cad3dLab .cad3dProfileTools.cad3dDockFloating,
+#cad3dLab .cad3dModelTools.cad3dDockFloating,
+#cad3dLab .tools.cad3dDockFloating{
+ position:absolute!important;z-index:125!important;left:0;top:0;display:flex!important;
+ flex-wrap:nowrap!important;align-items:center!important;gap:5px!important;
+ width:max-content!important;max-width:calc(100% - 12px)!important;
+ min-height:42px!important;padding:5px 8px!important;margin:0!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ border:1px solid #7ea6ba!important;border-radius:8px!important;
+ background:#192c39!important;box-shadow:0 12px 30px #000a!important;
+ transform:translate3d(0,0,0);pointer-events:auto;
+}
+#cad3dLab .cad3dBar.cad3dDockFloating .btn{padding:5px 7px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:28px;font-size:11px}
+#cad3dLab .cad3dBar.cad3dDockFloating .btn svg{width:16px;height:16px;flex:none}
+#cad3dLab .cad3dDockFloating .cad3dToolbarGrip{position:sticky;left:0;z-index:2}
+#cad3dLab .cad3dToolbarGrip[data-floating="true"]{background:#34556b!important;color:white!important}
+
 #cad3dLab .block3DMenu{position:relative;flex:none}
 #cad3dLab .block3DMenu>summary{list-style:none}
 #cad3dLab .block3DMenu>summary::-webkit-details-marker{display:none}
@@ -1130,6 +1154,108 @@ function cad3dBuildProfile(r,group){
  }
 }
 
+
+/* CAD3D_TOOLBARS_DOCKABLE_V1
+ * Each group can float above the viewport; a double-click restores its original slot.
+ * Positions persist in this browser without touching drawings or keyboard shortcuts.
+ */
+var cad3dToolbarLayout=null;
+function cad3dEnableMovableToolbars(){
+ const specs=[['draw','.cad3dBasicBars .cad3dBar[aria-label="Draw"]'],
+  ['modify','.cad3dBasicBars .cad3dBar[aria-label="Modify"]'],
+  ['draw2d','.cad3dProfileTools'],['model3d','.cad3dModelTools'],['options','.tools']];
+ const key='blackline-cad3d-toolbars-v1';
+ let saved={};
+ try{const data=JSON.parse(localStorage.getItem(key)||'{}');if(data&&typeof data==='object')saved=data;}catch(_e){}
+ const persist=()=>{
+  const data={};for(const state of states){
+   if(state.floating)data[state.id]={x:state.x,y:state.y};
+  }
+  try{localStorage.setItem(key,JSON.stringify(data));}catch(_e){}
+ };
+ const states=[];
+ const clampPosition=(bar,x,y)=>{
+  const maxX=Math.max(0,root.clientWidth-Math.min(bar.scrollWidth,bar.offsetWidth||bar.scrollWidth)-8);
+  const maxY=Math.max(38,root.clientHeight-bar.offsetHeight-55);
+  return {x:Math.round(clamp(x,4,maxX)),y:Math.round(clamp(y,38,maxY))};
+ };
+ const position=(state,x,y)=>{
+  const p=clampPosition(state.el,x,y);
+  state.x=p.x;state.y=p.y;state.el.style.left=p.x+'px';state.el.style.top=p.y+'px';
+ };
+ const float=(state,x,y)=>{
+  if(!state.floating){
+   state.el.classList.add('cad3dDockFloating');
+   root.appendChild(state.el);
+   state.floating=true;
+   state.grip.dataset.floating='true';
+   state.grip.title='Mover barra flotante · doble clic para acoplar';
+  }
+  position(state,x,y);
+ };
+ const dock=(state)=>{
+  if(!state.floating)return;
+  state.el.classList.remove('cad3dDockFloating');
+  state.el.style.removeProperty('left');state.el.style.removeProperty('top');
+  if(state.marker.parentNode)state.marker.parentNode.insertBefore(state.el,state.marker);
+  state.floating=false;state.grip.dataset.floating='false';
+  state.grip.title='Arrastrar barra · doble clic para acoplar';
+  persist();
+ };
+ for(const [id,selector] of specs){
+  const el=root.querySelector(selector);
+  if(!el)continue;
+  const marker=document.createComment('cad3d-toolbar:'+id);
+  el.parentNode.insertBefore(marker,el);
+  const grip=document.createElement('button');
+  grip.type='button';grip.className='cad3dToolbarGrip';grip.dataset.cad3dToolbar=id;
+  grip.setAttribute('aria-label','Mover barra '+id+' · doble clic para acoplar');
+  grip.title='Arrastrar barra · doble clic para acoplar';
+  grip.innerHTML='<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="5" cy="3" r="1.2"/><circle cx="11" cy="3" r="1.2"/><circle cx="5" cy="8" r="1.2"/><circle cx="11" cy="8" r="1.2"/><circle cx="5" cy="13" r="1.2"/><circle cx="11" cy="13" r="1.2"/></svg>';
+  el.insertBefore(grip,el.firstChild);
+  const state={id,el,marker,grip,floating:false,x:0,y:0};states.push(state);
+  grip.addEventListener('dblclick',function(e){e.preventDefault();e.stopPropagation();dock(state);});
+  let drag=null;
+  grip.addEventListener('pointerdown',function(e){
+   if(e.button!==0||drag)return;
+   e.preventDefault();e.stopPropagation();
+   const bounds=el.getBoundingClientRect(),host=root.getBoundingClientRect();
+   drag={pointer:e.pointerId,startX:e.clientX,startY:e.clientY,
+    x:state.floating?state.x:bounds.left-host.left,
+    y:state.floating?state.y:bounds.top-host.top,moved:false};
+   grip.setPointerCapture(e.pointerId);
+  });
+  grip.addEventListener('pointermove',function(e){
+   if(!drag||e.pointerId!==drag.pointer)return;
+   const dx=e.clientX-drag.startX,dy=e.clientY-drag.startY;
+   if(!drag.moved&&Math.hypot(dx,dy)<5)return;
+   if(!drag.moved){drag.moved=true;float(state,drag.x,drag.y);}
+   position(state,drag.x+dx,drag.y+dy);
+  });
+  function finish(e){
+   if(!drag||e.pointerId!==drag.pointer)return;
+   if(drag.moved){
+    // Releasing over the original dock strip snaps the bar back into place.
+    const dockRect=state.marker.parentNode.getBoundingClientRect();
+    if(e.clientX>=dockRect.left&&e.clientX<=dockRect.right&&
+       e.clientY>=dockRect.top&&e.clientY<=dockRect.bottom&&dockRect.height>=18) dock(state);
+    persist();
+   }
+   drag=null;
+  }
+  grip.addEventListener('pointerup',finish);
+  grip.addEventListener('pointercancel',function(e){finish(e);});
+  grip.addEventListener('lostpointercapture',function(){if(drag){drag=null;persist();}});
+  const previous=saved[id];
+  if(previous&&Number.isFinite(previous.x)&&Number.isFinite(previous.y))float(state,previous.x,previous.y);
+ }
+ root.addEventListener('click',function(e){
+  if(e.target.closest('.cad3dToolbarGrip'))e.stopPropagation();
+ },true);
+ return {reset(){states.forEach(dock);persist();},relayout(){
+  states.filter(x=>x.floating).forEach(x=>position(x,x.x,x.y));
+ }};
+}
 function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
@@ -1287,11 +1413,12 @@ function build(){
  root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
  root.querySelector('.sideGrip').addEventListener('pointerdown',beginSideResize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
+ cad3dToolbarLayout=cad3dEnableMovableToolbars();
  root.querySelector('.resizeGrip').addEventListener('pointerdown',beginResize);
  root.querySelector('.edgeResizeR').addEventListener('pointerdown',beginResize);
  root.querySelector('.edgeResizeB').addEventListener('pointerdown',beginResize);
  root.addEventListener('click',function(e){
-  var button=e.target.closest('.tools [data-action], .cad3dBasicBars [data-action]'), menu=e.target.closest('.ioMenu');
+  var button=e.target.closest('.tools [data-action], .cad3dBar [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
@@ -1586,7 +1713,7 @@ function setPlacement(which){
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
  if(!root)return;
- root.querySelectorAll('.cad3dBasicBars button,.cad3dProfileTools button').forEach(function(b){
+ root.querySelectorAll('.cad3dBar button[data-action],.cad3dProfileTools button[data-action]').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
