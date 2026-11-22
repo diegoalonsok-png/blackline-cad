@@ -55,3 +55,32 @@ test('Escape cancels destination-wall picking',()=>{
  assert(source.includes("if(openingTransfer){ev.preventDefault();ev.stopImmediatePropagation();openingTransfer=null"));
  assert(source.includes("if(click&&e.button===0){if(openingTransfer)finishOpeningTransfer(e)"));
 });
+
+
+test('Numeric MOVE, SCALE and COPY on a selected window never move the host wall',()=>{
+ const code=extract('function openingFitsHost(','function placeOpening(e){')+
+  extract('function cad3dSelectionTransform(','function run3DCommand(){');
+ function run(command,values){
+  const wall={id:1,type:'wall',x:2,y:3,z:0,rot:0,w:5,h:3,d:.2,layerId:'0',
+   openings:[{id:10,kind:'window',offset:0,sill:1,w:1,h:1}]};
+  const ctx={records:[wall],selected:[1],selectedOpeningId:10,serial:50,
+   editableRecord:()=>true,clamp:(n,a,b)=>Math.max(a,Math.min(n,b)),
+   redraw(){},renderProps(){},text(){}};
+  vm.runInNewContext(code,ctx);
+  ctx.cad3dSelectionTransform(command,values);
+  return {wall,ctx};
+ }
+ const move=run('move',[1,0,0]);
+ assert.equal(move.wall.x,2);assert.equal(move.wall.openings[0].offset,1);
+ const scale=run('scale',[1.5]);
+ assert.equal(scale.wall.w,5);assert.equal(scale.wall.openings[0].w,1.5);
+ const copy=run('copy',[2,0,0]);
+ assert.equal(copy.wall.openings.length,2);assert.equal(copy.wall.x,2);
+ assert.equal(copy.wall.openings[1].offset,2);assert.notEqual(copy.wall.openings[0].id,copy.wall.openings[1].id);
+ const collision=run('copy',[.15,0,0]);
+ assert.equal(collision.wall.openings.length,1);
+});
+test('Measurement and MOVEOPENING commands are available in 3D',()=>{
+ assert(source.includes("MEDIR:'dist',MEASURE:'dist'"));
+ assert(source.includes("if(command==='moveopening'){action('move');return;}"));
+});
