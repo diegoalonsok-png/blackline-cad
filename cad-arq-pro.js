@@ -51,7 +51,10 @@ function ensureLayer(){
 function defName(item,W,D){return 'ARQ · '+item.name+' · '+cm(W)+'×'+cm(D)}
 function ensureDefinition(item,W,D){
  const built=LIB.build(item.id,W,D),k=f(),st=S();
- const name=defName(item,built.w,built.d);
+ const oldName=defName(item,built.w,built.d);
+ // Preserve old colored definitions used by existing drawings. New insertions
+ // receive a separate white/0 definition instead of silently mutating history.
+ const name=st.blocks[oldName]&&!st.blocks[oldName].libraryLayer0?oldName+' · Layer 0':oldName;
  if(!st.blocks[name]){
   const ents=built.entities.map(e=>scaleEntity(e,k));
   for(const e of ents){e.layer='0';e.color='#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
