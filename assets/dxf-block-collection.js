@@ -17,7 +17,39 @@ const categories = [
  [/^ca_pers|persona/i,"Personas"],
  [/^ca_norte|norte/i,"Orientación y símbolos"]
 ];
-const categoryFor = name => categories.find(([re]) => re.test(name))?.[1] || "Otros";
+const categoryFor = name => {
+ const n=String(name).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ if(/camion|truck|volquete|cisterna|tractor/.test(n))return "Camiones";
+ if(/colectivo|bus|omnibus|autobus/.test(n))return "Colectivos";
+ if(/auto|vehicul|coche|carro|sedan|suv/.test(n))return "Automóviles";
+ if(/arbol|tree|palmera|pino|arbusto/.test(n))return "Árboles";
+ if(/ventana|window/.test(n))return "Ventanas";
+ if(/puerta|door/.test(n))return "Puertas";
+ if(/cocina|kitchen/.test(n))return "Cocinas";
+ if(/sanitario|inodoro|bidet|lavatorio|bañera|ducha/.test(n))return "Sanitarios";
+ if(/persona|people|human/.test(n))return "Personas";
+ if(/mesa|sillon|sofa|silla|cama|armario|mueble/.test(n))return "Mobiliario";
+ return categories.find(([re]) => re.test(name))?.[1] || "Otros";
+};
+function labelCategory(c){return ({Automóviles:"Auto",Camiones:"Camión",Colectivos:"Colectivo",Árboles:"Árbol",Puertas:"Puerta",Ventanas:"Ventana",Cocinas:"Cocina",Sanitarios:"Sanitario",Personas:"Persona",Mobiliario:"Mobiliario"})[c]||"Bloque"}
+function fingerprint(b){
+ // Conservative exact-match fingerprint: only eliminates byte-equivalent DXF geometry, not similar silhouettes.
+ return JSON.stringify(b.items.map(e=>[e.type,Object.keys(e.g).sort().filter(k=>!["5","8","62","330","100"].includes(k)).map(k=>[k,e.g[k]]),e.vertices]));
+}
+function organizeBlocks(parsed){
+ const seen=new Set(),numbers=new Map(),unique=new Map();let duplicates=0;
+ for(const b of parsed.blocks.values()){
+  if(!b.items.length)continue;
+  const hash=fingerprint(b);
+  if(seen.has(hash)){duplicates++;continue}
+  seen.add(hash);
+  const cat=categoryFor(b.name),i=(numbers.get(cat)||0)+1;numbers.set(cat,i);
+  b.displayName=labelCategory(cat)+" "+i;b.category=cat;
+  unique.set(b.name,b);
+ }
+ // Keep raw lookup intact: nested INSERT references may refer to blocks omitted from the visible catalog.
+ parsed.visible=[...unique.values()];parsed.duplicates=duplicates;return parsed;
+}
 let collection = null, selectedCategory = "", searchText = "", shown = 60;
 function parseFloatOr(v,fallback=0){const n=Number(v);return Number.isFinite(n)?n:fallback}
 function parsePairsFromFile(file,onGroup,onProgress){
@@ -110,10 +142,10 @@ function categoryPanel(){
  area.innerHTML='<label style="display:block;font-weight:600;margin-bottom:6px">Colecciones DXF · bloques originales</label><input type="file" id="blDxfLibraryFile" accept=".dxf" style="width:100%;font-size:11px"><p id="blDxfLibraryStatus" style="font-size:11px;line-height:1.5">Seleccioná tu archivo DXF para catalogar los bloques sin alterar el dibujo.</p><input type="search" id="blDxfBlockSearch" placeholder="Buscar nombre de bloque" aria-label="Buscar bloques DXF" style="width:100%;min-width:0;margin:5px 0" disabled><div id="blDxfCategories" style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0"></div><div id="blDxfCards" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;max-height:320px;overflow:auto"></div><button type="button" id="blDxfMore" class="btn slim" hidden>Mostrar más bloques</button>';
  parent.append(area);
  const input=$("blDxfLibraryFile"),status=$("blDxfLibraryStatus"),cats=$("blDxfCategories"),cards=$("blDxfCards"),search=$("blDxfBlockSearch"),more=$("blDxfMore");
- const all=()=>collection?[...collection.blocks.values()].filter(b=>(selectedCategory==="Todas"||categoryFor(b.name)===selectedCategory)&&b.name.toLocaleLowerCase().includes(searchText)):[];
+ const all=()=>collection?collection.visible.filter(b=>(selectedCategory==="Todas"||b.category===selectedCategory)&&(b.displayName+" "+b.name).toLocaleLowerCase().includes(searchText)):[];
  function render(){
   if(!collection)return;cats.replaceChildren();cards.replaceChildren();
-  const numbers=new Map([["Todas",collection.blocks.size]]);for(const b of collection.blocks.values()){const c=categoryFor(b.name);numbers.set(c,(numbers.get(c)||0)+1)}
+  const numbers=new Map([["Todas",collection.visible.length]]);for(const b of collection.visible){const c=b.category;numbers.set(c,(numbers.get(c)||0)+1)}
   for(const [c,count] of numbers){
    const btn=document.createElement("button");btn.type="button";btn.className="btn slim";btn.textContent=c+" ("+count+")";btn.style.cssText="font-size:10px;white-space:normal";
    if(c===selectedCategory)btn.setAttribute("aria-pressed","true");
@@ -123,8 +155,8 @@ function categoryPanel(){
    const card=document.createElement("div");card.className="bl-dxf-block-card";
    card.style.cssText="min-width:0;border:1px solid #3e5260;border-radius:5px;padding:5px;display:flex;flex-direction:column;gap:5px";
    card.append(blockPreview(b));
-   const label=document.createElement("div");label.textContent=b.name;label.title=b.name;label.style.cssText="font-size:11px;overflow-wrap:anywhere";card.append(label);
-   const key="OLIMPIADAS · "+b.name,existing=Boolean(cad()?.hasBlock(key));
+   const label=document.createElement("div");label.textContent=b.displayName;label.title="Original: "+b.name;label.style.cssText="font-size:11px;overflow-wrap:anywhere";card.append(label);
+   const key="OLIMPIADAS · "+b.displayName,existing=Boolean(cad()?.hasBlock(key));
    const btn=document.createElement("button");btn.type="button";btn.className="btn slim";
    btn.textContent=existing?"Ya está en la paleta":"Añadir a paleta";
    btn.disabled=existing;btn.onclick=()=>addToPalette(b,btn);
@@ -174,7 +206,7 @@ function categoryPanel(){
   flatten(b,{x:-b.baseX,y:-b.baseY,a:1,b:0,c:0,d:1},0);
   if(!output.length){status.textContent="El bloque "+b.name+" no contiene geometría 2D compatible; no se modificó el dibujo.";return}
   for(const e of output){for(const key of ["a","b","c"]){if(e[key]?.x!==undefined){e[key].x*=factor;e[key].y*=factor}}if(e.pts)e.pts.forEach(p=>{p.x*=factor;p.y*=factor});if(e.r)e.r*=factor;if(e.rx)e.rx*=factor;if(e.ry)e.ry*=factor}
-  const key="OLIMPIADAS · "+b.name;
+  const key="OLIMPIADAS · "+b.displayName;
   try{
    if(api.hasBlock(key)){status.textContent="Este bloque ya se encuentra en la paleta: "+b.name;return}
    const count=api.addBlock(key,output);
@@ -187,9 +219,9 @@ function categoryPanel(){
   const file=input.files?.[0];if(!file)return;if(!/\.dxf$/i.test(file.name)){status.textContent="Seleccioná un archivo DXF ASCII.";return}
   input.disabled=true;status.textContent="Leyendo bloques del DXF…";try{
    const parsed=await readDXF(file,pct=>status.textContent="Organizando biblioteca: "+pct+" %");
-   collection=parsed;shown=60;searchText="";search.value="";search.disabled=false;
+   collection=organizeBlocks(parsed);shown=60;searchText="";search.value="";search.disabled=false;
    selectedCategory="Todas";
-   status.textContent=collection.blocks.size+" bloques nombrados encontrados en "+file.name+". Elegí una categoría y pulsá Añadir a paleta en los bloques que quieras conservar.";
+   status.textContent=collection.visible.length+" bloques únicos catalogados de "+collection.blocks.size+" definiciones en "+file.name+"; "+collection.duplicates+" duplicados exactos omitidos. Los originales siguen intactos. Elegí una categoría y pulsá Añadir a paleta.";
    render();
   }catch(e){status.textContent="Error al importar la biblioteca: "+e.message}finally{input.disabled=false}
  });
