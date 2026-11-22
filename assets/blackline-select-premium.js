@@ -108,7 +108,9 @@ function geometry(b,kind,W,D,n){
 }
 
 const known=new Set(LIB.library.map(x=>x.id));
-for(const item of items)if(!known.has(item.id)){LIB.library.push(item);known.add(item.id)}
+// Preserve previously inserted definitions for existing drawings, but remove the
+// repetitive 160-item draft from new gallery discovery. Review real authored DWGs separately.
+for(const item of items)if(!known.has(item.id)){item.hideFromGallery=true;item.reviewArchive=true;LIB.library.push(item);known.add(item.id)}
 if(!LIB.categories.includes(cats))LIB.categories.push(cats);
 window.CAD2D_BLACKLINE_SELECT=Object.freeze({label:cats,count:items.length,requiresPaidPlan:true});
 })();
