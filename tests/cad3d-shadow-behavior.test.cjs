@@ -61,7 +61,7 @@ test('Disabling Sun disables casting and receivers without deleting objects',()=
 test('Opaque CAD3D meshes cast shadows while glass meshes transmit sunlight',()=>{
  const code=extract('function addMesh(','/* Partition the wall elevation');
  const objects=[];
- const ctx={T:{MeshStandardMaterial:class{constructor(p){this.options=p}},Mesh:class{constructor(geometry,mat){this.geometry=geometry;this.material=mat;this.userData={};this.position={set(){}};objects.push(this);}},DoubleSide:2},sunSettings:{onFaces:true}};
+ const ctx={T:{MeshStandardMaterial:class{constructor(p){this.options=p}},Mesh:class{constructor(geometry,mat){this.geometry=geometry;this.material=mat;this.userData={};this.position={set(){}};objects.push(this);}},DoubleSide:2},sunSettings:{onFaces:true},clamp:(n,a,b)=>Math.max(a,Math.min(b,n)),finite:(x,d)=>Number.isFinite(Number(x))?Number(x):d};
  vm.runInNewContext(code,ctx);
  const parent={add(obj){this.object=obj;}};
  ctx.addMesh({isGeometry:true},0xffffff,4,parent);
