@@ -383,7 +383,17 @@ const ARCH_STYLES={
   {id:'service-door',name:'Service · 80 cm',w:.80,h:2.00,sill:0},
   {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0},
   {id:'triple-sliding-door',name:'Triple sliding · 360 cm',w:3.60,h:2.40,sill:0},
-  {id:'triple-fold-door',name:'Triple folding · 270 cm',w:2.70,h:2.20,sill:0}
+  {id:'triple-fold-door',name:'Triple folding · 270 cm',w:2.70,h:2.20,sill:0},
+  {id:'classic-panel-door',name:'Classic raised-panel door · 90 cm',w:.90,h:2.20,sill:0},
+  {id:'neoclassical-double-door',name:'Neoclassical double glazed · 180 cm',w:1.80,h:2.40,sill:0},
+  {id:'french-12-pane-door',name:'French door · 12-pane glazing',w:1.60,h:2.20,sill:0},
+  {id:'victorian-glazed-door',name:'Victorian glazed entrance',w:1.10,h:2.30,sill:0},
+  {id:'gothic-tracery-door',name:'Gothic tracery entrance',w:1.20,h:2.50,sill:0},
+  {id:'colonial-six-pane-door',name:'Colonial six-panel entrance',w:.95,h:2.20,sill:0},
+  {id:'modern-steel-glass-door',name:'Modern steel glazed door',w:1.10,h:2.30,sill:0},
+  {id:'art-deco-door',name:'Art Deco geometric door',w:1.00,h:2.25,sill:0},
+  {id:'barn-sliding-door',name:'Barn sliding door',w:1.10,h:2.20,sill:0},
+  {id:'arched-style-entrance',name:'Arched-style entrance · decorative glazing',w:1.20,h:2.50,sill:0}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
@@ -404,7 +414,22 @@ const ARCH_STYLES={
   {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40},
   {id:'triple-sliding-window',name:'Three-leaf sliding · 300 cm',w:3.00,h:1.40,sill:.85},
   {id:'triple-casement',name:'Three-leaf casement · 270 cm',w:2.70,h:1.40,sill:.85},
-  {id:'tilt-turn-window',name:'Tilt and turn · 100 cm',w:1.00,h:1.30,sill:.90}
+  {id:'tilt-turn-window',name:'Tilt and turn · 100 cm',w:1.00,h:1.30,sill:.90},
+  {id:'georgian-six-pane',name:'Georgian · six-pane sash',w:1.10,h:1.50,sill:.75},
+  {id:'georgian-twelve-pane',name:'Georgian · twelve-pane sash',w:1.20,h:1.70,sill:.72},
+  {id:'neoclassical-french-window',name:'Neoclassical · French mullions',w:1.50,h:1.80,sill:.55},
+  {id:'victorian-bay-style',name:'Victorian · subdivided glazing',w:1.80,h:1.60,sill:.75},
+  {id:'gothic-lancet-tracery',name:'Gothic lancet · pointed tracery',w:1.00,h:2.10,sill:.45},
+  {id:'gothic-twin-lancet',name:'Gothic twin lancet · tracery',w:1.80,h:2.20,sill:.40},
+  {id:'gothic-rose-tracery',name:'Gothic rose-inspired glazing',w:1.80,h:1.80,sill:.75},
+  {id:'renaissance-cross-window',name:'Renaissance · cross mullion',w:1.40,h:1.75,sill:.70},
+  {id:'colonial-nine-pane',name:'Colonial · nine-pane glazing',w:1.20,h:1.40,sill:.85},
+  {id:'tudor-leaded-diamond',name:'Tudor · diamond leaded glass',w:1.10,h:1.50,sill:.85},
+  {id:'art-deco-geometric',name:'Art Deco · geometric glazing',w:1.30,h:1.60,sill:.85},
+  {id:'industrial-steel-grid',name:'Industrial steel · 4 × 4 grid',w:2.00,h:1.70,sill:.65},
+  {id:'japanese-shoji-grid',name:'Japanese grid · 4 × 5',w:1.80,h:1.70,sill:.50},
+  {id:'modern-ribbon-grid',name:'Contemporary horizontal mullions',w:2.60,h:.90,sill:1.15},
+  {id:'mediterranean-arched-style',name:'Mediterranean · decorative arch tracery',w:1.20,h:1.65,sill:.85}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -422,7 +447,11 @@ const ARCH_STYLES={
   {id:'ventilation-void',name:'High ventilation void · 60 × 40 cm',host:'wall',w:.60,h:.40,sill:2.00},
   {id:'slab-opening',name:'Slab opening · 100 × 100 cm',host:'slab',w:1,d:1},
   {id:'stairwell-opening',name:'Stairwell · 200 × 400 cm',host:'slab',w:2,d:4},
-  {id:'service-shaft',name:'Service shaft · 60 × 60 cm',host:'slab',w:.60,d:.60}
+  {id:'service-shaft',name:'Service shaft · 60 × 60 cm',host:'slab',w:.60,d:.60},
+  {id:'neoclassical-passage',name:'Neoclassical passage · 180 × 250 cm',host:'wall',w:1.80,h:2.50,sill:0},
+  {id:'gothic-passage',name:'Gothic-style passage · 140 × 270 cm',host:'wall',w:1.40,h:2.70,sill:0},
+  {id:'arcade-bay',name:'Arcade bay · 240 × 280 cm',host:'wall',w:2.40,h:2.80,sill:0},
+  {id:'circular-style-void',name:'Round-style opening · rectangular host void',host:'wall',w:1.20,h:1.20,sill:1.00}
  ]
 };
 
@@ -617,7 +646,7 @@ function build(){
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style">Visual Style ▾</button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D</header><div class="styleGrid" role="group" aria-label="Visual styles">'+
- [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico']].map(function(st){
+ [['wire2d','2D Wireframe','Lines only'],['wire3d','3D Wireframe','All edges'],['hidden','Hidden','Visible edges'],['shaded','Shaded','Solid colors'],['shaded-edges','Solid + Edges','Architectural view'],['realistic','Realistic','Material preview'],['monochrome','Monochrome','Neutral white'],['xray','X-Ray','Transparent'],['sketch','Croquis técnico','Sol y líneas'],['sketch-pencil','Croquis lápiz','Grafito'],['sketch-ink','Croquis tinta','Tinta negra'],['sketch-marker','Croquis marcador','Marcadores'],['sketch-watercolor','Croquis acuarela','Acuarela suave'],['sketch-mono','Croquis monocromo','Escala de grises'],['sketch-blueprint','Croquis blueprint','Azul técnico'],['sketch-charcoal','Carbón','Carboncillo arquitectónico'],['sketch-sepia','Sepia','Plumilla y tinta sepia'],['sketch-bluewash','Lavado azul','Lámina azulada'],['sketch-presentation','Presentación','Croquis suave de proyecto']].map(function(st){
  return '<button type="button" data-render-style="'+st[0]+'" aria-pressed="false"><span class="styleThumb" data-kind="'+st[0]+'"></span><span><strong>'+st[1]+'</strong><small>'+st[2]+'</small></span></button>';
  }).join('')+'</div><small>Changes the 3D view, not the drawing geometry.</small></div></div>'+
  '<details class="ioMenu"><summary class="btn">Import</summary><div>'+
@@ -1807,6 +1836,52 @@ function addMesh(g,color,id,parent,x,y,z){
  m.userData.owner=id;if(x!==undefined)m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=sunSettings.onFaces;parent.add(m);return m;
 }
 /* Partition the wall elevation or slab plan at the edges of its rectangular openings. */
+/* Render-time ornamental glazing: pane divisions are local to each movable leaf.
+   Geometry is not baked into the record; resizing and opening motion regenerate it. */
+function cad3DGlazingPattern(opening,door){
+ var id=String(opening.styleId||'').toLowerCase();
+ if(/gothic|lancet|rose|arched-style|mediterranean/.test(id))return {cols:/twin/.test(id)?2:1,rows:2,pointed:true};
+ if(/tudor|diamond/.test(id))return {cols:4,rows:5,diamond:true};
+ if(/georgian-twelve|twelve-pane|french-12/.test(id))return {cols:2,rows:6};
+ if(/georgian-six|six-pane|colonial-six/.test(id))return {cols:2,rows:3};
+ if(/colonial-nine/.test(id))return {cols:3,rows:3};
+ if(/industrial-steel|japanese-shoji/.test(id))return {cols:4,rows:/shoji/.test(id)?5:4};
+ if(/art-deco/.test(id))return {cols:3,rows:3,diamond:true};
+ if(/neoclassical|renaissance|victorian|classic|french/.test(id))return {cols:2,rows:3};
+ if(/modern-ribbon/.test(id))return {cols:1,rows:3};
+ return null;
+}
+function cad3DPaneBars(carpPart,opening,door,x,leafW,z,leafH,motion){
+ var p=cad3DGlazingPattern(opening,door);
+ if(!p)return;
+ var half=Math.max(.025,leafW-.11)/2,innerH=Math.max(.06,leafH-.14);
+ var cols=Math.max(1,p.cols),rows=Math.max(1,p.rows),bar=Math.min(.022,leafW/35);
+ var base=z+.07,depth=.073,tint=/industrial|steel|tudor/.test(opening.styleId||'')?0x384651:0xc8bdb0;
+ for(var col=1;col<cols;col++){
+  carpPart(bar,depth,innerH,x-half+col*(2*half)/cols,0,base,tint,0,motion);
+ }
+ for(var row=1;row<rows;row++){
+  carpPart(2*half,depth,bar,x,0,base+row*innerH/rows,tint,0,motion);
+ }
+ if(p.pointed){
+  // Raised, stepped lancet tracery in the top glazing zone. The host void remains rectangular.
+  var steps=7,peak=base+innerH*.96,shoulder=base+innerH*.63;
+  for(var side=-1;side<=1;side+=2)for(var j=0;j<steps;j++){
+   var a=j/steps,b=(j+1)/steps;
+   var xc=x+side*half*(a+b)/2;
+   var height=shoulder+(peak-shoulder)*(1-(a+b)/2);
+   carpPart(Math.max(bar,half/steps+.004),depth,bar,xc,0,height,tint,0,motion);
+  }
+ }
+ if(p.diamond){
+  var rings=Math.min(3,cols),cx=x;
+  for(var k=0;k<rings;k++){
+   var rad=Math.min(half*.35,innerH*.12);
+   var offset=(k-(rings-1)/2)*half*.65;
+   carpPart(bar,depth,rad*2,cx+offset,0,base+innerH*.55,tint,0,motion);
+  }
+ }
+}
 function architectureParts(r,part){
  var wall=r.type==='wall',length=r.w,span=wall?r.h:r.d,base=wall?0:-span/2,top=base+span;
  var thickness=wall?r.d:r.h,slope=wall?0:Math.tan((r.pitch||0)*Math.PI/180);
@@ -1851,9 +1926,10 @@ function architectureParts(r,part){
     cad3DLeafMotion(cfg,leaf,leaves,x0,x1,z+frame,leafH):null;
    if(door){
     carpPart(Math.max(.03,leafW-.013),.047,leafH,leafCenter,0,z+frame,color,0,motion);
-    if(/french|terrace/.test(opening.styleId||'')){
-     carpPart(Math.max(.04,leafW-.12),.052,leafH*.62,leafCenter,0,z+leafH*.23,0x568ea4,0,motion);
+    if(/french|terrace|neoclassical|victorian|gothic|colonial|art-deco|glazed|arched-style/.test(opening.styleId||'')){
+     carpPart(Math.max(.04,leafW-.12),.052,leafH*.72,leafCenter,0,z+leafH*.19,0x568ea4,0,motion);
     }
+    cad3DPaneBars(carpPart,opening,true,leafCenter,leafW,z+frame,leafH,motion);
     // A bar on each leaf makes its angle and opening direction legible in 3D.
     carpPart(.024,.065,.08,leafCenter+(cfg.hinge==='left'?leafW*.30:-leafW*.30),
      -.045,z+leafH*.52,0xc5ccd1,0,motion);
@@ -1862,6 +1938,7 @@ function architectureParts(r,part){
     carpPart(Math.max(.04,leafW-.018),.052,leafH,leafCenter,0,z+frame,0xa0b7c1,0,motion);
     carpPart(Math.max(.04,leafW-.095),.058,Math.max(.04,leafH-.11),
      leafCenter,0,z+frame+.055,0x4d8297,0,motion);
+    cad3DPaneBars(carpPart,opening,false,leafCenter,leafW,z+frame,leafH,motion);
    }
   }
  });
@@ -2212,7 +2289,8 @@ const CAD3D_VISUAL_STYLES={
  shaded:'Shaded','shaded-edges':'Solid + Edges',realistic:'Realistic',
  monochrome:'Monochrome',xray:'X-Ray',sketch:'Croquis técnico',
  'sketch-pencil':'Croquis lápiz','sketch-ink':'Croquis tinta','sketch-marker':'Croquis marcador',
- 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint'
+ 'sketch-watercolor':'Croquis acuarela','sketch-mono':'Croquis monocromo','sketch-blueprint':'Croquis blueprint',
+ 'sketch-charcoal':'Carbón arquitectónico','sketch-sepia':'Plumilla sepia','sketch-bluewash':'Lavado azul','sketch-presentation':'Croquis presentación'
 };
 const CAD3D_SKETCH_PRESETS={
  sketch:{bg:0xf3f1e8,ground:0xe6e4da,fill:0xf7f4eb,edge:0x333b3c,alpha:.9},
@@ -2221,7 +2299,11 @@ const CAD3D_SKETCH_PRESETS={
  'sketch-marker':{bg:0xf0eee5,ground:0xe5e1d7,fill:0xd2d2cb,edge:0x4e6269,alpha:.76},
  'sketch-watercolor':{bg:0xf5f1e9,ground:0xe5e3de,fill:0xdadcd7,edge:0x667a7f,alpha:.66},
  'sketch-mono':{bg:0xf2f2f0,ground:0xe5e5e1,fill:0xe9e9e5,edge:0x424546,alpha:.88},
- 'sketch-blueprint':{bg:0x344e66,ground:0x647f92,fill:0x8ca6b5,edge:0xe4f2fa,alpha:.92}
+ 'sketch-blueprint':{bg:0x344e66,ground:0x647f92,fill:0x8ca6b5,edge:0xe4f2fa,alpha:.92},
+ 'sketch-charcoal':{bg:0xe9e7df,ground:0xdad7cd,fill:0xcac9c3,edge:0x303235,alpha:.90},
+ 'sketch-sepia':{bg:0xf5ead3,ground:0xe7dac2,fill:0xf0e4cb,edge:0x70553d,alpha:.95},
+ 'sketch-bluewash':{bg:0xf0f5f6,ground:0xd9e5e8,fill:0xc2d7df,edge:0x455b70,alpha:.82},
+ 'sketch-presentation':{bg:0xfcfaf3,ground:0xe8e7de,fill:0xd7ddd5,edge:0x344953,alpha:.80}
 };
 function isCad3DSketch(mode){return Object.prototype.hasOwnProperty.call(CAD3D_SKETCH_PRESETS,mode);}
 
