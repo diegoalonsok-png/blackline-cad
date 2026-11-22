@@ -217,21 +217,54 @@ var css=`
  border:1px solid #ffe0a0; border-radius:50%; background:#26333d;
 }
 #cad3dLab .view.sketchView { background:#f0eee6 }
+
 #cad3dLab .viewNav {
- position:absolute; top:8px; left:8px; z-index:1; width:101px;
- display:grid; justify-items:start; gap:4px; pointer-events:none;
+ position:absolute;top:11px;left:11px;z-index:6;width:198px;
+ display:grid;justify-items:stretch;gap:6px;pointer-events:none;
+ font-family:Inter,"Segoe UI",Arial,sans-serif;
 }
-#cad3dLab .viewNav button, #cad3dLab .viewNav select { pointer-events:auto }
-#cad3dLab .viewCube { position:relative; width:83px; height:81px; transform:scale(.69); transform-origin:top left; margin-bottom:-25px }
-#cad3dLab .viewNav {width:168px}
-#cad3dLab .viewNavTop {display:flex;gap:8px;align-items:flex-start;pointer-events:none;height:62px}
-#cad3dLab .viewNavTop > * {pointer-events:auto}
-#cad3dLab .orbitBall {width:48px;height:48px;margin-top:2px;border:1px solid #8ca9b9;border-radius:50%;color:#edf7fc;cursor:grab;touch-action:none;user-select:none;position:relative;flex:none;background:radial-gradient(circle at 30% 25%,#7294a8,#263c50 60%,#101d2a 94%);box-shadow:inset -5px -7px 9px #071521b0,0 2px 7px #0008}
-#cad3dLab .orbitBall:active,#cad3dLab .orbitBall[data-dragging=true]{cursor:grabbing;border-color:#bce6f5}
-#cad3dLab .orbitBall svg{width:34px;height:34px;position:absolute;left:6px;top:6px;fill:none;stroke:currentColor;stroke-width:1.25;pointer-events:none}
+#cad3dLab .viewNav button,#cad3dLab .viewNav select,#cad3dLab .viewCube{pointer-events:auto}
+#cad3dLab .viewNavTop{display:flex;align-items:center;gap:12px;height:104px;pointer-events:none}
+#cad3dLab .viewNavTop > *{pointer-events:auto}
+#cad3dLab .viewCube{
+ width:104px;height:104px;position:relative;flex:none;overflow:hidden;
+ border:1px solid #506475;border-radius:17px;cursor:grab;touch-action:none;user-select:none;
+ background:radial-gradient(circle at 32% 17%,#344b5e 0%,#1a2a36 56%,#111b25 100%);
+ box-shadow:inset 0 1px 0 #b6ccd344,inset 0 -7px 12px #070e1690,0 5px 18px #0009;
+ transition:border-color .16s,box-shadow .16s;
+}
+#cad3dLab .viewCube:hover{border-color:#8ab8cf;box-shadow:inset 0 1px 0 #d6e7f34d,0 6px 20px #000b}
+#cad3dLab .viewCube[data-dragging=true]{cursor:grabbing}
+#cad3dLab .viewCube:focus-visible{outline:2px solid #a8def6;outline-offset:2px}
+#cad3dLab .cubeScene{display:block;width:100%;height:100%;overflow:visible}
+#cad3dLab .cubePlane{stroke:#90a9b8;stroke-width:1.05;stroke-linejoin:round;fill:var(--cube-tint,#314454)}
+#cad3dLab .cubeFaceZone{cursor:pointer}
+#cad3dLab .cubeFaceZone:hover .cubePlane,#cad3dLab .cubeFaceZone[aria-pressed=true] .cubePlane{
+ fill:#51778d;stroke:#d5eaf2;stroke-width:1.6;
+}
+#cad3dLab .cubeFaceLabel{
+ fill:#f0f6f9;font:700 9px Inter,"Segoe UI",sans-serif;letter-spacing:.5px;
+ text-anchor:middle;dominant-baseline:central;paint-order:stroke;
+ stroke:#14202a;stroke-width:1.25;pointer-events:none;user-select:none;
+}
+#cad3dLab .cubeEdgeZone{stroke:transparent;stroke-width:9;stroke-linecap:round;cursor:pointer;pointer-events:stroke}
+#cad3dLab .cubeEdgeZone:hover{stroke:#b5ddeb9e}
+#cad3dLab .cubeCornerZone{fill:#98afbc;stroke:#142633;stroke-width:1;cursor:pointer}
+#cad3dLab .cubeCornerZone:hover{fill:#e8faff;stroke:#80d4f3;stroke-width:2.5}
+#cad3dLab .orbitBall{
+ width:74px;height:74px;padding:0;flex:none;position:relative;overflow:hidden;
+ display:grid;place-items:center;touch-action:none;user-select:none;cursor:grab;
+ border:1px solid #628094;border-radius:50%;color:#e5f2f8;
+ background:radial-gradient(circle at 32% 22%,#3a5265 0%,#192c3b 57%,#0c1823 100%);
+ box-shadow:inset 0 1px 0 #d5edf24c,inset 0 -7px 12px #020b16c2,0 4px 15px #0009;
+ transition:border-color .15s,box-shadow .15s;
+}
+#cad3dLab .orbitBall svg{display:block;width:70px;height:70px;pointer-events:none}
+#cad3dLab .orbitBall:hover{border-color:#b0daee;box-shadow:inset 0 1px 0 #e4f8ff83,0 4px 18px #000c}
+#cad3dLab .orbitBall[data-dragging=true]{cursor:grabbing}
+#cad3dLab .orbitBall[data-drag-mode=pan] svg .orbitCore{fill:#64889d}
 #cad3dLab .orbitBall:focus-visible{outline:2px solid #a8def6;outline-offset:2px}
-#cad3dLab .orbitBall .orbitBallDot{position:absolute;left:21px;top:21px;width:5px;height:5px;border-radius:50%;background:#d9f3ff;pointer-events:none}
-#cad3dLab .view.planRulers .viewNav { top:23px; left:26px }
+#cad3dLab .view.planRulers .viewNav{top:23px;left:26px}
 #cad3dLab .rulerX, #cad3dLab .rulerY {
  position:absolute; z-index:1; overflow:hidden; pointer-events:none;
  background:var(--cad-ui-toolbar); color:var(--cad-ui-muted); font:9px Inter,Arial,sans-serif;
@@ -241,18 +274,6 @@ var css=`
 #cad3dLab .rulerX span { position:absolute; bottom:0; height:13px; padding-left:3px; border-left:1px solid var(--cad-ui-edge) }
 #cad3dLab .rulerY span { position:absolute; right:0; width:100%; padding-right:2px; border-top:1px solid var(--cad-ui-edge); text-align:right }
 #cad3dLab .snapMarker { position:absolute; width:8px; height:8px; transform:translate(-50%,-50%); border:1px solid #f2d07e; z-index:2; pointer-events:none }
-#cad3dLab .cubeFace {
- position:absolute; width:42px; height:42px; display:grid; place-items:center; padding:0;
- transform-origin:0 0; border:1px solid var(--cad-ui-edge); background:var(--cad-ui-raised);
- color:var(--cad-ui-text); cursor:pointer; font:700 10px Inter,Arial,sans-serif;
-}
-#cad3dLab .cubeFace[data-view-preset=top] { left:41px; top:0; transform:matrix(.905,.5,-.905,.5,0,0) }
-#cad3dLab .cubeFace[data-view-preset=front] { left:3px; top:21px; transform:matrix(.905,.5,0,.875,0,0) }
-#cad3dLab .cubeFace[data-view-preset=right] { left:41px; top:42px; transform:matrix(.905,-.5,0,.875,0,0) }
-#cad3dLab .cubeFace:hover, #cad3dLab .cubeFace[aria-pressed=true] {
- background:color-mix(in srgb,var(--cad-ui-raised),var(--bl-accent,#8bc7de) 26%);
- border-color:var(--bl-accent,#8bc7de);
-}
 #cad3dLab .cad3dViewSelect {
  width:100%; min-width:0; height:26px; padding:1px 4px;
  border:1px solid var(--cad-ui-edge); font:11px Inter,Arial,sans-serif; cursor:pointer;
@@ -526,11 +547,17 @@ function build(){
  }).join('')+'</aside>'+
  '<div class="view"><div class="rulerX" hidden aria-hidden="true"></div><div class="rulerY" hidden aria-hidden="true"></div>'+
  '<div class="snapMarker" hidden aria-hidden="true"></div><nav class="viewNav" aria-label="Vistas 3D">'+
- '<div class="viewNavTop"><div class="viewCube">'+
- '<button type="button" class="cubeFace" data-view-preset="top" title="Planta" aria-label="Planta">TOP</button>'+
- '<button type="button" class="cubeFace" data-view-preset="front" title="Frontal" aria-label="Frontal">FRONT</button>'+
- '<button type="button" class="cubeFace" data-view-preset="right" title="Derecha" aria-label="Derecha">RIGHT</button>'+
- '</div><button type="button" class="orbitBall" aria-label="Orbitar modelo 3D: arrastrar esfera para girar la cámara. Flechas para ajuste fino" title="Orbit · Drag to rotate model"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="14"/><ellipse cx="18" cy="18" rx="6" ry="14"/><path d="M4 18h28M8 9Q18 15 28 9M8 27Q18 21 28 27"/></svg><span class="orbitBallDot"></span></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
+ '<div class="viewNavTop"><div class="viewCube" tabindex="0" role="group" aria-label="Cubo de vistas 3D: clic en caras, aristas o esquinas; arrastrar para orbitar. Flechas para giro fino" title="ViewCube · Faces, edges, corners · Drag to orbit">'+
+ '<svg class="cubeScene" viewBox="0 0 100 100" aria-hidden="true"></svg>'+
+ '</div><button type="button" class="orbitBall" aria-label="Órbita: arrastrar el anillo para girar, arrastrar el centro para desplazar y rueda para zoom" title="Orbit ring · Center pan · Wheel zoom"><svg viewBox="0 0 72 72" aria-hidden="true">'+
+ '<defs><linearGradient id="cadOrbitRim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#cbe4f1"/><stop offset="0.48" stop-color="#557587"/><stop offset="1" stop-color="#bdd4e1"/></linearGradient></defs>'+
+ '<circle cx="36" cy="36" r="28.5" fill="#142530" stroke="url(#cadOrbitRim)" stroke-width="2.2"/>'+
+ '<circle cx="36" cy="36" r="23.5" fill="none" stroke="#58798b" stroke-width=".9" stroke-dasharray="1.5 5.3"/>'+
+ '<path d="M17 34a20 20 0 0 1 35-9l-1-6M55 38a20 20 0 0 1-35 9l1 6" fill="none" stroke="#c7e0ea" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'+
+ '<path d="m47 25 4 0 1-6M25 47l-4 0 0 6" fill="none" stroke="#c7e0ea" stroke-width="2.2" stroke-linecap="round"/>'+
+ '<circle class="orbitCore" cx="36" cy="36" r="13.5" fill="#344e61" stroke="#a4c0d1" stroke-width="1.4"/>'+
+ '<path d="M36 27v18M27 36h18M36 27l-3 3m3-3 3 3M36 45l-3-3m3 3 3-3M27 36l3-3m-3 3 3 3M45 36l-3-3m3 3-3 3" fill="none" stroke="#d8eaf3" stroke-width="1.4" stroke-linecap="round"/>'+
+ '<circle cx="36" cy="36" r="2.4" fill="#f3f8fc"/></svg></button></div><select class="cad3dViewSelect" aria-label="Vista de cámara CAD3D"></select></nav>'+
  '<div class="placementGuide" hidden aria-hidden="true"></div><output class="dynReadout" aria-live="off"></output><div class="cad3dContextMenu" role="menu" aria-label="CAD3D context menu" hidden></div>'+
  '<div class="viewShortcuts" role="group" aria-label="3D view shortcuts"><button type="button" data-view-shortcut="top">Top</button><button type="button" data-view-shortcut="iso">Iso</button><button type="button" data-view-shortcut="perspective">3D</button><button type="button" data-view-shortcut="fit">Fit</button></div></div>'+
  '<div class="sideGrip" title="Arrastrar para cambiar el ancho de Properties"></div>'+
@@ -560,7 +587,7 @@ function build(){
  var viewSelect=root.querySelector('.cad3dViewSelect');
  viewSelect.innerHTML='<option value="orbit" hidden>Órbita libre</option>'+
   viewPresets.map(function(v){return '<option value="'+v[0]+'">'+v[1]+'</option>';}).join('');
- syncViewControls();
+ syncViewControls();renderNavigationCube();
  viewSelect.addEventListener('change',function(){setViewPreset(this.value);});
  root.querySelector('.viewShortcuts').addEventListener('click',function(e){
   var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
@@ -568,10 +595,7 @@ function build(){
   if(key==='fit')fit3DModel();else setViewPreset(key);
  });
  bindOrbitBall(root.querySelector('.orbitBall'));
- root.querySelector('.viewCube').addEventListener('click',function(e){
-  var face=e.target.closest('[data-view-preset]');
-  if(face)setViewPreset(face.dataset.viewPreset);
- });
+ bindNavigationCube(root.querySelector('.viewCube'));
  root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
  root.querySelector('.sideGrip').addEventListener('pointerdown',beginSideResize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
@@ -1075,6 +1099,7 @@ function init(){
  bindCanvas(renderer.domElement);resize();applyViewCamera();applyRenderStyle();applySunSettings();
 }
 function updateCamera(){
+ renderNavigationCube();
  if(!camera){scheduleFallbackDraw();return;}
  camera.up.set(0,0,1);
  if(Math.abs(orbit.el)===Math.PI/2)camera.up.set(0,1,0);
@@ -1890,6 +1915,107 @@ function exportSketchSVG(){
  download('blackline-cad3d-'+(root.querySelector('.cad3dViewSelect')?.value||'vista')+'-croquis.svg',svg,'image/svg+xml;charset=utf-8');
  text('Croquis SVG vectorial exportado · proyección de aristas, puede incluir líneas ocultas');
 }
+
+/* Native 3D navigation: responsive orientation cube, no external graphics or model mutations. */
+var cubeNavigationFaces=[
+ {key:'right',label:'RIGHT',normal:[1,0,0],tone:'#36576d',v:[[1,-1,-1],[1,1,-1],[1,1,1],[1,-1,1]]},
+ {key:'left',label:'LEFT',normal:[-1,0,0],tone:'#304b5e',v:[[-1,-1,-1],[-1,-1,1],[-1,1,1],[-1,1,-1]]},
+ {key:'front',label:'FRONT',normal:[0,-1,0],tone:'#435f71',v:[[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]]},
+ {key:'back',label:'BACK',normal:[0,1,0],tone:'#324d60',v:[[-1,1,-1],[-1,1,1],[1,1,1],[1,1,-1]]},
+ {key:'top',label:'TOP',normal:[0,0,1],tone:'#617b8d',v:[[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]]},
+ {key:'bottom',label:'BOTTOM',normal:[0,0,-1],tone:'#263c4d',v:[[-1,-1,-1],[-1,1,-1],[1,1,-1],[1,-1,-1]]}
+];
+function renderNavigationCube(){
+ if(!root)return;
+ var svg=root.querySelector('.cubeScene');
+ if(!svg)return;
+ var az=orbit.az,el=orbit.el,ca=Math.cos(az),sa=Math.sin(az),ce=Math.cos(el),se=Math.sin(el);
+ function project(v){
+  return {x:50+26*(-sa*v[0]+ca*v[1]),y:50-26*(-se*ca*v[0]-se*sa*v[1]+ce*v[2])};
+ }
+ function xy(v){var p=project(v);return p.x.toFixed(2)+','+p.y.toFixed(2);}
+ function vector(v){return v.join(',');}
+ var toward=[ce*ca,ce*sa,se];
+ var faces=cubeNavigationFaces.map(function(f){
+  return Object.assign({},f,{depth:f.normal[0]*toward[0]+f.normal[1]*toward[1]+f.normal[2]*toward[2]});
+ }).filter(function(f){return f.depth>.025;}).sort(function(a,b){return a.depth-b.depth;});
+ var markup='',edges=new Map(),corners=new Map();
+ faces.forEach(function(f){
+  var c=[0,0,0];
+  f.v.forEach(function(v){c[0]+=v[0]/4;c[1]+=v[1]/4;c[2]+=v[2]/4;});
+  var center=project(c);
+  markup+='<g class="cubeFaceZone" data-view-preset="'+f.key+'" aria-pressed="'+String(activeView===f.key)+'" role="button">'+
+   '<title>'+f.label+' view</title><polygon class="cubePlane" style="--cube-tint:'+f.tone+'" points="'+f.v.map(xy).join(' ')+'"/>'+
+   '<text class="cubeFaceLabel" x="'+center.x.toFixed(2)+'" y="'+center.y.toFixed(2)+'">'+f.label+'</text></g>';
+  f.v.forEach(function(v,i){
+   var other=f.v[(i+1)%4],vs=[vector(v),vector(other)].sort(),key=vs.join('|');
+   edges.set(key,{a:v,b:other,mid:[(v[0]+other[0])/2,(v[1]+other[1])/2,(v[2]+other[2])/2]});
+   corners.set(vector(v),v);
+  });
+ });
+ edges.forEach(function(e){
+  var a=project(e.a),b=project(e.b);
+  markup+='<line class="cubeEdgeZone" x1="'+a.x.toFixed(2)+'" y1="'+a.y.toFixed(2)+'" x2="'+b.x.toFixed(2)+'" y2="'+b.y.toFixed(2)+'" data-view-vector="'+vector(e.mid)+'"><title>Diagonal edge view</title></line>';
+ });
+ corners.forEach(function(v){
+  var p=project(v);
+  markup+='<circle class="cubeCornerZone" cx="'+p.x.toFixed(2)+'" cy="'+p.y.toFixed(2)+'" r="3.4" data-view-vector="'+vector(v)+'"><title>Isometric corner view</title></circle>';
+ });
+ svg.innerHTML=markup;
+}
+function orientToCubeVector(value){
+ var v=String(value).split(',').map(Number);
+ if(v.length!==3||v.some(function(n){return !Number.isFinite(n);}))return;
+ var horizontal=Math.hypot(v[0],v[1]);
+ if(!horizontal&&!v[2])return;
+ orbit.az=horizontal<1e-5?0:Math.atan2(v[1],v[0]);
+ orbit.el=Math.atan2(v[2],horizontal);
+ viewMode='ortho';activeView='orbit';
+ syncViewControls();applyViewCamera();
+ root.querySelector('.placementGuide').hidden=true;
+ text('Vista axonométrica · Cubo 3D');
+}
+function bindNavigationCube(cube){
+ if(!cube)return;
+ var drag=null;
+ cube.addEventListener('pointerdown',function(e){
+  if(e.button!==0||drag)return;
+  var hit=e.target.closest('[data-view-preset],[data-view-vector]');
+  e.preventDefault();e.stopPropagation();
+  cube.focus({preventScroll:true});
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,
+   moved:false,preset:hit?.dataset.viewPreset||null,vector:hit?.dataset.viewVector||null};
+  cube.setPointerCapture(e.pointerId);
+ });
+ cube.addEventListener('pointermove',function(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var dx=e.clientX-drag.lastX,dy=e.clientY-drag.lastY;
+  if(!drag.moved&&Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>5)drag.moved=true;
+  drag.lastX=e.clientX;drag.lastY=e.clientY;
+  if(drag.moved){
+   e.preventDefault();e.stopPropagation();
+   cube.dataset.dragging='true';orbitCameraBy(dx,dy);
+  }
+ });
+ function end(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var d=drag;drag=null;delete cube.dataset.dragging;
+  if(cube.hasPointerCapture(e.pointerId))cube.releasePointerCapture(e.pointerId);
+  if(e.type==='pointerup'&&!d.moved){
+   if(d.preset)setViewPreset(d.preset);
+   else if(d.vector)orientToCubeVector(d.vector);
+  }
+ }
+ cube.addEventListener('pointerup',end);
+ cube.addEventListener('pointercancel',end);
+ cube.addEventListener('lostpointercapture',function(){drag=null;delete cube.dataset.dragging;});
+ cube.addEventListener('keydown',function(e){
+  var arrows={ArrowLeft:[-12,0],ArrowRight:[12,0],ArrowUp:[0,-12],ArrowDown:[0,12]};
+  if(arrows[e.key]){e.preventDefault();e.stopPropagation();orbitCameraBy(arrows[e.key][0],arrows[e.key][1]);}
+  else if(e.key==='Home'){e.preventDefault();setViewPreset('iso');}
+ });
+}
+
 function orbitCameraBy(dx,dy){
  if(!Number.isFinite(dx)||!Number.isFinite(dy))return;
  if(viewMode!=='perspective')viewMode='perspective';
@@ -1905,23 +2031,31 @@ function bindOrbitBall(ball){
  ball.addEventListener('pointerdown',function(e){
   if(e.button!==0||drag)return;
   e.preventDefault();e.stopPropagation();
-  drag={id:e.pointerId,x:e.clientX,y:e.clientY};
-  ball.dataset.dragging='true';ball.setPointerCapture(e.pointerId);
+  var rect=ball.getBoundingClientRect(),cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+  var mode=Math.hypot(e.clientX-cx,e.clientY-cy)<17?'pan':'orbit';
+  drag={id:e.pointerId,x:e.clientX,y:e.clientY,mode:mode};
+  ball.dataset.dragging='true';ball.dataset.dragMode=mode;ball.setPointerCapture(e.pointerId);
  });
  ball.addEventListener('pointermove',function(e){
   if(!drag||drag.id!==e.pointerId)return;
   e.preventDefault();e.stopPropagation();
   var dx=e.clientX-drag.x,dy=e.clientY-drag.y;
   drag.x=e.clientX;drag.y=e.clientY;
-  orbitCameraBy(dx,dy);
+  if(drag.mode==='pan'){panView(dx,dy,root.querySelector('.view'));applyViewCamera();}
+  else orbitCameraBy(dx,dy);
  });
  function finish(e){
   if(!drag||drag.id!==e.pointerId)return;
-  drag=null;delete ball.dataset.dragging;
+  drag=null;delete ball.dataset.dragging;delete ball.dataset.dragMode;
  }
  ball.addEventListener('pointerup',finish);
  ball.addEventListener('pointercancel',finish);
- ball.addEventListener('lostpointercapture',function(){drag=null;delete ball.dataset.dragging;});
+ ball.addEventListener('lostpointercapture',function(){drag=null;delete ball.dataset.dragging;delete ball.dataset.dragMode;});
+ ball.addEventListener('wheel',function(e){
+  if(viewMode==='walk')return;
+  e.preventDefault();e.stopPropagation();
+  orbit.dist=clamp(orbit.dist*Math.exp(e.deltaY*.001),1.4,450);applyViewCamera();
+ },{passive:false});
  ball.addEventListener('keydown',function(e){
   var vectors={ArrowLeft:[-12,0],ArrowRight:[12,0],ArrowUp:[0,-12],ArrowDown:[0,12]};
   if(!vectors[e.key])return;
