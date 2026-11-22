@@ -19,7 +19,13 @@ const cm=m=>Math.round(m*100);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byId=id=>LIB.library.find(x=>x.id===id);
 const plan=()=>window.CAD2D_PLAN;
-const allowed=item=>!item.pro||!plan()||plan().can('arq-pro');
+// Blackline Select is intentionally stricter than the general 90-day trial:
+// its use requires a paid plan confirmed by the billing server.
+const verifiedPaid=()=>{
+ const p=plan(),status=p?.status;
+ return Boolean(p?.enforced&&status?.source==='server'&&['pro','studio'].includes(status.plan));
+};
+const allowed=item=>item.paidOnly?verifiedPaid():!item.pro||!plan()||plan().can('arq-pro');
 
 /* ---------- Capas arquitectónicas ---------- */
 const LAYERS={
@@ -47,7 +53,7 @@ function ensureDefinition(item,W,D){
   for(const e of ents){e.layer='0';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
   const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities(ents)});
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
-  def.dynamic2d=false;def.dynamicActions=true;
+  def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);
   const bb=LIB.bounds(built.entities);
   def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
   st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
@@ -66,8 +72,12 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 /* ---------- Inserción ---------- */
 let pendingInsert=null,lastItem=null;
 function armInsert(item,W,D){
- if(item.dxfPlan&&window.cadInsertDxfPlan){if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);return window.cadInsertDxfPlan(item.dxfPlan,item.name)}
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
+ if(!allowed(item)){
+  if(plan()?.upsell)plan().upsell(item.paidOnly?'Blackline Select requiere membresía PRO o Estudio confirmada':'Bloque Pro: '+item.name);
+  else CORE.toast('Requiere membresía PRO o Estudio');
+  return false;
+ }
+ if(item.dxfPlan&&window.cadInsertDxfPlan){window.cadInsertDxfPlan(item.dxfPlan,item.name);return true}
  const name=ensureDefinition(item,W??item.w,D??item.d),st=S();
  const layer=ensureLayer(item.cat);
  if(!pendingInsert)pendingInsert={prevLayer:st.layerId};
@@ -75,6 +85,7 @@ function armInsert(item,W,D){
  window.BlacklineBlockAPI.selectBlock(name);
  CORE.toast('ARQ · '+item.name+' listo · clic en el plano para insertar · Esc cancela');
  syncSizeRow(item,st.blocks[name].arq);
+ return true;
 }
 function finishPendingInsert(){
  if(!pendingInsert)return;
@@ -172,7 +183,7 @@ function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
  b.title=item.name+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
  b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(item.name)}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
- b.onclick=()=>{armInsert(item);for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
+ b.onclick=()=>{if(armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
 function chips(container,onPick){
@@ -636,5 +647,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>(LAYERS[cat]||[])[0]||null,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>(LAYERS[cat]||[])[0]||null,insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},count:LIB.library.length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
