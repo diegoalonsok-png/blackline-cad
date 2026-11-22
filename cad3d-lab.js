@@ -1579,10 +1579,43 @@ function addWallAttachments(wall,group){
    profile.moveTo(-w/2,0);profile.lineTo(w/2,0);profile.lineTo(w/2,h);profile.lineTo(-w/2,h);profile.closePath();
   }
   var dep=clamp(finite(att.depth,.12),.01,3),side=att.side===1?1:-1;
-  var geo=new T.ExtrudeGeometry(profile,{depth:dep,bevelEnabled:false,curveSegments:24});
-  var mesh=new T.Mesh(geo,new T.MeshStandardMaterial({color:0xaab0b5,roughness:.82,side:T.DoubleSide}));
-  mesh.rotation.x=Math.PI/2;
-  mesh.position.set(clamp(finite(att.offset,0),-wall.w/2,wall.w/2),side*wall.d/2+(side===1?dep:0),clamp(finite(att.sill,.5),0,wall.h));
+  var candidates=(wall.openings||[]).filter(function(o){
+   return o.offset+o.w/2>att.offset-w/2&&o.offset-o.w/2<att.offset+w/2&&
+    (o.sill||0)+o.h>att.sill-h&&o.sill<att.sill+h;
+  });
+  var material=new T.MeshStandardMaterial({color:0xaab0b5,roughness:.82,side:T.DoubleSide});
+  var mesh;
+  if(!candidates.length){
+   // Preserve the smooth original circle and polygon when no opening cuts it.
+   mesh=new T.Mesh(new T.ExtrudeGeometry(profile,{depth:dep,bevelEnabled:false,curveSegments:24}),material);
+   mesh.rotation.x=Math.PI/2;
+   mesh.position.set(att.offset,side*wall.d/2+(side===1?dep:0),att.sill);
+  }else{
+   // Cut the addition with the same wall-local openings as the host wall.
+   // Vertical sectioning supports partial intersections and concave polylines.
+   var verts=[],left=att.offset-w/2,right=att.offset+w/2;
+   var width=right-left,steps=Math.max(24,Math.min(180,Math.ceil(width/.018)));
+   var y0=side*wall.d/2+(side===-1?-dep:0),y1=y0+dep;
+   function quad(a,b,d,e){
+    verts.push.apply(verts,a.concat(b,d,a,d,e));
+   }
+   function prism(x0,x1,z0,z1){
+    if(x1-x0<.00001||z1-z0<.00001)return;
+    var A=[x0,y0,z0],B=[x1,y0,z0],C=[x1,y0,z1],D=[x0,y0,z1];
+    var E=[x0,y1,z0],F=[x1,y1,z0],G=[x1,y1,z1],H=[x0,y1,z1];
+    quad(A,D,C,B);quad(E,F,G,H);quad(A,E,H,D);
+    quad(B,C,G,F);quad(A,B,F,E);quad(D,H,G,C);
+   }
+   for(var i=0;i<steps;i++){
+    var x0=left+width*i/steps,x1=left+width*(i+1)/steps,mid=(x0+x1)/2;
+    var spans=profileSpansAtX(att,mid);
+    var cuts=candidates.map(function(o){return openingSpanAtX(o,mid);}).filter(Boolean);
+    subtractVerticalSpans(spans,cuts).forEach(function(span){prism(x0,x1,span[0],span[1]);});
+   }
+   var geometry=new T.BufferGeometry();
+   geometry.setAttribute('position',new T.Float32BufferAttribute(verts,3));
+   geometry.computeVertexNormals();mesh=new T.Mesh(geometry,material);
+  }
   mesh.userData.owner=wall.id;mesh.castShadow=true;mesh.receiveShadow=sunSettings.onFaces;group.add(mesh);
  });
 }
