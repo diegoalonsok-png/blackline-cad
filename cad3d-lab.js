@@ -50,7 +50,19 @@ var icons={
  dist:'<path d="M3 16 16 3l5 5L8 21zM8 11l2 2m1-5 2 2m1-5 2 2"/>',
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
-var css=`/* CAD3D own basic Draw + Modify ribbons, preserving CAD2D. */
+var css=`
+/* Classic drafting / refined CAD3D navigator, isolated from CAD2D. */
+#cad3dLab .view.wire2dView{background:#fff!important}
+#cad3dLab .viewCube{border-radius:19px;border:1px solid #86a9bd;background:linear-gradient(150deg,#344b5b,#203444 42%,#101c28);box-shadow:inset 0 1px 0 #d9f1ff88,inset 0 -2px 7px #08111ca0,0 5px 15px #0007}
+#cad3dLab .viewCube:hover{border-color:#bce3f6;box-shadow:0 0 0 2px #8ad5f340,0 7px 20px #0009}
+#cad3dLab .cubePlane{stroke:#bed2dc;stroke-width:1.1}
+#cad3dLab .cubeFaceLabel{fill:#f7fbff;letter-spacing:.65px}
+#cad3dLab .cubeCornerZone{fill:#c7d8e0;stroke:#233744}
+#cad3dLab .orbitBall{border:1px solid #91b6c7;background:radial-gradient(circle at 36% 28%,#52778b,#203c4d 57%,#0a1825);box-shadow:inset 0 2px 1px #e4f9ff75,inset 0 -6px 10px #04121a9c,0 6px 18px #0008}
+#cad3dLab .orbitBall:hover{border-color:#d0efff;box-shadow:inset 0 1px 0 #ecfbff9a,0 0 0 2px #8ecce93b,0 7px 19px #000a}
+#cad3dLab .orbitBall svg{width:66px;height:66px;filter:drop-shadow(0 1px 1px #0007)}
+#cad3dLab .orbitBall:focus-visible,#cad3dLab .viewCube:focus-visible{outline:2px solid #c4eeff;outline-offset:3px}
+/* CAD3D own basic Draw + Modify ribbons, preserving CAD2D. */
 #cad3dLab .cad3dBasicBars{display:flex;align-items:center;gap:8px;flex:none;overflow-x:auto;scrollbar-width:thin;padding:5px 9px;background:#172530;border-bottom:1px solid #4c6576;min-height:42px}
 #cad3dLab .cad3dBasicBars .cad3dBar{display:flex;align-items:center;gap:3px;flex:none}
 #cad3dLab .cad3dBasicBars .cad3dBar strong{font:700 10px Inter,Arial,sans-serif;color:#b9c8d3;margin:0 5px 0 2px}
@@ -1173,7 +1185,7 @@ function fallbackPolygon(points,fill,stroke,width){
  g.fillStyle=isCad3DSketch(renderStyle)||renderStyle==='hidden'?'#f8f6ef':
   renderStyle==='monochrome'?'#e1e3e4':renderStyle==='realistic'?'#aa9b86':fill;
  if(!wire){g.globalAlpha=renderStyle==='xray'?.26:1;g.fill();g.globalAlpha=1;}
- g.strokeStyle=['sketch','hidden','wire2d','wire3d'].includes(renderStyle)?'#303537':stroke;
+ g.strokeStyle=renderStyle==='wire2d'?'#000000':['sketch','hidden','wire3d'].includes(renderStyle)?'#303537':stroke;
  g.lineWidth=['sketch','wire2d','wire3d'].includes(renderStyle)?1.2:(width||1);g.stroke();
 }
 function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
@@ -1184,7 +1196,7 @@ function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
   pts.push(project(rec.x+lx*c-ly*ss,rec.y+lx*ss+ly*c,rec.z+z+iz*h+lx*(slope||0)));
  }
  var selectedObject=selected.includes(rec.id);
- var stroke=renderStyle==='wire2d'?'#111111':selectedObject?'#efc978':'#5a7585';
+ var stroke=renderStyle==='wire2d'?'#000000':selectedObject?'#efc978':'#5a7585';
  var faces=[
   {v:[0,1,3,2],fill:'#243440'},{v:[4,6,7,5],fill:color||'#617788'},
   {v:[0,4,5,1],fill:'#2e4554'},{v:[2,3,7,6],fill:'#395569'},
@@ -1193,7 +1205,7 @@ function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
  faces.sort(function(a,b){return b.v.reduce(function(n,i){return n+pts[i].y;},0)-a.v.reduce(function(n,i){return n+pts[i].y;},0);});
  faces.forEach(function(face){fallbackPolygon(face.v.map(function(i){return pts[i];}),face.fill,stroke,selectedObject?1.8:.85);});
  if(renderStyle==='wire2d'){
-  fallbackCtx.fillStyle='#111111';
+  fallbackCtx.fillStyle='#000000';
   pts.forEach(function(p){fallbackCtx.beginPath();fallbackCtx.arc(p.x,p.y,2,0,Math.PI*2);fallbackCtx.fill();});
  }
 }
@@ -1202,7 +1214,7 @@ function fallbackDraw(){
  var ctx=fallbackCtx,w=fallbackCanvas.clientWidth,h=fallbackCanvas.clientHeight;
  if(w<=0||h<=0)return;
  var projection=fallbackProjector();
- ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#f6f5f1':
+ ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#ffffff':
   CAD3D_SKETCH_PRESETS[renderStyle]?'#'+CAD3D_SKETCH_PRESETS[renderStyle].bg.toString(16).padStart(6,'0'):
   ['hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
@@ -1211,10 +1223,10 @@ function fallbackDraw(){
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.moveTo(c.x,c.y);ctx.lineTo(d.x,d.y);ctx.stroke();
  }
  var origin=projection(0,0,0);
- ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#8d918e':'#7191a2';ctx.lineWidth=1;
+ ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#8d918e':'#7191a2';ctx.lineWidth=1;
  ctx.beginPath();ctx.moveTo(origin.x-4,origin.y);ctx.lineTo(origin.x+4,origin.y);ctx.moveTo(origin.x,origin.y-4);ctx.lineTo(origin.x,origin.y+4);ctx.stroke();
  if(underlay?.segments?.length){
-  ctx.strokeStyle=renderStyle==='wire2d'?'#111111':'#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
+  ctx.strokeStyle=renderStyle==='wire2d'?'#000000':'#83a9c4';ctx.lineWidth=1.1;ctx.setLineDash([]);
   ctx.beginPath();
   underlay.segments.forEach(function(p){
    var a=projection(p[0],p[1],0),b=projection(p[2],p[3],0);
@@ -1234,18 +1246,18 @@ function fallbackDraw(){
    var p=projection(rec.x,rec.y,rec.z+rec.radius),radius=Math.max(4,rec.radius*p.scale);
    var grad=ctx.createRadialGradient(p.x-radius*.25,p.y-radius*.25,1,p.x,p.y,radius);grad.addColorStop(0,'#b2cad7');grad.addColorStop(1,'#435b6d');
    ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':grad;
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#5e8399';
    ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);if(renderStyle!=='wire2d')ctx.fill();ctx.stroke();
   }else if(rec.type==='cylinder'||rec.type==='cone'){
    var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
    ctx.fillStyle=isCad3DSketch(renderStyle)?'#f7f5ee':'#547b91';
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':selected.includes(rec.id)?'#efc978':'#789aaa';ctx.lineWidth=1.4;
    ctx.beginPath();ctx.moveTo(low.x-rad,low.y);ctx.lineTo(rec.type==='cone'?high.x:high.x-rad,high.y);ctx.lineTo(rec.type==='cone'?high.x:high.x+rad,rec.type==='cone'?high.y:high.y);ctx.lineTo(low.x+rad,low.y);ctx.closePath();if(renderStyle!=='wire2d')ctx.fill();ctx.stroke();
    ctx.beginPath();ctx.ellipse(low.x,low.y,rad,rad*.22,0,0,Math.PI*2);ctx.stroke();
   }else if(rec.type==='boolean'&&rec.triangles?.length){
    var p=rec.triangles,angle=(rec.rot||0)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
    var vertex=function(i){return projection(rec.x+p[i]*cos-p[i+1]*sin,rec.y+p[i]*sin+p[i+1]*cos,rec.z+p[i+2]);};
-   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':isCad3DSketch(renderStyle)?'#2e3334':'#789ab3';ctx.lineWidth=1;
+   ctx.strokeStyle=renderStyle==='wire2d'?'#000000':isCad3DSketch(renderStyle)?'#2e3334':'#789ab3';ctx.lineWidth=1;
    for(var i=0;i+8<p.length;i+=9){
     var a=vertex(i),b=vertex(i+3),c=vertex(i+6);
     ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.lineTo(c.x,c.y);ctx.closePath();ctx.stroke();
@@ -2479,6 +2491,7 @@ function renderStyleControls(){
  var sketchButton=root.querySelector('[data-action="sketch"]');
  if(sketchButton)sketchButton.classList.toggle('sketchActive',isCad3DSketch(renderStyle));
  root.querySelector('.view')?.classList.toggle('sketchView',isCad3DSketch(renderStyle));
+ root.querySelector('.view')?.classList.toggle('wire2dView',renderStyle==='wire2d');
 }
 /* Lightweight, deterministic hatch strokes drawn on visible box faces.
    Presentation-only THREE.LineSegments. CAD model geometry and opening records remain untouched. */
@@ -2535,7 +2548,7 @@ function applyRenderStyle(){
  if(!T)return;
  var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf6f5f1:
+ if(scene)scene.background=new T.Color(renderStyle==='wire2d'?0xffffff:sketch?sketch.bg:lightPaper?0xf6f5f1:
   sunSettings.enabled&&['shaded','shaded-edges','realistic'].includes(renderStyle)?0xc4d8e4:MODEL_BACKGROUND);
  if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:sunSettings.enabled?0xd1cbc0:0x9ba5a8);
  if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
@@ -2565,7 +2578,7 @@ function applyRenderStyle(){
   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
-   var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
+   var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x000000:
     renderStyle==='wire3d'?0x191d21:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
@@ -2588,7 +2601,7 @@ function applyRenderStyle(){
      var dots=new T.BufferGeometry();
      dots.setAttribute('position',new T.Float32BufferAttribute(coords,3));
      var points=new T.Points(dots,new T.PointsMaterial({
-      color:0x151515,size:3.2,sizeAttenuation:false,depthTest:false,depthWrite:false
+      color:0x000000,size:3.2,sizeAttenuation:false,depthTest:false,depthWrite:false
      }));
      points.userData.cadSketch=true;points.renderOrder=6;m.add(points);
     }
@@ -3183,7 +3196,14 @@ async function readJSON(e){
 }
 window.addEventListener('keydown',function(ev){
  if(!root||root.hidden||!root.contains(document.activeElement))return;
- var mode={F3:'osnap',F7:'grid',F8:'ortho'}[ev.key];
+ // CAD3D-specific viewport styles: plain F3 switches to 2D Wireframe; F4 to shaded.
+ // Ctrl/Cmd+F3 is also accepted when the browser delivers it. Shift+F3 preserves OSNAP.
+ if(ev.key==='F3'&&ev.shiftKey){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode('osnap');return;}
+ if(ev.key==='F3'||ev.key==='F4'){
+  ev.preventDefault();ev.stopImmediatePropagation();
+  setVisualStyle(ev.key==='F3'?'wire2d':'shaded-edges');return;
+ }
+ var mode={F7:'grid',F8:'ortho'}[ev.key];
  if(mode){ev.preventDefault();ev.stopImmediatePropagation();toggleDraftMode(mode);return;}
  if(ev.key==='Enter'&&['wall','door','window','opening'].includes(placing)&&!ev.target?.closest?.('input,textarea,select,[contenteditable=true]')){
   ev.preventDefault();ev.stopImmediatePropagation();
