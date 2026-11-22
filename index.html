@@ -9374,7 +9374,7 @@ function initPermanentBlockGallery(){
   }).join('');
   return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="#ecf4fc" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
  }
- window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);if(!x)return false;install(x);return true};
+ window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);return x?install(x)!==false:false};
  function install(x){
   if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
@@ -9413,6 +9413,7 @@ function initPermanentBlockGallery(){
   setTool('insertBlock');state.galleryRepeatedInsert=true;
   $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar · Esc para terminar';
   toast('Ready to insert at 1:1 · '+layer.name);
+  return true;
  }
  function showCards(){
   for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
@@ -9425,7 +9426,7 @@ function initPermanentBlockGallery(){
    button.title=x.id+' · ancho '+x.w+' m · marco paramétrico 0,05 m · clic para insertar';
    button.innerHTML=svgFor(x)+'<span style="font-size:10px;display:block;line-height:1.3;color:#e5eef7;white-space:normal;margin-top:4px">'+escapeHTML(x.id)+'</span>'+(x.pro?'<span style="font-size:9px;color:#f2d38f">PRO · membresía</span>':x.free?'<span style="font-size:9px;color:#9fe0c4">FREE · PARAMÉTRICO</span>':x.kind?'<span style="font-size:9px;color:#9cdeed">↔ PARAMÉTRICO</span>':x.wholeRoom?'<span style="font-size:9px;color:#9cdeed">AMBIENTE · BLOQUE ÚNICO</span>':'');
    const svg=button.querySelector('svg');svg.style.height='100%';svg.style.minHeight='58px';svg.style.background='transparent';
-   button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{install(x);for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
+   button.setAttribute('aria-pressed',String(select.value===(x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id)));button.onclick=()=>{if(install(x)===false)return;for(const other of cards.children)other.setAttribute('aria-pressed','false');button.setAttribute('aria-pressed','true')};
    cards.append(button);
   }
  }
@@ -10771,7 +10772,8 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
 <script src="cad-performance.js?v=20261120-1850"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261120-1850"></script><script src="cad-cloud.js?v=20261120-1850"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261120-1850"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
+<script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="cad-arq-pro.js?v=20261121-1"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
