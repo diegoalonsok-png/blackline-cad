@@ -808,24 +808,28 @@ function applySunSettings(){
   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
- if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?0.65:1.3;
- if(sunFill)sunFill.intensity=sunSettings.enabled?0.22:0.7;
+ if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?1.05:1.15;
+ if(sunFill)sunFill.intensity=sunSettings.enabled?0.38:0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);}});
+ if(scene&&scene.background&&typeof scene.background.setHex==='function'&&['shaded','shaded-edges','realistic'].includes(renderStyle))
+  scene.background.setHex(sunSettings.enabled?0xc4d8e4:MODEL_BACKGROUND);
+ if(sunGround&&sunGround.material&&sunGround.material.color&&typeof sunGround.material.color.setHex==='function')
+  sunGround.material.color.setHex(sunSettings.enabled?0xd1cbc0:0x9ba5a8);
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
- var radius=Math.max(45,bounds.span*2),range=Math.max(30,Math.min(450,bounds.span*1.9));
+ var radius=Math.max(45,bounds.span*2),range=Math.max(7,Math.min(280,bounds.span*1.25));
  sunLight.target.position.set(bounds.x,bounds.y,bounds.z);scene.add(sunLight.target);
  sunLight.position.set(bounds.x+radius*Math.cos(el)*Math.cos(az),
   bounds.y+radius*Math.cos(el)*Math.sin(az),bounds.z+radius*Math.sin(el));
  sunLight.target.updateMatrixWorld();
- sunLight.intensity=sunSettings.enabled?2.7:2.1;
+ sunLight.intensity=sunSettings.enabled?2.35:2.1;
  sunLight.castShadow=sunSettings.enabled;
  sunLight.shadow.mapSize.set(2048,2048);
  var shadowCamera=sunLight.shadow.camera;
  shadowCamera.left=-range;shadowCamera.right=range;
  shadowCamera.top=range;shadowCamera.bottom=-range;
  shadowCamera.near=.5;shadowCamera.far=radius*3.5;
- sunLight.shadow.bias=-.0002;sunLight.shadow.normalBias=.018;
+ sunLight.shadow.bias=-.00012;sunLight.shadow.normalBias=.014;sunLight.shadow.radius=2;
  shadowCamera.updateProjectionMatrix();
  if(renderer)renderer.shadowMap.needsUpdate=true;
 }
@@ -1106,13 +1110,14 @@ function init(){
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
  renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
+ renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
  root.querySelector('.view').appendChild(renderer.domElement);
- sunAmbient=new T.AmbientLight(0xffffff,1.3);scene.add(sunAmbient);
- sunLight=new T.DirectionalLight(0xffffff,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
- sunFill=new T.DirectionalLight(0x8bc0ef,.7);sunFill.position.set(7,9,7);scene.add(sunFill);
+ sunAmbient=new T.HemisphereLight(0xdceefb,0x918c83,1.15);scene.add(sunAmbient);
+ sunLight=new T.DirectionalLight(0xffeed1,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
+ sunFill=new T.DirectionalLight(0xc4e4fa,.7);sunFill.position.set(7,9,7);scene.add(sunFill);
  // The grid is lines, not a shadow receiver. Keep visual ground separate from editable model.
  sunGround=new T.Mesh(new T.PlaneGeometry(2000,2000),
-  new T.MeshStandardMaterial({color:0x9ba5a8,roughness:1,metalness:0,side:T.DoubleSide}));
+  new T.MeshStandardMaterial({color:0xd1cbc0,roughness:.98,metalness:0,side:T.DoubleSide}));
  sunGround.position.z=-.03;sunGround.receiveShadow=true;sunGround.castShadow=false;
  sunGround.renderOrder=0;scene.add(sunGround);
  gridHelper=new T.GridHelper(60,60,0x6e8391,new T.Color(MODEL_GRID));gridHelper.rotation.x=Math.PI/2;scene.add(gridHelper);
@@ -2070,8 +2075,9 @@ function applyRenderStyle(){
  if(!T)return;
  var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf3f1e8:MODEL_BACKGROUND);
- if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:0x9ba5a8);
+ if(scene)scene.background=new T.Color(sketch?sketch.bg:lightPaper?0xf6f5f1:
+  sunSettings.enabled&&['shaded','shaded-edges','realistic'].includes(renderStyle)?0xc4d8e4:MODEL_BACKGROUND);
+ if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:sunSettings.enabled?0xd1cbc0:0x9ba5a8);
  if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
  if(axesHelper)axesHelper.visible=!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
  if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
@@ -2099,13 +2105,33 @@ function applyRenderStyle(){
   m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
   if(withEdges){
    var edge=new T.EdgesGeometry(m.geometry,22);
-   var colorEdge=sketch?sketch.edge:renderStyle==='shaded-edges'?0x394954:0x43535e;
+   var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
+    renderStyle==='wire3d'?0x191d21:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
     color:colorEdge,depthTest:depthTest,depthWrite:false,
     transparent:!!sketch||renderStyle==='shaded-edges',opacity:sketch?sketch.alpha:renderStyle==='shaded-edges'?.68:1
    }));
    line.userData.cadSketch=true;line.renderOrder=5;m.add(line);
+   // 2D Wireframe: crisp black edge lines with visible geometric vertices.
+   // These points are presentation-only, never editable drawing records.
+   if(renderStyle==='wire2d'){
+    var positions=edge.getAttribute('position'),coords=[],seen=new Set();
+    for(var vi=0;vi<positions.count&&seen.size<1200;vi++){
+     var vx=positions.getX(vi),vy=positions.getY(vi),vz=positions.getZ(vi);
+     var k=Math.round(vx*10000)+','+Math.round(vy*10000)+','+Math.round(vz*10000);
+     if(seen.has(k))continue;
+     seen.add(k);coords.push(vx,vy,vz);
+    }
+    if(coords.length){
+     var dots=new T.BufferGeometry();
+     dots.setAttribute('position',new T.Float32BufferAttribute(coords,3));
+     var points=new T.Points(dots,new T.PointsMaterial({
+      color:0x151515,size:3.2,sizeAttenuation:false,depthTest:false,depthWrite:false
+     }));
+     points.userData.cadSketch=true;points.renderOrder=6;m.add(points);
+    }
+   }
   }
  });
 }
