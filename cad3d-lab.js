@@ -667,8 +667,16 @@ var css=`
  background:#1b4256!important;border-color:#a2d7ee!important;
  box-shadow:inset 0 -2px 0 #8dcce0!important;
 }
-#cad3dLab.cad3dCompactMode .cad3dDockBar .btn > span,
-#cad3dLab.cad3dCompactMode .cad3dDockBar summary.btn > span{display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dBar > button.btn > span,
+#cad3dLab.cad3dCompactMode .cad3dProfileTools > button.btn > span,
+#cad3dLab.cad3dCompactMode .cad3dModelTools > button.btn > span,
+#cad3dLab.cad3dCompactMode .tools > button.btn > span,
+#cad3dLab.cad3dCompactMode .tools > label.btn > span,
+#cad3dLab.cad3dCompactMode .tools > .sunControl > button.btn > span,
+#cad3dLab.cad3dCompactMode .tools > .styleControl > button.btn > span,
+#cad3dLab.cad3dCompactMode .tools > .block3DMenu > summary.btn > span,
+#cad3dLab.cad3dCompactMode .tools > .ioMenu > summary.btn > span,
+#cad3dLab.cad3dCompactMode .tools > .viewSaveMenu > summary.btn > span{display:none!important}
 #cad3dLab.cad3dCompactMode .cad3dDockBar .btn > svg,
 #cad3dLab.cad3dCompactMode .cad3dDockBar summary.btn > svg{
  width:21px!important;height:21px!important;max-width:21px!important;max-height:21px!important;
@@ -745,6 +753,24 @@ var css=`
  pointer-events:none!important;
 }
 #cad3dLab.cad3dCompactMode .cad3dDockDraggingBar > strong{display:none!important}
+#cad3dLab.cad3dCompactMode .cad3dDockLeft .stylePanel,
+#cad3dLab.cad3dCompactMode .cad3dDockLeft .sunPanel,
+#cad3dLab.cad3dCompactMode .cad3dDockLeft .viewSavePanel,
+#cad3dLab.cad3dCompactMode .cad3dDockLeft .ioMenu > div{
+ left:calc(100% + 5px)!important;right:auto!important;top:0!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockLeft .block3DPanel{
+ left:calc(100% + 5px)!important;right:auto!important;top:0!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockRight .block3DPanel,
+#cad3dLab.cad3dCompactMode .cad3dDockRight .stylePanel,
+#cad3dLab.cad3dCompactMode .cad3dDockRight .sunPanel,
+#cad3dLab.cad3dCompactMode .cad3dDockRight .viewSavePanel{
+ right:calc(100% + 5px)!important;left:auto!important;top:0!important;
+}
+#cad3dLab.cad3dCompactMode .cad3dDockRight .ioMenu > div{
+ right:calc(100% + 5px)!important;left:auto!important;top:0!important;
+}
 `;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
