@@ -1472,6 +1472,27 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
  }
  positions.needsUpdate=true;g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
 }
+function addWallAttachments(wall,group){
+ (wall.attachments||[]).forEach(function(att){
+  if(!['rect','circle','polyline'].includes(att.shape))return;
+  var w=clamp(finite(att.w,.6),.03,100),h=clamp(finite(att.h,.6),.03,100);
+  var profile=new T.Shape();
+  if(att.shape==='circle')profile.absarc(0,0,Math.min(w,h)/2,0,Math.PI*2,false);
+  else if(att.shape==='polyline'){
+   if(!Array.isArray(att.points)||att.points.length<3||att.points.length>64)return;
+   att.points.forEach(function(p,i){if(i)profile.lineTo(p[0]*w,p[1]*h);else profile.moveTo(p[0]*w,p[1]*h);});
+   profile.closePath();
+  }else{
+   profile.moveTo(-w/2,0);profile.lineTo(w/2,0);profile.lineTo(w/2,h);profile.lineTo(-w/2,h);profile.closePath();
+  }
+  var dep=clamp(finite(att.depth,.12),.01,3),side=att.side===1?1:-1;
+  var geo=new T.ExtrudeGeometry(profile,{depth:dep,bevelEnabled:false,curveSegments:24});
+  var mesh=new T.Mesh(geo,new T.MeshStandardMaterial({color:0xaab0b5,roughness:.82,side:T.DoubleSide}));
+  mesh.rotation.x=Math.PI/2;
+  mesh.position.set(clamp(finite(att.offset,0),-wall.w/2,wall.w/2),side*wall.d/2+(side===1?dep:0),clamp(finite(att.sill,.5),0,wall.h));
+  mesh.userData.owner=wall.id;mesh.castShadow=true;mesh.receiveShadow=sunSettings.onFaces;group.add(mesh);
+ });
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
@@ -1486,6 +1507,7 @@ function buildObject(r){
   }
   addMesh(g,color,r.id,group,x,y,z);
  });
+ if(r.type==='wall')addWallAttachments(r,group);
  if(r.type==='sphere'){var sphere=new T.SphereGeometry(r.radius,28,18);sphere.translate(0,0,r.radius);addMesh(sphere,0xb0b7c0,r.id,group);}
  if(r.type==='cylinder'||r.type==='cone'){
   var cone=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);
@@ -1545,6 +1567,21 @@ function renderProps(){
  if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
+ if(r.type==='wall'){
+  html+='<div class="detail"><strong>WALL EXTRUSIONS</strong> '+
+   '<button class="btn" type="button" data-add-extrusion="rect">+ Rectangle</button> '+
+   '<button class="btn" type="button" data-add-extrusion="circle">+ Circle</button> '+
+   '<button class="btn" type="button" data-add-extrusion="polyline">+ Polyline</button>';
+  (r.attachments||[]).forEach(function(a){
+   html+='<div class="detail"><strong>'+escapeHtml(a.shape)+' #'+a.id+'</strong>';
+   [['offset','Offset X'],['sill','Base Z'],['w','Width'],['h','Height'],['depth','Extrusion']].forEach(function(pair){
+    html+='<label>'+pair[1]+' (m)<input type="number" step="any" data-att-id="'+a.id+'" data-att-key="'+pair[0]+'" value="'+a[pair[0]]+'"></label>';
+   });
+   html+='<label>Face <select data-att-id="'+a.id+'" data-att-key="side"><option value="-1"'+(a.side===-1?' selected':'')+'>Front</option><option value="1"'+(a.side===1?' selected':'')+'>Back</option></select></label>'+
+    '<button class="btn" type="button" data-del-extrusion="'+a.id+'">Detach</button></div>';
+  });
+  html+='</div>';
+ }
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
   r.openings.forEach(function(o,i){
@@ -1562,7 +1599,7 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
@@ -1580,6 +1617,13 @@ function change(e){
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
  }
  var val=Number(input.value);if(!Number.isFinite(val))return text('Valor inválido');
+ if(input.dataset.attId){
+  var att=(r.attachments||[]).find(function(a){return a.id===Number(input.dataset.attId);});
+  if(!att)return;
+  var key=input.dataset.attKey;
+  att[key]=key==='side'?(val===1?1:-1):['w','h'].includes(key)?clamp(val,.03,100):key==='depth'?clamp(val,.01,3):clamp(val,-10000,10000);
+  redraw();renderProps();text('Extrusión actualizada');return;
+ }
  if(input.dataset.opening){
   var o=(r.openings||[]).find(function(v){return v.id===Number(input.dataset.opening);});if(!o)return;
   var key=input.dataset.attr;
@@ -1597,7 +1641,34 @@ function change(e){
  }
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
 }
+function addWallExtrusion(btn){
+ var wall=records.find(function(r){return selected.includes(r.id)&&r.type==='wall'&&editableRecord(r);});
+ if(!wall)return;
+ var kind=btn.dataset.addExtrusion,pts=null;
+ if(kind==='polyline'){
+  var raw=window.prompt('Closed polyline X,Z coordinates separated by semicolons', '-0.5,0; 0.5,0; 0.3,1; -0.3,1');
+  if(raw===null)return;
+  pts=raw.split(';').map(function(p){return p.trim().split(/[ ,]+/).map(Number);});
+  if(pts.length<3||pts.length>64||pts.some(function(p){return p.length!==2||p.some(function(v){return !Number.isFinite(v)||Math.abs(v)>10;});})){text('Invalid polyline');return;}
+  var area=0;pts.forEach(function(p,i){var q=pts[(i+1)%pts.length];area+=p[0]*q[1]-p[1]*q[0];});
+  if(Math.abs(area)<.00001){text('Polyline has zero area');return;}
+  if(area<0)pts.reverse();
+ }
+ wall.attachments=wall.attachments||[];
+ if(wall.attachments.length>=100){text('Attachment limit reached');return;}
+ wall.attachments.push({id:serial++,shape:kind,points:pts,offset:0,sill:.5,w:.6,h:.6,depth:.12,side:-1});
+ redraw();renderProps();text('Extruded profile attached to wall');
+}
 function clickProps(e){
+ var add=e.target.closest('[data-add-extrusion]');
+ if(add){addWallExtrusion(add);return;}
+ var delAttachment=e.target.closest('[data-del-extrusion]');
+ if(delAttachment){
+  var wall=records.find(function(r){return selected.includes(r.id)&&r.type==='wall';});
+  if(!wall)return;
+  wall.attachments=(wall.attachments||[]).filter(function(a){return a.id!==Number(delAttachment.dataset.delExtrusion);});
+  redraw();renderProps();text('Attachment removed');return;
+ }
  var o=e.target.closest('[data-remove-opening]');if(o){
   var host=records.find(function(r){return selected.includes(r.id)&&(r.type==='wall'||r.type==='slab');});if(!host)return;
   host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});
