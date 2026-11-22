@@ -1378,7 +1378,7 @@ function profileSpansAtX(att,x){
   var rad=Math.min(w,h)/2;
   if(Math.abs(local)>=rad)return [];
   var rise=Math.sqrt(Math.max(0,rad*rad-local*local));
-  return [[z-rise,z+rise]];
+  return [[z+rad-rise,z+rad+rise]];
  }
  if(att.shape==='polyline'){
   var pts=att.points||[],hits=[];
@@ -1570,7 +1570,7 @@ function addWallAttachments(wall,group){
   if(!['rect','circle','polyline'].includes(att.shape))return;
   var w=clamp(finite(att.w,.6),.03,100),h=clamp(finite(att.h,.6),.03,100);
   var profile=new T.Shape();
-  if(att.shape==='circle')profile.absarc(0,0,Math.min(w,h)/2,0,Math.PI*2,false);
+  if(att.shape==='circle')profile.absarc(0,Math.min(w,h)/2,Math.min(w,h)/2,0,Math.PI*2,false);
   else if(att.shape==='polyline'){
    if(!Array.isArray(att.points)||att.points.length<3||att.points.length>64)return;
    att.points.forEach(function(p,i){if(i)profile.lineTo(p[0]*w,p[1]*h);else profile.moveTo(p[0]*w,p[1]*h);});
