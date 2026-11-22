@@ -2739,7 +2739,10 @@ async function saveCAD3DView(){
   }
   if(o.format==='pdf'){
    var pdf=cad3dPDFfromJPEG(out.toDataURL('image/jpeg',.93),o.w,o.h,o.dpi);
-   download(filename+'.pdf',pdf,'application/pdf');
+   var pdfUrl=URL.createObjectURL(pdf),pdfLink=document.createElement('a');
+   pdfLink.href=pdfUrl;pdfLink.download=filename+'.pdf';
+   document.body.appendChild(pdfLink);pdfLink.click();pdfLink.remove();
+   setTimeout(function(){URL.revokeObjectURL(pdfUrl);},1200);
   }else{
    var type=o.format==='jpg'?'image/jpeg':'image/png';
    var url=out.toDataURL(type,.94),a=document.createElement('a');
