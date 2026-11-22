@@ -106,7 +106,7 @@
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;save();paint();return}
-   const card=e.target.closest('[data-id]');if(card){armedId=card.dataset.id;try{ARQ.insert(armedId)}catch(err){CORE.toast(String(err?.message||err))}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
+   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
   const hd=el.querySelector('.hd');let drag=null;
