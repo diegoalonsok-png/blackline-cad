@@ -2258,7 +2258,7 @@ function blockInstanceGeometry(definition,ref){
  if(!param||!ref.params)return definition.entities;
  const w=Number(ref.params.width),h=Number(ref.params.depth);
  if(!Number.isFinite(w)||w<=0||w>1e8)return definition.entities;
- const base={layer:'openings',width:.05},P2=(x,y)=>P(x,y);
+ const base={layer:definition.libraryLayer0?'0':'openings',...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:.05},P2=(x,y)=>P(x,y);
  const framed=(kind)=>{
   const t=Number(ref.params.frameWidth??param.defaults.frameWidth);
   const d=param.kind==='framed-window'?cadWindowDepthModel(ref,definition):Number(ref.params.frameDepth??param.defaults.frameDepth);
@@ -2562,7 +2562,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:ref.xref&&e.layer?e.layer:ref.layer,width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -8894,7 +8894,9 @@ function insertSelectedBlock(point){
  // Keep the original wall intact if we detect a two-face wall but cannot cut BOTH faces.
  saveHistory();
  const beforeInsertion=state.history.at(-1);
- const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:state.layerId};
+ const baseLayer=block.libraryLayer0?state.layers.find(l=>l.id==='0'||l.name==='0'):null;
+ if(block.libraryLayer0&&!baseLayer)state.layers.unshift({id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.13});
+ const ref={id:state.nextId++,type:'blockRef',blockName:block.name,p:P(point.x,point.y),scale:factor,rotation:angle,layer:block.libraryLayer0?(baseLayer?.id||'0'):state.layerId,...(block.libraryLayer0?{color:'#ffffff'}:{})};
  if(block.dynamic2d){const b=blDynBounds(block);if(b)ref.dynamic={width:b.width,height:b.height}}
  if(block.parametric){
   ref.params={...block.parametric.defaults};
@@ -8907,10 +8909,10 @@ function insertSelectedBlock(point){
      if(width>0&&width<1e8)ref.params.width=width;
     }
    }
-   ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;
+   if(!block.libraryLayer0)ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;
   }
  }
- else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
+ else if(/(?:PUERTA|VENTANA|DOOR|WINDOW|OPENING|ABERTURA)/i.test(block.name)){if(!block.libraryLayer0)ref.layer=ensureArchitecturalLayer('openings');ref.lineweight=.05;}
  const aligned=cadAlignOpeningToWall(ref,block,point);
  state.entities.push(ref);
  const cutCount=openingOverlapsAnother(ref,block)?0:autoCutWallForOpening(ref,block);
@@ -9385,24 +9387,22 @@ function initPermanentBlockGallery(){
  function install(x){
   if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
-  const info={Openings:['BL_OPENINGS','#f2c58a'],Furniture:['BL_FURNITURE','#a1c2e1'],Sanitary:['BL_SANITARY','#9fe0d0'],Vehicles:['BL_VEHICLES','#d2b7ee'],Landscape:['BL_LANDSCAPE','#add78e'],Rooms:['BL_ROOMS','#e4c8a1']}[x.cat];
-  if(!info)return toast('Unknown block category');
+  // Library folder names are for browsing only, never drawing layers.
   const key=x.kind?'CAD2D Abertura v2 · '+x.id:'BL '+x.id,already=Boolean(state.blocks[key]);
-  let layer=state.layers.find(l=>l.name===info[0]);
+  let layer=state.layers.find(l=>l.id==='0'||l.name==='0');
   if(!layer||!already)saveHistory();
   if(!layer){
-   const id=info[0];
-   layer={id,name:id,color:info[1],visible:true,locked:false,width:x.kind?.05:.25};
-   state.layers.push(layer);
+   layer={id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.13};
+   state.layers.unshift(layer);
    renderLayers();
   }
   const entities=x.draw.map(d=>{
    const v=d.slice(1).map(n=>n*factor),type=d[0];
-   if(type==='line')return {type,a:P(v[0],v[1]),b:P(v[2],v[3]),layer:layer.id};
-   if(type==='rect')return {type,a:P(v[0],v[1]),b:P(v[0]+v[2],v[1]+v[3]),layer:layer.id};
-   if(type==='circle')return {type,c:P(v[0],v[1]),r:v[2],layer:layer.id};
-   if(type==='ellipse')return {type,c:P(v[0],v[1]),rx:v[2],ry:v[3],rotation:0,layer:layer.id};
-   if(type==='arc')return {type,c:P(v[0],v[1]),r:v[2],a0:d[4]*Math.PI/180,a1:d[5]*Math.PI/180,layer:layer.id};
+   if(type==='line')return {type,a:P(v[0],v[1]),b:P(v[2],v[3]),layer:layer.id,color:'#ffffff'};
+   if(type==='rect')return {type,a:P(v[0],v[1]),b:P(v[0]+v[2],v[1]+v[3]),layer:layer.id,color:'#ffffff'};
+   if(type==='circle')return {type,c:P(v[0],v[1]),r:v[2],layer:layer.id,color:'#ffffff'};
+   if(type==='ellipse')return {type,c:P(v[0],v[1]),rx:v[2],ry:v[3],rotation:0,layer:layer.id,color:'#ffffff'};
+   if(type==='arc')return {type,c:P(v[0],v[1]),r:v[2],a0:d[4]*Math.PI/180,a1:d[5]*Math.PI/180,layer:layer.id,color:'#ffffff'};
   });
   if(entities.some(e=>!e))return toast('Unsupported block geometry');
   // Reuse the definition when available; built-ins never overwrite user imports.
@@ -9412,7 +9412,7 @@ function initPermanentBlockGallery(){
     ...(x.kind==='swing-door'?{mirror:Boolean(x.reverse)}:{}),
     ...(x.kind==='framed-window'?{mullion:Boolean(x.mullion),...(x.vano?{vano:true}:{})}:{})
    }}:null;
-   state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),...(param?{parametric:param}:{}),...(x.pro?{pro:true}:{})});
+   state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),libraryLayer0:true,...(param?{parametric:param}:{}),...(x.pro?{pro:true}:{})});
    if(x.wholeRoom){state.blocks[key].dynamic2d=blDynEligible(state.blocks[key]);state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
    renderBlockLibrary();queueLocalBackup()
   }
