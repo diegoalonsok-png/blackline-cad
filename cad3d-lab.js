@@ -372,7 +372,13 @@ const ARCH_STYLES={
   {id:'revolving-door',name:'Revolving entrance',w:2.2,h:2.4,sill:0},
   {id:'barn-sliding',name:'Barn sliding door',w:1.1,h:2.3,sill:0},
   {id:'fire-rated',name:'Fire-rated door',w:1,h:2.1,sill:0},
-  {id:'pointed-door',name:'Pointed arch doorway',w:1.2,h:2.6,sill:0,shape:'pointed'}
+  {id:'pointed-door',name:'Pointed arch doorway',w:1.2,h:2.6,sill:0,shape:'pointed'},
+  {id:'double-sliding-patio',name:'Patio double sliding · 3.60 m',w:3.6,h:2.40,sill:0},
+  {id:'triple-folding',name:'Triple folding glass · 3.00 m',w:3.00,h:2.45,sill:0},
+  {id:'industrial-french',name:'Industrial French glazed',w:2.10,h:2.4,sill:0},
+  {id:'french-transom',name:'French glazed with transom',w:1.80,h:2.70,sill:0},
+  {id:'pivot-double-entry',name:'Double pivot entrance',w:2.4,h:2.7,sill:0},
+  {id:'garage-double',name:'Double garage sectional',w:4.8,h:2.5,sill:0}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
@@ -401,7 +407,13 @@ const ARCH_STYLES={
   {id:'bay-window',name:'Bay picture window',w:2.2,h:1.4,sill:.8},
   {id:'tilt-turn',name:'Tilt and turn',w:1,h:1.3,sill:.9},
   {id:'guillotine',name:'Vertical sash',w:.95,h:1.25,sill:.85},
-  {id:'glass-block',name:'Glass block panel',w:1.2,h:1.4,sill:.8}
+  {id:'glass-block',name:'Glass block panel',w:1.2,h:1.4,sill:.8},
+  {id:'triple-sliding-window',name:'Triple sliding · 3.00 m',w:3,h:1.5,sill:.8},
+  {id:'quad-fixed-window',name:'Four-pane fixed glazing',w:3.2,h:1.55,sill:.7},
+  {id:'french-casement',name:'French two-leaf casement',w:1.6,h:1.5,sill:.85},
+  {id:'arched-french',name:'Arched French window',w:1.5,h:1.7,sill:.7,shape:'arch'},
+  {id:'round-louver',name:'Round louver window',w:1.1,h:1.1,sill:1.1,shape:'round'},
+  {id:'wide-clerestory',name:'Wide horizontal clerestory',w:3.6,h:.6,sill:2.0}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -416,6 +428,8 @@ const ARCH_STYLES={
   {id:'segment-opening',name:'Segmental passage',host:'wall',w:1.7,h:2.45,sill:0,shape:'segment'},
   {id:'pointed-opening',name:'Pointed arch',host:'wall',w:1.4,h:2.7,sill:0,shape:'pointed'},
   {id:'triangle-opening',name:'Triangular opening',host:'wall',w:1.3,h:1.2,sill:1,shape:'triangle'},
+  {id:'oval-opening',name:'Oval wall opening',host:'wall',w:1.8,h:1.0,sill:1.0,shape:'round'},
+  {id:'wide-arch-opening',name:'Wide arched passage',host:'wall',w:3,h:2.65,sill:0,shape:'arch'},
   {id:'slab-opening',name:'Slab opening',host:'slab',w:1,d:1}
  ]
 };
@@ -1556,9 +1570,9 @@ function architectureParts(r,part){
   if(opening.kind==='door'){
    var id=opening.styleId||'',frameDepth=thickness+.03;
    var doubleLeaf=/double|french|terrace|bifold|folding|industrial|revolving/.test(id);
-   var panels=/garage/.test(id)?1:/bifold|folding/.test(id)?4:doubleLeaf?2:1;
-   var sliding=/sliding|pocket|barn|terrace/.test(id);
-   var glazed=/french|terrace|industrial/.test(id);
+   var panels=/garage/.test(id)?1:/triple-folding/.test(id)?3:/bifold|folding/.test(id)?4:doubleLeaf?2:1;
+   var sliding=/sliding|pocket|barn|terrace|patio/.test(id);
+   var glazed=/french|terrace|industrial|patio|triple-folding/.test(id);
    var frameW=Math.min(.065,w/10),usable=Math.max(.05,w-2*frameW);
    var leafColor=glazed?0x598fa4:/fire-rated|industrial/.test(id)?0x8296a0:0x997a63;
    // Perimeter frame, head and both jambs, remain attached to the host.
@@ -1592,7 +1606,7 @@ function architectureParts(r,part){
   }else{
    var id=opening.styleId||'',d=thickness+.035;
    var frameW=Math.min(.055,w/10,h/10),innerW=Math.max(.04,w-2*frameW),innerH=Math.max(.04,h-2*frameW);
-   var sliding=/sliding/.test(id),n=/double|two-leaf|sliding|bay/.test(id)?2:/ribbon/.test(id)?3:1;
+   var sliding=/sliding/.test(id),n=/quad-fixed/.test(id)?4:/triple-sliding/.test(id)?3:/double|two-leaf|sliding|bay|french/.test(id)?2:/ribbon/.test(id)?3:1;
    var glazingColor=/glass-block/.test(id)?0x9ec8d3:0x548b9e;
    // Full perimeter with clear glazing to distinguish windows from solid doors.
    part(w,d,frameW,x,0,z,0x9babb5,0);
@@ -1602,7 +1616,7 @@ function architectureParts(r,part){
    part(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true);
    for(var pane=1;pane<n;pane++)
     part(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
-   if(/french|glass-block/.test(id)){
+   if(/french|glass-block|quad-fixed/.test(id)){
     for(var grid=1;grid<4;grid++)
      part(innerW,.038,.018,x,0,z+frameW+innerH*grid/4,0xb9c7cd,0);
     for(var col=1;col<4;col++)
