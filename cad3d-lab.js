@@ -1390,7 +1390,7 @@ function placeOpening(e){
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
- var op={id:serial++,kind:kind,styleId:style.id,shape:style.shape||'rect',offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
+ var op={id:serial++,kind:kind,styleId:style.id,shape:style.shape||'rect',offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w,hingeSide:'left',openDirection:1,openAngle:0,openFraction:0};
  if(slab){
   var maxY=(rec.d-span)/2;
   op.offsetY=clamp(-dx*s+dy*c,-maxY,maxY);op.d=span;
@@ -1488,6 +1488,15 @@ function selectAt(e){
 }
 function boxGeom(w,d,h){var g=new T.BoxGeometry(w,d,h);g.translate(0,0,h/2);return g;}
 function glazingOpacity(opening){return clamp(finite(opening?.glassOpacity,.24),.08,.85);}
+function openingMotionType(o){
+ if(!o||o.kind==='opening')return 'fixed';
+ var id=o.styleId||'';
+ if(/sliding|pocket|barn|terrace|patio|guillotine/.test(id))return 'sliding';
+ if(/fixed|glass-block|ribbon|clerestory|garage/.test(id))return 'fixed';
+ if(/bifold|folding/.test(id))return 'folding';
+ if(/awning|hopper|tilt|casement|pivot|french|swing|hinged|single|double|arched|pointed/.test(id))return 'hinged';
+ return o.kind==='door'?'hinged':'fixed';
+}
 function openingIsGlass(opening){
  return opening.kind==='window'||(opening.kind==='door'&&/french|terrace|industrial|patio|glazed|folding/.test(opening.styleId||''));
 }
@@ -1959,6 +1968,18 @@ function renderProps(){
      return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';
     }).join('')+'</select></label>';
    }
+   if(r.type==='wall'&&o.kind!=='opening'){
+    var motion=openingMotionType(o);
+    if(motion!=='fixed'){
+     html+='<label>Opening action <select data-opening-action="'+o.id+'"><option value="closed"'+((o.openAngle||0)===0&&(o.openFraction||0)===0?' selected':'')+'>Closed</option><option value="half">Half open</option><option value="full">Fully open</option></select></label>';
+     if(motion==='sliding')html+='<label>Slide opening (0–100%)<input type="number" min="0" max="100" step="5" data-opening-slide="'+o.id+'" value="'+Math.round(clamp(finite(o.openFraction,0),0,1)*100)+'"></label>';
+     else{
+      html+='<label>Open angle (°)<input type="number" min="0" max="170" step="5" data-opening-angle="'+o.id+'" value="'+clamp(finite(o.openAngle,0),0,170)+'"></label>';
+      html+='<label>Hinge <select data-opening-hinge="'+o.id+'"><option value="left"'+(o.hingeSide!=='right'?' selected':'')+'>Left</option><option value="right"'+(o.hingeSide==='right'?' selected':'')+'>Right</option></select></label>';
+      html+='<label>Opening direction <select data-opening-direction="'+o.id+'"><option value="1"'+(o.openDirection!==-1?' selected':'')+'>Inward</option><option value="-1"'+(o.openDirection===-1?' selected':'')+'>Outward</option></select></label>';
+     }
+    }
+   }
    if(r.type==='wall'&&openingIsGlass(o))
     html+='<label>Glass opacity <input type="number" min="0.08" max="0.85" step="0.05" data-glass-opacity="'+o.id+'" value="'+glazingOpacity(o)+'"></label>';
    if(r.type==='wall')html+='<label>Void shape <select data-opening-shape="'+o.id+'">'+
@@ -1971,7 +1992,7 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape],select[data-opening-style],input[data-glass-opacity]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],input[data-att-id],select[data-att-id],select[data-opening-shape],select[data-opening-style],input[data-glass-opacity],input[data-opening-slide],input[data-opening-angle],select[data-opening-hinge],select[data-opening-direction],select[data-opening-action]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
@@ -1987,6 +2008,25 @@ function change(e){
    else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
   }
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
+ }
+ if(input.dataset.openingAngle||input.dataset.openingSlide||input.dataset.openingHinge||input.dataset.openingDirection||input.dataset.openingAction){
+  var openingId=Number(input.dataset.openingAngle||input.dataset.openingSlide||input.dataset.openingHinge||input.dataset.openingDirection||input.dataset.openingAction);
+  var moving=(r.openings||[]).find(function(o){return o.id===openingId;});
+  if(!moving)return;
+  var motion=openingMotionType(moving);
+  if(motion==='fixed')return text('Este modelo no posee hoja móvil');
+  if(input.dataset.openingAction){
+   var amount=input.value==='half'?.5:input.value==='full'?1:0;
+   if(motion==='sliding')moving.openFraction=amount;else moving.openAngle=amount*90;
+  }else if(input.dataset.openingAngle&&motion!=='sliding'){
+   if(!Number.isFinite(Number(input.value)))return;
+   moving.openAngle=clamp(Number(input.value),0,170);
+  }else if(input.dataset.openingSlide&&motion==='sliding'){
+   if(!Number.isFinite(Number(input.value)))return;
+   moving.openFraction=clamp(Number(input.value)/100,0,1);
+  }else if(input.dataset.openingHinge)moving.hingeSide=input.value==='right'?'right':'left';
+  else if(input.dataset.openingDirection)moving.openDirection=input.value==='-1'?-1:1;
+  redraw();renderProps();text('Apertura paramétrica actualizada');return;
  }
  if(input.dataset.glassOpacity){
   var glassOpening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.glassOpacity);});
@@ -2736,6 +2776,8 @@ async function readJSON(e){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
        shape:['rect','round','arch','segment','triangle','pointed'].includes(v.shape)?v.shape:'rect',
        glassOpacity:clamp(finite(v.glassOpacity,.24),.08,.85),
+       hingeSide:v.hingeSide==='right'?'right':'left',openDirection:v.openDirection===-1?-1:1,
+       openAngle:clamp(finite(v.openAngle,0),0,170),openFraction:clamp(finite(v.openFraction,0),0,1),
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
      if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
