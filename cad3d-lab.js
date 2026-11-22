@@ -434,14 +434,15 @@ function cad3DOpeningConfig(o){
   ['fixed','casement','sliding','awning','hopper','tilt-turn'];
  var op=permitted.includes(o.operation)?o.operation:d.operation;
  return {operation:op,leaves:clamp(Math.round(Number(o.leaves)||d.leaves),1,3),
-  hinge:o.hinge==='right'?'right':'left',swing:o.swing==='out'?'out':'in',
+  hinge:['left','right'].includes(o.hinge)?o.hinge:d.hinge,
+  swing:['in','out'].includes(o.swing)?o.swing:d.swing,
   openAngle:clamp(Number(o.openAngle)||0,0,120),
   openPercent:clamp(Number(o.openPercent)||0,0,100)};
 }
 /* Leaf transformation is resolved relative to the frame hinge, never to the model origin. */
 function cad3DLeafMotion(config,i,count,x0,x1,z,h){
  var hinged=config.operation==='hinged'||config.operation==='casement'||
-  config.operation==='pivot'||config.operation==='folding'||config.operation==='tilt-turn';
+  config.operation==='pivot'||config.operation==='folding';
  var sliding=config.operation==='sliding',sectional=config.operation==='sectional';
  var right=(config.hinge==='right');
  if(count>1&&hinged&&config.operation!=='pivot')right=(i%2===0)?right:!right;
@@ -451,7 +452,7 @@ function cad3DLeafMotion(config,i,count,x0,x1,z,h){
  var m={axis:'z',angle:0,pivotX:hingeX,pivotY:0,pivotZ:z,
   shiftX:0,shiftY:0,shiftZ:0};
  if(hinged)m.angle=sign*config.openAngle*Math.PI/180;
- else if(config.operation==='awning'||config.operation==='hopper'){
+ else if(['awning','hopper','tilt-turn'].includes(config.operation)){
   m.axis='x';m.pivotX=(x0+x1)/2;m.pivotZ=config.operation==='awning'?z+h:z;
   m.angle=(config.operation==='awning'?-1:1)*
    (config.swing==='out'?1:-1)*config.openAngle*Math.PI/180;
@@ -726,6 +727,17 @@ function build(){
   if(button)changeLayer(button.dataset.layerToggle);
  });
  renderDraftModes();renderLayerPanel();
+ root.querySelector('.props').addEventListener('input',function(e){
+  var field=e.target.closest('input[type="range"][data-opening-param]');
+  if(!field)return;
+  var host=records.find(function(r){return selected.length===1&&r.id===selected[0]&&editableRecord(r);});
+  var op=(host?.openings||[]).find(function(o){return o.id===Number(field.dataset.openingParam);});
+  if(!op||!['openAngle','openPercent'].includes(field.dataset.param))return;
+  op[field.dataset.param]=Number(field.value);
+  var output=root.querySelector('[data-opening-value="'+op.id+'"]');
+  if(output)output.textContent=field.value+(field.dataset.param==='openPercent'?'%':'°');
+  redraw();
+ });
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
  bind3DGripOverlay(root.querySelector('.cad3dGripLayer'));
@@ -1546,6 +1558,8 @@ function get3DGripDefinitions(r,openingId){
   }else{
    add('opening-height','Altura de puerta o ventana',o.offset,0,o.sill+o.h,'z');
    add('opening-sill','Antepecho / solera',o.offset,0,o.sill,'z');
+   if(['door','window'].includes(o.kind)&&cad3DOpeningConfig(o).operation!=='fixed')
+    add('opening-motion','Abrir/cerrar hojas 3D',o.offset+o.w*.35,0,o.sill+o.h*.45,'motion');
   }
   return grips;
  }
@@ -1599,6 +1613,10 @@ function apply3DGripCandidate(original,kind,delta,openingId){
   else if(kind==='opening-depth-start'&&r.type==='slab'){o.d-=delta;o.offsetY+=delta/2;}
   else if(kind==='opening-depth-end'&&r.type==='slab'){o.d+=delta;o.offsetY+=delta/2;}
   else if(kind==='opening-offset-y'&&r.type==='slab')o.offsetY+=delta;
+  else if(kind==='opening-motion'){
+   var config=cad3DOpeningConfig(o),slide=['sliding','sectional'].includes(config.operation);
+   var k=slide?'openPercent':'openAngle';o[k]=clamp(config[k]+delta,0,slide?100:120);
+  }
   else return null;
   if(!Number.isFinite(o.w)||o.w<.05||o.w>1000)return null;
   if(r.type==='wall'&&(!Number.isFinite(o.h)||o.h<.05))return null;
@@ -1727,6 +1745,7 @@ function bind3DGripOverlay(layer){
   e.preventDefault();e.stopPropagation();drag.moved=true;
   var delta=drag.def.kind==='rotate'?
    (Math.atan2(e.clientY-drag.centerY,e.clientX-drag.centerX)-drag.angle)*180/Math.PI:
+   drag.def.kind==='opening-motion'?-dy*.85:
    grip3DDragMeters(drag.original,drag.def,dx,dy);
   if(delta==null)return;
   var next=apply3DGripCandidate(drag.original,drag.def.kind,delta,drag.openingId);
