@@ -1829,13 +1829,21 @@ function addShapedOpenings(wall,group){
    mesh.receiveShadow=sunSettings.onFaces&&!mesh.userData.cadGlass;
    mesh.material.depthWrite=!mesh.userData.cadGlass;group.add(mesh);
   }
-  // Frames around nonrectangular glazed panels remain opaque and cast shadows.
+  // Exact segmented perimeter on both wall faces. This preserves angular
+  // corners (pointed arches/triangles) that Catmull-Rom would round off.
   if(o.kind!=='opening'){
-   var curvePts=points.map(function(p){return new T.Vector3(p[0],0,p[1]);});
-   var curve=new T.CatmullRomCurve3(curvePts,true,'centripetal');
-   var rim=new T.Mesh(new T.TubeGeometry(curve,Math.min(160,Math.max(48,points.length)),.024,5,true),
-    new T.MeshStandardMaterial({color:0x697f8c,roughness:.78,metalness:.1}));
-   rim.userData.owner=wall.id;rim.castShadow=true;rim.receiveShadow=sunSettings.onFaces;group.add(rim);
+   for(var face of [-1,1]){
+    var rimPath=new T.CurvePath(),faceY=face*(wall.d/2+.012);
+    for(var k=0;k<points.length;k++){
+     var a=points[k],b=points[(k+1)%points.length];
+     if(Math.hypot(a[0]-b[0],a[1]-b[1])<.000001)continue;
+     rimPath.add(new T.LineCurve3(new T.Vector3(a[0],faceY,a[1]),new T.Vector3(b[0],faceY,b[1])));
+    }
+    if(!rimPath.curves.length)continue;
+    var rim=new T.Mesh(new T.TubeGeometry(rimPath,Math.min(192,Math.max(64,points.length*2)),.024,5,false),
+     new T.MeshStandardMaterial({color:0x697f8c,roughness:.78,metalness:.1}));
+    rim.userData.owner=wall.id;rim.castShadow=true;rim.receiveShadow=sunSettings.onFaces;group.add(rim);
+   }
   }
   for(var side of [-1,1]){
    var path=points.map(function(p){return new T.Vector3(p[0],side*(wall.d/2+.012),p[1]);});
