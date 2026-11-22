@@ -5,6 +5,8 @@ if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
 var selectedOpeningId=null;
 var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
+var saved3DCameras=[];
+var walkEyeHeight=1.65;
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
@@ -51,6 +53,20 @@ var icons={
  view:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/>'
 };
 var css=`
+#cad3dLab .cameraTools{display:flex;gap:4px;align-items:center;flex:none}
+#cad3dLab .cameraTools .btn{white-space:nowrap}
+#cad3dLab .cameraMenu{position:relative;flex:none}
+#cad3dLab .cameraMenu>summary{list-style:none}
+#cad3dLab .cameraMenu>summary::-webkit-details-marker{display:none}
+#cad3dLab .cameraPanel{position:absolute;right:0;top:calc(100% + 8px);z-index:80;min-width:258px;max-height:350px;overflow:auto;padding:10px;border:1px solid #66899c;border-radius:10px;background:#15242f;box-shadow:0 10px 30px #000a;display:grid;gap:7px;color:#e9f3f8}
+#cad3dLab .cameraMenu:not([open]) .cameraPanel{display:none}
+#cad3dLab .cameraPanel input{width:100%;box-sizing:border-box;padding:6px;background:#263744;border:1px solid #627f91;border-radius:5px;color:#fff}
+#cad3dLab .cameraRow{display:flex;align-items:center;gap:4px}
+#cad3dLab .cameraRecall{flex:1;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#cad3dLab .cameraPanel small{color:#b2c7d5}
+#cad3dLab .walkControls{display:flex;gap:3px}
+#cad3dLab .walkControls[hidden]{display:none}
+
 /* Native CAD3D view save dialog: preserves scene, camera and user project. */
 #cad3dLab .viewSaveMenu{position:relative;display:inline-flex;align-items:center;flex:none}
 #cad3dLab .viewSaveMenu>summary{list-style:none;cursor:pointer;white-space:nowrap}
@@ -682,6 +698,16 @@ function build(){
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
  '<div class="tools"><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false">Parametric 3D</button>'+
+ '<div class="cameraTools"><button type="button" class="btn" data-camera-walk>Walk</button>'+
+ '<div class="walkControls" hidden><button type="button" class="btn" data-walk-step="forward" title="Avanzar 0,5 m">↑</button>'+
+ '<button type="button" class="btn" data-walk-step="back" title="Retroceder 0,5 m">↓</button>'+
+ '<button type="button" class="btn" data-walk-step="left" title="Mover a izquierda">←</button>'+
+ '<button type="button" class="btn" data-walk-step="right" title="Mover a derecha">→</button></div>'+
+ '<details class="cameraMenu"><summary class="btn">Cameras ▾</summary><div class="cameraPanel">'+
+ '<strong>Cámaras guardadas</strong><small>Capturá vistas del proyecto para recuperarlas después.</small>'+
+ '<input type="text" data-camera-name maxlength="70" placeholder="Nombre · Ej. Living">'+
+ '<button type="button" class="btn" data-camera-save>+ Guardar cámara</button>'+
+ '<div class="cameraList" aria-live="polite"></div></div></details></div>'+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
@@ -811,6 +837,19 @@ function build(){
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
   if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
  });
+ root.querySelector('[data-camera-walk]').addEventListener('click',function(){
+  setViewPreset(viewMode==='walk'?'perspective':'walk');
+ });
+ root.querySelector('.walkControls').addEventListener('click',function(e){
+  var b=e.target.closest('[data-walk-step]');if(b)walk3DStep(b.dataset.walkStep,.5);
+ });
+ root.querySelector('[data-camera-save]').addEventListener('click',save3DCamera);
+ root.querySelector('.cameraList').addEventListener('click',function(e){
+  var a=e.target.closest('[data-camera-recall]'),b=e.target.closest('[data-camera-delete]');
+  if(a)recall3DCamera(Number(a.dataset.cameraRecall));
+  if(b){saved3DCameras.splice(Number(b.dataset.cameraDelete),1);renderSavedCameras();text('Cámara eliminada');}
+ });
+ renderSavedCameras();syncCameraToolbar();
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
  root.querySelector('.styleLaunch').addEventListener('click',function(){
   var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
@@ -1369,8 +1408,8 @@ function updateCamera(){
  camera.up.set(0,0,1);
  if(Math.abs(orbit.el)===Math.PI/2)camera.up.set(0,1,0);
  if(viewMode==='walk'){
-  camera.position.set(target.x,target.y,1.65);
-  camera.lookAt(new T.Vector3(target.x-Math.cos(orbit.az)*8,target.y-Math.sin(orbit.az)*8,1.65+8*Math.tan(orbit.el)));
+  camera.position.set(target.x,target.y,walkEyeHeight);
+  camera.lookAt(new T.Vector3(target.x-Math.cos(orbit.az)*8,target.y-Math.sin(orbit.az)*8,walkEyeHeight+8*Math.tan(orbit.el)));
  }else{
   camera.position.set(target.x+orbit.dist*Math.cos(orbit.el)*Math.cos(orbit.az),
    target.y+orbit.dist*Math.cos(orbit.el)*Math.sin(orbit.az),target.z+orbit.dist*Math.sin(orbit.el));
@@ -2973,6 +3012,60 @@ function bindOrbitBall(ball){
   e.preventDefault();e.stopPropagation();orbitCameraBy(...vectors[e.key]);
  });
 }
+
+function walk3DStep(direction,step){
+ if(viewMode!=='walk')setViewPreset('walk');
+ var f=direction==='forward'?1:direction==='back'?-1:0;
+ var side=direction==='left'?-1:direction==='right'?1:0;
+ var d=step||.5;
+ target.x+=(-Math.cos(orbit.az)*f+Math.sin(orbit.az)*side)*d;
+ target.y+=(-Math.sin(orbit.az)*f-Math.cos(orbit.az)*side)*d;
+ applyViewCamera();
+}
+function syncCameraToolbar(){
+ if(!root)return;
+ var walking=viewMode==='walk';
+ var b=root.querySelector('[data-camera-walk]');
+ if(b){b.setAttribute('aria-pressed',String(walking));b.textContent=walking?'Exit Walk':'Walk';}
+ var row=root.querySelector('.walkControls');if(row)row.hidden=!walking;
+}
+function renderSavedCameras(){
+ if(!root)return;
+ var list=root.querySelector('.cameraList');if(!list)return;
+ list.innerHTML=saved3DCameras.length?saved3DCameras.map(function(c,i){
+  return '<div class="cameraRow"><button type="button" class="btn cameraRecall" data-camera-recall="'+i+'">'+escapeHtml(c.name)+'</button>'+
+   '<button type="button" class="btn" data-camera-delete="'+i+'" aria-label="Borrar cámara">×</button></div>';
+ }).join(''):'<small>Sin cámaras guardadas.</small>';
+}
+function save3DCamera(){
+ if(saved3DCameras.length>=32)return text('Máximo de 32 cámaras');
+ var input=root.querySelector('[data-camera-name]');
+ var name=input.value.trim().slice(0,70)||'Cámara '+(saved3DCameras.length+1);
+ saved3DCameras.push({name:name,x:target.x,y:target.y,z:target.z,az:orbit.az,el:orbit.el,dist:orbit.dist,
+  mode:viewMode,view:activeView,eyeHeight:walkEyeHeight,fov:perspectiveCamera?.fov||50});
+ input.value='';renderSavedCameras();text('Cámara guardada: '+name);
+}
+function recall3DCamera(i){
+ var c=saved3DCameras[i];if(!c)return;
+ setPlacement(null);cad3dEndZoom();
+ viewMode=c.mode;activeView=c.view;
+ orbit.az=c.az;orbit.el=c.el;orbit.dist=c.dist;walkEyeHeight=c.eyeHeight;
+ target.x=c.x;target.y=c.y;target.z=c.z;
+ if(perspectiveCamera)perspectiveCamera.fov=c.fov;
+ syncViewControls();syncCameraToolbar();applyViewCamera();
+ root.querySelector('.cameraMenu').open=false;text('Cámara: '+c.name);
+}
+function sanitize3DCameras(input){
+ if(!Array.isArray(input))return [];
+ return input.slice(0,32).filter(function(c){return c&&typeof c.name==='string'&&
+ [c.x,c.y,c.z,c.az,c.el,c.dist].every(function(n){return Number.isFinite(n);});}).map(function(c){
+  return {name:c.name.slice(0,70),x:clamp(c.x,-100000,100000),y:clamp(c.y,-100000,100000),
+   z:clamp(c.z,-100000,100000),az:c.az,el:clamp(c.el,-1.55,1.55),dist:clamp(c.dist,1.4,450),
+   mode:['perspective','ortho','walk'].includes(c.mode)?c.mode:'perspective',
+   view:String(c.view||'perspective').slice(0,32),eyeHeight:clamp(Number(c.eyeHeight)||1.65,.7,2.5),
+   fov:clamp(Number(c.fov)||50,20,100)};
+ });
+}
 function syncViewControls(){
  root.querySelector('.cad3dViewSelect').value=activeView;
  root.querySelectorAll('[data-view-preset]').forEach(function(button){
@@ -2984,7 +3077,7 @@ function setViewPreset(key){
  if(!v)return;
  activeView=v[0];viewMode=v[2];orbit.az=v[3];orbit.el=v[4];
  if(viewMode==='walk')target.z=1.65;
- syncViewControls();applyViewCamera();
+ syncViewControls();syncCameraToolbar();applyViewCamera();
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
 }
@@ -3276,7 +3369,7 @@ async function importCADFile(ev){
  }catch(e){if(request===importSequence)text('Error importando plano: '+(e.message||e));}
 }
 function exportJSON(){
- var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer};
+ var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer,cameras:saved3DCameras};
  download('blackline-cad3d.3djson',JSON.stringify(data,null,2),'application/json');text('Modelo editable .3DJSON exportado');
 }
 async function readJSON(e){
@@ -3323,7 +3416,7 @@ async function readJSON(e){
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
-  records=sanitized;layers=importedLayers;
+  records=sanitized;layers=importedLayers;saved3DCameras=sanitize3DCameras(data.cameras);renderSavedCameras();
   currentLayer=layers.some(function(l){return l.id===data.currentLayer;})?data.currentLayer:'0';
   renderLayerPanel();underlay=null;
   if(data.underlay&&Array.isArray(data.underlay.segments)&&data.underlay.segments.length<=30000){
