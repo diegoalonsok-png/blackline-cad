@@ -133,6 +133,10 @@ var css=`
  text-align:left; white-space:normal; font-size:11px;
 }
 #cad3dLab .catalogItems svg { width:100%; height:54px; margin:1px 0 3px }
+#cad3dLab .catalogSearch { display:block; width:calc(100% - 28px);margin:0 14px 9px;padding:7px 9px;border:1px solid var(--cad-ui-edge);border-radius:6px;background:var(--cad-ui-base,#101920);color:var(--cad-ui-text,#e4edf4) }
+#cad3dLab .catalogItems .modelPreview {background:#d4e4e9;border-radius:5px;padding:4px;display:grid;place-items:center}
+#cad3dLab .catalogItems .modelPreview svg {height:56px;margin:0;stroke:#314b59;stroke-width:2;fill:none}
+#cad3dLab .catalogItems .btn[data-selected=true] {border-color:var(--bl-accent,#91bfd5);background:#2c4755}
 #cad3dLab .catalogItems small { color:var(--cad-ui-muted); font-size:10px }
 #cad3dLab .tools .armed, #cad3dLab .tools .sketchActive, #cad3dLab .archLaunch.armed {
  outline:2px solid var(--bl-accent,#8bc7de)!important; outline-offset:-2px;
@@ -383,15 +387,46 @@ function styleDimensions(kind,st){
  if(kind==='slab')return Math.round(st.h*100)+' cm'+(st.pitch?' · '+st.pitch+'°':'');
  return st.w.toFixed(2)+' × '+(st.d||st.h).toFixed(2)+' m';
 }
+/* Local schematic elevation thumbnails (no downloaded assets). */
+function archPreview(kind,st){
+ if(!['door','window','opening'].includes(kind))return ico(kind);
+ var id=st.id||'',shape=st.shape||'rect',open=kind==='opening';
+ var frame=shape==='round'?'<ellipse cx="50" cy="29" rx="31" ry="22"/>':
+  shape==='arch'?'<path d="M16 51V28a34 25 0 0 1 68 0v23Z"/>':
+  shape==='pointed'?'<path d="M16 51V26L50 5l34 21v25Z"/>':
+  shape==='triangle'?'<path d="M16 51 50 6 84 51Z"/>':
+  shape==='segment'?'<path d="M16 51V22Q50 7 84 22V51Z"/>':
+  '<rect x="16" y="7" width="68" height="44"/>';
+ var inside='';
+ if(!open){
+  if(/louver|shutter|glass-block/.test(id)){
+   for(var i=0;i<6;i++)inside+='<path d="M20 '+(12+i*6)+'H80"/>';
+  }else if(/double|french|two-leaf|bifold|folding|sliding|garage|terrace|industrial/.test(id)){
+   inside='<path d="M50 9V49"/>';
+   if(/french|industrial|garage|glass|bifold/.test(id))inside+='<path d="M19 30H81M35 9V49M65 9V49"/>';
+  }else if(/awning|hopper|tilt|casement|pivot/.test(id)){
+   inside='<path d="M20 12 76 46M80 12 24 46"/>';
+  }else if(/guillotine|sash|ribbon|clerestory/.test(id)){
+   inside='<path d="M19 29H81"/>';
+  }else if(shape==='round'){
+   inside='<path d="M50 8V50M19 29H81"/>';
+  }else if(shape==='rect')inside='<path d="M20 28H80"/>';
+ }
+ return '<span class="modelPreview"><svg viewBox="0 0 100 58" role="img" aria-label="'+escapeHtml(st.name)+'">'+frame+inside+'</svg></span>';
+}
 function renderArchPalette(){
  var palette=root.querySelector('.archPalette');
  palette.querySelectorAll('[data-arch-tool]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.archTool===activeCategory));
  });
- palette.querySelector('.catalogItems').innerHTML=ARCH_STYLES[activeCategory].map(function(st){
-  return '<button type="button" class="btn" data-style="'+st.id+'">'+ico(activeCategory)+
-   '<span>'+st.name+'</span><small>'+styleDimensions(activeCategory,st)+'</small></button>';
- }).join('');
+ var needle=(palette.querySelector('.catalogSearch')?.value||'').trim().toLowerCase();
+ var options=ARCH_STYLES[activeCategory].filter(function(st){
+  return !needle||(st.name+' '+st.id+' '+styleDimensions(activeCategory,st)).toLowerCase().includes(needle);
+ });
+ palette.querySelector('.catalogItems').innerHTML=options.map(function(st){
+  return '<button type="button" class="btn" data-style="'+st.id+'" data-selected="'+(activePreset[activeCategory]===st.id)+'">'+archPreview(activeCategory,st)+
+   '<span>'+escapeHtml(st.name)+'</span><small>'+styleDimensions(activeCategory,st)+'</small></button>';
+ }).join('')||'<p>No matching models.</p>';
 }
 function showArchPalette(show){
  var palette=root.querySelector('.archPalette'), launcher=root.querySelector('.archLaunch');
@@ -529,7 +564,7 @@ function build(){
  '<div class="archTools" role="group" aria-label="Tipos paramétricos">'+
  Object.keys(archLabels).map(function(kind){
   return '<button type="button" class="btn" data-arch-tool="'+kind+'">'+archLabels[kind]+'</button>';
- }).join('')+'</div><div class="catalogItems"></div>'+
+ }).join('')+'</div><input class="catalogSearch" type="search" aria-label="Search architectural models" placeholder="Search doors, windows, openings…"><div class="catalogItems"></div>'+
  ['n','s','e','w','ne','nw','se','sw'].map(function(d){
   return '<div class="archGrip '+d+'" data-arch-grip="'+d+'" title="Arrastrá para cambiar el tamaño" aria-hidden="true"></div>';
  }).join('')+'</aside>'+
@@ -634,6 +669,7 @@ function build(){
  root.querySelector('.props').addEventListener('click',clickProps);
  var palette=root.querySelector('.archPalette');
  palette.addEventListener('click',clickArchPalette);
+ palette.querySelector('.catalogSearch').addEventListener('input',renderArchPalette);
  palette.addEventListener('pointerdown',beginArchGesture);
  root.querySelector('.archLaunch').addEventListener('click',function(){showArchPalette(palette.hidden);});
  renderArchPalette();
