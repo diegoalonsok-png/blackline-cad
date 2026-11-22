@@ -1533,31 +1533,37 @@ function renderProps(){
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
- var html='<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
+ var focus=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
+ var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
+ '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
  var host=r.type==='wall'||r.type==='slab';
- if(host)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
- var keys=['x','y','z'];
- if(r.type!=='boolean')keys.push('rot');
- if(r.type==='box'||r.type==='wall'||r.type==='slab')keys.push('w','d','h');
- if(r.type==='slab')keys.push('pitch');
- if(r.type==='sphere')keys.push('radius');
- if(r.type==='cone'||r.type==='cylinder')keys.push('radius','h');
+ if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
+ var keys=focus?[]:['x','y','z'];
+ if(!focus&&r.type!=='boolean')keys.push('rot');
+ if(!focus&&(r.type==='box'||r.type==='wall'||r.type==='slab'))keys.push('w','d','h');
+ if(!focus&&r.type==='slab')keys.push('pitch');
+ if(!focus&&r.type==='sphere')keys.push('radius');
+ if(!focus&&(r.type==='cone'||r.type==='cylinder'))keys.push('radius','h');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Thickness (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){html+='<label>'+labels[k]+'<input type="number" step="any" data-key="'+k+'" value="'+escapeHtml(r[k]||0)+'"></label>';});
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
-  r.openings.forEach(function(o,i){
-   html+='<div class="detail"><strong>'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+'</strong>';
+  r.openings.filter(function(o){return !focus||o.id===focus.id;}).forEach(function(o,i){
+   html+='<div class="detail"><button type="button" class="btn" data-select-opening-id="'+o.id+'">'+escapeHtml(o.kind.toUpperCase())+' '+(i+1)+' · Edit</button>';
    var fields=r.type==='wall'?[['offset','Offset X'],['w','Width'],['h','Height'],['sill','Sill']]:
     [['offset','Offset X'],['offsetY','Offset Y'],['w','Width'],['d','Depth']];
    fields.forEach(function(k){
     html+='<label>'+k[1]+'<input type="number" step="any" data-opening="'+o.id+'" data-attr="'+k[0]+'" value="'+escapeHtml(o[k[0]])+'"></label>';
    });
+   if(r.type==='wall'){
+    var available=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host!=='slab';}):ARCH_STYLES[o.kind];
+    if(available)html+='<label>Model <select data-opening-style="'+o.id+'">'+available.map(function(st){return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';}).join('')+'</select></label>';
+   }
    html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
- html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
+ if(!focus)html+='<div class="detail"><button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
  p.innerHTML=html;
 }
 function change(e){
