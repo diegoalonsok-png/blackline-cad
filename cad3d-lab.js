@@ -1395,13 +1395,20 @@ function bindCanvas(el){
  el.addEventListener('pointerdown',function(e){
   if(dragging||e.button>2)return;
   e.preventDefault();el.focus({preventScroll:true});
+  // While placing geometry, unmodified primary-button input belongs to DRAW,
+  // not to camera orbit. Alt+left / middle / right remain navigation gestures.
+  var placementClick=e.button===0&&!!placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey;
   var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&viewMode==='ortho'&&!placing);
-  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan};
+  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan,placementClick:placementClick};
   el.dataset.navigationDrag='false';
   el.setPointerCapture(e.pointerId);
  });
  el.addEventListener('pointermove',function(e){
   if(dragging&&dragging.id===e.pointerId){
+   if(dragging.placementClick){
+    // Keep preview moving but never orbit/pan while the user is picking a wall point.
+    updatePlacementGuide(e);updateDynamicReadout(e);return;
+   }
    var dx=e.clientX-dragging.lastX,dy=e.clientY-dragging.lastY;
    if(dragging.moved||Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)>(placing?12:5)){
     hideObjectContextMenu();
@@ -1420,9 +1427,11 @@ function bindCanvas(el){
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
-  var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=(placing?12:5);
+  var drawClick=dragging.placementClick&&e.button===0;
+  var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
   dragging=null;delete el.dataset.navigationDrag;
-  if(click&&e.button===0){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
+  if(drawClick){hideObjectContextMenu();placeAt(e);}
+  else if(click&&e.button===0&&!placing){hideObjectContextMenu();selectAt(e);}
   if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
   if(draftModes.dyn)updateDynamicReadout(e);
  });
