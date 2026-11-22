@@ -1198,6 +1198,23 @@ function hostHitAt(e,type){
  if(!hit)return null;
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
 }
+/* Validate architectural opening edits before changing the wall geometry. */
+function openingFitsCADHost(host,item,excludeId){
+ if(!host||!Number.isFinite(item.offset)||!Number.isFinite(item.w)||item.w<=0)return false;
+ if(Math.abs(item.offset)+item.w/2>host.w/2+1e-6)return false;
+ if(host.type==='wall'){
+  if(!Number.isFinite(item.sill)||!Number.isFinite(item.h)||item.h<=0||item.sill<0||item.sill+item.h>host.h+1e-6)return false;
+ }else if(host.type==='slab'){
+  if(!Number.isFinite(item.offsetY)||!Number.isFinite(item.d)||item.d<=0||Math.abs(item.offsetY)+item.d/2>host.d/2+1e-6)return false;
+ }
+ return !(host.openings||[]).some(function(other){
+  if(other.id===excludeId)return false;
+  if(Math.abs(other.offset-item.offset)>=(other.w+item.w)/2+.015)return false;
+  return host.type==='wall'?
+   Math.max(other.sill,item.sill)<Math.min(other.sill+other.h,item.sill+item.h)+.015:
+   Math.abs(other.offsetY-item.offsetY)<(other.d+item.d)/2+.015;
+ });
+}
 function placeOpening(e){
  var kind=placing,style=archStyle(kind,activePreset[kind]),type=style.host||'wall';
  var hit=hostHitAt(e,type);
@@ -1568,8 +1585,18 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('select[data-opening-style]')){
+  var opening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
+  var style=opening&&(ARCH_STYLES[opening.kind]||[]).find(function(st){return st.id===input.value;});
+  if(!opening||!style)return;
+  var candidate=Object.assign({},opening,{styleId:style.id,w:style.w});
+  if(r.type==='wall'){candidate.h=style.h;candidate.sill=Math.min(style.sill,Math.max(0,r.h-style.h));}
+  else candidate.d=style.d;
+  if(!openingFitsCADHost(r,candidate,opening.id)){renderProps();text('El modelo elegido no entra en el muro o se superpone a otro vano');return;}
+  Object.assign(opening,candidate);selectedOpeningId=opening.id;redraw();renderProps();text('Modelo de carpintería actualizado');return;
+ }
  if(input.matches('select[data-object-layer]')){
   if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
   if(!editableRecord(r))selected=[];
@@ -1592,6 +1619,8 @@ function change(e){
   if(key==='w'||key==='h'||key==='d')val=clamp(val,.05,1000);
   else if(key==='sill')val=clamp(val,0,1000);
   else val=clamp(val,-10000,10000);
+  var proposal=Object.assign({},o,{[key]:val});
+  if(!openingFitsCADHost(r,proposal,o.id)){renderProps();text('La abertura no entra en el muro o se superpone a otra');return;}
   o[key]=val;
  }else{
   var name=input.dataset.key;
@@ -1604,14 +1633,17 @@ function change(e){
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
 }
 function clickProps(e){
+ var chosen=e.target.closest('[data-select-opening-id]');
+ if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
+ if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
  var o=e.target.closest('[data-remove-opening]');if(o){
   var host=records.find(function(r){return selected.includes(r.id)&&(r.type==='wall'||r.type==='slab');});if(!host)return;
-  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});
+  host.openings=host.openings.filter(function(x){return x.id!==Number(o.dataset.removeOpening);});selectedOpeningId=null;
   redraw();renderProps();text('Abertura desvinculada y vano cerrado');return;
  }
  var del=e.target.closest('[data-remove-object]');if(del){
   records=records.filter(function(r){return r.id!==Number(del.dataset.removeObject);});
-  selected=[];redraw();renderProps();text('Objeto eliminado');
+  selected=[];selectedOpeningId=null;redraw();renderProps();text('Objeto eliminado');
  }
 }
 /* Exact axis-aligned box boolean prototype: partition at all six cutting planes.
