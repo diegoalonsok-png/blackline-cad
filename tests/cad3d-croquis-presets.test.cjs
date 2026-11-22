@@ -11,9 +11,9 @@ function section(start, end) {
 }
 const registry = section('const CAD3D_VISUAL_STYLES=', 'function renderStyleControls()');
 const presetApi = vm.runInNewContext(registry + '\n({CAD3D_SKETCH_PRESETS,CAD3D_VISUAL_STYLES,isCad3DSketch})', {});
-const names = ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint'];
-test('Seven Croquis presets registered with materials and labels', () => {
- assert.equal(Object.keys(presetApi.CAD3D_SKETCH_PRESETS).length, 7);
+const names = ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint','sketch-etching','sketch-bluepen','sketch-gesture','sketch-duotone'];
+test('Eleven Croquis presets registered with materials and labels', () => {
+ assert.equal(Object.keys(presetApi.CAD3D_SKETCH_PRESETS).length, 11);
  for(const name of names) {
   assert(presetApi.CAD3D_VISUAL_STYLES[name], name);
   assert.equal(presetApi.isCad3DSketch(name), true);
@@ -22,7 +22,7 @@ test('Seven Croquis presets registered with materials and labels', () => {
  }
  assert.equal(presetApi.isCad3DSketch('shaded'), false);
 });
-test('Visual Style toolbar contains all seven Croquis buttons', () => {
+test('Visual Style toolbar contains all eleven Croquis buttons', () => {
  const toolbar = section("[['wire2d'", "tool('shot'");
  assert(toolbar.includes('data-render-style'));
  for(const name of names) assert(toolbar.includes("['" + name + "'"), name);
