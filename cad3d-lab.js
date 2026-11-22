@@ -1610,7 +1610,9 @@ function numeric3DGripAdjustment(r,kind,openingId){
  'opening-depth-start':'d','opening-depth-end':'d','opening-offset-y':'offsetY'})[kind]:
  ({'length-start':'w','length-end':'w','depth-start':'d','depth-end':'d','thickness':'d','height':'h','radius':'radius','rotate':'rot'})[kind];
  if(!field)return null;
- var value=Number(window.prompt('Nuevo valor '+field+(field==='rot'?' (grados)':' (metros)'),String(current[field])));
+ var response=window.prompt('Nuevo valor '+field+(field==='rot'?' (grados)':' (metros)'),String(current[field]));
+ if(response===null||response.trim()==='')return null;
+ var value=Number(response);
  if(!Number.isFinite(value))return null;
  var d=value-current[field];
  if(kind==='length-start'||kind==='depth-start'||kind==='opening-start'||kind==='opening-depth-start')d=-d;
@@ -1897,7 +1899,7 @@ function styleOptions(kind,id){
 }
 function renderProps(){
  if(!root)return;var p=root.querySelector('.props');
- render3DGrips();
+ if(typeof render3DGrips==='function')render3DGrips();
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
  if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
