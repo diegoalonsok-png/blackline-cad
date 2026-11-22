@@ -72,3 +72,33 @@ test('Drawing overlays cannot crash CAD object highlighting or mesh export',()=>
  assert(src.includes('o.isMesh&&o.material?.emissive'));
  assert(src.includes('mesh.isMesh&&!mesh.userData.cadSketch'));
 });
+
+test('Artistic controls have live sliders and never mutate model geometry',()=>{
+ for(const key of ['weight','roughness','wash','paper']){
+  assert(src.includes('data-sketch-adjust="'+key+'"'));
+  assert(src.includes('data-sketch-value="'+key+'"'));
+ }
+ assert(src.includes("root.querySelector('.stylePanel').addEventListener('input'"));
+ assert(src.includes('cadSketchTuning[key]=value'));
+ assert(src.includes('if(renderer)applyRenderStyle();else fallbackDraw()'));
+});
+test('Tuning affects stroke width, jitter and watercolor fill intensity independently',()=>{
+ const a=src.indexOf('const cadSketchTuning='),b=src.indexOf('function renderStyleControls()',a);
+ assert(a>=0&&b>a);
+ const ctx={clamp:(x,a,b)=>Math.max(a,Math.min(x,b))};
+ vm.runInNewContext(src.slice(start,b),ctx);
+ const first=ctx.cadEffectiveSketch('sketch-watercolor');
+ ctx.cadSketchTuning.weight=2;
+ ctx.cadSketchTuning.roughness=0;
+ ctx.cadSketchTuning.wash=.9;
+ const second=ctx.cadEffectiveSketch('sketch-watercolor');
+ assert.equal(second.width,first.width*2);
+ assert.equal(second.jitter,0);
+ assert(second.fillMix>first.fillMix);
+ assert.equal(presets['sketch-watercolor'].jitter,.28,'Preset stays immutable');
+});
+test('Paper grain uses noninteractive opacity variable and defaults to a natural surface',()=>{
+ assert(src.includes('pointer-events:none'));
+ assert(src.includes('--cad3d-paper-strength'));
+ assert(src.includes("view.style.setProperty('--cad3d-paper-strength'"));
+});
