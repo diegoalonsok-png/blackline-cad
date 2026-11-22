@@ -27,6 +27,11 @@ var viewPresets=[
  ['walk','Peatonal 1,65 m','walk',-Math.PI/2,.02]
 ];
 var icons={
+ line:'<path d="M4 19 20 5"/><circle cx="4" cy="19" r="2" fill="currentColor" stroke="none"/><circle cx="20" cy="5" r="2" fill="currentColor" stroke="none"/>',
+ polyline:'<path d="M3 19 9 8 15 14 21 4"/><circle cx="3" cy="19" r="1.5"/><circle cx="9" cy="8" r="1.5"/><circle cx="15" cy="14" r="1.5"/><circle cx="21" cy="4" r="1.5"/>',
+ rectangle:'<rect x="4" y="6" width="16" height="12" rx=".3"/>',
+ circle:'<circle cx="12" cy="12" r="8.5"/>',
+ arc:'<path d="M4 18A10 10 0 0 1 20 18"/><circle cx="4" cy="18" r="1.2"/><circle cx="20" cy="18" r="1.2"/>',
  cube:'<path d="m12 2 9 5-9 5-9-5 9-5ZM3 7v10l9 5V12M21 7v10l-9 5"/>',
  sphere:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
  cylinder:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 4 16 4 16 0V5"/>',
@@ -105,6 +110,12 @@ var css=`
 #cad3dLab .cad3dBasicBars .btn{padding:5px 7px;display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-height:28px;font-size:11px}
 #cad3dLab .cad3dBasicBars svg{width:16px;height:16px;flex:none}
 #cad3dLab .cad3dBasicBars .armed{background:#31536a;outline:1px solid #98d9f1}
+#cad3dLab .cad3dProfileTools{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;min-height:42px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+#cad3dLab .cad3dProfileTools>strong{flex:none;white-space:nowrap}
+#cad3dLab .cad3dProfileTools .btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;min-width:auto!important;width:auto!important;height:32px!important;min-height:32px!important;max-height:32px!important;padding:5px 10px!important;margin:0!important;white-space:nowrap;font:12px Inter,Arial,sans-serif!important;line-height:1!important}
+#cad3dLab .cad3dProfileTools .btn svg{display:block;flex:0 0 18px;width:18px!important;height:18px!important;max-width:18px!important;max-height:18px!important;overflow:visible}
+#cad3dLab .cad3dProfileTools .btn span{display:inline;white-space:nowrap;line-height:1;font:inherit}
+#cad3dLab .cad3dProfileTools .btn.armed{background:#31536a;outline:1px solid #98d9f1}
 
 .app .tabbar #cad3dOpen {
  align-self:center; justify-content:center; flex:none; min-width:54px; height:24px!important;
@@ -1125,8 +1136,8 @@ function build(){
  cad3dBasicBars()+
  '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
  '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
- tool('line','Line','line')+tool('polyline','Polyline','line')+tool('rectangle','Rectangle','cube')+
- tool('circle','Circle','sphere')+tool('arc','Arc','rotate')+'</div>'+
+ tool('line','Line','line')+tool('polyline','Polyline','polyline')+tool('rectangle','Rectangle','rectangle')+
+ tool('circle','Circle','circle')+tool('arc','Arc','arc')+'</div>'+
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
  '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="-1000" max="1000" step="0.1" value="2.8" aria-label="Extrude height or signed face distance in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
