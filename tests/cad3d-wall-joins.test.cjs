@@ -11,7 +11,7 @@ const EPS=1e-8;
 test('CAD3D miter code parses and is actually called when constructing wall meshes',()=>{
  assert.doesNotThrow(()=>new vm.Script(source));
  assert(source.includes("var wallJoin=r.type==='wall'?wallJoinOffsets(r):null"));
- assert(source.includes('if(wallJoin)applyWallMiter(g,r,w,x,wallJoin)'));
+ assert(source.includes('if(wallJoin&&openingId==null)applyWallMiter(g,r,w,x,wallJoin)'));
 });
 test('two 20 cm walls meeting at right angle share exact mitred endpoints',()=>{
  const a=wall(1,2,0,4,.2,0),b=wall(2,4,2,4,.2,90);

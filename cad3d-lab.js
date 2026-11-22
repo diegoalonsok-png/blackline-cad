@@ -376,7 +376,9 @@ const ARCH_STYLES={
   {id:'french-door',name:'French glazed · 160 cm',w:1.60,h:2.20,sill:0},
   {id:'garage-door',name:'Garage sectional · 260 cm',w:2.60,h:2.40,sill:0},
   {id:'service-door',name:'Service · 80 cm',w:.80,h:2.00,sill:0},
-  {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0}
+  {id:'terrace-door',name:'Terrace sliding · 300 cm',w:3.00,h:2.40,sill:0},
+  {id:'triple-sliding-door',name:'Triple sliding · 360 cm',w:3.60,h:2.40,sill:0},
+  {id:'triple-fold-door',name:'Triple folding · 270 cm',w:2.70,h:2.20,sill:0}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
@@ -394,7 +396,10 @@ const ARCH_STYLES={
   {id:'floor-to-ceiling',name:'Full-height glazing · 180 cm',w:1.80,h:2.40,sill:0},
   {id:'corner-fixed',name:'Tall fixed · 100 cm',w:1.00,h:2.20,sill:.15},
   {id:'bathroom',name:'Bathroom · 60 cm',w:.60,h:.60,sill:1.70},
-  {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40}
+  {id:'ribbon-window',name:'Ribbon · 300 cm',w:3.00,h:.70,sill:1.40},
+  {id:'triple-sliding-window',name:'Three-leaf sliding · 300 cm',w:3.00,h:1.40,sill:.85},
+  {id:'triple-casement',name:'Three-leaf casement · 270 cm',w:2.70,h:1.40,sill:.85},
+  {id:'tilt-turn-window',name:'Tilt and turn · 100 cm',w:1.00,h:1.30,sill:.90}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -407,6 +412,61 @@ const ARCH_STYLES={
   {id:'slab-opening',name:'Slab opening',host:'slab',w:1,d:1}
  ]
 };
+
+/* Independent parametric leaf specification; dimensions and void remain hosted by a wall.
+   Autocad Architecture / Revit interaction is a reference, not proprietary source code. */
+function cad3DOpeningDefaults(kind,styleId){
+ var id=String(styleId||'').toLowerCase(),triple=/triple|three|3-leaf/.test(id),
+  double=/double|two-leaf|french|terrace/.test(id),leaves=triple?3:double?2:1;
+ if(kind==='door'){
+  return {operation:/garage/.test(id)?'sectional':/sliding|pocket/.test(id)?'sliding':
+   /fold/.test(id)?'folding':/pivot/.test(id)?'pivot':'hinged',
+   leaves:leaves,hinge:/right/.test(id)?'right':'left',swing:'in',openAngle:0,openPercent:0};
+ }
+ return {operation:/sliding/.test(id)?'sliding':/awning/.test(id)?'awning':
+  /hopper/.test(id)?'hopper':/tilt-turn/.test(id)?'tilt-turn':
+  /casement|two-leaf|double-window/.test(id)?'casement':'fixed',
+  leaves:leaves,hinge:'left',swing:'out',openAngle:0,openPercent:0};
+}
+function cad3DOpeningConfig(o){
+ var d=cad3DOpeningDefaults(o.kind,o.styleId);
+ var permitted=o.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+  ['fixed','casement','sliding','awning','hopper','tilt-turn'];
+ var op=permitted.includes(o.operation)?o.operation:d.operation;
+ return {operation:op,leaves:clamp(Math.round(Number(o.leaves)||d.leaves),1,3),
+  hinge:['left','right'].includes(o.hinge)?o.hinge:d.hinge,
+  swing:['in','out'].includes(o.swing)?o.swing:d.swing,
+  openAngle:clamp(Number(o.openAngle)||0,0,120),
+  openPercent:clamp(Number(o.openPercent)||0,0,100)};
+}
+/* Leaf transformation is resolved relative to the frame hinge, never to the model origin. */
+function cad3DLeafMotion(config,i,count,x0,x1,z,h){
+ var hinged=config.operation==='hinged'||config.operation==='casement'||
+  config.operation==='pivot'||config.operation==='folding';
+ var sliding=config.operation==='sliding',sectional=config.operation==='sectional';
+ var right=(config.hinge==='right');
+ if(count>1&&hinged&&config.operation!=='pivot')right=(i%2===0)?right:!right;
+ var hingeX=config.operation==='pivot'?(x0+x1)/2+(right?-.16:.16)*(x1-x0):
+  right?x1:x0;
+ var sign=(right?-1:1)*(config.swing==='out'?-1:1);
+ var m={axis:'z',angle:0,pivotX:hingeX,pivotY:0,pivotZ:z,
+  shiftX:0,shiftY:0,shiftZ:0};
+ if(hinged)m.angle=sign*config.openAngle*Math.PI/180;
+ else if(['awning','hopper','tilt-turn'].includes(config.operation)){
+  m.axis='x';m.pivotX=(x0+x1)/2;m.pivotZ=config.operation==='awning'?z+h:z;
+  m.angle=(config.operation==='awning'?-1:1)*
+   (config.swing==='out'?1:-1)*config.openAngle*Math.PI/180;
+ }else if(sliding){
+  // Each sliding leaf moves into the adjacent track, exposing part of the opening.
+  m.shiftX=(i%2===0?1:-1)*config.openPercent/100*(x1-x0);
+  m.shiftY=(i%2===0?1:-1)*.03;
+ }else if(sectional){
+  m.shiftZ=config.openPercent/100*h;
+  m.shiftY=-config.openPercent/100*.08;
+ }
+ return m;
+}
+
 function archStyle(kind,id){
  return (ARCH_STYLES[kind]||[]).find(function(st){return st.id===id;})||(ARCH_STYLES[kind]||[])[0]||null;
 }
@@ -667,6 +727,17 @@ function build(){
   if(button)changeLayer(button.dataset.layerToggle);
  });
  renderDraftModes();renderLayerPanel();
+ root.querySelector('.props').addEventListener('input',function(e){
+  var field=e.target.closest('input[type="range"][data-opening-param]');
+  if(!field)return;
+  var host=records.find(function(r){return selected.length===1&&r.id===selected[0]&&editableRecord(r);});
+  var op=(host?.openings||[]).find(function(o){return o.id===Number(field.dataset.openingParam);});
+  if(!op||!['openAngle','openPercent'].includes(field.dataset.param))return;
+  op[field.dataset.param]=Number(field.value);
+  var output=root.querySelector('[data-opening-value="'+op.id+'"]');
+  if(output)output.textContent=field.value+(field.dataset.param==='openPercent'?'%':'°');
+  redraw();
+ });
  root.querySelector('.props').addEventListener('change',change);
  root.querySelector('.props').addEventListener('click',clickProps);
  bind3DGripOverlay(root.querySelector('.cad3dGripLayer'));
@@ -1348,7 +1419,8 @@ function placeOpening(e){
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
- var op={id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w};
+ var op=Object.assign({id:serial++,kind:kind,styleId:style.id,offset:clamp(dx*c+dy*s,-maxX,maxX),w:style.w},
+  kind==='door'||kind==='window'?cad3DOpeningDefaults(kind,style.id):{});
  if(slab){
   var maxY=(rec.d-span)/2;
   op.offsetY=clamp(-dx*s+dy*c,-maxY,maxY);op.d=span;
@@ -1486,6 +1558,9 @@ function get3DGripDefinitions(r,openingId){
   }else{
    add('opening-height','Altura de puerta o ventana',o.offset,0,o.sill+o.h,'z');
    add('opening-sill','Antepecho / solera',o.offset,0,o.sill,'z');
+   if(['door','window'].includes(o.kind)&&
+    (typeof cad3DOpeningConfig!=='function'||cad3DOpeningConfig(o).operation!=='fixed'))
+    add('opening-motion','Abrir/cerrar hojas 3D',o.offset+o.w*.35,0,o.sill+o.h*.45,'motion');
   }
   return grips;
  }
@@ -1539,6 +1614,10 @@ function apply3DGripCandidate(original,kind,delta,openingId){
   else if(kind==='opening-depth-start'&&r.type==='slab'){o.d-=delta;o.offsetY+=delta/2;}
   else if(kind==='opening-depth-end'&&r.type==='slab'){o.d+=delta;o.offsetY+=delta/2;}
   else if(kind==='opening-offset-y'&&r.type==='slab')o.offsetY+=delta;
+  else if(kind==='opening-motion'){
+   var config=cad3DOpeningConfig(o),slide=['sliding','sectional'].includes(config.operation);
+   var k=slide?'openPercent':'openAngle';o[k]=clamp(config[k]+delta,0,slide?100:120);
+  }
   else return null;
   if(!Number.isFinite(o.w)||o.w<.05||o.w>1000)return null;
   if(r.type==='wall'&&(!Number.isFinite(o.h)||o.h<.05))return null;
@@ -1667,6 +1746,7 @@ function bind3DGripOverlay(layer){
   e.preventDefault();e.stopPropagation();drag.moved=true;
   var delta=drag.def.kind==='rotate'?
    (Math.atan2(e.clientY-drag.centerY,e.clientX-drag.centerX)-drag.angle)*180/Math.PI:
+   drag.def.kind==='opening-motion'?-dy*.85:
    grip3DDragMeters(drag.original,drag.def,dx,dy);
   if(delta==null)return;
   var next=apply3DGripCandidate(drag.original,drag.def.kind,delta,drag.openingId);
@@ -1733,42 +1813,40 @@ function architectureParts(r,part){
  if(!wall)return;
  cuts.forEach(function(o){
   var opening=o.source;
-  function carpPart(w,d,h,x,y,z,color,slope){part(w,d,h,x,y,z,color,slope,opening.id);}
+  function carpPart(w,d,h,x,y,z,color,slope,motion){part(w,d,h,x,y,z,color,slope,opening.id,motion);}
   if(opening.kind==='opening'||opening.styleId==='open-door')return;
   var x=(o.left+o.right)/2,w=o.right-o.left,h=o.top-o.bottom,z=o.bottom;
   var frame=Math.min(.055,w/4,h/4);
-  if(opening.kind==='door'){
-   var doorType=opening.styleId||'',doubleDoor=/double|french|terrace|garage/.test(doorType);
-   var glazed=/french|terrace/.test(doorType),sliding=/sliding|pocket/.test(doorType);
-   var depth=.048,leafColor=glazed?0x54889d:sliding?0x9daab4:0x8b725e;
-   var panelW=Math.max(.03,w-2*frame),panelH=Math.max(.03,h-frame);
-   // Doors remain schematic solids, with recognizable multi-leaf and glazed variants.
-   carpPart(panelW,depth,panelH,x,0,z,leafColor,0);
-   carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x7d8791,0);
-   if(doubleDoor||sliding){
-    carpPart(Math.min(frame,panelW/12),depth+.026,panelH,x,0,z,0xc2ced3,0);
-   }
-   if(doorType==='garage-door'){
-    for(var rail=1;rail<5;rail++)carpPart(panelW,depth+.026,.018,x,0,z+panelH*rail/5,0x657884,0);
-   }
-   if(glazed){
-    carpPart(Math.max(.05,panelW-2*frame),depth+.028,Math.max(.08,panelH*.60),x,0,z+panelH*.24,0x4f8799,0);
-   }
-   if(doorType==='pivot-door'){
-    carpPart(.025,depth+.04,panelH,x+panelW*.30,0,z,0xc4ced4,0);
-   }
-  }else{
-   var d=thickness+.03,windowType=opening.styleId||'';
-   carpPart(w,d,frame,x,0,z,0xb5c4cc,0);
-   carpPart(w,d,frame,x,0,z+h-frame,0xb5c4cc,0);
-   carpPart(frame,d,h,o.left+frame/2,0,z,0xb5c4cc,0);
-   carpPart(frame,d,h,o.right-frame/2,0,z,0xb5c4cc,0);
-   carpPart(Math.max(.05,w-2*frame),.019,Math.max(.05,h-2*frame),x,0,z+frame,0x54889d,0);
-   if(/double|sliding|two-leaf/.test(windowType)){
-    carpPart(Math.min(.055,w/15),d+.025,h,x,0,z,0xc3d3da,0);
-   }
-   if(/awning|hopper|clerestory|ribbon/.test(windowType)){
-    carpPart(w,d+.026,Math.min(.04,h/8),x,0,z+h*.52,0xc3d3da,0);
+  var cfg=typeof cad3DOpeningConfig==='function'?cad3DOpeningConfig(opening):
+   {operation:'fixed',leaves:1,hinge:'left',swing:'in',openAngle:0,openPercent:0};
+  var leaves=Math.max(1,Math.min(3,cfg.leaves||1));
+  var innerW=Math.max(.06,w-2*frame),leafW=innerW/leaves,leafH=Math.max(.06,h-2*frame);
+  var left=o.left+frame,door=opening.kind==='door';
+  var color=door?0x88745e:0x528a9b;
+  // The fixed frame remains in the wall void even while the leaves rotate or slide.
+  carpPart(w,thickness+.02,frame,x,0,z+h-frame,0x9aafb9,0);
+  if(!door){
+   carpPart(w,thickness+.02,frame,x,0,z,0xa9bec7,0);
+   carpPart(frame,thickness+.03,h,o.left+frame/2,0,z,0xa9bec7,0);
+   carpPart(frame,thickness+.03,h,o.right-frame/2,0,z,0xa9bec7,0);
+  }
+  for(var leaf=0;leaf<leaves;leaf++){
+   var x0=left+leaf*leafW,x1=x0+leafW,leafCenter=(x0+x1)/2;
+   var motion=typeof cad3DLeafMotion==='function'?
+    cad3DLeafMotion(cfg,leaf,leaves,x0,x1,z+frame,leafH):null;
+   if(door){
+    carpPart(Math.max(.03,leafW-.013),.047,leafH,leafCenter,0,z+frame,color,0,motion);
+    if(/french|terrace/.test(opening.styleId||'')){
+     carpPart(Math.max(.04,leafW-.12),.052,leafH*.62,leafCenter,0,z+leafH*.23,0x568ea4,0,motion);
+    }
+    // A bar on each leaf makes its angle and opening direction legible in 3D.
+    carpPart(.024,.065,.08,leafCenter+(cfg.hinge==='left'?leafW*.30:-leafW*.30),
+     -.045,z+leafH*.52,0xc5ccd1,0,motion);
+   }else{
+    // Per-leaf sash and glazing all inherit the same hinge/sliding transformation.
+    carpPart(Math.max(.04,leafW-.018),.052,leafH,leafCenter,0,z+frame,0xa0b7c1,0,motion);
+    carpPart(Math.max(.04,leafW-.095),.058,Math.max(.04,leafH-.11),
+     leafCenter,0,z+frame+.055,0x4d8297,0,motion);
    }
   }
  });
@@ -1857,13 +1935,20 @@ function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId){
+ if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
   var g=boxGeom(w,d,h);
-  if(wallJoin)applyWallMiter(g,r,w,x,wallJoin);
+  if(wallJoin&&openingId==null)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
    var p=g.getAttribute('position');
    for(var i=0;i<p.count;i++)p.setZ(i,p.getZ(i)+(p.getX(i)+x)*slope);
    g.computeVertexNormals();
+  }
+  // Rotate around the actual hinge/pivot. The host wall and void stay fixed.
+  if(motion){
+   g.translate(x-motion.pivotX,y-motion.pivotY,z-motion.pivotZ);
+   if(motion.axis==='x')g.rotateX(motion.angle||0);else g.rotateZ(motion.angle||0);
+   g.translate(motion.pivotX+(motion.shiftX||0),motion.pivotY+(motion.shiftY||0),motion.pivotZ+(motion.shiftZ||0));
+   x=y=z=0;
   }
   var component=addMesh(g,color,r.id,group,x,y,z);
   if(openingId!=null)component.userData.openingId=openingId;
@@ -1943,6 +2028,34 @@ function renderProps(){
     var available=o.kind==='opening'?ARCH_STYLES.opening.filter(function(st){return st.host!=='slab';}):ARCH_STYLES[o.kind];
     if(available)html+='<label>Model <select data-opening-style="'+o.id+'">'+available.map(function(st){return '<option value="'+st.id+'"'+(st.id===o.styleId?' selected':'')+'>'+escapeHtml(st.name)+'</option>';}).join('')+'</select></label>';
    }
+   if(r.type==='wall'&&o.kind!=='opening'){
+    var fallback={operation:'fixed',leaves:1,hinge:'left',swing:'in',openAngle:0,openPercent:0};
+    var cfg=typeof cad3DOpeningConfig==='function'?cad3DOpeningConfig(o):fallback;
+    var operations=o.kind==='door'?
+     [['hinged','Batiente / hinged'],['sliding','Corrediza / sliding'],['folding','Plegadiza / folding'],['pivot','Pivotante / pivot'],['sectional','Seccional / garage']]:
+     [['fixed','Fija / fixed'],['casement','Batiente / casement'],['sliding','Corrediza / sliding'],['awning','Basculante superior / awning'],
+      ['hopper','Basculante inferior / hopper'],['tilt-turn','Oscilobatiente / tilt-turn']];
+    function optValue(key,v){return String(cfg[key])===String(v)?' selected':'';}
+    html+='<div class="detail"><strong>3D DYNAMIC OPENING</strong>'+
+     '<label>Opening system <select data-opening-param="'+o.id+'" data-param="operation">'+
+     operations.map(function(a){return '<option value="'+a[0]+'"'+optValue('operation',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>'+
+     '<label>Leaves <select data-opening-param="'+o.id+'" data-param="leaves">'+
+     [1,2,3].map(function(n){return '<option value="'+n+'"'+optValue('leaves',n)+'>'+n+' leaf'+(n===1?'':'s')+'</option>';}).join('')+'</select></label>'+
+     '<label>Hinge side <select data-opening-param="'+o.id+'" data-param="hinge">'+
+     [['left','Left'],['right','Right']].map(function(a){return '<option value="'+a[0]+'"'+optValue('hinge',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>'+
+     '<label>Opening direction <select data-opening-param="'+o.id+'" data-param="swing">'+
+     [['in','Inward'],['out','Outward']].map(function(a){return '<option value="'+a[0]+'"'+optValue('swing',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>';
+    var horizontal=cfg.operation==='sliding'||cfg.operation==='sectional';
+    if(cfg.operation==='fixed')html+='<small>Fixed glazing · choose an operable system to open this sash.</small></div>';
+    else{
+     var prop=horizontal?'openPercent':'openAngle',max=horizontal?100:120;
+     html+='<label>'+(horizontal?'Opening (%)':'Opening angle (°)')+
+      '<input type="range" min="0" max="'+max+'" step="1" data-opening-param="'+o.id+'" data-param="'+prop+
+      '" value="'+cfg[prop]+'"><output data-opening-value="'+o.id+'">'+cfg[prop]+(horizontal?'%':'°')+'</output></label>'+
+      '<div class="detail"><button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="open">Open</button> '+
+      '<button class="btn" type="button" data-opening-motion="'+o.id+'" data-motion="close">Close</button></div></div>';
+    }
+   }
    html+='<button class="btn" type="button" data-remove-opening="'+o.id+'">Remove opening</button></div>';
   });html+='</div>';
  }
@@ -1951,8 +2064,27 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('[data-opening-param]')){
+  var op=(r.openings||[]).find(function(v){return v.id===Number(input.dataset.openingParam);});
+  if(!op||!['door','window'].includes(op.kind))return;
+  var key=input.dataset.param,allowed=['operation','leaves','hinge','swing','openAngle','openPercent'];
+  if(!allowed.includes(key))return;
+  var v=(key==='leaves'||key==='openAngle'||key==='openPercent')?Number(input.value):input.value;
+  if(key==='leaves')v=clamp(Math.round(v),1,3);
+  if(key==='openAngle')v=clamp(v,0,120);
+  if(key==='openPercent')v=clamp(v,0,100);
+  if(key==='operation'){
+   var permitted=op.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+    ['fixed','casement','sliding','awning','hopper','tilt-turn'];
+   if(!permitted.includes(v))return;
+  }
+  if(key==='hinge'&&!['left','right'].includes(v))return;
+  if(key==='swing'&&!['in','out'].includes(v))return;
+  op[key]=v;
+  redraw();renderProps();text('Apertura 3D paramétrica actualizada');return;
+ }
  if(input.matches('select[data-opening-style]')){
   var opening=(r.openings||[]).find(function(o){return o.id===Number(input.dataset.openingStyle);});
   var style=opening&&(ARCH_STYLES[opening.kind]||[]).find(function(st){return st.id===input.value;});
@@ -1961,6 +2093,7 @@ function change(e){
   if(r.type==='wall'){candidate.h=style.h;candidate.sill=Math.min(style.sill,Math.max(0,r.h-style.h));}
   else candidate.d=style.d;
   if(!openingFitsCADHost(r,candidate,opening.id)){renderProps();text('El modelo elegido no entra en el muro o se superpone a otro vano');return;}
+  if(opening.kind==='door'||opening.kind==='window')Object.assign(candidate,cad3DOpeningDefaults(opening.kind,style.id));
   Object.assign(opening,candidate);selectedOpeningId=opening.id;redraw();renderProps();text('Modelo de carpintería actualizado');return;
  }
  if(input.matches('select[data-object-layer]')){
@@ -1999,6 +2132,16 @@ function change(e){
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
 }
 function clickProps(e){
+ var motion=e.target.closest('[data-opening-motion]');
+ if(motion){
+  var host=records.find(function(r){return selected.length===1&&r.id===selected[0]&&editableRecord(r);});
+  var op=(host?.openings||[]).find(function(o){return o.id===Number(motion.dataset.openingMotion);});
+  if(!op)return;
+  var cfg=cad3DOpeningConfig(op),horizontal=['sliding','sectional'].includes(cfg.operation);
+  if(cfg.operation==='fixed')return text('Paño fijo: elegí batiente, corrediza o basculante para abrirlo');
+  op[horizontal?'openPercent':'openAngle']=motion.dataset.motion==='close'?0:horizontal?100:90;
+  redraw();renderProps();text('Carpintería '+(motion.dataset.motion==='close'?'cerrada':'abierta')+' en 3D');return;
+ }
  var chosen=e.target.closest('[data-select-opening-id]');
  if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
  if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
@@ -2693,6 +2836,17 @@ async function readJSON(e){
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
      var op={id:finite(v.id,0),kind:v.kind,styleId:String(v.styleId||'').slice(0,60),
       offset:finite(v.offset,0),w:clamp(finite(v.w,1),.05,1000)};
+     if(v.kind==='door'||v.kind==='window'){
+      var defs=cad3DOpeningDefaults(v.kind,v.styleId);
+      Object.assign(op,defs);
+      op.operation=(v.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+       ['fixed','casement','sliding','awning','hopper','tilt-turn']).includes(v.operation)?v.operation:defs.operation;
+      op.leaves=clamp(Math.round(finite(v.leaves,defs.leaves)),1,3);
+      op.hinge=v.hinge==='right'?'right':'left';
+      op.swing=v.swing==='out'?'out':'in';
+      op.openAngle=clamp(finite(v.openAngle,0),0,120);
+      op.openPercent=clamp(finite(v.openPercent,0),0,100);
+     }
      if(r.type==='wall'){op.h=clamp(finite(v.h,1),.05,1000);op.sill=clamp(finite(v.sill,0),0,1000);}
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
      return op;
