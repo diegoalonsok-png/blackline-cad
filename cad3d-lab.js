@@ -1236,9 +1236,12 @@ function cad3dEnableMovableToolbars(){
    if(!drag||e.pointerId!==drag.pointer)return;
    if(drag.moved){
     // Releasing over the original dock strip snaps the bar back into place.
-    const dockRect=state.marker.parentNode.getBoundingClientRect();
-    if(e.clientX>=dockRect.left&&e.clientX<=dockRect.right&&
-       e.clientY>=dockRect.top&&e.clientY<=dockRect.bottom&&dockRect.height>=18) dock(state);
+    const dockHost=state.marker.parentNode;
+    if(dockHost.classList?.contains('cad3dBasicBars')){
+     const dockRect=dockHost.getBoundingClientRect();
+     if(e.clientX>=dockRect.left&&e.clientX<=dockRect.right&&
+        e.clientY>=dockRect.top&&e.clientY<=dockRect.bottom) dock(state);
+    }
     persist();
    }
    drag=null;
