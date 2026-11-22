@@ -1986,7 +1986,7 @@ function addDoorPlanSymbols(wall,group){
    var line=new T.Line(new T.BufferGeometry().setFromPoints(segment),mat.clone());
    line.userData.owner=wall.id;line.userData.openingId=o.id;symbol.add(line);
   });
-  mat.dispose();
+  if(typeof mat.dispose==='function')mat.dispose();
   symbol.visible=activeView==='top'&&viewMode==='ortho';
   group.add(symbol);
  });
