@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const src=fs.readFileSync('cad3d-lab.js','utf8');
 test('CAD3D source parses as JavaScript',()=>assert.doesNotThrow(()=>new vm.Script(src)));
 test('Sun uses a lit WebGL ground receiver, separate from editable records',()=>{
- assert(src.includes('new T.MeshStandardMaterial({color:0x9ba5a8'),'Lit ground receiver is missing');
+ assert(src.includes('new T.MeshStandardMaterial({color:0xd1cbc0'),'Lit ground receiver is missing');
  assert(src.includes('sunGround.receiveShadow=true'),'Ground must receive shadows');
  assert(src.includes('renderer.shadowMap.enabled=true'),'Renderer must enable shadow maps');
  assert(src.includes('sunLight.castShadow=sunSettings.enabled'),'Sun must cast shadows');
