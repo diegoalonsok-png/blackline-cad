@@ -915,7 +915,7 @@ function renderDraftModes(){
 }
 function toggleDraftMode(mode){
  draftModes[mode]=!draftModes[mode];renderDraftModes();
- if(mode==='grid'){if(gridHelper)gridHelper.visible=draftModes.grid&&renderStyle!=='sketch';fallbackDraw();}
+ if(mode==='grid'){if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle);fallbackDraw();}
  if(mode==='dyn'&&!draftModes.dyn)root?.querySelector('.dynReadout')?.removeAttribute('data-show');
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
@@ -2600,9 +2600,10 @@ function run3DCommand(){
  if(command==='save'||command==='qsave'||command==='saveas'){exportJSON();return;}
  if(command==='open'){root.querySelector('.fileInput').click();return;}
  if(command==='export'){exportDXF();return;}
+ if(['plan2d','plan','planta2d'].includes(command)){setPlan2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
- if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
+ if(command==='select'||command==='cancel'){openingTransfer=null;setPlacement(null);text('Selección activa');return;}
  if(command==='pan'){text('Paneo: arrastrá con el botón central o derecho');return;}
  // Native CAD commands: ZOOM, Z, ZOOM E, ZOOM EXTENTS and ZOOM numeric factors.
  if(/^(?:zoom|z)(?:\s+.*)?$/i.test(raw)){
@@ -2881,6 +2882,7 @@ window.addEventListener('keydown',function(ev){
   return;
  }
  if(ev.key==='Escape'){
+  if(openingTransfer){ev.preventDefault();ev.stopImmediatePropagation();openingTransfer=null;text('MOVE OPENING cancelado');return;}
   if(placing){ev.preventDefault();ev.stopImmediatePropagation();setPlacement(null);text('Comando 3D cancelado');}
   else if(!root.querySelector('.archPalette').hidden){ev.preventDefault();ev.stopImmediatePropagation();showArchPalette(false);}
   return;
