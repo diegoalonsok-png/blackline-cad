@@ -1649,7 +1649,9 @@ function architectureParts(r,part){
    carpPart(frameW,frameDepth,h,o.left+frameW/2,0,z,0x73848d,0);
    carpPart(frameW,frameDepth,h,o.right-frameW/2,0,z,0x73848d,0);
    var leafW=usable/panels;
-   for(var leaf=0;leaf<panels;leaf++){
+   var dynamicSash=openingMotionType(opening)!=='fixed'&&
+    (openingMotionType(opening)==='sliding'?finite(opening.openFraction,0)>0:finite(opening.openAngle,0)>0);
+   if(!dynamicSash)for(var leaf=0;leaf<panels;leaf++){
     var cx=o.left+frameW+leafW*(leaf+.5);
     var inset=Math.min(.022,leafW/10),height=Math.max(.1,h-2*frameW);
     if(glazed){
@@ -1682,6 +1684,9 @@ function architectureParts(r,part){
    carpPart(w,d,frameW,x,0,z+h-frameW,0x9babb5,0);
    carpPart(frameW,d,h,o.left+frameW/2,0,z,0x9babb5,0);
    carpPart(frameW,d,h,o.right-frameW/2,0,z,0x9babb5,0);
+   var dynamicSash=openingMotionType(opening)!=='fixed'&&
+    (openingMotionType(opening)==='sliding'?finite(opening.openFraction,0)>0:finite(opening.openAngle,0)>0);
+   if(!dynamicSash){
    carpPart(innerW,.016,innerH,x,0,z+frameW,glazingColor,0,true,glazingOpacity(opening));
    for(var pane=1;pane<n;pane++)
     carpPart(Math.min(.048,innerW/16),d+.025,innerH,o.left+frameW+innerW*pane/n,0,z+frameW,0xd1dae0,0);
@@ -1702,6 +1707,7 @@ function architectureParts(r,part){
    if(/bay/.test(id)){
     carpPart(.048,.16,innerH,o.left+frameW,0,z+frameW,0x9aadb7,0);
     carpPart(.048,.16,innerH,o.right-frameW,0,z+frameW,0x9aadb7,0);
+   }
    }
   }
  });
