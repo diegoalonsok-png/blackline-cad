@@ -2206,13 +2206,13 @@ function build(){
   // Do not intercept numeric dimensions or modifier combinations.
   if(ev.isComposing||ev.ctrlKey||ev.metaKey||ev.altKey||ev.repeat)return;
   var key=ev.key.toUpperCase();
-  if(this.value.trim()===''&&['T','F','L','R','B','Z','V','P','I','O','+','-'].includes(key)){
+  if(this.value.trim()===''&&['T','F','L','R','B','Z','V','P','I','O','C','+','-'].includes(key)){
    ev.preventDefault();ev.stopPropagation();cad3dViewAlias(key);
   }
  });
  root.querySelector('#cad3dCommand').addEventListener('input',function(){
   var value=this.value.trim().toUpperCase();
-  if(['T','F','L','R','B','Z','V','P','I','O','TOP','FRONT','LEFT','RIGHT','BACK','ZOOM'].includes(value)){
+  if(['T','F','L','R','B','Z','V','P','I','O','C','TOP','FRONT','LEFT','RIGHT','BACK','ZOOM','ZOOMEXTENTS'].includes(value)){
    this.value='';cad3dViewAlias(value);
   }
  });
@@ -2352,28 +2352,53 @@ function changeLayer(kind){
 }
 function cad3dBounds(){
  var b={minX:Infinity,minY:Infinity,minZ:Infinity,maxX:-Infinity,maxY:-Infinity,maxZ:-Infinity};
+ function add(x,y,z){
+  if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return;
+  b.minX=Math.min(b.minX,x);b.maxX=Math.max(b.maxX,x);
+  b.minY=Math.min(b.minY,y);b.maxY=Math.max(b.maxY,y);
+  b.minZ=Math.min(b.minZ,z);b.maxZ=Math.max(b.maxZ,z);
+ }
  records.filter(visibleRecord).forEach(function(r){
   var halfW=(r.w||r.radius*2||2)/2,halfD=(r.d||r.radius*2||2)/2;
-  if(r.type==='sphere'){halfW=halfD=r.radius||1;}
+  if(r.type==='sphere')halfW=halfD=r.radius||1;
   var angle=(r.rot||0)*Math.PI/180;
   var ex=Math.abs(Math.cos(angle))*halfW+Math.abs(Math.sin(angle))*halfD;
   var ey=Math.abs(Math.sin(angle))*halfW+Math.abs(Math.cos(angle))*halfD;
   var height=r.type==='sphere'?(r.radius||1)*2:(r.h||2);
-  b.minX=Math.min(b.minX,r.x-ex);b.maxX=Math.max(b.maxX,r.x+ex);
-  b.minY=Math.min(b.minY,r.y-ey);b.maxY=Math.max(b.maxY,r.y+ey);
-  b.minZ=Math.min(b.minZ,r.z||0);b.maxZ=Math.max(b.maxZ,(r.z||0)+height);
+  add((r.x||0)-ex,(r.y||0)-ey,r.z||0);
+  add((r.x||0)+ex,(r.y||0)+ey,(r.z||0)+height);
+  if(r.type==='profile2d'&&Array.isArray(r.profilePoints)){
+   var c=Math.cos(angle),sn=Math.sin(angle);
+   r.profilePoints.forEach(function(p){add((r.x||0)+p[0]*c-p[1]*sn,(r.y||0)+p[0]*sn+p[1]*c,r.z||0);});
+  }
  });
- if(!Number.isFinite(b.minX))return {x:0,y:0,z:0,span:24};
+ if(underlay&&Array.isArray(underlay.segments)){
+  underlay.segments.forEach(function(p){if(p.length>=4){add(p[0],p[1],0);add(p[2],p[3],0);}});
+ }
+ if(!Number.isFinite(b.minX))return {x:0,y:0,z:0,span:24,width:24,depth:24,height:4,empty:true};
+ var width=Math.max(.1,b.maxX-b.minX),depth=Math.max(.1,b.maxY-b.minY),height=Math.max(.1,b.maxZ-b.minZ);
  return {x:(b.minX+b.maxX)/2,y:(b.minY+b.maxY)/2,z:(b.minZ+b.maxZ)/2,
-  span:Math.max(8,b.maxX-b.minX,b.maxY-b.minY,(b.maxZ-b.minZ)*2)};
+  width:width,depth:depth,height:height,span:Math.max(2,width,depth,height*2),empty:false};
 }
 function fit3DModel(){
- var b=cad3dBounds();
- if(target){target.x=b.x;target.y=b.y;target.z=b.z;}
- else if(T)target=new T.Vector3(b.x,b.y,b.z);
- else target={x:b.x,y:b.y,z:b.z};
- orbit.dist=clamp(b.span*1.7,8,450);applyViewCamera();
- text('Vista ajustada a los objetos 3D');
+ var b=cad3dBounds(),view=root?.querySelector('.view');
+ if(b.empty){text('No hay objetos visibles para centrar');return false;}
+ if(!target)target=T?new T.Vector3(b.x,b.y,b.z):{x:b.x,y:b.y,z:b.z};
+ else {target.x=b.x;target.y=b.y;target.z=b.z;}
+ var aspect=view?Math.max(.25,view.clientWidth/Math.max(1,view.clientHeight)):1.5;
+ if(viewMode==='ortho'){
+  // OrthographicCamera half-height equals orbit.dist * .38.
+  var top=activeView==='top'||activeView==='bottom';
+  var spanX=top?b.width:b.span,spanY=top?b.depth:b.span;
+  var half=Math.max(spanY/2,spanX/(2*aspect)) * 1.25;
+  orbit.dist=clamp(half/.38,1.4,450);
+ }else{
+  var fov=50*Math.PI/180;
+  orbit.dist=clamp(b.span*.75/Math.tan(fov/2),2,450);
+ }
+ applyViewCamera();
+ text('Zoom Extents · objetos visibles centrados');
+ return true;
 }
 function applySunSettings(){
  if(root){
@@ -2985,7 +3010,8 @@ function cad3dViewAlias(word){
   P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso'};
  var key=String(word||'').trim().toUpperCase();
  if(key==='C'||key==='CAMERA'||key==='CAMARAS'||key==='CÁMARAS')return cad3dCameraMenu();
- if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
+ if(key==='Z'||key==='ZOOM'||key==='ZE'||key==='ZOOMEXTENTS'){cad3dEndZoom();fit3DModel();return true;}
+ if(key==='ZI'||key==='ZOOMINTERACTIVE'){cad3dStartZoom();return true;}
  if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA')return cad3dViewMenu();
  if(key==='O'||key==='ORTHO'||key==='ORTHOGRAPHIC')return cad3dOrthographicView();
  if(key==='P'||key==='PERSPECTIVE'||key==='PERSPECTIVA')return cad3dSetProjection('perspective');
@@ -4678,6 +4704,7 @@ function setViewPreset(key){
  if(key==='top'&&renderStyle==='wire3d')setVisualStyle('wire2d');
  if(viewMode==='walk')target.z=1.65;
  syncViewControls();applyViewCamera();
+ if(key==='top')fit3DModel();
  root.querySelector('.placementGuide').hidden=true;
  text(v[1]+' · '+(viewMode==='walk'?'W/A/S/D caminar · rueda avanzar / retroceder':'Botón central: paneo · Mayús + central: órbita'));
 }
@@ -5074,7 +5101,7 @@ window.addEventListener('keydown',function(ev){
  }
  if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.isComposing||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
  var key=ev.key.toLowerCase();
- if(['t','l','r','v','p','o','c'].includes(key)&&!ev.repeat){
+ if(['t','l','r','v','p','o','c','z'].includes(key)&&!ev.repeat){
   ev.preventDefault();ev.stopImmediatePropagation();cad3dViewAlias(key);return;
  }
  if(viewMode==='walk'&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){
