@@ -793,6 +793,7 @@ css+="\n#cad3dLab > .archPalette{position:absolute!important;right:auto!importan
 css+="\n#cad3dLab .viewCube{background:linear-gradient(140deg,#f9fbfd,#cfdae4)!important;border:2px solid #4f6e82!important;border-radius:19px!important;box-shadow:inset 0 1px 2px #fff,0 4px 11px #0006!important}\n#cad3dLab .viewCube .cubePlane{stroke:#132b39!important;stroke-width:1.8px!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"top\"] .cubePlane{fill:#a6d3ff!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"front\"] .cubePlane{fill:#a3e3a3!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"right\"] .cubePlane{fill:#f4aaa9!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"left\"] .cubePlane{fill:#d7b1f1!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"back\"] .cubePlane{fill:#b9e5d6!important}\n#cad3dLab .viewCube .cubeFaceZone[data-view-preset=\"bottom\"] .cubePlane{fill:#d9dfe8!important}\n#cad3dLab .viewCube .cubeFaceLabel{font-weight:800!important;fill:#111a24!important;stroke:none!important;paint-order:normal!important;letter-spacing:.15px!important;font-size:9.5px!important;pointer-events:none!important}\n#cad3dLab .viewCube .cubeCornerZone{fill:#f5f8fb!important;stroke:#293b46!important;stroke-width:1.2!important}\n#cad3dLab .viewCube .cubeFaceZone:hover .cubePlane{filter:brightness(1.12)}\n#cad3dLab .orbitBall{background:linear-gradient(140deg,#edf5fb,#cbdbe8)!important;border:2px solid #284962!important;border-radius:50%!important;box-shadow:inset 0 1px 2px #fff,0 5px 12px #0007!important}\n#cad3dLab .orbitBall svg{width:100%!important;height:100%!important;filter:none!important}\n";
 css+="\n#cad3dLab .cad3dNavToolbar,#cad3dLab .cad3dStyleToolbar,#cad3dLab .cad3dQuickViews{display:flex;align-items:center;flex:none;gap:3px;padding:4px 7px;background:#14212a;border-bottom:1px solid #415767;min-height:41px;white-space:nowrap}\n#cad3dLab .cad3dNavToolbar strong,#cad3dLab .cad3dStyleToolbar strong,#cad3dLab .cad3dQuickViews strong{font:700 9px Inter,Arial,sans-serif;letter-spacing:.9px;color:#b0c3cf;margin:0 5px 0 2px}\n#cad3dLab .cad3dQuickTool{min-width:30px;height:31px;border:1px solid #455968;border-radius:6px;background:#090f15;color:#ecf4f8;display:inline-grid;place-items:center;padding:0 5px;font:700 13px Inter,Arial,sans-serif;cursor:pointer;transition:background .15s,border-color .15s}\n#cad3dLab .cad3dQuickViews .cad3dQuickTool{font-size:10px;min-width:36px}\n#cad3dLab .cad3dQuickTool:hover{background:#2b4352;border-color:#a5cadd}\n#cad3dLab .cad3dQuickTool[aria-pressed=\"true\"]{background:#244e67;border:1px solid #9edff7;box-shadow:inset 0 -2px 0 #9edff7}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube{outline:2px solid #8caec9;outline-offset:5px}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewNavTop{position:relative}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube:before{content:\"N\";position:absolute;left:45%;top:0;z-index:7;font-weight:800;color:#113957;pointer-events:none}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube:after{content:\"O  ·  S  ·  E\";position:absolute;bottom:1px;left:0;right:0;text-align:center;z-index:7;font-size:9px;font-weight:800;color:#14354e;pointer-events:none}\n#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dNavToolbar,#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dStyleToolbar,#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dQuickViews{gap:3px!important;padding:4px 5px!important}\n#cad3dLab.cad3dCompactMode .cad3dDockBar .cad3dQuickTool{min-height:31px;flex:0 0 auto}\n";
 css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:hidden}\n#cad3dLab .view.wire2dView{background:#fff!important}\n";
+css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1836,6 +1837,29 @@ function cad3dEnableMovableToolbars(){
 }
 
 var cad3dNavigationTool='select',cad3dBIMCompass=false;
+
+function cad3dApprovedStyleCube(mode){
+ // Six original-layout cube pictograms, compact SVG rather than platform-dependent glyphs.
+ var top='24,3 44,13 24,24 4,13',left='4,13 24,24 24,45 4,34',right='44,13 24,24 24,45 44,34';
+ var line='#f3f8fc',dark='#23333e';
+ var fill=mode==='shaded'?['#bcd0e0','#90a9bf','#738da3']:
+   mode==='realistic'?['#91c7fd','#7fe67f','#ee7373']:
+   mode==='sketch'?['#f3f4f4','#ededed','#dedede']:
+   mode==='xray'?['#80c0e92f','#75acc83b','#a3dcff2c']:
+   ['none','none','none'];
+ var edge=mode==='sketch'?'#28333a':mode==='shaded'?'#e6f2fc':line;
+ var widths=mode==='hidden'?'2.3':'1.9';
+ var svg='<svg class="cad3dApprovedCubeSvg" viewBox="0 0 48 48" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">';
+ if(mode==='xray')svg+='<polygon points="'+top+'" fill="#95c5ed1c"/><polygon points="'+left+'" fill="#95c5ed13"/><polygon points="'+right+'" fill="#95c5ed26"/>';
+ svg+='<polygon points="'+top+'" fill="'+fill[0]+'" stroke="'+edge+'" stroke-width="'+widths+'" stroke-linejoin="round"/>'+
+  '<polygon points="'+left+'" fill="'+fill[1]+'" stroke="'+edge+'" stroke-width="'+widths+'" stroke-linejoin="round"/>'+
+  '<polygon points="'+right+'" fill="'+fill[2]+'" stroke="'+edge+'" stroke-width="'+widths+'" stroke-linejoin="round"/>';
+ if(mode==='wire3d'||mode==='xray'||mode==='hidden')svg+='<path d="M24 24V45M4 13L24 3L44 13M4 34L24 45L44 34" fill="none" stroke="'+edge+'" stroke-width="1.45"/>';
+ if(mode==='sketch')svg+='<path d="M18 10l7 3m7 8-1 7M11 25l6 4M27 32l6-2" fill="none" stroke="#7e868d" stroke-width="1.3" stroke-linecap="round"/>';
+ if(mode==='shaded')svg+='<path d="M4 13L24 24L44 13" fill="none" stroke="#fff" stroke-opacity=".38"/>';
+ return svg+'</svg>';
+}
+
 function cad3dCompact3DBar(){
  function b(group,key,label,display){return '<button type="button" class="cad3dQuickTool" data-'+group+'="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="false">'+display+'</button>';}
  var tools=[
@@ -1843,15 +1867,14 @@ function cad3dCompact3DBar(){
  ['hand','Mano · desplazar','✋'],['center','Centrar modelo','⊙'],['fit','Ajustar todo','⛶']
  ];
  var styles=[
- ['shaded','Sólido','▣'],['wire3d','Alámbrico','◇'],['xray','Transparente','◈'],
- ['realistic','Por colores','◩'],['hidden','Contorno','⬡'],['sketch','Croquis','✎']
+ ['shaded','Sólido'],['wire3d','Alámbrico'],['xray','Transparente'],
+ ['realistic','Por colores'],['hidden','Contorno'],['sketch','Croquis']
  ];
  var views=['top','front','right','left','back','bottom'];
  return '<div class="cad3dNavToolbar" role="toolbar" aria-label="Navegación 3D">'+
   '<strong>NAVEGACIÓN</strong>'+tools.map(function(t){return b('nav-tool',t[0],t[1],t[2]);}).join('')+'</div>'+
   '<div class="cad3dStyleToolbar" role="toolbar" aria-label="Estilos visuales del modelo">'+
-  '<strong>ESTILOS</strong>'+styles.map(function(t){return b('quick-style',t[0],t[1],t[2]);}).join('')+
-  b('quick-style','sun','Sol y sombras','☀')+'</div>'+
+  '<strong>ESTILOS</strong>'+styles.map(function(t){return b('quick-style',t[0],t[1],cad3dApprovedStyleCube(t[0]));}).join('')+'</div>'+
   '<div class="cad3dQuickViews" role="toolbar" aria-label="Vistas y brújula BIM">'+
   '<strong>VISTAS</strong>'+views.map(function(key){return b('quick-view',key,key.toUpperCase(),key.toUpperCase());}).join('')+
   b('quick-view','iso','Isométrica','ISO')+b('quick-view','bim','Brújula BIM · alternar','N/E')+'</div>';
@@ -1880,7 +1903,10 @@ function cad3dBindCompactBars(){
   if(style){
    var mode=style.dataset.quickStyle;
    if(mode==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();}
-   else setVisualStyle(mode);
+   else {
+    if(mode==='wire3d'&&activeView==='top')setViewPreset('iso');
+    setVisualStyle(mode);
+   }
    cad3dSyncCompactBars();return;
   }
   if(view){
@@ -2664,7 +2690,7 @@ function fallbackPolygon(points,fill,stroke,width){
  g.fillStyle=isCad3DSketch(renderStyle)||renderStyle==='hidden'?'#f8f6ef':
   renderStyle==='monochrome'?'#e1e3e4':renderStyle==='realistic'?'#aa9b86':fill;
  if(!wire){g.globalAlpha=renderStyle==='xray'?.26:1;g.fill();g.globalAlpha=1;}
- g.strokeStyle=renderStyle==='wire2d'?'#000000':['sketch','hidden','wire3d'].includes(renderStyle)?'#303537':stroke;
+ g.strokeStyle=renderStyle==='wire2d'?'#000000':['sketch','hidden'].includes(renderStyle)?'#303537':renderStyle==='wire3d'?'#e6f3fb':stroke;
  g.lineWidth=['sketch','wire2d','wire3d'].includes(renderStyle)?1.2:(width||1);g.stroke();
 }
 function fallbackBox(project,rec,w,d,h,x,y,z,color,slope){
@@ -4319,7 +4345,7 @@ function applyRenderStyle(){
   if(withEdges&&!cutout){
    var edge=new T.EdgesGeometry(m.geometry,22);
    var colorEdge=sketch?sketch.edge:renderStyle==='wire2d'?0x111111:
-    renderStyle==='wire3d'?0x191d21:renderStyle==='shaded-edges'?0x394954:0x43535e;
+    renderStyle==='wire3d'?0xe6f3fb:renderStyle==='shaded-edges'?0x394954:0x43535e;
    var depthTest=!['wire2d','wire3d'].includes(renderStyle);
    var line=new T.LineSegments(edge,new T.LineBasicMaterial({
     color:colorEdge,depthTest:depthTest,depthWrite:false,
