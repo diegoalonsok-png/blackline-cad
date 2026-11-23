@@ -3327,6 +3327,21 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
    var x1=(p.x+1)*w/2,y1=(1-p.y)*h/2,x2=(q.x+1)*w/2,y2=(1-q.y)*h/2;
    var dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
    if(len<2||len>4*Math.max(w,h)||Math.max(x1,x2)<0||Math.min(x1,x2)>w||Math.max(y1,y2)<0||Math.min(y1,y2)>h)continue;
+   // Reject geometry-only joint seams: support must exist in the clean raster.
+   // The edge mask is built by the color/luminance non-maximum-suppression pass.
+   if(opts.edgeMask){
+    var samples=Math.max(4,Math.min(18,Math.ceil(len/12))),support=0;
+    for(var step=1;step<samples;step++){
+     var t=step/samples,px=Math.round(x1+dx*t),py=Math.round(y1+dy*t);
+     var near=false;
+     for(var oy=-2;oy<=2&&!near;oy++)for(var ox=-2;ox<=2;ox++){
+      var sx=px+ox,sy=py+oy;
+      if(sx>=0&&sx<w&&sy>=0&&sy<h&&opts.edgeMask[sy*w+sx]>0){near=true;break;}
+     }
+     if(near)support++;
+    }
+    if(support<Math.max(2,Math.floor(samples*.28)))continue;
+   }
    // Geometry-aware hidden edge rejection at the line midpoint.
    var mid=a.clone().add(b).multiplyScalar(.5),screen=mid.clone().project(camera);
    point.set(screen.x,screen.y);ray.setFromCamera(point,camera);
