@@ -91,3 +91,14 @@ test('Eight distinct art engines produce deterministic different images',()=>{
   assert(delta>100,'not distinct: '+styles[i]+' '+styles[j]);
  }
 });
+
+test('Croquis export reuses full-resolution raster for PNG, JPEG and PDF',()=>{
+ const dl=block("panel.querySelector('.cad3dSketchDownload').addEventListener",'handle.addEventListener');
+ for(const term of ['cad3dSketchProcess(true,out)','cad3dPDFfromJPEG',
+  "out.toBlob(saveBlob,fmt==='jpg'?'image/jpeg':'image/png'",'link.download=filename']){
+  assert(dl.includes(term),term);
+ }
+ const sourceMarkup=block('function cad3dSketchRenderMarkup(){','function cad3dInitSketchCapture(){');
+ const markup=vm.runInNewContext(sourceMarkup+'\ncad3dSketchRenderMarkup()', {});
+ for(const format of ['png','jpg','pdf'])assert(markup.includes('value="'+format+'"'),format);
+});
