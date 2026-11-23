@@ -3099,7 +3099,7 @@ function toggleDraftMode(mode){
 function setPlacement(which){
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
- if(which&&['line','polyline','rectangle','circle','arc','wall','slab','floor','dist'].includes(which)){
+ if(which&&['line','polyline','rectangle','circle','arc','wall','slab','floor','dist','stair','railing'].includes(which)){
   cad3dNavigationTool='select';cad3dSyncCompactBars();
  }
  cad3dUpdateDraftPreview();
@@ -3116,6 +3116,8 @@ function setPlacement(which){
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
   wall:'Muro continuo: clic en cada vértice para seguir dibujando · Enter finaliza · Esc cancela',
+  stair:'Escalera recta: elegí inicio y final del recorrido · editá escalones y barandas en Propiedades',
+  railing:'Baranda recta: elegí inicio y final del recorrido · editá altura y estilo en Propiedades',
   slab:'Losa: clic en dos esquinas opuestas',floor:'Piso: dos esquinas de la plataforma, medidas editables en Properties',
   door:'Puertas continuas: clic sobre cada muro · Enter o Esc termina',
   window:'Ventanas continuas: clic sobre cada muro · Enter o Esc termina',
@@ -3979,9 +3981,9 @@ function placeAt(e){
 function placePoint(pt){
  var kind=placing;
  if(['line','polyline','rectangle','circle','arc'].includes(kind)){cad3dDrawProfilePoint(pt);return;}
- if(['wall','slab','floor','move','copy','dist'].includes(kind)&&!firstPoint){
+ if(['wall','slab','floor','move','copy','dist','stair','railing'].includes(kind)&&!firstPoint){
   firstPoint=pt;
-  text(kind==='wall'?'Muro: indicá el extremo final':kind==='slab'||kind==='floor'?'Piso: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
+  text(kind==='wall'?'Muro: indicá el extremo final':kind==='stair'||kind==='railing'?'Indicá el extremo final: largo y dirección se calculan automáticamente':kind==='slab'||kind==='floor'?'Piso: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
  }
  if(kind==='dist'){
   var length=Math.hypot(pt.x-firstPoint.x,pt.y-firstPoint.y);
@@ -4011,6 +4013,16 @@ function placePoint(pt){
   Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
    w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
    x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:slabStyle.slabKind==='roof'?2.8:0});
+ }else if(kind==='stair'||kind==='railing'){
+  if(!cad3dStairsBetaEnabled){text('Activá Escaleras y Barandas BETA desde la Galería Paramétrica');return;}
+  var style=archStyle(kind,activePreset[kind]),dx=pt.x-firstPoint.x,dy=pt.y-firstPoint.y,len=Math.hypot(dx,dy);
+  if(len<.20){text('El tramo debe medir al menos 20 cm');return;}
+  rec=newRecord(kind);
+  Object.assign(rec,{styleId:style.id,w:len,d:style.d,h:style.h,
+   x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:0,rot:Math.atan2(dy,dx)*180/Math.PI});
+  if(kind==='stair')Object.assign(rec,{stepCount:style.stepCount,rails:style.rails,
+   railStyle:style.railStyle,railHeight:style.railHeight,postSpacing:1});
+  else Object.assign(rec,{railStyle:style.railStyle,postSpacing:style.postSpacing,railRise:style.railRise});
  }else if(kind==='block3d'){
   var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
   rec=newRecord('block3d');
@@ -4029,7 +4041,7 @@ function placePoint(pt){
   return;
  }
  setPlacement(null);
- text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'||kind==='floor'?'Losa / Piso dibujado · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
+ text(kind==='stair'?'Escalera · '+rec.stepCount+' escalones · '+rec.w.toFixed(2)+' m · editable en Propiedades':kind==='railing'?'Baranda · '+rec.w.toFixed(2)+' m · editable en Propiedades':kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'||kind==='floor'?'Losa / Piso dibujado · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
 }
 
 /* Hit-test the projected visible object area in the Canvas2D compatibility viewer. */
@@ -6051,7 +6063,7 @@ function checkVisibleShadows(){
  finally{sunLight.castShadow=lightWasCasting;renderer.shadowMap.needsUpdate=true;renderer.render(scene,camera);}
 }
 function verify3DSolids(){
- var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean']);
+ var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean','stair','railing']);
  var invalid=records.filter(function(r){
   if(!supported.has(r.type))return true;
   var dims=r.type==='sphere'?[r.radius]:r.type==='cylinder'||r.type==='cone'?[r.radius,r.h]:r.type==='boolean'?[]:[r.w,r.d,r.h];
@@ -6126,7 +6138,10 @@ function action(a){
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
-  else{setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);}
+  else{
+   if(['stair','railing'].includes(a)&&!cad3dStairsBetaEnabled){text('Escaleras/Barandas BETA desactivadas en la galería');return true;}
+   setPlacement(a);if(!root.querySelector('.archPalette').hidden)showArchPalette(false);
+  }
   return true;
  }
  if(['move','copy','rotate','erase'].includes(a)){
