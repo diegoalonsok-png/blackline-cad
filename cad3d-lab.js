@@ -5171,7 +5171,7 @@ function renderProps(){
  var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
  '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
- var host=r.type==='wall'||r.type==='slab';
+ var host=['wall','slab','stair','railing'].includes(r.type);
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
  if(!focus&&r.type==='profile2d')html+='<div class="detail">2D PROFILE: '+escapeHtml(r.name||'Profile')+
   ' · '+(r.profileClosed?'Closed':'Open')+' · '+(r.profilePoints||[]).length+' vertices'+
@@ -5181,20 +5181,39 @@ function renderProps(){
  ' · '+Math.floor((r.meshVertices||[]).length/9)+' triangles</div>'+
  '<label>Model color <input type="color" data-object-color value="'+(r.materialColor||'#b6bdc0')+'"></label>';
  // Height appears FIRST in Properties, where it is immediately visible for editing.
- var heightEditable=['wall','slab','box','block3d','imported3d','profile2d','cylinder','cone'].includes(r.type);
+ var heightEditable=['wall','slab','box','block3d','imported3d','profile2d','cylinder','cone','stair','railing'].includes(r.type);
  var keys=focus?[]:(heightEditable?['h']:[]);
  if(!focus)keys.push('x','y','z');
  if(!focus&&r.type!=='boolean')keys.push('rot');
- if(!focus&&['box','wall','slab','block3d','imported3d'].includes(r.type))keys.push('w','d');
+ if(!focus&&['box','wall','slab','block3d','imported3d','stair','railing'].includes(r.type))keys.push('w','d');
  if(!focus&&r.type==='slab')keys.push('pitch');
  if(!focus&&['sphere','cone','cylinder'].includes(r.type))keys.push('radius');
- var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':'Depth (m)',h:r.type==='slab'?'Slab thickness (m)':r.type==='profile2d'?'Extrusion height (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
+ var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:r.type==='wall'?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':r.type==='stair'?'Ancho de escalera (m)':r.type==='railing'?'Espesor (m)':'Depth (m)',h:r.type==='slab'?'Slab thickness (m)':r.type==='stair'?'Desnivel total (m)':r.type==='railing'?'Altura de baranda (m)':r.type==='profile2d'?'Extrusion height (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
  keys.forEach(function(k){
   var primary=k==='h';
   html+='<label'+(primary?' class="cad3dHeightProperty"':'')+'>'+labels[k]+
    '<input type="number" step="any"'+(primary?' min="'+(r.type==='profile2d'?0:.01)+'"':'')+
    ' data-key="'+k+'" value="'+escapeHtml(r[k]??0)+'"></label>';
  });
+ if(!focus&&(r.type==='stair'||r.type==='railing')){
+  var options=function(current,arr){return arr.map(function(v){
+   return '<option value="'+v[0]+'"'+(current===v[0]?' selected':'')+'>'+v[1]+'</option>';
+  }).join('');};
+  html+='<div class="cad3dStairStats"><strong>ARQUITECTURA PARAMÉTRICA · BETA</strong>';
+  if(r.type==='stair'){
+   var n=clamp(Math.round(finite(r.stepCount,16)),3,48);
+   html+='<p>'+n+' peldaños · huella '+(r.w/n).toFixed(3)+' m · contrahuella '+(r.h/n).toFixed(3)+' m</p>'+
+    '<label>Peldaños <input data-arch-param="stepCount" type="number" min="3" max="48" step="1" value="'+n+'"></label>'+
+    '<label>Barandas <select data-arch-param="rails">'+options(r.rails,[['none','Sin barandas'],['left','Izquierda'],['right','Derecha'],['both','Ambos lados']])+'</select></label>'+
+    '<label>Altura del pasamanos (m) <input data-arch-param="railHeight" type="number" min=".6" max="1.35" step=".05" value="'+escapeHtml(r.railHeight??.95)+'"></label>';
+  }else{
+   html+='<label>Desnivel entre extremos (m) <input data-arch-param="railRise" type="number" min="-10" max="10" step=".05" value="'+escapeHtml(r.railRise??0)+'"></label>';
+  }
+  html+='<label>Material de baranda <select data-arch-param="railStyle">'+options(r.railStyle,[['metal','Metal'],['wood','Madera'],['glass','Vidrio']])+'</select></label>'+
+   '<label>Separación entre postes (m) <input data-arch-param="postSpacing" type="number" min=".35" max="3" step=".05" value="'+escapeHtml(r.postSpacing??1)+'"></label>'+
+   '<button type="button" class="btn" data-save-arch-preset>Guardar como componente reutilizable</button>'+
+   '<small>Prototipo visual. Comprobar la normativa local antes de construir.</small></div>';
+ }
  if(host&&r.openings.length){
   html+='<div class="detail"><strong>PARAMETRIC OPENINGS</strong>';
   r.openings.filter(function(o){return !focus||o.id===focus.id;}).forEach(function(o,i){
@@ -5246,8 +5265,20 @@ function renderProps(){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param],input[data-object-color]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param],[data-arch-param],input[data-object-color]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('[data-arch-param]')){
+  if(!['stair','railing'].includes(r.type))return;
+  var key=input.dataset.archParam;
+  if(key==='railStyle'&&['metal','wood','glass'].includes(input.value))r.railStyle=input.value;
+  else if(key==='rails'&&r.type==='stair'&&['none','left','right','both'].includes(input.value))r.rails=input.value;
+  else if(key==='stepCount'&&r.type==='stair')r.stepCount=clamp(Math.round(finite(Number(input.value),16)),3,48);
+  else if(key==='railHeight'&&r.type==='stair')r.railHeight=clamp(finite(Number(input.value),.95),.6,1.35);
+  else if(key==='postSpacing')r.postSpacing=clamp(finite(Number(input.value),1),.35,3);
+  else if(key==='railRise'&&r.type==='railing')r.railRise=clamp(finite(Number(input.value),0),-10,10);
+  else return;
+  r.styleId='';redraw();renderProps();text('Geometría paramétrica actualizada');return;
+ }
  if(input.matches('[data-object-color]')){
   if(r.type!=='imported3d'||!/^#[0-9a-f]{6}$/i.test(input.value))return;
   r.materialColor=input.value;redraw();renderProps();text('Color del modelo actualizado');return;
@@ -5293,7 +5324,11 @@ function change(e){
   if(st){
    r.h=st.h;
    if(r.type==='wall')r.d=st.d;
-   else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
+   else if(['stair','railing'].includes(r.type)){
+    r.w=st.w;r.d=st.d;
+    if(r.type==='stair')Object.assign(r,{stepCount:st.stepCount,rails:st.rails,railStyle:st.railStyle,railHeight:st.railHeight,postSpacing:1});
+    else Object.assign(r,{railStyle:st.railStyle,postSpacing:st.postSpacing,railRise:st.railRise});
+   }else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
   }
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
  }
@@ -5350,6 +5385,11 @@ function cad3dFocusObject(id){
  applyViewCamera();text('Cámara centrada en '+(r.name||r.type));
 }
 function clickProps(e){
+ if(e.target.closest('[data-save-arch-preset]')){
+  var component=records.find(function(x){return selected.length===1&&selected[0]===x.id;});
+  if(component&&['stair','railing'].includes(component.type))cad3dSaveStairPreset(component);
+  return;
+ }
  var duplicate=e.target.closest('[data-duplicate-object]');
  if(duplicate){cad3dCloneObject(Number(duplicate.dataset.duplicateObject));return;}
  var focusObject=e.target.closest('[data-focus-object]');
