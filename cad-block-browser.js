@@ -175,7 +175,7 @@
  }
  function paint(){
   if(!el)return;
-  const visual=st.view==='visual';
+  const visual=st.view==='visual'||st.view==='olymp3';
   const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
