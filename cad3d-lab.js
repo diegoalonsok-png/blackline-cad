@@ -1847,7 +1847,7 @@ function cad3dEnableMovableToolbars(){
  const descriptors=[
   ['draw','.cad3dBasicBars .cad3dBar[aria-label="Draw"]'],
   ['modify','.cad3dBasicBars .cad3dBar[aria-label="Modify"]'],
-  ['draw2d','.cad3dProfileTools'],
+  
   ['model3d','.cad3dModelTools'],
   ['options','.tools'],
   ['navigation','.cad3dNavToolbar'],
@@ -2046,7 +2046,7 @@ function cad3dCompact3DBar(){
  }
  var tools=[
  ['select','Seleccionar objetos 3D','↖'],['orbit','Giro libre','⟳'],['pan','Panorámica','✥'],['ring','Órbita con anillo','◎'],
- ['hand','Mano · desplazar','✋'],['center','Centrar modelo','⊙'],['fit','Ajustar todo','⛶']
+ ['center','Centrar modelo','⊙'],['fit','Ajustar todo','⛶']
  ];
  var styles=[
  ['shaded','Sólido'],['wire3d','Alámbrico'],['xray','Transparente'],
@@ -2063,7 +2063,7 @@ function cad3dCompact3DBar(){
 }
 function cad3dSyncCompactBars(){
  if(!root)return;
- root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.navTool===cad3dNavigationTool||(b.dataset.navTool==='hand'&&cad3dNavigationTool==='pan')));});
+ root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.navTool===cad3dNavigationTool));});
  root.querySelectorAll('[data-quick-style]').forEach(function(b){
   b.setAttribute('aria-pressed',String(b.dataset.quickStyle==='materials'?!root.querySelector('.cad3dMaterialsPanel')?.hidden:b.dataset.quickStyle==='sun'?sunSettings.enabled:b.dataset.quickStyle===renderStyle));
  });
@@ -2112,8 +2112,12 @@ function cad3dBindCompactBars(){
 }
 
 function cad3dBasicBars(){
+ // One shared DRAW group for 2D profiles and 3D primitives.
+ // Keep each existing data-action and icon: never fork a second 2D tool implementation.
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
+   tool('line','Line','line')+tool('polyline','Polyline','polyline')+
+   tool('rectangle','Rectangle','rectangle')+tool('circle','Circle','circle')+tool('arc','Arc','arc')+
    tool('wall','Wall','wall')+tool('slab','Slab','slab')+tool('floor','Floor','floor')+
    tool('door','Door','door')+tool('window','Window','window')+tool('opening','Opening','opening')+
    tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
@@ -2121,7 +2125,7 @@ function cad3dBasicBars(){
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
    '<button type="button" class="btn cad3dHistoryButton" data-history="undo" title="Deshacer 3D · Ctrl+Z / Cmd+Z" aria-label="Deshacer último cambio 3D" disabled>↶</button>'+
    '<button type="button" class="btn cad3dHistoryButton" data-history="redo" title="Rehacer 3D · Ctrl+Y / Ctrl+Shift+Z" aria-label="Rehacer cambio 3D" disabled>↷</button>'+
-   tool('select','Select','cube')+tool('move','Move','move')+tool('copy','Copy','copy')+
+   tool('move','Move','move')+tool('copy','Copy','copy')+
    tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
 
@@ -2518,10 +2522,6 @@ function build(){
  cad3dBasicBars()+cad3dCompact3DBar()+
  '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar y renderizar esta perspectiva como croquis"><svg viewBox="0 0 32 32" width="23" height="23" aria-hidden="true"><path d="M16 2 29 9 16 17 3 9Z" fill="#a6d5f1" stroke="#eaf6ff" stroke-width="1.6"/><path d="M3 9 16 17 16 30 3 22Z" fill="#f5b981" stroke="#eaf6ff" stroke-width="1.6"/><path d="M29 9 16 17 16 30 29 22Z" fill="#83c9b6" stroke="#eaf6ff" stroke-width="1.6"/></svg> Render Croquis</button><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
 
- '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
- '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
- tool('line','Line','line')+tool('polyline','Polyline','polyline')+tool('rectangle','Rectangle','rectangle')+
- tool('circle','Circle','circle')+tool('arc','Arc','arc')+'</div>'+
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
  '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="-1000" max="1000" step="0.1" value="2.8" aria-label="Extrude height or signed face distance in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
@@ -2719,9 +2719,6 @@ function build(){
    var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
    root.querySelector('.styleLaunch').setAttribute('aria-expanded',String(!panel.hidden));
   }else action(button.dataset.action);}
- });
- root.querySelector('.cad3dProfileTools').addEventListener('click',function(e){
-  var button=e.target.closest('[data-action]');if(button)action(button.dataset.action);
  });
  root.querySelector('.cad3dModelTools').addEventListener('click',function(e){
   var button=e.target.closest('[data-solid-command]');if(!button)return;
@@ -3184,7 +3181,7 @@ function setPlacement(which){
  }
  cad3dUpdateDraftPreview();
  if(!root)return;
- root.querySelectorAll('.cad3dBar button[data-action],.cad3dProfileTools button[data-action]').forEach(function(b){
+ root.querySelectorAll('.cad3dBar button[data-action]').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
   if(!['union','subtract','intersect','erase'].includes(b.dataset.action))b.setAttribute('aria-pressed',String(armed));
  });
@@ -6719,7 +6716,10 @@ window.addEventListener('keydown',function(ev){
  if(!root||root.hidden)return;
  // The CAD3D model owns its own shortcuts, never editable form inputs or CAD2D.
  var editing=ev.target?.closest?.('input,textarea,select,[contenteditable],[role="textbox"]');
- if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&!ev.isComposing&&!editing){
+ // Undo/redo the model also from an empty CAD3D Command field, but never
+ // steal native text undo from dimensions, properties or unfinished commands.
+ var historyAllowed=!editing||(editing.id==='cad3dCommand'&&!editing.value.trim());
+ if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&!ev.isComposing&&historyAllowed){
   var historyKey=String(ev.key||'').toLowerCase();
   if(historyKey==='z'||historyKey==='y'||historyKey==='a'){
    ev.preventDefault();ev.stopImmediatePropagation();
