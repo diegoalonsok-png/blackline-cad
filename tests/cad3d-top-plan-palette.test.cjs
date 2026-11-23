@@ -82,3 +82,32 @@ test('CAD3D Undo/Redo icons match visible CAD2D SVGs and keep history bindings',
  assert(src.includes('.cad3dHistoryButton:disabled{'));
  assert(src.includes('.cad3dHistoryButton svg{'));
 });
+
+test('Giro palette preserves six circular reference controls without duplicating the old navigation bar',()=>{
+ const markup=src.slice(src.indexOf('function cad3dGiroMarkup(){'),src.indexOf('function cad3dCenterModelWithoutZoom(){'));
+ const indexOrder=['orbit','panorama','ring','hand','center','fit'];
+ for(let i=0;i<indexOrder.length;i++){
+  const needle="['"+indexOrder[i]+"',";
+  const idx=markup.indexOf(needle);
+  assert(idx>0,needle);
+  if(i)assert(idx>markup.indexOf("['"+indexOrder[i-1]+"',"),'Order is preserved');
+ }
+ assert(markup.includes('Variantes de interacción (Botón Girar)'));
+ assert(markup.includes('cad3dGiroDisk'));
+ assert(markup.includes('data-giro-zoom="1"'));
+ assert(markup.includes('data-giro-zoom="-1"'));
+ const nav=src.slice(src.indexOf('function cad3dCompact3DBar(){'),src.indexOf('function cad3dSyncCompactBars(){'));
+ assert(nav.includes("var tools=[['select'"));
+ assert(nav.includes('data-giro-open'));
+ assert(!nav.includes("['orbit','Giro libre'"),'Remove the duplicate old orbit button');
+});
+test('Giro preserves dock/move and continuous hold zoom stopping on release',()=>{
+ const code=src.slice(src.indexOf('function cad3dInitGiroPalette(){'),src.indexOf('function cad3dBasicBars(){'));
+ for(const term of ['pointerdown','pointermove','pointerup','pointercancel',
+   'lostpointercapture','requestAnimationFrame(step)','cancelAnimationFrame(zoom.frame)',
+   'cad3dGiroZoomFrame(zoom.direction,dt)','cad3dGiroDocked',
+   'blackline-cad3d-giro-palette-v1','aria-pressed'])assert(code.includes(term),term);
+ assert(src.includes("cad3dInitGiroPalette();"));
+ assert(src.includes("cad3dNavigationTool==='panorama'&&e.shiftKey"));
+ assert(src.includes('function cad3dCenterModelWithoutZoom()'));
+});
