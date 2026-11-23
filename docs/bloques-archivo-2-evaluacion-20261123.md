@@ -14,8 +14,8 @@ Fecha: **23/11/2026**. Esta nota preserva la clasificación de la colección ent
 | --- | ---: | --- |
 | `Gastronomia/Glastender` | 576 DWG + 1 ZIP adicional | **Excluido**: dibujos asociados a fabricante comercial. No incorporar ni convertir para publicación |
 | `Heladeras/NEVER*.DWG` | 5 | **Excluido** por posible asociación comercial no esclarecida |
-| `Flechas/` | 21 DWG | **Excluir** de la galería profesional: representaciones básicas y simbología redundante |
-| `Farolas/hoja-far.dwg` | 1 | **No es un bloque unitario**: posible hoja compuesta, solo revisión |
+| `Flechas/` | 21 DWG | **No incorporar por ahora**: posible redundancia con símbolos existentes; calidad gráfica no comprobada |
+| `Farolas/hoja-far.dwg` | 1 | **Revisión aparte**: el nombre sugiere una hoja compuesta, no una farola unitaria; falta inspección gráfica |
 | `Excavadoras/` | 9 | **Candidato**, no publicar sin derechos y revisión de dibujo |
 | `Farolas/faro-*.dwg` | 9 | **Candidato**, no publicar sin derechos y revisión de dibujo |
 | `Heladeras/` (nombres genéricos) | 4 | **Candidato**, no publicar sin derechos y revisión de dibujo |
