@@ -36,7 +36,7 @@
   plan:{en:'Plans',es:'Plantas',mode:'Planta'},
   section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
   archive:{en:'Recovered views',es:'Vistas recuperadas',item:it=>archivedView(it)},
-  olymp3:{en:'Olimpiadas 3 · 1,000+ vectors',es:'Olimpiadas 3 · 1.000+ vectores',item:it=>/^olymp3-/.test(it.id)},
+  olymp3:{en:'2D blocks · 1,000+ vectors',es:'Bloques 2D · 1.000+ vectores',item:it=>/^olymp3-/.test(it.id)},
   doorElev:{en:'Door elevations',es:'Puertas en vista',item:it=>/puerta|door/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   windowElev:{en:'Window elevations',es:'Ventanas en vista',item:it=>/ventana|ventanal|window|paño fijo|pano fijo/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   fridgeElev:{en:'Fridge elevations',es:'Heladeras en vista',item:it=>/heladera|refrigerador|fridge|freezer/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
@@ -130,7 +130,7 @@
  let el=null,armedId=null,visibleCount=st.view==='olymp3'?18:72;
  const pageSize=()=>st.view==='visual'?12:st.view==='olymp3'?18:72;
  function loadOlimpiadas(){const pkg=window.CAD2D_OLYMPIADAS3;
-  if(pkg&&!pkg.loading&&pkg.loaded<pkg.total)pkg.load().catch(err=>CORE.toast('Bloques Olimpiadas: '+err.message));
+  if(pkg&&!pkg.loading&&pkg.loaded<pkg.total)pkg.load().catch(err=>CORE.toast('Bloques 2D: '+err.message));
  }
  // Quality gate: the temporary schematic views26 set remains in source for
  // backward compatibility, but is not advertised as production CAD drafting.
@@ -202,7 +202,7 @@
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
    :T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
   const pkg=window.CAD2D_OLYMPIADAS3;
-  if(pkg&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Olimpiadas '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
+  if(pkg&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
  function place(){
   const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
