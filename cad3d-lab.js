@@ -840,6 +840,7 @@ css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px
 css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;padding:7px 12px;font:11px Inter,Arial,sans-serif;color:#d4e9f6;background:#21394a;border-bottom:1px solid #577589;cursor:pointer}\n#cad3dLab .cad3dStairsBeta input{accent-color:#6bb8e6}\n#cad3dLab .archTools button[hidden]{display:none!important}\n#cad3dLab .cad3dStairStats{margin:9px 0;padding:8px;border:1px solid #4e748a;border-radius:6px;font-size:11px;color:#c7dbe6;background:#1a3342}\n";
 css+="\n#cad3dLab .cad3dHistoryButton{font-family:Arial,sans-serif!important;font-size:21px!important;line-height:1!important;font-weight:600!important;min-width:35px!important}\n#cad3dLab .cad3dHistoryButton:disabled{opacity:.35!important;cursor:not-allowed!important;background:#14212c!important}\n#cad3dLab .cad3dHistoryButton:not(:disabled){color:#e3f6ff!important;border-color:#66899c!important}\n";
 css+="\n#cad3dLab.cad3dPlanMode .view{background:#fff!important}\n#cad3dLab.cad3dPlanMode .cad3dPlanWallOverlay{pointer-events:none}\n";
+css+="\n#cad3dLab .cad3dDraftPreview .cad3dPlateDimension{fill:#07587f;font:700 12px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1739,8 +1740,9 @@ function cad3dUpdateDraftPreview(point){
   overlay.setAttribute('aria-hidden','true');
   view.appendChild(overlay);
  }
- var kind=placing,points=cad3dDraftProfile;
- if(!['line','polyline','rectangle','circle','arc'].includes(kind)||!points.length){
+ var kind=placing,isPlate=kind==='slab'||kind==='floor';
+ var points=isPlate&&firstPoint?[[firstPoint.x,firstPoint.y]]:cad3dDraftProfile;
+ if(!['line','polyline','rectangle','circle','arc','slab','floor'].includes(kind)||!points.length){
   overlay.replaceChildren();overlay.style.display='none';return;
  }
  var w=view.clientWidth,h=view.clientHeight;
@@ -1752,7 +1754,7 @@ function cad3dUpdateDraftPreview(point){
  if(point&&Number.isFinite(point.x)&&Number.isFinite(point.y))pts.push([point.x,point.y]);
  if(pts.length<2){overlay.replaceChildren();return;}
  var shape=pts;
- if(kind==='rectangle'){
+ if(kind==='rectangle'||isPlate){
   var a=pts[0],b=pts[pts.length-1];
   shape=[a,[b[0],a[1]],b,[a[0],b[1]],a];
  }else if(kind==='circle'){
@@ -1762,8 +1764,16 @@ function cad3dUpdateDraftPreview(point){
   shape=cad3dThreePointArc(pts[0],pts[1],pts[2])||pts;
  }
  var path=shape.map(function(p,i){var q=projected(p);return (i?'L':'M')+q.x.toFixed(2)+','+q.y.toFixed(2);}).join(' ');
+ var dimensionLabels='';
+ if(isPlate&&pts.length>=2){
+  var a=pts[0],b=pts[pts.length-1],width=Math.abs(b[0]-a[0]),depth=Math.abs(b[1]-a[1]);
+  var p0=projected(a),p1=projected([b[0],a[1]]),p2=projected(b);
+  var midX=(p0.x+p1.x)/2,midY=(p1.y+p2.y)/2;
+  dimensionLabels='<text class="cad3dPlateDimension" x="'+midX.toFixed(1)+'" y="'+(p0.y-10).toFixed(1)+'" text-anchor="middle">'+width.toFixed(2)+' m</text>'+
+   '<text class="cad3dPlateDimension" x="'+(p1.x+10).toFixed(1)+'" y="'+midY.toFixed(1)+'">'+depth.toFixed(2)+' m</text>';
+ }
  overlay.innerHTML='<path d="'+path+'" fill="none" stroke="'+(renderStyle==='wire2d'?'#0071b5':'#72ddff')+'" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="7 4"/>'+
-  pts.map(function(p){var q=projected(p);return '<circle cx="'+q.x+'" cy="'+q.y+'" r="3.3" fill="#ffcd64" stroke="#23445d" stroke-width="1.3"/>';}).join('');
+  pts.map(function(p){var q=projected(p);return '<circle cx="'+q.x+'" cy="'+q.y+'" r="3.3" fill="#ffcd64" stroke="#23445d" stroke-width="1.3"/>';}).join('')+dimensionLabels;
 }
 
 function cad3dDrawProfilePoint(pt){
@@ -3188,7 +3198,7 @@ function setPlacement(which){
   wall:'Muro continuo: clic en cada vértice para seguir dibujando · Enter finaliza · Esc cancela',
   stair:'Escalera recta: elegí inicio y final del recorrido · editá escalones y barandas en Propiedades',
   railing:'Baranda recta: elegí inicio y final del recorrido · editá altura y estilo en Propiedades',
-  slab:'Losa: clic en dos esquinas opuestas',floor:'Piso: dos esquinas de la plataforma, medidas editables en Properties',
+  slab:'LOSA rectangular: clic en dos esquinas; medidas visibles; también escribí 5x4 en Command. Espesor editable en Propiedades',floor:'PISO rectangular: clic en dos esquinas; medidas visibles; también escribí 5x4 en Command',
   door:'Puertas continuas: clic sobre cada muro · Enter o Esc termina',
   window:'Ventanas continuas: clic sobre cada muro · Enter o Esc termina',
   opening:'Vanos continuos: clic sobre '+(openingHost==='slab'?'la losa':'el muro')+' · Enter o Esc termina',
@@ -3385,6 +3395,7 @@ function updatePlacementGuide(e){
  var raw=groundAt(e);
  if(!raw){marker.hidden=true;guide.hidden=true;return;}
  cursorPoint=placing?assistedPoint(raw,view):raw;
+ if(firstPoint&&(placing==='slab'||placing==='floor'))cad3dUpdateDraftPreview(cursorPoint);
  root.querySelector('.draftCoordinates').textContent='X '+cursorPoint.x.toFixed(2)+' · Y '+cursorPoint.y.toFixed(2)+' m';
  if(!placing)return;
  var p=pointOnScreen(cursorPoint,view);
@@ -4083,7 +4094,7 @@ function placePoint(pt){
  if(['line','polyline','rectangle','circle','arc'].includes(kind)){cad3dDrawProfilePoint(pt);return;}
  if(['wall','slab','floor','move','copy','dist','stair','railing'].includes(kind)&&!firstPoint){
   firstPoint=pt;
-  text(kind==='wall'?'Muro: indicá el extremo final':kind==='stair'||kind==='railing'?'Indicá el extremo final: largo y dirección se calculan automáticamente':kind==='slab'||kind==='floor'?'Piso: indicá la esquina opuesta':'Indicá el segundo punto o escribí sus coordenadas');return;
+  text(kind==='wall'?'Muro: indicá el extremo final':kind==='stair'||kind==='railing'?'Indicá el extremo final: largo y dirección se calculan automáticamente':kind==='slab'||kind==='floor'?'RECTÁNGULO '+(kind==='slab'?'LOSA':'PISO')+' · clic en esquina opuesta, o escribí largo x ancho (ejemplo 5x4)':'Indicá el segundo punto o escribí sus coordenadas');return;
  }
  if(kind==='dist'){
   var length=Math.hypot(pt.x-firstPoint.x,pt.y-firstPoint.y);
@@ -4109,6 +4120,7 @@ function placePoint(pt){
   Object.assign(rec,{styleId:wallStyle.id,d:wallStyle.d,h:wallStyle.h,x:(firstPoint.x+pt.x)/2,y:(firstPoint.y+pt.y)/2,
    w:Math.hypot(dx,dy),rot:Math.atan2(dy,dx)*180/Math.PI,z:0});
  }else if(kind==='slab'||kind==='floor'){
+  if(Math.abs(pt.x-firstPoint.x)<.05||Math.abs(pt.y-firstPoint.y)<.05)return text('LOSA / PISO: ambos lados del rectángulo deben medir al menos 0,05 m');
   var slabStyle=archStyle('slab',kind==='floor'?'floor-20':activePreset.slab);rec=newRecord('slab');
   Object.assign(rec,{styleId:slabStyle.id,slabKind:slabStyle.slabKind,pitch:slabStyle.pitch,h:slabStyle.h,
    w:Math.max(.05,Math.abs(pt.x-firstPoint.x)),d:Math.max(.05,Math.abs(pt.y-firstPoint.y)),
@@ -6331,6 +6343,10 @@ function updateDynamicReadout(e){
  if(!draftModes.dyn||!placing||root.hidden){el.removeAttribute('data-show');return;}
  var point=groundAt(e);if(!point){el.removeAttribute('data-show');return;}
  var length=firstPoint?' · L '+Math.hypot(point.x-firstPoint.x,point.y-firstPoint.y).toFixed(2)+' m':'';
+ if(firstPoint&&(placing==='slab'||placing==='floor')){
+  var w=Math.abs(point.x-firstPoint.x),d=Math.abs(point.y-firstPoint.y);
+  length=' · Largo '+w.toFixed(2)+' m · Ancho '+d.toFixed(2)+' m · '+(w*d).toFixed(2)+' m²';
+ }
  el.textContent='X '+point.x.toFixed(2)+' · Y '+point.y.toFixed(2)+' m'+length;
  var rect=root.querySelector('.view').getBoundingClientRect();
  el.style.left=clamp(e.clientX-rect.left+16,8,Math.max(8,rect.width-el.offsetWidth-12))+'px';
@@ -6349,6 +6365,17 @@ function run3DCommand(){
   return;
  }
  var upper=raw.toUpperCase(),number=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+ // Exact SLAB/FLOOR footprint by dimensions in metres, e.g. 5x4 or -5x4.
+ if(firstPoint&&(placing==='slab'||placing==='floor')){
+  var dim=raw.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*[x×;]\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))$/i);
+  if(dim){
+   var w=Number(dim[1]),d=Number(dim[2]);
+   if(!Number.isFinite(w)||!Number.isFinite(d)||Math.abs(w)<.05||Math.abs(d)<.05)
+    return text('LOSA / PISO: ingresá largo y ancho mayores o iguales a 0,05 m');
+   placePoint({x:firstPoint.x+w,y:firstPoint.y+d,z:0});return;
+  }
+ }
+
  if(placing==='rotate'&&number.test(raw)){
   var angle=Number(raw);
   if(!Number.isFinite(angle))return text('Ingresá un ángulo válido');
