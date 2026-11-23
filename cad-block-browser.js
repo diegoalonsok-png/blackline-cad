@@ -294,4 +294,6 @@
  for(const asset of ["cc0-bathroom-blocks.js","cc0-door-blocks.js","cc0-kitchen-blocks.js"]){const script=document.createElement('script');script.src='assets/'+asset+'?v=20261123-2';document.head.appendChild(script)}
  // Ventanas CC0 en planta, integradas sin modificar las herramientas existentes.
  const windowsScript=document.createElement('script');windowsScript.src='assets/cc0-window-blocks.js?v=20261123-2';document.head.appendChild(windowsScript);
+ // Símbolos de documentación y vegetación CC0, dentro de la biblioteca habitual.
+ const symbolsScript=document.createElement('script');symbolsScript.src='assets/cc0-symbol-blocks.js?v=20261123-2';document.head.appendChild(symbolsScript);
 })();
