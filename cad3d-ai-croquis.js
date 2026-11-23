@@ -13,7 +13,7 @@ function init(){
   box.setAttribute('role','dialog');box.setAttribute('aria-label','Generador de croquis por IA');
   box.innerHTML='<header><strong>✦ CROQUIS IA · DESDE PERSPECTIVA</strong><button data-close title="Cerrar">×</button></header>'+
    '<div class="cadCroquisAIOptions"><label>Estilo<select data-style><option value="watercolor">Acuarela arquitectónica</option><option value="pencil">Lápiz y grafito</option><option value="ink">Tinta y plumilla</option><option value="marker">Marcadores</option><option value="pastel">Pastel</option></select></label>'+
-   '<label>Motor<select data-quality><option value="fast">FLUX.2 · prueba rápida</option><option value="high">FLUX.2 · mayor detalle</option></select></label></div>'+
+   '<label>Motor<select data-quality><option value="fast">FLUX.2 Klein · piloto privado</option></select></label></div>'+
    '<div class="cadCroquisAIActions"><button data-photo>📷 Fotografiar perspectiva</button><button data-export-photo disabled>Guardar foto 3D</button><button data-check>Comprobar Cloudflare</button><button data-create disabled>✦ Generar croquis</button><button data-save disabled>Guardar croquis PNG</button></div>'+
    '<div class="cadCroquisAICompare"><figure><figcaption>Perspectiva original</figcaption><img data-original alt="Captura original del modelo CAD"></figure>'+
    '<figure><figcaption>Croquis generado</figcaption><img data-result alt="Croquis arquitectónico generado"></figure></div>'+
@@ -55,8 +55,8 @@ function init(){
     var type=res.headers.get('content-type')||'';
     if(!res.ok||!type.includes('application/json'))throw Error('El servicio de Cloudflare no responde en esta publicación. Abrí CAD2D3D desde Cloudflare Pages y comprobá el despliegue.');
     var body=await res.json();
-    if(body.ready===true){state.ready=true;create.disabled=false;tell('Motor de IA conectado y listo. Elegí un estilo y pulsá Generar croquis.');}
-    else{tell('Cloudflare pendiente: '+(body.error||'Verificá el binding AI y la activación del motor en Production.'));}
+    if(body.ready===true&&body.policy==='private-pilot-v1'&&body.quotaConfigured===true&&body.privateAccessConfigured===true){state.ready=true;create.disabled=false;tell('Piloto privado listo: máximo 5 intentos diarios. Solo FLUX.2 Klein.');}
+    else{tell('Cloudflare pendiente: '+(body.error||'La protección del piloto todavía no está publicada. No se enviarán imágenes a IA.'));}
    }catch(e){tell('Sin conexión con el motor IA: '+(e.message||String(e))+' Podés guardar la foto y convertirla en ChatGPT.');}
    finally{check.disabled=false;}
   }
@@ -88,6 +88,8 @@ function init(){
   async function generate(){
    if(state.busy)return;
    if(!state.ready){await checkBackend();if(!state.ready)return;}
+   var key=window.prompt('Clave privada del piloto de croquis (no se guarda):');
+   if(!key){tell('Generación cancelada. No se llamó a la IA.');return;}
    state.busy=true;create.disabled=true;save.disabled=true;
    try{
     var size=await photo(),style=box.querySelector('[data-style]').value,quality=box.querySelector('[data-quality]').value;
@@ -98,7 +100,7 @@ function init(){
     form.append('style',style);form.append('quality',quality);
     form.append('width',String(w));form.append('height',String(h));
     tell('Generando el croquis en Cloudflare Workers AI…');
-    var res=await fetch('/croquis/render',{method:'POST',body:form,credentials:'same-origin',cache:'no-store'});
+    var res=await fetch('/croquis/render',{method:'POST',body:form,headers:{Authorization:'Bearer '+key},credentials:'same-origin',cache:'no-store',redirect:'error'});
     if(!res.ok){
      var error='HTTP '+res.status;try{var data=await res.json();error=data.error||error;}catch(_e){}
      throw Error(error);
@@ -108,7 +110,7 @@ function init(){
     clearURL('resultURL');state.resultURL=URL.createObjectURL(blob);
     art.src=state.resultURL;save.disabled=false;tell('Croquis generado. Compará la foto y guardá el PNG.');
    }catch(e){tell('No se pudo generar: '+(e.message||String(e)));}
-   finally{state.busy=false;create.disabled=!state.ready;}
+   finally{key=null;state.busy=false;create.disabled=!state.ready;}
   }
   btn.addEventListener('click',function(){
    box.hidden=false;
