@@ -11,7 +11,7 @@
 (function(){
  'use strict';
  var DOMINIO='blackline-cad.org';
- var DWG_ACTIVO=true; // si el conversor no responde, CAD2D avisa y sugiere DXF
+ var DWG_ACTIVO=false; // conversión remota desactivada por decisión del titular: evitar costes del contenedor
  var DWG_ENDPOINT='https://dwg.'+DOMINIO+'/api/convert/dwg';
  var CUENTAS_ACTIVAS=true;
  // Cada persona tiene 90 días con todo habilitado desde su primer uso (con o sin cuenta).
