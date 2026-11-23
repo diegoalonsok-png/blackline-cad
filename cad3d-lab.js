@@ -6442,7 +6442,7 @@ async function readJSON(e){
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
-  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d','profile2d'];
+  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d','profile2d','stair','railing'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
    var o={id:finite(r.id,0),type:r.type,layerId:importedLayers.some(function(l){return l.id===r.layerId;})?r.layerId:'0',x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
@@ -6455,6 +6455,18 @@ async function readJSON(e){
     o.h=o.extrudedHeight;o.name=String(r.name||'2D profile').slice(0,80);
    }
    if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
+   if(r.type==='stair'){
+    o.stepCount=clamp(Math.round(finite(r.stepCount,16)),3,48);
+    o.rails=['none','left','right','both'].includes(r.rails)?r.rails:'both';
+    o.railHeight=clamp(finite(r.railHeight,.95),.6,1.35);
+    o.railStyle=['metal','wood','glass'].includes(r.railStyle)?r.railStyle:'metal';
+    o.postSpacing=clamp(finite(r.postSpacing,1),.35,3);
+   }
+   if(r.type==='railing'){
+    o.railStyle=['metal','wood','glass'].includes(r.railStyle)?r.railStyle:'metal';
+    o.postSpacing=clamp(finite(r.postSpacing,1),.35,3);
+    o.railRise=clamp(finite(r.railRise,0),-10,10);
+   }
    if((r.type==='wall'||r.type==='slab')&&Array.isArray(r.openings)){
     var kinds=r.type==='wall'?['door','window','opening']:['opening'];
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
