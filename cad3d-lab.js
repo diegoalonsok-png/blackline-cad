@@ -8,6 +8,7 @@ var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=nu
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
+var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var saved3DCameras=[],camera3DSequence=1;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
@@ -802,6 +803,7 @@ css+="\n#cad3dLab .cad3dSketchCaptureControls{max-height:182px;overflow:auto;ali
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n/* The multicolour Croquis cube already opens Styles: hide its redundant black twin. */\n#cad3dLab .tools .styleControl,#cad3dLab .tools .styleControl > .styleLaunch{display:none!important;width:0!important;min-width:0!important;margin:0!important;padding:0!important}\n#cad3dLab .cad3dMarquee{position:absolute;z-index:28;pointer-events:none;box-sizing:border-box;border:1px solid #45a5ff;background:rgba(53,147,240,.21)}\n#cad3dLab .cad3dMarquee.crossing{border:1px dashed #45d780;background:rgba(52,190,103,.25)}\n#cad3dLab .cad3dMarquee[hidden]{display:none!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
+css+="\n#cad3dLab .cad3dEnvironment{min-width:0;margin:8px 0;padding:10px;border:1px solid #638297;border-radius:8px;background:#1d303e;display:grid;gap:9px}\n#cad3dLab .cad3dEnvironment legend{color:#bce1f4;font:700 11px Inter,Arial,sans-serif;padding:0 5px}\n#cad3dLab .cad3dEnvironment .envRow{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#e5edf2;font-size:12px}\n#cad3dLab .cad3dEnvironment input[type=color]{width:60px;height:30px;padding:2px;border:1px solid #7899a8;border-radius:5px;background:#0c1c27;cursor:pointer}\n#cad3dLab .cad3dEnvironment select{min-height:30px;width:126px;background:#172733;border:1px solid #667f90;color:#edf5f8;border-radius:5px}\n#cad3dLab .cad3dEnvironment .envSwitch{justify-content:flex-start}\n#cad3dLab .cad3dEnvironment small{font-size:10px;color:#a5bbca;line-height:1.3}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2393,9 +2395,9 @@ function build(){
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
  '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Parametric 3D" aria-label="Parametric 3D">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>Parametric 3D</span></button>'+cad3DBlockCatalog()+
- '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
+ '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
- '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / SHADOWS</strong><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
+ '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / ENTORNO</strong><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
  '<label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
  '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
@@ -2404,6 +2406,13 @@ function build(){
  '<div class="sunPresetRow"><button type="button" class="btn" data-sun-preset="morning">Morning</button><button type="button" class="btn" data-sun-preset="noon">Noon</button><button type="button" class="btn" data-sun-preset="afternoon">Afternoon</button></div>'+
  '<button type="button" class="btn" data-check-shadows title="Compare render with shadows on and off">Check visible shadows</button>'+
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
+  '<fieldset class="cad3dEnvironment"><legend>CIELO · SUELO · NUBES</legend>'+
+ '<label class="envRow">Color del cielo <input type="color" data-environment-color="sky" value="#c4d8e4" aria-label="Color del cielo"></label>'+
+ '<label class="envRow">Color del suelo <input type="color" data-environment-color="ground" value="#d1cbc0" aria-label="Color del suelo"></label>'+
+ '<label class="envRow envSwitch"><input type="checkbox" data-environment-ground checked> Mostrar suelo</label>'+
+ '<label class="envRow">Nubes <select data-environment-clouds aria-label="Nubes"><option value="none">Sin nubes</option><option value="scattered">Dispersas</option><option value="cloudy">Nublado</option></select></label>'+
+ '<button type="button" class="btn" data-environment-reset>Restaurar colores del estilo</button>'+
+ '<small>Solo presentación; no afecta materiales ni el dibujo 2D.</small></fieldset>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style" aria-label="Visual Style">'+ico('view')+'<span>Visual Style</span></button>'+
@@ -2648,6 +2657,26 @@ function build(){
   if(!preset)return;sunSettings.azimuth=preset[0];sunSettings.elevation=preset[1];sunSettings.enabled=true;applySunSettings();
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
+  root.querySelectorAll('[data-environment-color]').forEach(function(el){
+  el.addEventListener('input',function(){
+   var k=this.dataset.environmentColor;
+   if(k!=='sky'&&k!=='ground')return;
+   environmentSettings[k]=this.value;
+   environmentSettings[k==='sky'?'customSky':'customGround']=true;
+   save3DEnvironment();apply3DEnvironment();
+  });
+ });
+ root.querySelector('[data-environment-ground]').addEventListener('change',function(){
+  environmentSettings.showGround=this.checked;save3DEnvironment();apply3DEnvironment();
+ });
+ root.querySelector('[data-environment-clouds]').addEventListener('change',function(){
+  environmentSettings.clouds=this.value;save3DEnvironment();apply3DEnvironment();
+ });
+ root.querySelector('[data-environment-reset]').addEventListener('click',function(){
+  environmentSettings={sky:'#c4d8e4',ground:'#d1cbc0',customSky:false,customGround:false,showGround:true,clouds:'none'};
+  save3DEnvironment();apply3DEnvironment();
+ });
+ apply3DEnvironment();
  root.querySelector('.viewSavePanel').addEventListener('change',updateSaveViewSettings);
  root.querySelector('.viewSavePanel').addEventListener('input',updateSaveViewSettings);
  root.querySelector('[data-save-go]').addEventListener('click',saveCAD3DView);
@@ -2852,6 +2881,90 @@ function fit3DModel(){
  text('Zoom Extents · objetos visibles centrados');
  return true;
 }
+/* Atmosfera visual, sin alterar la geometría 2D o 3D. */
+function read3DEnvironment(){
+ var v={sky:'#c4d8e4',ground:'#d1cbc0',customSky:false,customGround:false,showGround:true,clouds:'none'};
+ try{
+  var p=JSON.parse(localStorage.getItem('blackline-cad3d-environment-v1')||'null');
+  if(p&&typeof p==='object'){
+   ['sky','ground'].forEach(function(k){if(typeof p[k]==='string'&&/^#[0-9a-f]{6}$/i.test(p[k]))v[k]=p[k];});
+   v.customSky=p.customSky===true;v.customGround=p.customGround===true;
+   v.showGround=p.showGround!==false;
+   if(['none','scattered','cloudy'].includes(p.clouds))v.clouds=p.clouds;
+  }
+ }catch(_e){}
+ return v;
+}
+function save3DEnvironment(){
+ try{localStorage.setItem('blackline-cad3d-environment-v1',JSON.stringify(environmentSettings));}catch(_e){}
+}
+function cad3dSkyColor(){
+ var st=CAD3D_SKETCH_PRESETS[renderStyle];
+ if(renderStyle==='wire2d')return '#ffffff';
+ if(environmentSettings.customSky)return environmentSettings.sky;
+ if(st)return '#'+st.bg.toString(16).padStart(6,'0');
+ if(['hidden','monochrome'].includes(renderStyle))return '#f6f5f1';
+ return sunSettings.enabled&&['shaded','shaded-edges','realistic'].includes(renderStyle)?'#c4d8e4':MODEL_BACKGROUND;
+}
+function cad3dGroundColor(){
+ var st=CAD3D_SKETCH_PRESETS[renderStyle];
+ if(environmentSettings.customGround)return environmentSettings.ground;
+ return st?'#'+st.ground.toString(16).padStart(6,'0'):sunSettings.enabled?'#d1cbc0':'#9ba5a8';
+}
+/* Panorama procedimental 360°, nubes al fondo y no sobre los objetos. */
+function cad3dMakeClouds(color,mode){
+ var c=document.createElement('canvas');c.width=1536;c.height=768;
+ var ctx=c.getContext('2d');if(!ctx)return null;
+ ctx.fillStyle=color;ctx.fillRect(0,0,c.width,c.height);
+ var haze=ctx.createLinearGradient(0,260,0,600);
+ haze.addColorStop(0,'rgba(255,255,255,0)');haze.addColorStop(.7,'rgba(255,255,255,.12)');haze.addColorStop(1,'rgba(255,255,255,.02)');
+ ctx.fillStyle=haze;ctx.fillRect(0,260,c.width,340);
+ var seed=17411;
+ function random(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;}
+ var n=mode==='cloudy'?63:26,alpha=mode==='cloudy'?.65:.49;
+ for(var i=0;i<n;i++){
+  var x=random()*c.width,y=185+random()*280,w=50+random()*125,h=14+random()*30;
+  for(var j=0;j<6;j++){
+   var px=x+(random()-.5)*w*1.4,py=y+(random()-.5)*h*1.4,r=w*(.25+random()*.32);
+   ctx.save();ctx.translate(px,py);ctx.scale(1,h/w*(1.4+random()));
+   var grad=ctx.createRadialGradient(0,0,0,0,0,r);
+   grad.addColorStop(0,'rgba(255,255,255,'+alpha+')');
+   grad.addColorStop(.62,'rgba(255,255,255,'+(alpha*.7)+')');
+   grad.addColorStop(1,'rgba(255,255,255,0)');
+   ctx.fillStyle=grad;ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+ }
+ var tex=new T.CanvasTexture(c);
+ tex.mapping=T.EquirectangularReflectionMapping;tex.colorSpace=T.SRGBColorSpace;tex.needsUpdate=true;
+ return tex;
+}
+function apply3DEnvironment(){
+ if(root){
+  root.querySelectorAll('[data-environment-color]').forEach(function(input){
+   input.value=input.dataset.environmentColor==='sky'?cad3dSkyColor():cad3dGroundColor();
+  });
+  var ground=root.querySelector('[data-environment-ground]');
+  if(ground)ground.checked=environmentSettings.showGround;
+  var clouds=root.querySelector('[data-environment-clouds]');
+  if(clouds)clouds.value=environmentSettings.clouds;
+ }
+ if(T&&scene){
+  var sky=cad3dSkyColor(),on=environmentSettings.clouds!=='none'&&!['wire2d','wire3d','hidden'].includes(renderStyle);
+  var key=on?sky+'/'+environmentSettings.clouds:'';
+  if(key!==cloudTextureKey){
+   if(cloudTexture){cloudTexture.dispose();cloudTexture=null;}
+   cloudTextureKey=key;
+   if(on)cloudTexture=cad3dMakeClouds(sky,environmentSettings.clouds);
+  }
+  scene.background=cloudTexture&&on?cloudTexture:new T.Color(sky);
+ }
+ if(sunGround){
+  sunGround.material.color.set(cad3dGroundColor());
+  sunGround.visible=environmentSettings.showGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
+  sunGround.receiveShadow=sunSettings.enabled&&sunSettings.onGround;
+ }
+ if(fallbackCanvas)fallbackDraw();
+}
 function applySunSettings(){
  if(root){
   root.querySelector('[data-sun-enabled]').checked=sunSettings.enabled;
@@ -2863,7 +2976,7 @@ function applySunSettings(){
   });
   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
+ apply3DEnvironment();
  if(sunAmbient)sunAmbient.intensity=sunSettings.enabled?1.05:1.15;
  if(sunFill)sunFill.intensity=sunSettings.enabled?0.38:0.7;
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){
@@ -2872,10 +2985,7 @@ function applySunSettings(){
   // Transparent glass must not block sunlight; all other meshes retain normal shadows.
   if(o.userData?.cadGlass){o.receiveShadow=false;o.castShadow=false;}
  }});
- if(scene&&scene.background&&typeof scene.background.setHex==='function'&&['shaded','shaded-edges','realistic'].includes(renderStyle))
-  scene.background.setHex(sunSettings.enabled?0xc4d8e4:MODEL_BACKGROUND);
- if(sunGround&&sunGround.material&&sunGround.material.color&&typeof sunGround.material.color.setHex==='function')
-  sunGround.material.color.setHex(sunSettings.enabled?0xd1cbc0:0x9ba5a8);
+ apply3DEnvironment();
  if(!sunLight||!T)return;
  var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(7,Math.min(280,bounds.span*1.25));
@@ -3169,7 +3279,9 @@ function fallbackDraw(){
  var projection=fallbackProjector();
  ctx.clearRect(0,0,w,h);ctx.fillStyle=renderStyle==='wire2d'?'#ffffff':
   CAD3D_SKETCH_PRESETS[renderStyle]?'#'+CAD3D_SKETCH_PRESETS[renderStyle].bg.toString(16).padStart(6,'0'):
-  ['hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;ctx.fillRect(0,0,w,h);
+  ['hidden','monochrome'].includes(renderStyle)?'#f4f1e8':MODEL_BACKGROUND;
+ if(environmentSettings.customSky&&renderStyle!=='wire2d')ctx.fillStyle=environmentSettings.sky;
+ ctx.fillRect(0,0,w,h);
  ctx.lineWidth=.65;ctx.strokeStyle=MODEL_GRID;
  if(draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle))for(var i=-20;i<=20;i++){
   var a=projection(i,-20,0),b=projection(i,20,0),c=projection(-20,i,0),d=projection(20,i,0);
@@ -4886,12 +4998,10 @@ function applyRenderStyle(){
  if(!T)return;
  var sketch=CAD3D_SKETCH_PRESETS[renderStyle]||null;
  var lightPaper=!!sketch||['hidden','monochrome','wire2d'].includes(renderStyle);
- if(scene)scene.background=new T.Color(renderStyle==='wire2d'?0xffffff:sketch?sketch.bg:lightPaper?0xf6f5f1:
-  sunSettings.enabled&&['shaded','shaded-edges','realistic'].includes(renderStyle)?0xc4d8e4:MODEL_BACKGROUND);
- if(sunGround)sunGround.material.color.setHex(sketch?sketch.ground:sunSettings.enabled?0xd1cbc0:0x9ba5a8);
+ apply3DEnvironment();
  if(gridHelper)gridHelper.visible=draftModes.grid&&!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
  if(axesHelper)axesHelper.visible=!isCad3DSketch(renderStyle)&&!['hidden','wire2d'].includes(renderStyle);
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&!['hidden','wire2d','wire3d'].includes(renderStyle);
+ apply3DEnvironment();
  if(!modelRoot)return;
  var plainLines=['wire2d','wire3d','hidden'].includes(renderStyle);
  var withEdges=!!sketch||['wire2d','wire3d','hidden','shaded-edges','monochrome'].includes(renderStyle);
@@ -4978,8 +5088,7 @@ function setVisualStyle(mode){
  if(target&&savedView.target)target.set(savedView.target.x,savedView.target.y,savedView.target.z);
  if(renderer){applyViewCamera();renderer.shadowMap.needsUpdate=true;}
  syncViewControls();
- if(sunGround)sunGround.visible=sunSettings.enabled&&sunSettings.onGround&&
-  !['hidden','wire2d','wire3d'].includes(renderStyle);
+ apply3DEnvironment();
  if(fallbackCanvas)fallbackDraw();
  text('Visual Style: '+CAD3D_VISUAL_STYLES[mode]+' · cámara y geometría conservadas');
  return true;
