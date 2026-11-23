@@ -843,6 +843,50 @@ css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px
 css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;padding:7px 12px;font:11px Inter,Arial,sans-serif;color:#d4e9f6;background:#21394a;border-bottom:1px solid #577589;cursor:pointer}\n#cad3dLab .cad3dStairsBeta input{accent-color:#6bb8e6}\n#cad3dLab .archTools button[hidden]{display:none!important}\n#cad3dLab .cad3dStairStats{margin:9px 0;padding:8px;border:1px solid #4e748a;border-radius:6px;font-size:11px;color:#c7dbe6;background:#1a3342}\n";
 css+="\n#cad3dLab .cad3dHistoryButton{font-family:Arial,sans-serif!important;font-size:21px!important;line-height:1!important;font-weight:600!important;min-width:35px!important}\n#cad3dLab .cad3dHistoryButton:disabled{opacity:.35!important;cursor:not-allowed!important;background:#14212c!important}\n#cad3dLab .cad3dHistoryButton:not(:disabled){color:#e3f6ff!important;border-color:#66899c!important}\n";
 css+="\n#cad3dLab .cad3dDraftPreview .cad3dPlateDimension{fill:#07587f;font:700 12px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n#cad3dLab .wireframeView .cad3dPlateDimension{fill:#e4f8ff;stroke:#000}\n";
+css+=`
+/* Palette surfaces share the exact CAD2D theme tokens, including light/custom themes. */
+#cad3dLab .archPalette,#cad3dLab .sunPanel,#cad3dLab .cad3dMaterialsPanel,#cad3dLab .viewSavePanel,#cad3dLab .cad3dDetachedPanel{
+ background:var(--cad-ui-base,#141519)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border:1px solid var(--cad-ui-edge,#353a43)!important;border-radius:8px!important;
+ box-shadow:0 15px 40px #0009!important}
+#cad3dLab .archTitle,#cad3dLab .sunFloatingHeader,#cad3dLab .cad3dMaterialsHeader,#cad3dLab .viewSaveHeader,#cad3dLab .cad3dDetachedPanel>.panel-title{
+ background:var(--cad-ui-raised,#1d2026)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border-bottom:1px solid var(--cad-ui-edge,#353a43)!important;border-radius:7px 7px 0 0!important}
+#cad3dLab>.archPalette{resize:both!important;overflow:hidden!important;min-width:240px;min-height:220px}
+#cad3dLab>.sunPanel{resize:both!important;overflow:auto!important;width:274px;height:360px;min-width:230px;min-height:220px;max-width:calc(100% - 16px)!important;max-height:calc(100% - 16px)!important}
+#cad3dLab>.viewSavePanel{resize:both!important;overflow:auto!important;min-width:250px;min-height:250px;max-width:calc(100% - 16px)!important;max-height:calc(100% - 16px)!important}
+#cad3dLab .cad3dMaterialCard,#cad3dLab .cad3dMaterialEditor,#cad3dLab .cad3dStairsBeta,#cad3dLab .cad3dStairStats{
+ background:var(--cad-ui-raised,#1d2026)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border-color:var(--cad-ui-edge,#353a43)!important}
+#cad3dLab .cad3dMaterialSizes button,#cad3dLab .cad3dMaterialEditorBody button{
+ background:var(--cad-ui-toolbar,#15171b)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border-color:var(--cad-ui-edge,#353a43)!important}
+#cad3dLab .cad3dMaterialCategory select,#cad3dLab .cad3dMaterialEditorBody input[type=text],
+#cad3dLab .cad3dMaterialEditorBody input[type=number],#cad3dLab .viewSavePanel input,#cad3dLab .viewSavePanel select{
+ background:var(--cad-ui-input,#191b21)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border-color:var(--cad-ui-edge,#353a43)!important}
+#cad3dLab .side>.panel{
+ background:var(--cad-ui-base,#141519)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border:1px solid var(--cad-ui-edge,#353a43)!important}
+#cad3dLab .side>.panel>.panel-title{
+ background:var(--cad-ui-raised,#1d2026)!important;color:var(--cad-ui-text,#f0f2f5)!important;
+ border-color:var(--cad-ui-edge,#353a43)!important;display:flex;align-items:center}
+#cad3dLab .cad3dDetachedPanel{
+ position:absolute!important;z-index:150;display:flex;flex-direction:column;min-width:235px;
+ min-height:145px;max-width:calc(100% - 16px);max-height:calc(100% - 16px);
+ resize:both;overflow:auto;margin:0!important;padding:0!important}
+#cad3dLab .cad3dDetachedPanel>.panel-title{
+ display:flex;align-items:center;gap:6px;flex:none;cursor:grab;touch-action:none;user-select:none}
+#cad3dLab .cad3dDetachedPanel>.panel-content{min-height:0;overflow:auto;flex:1}
+#cad3dLab .cad3dDetachedPanel label{display:flex;align-items:center;justify-content:space-between;gap:4px;margin:7px 0;font-size:11px}
+#cad3dLab .cad3dDetachedPanel select{max-width:66%;min-width:0}
+#cad3dLab .cad3dDetachedPanel input{width:84px;max-width:52%;padding:4px;font:11px Inter,Arial,sans-serif}
+#cad3dLab .cad3dDetachedPanel .detail{padding:8px 0;margin-top:8px;border-top:1px solid var(--cad-ui-edge)}
+#cad3dLab .cad3dPaletteDockButton{
+ margin-left:auto;border:1px solid var(--cad-ui-edge);border-radius:4px;
+ background:var(--cad-ui-toolbar);color:var(--cad-ui-text);
+ cursor:pointer;font-size:12px;min-width:24px;min-height:22px}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1251,8 +1295,78 @@ function cad3dPaletteConstrain(panel){
  panel.style.left=clamp(x,8,Math.max(8,root.clientWidth-w-8))+'px';
  panel.style.top=clamp(y,8,Math.max(8,root.clientHeight-h-8))+'px';
 }
+
+/* Persist free-resize dimensions, and allow the two docked Properties palettes to float. */
+function cad3dWatchPaletteResize(name,panel){
+ if(!panel||typeof ResizeObserver==='undefined')return;
+ var last='';
+ new ResizeObserver(function(){
+  if(panel.hidden||!panel.isConnected)return;
+  var current=panel.offsetWidth+'x'+panel.offsetHeight;
+  if(current===last)return;last=current;
+  cad3dPaletteRemember(name,panel);
+ }).observe(panel);
+}
+function cad3dBindSidebarPalettes(){
+ var side=root?.querySelector('.side.sidebar');if(!side)return;
+ Array.from(side.querySelectorAll(':scope > .panel')).forEach(function(panel,i){
+  var name=i===0?'layers':'properties',header=panel.querySelector('.panel-title');
+  if(!header)return;
+  var anchor=document.createComment('Original '+name+' location');side.insertBefore(anchor,panel);
+  var button=document.createElement('button');button.type='button';
+  button.className='cad3dPaletteDockButton';header.appendChild(button);
+  var floating=false,drag=null;
+  function setFloating(next){
+   floating=next;
+   if(next){
+    root.appendChild(panel);panel.classList.add('cad3dDetachedPanel');
+    if(!cad3dPaletteRestore(name,panel)){
+     panel.style.left=Math.max(8,root.clientWidth-345)+'px';
+     panel.style.top=(i===0?85:250)+'px';
+     panel.style.width=Math.min(300,root.clientWidth-24)+'px';
+     panel.style.height=Math.min(360,root.clientHeight-24)+'px';
+    }
+    cad3dPaletteConstrain(panel);cad3dBringPaletteFront(panel);
+    button.textContent='↩';button.title='Volver a acoplar';
+   }else{
+    side.insertBefore(panel,anchor);panel.classList.remove('cad3dDetachedPanel');
+    panel.style.left='';panel.style.top='';panel.style.width='';
+    panel.style.height='';panel.style.zIndex='';
+    button.textContent='↗';button.title='Desacoplar y cambiar tamaño';
+   }
+   button.setAttribute('aria-pressed',String(floating));
+   try{localStorage.setItem('blackline-cad3d-detached-'+name+'-v1',floating?'yes':'no');}catch(_e){}
+  }
+  button.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();setFloating(!floating);});
+  header.addEventListener('pointerdown',function(e){
+   if(!floating||e.button!==0||e.target.closest('button,input,select'))return;
+   var r=panel.getBoundingClientRect();drag={id:e.pointerId,dx:e.clientX-r.left,dy:e.clientY-r.top};
+   header.setPointerCapture(e.pointerId);cad3dBringPaletteFront(panel);
+   e.preventDefault();e.stopPropagation();
+  });
+  header.addEventListener('pointermove',function(e){
+   if(!floating||!drag||drag.id!==e.pointerId)return;
+   var r=root.getBoundingClientRect();
+   panel.style.left=clamp(e.clientX-r.left-drag.dx,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+   panel.style.top=clamp(e.clientY-r.top-drag.dy,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+  });
+  function finish(e){
+   if(!drag||drag.id!==e.pointerId)return;
+   var id=drag.id;drag=null;cad3dPaletteRemember(name,panel);
+   try{if(header.hasPointerCapture(id))header.releasePointerCapture(id);}catch(_e){}
+  }
+  header.addEventListener('pointerup',finish);
+  header.addEventListener('pointercancel',finish);
+  header.addEventListener('lostpointercapture',finish);
+  cad3dWatchPaletteResize(name,panel);
+  var restoreFloating=false;
+  try{restoreFloating=localStorage.getItem('blackline-cad3d-detached-'+name+'-v1')==='yes';}catch(_e){}
+  setFloating(restoreFloating);
+ });
+}
+
 function cad3dBringPaletteFront(panel){
- root.querySelectorAll('.archPalette,.sunPanel').forEach(function(el){el.style.zIndex=el===panel?'130':'110';});
+ root.querySelectorAll('.archPalette,.sunPanel,.viewSavePanel,.cad3dMaterialsPanel,.cad3dDetachedPanel').forEach(function(el){el.style.zIndex=el===panel?'165':'110';});
 }
 function showArchPalette(show){
  var palette=root.querySelector('.archPalette'),launcher=root.querySelector('.archLaunch');
@@ -2135,6 +2249,7 @@ function cad3dMakeSunPanelMovable(){
  var handle=panel?.querySelector('.sunFloatingHeader'),close=panel?.querySelector('.sunFloatingClose');
  if(!panel||!handle||!button)return;
  root.appendChild(panel);
+ cad3dWatchPaletteResize('sun',panel);
  var drag=null,restored=cad3dPaletteRestore('sun',panel);
  function place(){
   if(panel.hidden)return;
@@ -2187,6 +2302,7 @@ function cad3dMakeSavePanelMovable(){
  var handle=panel?.querySelector('.viewSaveHeader'),close=panel?.querySelector('.viewSaveClose');
  if(!panel||!menu||!handle||!close)return;
  root.appendChild(panel);
+ cad3dWatchPaletteResize('save-image',panel);
  var drag=null,restored=cad3dPaletteRestore('save-image',panel);
  function positionPanel(){
   if(!panel.dataset.userPositioned){
@@ -2828,13 +2944,13 @@ function build(){
   var key=ev.key.toUpperCase();
   if(cad3dIsRectangle(placing)&&(key==='+'||key==='-'))return;
   if(this.value.trim()===''&&['T','F','L','R','B','Z','V','P','I','O','C','M','+','-'].includes(key)){
-   ev.preventDefault();ev.stopPropagation();if(key==='M')cad3dShowMaterials();else cad3dViewAlias(key);
+   ev.preventDefault();ev.stopPropagation();if(key==='M')cad3dShowMaterials(true);else cad3dViewAlias(key);
   }
  });
  root.querySelector('#cad3dCommand').addEventListener('input',function(){
   var value=this.value.trim().toUpperCase();
   if(['T','F','L','R','B','Z','V','P','I','O','C','M','MATERIALES','MATERIALS','TOP','FRONT','LEFT','RIGHT','BACK','ZOOM','ZOOMEXTENTS'].includes(value)){
-   this.value='';if(['M','MATERIALES','MATERIALS'].includes(value))cad3dShowMaterials();else cad3dViewAlias(value);
+   this.value='';if(['M','MATERIALES','MATERIALS'].includes(value))cad3dShowMaterials(true);else cad3dViewAlias(value);
   }
  });
  root.querySelector('.draftBar').addEventListener('click',function(e){
@@ -2894,6 +3010,7 @@ function build(){
  palette.addEventListener('pointerdown',beginArchGesture);
  // Make the complete gallery a free floating workspace panel (not clipped by the viewport).
  root.appendChild(palette);
+ cad3dWatchPaletteResize('architecture',palette);
  if(cad3dPaletteRestore('architecture',palette)){
   var wasHidden=palette.hidden;palette.hidden=false;
   cad3dPaletteConstrain(palette);palette.hidden=wasHidden;
@@ -2902,6 +3019,7 @@ function build(){
 
  root.querySelector('.archLaunch').addEventListener('click',function(){showArchPalette(palette.hidden);});
  renderArchPalette();
+ cad3dBindSidebarPalettes();
  root.querySelector('.fileInput').addEventListener('change',readJSON);
  root.querySelector('.cadInput').addEventListener('change',importCADFile);
  observer=new ResizeObserver(function(){resize();});
@@ -4628,7 +4746,7 @@ function cad3dShowMaterials(open){
  panel.hidden=!open;
  root.querySelector('.cad3dMaterialLaunch')?.setAttribute('aria-expanded',String(open));
  cad3dSyncCompactBars();
- if(open){cad3dMaterialRender();cad3dPaletteConstrain(panel);panel.style.zIndex='150';}
+ if(open){cad3dMaterialRender();cad3dPaletteConstrain(panel);cad3dBringPaletteFront(panel);}
 }
 function cad3dMaterialCanvas(id){
  if(cad3dTextureCanvases[id])return cad3dTextureCanvases[id];
@@ -6815,7 +6933,7 @@ window.addEventListener('keydown',function(ev){
   ev.preventDefault();ev.stopImmediatePropagation();
   var command=root.querySelector('#cad3dCommand');command.focus({preventScroll:true});command.value=ev.key;return;
  }
- if(key==='m'&&!ev.repeat){ev.preventDefault();ev.stopImmediatePropagation();cad3dShowMaterials();return;}
+ if(key==='m'&&!ev.repeat){ev.preventDefault();ev.stopImmediatePropagation();cad3dShowMaterials(true);return;}
  if(['t','l','r','v','p','o','c','z'].includes(key)&&!ev.repeat){
   ev.preventDefault();ev.stopImmediatePropagation();cad3dViewAlias(key);return;
  }
