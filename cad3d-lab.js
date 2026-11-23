@@ -1205,6 +1205,101 @@ css+=`
  max-width:min(640px,calc(100% - 16px))!important;
 }
 `;
+css+=`
+/* Copied from cad-quickbar.js (CAD2D): same oval bar, 34px ghost buttons,
+   21px thin outline icons, separator, graphite palette and hover behavior. */
+#cad3dLab>.cad3dGiroPalette{
+ display:flex!important;align-items:center!important;flex-direction:row!important;
+ gap:2px!important;padding:5px 8px 5px 4px!important;
+ width:min(392px,calc(100% - 16px))!important;
+ min-width:min(376px,calc(100% - 16px))!important;
+ max-width:min(640px,calc(100% - 16px))!important;
+ height:46px!important;min-height:46px!important;max-height:78px!important;
+ border-radius:999px!important;background:#202326!important;
+ border:1.5px solid #7c838a!important;
+ box-shadow:0 8px 22px #0008!important;
+ box-sizing:border-box!important;resize:both!important;
+ overflow:hidden!important;user-select:none;touch-action:auto;
+}
+#cad3dLab .cad3dGiroHead{
+ flex:0 0 66px!important;width:66px!important;min-width:66px!important;
+ padding:0!important;margin:0!important;min-height:34px!important;height:34px!important;
+ border:0!important;background:transparent!important;
+ align-items:center!important;gap:2px!important;
+}
+#cad3dLab .cad3dGiroHead::before{
+ content:'⠿'!important;
+ flex:0 0 22px!important;
+ width:22px!important;color:#c9d0d6!important;
+ font:15px/34px Arial,sans-serif!important;
+ text-align:center!important;letter-spacing:-2px!important;
+}
+#cad3dLab .cad3dGiroHeadControls{
+ display:flex!important;align-items:center!important;gap:0!important;margin-left:0!important;
+}
+#cad3dLab .cad3dGiroHeadControls button{
+ flex:0 0 15px!important;min-width:15px!important;width:15px!important;
+ min-height:24px!important;height:24px!important;padding:0!important;
+ display:grid!important;place-items:center!important;
+ background:transparent!important;border:0!important;box-shadow:none!important;
+ color:#c9d0d6!important;font:14px/1 Arial,sans-serif!important;
+ cursor:pointer!important;
+}
+#cad3dLab .cad3dGiroHeadControls button:hover{background:#3a4046!important;color:#f2f5f7!important}
+#cad3dLab .cad3dGiroChoices{
+ flex:1 1 auto!important;min-width:0!important;display:flex!important;
+ flex-wrap:nowrap!important;align-items:center!important;justify-content:space-around!important;
+ gap:2px!important;margin:0!important;padding:0!important;overflow:hidden!important;
+}
+#cad3dLab .cad3dGiroChoice{
+ flex:0 0 34px!important;min-width:34px!important;max-width:34px!important;
+ width:34px!important;min-height:34px!important;height:34px!important;
+ display:grid!important;place-items:center!important;
+ margin:0!important;padding:0!important;gap:0!important;
+ border:0!important;border-radius:50%!important;
+ background:transparent!important;box-shadow:none!important;
+ color:#f2f5f7!important;cursor:pointer!important;
+}
+#cad3dLab .cad3dGiroChoice:hover,
+#cad3dLab .cad3dGiroChoice[aria-pressed=true]{background:#3a4046!important}
+#cad3dLab .cad3dGiroChoice:focus-visible,
+#cad3dLab .cad3dGiroHeadControls button:focus-visible{outline:2px solid #9adff3!important}
+#cad3dLab .cad3dGiroChoice .cad3dGiroDisk,
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk,
+#cad3dLab .cad3dGiroChoice:hover .cad3dGiroDisk,
+#cad3dLab .cad3dGiroChoice[aria-pressed=true] .cad3dGiroDisk{
+ width:34px!important;height:34px!important;
+ border:0!important;border-radius:50%!important;
+ background:transparent!important;box-shadow:none!important;
+ display:grid!important;place-items:center!important;
+}
+#cad3dLab .cad3dGiroChoice .cad3dGiroDisk svg,
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk svg{
+ width:21px!important;height:21px!important;
+ fill:none!important;stroke:currentColor!important;stroke-width:1.8!important;
+ stroke-linecap:round!important;stroke-linejoin:round!important;
+ filter:none!important;
+}
+#cad3dLab .cad3dGiroSep{
+ flex:0 0 1px!important;width:1px!important;height:22px!important;
+ background:#4e555c!important;margin:0 4px!important;align-self:center!important;
+}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroCollapsed{
+ width:76px!important;min-width:76px!important;max-width:76px!important;
+ height:46px!important;min-height:46px!important;max-height:46px!important;
+ resize:none!important;
+}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroDocked{
+ max-width:min(640px,calc(100% - 16px))!important;
+}
+.app.bl-light #cad3dLab>.cad3dGiroPalette{
+ background:#ffffff!important;border-color:#9aa6ae!important;
+}
+.app.bl-light #cad3dLab .cad3dGiroChoice,
+.app.bl-light #cad3dLab .cad3dGiroHeadControls button{color:#18232b!important}
+.app.bl-light #cad3dLab .cad3dGiroChoice:hover,
+.app.bl-light #cad3dLab .cad3dGiroHeadControls button:hover{background:#e6edf2!important}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2684,7 +2779,7 @@ function cad3dGiroMarkup(){
    return '<button type="button" class="cad3dGiroChoice" data-giro-action="'+item[0]+'" aria-label="'+item[1]+' '+item[2]+'" title="'+item[1]+' '+item[2]+'" aria-pressed="false">'+
     '<span class="cad3dGiroDisk">'+cad3dGiroSvg(item[0])+'</span>'+
     '<span>'+item[1]+(item[2]?'<small>'+item[2]+'</small>':'')+'</span></button>';
-  }).join('')+zoomButton(1,'Adelante')+zoomButton(-1,'Atrás')+'</div></section>';
+  }).join('')+'<span class="cad3dGiroSep" aria-hidden="true"></span>'+zoomButton(1,'Adelante')+zoomButton(-1,'Atrás')+'</div></section>';
 }
 
 function cad3dCenterModelWithoutZoom(){
@@ -2735,7 +2830,7 @@ function cad3dInitGiroPalette(){
  function save(){
   try{localStorage.setItem('blackline-cad3d-giro-palette-v1',JSON.stringify({
    docked:docked,left:parseFloat(panel.style.left)||38,top:parseFloat(panel.style.top)||135,
-   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden,collapsed:collapsed
+   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden,collapsed:collapsed,version:2
   }));}catch(_e){}
  }
  function dock(value){
@@ -2820,8 +2915,8 @@ function cad3dInitGiroPalette(){
   panel.style.left=clamp(Number(initial.left)||38,8,Math.max(8,root.clientWidth-140))+'px';
   panel.style.top=clamp(Number(initial.top)||135,8,Math.max(8,root.clientHeight-110))+'px';
   // Migrate old, oversized saved palettes to the new slim CAD2D-scale default.
-  if(Number.isFinite(initial.width))panel.style.width=Math.min(initial.width,432,root.clientWidth-16)+'px';
-  if(Number.isFinite(initial.height))panel.style.height=Math.min(initial.height,60,root.clientHeight-16)+'px';
+  if(Number.isFinite(initial.width))panel.style.width=Math.min(initial.width,initial.version===2?640:392,root.clientWidth-16)+'px';
+  if(Number.isFinite(initial.height))panel.style.height=Math.min(initial.height,initial.version===2?78:46,root.clientHeight-16)+'px';
   if(initial.collapsed)setCollapsed(true);
   if(initial.docked){
    docked=true;panel.classList.add('cad3dGiroDocked');pin.setAttribute('aria-pressed','true');
