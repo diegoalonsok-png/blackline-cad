@@ -798,6 +798,7 @@ css+="\n/* Full Visual Style gallery and six fast style cubes are complementary,
 css+="\n#cad3dLab > .viewSavePanel{position:absolute!important;left:36px;top:180px;right:auto!important;bottom:auto!important;z-index:145!important;box-sizing:border-box;max-width:calc(100% - 16px)!important;max-height:calc(100% - 32px)!important;overflow:auto}\n#cad3dLab > .viewSavePanel[hidden]{display:none!important}\n#cad3dLab .viewSaveHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-14px -14px 5px;padding:10px 14px;border-bottom:1px solid #587081;background:#223443;border-radius:10px 10px 0 0;cursor:grab;user-select:none;touch-action:none;font:700 11px Inter,Arial,sans-serif;letter-spacing:.4px}\n#cad3dLab .viewSaveHeader:active{cursor:grabbing}\n#cad3dLab .viewSaveClose{background:none!important;border:0!important;color:#e7f1f6!important;min-height:22px!important;padding:0 5px!important;font-size:20px!important;cursor:pointer}\n";
 css+="\n#cad3dLab > .cad3dSketchCapturePanel{position:absolute;z-index:160;left:45px;top:110px;width:min(760px,calc(100% - 40px));max-height:calc(100% - 35px);overflow:auto;box-sizing:border-box;background:#142431;color:#eaf4fa;border:1px solid #81acc1;border-radius:11px;padding:12px;box-shadow:0 18px 45px #000b}\n#cad3dLab > .cad3dSketchCapturePanel[hidden]{display:none!important}\n#cad3dLab .cad3dSketchCaptureHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-12px -12px 10px;padding:10px 12px;background:#25394a;border-bottom:1px solid #6b91a4;cursor:grab;user-select:none;touch-action:none}\n#cad3dLab .cad3dSketchCaptureHead:active{cursor:grabbing}\n#cad3dLab .cad3dSketchClose{font-size:20px;color:#eaf4fa;background:none;border:0;cursor:pointer}\n#cad3dLab .cad3dSketchCaptureControls{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-bottom:9px}\n#cad3dLab .cad3dSketchCaptureControls label{font:11px Inter,Arial,sans-serif;display:grid;gap:4px;flex:1;min-width:140px}\n#cad3dLab .cad3dSketchCaptureControls select,#cad3dLab .cad3dSketchCaptureControls input{width:100%;box-sizing:border-box;background:#213343;color:white;border:1px solid #617e8e;border-radius:5px;padding:6px}\n#cad3dLab .cad3dSketchCapturePreview{display:block;width:100%;height:auto;max-height:52vh;object-fit:contain;background:#faf7f0;border:1px solid #40566b}\n#cad3dLab .cad3dSketchCapturePanel small{font:10px Inter,Arial,sans-serif;color:#b3c8d5}\n";
 css+="\n#cad3dLab .cad3dNavToolbar [data-nav-tool=select]{font-size:22px!important;min-width:39px!important;font-weight:700!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{border:1px solid #79b9d0!important;background:#22506a!important;color:#f4fbff!important;font-weight:700!important;white-space:nowrap!important}\n#cad3dLab .view:not(.cad3dPanning):not(.placing) canvas{cursor:default}\n";
+css+="\n#cad3dLab .cad3dSketchCaptureControls{max-height:182px;overflow:auto;align-items:center!important;gap:8px!important;padding-right:4px}\n#cad3dLab .cad3dSketchCaptureControls label{min-width:130px!important;max-width:210px!important;flex:1 1 150px!important}\n#cad3dLab .cad3dSketchCaptureControls label.cad3dSketchCheck{display:flex!important;align-items:center!important;gap:5px!important;min-width:105px!important;flex:0 1 auto!important;white-space:nowrap}\n#cad3dLab .cad3dSketchCaptureControls label.cad3dSketchCheck input{width:auto!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{display:inline-flex!important;align-items:center!important;gap:7px!important}\n";
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
@@ -2098,6 +2099,9 @@ function cad3dSketchCapture(){
  cad3dSketchSource=canvas;
  cad3dSketchProcess();
 }
+function cad3dSketchHex(hex){
+ var v=String(hex||'#000000').replace('#','');return [0,2,4].map(function(i){return parseInt(v.slice(i,i+2),16)||0;});
+}
 function cad3dSketchProcess(){
  var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=cad3dSketchSource;
  if(!panel||!source||panel.hidden)return;
@@ -2107,39 +2111,121 @@ function cad3dSketchProcess(){
  if(!ctx)return;
  var src=source.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h);
  var dst=ctx.createImageData(w,h),pixels=src.data,data=dst.data;
+ var val=function(key){return panel.querySelector('[data-sketch-setting="'+key+'"]')?.value;};
+ var checked=function(key){return !!panel.querySelector('[data-sketch-setting="'+key+'"]')?.checked;};
  var style=panel.querySelector('.cad3dSketchCaptureStyle').value;
  var strength=Number(panel.querySelector('.cad3dSketchCaptureStrength').value)/100;
- var grey=new Uint8Array(w*h);
+ var edgeColor=cad3dSketchHex(val('edgeColor')),skyColor=cad3dSketchHex(val('skyColor'));
+ var groundColor=cad3dSketchHex(val('groundColor')),wallColor=cad3dSketchHex(val('wallColor'));
+ var weight=Number(val('weight')||1), jitter=Number(val('jitter')||0);
+ var sky=checked('sky'),ground=checked('ground'),clouds=checked('clouds'),trees=checked('trees');
+ var recolor=val('wallMode')==='tint';
+ var grey=new Uint8Array(w*h),edge=new Uint8Array(w*h),skyMask=new Uint8Array(w*h);
+ var skySample=[pixels[0],pixels[1],pixels[2]];
+ var floorPixel=((h-1)*w+(w-1))*4,floorSample=[pixels[floorPixel],pixels[floorPixel+1],pixels[floorPixel+2]];
+ var distance=function(r,g,b,v){return Math.hypot(r-v[0],g-v[1],b-v[2]);};
  for(var i=0;i<grey.length;i++){
   var k=i*4;grey[i]=Math.round(.299*pixels[k]+.587*pixels[k+1]+.114*pixels[k+2]);
  }
- // Sobel edge detection, combined with a light paper wash.
  for(var y=0;y<h;y++)for(var x=0;x<w;x++){
-  var j=y*w+x,k=j*4;
-  var g=0;
+  var j=y*w+x,k=j*4,g=0;
   if(x>0&&x<w-1&&y>0&&y<h-1){
    var a=j-w,b=j+w;
    var gx=-grey[a-1]+grey[a+1]-2*grey[j-1]+2*grey[j+1]-grey[b-1]+grey[b+1];
    var gy=-grey[a-1]-2*grey[a]-grey[a+1]+grey[b-1]+2*grey[b]+grey[b+1];
-   g=Math.min(1,Math.hypot(gx,gy)/255)*strength;
+   g=Math.min(255,Math.hypot(gx,gy)*.5);
   }
-  var r=pixels[k],green=pixels[k+1],blue=pixels[k+2];
-  var paper=(Math.sin(x*.17+y*.11)*Math.sin(x*.071-y*.13)+1)*1.8;
-  if(style==='pencil'){
-   var v=242-(255-grey[j])*.22-g*155+paper;
-   data[k]=v+3;data[k+1]=v+2;data[k+2]=v;
-  }else{
-   var wash=style==='watercolor'?.44:style==='marker'?.65:.32;
-   var steps=style==='marker'?5:style==='watercolor'?10:16;
-   var base=[r,green,blue].map(v=>Math.round(v/(255/steps))*(255/steps));
-   var shade=style==='watercolor'?g*100:style==='marker'?g*140:g*175;
-   data[k]=Math.max(0,Math.min(255,249*(1-wash)+base[0]*wash-shade+paper));
-   data[k+1]=Math.max(0,Math.min(255,247*(1-wash)+base[1]*wash-shade+paper));
-   data[k+2]=Math.max(0,Math.min(255,240*(1-wash)+base[2]*wash-shade+paper));
+  edge[j]=g;
+ }
+ // Build a sky mask, flood-filling similar sky pixels from the image's top border.
+ // This prevents repainting building faces with the same blue colour as the sky.
+ if(sky||clouds){
+  var queue=new Int32Array(w*h),head=0,tail=0,limit=65;
+  function add(pos){
+   if(skyMask[pos])return;
+   var k=pos*4;
+   if(distance(pixels[k],pixels[k+1],pixels[k+2],skySample)>limit)return;
+   skyMask[pos]=1;queue[tail++]=pos;
   }
+  for(var sx=0;sx<w;sx++)add(sx);
+  while(head<tail){
+   var p=queue[head++],px=p%w,py=(p/w)|0;
+   if(px>0)add(p-1);if(px<w-1)add(p+1);
+   if(py>0)add(p-w);if(py<h-1)add(p+w);
+  }
+ }
+ for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+  var j=y*w+x,k=j*4;
+  var r=pixels[k],g=pixels[k+1],b=pixels[k+2];
+  var isSky=skyMask[j]===1;
+  if(isSky&&sky){r=skyColor[0];g=skyColor[1];b=skyColor[2];}
+  else if(ground&&y>h*.35&&distance(r,g,b,floorSample)<37&&edge[j]<70){
+   r=r*.4+groundColor[0]*.6;g=g*.4+groundColor[1]*.6;b=b*.4+groundColor[2]*.6;
+  }else if(recolor&&!isSky&&y<h*.88&&edge[j]<54&&Math.max(r,g,b)-Math.min(r,g,b)<29&&grey[j]>65&&grey[j]<245){
+   r=r*.32+wallColor[0]*.68;g=g*.32+wallColor[1]*.68;b=b*.32+wallColor[2]*.68;
+  }
+  var paper=(Math.sin(x*.17+y*.11)*Math.sin(x*.071-y*.13)+1)*1.25;
+  var wash=style==='watercolor'?.57:style==='marker'?.82:style==='pencil'?.12:.55;
+  var steps=style==='marker'?7:style==='watercolor'?13:20;
+  var tone=[r,g,b].map(function(v){return Math.round(v/(255/steps))*(255/steps);});
+  var base=style==='pencil'?[243,242,239]:[247,246,242];
+  var v=(255-grey[j])/255*.11;
+  for(var c=0;c<3;c++)data[k+c]=Math.max(0,Math.min(255,base[c]*(1-wash)+tone[c]*wash-v*25+paper));
   data[k+3]=255;
  }
+ // Separate edge pass: adjustable black/colored profiles, weight and irregular strokes.
+ // Preserve source linework under a colored wash instead of replacing it with color alone.
+ var radius=Math.max(0,Math.round(weight/2)-1);
+ for(var y=1;y<h-1;y++)for(var x=1;x<w-1;x++){
+  var j=y*w+x,k=j*4;
+  var jitterX=jitter?Math.round(Math.sin(y*.37+x*.13)*jitter):0;
+  var jitterY=jitter?Math.round(Math.cos(y*.19-x*.07)*jitter):0;
+  var xx=Math.max(0,Math.min(w-1,x+jitterX)),yy=Math.max(0,Math.min(h-1,y+jitterY));
+  var peak=0;
+  for(var oy=-radius;oy<=radius;oy++)for(var ox=-radius;ox<=radius;ox++){
+   var nx=Math.max(0,Math.min(w-1,xx+ox)),ny=Math.max(0,Math.min(h-1,yy+oy));
+   peak=Math.max(peak,edge[ny*w+nx]);
+  }
+  var alpha=Math.min(.90,Math.max(0,(peak-24)/175)*strength*(style==='pencil'?.73:1));
+  for(var c=0;c<3;c++)data[k+c]=Math.max(0,Math.min(255,data[k+c]*(1-alpha)+edgeColor[c]*alpha));
+ }
  ctx.putImageData(dst,0,0);
+ if(clouds&&skyMask.some(function(p){return !!p;})){
+  // Clouds are drawn only on a valid sky mask, not over the building.
+  var cloudLayer=document.createElement('canvas');cloudLayer.width=w;cloudLayer.height=h;
+  var cc=cloudLayer.getContext('2d');
+  cc.fillStyle='rgba(255,255,255,.72)';
+  for(var i=0;i<6;i++){
+   var cx=w*(.13+(i%3)*.31),cy=h*(.08+Math.floor(i/3)*.075);
+   cc.beginPath();cc.ellipse(cx,cy,w*.065,h*.021,0,0,Math.PI*2);
+   cc.ellipse(cx-w*.025,cy-h*.012,w*.034,h*.025,0,0,Math.PI*2);
+   cc.ellipse(cx+w*.018,cy-h*.019,w*.046,h*.029,0,0,Math.PI*2);cc.fill();
+  }
+  var cd=cc.getImageData(0,0,w,h),od=ctx.getImageData(0,0,w,h);
+  for(var j=0;j<w*h;j++)if(skyMask[j]&&cd.data[j*4+3]){
+   var k=j*4,alpha=cd.data[k+3]/255;
+   for(var c=0;c<3;c++)od.data[k+c]=od.data[k+c]*(1-alpha)+cd.data[k+c]*alpha;
+  }
+  ctx.putImageData(od,0,0);
+ }
+ if(trees){
+  // Decorative trees at image margins. Deliberately separate from 3D model.
+  var tree=function(x,y,scale){
+   ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);
+   ctx.strokeStyle='#6d6554';ctx.lineWidth=2;
+   ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-75);ctx.moveTo(0,-42);ctx.lineTo(-24,-70);
+   ctx.moveTo(0,-51);ctx.lineTo(25,-81);ctx.stroke();
+   var colors=['#9aaa6c','#b6bf82','#7c956d','#c6c58e'];
+   for(var i=0;i<18;i++){
+    var a=i*2.39996,r=14+Math.sqrt(i)*8;
+    ctx.fillStyle=colors[i%4];ctx.globalAlpha=.65;
+    ctx.beginPath();ctx.ellipse(Math.cos(a)*r,-85+Math.sin(a)*r*.5,13,8,a,0,Math.PI*2);ctx.fill();
+   }
+   ctx.restore();
+  };
+  tree(w*.045,h*.84,Math.max(.6,Math.min(1.7,w/950)));
+  tree(w*.955,h*.79,Math.max(.6,Math.min(1.5,w/1050)));
+ }
 }
 function cad3dInitSketchCapture(){
  var panel=root.querySelector('.cad3dSketchCapturePanel');
@@ -2153,7 +2239,8 @@ function cad3dInitSketchCapture(){
  panel.querySelector('.cad3dSketchClose').addEventListener('click',function(){panel.hidden=true;});
  panel.querySelector('.cad3dSketchRecapture').addEventListener('click',cad3dSketchCapture);
  panel.querySelector('.cad3dSketchCaptureStyle').addEventListener('change',cad3dSketchProcess);
- panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('change',cad3dSketchProcess);
+ panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchProcess);
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchProcess);el.addEventListener('change',cad3dSketchProcess);});
  panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
   var canvas=panel.querySelector('.cad3dSketchCapturePreview');if(!cad3dSketchSource)return;
   canvas.toBlob(function(blob){
@@ -2192,7 +2279,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar y renderizar esta perspectiva como croquis">✎ Render Croquis</button><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar y renderizar esta perspectiva como croquis"><svg viewBox="0 0 32 32" width="23" height="23" aria-hidden="true"><path d="M16 2 29 9 16 17 3 9Z" fill="#a6d5f1" stroke="#eaf6ff" stroke-width="1.6"/><path d="M3 9 16 17 16 30 3 22Z" fill="#f5b981" stroke="#eaf6ff" stroke-width="1.6"/><path d="M29 9 16 17 16 30 29 22Z" fill="#83c9b6" stroke="#eaf6ff" stroke-width="1.6"/></svg> Render Croquis</button><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
 
  '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
  '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
@@ -2265,6 +2352,17 @@ function build(){
  '<section class="cad3dSketchCapturePanel" role="dialog" aria-label="Render de croquis arquitectónico" hidden>'+
  '<header class="cad3dSketchCaptureHead"><strong>✎ RENDER CROQUIS · VISTA ACTUAL</strong><button type="button" class="cad3dSketchClose" aria-label="Cerrar">×</button></header>'+
  '<div class="cad3dSketchCaptureControls"><label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador conceptual</option></select></label>'+
+ '<label>Color de líneas<input type="color" data-sketch-setting="edgeColor" value="#303843"></label>'+
+ '<label>Grosor de trazo (1–5)<input type="range" min="1" max="5" value="2" data-sketch-setting="weight"></label>'+
+ '<label>Trazo irregular<input type="range" min="0" max="3" value="0" data-sketch-setting="jitter"></label>'+
+ '<label>Color de paredes<input type="color" data-sketch-setting="wallColor" value="#e8d7b9"></label>'+
+ '<label>Caras<select data-sketch-setting="wallMode"><option value="original">Colores originales</option><option value="tint">Tintar superficies neutras</option></select></label>'+
+ '<label>Color de cielo<input type="color" data-sketch-setting="skyColor" value="#b9dbf2"></label>'+
+ '<label>Color de suelo<input type="color" data-sketch-setting="groundColor" value="#ddd6c8"></label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="sky" checked> Cielo celeste</label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="ground"> Teñir suelo</label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="clouds"> Nubes</label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="trees"> Árboles ilustrados</label>'+
  '<label>Intensidad de líneas <input class="cad3dSketchCaptureStrength" type="range" min="15" max="95" value="60"></label>'+
  '<button type="button" class="btn cad3dSketchRecapture" title="Capturar de nuevo la cámara actual">Actualizar captura</button>'+
  '<button type="button" class="btn cad3dSketchDownload">Guardar PNG</button></div>'+
