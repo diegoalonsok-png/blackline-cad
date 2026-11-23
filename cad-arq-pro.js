@@ -188,10 +188,18 @@ function cardsFor(cat,q){
  const s=q.trim().toLowerCase();
  return LIB.library.filter(x=>!x.hideFromGallery&&(s?(x.name+' '+x.cat).toLowerCase().includes(s):(cat==='Todos'||x.cat===cat)));
 }
+// Etiquetas genéricas en la paleta, sin cambiar el nombre CAD ni su geometría.
+function arqSimpleName(item){
+ const patterns=[['Puerta',/\b(?:puerta|door|porton|portón)\b/i],['Ventana',/\b(?:ventana|ventanal|window)\b/i],['Escalera',/\b(?:escalera|stair)\b/i],['Inodoro',/\b(?:inodoro|toilet|wc)\b/i],['Bañadera',/\b(?:bañadera|bañera|bathtub)\b/i],['Auto',/\b(?:auto|automóvil|coche|car)\b/i],['Camión',/\b(?:camión|camion|truck)\b/i],['Árbol',/\b(?:árbol|arbol|tree)\b/i],['Heladera',/\b(?:heladera|refrigerador|fridge)\b/i],['Cocina',/\b(?:cocina|kitchen)\b/i]];
+ const type=patterns.find(p=>p[1].test(String(item.name||'')))?.[0];
+ if(!type)return item.name;
+ const matching=LIB.library.filter(x=>patterns.find(p=>p[1].test(String(x.name||'')))?.[0]===type).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
+ return type+' '+(matching.findIndex(x=>x.id===item.id)+1);
+}
 function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
- b.title=item.name+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
- b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(item.name)}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
+ b.title=arqSimpleName(item)+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
+ b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
  b.onclick=()=>{if(armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
