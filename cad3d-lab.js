@@ -1342,6 +1342,71 @@ css+=`
  width:100%!important;min-width:0!important;
 }
 `;
+css+=`
+/* CAD2D QuickBar parity v3: compact floating strip, not a floating dialog.
+   Exactly eight 28-30px action targets with 19px monochrome SVGs. */
+#cad3dLab>.cad3dGiroPalette{
+ box-sizing:border-box!important;display:flex!important;flex-direction:row!important;align-items:center!important;
+ gap:2px!important;padding:3px 5px!important;
+ width:min(334px,calc(100% - 16px));
+ min-width:min(318px,calc(100% - 16px))!important;
+ max-width:min(560px,calc(100% - 16px))!important;
+ height:42px;min-height:42px!important;max-height:54px!important;
+ border-radius:999px!important;border:1.5px solid #7c838a!important;
+ background:#202326!important;box-shadow:0 8px 22px #0008!important;
+ overflow:hidden!important;resize:both!important;
+}
+#cad3dLab .cad3dGiroHead{
+ flex:0 0 58px!important;width:58px!important;min-width:58px!important;
+ height:31px!important;min-height:31px!important;
+ gap:0!important;padding:0!important;margin:0!important;
+ background:transparent!important;border:none!important;
+}
+#cad3dLab .cad3dGiroHead::before{
+ flex:0 0 16px!important;width:16px!important;
+ color:#c9d0d6!important;font:14px/31px Arial,sans-serif!important;
+}
+#cad3dLab .cad3dGiroHeadControls{gap:0!important}
+#cad3dLab .cad3dGiroHeadControls button{
+ flex:0 0 14px!important;min-width:14px!important;width:14px!important;
+ height:20px!important;min-height:20px!important;font:12px/1 Arial,sans-serif!important;
+ border:0!important;padding:0!important;
+}
+#cad3dLab .cad3dGiroChoices{
+ flex:1 1 auto!important;min-width:0!important;display:flex!important;
+ justify-content:space-between!important;gap:0!important;
+ padding:0!important;margin:0!important;overflow:hidden!important;
+}
+#cad3dLab .cad3dGiroChoice{
+ flex:0 0 29px!important;width:29px!important;min-width:29px!important;
+ max-width:29px!important;height:30px!important;min-height:30px!important;
+ padding:0!important;display:grid!important;place-items:center!important;
+ border-radius:50%!important;background:transparent!important;
+}
+#cad3dLab .cad3dGiroChoice .cad3dGiroDisk,
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk{
+ width:29px!important;height:29px!important;min-width:29px!important;min-height:29px!important;
+ border:0!important;border-radius:50%!important;background:transparent!important;
+ box-shadow:none!important;
+}
+#cad3dLab .cad3dGiroChoice .cad3dGiroDisk svg,
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk svg{
+ width:19px!important;height:19px!important;stroke-width:1.8!important;
+ stroke:currentColor!important;fill:none!important;filter:none!important;
+}
+#cad3dLab .cad3dGiroSep{
+ flex:0 0 1px!important;width:1px!important;
+ height:20px!important;margin:0 3px!important;background:#4e555c!important;
+}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroCollapsed{
+ width:68px!important;min-width:68px!important;max-width:68px!important;
+ height:42px!important;min-height:42px!important;max-height:42px!important;
+ padding:3px!important;resize:none!important;
+}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroDocked{
+ max-width:min(560px,calc(100% - 16px))!important;
+}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2875,7 +2940,7 @@ function cad3dInitGiroPalette(){
  function save(){
   try{localStorage.setItem('blackline-cad3d-giro-palette-v1',JSON.stringify({
    docked:docked,left:parseFloat(panel.style.left)||38,top:parseFloat(panel.style.top)||135,
-   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden,collapsed:collapsed,version:2
+   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden,collapsed:collapsed,version:3
   }));}catch(_e){}
  }
  function dock(value){
@@ -2959,15 +3024,21 @@ function cad3dInitGiroPalette(){
  if(initial&&typeof initial==='object'){
   panel.style.left=clamp(Number(initial.left)||38,8,Math.max(8,root.clientWidth-140))+'px';
   panel.style.top=clamp(Number(initial.top)||135,8,Math.max(8,root.clientHeight-110))+'px';
-  // Migrate old, oversized saved palettes to the new slim CAD2D-scale default.
-  if(Number.isFinite(initial.width))panel.style.width=Math.min(initial.width,initial.version===2?640:392,root.clientWidth-16)+'px';
-  if(Number.isFinite(initial.height))panel.style.height=Math.min(initial.height,initial.version===2?78:46,root.clientHeight-16)+'px';
+  // Versions 1-2 stored the large dialog dimensions. Do not carry them over.
+  var compactW=initial.version===3&&Number.isFinite(initial.width)?initial.width:334;
+  var compactH=initial.version===3&&Number.isFinite(initial.height)?initial.height:42;
+  panel.style.width=clamp(compactW,Math.min(318,root.clientWidth-16),Math.min(560,root.clientWidth-16))+'px';
+  panel.style.height=clamp(compactH,42,54)+'px';
   if(initial.collapsed)setCollapsed(true);
   if(initial.docked){
    docked=true;panel.classList.add('cad3dGiroDocked');pin.setAttribute('aria-pressed','true');
   }
   show(initial.open!==false);
- }else show(true);
+ }else{
+  panel.style.width=Math.min(334,root.clientWidth-16)+'px';
+  panel.style.height='42px';
+  show(true);
+ }
  if(typeof ResizeObserver!=='undefined'){
   var prev='';
   new ResizeObserver(function(){
