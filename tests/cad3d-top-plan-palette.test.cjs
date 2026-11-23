@@ -94,8 +94,9 @@ test('Giro palette preserves six circular reference controls without duplicating
  }
  assert(markup.includes('Variantes de interacción (Botón Girar)'));
  assert(markup.includes('cad3dGiroDisk'));
- assert(markup.includes('data-giro-zoom="1"'));
- assert(markup.includes('data-giro-zoom="-1"'));
+ assert(markup.includes('zoomButton(1,\'Adelante\')'));
+ assert(markup.includes('zoomButton(-1,\'Atrás\')'));
+ assert(markup.includes('data-giro-zoom'));
  const nav=src.slice(src.indexOf('function cad3dCompact3DBar(){'),src.indexOf('function cad3dSyncCompactBars(){'));
  assert(nav.includes("var tools=[['select'"));
  assert(nav.includes('data-giro-open'));
@@ -110,4 +111,19 @@ test('Giro preserves dock/move and continuous hold zoom stopping on release',()=
  assert(src.includes("cad3dInitGiroPalette();"));
  assert(src.includes("cad3dNavigationTool==='panorama'&&e.shiftKey"));
  assert(src.includes('function cad3dCenterModelWithoutZoom()'));
+});
+
+test('Compact 2D-scale Giro palette keeps eight controls on one row with visibility toggle',()=>{
+ const start=src.indexOf('function cad3dGiroSvg(kind){'),end=src.indexOf('function cad3dCenterModelWithoutZoom(){',start);
+ const markup=new Function(src.slice(start,end)+'return cad3dGiroMarkup();')();
+ assert.equal((markup.match(/class="cad3dGiroChoice(?:\\s|")/g)||[]).length,8);
+ assert(markup.includes('data-giro-zoom="1"'));
+ assert(markup.includes('data-giro-zoom="-1"'));
+ assert(!markup.includes('cad3dGiroZoomStrip'));
+ for(const prop of ['data-giro-minimize','data-giro-pin','data-giro-close'])assert(markup.includes(prop),prop);
+ assert(src.includes('grid-template-columns:repeat(8,minmax(0,1fr))!important'));
+ assert(src.includes('height:165px;min-height:48px'));
+ assert(src.includes("launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾'"));
+ assert(src.includes('Math.min(initial.width,820,root.clientWidth-16)'));
+ assert(src.includes('if(initial.collapsed)setCollapsed(true);'));
 });
