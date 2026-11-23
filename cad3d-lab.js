@@ -3958,7 +3958,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar y renderizar esta perspectiva como croquis"><svg viewBox="0 0 32 32" width="23" height="23" aria-hidden="true"><path d="M16 2 29 9 16 17 3 9Z" fill="#a6d5f1" stroke="#eaf6ff" stroke-width="1.6"/><path d="M3 9 16 17 16 30 3 22Z" fill="#f5b981" stroke="#eaf6ff" stroke-width="1.6"/><path d="M29 9 16 17 16 30 29 22Z" fill="#83c9b6" stroke="#eaf6ff" stroke-width="1.6"/></svg> Render Croquis</button><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
 
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
@@ -4032,42 +4032,7 @@ function build(){
  '<details class="ioMenu"><summary class="btn" title="Export" aria-label="Export">'+ico('export')+'<span>Export</span></summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
- '<section class="cad3dSketchCapturePanel" role="dialog" aria-label="Render de croquis arquitectónico" hidden>'+
- '<header class="cad3dSketchCaptureHead"><strong>✎ RENDER CROQUIS · VISTA ACTUAL</strong><button type="button" class="cad3dSketchClose" aria-label="Cerrar">×</button></header>'+
- '<div class="cad3dSketchCaptureControls"><label>Preajuste<select data-sketch-preset><option value="custom">Personalizado</option><option value="technical">Técnico</option><option value="ink">Tinta</option><option value="watercolor">Acuarela</option><option value="pencil">Lápiz</option><option value="marker">Marcador</option><option value="wash">Aguada</option></select></label>'+
- '<button type="button" class="btn" data-sketch-save-preset>Guardar estilo</button><button type="button" class="btn" data-sketch-load-preset>Cargar estilo</button>'+
- '<label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador y pastel</option><option value="wash">Aguada tonal</option></select></label>'+
- '<label>Color de líneas<input type="color" data-sketch-setting="edgeColor" value="#303843"></label>'+
- '<label>Grosor de trazo (1–5)<input type="range" min="1" max="5" value="2" data-sketch-setting="weight"></label>'+
- '<label>Trazo irregular<input type="range" min="0" max="3" value="0" data-sketch-setting="jitter"></label>'+
- '<label>Curvatura de línea<input type="range" min="0" max="3" step=".2" value="1.2" data-sketch-setting="bowing"></label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="multiStroke" checked> Doble trazo manual</label>'+
- '<label>Perfiles<input type="range" min="1" max="5" value="2" data-sketch-setting="profile"></label>'+
- '<label>Extensiones<input type="range" min="0" max="10" value="3" data-sketch-setting="extension"></label>'+
- '<label>Puntos finales<input type="range" min="0" max="6" value="2" data-sketch-setting="endpoints"></label>'+
- '<label>Papel<select data-sketch-setting="paper"><option value="white">Blanco</option><option value="cream">Crema</option><option value="watercolor">Acuarela</option></select></label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="passes" checked> Motor por pasadas (recomendado)</label>'+
- '<label>Sombras naturales<input type="range" min="0" max="100" value="45" data-sketch-setting="shadow"></label>'+
- '<label>Textura de papel<input type="range" min="0" max="100" value="40" data-sketch-setting="grain"></label>'+
- '<label>Detalle de contornos<input type="range" min="0" max="100" value="50" data-sketch-setting="detail"></label>'+
- '<label>Pinceladas<input type="range" min="0" max="100" value="58" data-sketch-setting="brush"></label>'+
- '<label>Difusión de pigmento<input type="range" min="0" max="100" value="60" data-sketch-setting="pigment"></label>'+
- '<label>Acabado tonal<input type="range" min="0" max="100" value="65" data-sketch-setting="finish"></label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="geometry"> Reforzar aristas 3D (experimental)</label>'+
- '<label>Color de paredes<input type="color" data-sketch-setting="wallColor" value="#e8d7b9"></label>'+
- '<label>Caras<select data-sketch-setting="wallMode"><option value="original">Colores originales</option><option value="tint">Tintar superficies neutras</option></select></label>'+
- '<label>Color de cielo<input type="color" data-sketch-setting="skyColor" value="#b9dbf2"></label>'+
- '<label>Color de suelo<input type="color" data-sketch-setting="groundColor" value="#ddd6c8"></label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="sky" checked> Cielo celeste</label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="ground"> Teñir suelo</label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="clouds"> Nubes</label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="trees"> Árboles ilustrados</label>'+
- '<label>Intensidad de líneas <input class="cad3dSketchCaptureStrength" type="range" min="15" max="95" value="60"></label>'+
- '<button type="button" class="btn cad3dSketchRecapture" title="Capturar de nuevo la cámara actual">Actualizar captura</button>'+
- '<button type="button" class="btn cad3dSketchDownload" title="Procesar imagen completa sin reducir píxeles">Guardar PNG (alta resolución)</button></div>'+
- '<canvas class="cad3dSketchCapturePreview" aria-label="Vista procesada como croquis"></canvas>'+
- '<small>Motor local de seis pasadas: captura limpia → suavizado → máscaras → aguadas → contornos → sombras. Respeta el encuadre y la geometría; no agrega objetos ni utiliza IA.</small></section>'+
- cad3dMaterialMarkup()+
+  cad3dMaterialMarkup()+
  '<div class="body">'+
  '<aside id="cad3dArchPalette" class="archPalette" aria-label="Galería paramétrica 3D" hidden>'+
  '<header class="archTitle"><h2>PARAMETRIC 3D GALLERY</h2>'+
@@ -4277,7 +4242,7 @@ function build(){
  cad3dMaterialSetup();
  cad3dMakeSunPanelMovable();
  cad3dMakeSavePanelMovable();
- cad3dInitSketchCapture();
+ // Render Croquis dialog retired; normal CAD3D style gallery remains available.
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
