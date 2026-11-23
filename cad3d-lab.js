@@ -1008,6 +1008,47 @@ function cad3DLeafMotion(config,i,count,x0,x1,z,h){
  return m;
 }
 
+/* Component presets remain parametric and independent once inserted. */
+function cad3dRestoreSavedStairs(){
+ try{
+  var saved=JSON.parse(localStorage.getItem('blackline-cad3d-stair-components-v1')||'[]');
+  if(!Array.isArray(saved))return;
+  saved.slice(0,40).forEach(function(item){
+   if(!item||!['stair','railing'].includes(item.kind)||!item.spec)return;
+   var p=item.spec;
+   if(typeof p.name!=='string'||typeof p.id!=='string'||!/^user-arch-[a-z0-9-]+$/.test(p.id)||ARCH_STYLES[item.kind].some(function(v){return v.id===p.id;}))return;
+   var spec={id:p.id,name:p.name.slice(0,80),
+    w:clamp(finite(p.w,3),.20,100),d:clamp(finite(p.d,1),.05,10),h:clamp(finite(p.h,1),.30,20),
+    railStyle:['metal','wood','glass'].includes(p.railStyle)?p.railStyle:'metal',
+    postSpacing:clamp(finite(p.postSpacing,1),.35,3)};
+   if(item.kind==='stair')Object.assign(spec,{stepCount:clamp(Math.round(finite(p.stepCount,16)),3,48),
+    rails:['none','left','right','both'].includes(p.rails)?p.rails:'both',
+    railHeight:clamp(finite(p.railHeight,.95),.60,1.35)});
+   else spec.railRise=clamp(finite(p.railRise,0),-10,10);
+   ARCH_STYLES[item.kind].push(spec);
+  });
+ }catch(_e){}
+}
+function cad3dSaveStairPreset(r){
+ var requested=window.prompt('Nombre del componente 3D',r.type==='stair'?'Mi escalera':'Mi baranda');
+ if(requested==null)return;
+ var name=requested.trim().slice(0,80);if(!name)return text('El componente necesita un nombre');
+ try{
+  var previous=JSON.parse(localStorage.getItem('blackline-cad3d-stair-components-v1')||'[]');
+  if(!Array.isArray(previous))previous=[];
+  if(previous.length>=40)return text('Límite: 40 componentes personalizados');
+  var id='user-arch-'+Date.now().toString(36)+'-'+(previous.length+1).toString(36);
+  var spec={id:id,name:name,w:r.w,d:r.d,h:r.h,railStyle:r.railStyle,postSpacing:r.postSpacing};
+  if(r.type==='stair')Object.assign(spec,{stepCount:r.stepCount,rails:r.rails,railHeight:r.railHeight});
+  else spec.railRise=r.railRise;
+  previous.push({kind:r.type,spec:spec});
+  localStorage.setItem('blackline-cad3d-stair-components-v1',JSON.stringify(previous));
+  ARCH_STYLES[r.type].push(spec);
+  if(root)renderArchPalette();
+  text('Componente «'+name+'» guardado para reutilizar en la galería de este navegador');
+ }catch(e){text('No se pudo guardar el componente: '+String(e.message||e));}
+}
+cad3dRestoreSavedStairs();
 function archStyle(kind,id){
  return (ARCH_STYLES[kind]||[]).find(function(st){return st.id===id;})||(ARCH_STYLES[kind]||[])[0]||null;
 }
