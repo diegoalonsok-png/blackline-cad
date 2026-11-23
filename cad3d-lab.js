@@ -3138,6 +3138,9 @@ function toggleDraftMode(mode){
  text(mode.toUpperCase()+(draftModes[mode]?' activado':' desactivado'));
 }
 function setPlacement(which){
+ if(['stair','railing'].includes(which)&&cad3dMaterialPaint){
+  cad3dMaterialPaint=false;cad3dMaterialRender();
+ }
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
  if(which&&['line','polyline','rectangle','circle','arc','wall','slab','floor','dist','stair','railing'].includes(which)){
