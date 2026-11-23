@@ -3396,45 +3396,67 @@ css+="\n/* Separate render action, preserves all previously approved CAD3D toolb
 var cad3dSketchSource=null;
 var cad3dSketchCleanCapture=false;
 function cad3dSketchCapture(){
- var source=renderer?.domElement||fallbackCanvas;
- if(!source)return text('No hay una vista 3D disponible para capturar');
- var w=Math.max(1,source.width),h=Math.max(1,source.height);
- var factor=Math.min(1,2560/w,1600/h);
- var canvas=document.createElement('canvas');
- canvas.width=Math.max(1,Math.round(w*factor));
- canvas.height=Math.max(1,Math.round(h*factor));
+ var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=renderer?.domElement||fallbackCanvas;
+ if(!panel||!source)return text('No hay una vista 3D disponible para capturar');
+ var scale=Number(panel.querySelector('[data-sketch-setting="resolution"]')?.value)||1;
+ var sw=Math.max(1,source.width),sh=Math.max(1,source.height);
+ var max=renderer?.capabilities?.maxTextureSize||4096;
+ var factor=Math.min(scale,2560/sw,1600/sh,max/sw,max/sh,Math.sqrt(4000000/(sw*sh)));
+ var w=Math.max(1,Math.round(sw*factor)),h=Math.max(1,Math.round(sh*factor));
+ var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
  var ctx=canvas.getContext('2d',{willReadFrequently:true});
- if(!ctx)return;
- // Camera, construction and editing data are not modified. Only the render-only
- // helpers become temporarily invisible while the source pixels are sampled.
- var hidden=[],oldClean=cad3dSketchCleanCapture;
- function hide(node){
-  if(!node||!node.visible)return;
-  hidden.push([node,node.visible]);node.visible=false;
- }
+ if(!ctx)return text('Canvas para render no disponible');
+ var oldStyle=renderStyle,changedStyle=false,hidden=[],oldClean=cad3dSketchCleanCapture;
+ var oldPixelRatio=renderer?.getPixelRatio(),oldAspect=camera?.aspect;
+ var oldLeft=camera?.left,oldRight=camera?.right,oldTop=camera?.top,oldBottom=camera?.bottom;
+ var resized=false,view=root.querySelector('.view');
+ function hide(node){if(node?.visible){hidden.push(node);node.visible=false;}}
  cad3dSketchCleanCapture=true;
  try{
   if(renderer&&scene&&camera){
+   if(panel.querySelector('[data-sketch-setting="baseStyle"]')?.value==='realistic'&&
+    renderStyle!=='realistic'){renderStyle='realistic';changedStyle=true;applyRenderStyle();}
    hide(gridHelper);hide(axesHelper);hide(underlayGroup);
    if(modelRoot)modelRoot.traverse(function(o){
     if(o.userData?.cadSketch||o.userData?.cadSelectionHelper||o.userData?.cadDraftGuide)hide(o);
    });
-   renderer.render(scene,camera);
-  }else fallbackDraw();
-  ctx.drawImage(source,0,0,canvas.width,canvas.height);
- }catch(err){
-  text('No se pudo capturar el croquis: '+String(err?.message||err));
-  return;
- }finally{
-  for(var n=hidden.length-1;n>=0;n--)hidden[n][0].visible=hidden[n][1];
+   if(w!==source.width||h!==source.height){
+    renderer.setPixelRatio(1);renderer.setSize(w,h,false);resized=true;
+    if(camera.isPerspectiveCamera)camera.aspect=w/h;
+    else if(camera.isOrthographicCamera){
+     var cx=(oldLeft+oldRight)/2,halfHeight=(oldTop-oldBottom)/2;
+     camera.left=cx-halfHeight*w/h;camera.right=cx+halfHeight*w/h;
+    }
+    camera.updateProjectionMatrix();
+   }
+   renderer.render(scene,camera);ctx.drawImage(renderer.domElement,0,0,w,h);
+  }else{fallbackDraw();ctx.drawImage(source,0,0,w,h);}
+ }catch(err){text('Error de captura: '+String(err?.message||err));return;}
+ finally{
+  if(renderer&&resized){
+   renderer.setPixelRatio(oldPixelRatio);renderer.setSize(view.clientWidth,view.clientHeight,false);
+   if(camera.isPerspectiveCamera)camera.aspect=oldAspect;
+   else if(camera.isOrthographicCamera){
+    camera.left=oldLeft;camera.right=oldRight;camera.top=oldTop;camera.bottom=oldBottom;
+   }
+   camera.updateProjectionMatrix();
+  }
+  for(var i=hidden.length-1;i>=0;i--)hidden[i].visible=true;
+  if(changedStyle){renderStyle=oldStyle;applyRenderStyle();}
   cad3dSketchCleanCapture=oldClean;
   if(renderer&&scene&&camera)renderer.render(scene,camera);
-  else fallbackDraw();
+  else if(fallbackCanvas)fallbackDraw();
  }
  cad3dSketchSource=canvas;
+ var original=panel.querySelector('.cad3dSketchCaptureOriginal');
+ if(original){
+  var f=Math.min(1,680/w,440/h);
+  original.width=Math.max(1,Math.round(w*f));
+  original.height=Math.max(1,Math.round(h*f));
+  original.getContext('2d').drawImage(canvas,0,0,original.width,original.height);
+ }
  cad3dSketchProcess();
 }
-
 function cad3dSketchGeometryEdges(ctx,w,h,opts){
  if(!T||!renderer||!camera||!modelRoot)return;
  camera.updateMatrixWorld(true);modelRoot.updateMatrixWorld(true);
@@ -4032,7 +4054,13 @@ function cad3dInitSketchCapture(){
    if(!saved)return text('No hay estilo guardado');preset.value='custom';cad3dSketchSetStyle(panel,saved);
   }catch(err){text('Error cargando estilo: '+err.message);}
  });
- panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchRequestRedraw);el.addEventListener('change',cad3dSketchRequestRedraw);});
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){
+  if(el.dataset.sketchSetting==='baseStyle'||el.dataset.sketchSetting==='resolution'){
+   el.addEventListener('change',cad3dSketchCapture);return;
+  }
+  el.addEventListener('input',cad3dSketchRequestRedraw);
+  el.addEventListener('change',cad3dSketchRequestRedraw);
+ });
  panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
   if(!cad3dSketchSource)return;
   var canvas=document.createElement('canvas');
