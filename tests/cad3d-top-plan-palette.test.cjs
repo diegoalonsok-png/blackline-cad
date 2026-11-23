@@ -127,3 +127,63 @@ test('Compact 2D-scale Giro palette keeps eight controls on one row with visibil
  assert(src.includes('Math.min(initial.width,820,root.clientWidth-16)'));
  assert(src.includes('if(initial.collapsed)setCollapsed(true);'));
 });
+
+test('Existing Parametric Gallery launcher has an explicit visible GALERÍA 3D label',()=>{
+ assert(src.includes('title="Abrir o cerrar Galería 3D paramétrica"'));
+ assert(src.includes('<span>GALERÍA 3D</span>'));
+ assert(src.includes('button.btn.archLaunch > span'));
+ assert(src.includes('display:inline!important;font:700 10px/1.1 Arial,sans-serif!important'));
+});
+test('Gallery can dock alongside Layers and detach without duplicating objects',()=>{
+ const script=between('var cad3dArchDockStorageKey=', 'function showArchPalette(show){');
+ const classes=new Set();
+ const button={textContent:'',title:'',setAttribute(){}};
+ const palette={
+  classList:{contains:x=>classes.has(x),add:x=>classes.add(x),remove:x=>classes.delete(x)},
+  querySelector:x=>x==='[data-arch-dock]'?button:null,
+  style:{left:'120px',top:'100px',width:'340px',height:'340px'},
+  dataset:{},offsetWidth:340,offsetHeight:340,hidden:false,
+  getBoundingClientRect(){return {left:120,top:100,width:340,height:340};}
+ };
+ const layers={nextSibling:{id:'properties'},querySelector(){return {textContent:'Layers'};}};
+ const side={
+  firstChild:layers,
+  querySelectorAll(){return [layers];},
+  insertBefore(p,next){p.parentNode=this;this.lastInsertion=next;},
+  classList:{toggle(){}},
+  getBoundingClientRect(){return {left:700,right:1000,top:100,bottom:750};}
+ };
+ const root={
+  clientWidth:1100,clientHeight:820,
+  querySelector(sel){return sel==='.archPalette'?palette:sel==='.side.sidebar'?side:null;},
+  appendChild(p){p.parentNode=this;},
+  getBoundingClientRect(){return {left:0,top:0};}
+ };
+ const store=new Map();
+ const ctx={root,localStorage:{setItem:(k,v)=>store.set(k,v),getItem:k=>store.get(k)||null},
+  cad3dPaletteRemember(){},cad3dPaletteRestore(){return true;},
+  cad3dPaletteConstrain(){},cad3dBringPaletteFront(){},
+  clamp:(n,min,max)=>Math.max(min,Math.min(max,n)),Math,Array};
+ vm.runInNewContext(script,ctx);
+ assert.equal(ctx.cad3dArchDockNear(692,300),true,'Near the Layers sidebar is magnetic');
+ assert.equal(ctx.cad3dArchDockNear(400,300),false,'Far from Layers stays floating');
+ assert.equal(ctx.cad3dArchSetDocked(true),true);
+ assert.equal(palette.parentNode,side);
+ assert.equal(side.lastInsertion,layers.nextSibling,'Stack gallery directly after Layers');
+ assert.equal(classes.has('cad3dArchDocked'),true);
+ assert.equal(button.textContent,'↗ Desacoplar');
+ assert.equal(ctx.cad3dArchSetDocked(false),false);
+ assert.equal(palette.parentNode,root);
+ assert.equal(classes.has('cad3dArchDocked'),false);
+ assert.equal(button.textContent,'⇥ Acoplar');
+});
+test('Gallery header drag can snap into sidebar and preserve Layers',()=>{
+ const code=between('function beginArchGesture(e){', 'function clickArchPalette(e){');
+ for(const token of ['cad3dArchDockNear(ev.clientX,ev.clientY)',
+  'cad3dArchSetDocked(true)','cad3dArchSetDocked(false,{rect:b})',
+  'window.addEventListener(\'pointermove\',move,true)',
+  'window.removeEventListener(\'pointermove\',move,true)',
+  'cad3dPaletteRemember(\'architecture\',palette)'])assert(code.includes(token),token);
+ assert(src.includes('cad3dArchRestoreDocking();'));
+ assert(src.includes('if(!palette.hidden)cad3dPaletteRemember(\'architecture\',palette)'));
+});
