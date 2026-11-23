@@ -5003,9 +5003,68 @@ function applyWallMiter(g,r,partWidth,partCenter,join){
  }
  positions.needsUpdate=true;g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();
 }
+/* Native parametric stair and railing geometry. Beta can disable insertion, never data. */
+function cad3dStairSpec(r){
+ var n=clamp(Math.round(finite(r.stepCount,16)),3,48);
+ return {n:n,run:Math.max(.2,finite(r.w,4)),width:Math.max(.30,finite(r.d,1)),
+  rise:Math.max(.015,finite(r.h,2.8))/n,going:Math.max(.2,finite(r.w,4))/n};
+}
+function cad3dRailLine(group,id,a,b,radius,color){
+ var start=new T.Vector3(a[0],a[1],a[2]),end=new T.Vector3(b[0],b[1],b[2]);
+ var dir=end.clone().sub(start),length=dir.length();if(length<.002)return;
+ var mesh=addMesh(new T.CylinderGeometry(radius,radius,length,8,1),color,id,group);
+ mesh.position.copy(start.add(end).multiplyScalar(.5));
+ mesh.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),dir.normalize());
+}
+function cad3dRailGeometry(id,parent,spec){
+ var length=Math.max(.20,finite(spec.length,3)),side=finite(spec.y,0),h=Math.max(.55,finite(spec.height,.95));
+ var rise=finite(spec.rise,0),count=clamp(Math.ceil(length/clamp(finite(spec.spacing,1),.35,3)),1,48);
+ var style=['metal','wood','glass'].includes(spec.style)?spec.style:'metal';
+ var color=style==='wood'?0x947252:style==='glass'?0xbfc7ce:0x9da9b2;
+ var baseZ=typeof spec.baseZ==='function'?spec.baseZ:function(t){return t*rise;};
+ function pt(t,z){return [-length/2+length*t,side,baseZ(t)+z];}
+ for(var i=0;i<=count;i++)cad3dRailLine(parent,id,pt(i/count,0),pt(i/count,h),style==='wood'?.026:.020,color);
+ for(var i=0;i<count;i++){
+  var a=pt(i/count,h),b=pt((i+1)/count,h);
+  cad3dRailLine(parent,id,a,b,style==='wood'?.042:.032,color);
+  if(style==='metal'){
+   cad3dRailLine(parent,id,pt(i/count,h*.56),pt((i+1)/count,h*.56),.015,0x7e8c97);
+  }else if(style==='glass'){
+   var p0=pt(i/count,0),p1=pt((i+1)/count,0);
+   var dx=p1[0]-p0[0],dz=p1[2]-p0[2],seg=Math.hypot(dx,dz);
+   var glass=new T.Mesh(new T.BoxGeometry(Math.max(.03,seg-.055),.015,Math.max(.25,h-.12)),
+    new T.MeshStandardMaterial({color:0x8dbbcf,metalness:.02,roughness:.10,transparent:true,opacity:.35,depthWrite:false,side:T.DoubleSide}));
+   glass.userData.owner=id;glass.userData.cadGlass=true;
+   glass.position.set((p0[0]+p1[0])/2,side,(p0[2]+p1[2])/2+h/2);
+   glass.rotation.y=-Math.atan2(dz,dx);glass.castShadow=false;glass.receiveShadow=false;parent.add(glass);
+  }
+ }
+}
+function cad3dBuildStair(r,group){
+ var st=cad3dStairSpec(r),style=String(r.styleId||'');
+ var body=style==='stair-wood'?0x947354:style==='stair-wide'?0xa5a7a0:0xaab0b5;
+ for(var i=0;i<st.n;i++){
+  var height=(i+1)*st.rise,x=-st.run/2+st.going*(i+.5);
+  addMesh(boxGeom(st.going+.001,st.width,height),body,r.id,group,x,0,0);
+ }
+ if(!['left','right','both'].includes(r.rails))return;
+ var sides=r.rails==='both'?[-1,1]:[r.rails==='left'?-1:1];
+ sides.forEach(function(sign){
+  var n=st.n;
+  cad3dRailGeometry(r.id,group,{length:st.run,y:sign*(st.width/2-.055),height:clamp(finite(r.railHeight,.95),.60,1.35),
+   spacing:clamp(finite(r.postSpacing,1),.35,3),style:r.railStyle||'metal',
+   baseZ:function(t){return Math.min(st.n,Math.max(1,Math.ceil(t*n)))*st.rise;}});
+ });
+}
+function cad3dBuildRailing(r,group){
+ cad3dRailGeometry(r.id,group,{length:r.w,y:0,height:r.h,spacing:r.postSpacing,
+  rise:r.railRise,style:r.railStyle});
+}
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
  if(r.type==='box')addMesh(boxGeom(r.w,r.d,r.h),0x9ea9b4,r.id,group);
+ if(r.type==='stair')cad3dBuildStair(r,group);
+ if(r.type==='railing')cad3dBuildRailing(r,group);
  if(r.type==='block3d')buildCAD3DBlock(r,group);
  if(r.type==='imported3d')cad3dBuildImportedMesh(r,group);
  if(r.type==='profile2d')cad3dBuildProfile(r,group);
