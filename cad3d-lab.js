@@ -3365,6 +3365,48 @@ function placePoint(pt){
  setPlacement(null);
  text(kind==='wall'?'Muro dibujado · '+rec.w.toFixed(2)+' m':kind==='slab'||kind==='floor'?'Losa / Piso dibujado · '+rec.w.toFixed(2)+' × '+rec.d.toFixed(2)+' m':kind.toUpperCase()+' colocado');
 }
+
+/* Hit-test the projected visible object area in the Canvas2D compatibility viewer. */
+function cad3dFallbackPolyHit(points,x,y,tol){
+ var inside=false;
+ for(var i=0,j=points.length-1;i<points.length;j=i++){
+  var a=points[i],b=points[j],dx=b.x-a.x,dy=b.y-a.y,dd=dx*dx+dy*dy;
+  if(dd){var t=Math.max(0,Math.min(1,((x-a.x)*dx+(y-a.y)*dy)/dd));
+   if(Math.hypot(x-a.x-t*dx,y-a.y-t*dy)<=tol)return true;}
+  if((a.y>y)!==(b.y>y)&&x<(b.x-a.x)*(y-a.y)/(b.y-a.y)+a.x)inside=!inside;
+ }
+ return points.length>=3&&inside;
+}
+function cad3dFallbackSurfaceHit(rec,projection,x,y){
+ var tol=renderStyle.startsWith('wire')?5:2;
+ function box(w,d,h,ox,oy,oz,slope){
+  var angle=(rec.rot||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),pts=[];
+  for(var iz=0;iz<=1;iz++)for(var iy=0;iy<=1;iy++)for(var ix=0;ix<=1;ix++){
+   var lx=ox+(ix-.5)*w,ly=oy+(iy-.5)*d;
+   pts.push(projection(rec.x+lx*c-ly*s,rec.y+lx*s+ly*c,rec.z+oz+iz*h+lx*(slope||0)));
+  }
+  return [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]].some(function(face){
+   return cad3dFallbackPolyHit(face.map(function(i){return pts[i];}),x,y,tol);
+  });
+ }
+ if(rec.type==='box'||rec.type==='block3d')return box(rec.w,rec.d,rec.h,0,0,0,0);
+ if(rec.type==='wall'||rec.type==='slab'){
+  var hit=false;architectureParts(rec,function(w,d,h,ox,oy,oz,color,slope){
+   if(!hit)hit=box(w,d,h,ox,oy,oz,slope);
+  });return hit;
+ }
+ if(rec.type==='sphere'){
+  var p=projection(rec.x,rec.y,rec.z+rec.radius);
+  return Math.hypot(x-p.x,y-p.y)<=Math.max(4,rec.radius*p.scale)+tol;
+ }
+ if(rec.type==='cylinder'||rec.type==='cone'){
+  var low=projection(rec.x,rec.y,rec.z),high=projection(rec.x,rec.y,rec.z+rec.h),rad=Math.max(4,rec.radius*low.scale);
+  return cad3dFallbackPolyHit([{x:low.x-rad,y:low.y},{x:rec.type==='cone'?high.x:high.x-rad,y:high.y},
+   {x:rec.type==='cone'?high.x:high.x+rad,y:high.y},{x:low.x+rad,y:low.y}],x,y,tol)||
+   Math.pow((x-low.x)/(rad+tol),2)+Math.pow((y-low.y)/(Math.max(3,rad*.22)+tol),2)<=1;
+ }
+ return false;
+}
 function selectAt(e){
  if(fallbackCanvas){
   var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34,projection=fallbackProjector();
@@ -3383,7 +3425,12 @@ function selectAt(e){
    }
    if(distance<limit&&(!best||distance<best.distance))best={id:rec.id,distance:distance};
   });
-  var id=wallOrSlab?.host.id??best?.id;
+  // Prefer the topmost projected solid surface, including off-centre face clicks.
+  var px=e.clientX-r.left,py=e.clientY-r.top;
+  var surface=records.filter(editableRecord).slice().reverse().find(function(rec){
+   return cad3dFallbackSurfaceHit(rec,projection,px,py);
+  });
+  var id=surface?.id??wallOrSlab?.host.id??best?.id;
   selectedOpeningId=null;
   if(id==null){if(!e.shiftKey)selected=[];}
   else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
