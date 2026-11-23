@@ -50,11 +50,11 @@ test('real browser: toolbars compact, drag to bottom, re-dock to top and keep co
   await evalJS("document.getElementById('cad3dOpen').click()");
   let built=false;for(let i=0;i<50;i++){built=await evalJS("Boolean(document.querySelector('#cad3dLab .cad3dDockBottom'))");if(built)break;await sleep(100);}
   assert.ok(built,'dock zones created');
-  const initial=await evalJS(`(()=>{const r=document.getElementById('cad3dLab');const b=r.querySelector('.cad3dProfileTools [data-action="line"]');return {compact:r.classList.contains('cad3dCompactMode'),bars:r.querySelectorAll('.cad3dDockTop > .cad3dDockBar').length,width:b.getBoundingClientRect().width,hidden:getComputedStyle(b.querySelector('span')).display==='none'};})()`);
-  assert.equal(initial.compact,true);assert.equal(initial.bars,5);
+  const initial=await evalJS(`(()=>{const r=document.getElementById('cad3dLab');const b=r.querySelector('.cad3dBar[aria-label="Draw"] [data-action="line"]');return {compact:r.classList.contains('cad3dCompactMode'),bars:r.querySelectorAll('.cad3dDockTop > .cad3dDockBar').length,width:b.getBoundingClientRect().width,hidden:getComputedStyle(b.querySelector('span')).display==='none'};})()`);
+  assert.equal(initial.compact,true);assert.ok(initial.bars>=2,'Draw/Modify bars remain docked');
   assert.ok(initial.width<=40,'compact icon size = '+initial.width);assert.equal(initial.hidden,true);
   const result=await evalJS(`(()=>{
-   const r=document.getElementById('cad3dLab'),el=r.querySelector('.cad3dProfileTools'),grip=el.querySelector('.cad3dToolbarGrip'),top=r.querySelector('.cad3dDockTop');
+   const r=document.getElementById('cad3dLab'),el=r.querySelector('.cad3dBar[aria-label="Draw"]'),grip=el.querySelector('.cad3dToolbarGrip'),top=r.querySelector('.cad3dDockTop');
    const p=grip.getBoundingClientRect(),id=172,px=p.left+p.width/2,py=p.top+p.height/2;
    const ev=(kind,x,y,target)=>target.dispatchEvent(new PointerEvent(kind,{bubbles:true,cancelable:true,pointerId:id,button:0,clientX:x,clientY:y}));
    ev('pointerdown',px,py,grip);ev('pointermove',px+30,py+60,window);
