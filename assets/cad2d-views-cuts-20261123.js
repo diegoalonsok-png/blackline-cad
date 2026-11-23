@@ -16,6 +16,7 @@ function reg(id,name,cat,w,h,fn,opt={}){
  ids.add(id);
  A.library.push({id,name,cat,w,d:h,wMin:opt.open?w*.75:w,wMax:opt.open?w*1.6:w,
    dMin:opt.open?h*.88:h,dMax:opt.open?h*1.2:h,gen:fn,
+   hideFromGallery:true, // superseded sketches remain readable in saved drawings
    family:opt.family||id,author:'Blackline CAD · trazado vectorial original',pro:false,
    hideFromGallery:true,experimental:true});
  total++;
