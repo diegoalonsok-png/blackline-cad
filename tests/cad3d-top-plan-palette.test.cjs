@@ -124,7 +124,10 @@ test('Compact 2D-scale Giro palette keeps eight controls on one row with visibil
  assert(src.includes('grid-template-columns:repeat(8,minmax(0,1fr))!important'));
  assert(src.includes('height:165px;min-height:48px'));
  assert(src.includes("launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾'"));
- assert(src.includes('Math.min(initial.width,820,root.clientWidth-16)'));
+ assert(src.includes('Math.min(initial.width,initial.version===2?640:392,root.clientWidth-16)'));
+ assert(src.includes('resize:both!important'));
+ assert(src.includes('width:min(392px,calc(100% - 16px));'));
+ assert(src.includes('height:46px;'));
  assert(src.includes('if(initial.collapsed)setCollapsed(true);'));
 });
 
