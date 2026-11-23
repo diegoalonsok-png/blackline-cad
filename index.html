@@ -1853,19 +1853,6 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));schedule()}
-/* Native CAD2D engine bridge: CAD3D mounts the ACTUAL existing CAD2D canvas
- * and activates the same drawing tools, not copies or rewritten primitives.
- * Nothing is removed from the 2D workspace; its DOM is restored on exit. */
-window.BlacklineCAD2DEngine=Object.freeze({
- getCanvasWrap:()=>wrap,
- getCommandInput:()=>document.getElementById('command'),
- activate:(tool)=>setTool(tool),
- resize:()=>resize(),
- redraw:()=>schedule(),
- snapshot:()=>({entities:JSON.parse(JSON.stringify(state.entities)),unit:state.unit,
-  layers:JSON.parse(JSON.stringify(state.layers)),tool:state.tool}),
- get selected(){return [...state.selected]}
-});
 function schedule(){if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
@@ -10898,5 +10885,5 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261122-folders"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script defer src="cad3d-lab.js?v=20261122-native-cad2d-engine-v29"></script>
+<script defer src="cad3d-lab.js?v=20261122-cad2d-drafting-parity-v28"></script>
 </body></html>
