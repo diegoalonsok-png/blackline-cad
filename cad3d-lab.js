@@ -1300,6 +1300,48 @@ css+=`
 .app.bl-light #cad3dLab .cad3dGiroChoice:hover,
 .app.bl-light #cad3dLab .cad3dGiroHeadControls button:hover{background:#e6edf2!important}
 `;
+css+=`
+/* Sun / Entorno uses the SAME Layers sidebar docking surface as Parametric Gallery. */
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked{
+ position:relative!important;top:auto!important;left:auto!important;right:auto!important;
+ bottom:auto!important;z-index:auto!important;
+ box-sizing:border-box!important;display:grid!important;flex:0 0 auto!important;
+ width:calc(100% - 8px)!important;min-width:0!important;max-width:calc(100% - 8px)!important;
+ height:360px;min-height:180px;max-height:min(70vh,630px)!important;
+ margin:4px!important;padding:8px!important;gap:7px!important;
+ resize:vertical!important;overflow:auto!important;
+ border-radius:9px!important;box-shadow:0 2px 7px #0007!important;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked>.sunFloatingHeader{
+ display:flex!important;align-items:center!important;
+ margin:-8px -8px 0!important;padding:7px 8px!important;gap:4px!important;
+ min-width:0!important;flex-wrap:wrap!important;
+ border-radius:8px 8px 0 0!important;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked>.sunFloatingHeader strong{
+ font-size:11px!important;line-height:1.3!important;white-space:nowrap!important;
+}
+#cad3dLab .sunFloatingHeader .sunDockButton{
+ display:inline-flex;align-items:center;justify-content:center;
+ flex:0 0 auto;min-width:25px;min-height:23px;
+ margin-left:auto;padding:2px 5px;
+ background:var(--cad-ui-raised,#252b31);color:var(--cad-ui-text,#e4edf3);
+ border:1px solid var(--cad-ui-edge,#53616b);border-radius:5px;
+ cursor:pointer;font:11px/1 Arial,sans-serif;
+}
+#cad3dLab .sunFloatingHeader .sunDockButton[aria-pressed=true]{
+ border-color:#88bfd9;background:#344a55;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked .sunPresetRow{
+ display:flex!important;flex-wrap:wrap!important;gap:4px!important;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked .sunPresetRow button{
+ min-width:56px!important;flex:1 1 58px!important;padding:5px 2px!important;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked input[type=range]{
+ width:100%!important;min-width:0!important;
+}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1679,7 +1721,8 @@ function renderArchPalette(){
  }).join('');
 }
 function cad3dPaletteRemember(name,panel){
- if(name==='architecture'&&panel.classList.contains('cad3dArchDocked'))return;
+ if((name==='architecture'&&panel.classList.contains('cad3dArchDocked'))||
+    (name==='sun'&&panel.classList.contains('cad3dSunDocked')))return;
  try{localStorage.setItem('blackline-cad3d-floating-'+name+'-v1',JSON.stringify({
   left:parseFloat(panel.style.left),top:parseFloat(panel.style.top),
   width:panel.offsetWidth,height:panel.offsetHeight
@@ -1715,7 +1758,9 @@ function cad3dWatchPaletteResize(name,panel){
  if(!panel||typeof ResizeObserver==='undefined')return;
  var last='';
  new ResizeObserver(function(){
-  if(panel.hidden||!panel.isConnected||(name==='architecture'&&panel.classList.contains('cad3dArchDocked')))return;
+  if(panel.hidden||!panel.isConnected||
+    (name==='architecture'&&panel.classList.contains('cad3dArchDocked'))||
+    (name==='sun'&&panel.classList.contains('cad3dSunDocked')))return;
   var current=panel.offsetWidth+'x'+panel.offsetHeight;
   if(current===last)return;last=current;
   cad3dPaletteRemember(name,panel);
@@ -3360,7 +3405,7 @@ function build(){
  
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
- '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / ENTORNO</strong><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
+ '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / ENTORNO</strong><button type="button" class="sunDockButton" data-sun-dock aria-pressed="false" title="Acoplar a Layers" aria-label="Acoplar o desacoplar Sol / Entorno">⇥</button><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
  '<label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
  '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
