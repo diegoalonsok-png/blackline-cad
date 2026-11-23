@@ -35,6 +35,7 @@
   furniture:{en:'Furniture',es:'Mobiliario',family:'Mobiliario'},
   plan:{en:'Plans',es:'Plantas',mode:'Planta'},
   section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
+  archive:{en:'Recovered views',es:'Vistas recuperadas',item:it=>archivedView(it)},
   doorElev:{en:'Door elevations',es:'Puertas en vista',item:it=>/puerta|door/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   windowElev:{en:'Window elevations',es:'Ventanas en vista',item:it=>/ventana|ventanal|window|paño fijo|pano fijo/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   fridgeElev:{en:'Fridge elevations',es:'Heladeras en vista',item:it=>/heladera|refrigerador|fridge|freezer/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
@@ -69,6 +70,8 @@
 #cadBlockBrowser .card .nm{font-size:12px;color:#e8eef2;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 #cadBlockBrowser .card .mt{font-size:11px;color:#8fd0e4}
 #cadBlockBrowser .card .pro{align-self:flex-start;font-size:9px;font-weight:700;padding:1px 6px;border-radius:6px;background:#c79a3a;color:#111}
+#cadBlockBrowser .card .archive-label{align-self:flex-start;font-size:9px;letter-spacing:.04em;color:#b9b2a4;border:1px solid #687078;border-radius:5px;padding:1px 5px}
+#cadBlockBrowser.visual .card .archive-label{color:#6a5846;border-color:#b5a385}
 #cadBlockBrowser .ft{padding:7px 14px;border-top:1px solid #26333d;color:#8ea2ae;font-size:12px}
 #cadBlockBrowser .rz{position:absolute;z-index:2}#cadBlockBrowser .rz.e{right:0;top:0;bottom:0;width:7px;cursor:ew-resize}#cadBlockBrowser .rz.s{left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
 #cadBlockBrowser .rz.w{left:0;top:0;bottom:0;width:7px;cursor:ew-resize}#cadBlockBrowser .rz.n{left:0;right:0;top:0;height:5px;cursor:ns-resize}
@@ -126,7 +129,12 @@
  let el=null,armedId=null,visibleCount=72;
  // Quality gate: the temporary schematic views26 set remains in source for
  // backward compatibility, but is not advertised as production CAD drafting.
- const items=()=>LIB.library.filter(it=>!it.hideFromGallery&&!/^views26-/.test(it.id));
+ // Quality review hid older schematic views, not their editable geometry.
+ // Recover access only in view-specific tabs, retaining curated main gallery.
+ const archivedView=it=>Boolean(it.hideFromGallery&&/^(?:cv-|vm-|alz-)/.test(it.id));
+ const archiveTabs=new Set(['section','archive','doorElev','windowElev','fridgeElev']);
+ const items=()=>LIB.library.filter(it=>!/^views26-/.test(it.id)&&
+   (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))));
  const familyOf=it=>{
   const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
   if(/sanit|bañ|bath|inodoro|bidet|lavatorio|ducha|mingitorio|vanitory|bañera|jacuzzi|wc\b|toilet|urinal|shower/.test(c+' '+n)||/^san-|^ca_ba_/.test(id))return 'Baños';
@@ -146,7 +154,7 @@
   const n=String(it.name||'').toLowerCase(),id=String(it.id||'').toLowerCase(),c=String(it.cat||'');
   if(/corte|sección|section|perfil|sectional/.test(n)||/\bsection\b/.test(id))return 'Corte';
   if(/vista|alzado|elevac|frontal|posterior|lateral|elevation/.test(n)||c==='Alzados'||c==='Mobiliario en vista'||/^ca_puerta_elev|^bl-view-window-|^olymp2-ca-puerta-elev/.test(id))return 'Alzado';
-  if(c==='Cortes y vistas')return 'Alzado';
+  if(c==='Cortes y vistas'||c==='Mobiliario en vista')return 'Alzado';
   return 'Planta';
  };
  const inView=it=>{const v=VIEWS[st.view];if(!v)return true;if(v.item)return v.item(it);
@@ -183,7 +191,7 @@
   });
   const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
@@ -240,14 +248,18 @@
  function close(){if(el)el.style.display='none';armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
+ function openRecovered(){st.view='archive';st.cat='';st.q='';visibleCount=72;save();open();
+  const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
+ }
  function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=12;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,close});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,close});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
   for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
+  for(const k of ['VISTASRECUPERADAS','VISTASBLOQUES'])EXT.commands[k]=openRecovered;
  }
  // Botón grande en la cinta (Inicio y Arquitectura) y en la barra rápida.
  const ico='<rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="16" y="11" width="6" height="6" rx="1"/><path d="M4 21h16"/>';
