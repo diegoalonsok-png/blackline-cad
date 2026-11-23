@@ -1407,6 +1407,15 @@ css+=`
  max-width:min(560px,calc(100% - 16px))!important;
 }
 `;
+css+=`
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked[hidden]{
+ display:none!important;
+}
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked .sunFloatingHeader,
+#cad3dLab .side.sidebar>.sunPanel.cad3dSunDocked .sunFloatingHeader strong{
+ color:var(--cad-ui-text,#e8eef3)!important;
+}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -3068,15 +3077,66 @@ function cad3dBasicBars(){
    tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
 
+
+/* The original Sun/Environment panel is moved into the Layers dock (no clone). */
+var cad3dSunDockKey='blackline-cad3d-sun-docked-v1';
+function cad3dSunSetDocked(want,options){
+ var panel=root?.querySelector('.sunPanel'),side=root?.querySelector('.side.sidebar');
+ if(!panel||!side)return false;
+ options=options||{};
+ var current=panel.classList.contains('cad3dSunDocked');
+ if(!!want===current)return current;
+ if(want){
+  if(!panel.hidden)cad3dPaletteRemember('sun',panel);
+  panel.classList.add('cad3dSunDocked');
+  // Stack alongside Layers and Parametric Gallery, preserving the actual controls.
+  var gallery=side.querySelector(':scope > .archPalette.cad3dArchDocked');
+  var layers=Array.from(side.querySelectorAll(':scope > .panel')).find(function(p){
+   return /^layers$/i.test(p.querySelector('.panel-title')?.textContent.trim()||'');
+  });
+  var anchor=gallery||layers;
+  side.insertBefore(panel,anchor?anchor.nextSibling:side.firstChild);
+  panel.style.left='';panel.style.top='';panel.style.right='';panel.style.bottom='';
+  panel.style.width='';panel.style.height='';
+  panel.dataset.userPositioned='false';
+ }else{
+  panel.classList.remove('cad3dSunDocked');
+  root.appendChild(panel);
+  var restored=cad3dPaletteRestore('sun',panel);
+  if(!restored){
+   panel.style.width=Math.min(274,root.clientWidth-20)+'px';
+   panel.style.height=Math.min(365,root.clientHeight-30)+'px';
+   panel.style.left=Math.max(8,root.clientWidth-panel.offsetWidth-280)+'px';
+   panel.style.top='135px';
+  }
+  if(options.rect){
+   var host=root.getBoundingClientRect();
+   panel.style.left=clamp(options.rect.left-host.left,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+   panel.style.top=clamp(options.rect.top-host.top,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+  }
+  panel.dataset.userPositioned='true';
+  if(!panel.hidden)cad3dPaletteConstrain(panel);
+ }
+ var button=panel.querySelector('[data-sun-dock]');
+ if(button){
+  button.textContent=want?'↗':'⇥';
+  button.title=want?'Desacoplar Sol / Entorno':'Acoplar Sol / Entorno junto a Layers';
+  button.setAttribute('aria-pressed',String(!!want));
+ }
+ cad3dArchDockCandidate(false);
+ try{localStorage.setItem(cad3dSunDockKey,want?'yes':'no');}catch(_e){}
+ return !!want;
+}
 function cad3dMakeSunPanelMovable(){
  var panel=root.querySelector('.sunPanel'),button=root.querySelector('.sunLaunch');
  var handle=panel?.querySelector('.sunFloatingHeader'),close=panel?.querySelector('.sunFloatingClose');
+ var dockButton=panel?.querySelector('[data-sun-dock]');
  if(!panel||!handle||!button)return;
  root.appendChild(panel);
  cad3dWatchPaletteResize('sun',panel);
- var drag=null,restored=cad3dPaletteRestore('sun',panel);
+ var restored=cad3dPaletteRestore('sun',panel);
  function place(){
-  if(panel.hidden)return;
+  if(panel.hidden||panel.classList.contains('cad3dSunDocked'))return;
   if(!panel.dataset.userPositioned){
    var rr=root.getBoundingClientRect(),br=button.getBoundingClientRect();
    var width=panel.offsetWidth||274,height=panel.offsetHeight||365;
@@ -3089,36 +3149,68 @@ function cad3dMakeSunPanelMovable(){
   cad3dPaletteConstrain(panel);
   cad3dBringPaletteFront(panel);
  }
- button.addEventListener('click',function(){queueMicrotask(place);});
+ button.addEventListener('click',function(){
+  queueMicrotask(function(){
+   if(!panel.hidden&&panel.classList.contains('cad3dSunDocked')){
+    panel.scrollIntoView({block:'nearest'});
+   }else place();
+  });
+ });
  if(restored){
-  var hidden=panel.hidden;panel.hidden=false;cad3dPaletteConstrain(panel);panel.hidden=hidden;
+  var wasHidden=panel.hidden;panel.hidden=false;
+  cad3dPaletteConstrain(panel);panel.hidden=wasHidden;
  }
  panel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(panel);});
  close.addEventListener('click',function(e){
   e.stopPropagation();panel.hidden=true;button.setAttribute('aria-expanded','false');
  });
+ dockButton?.addEventListener('click',function(e){
+  e.stopPropagation();cad3dSunSetDocked(!panel.classList.contains('cad3dSunDocked'));
+ });
  handle.addEventListener('pointerdown',function(e){
-  if(e.button!==0||e.target.closest('button,input'))return;
+  if(e.button!==0||e.target.closest('button,input,select'))return;
   e.preventDefault();e.stopPropagation();
-  var pr=panel.getBoundingClientRect();
-  drag={id:e.pointerId,dx:e.clientX-pr.left,dy:e.clientY-pr.top};
-  handle.setPointerCapture(e.pointerId);panel.dataset.userPositioned='true';
-  cad3dBringPaletteFront(panel);
+  var start=e.pointerId,initial=panel.getBoundingClientRect(),host=root.getBoundingClientRect();
+  var offsetX=e.clientX-initial.left,offsetY=e.clientY-initial.top;
+  var fromDock=panel.classList.contains('cad3dSunDocked');
+  var moved=false,lastX=e.clientX,lastY=e.clientY;
+  function move(ev){
+   if(ev.pointerId!==start)return;
+   lastX=ev.clientX;lastY=ev.clientY;
+   if(!moved){
+    if(Math.hypot(ev.clientX-e.clientX,ev.clientY-e.clientY)<4)return;
+    moved=true;
+    if(fromDock)cad3dSunSetDocked(false,{rect:initial});
+   }
+   var rr=root.getBoundingClientRect();
+   panel.style.left=clamp(ev.clientX-rr.left-offsetX,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+   panel.style.top=clamp(ev.clientY-rr.top-offsetY,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+   panel.dataset.userPositioned='true';
+   cad3dArchDockCandidate(cad3dArchDockNear(ev.clientX,ev.clientY));
+  }
+  function finish(ev,canDock){
+   if(ev.pointerId!==start)return;
+   window.removeEventListener('pointermove',move,true);
+   window.removeEventListener('pointerup',end,true);
+   window.removeEventListener('pointercancel',cancel,true);
+   window.removeEventListener('blur',blur,true);
+   if(moved&&canDock&&cad3dArchDockNear(lastX,lastY))cad3dSunSetDocked(true);
+   else if(!panel.classList.contains('cad3dSunDocked')){
+    cad3dPaletteConstrain(panel);cad3dPaletteRemember('sun',panel);
+   }
+   cad3dArchDockCandidate(false);
+  }
+  function end(ev){finish(ev,true);}
+  function cancel(ev){finish(ev,false);}
+  function blur(){finish({pointerId:start},false);}
+  window.addEventListener('pointermove',move,true);
+  window.addEventListener('pointerup',end,true);
+  window.addEventListener('pointercancel',cancel,true);
+  window.addEventListener('blur',blur,true);
  });
- handle.addEventListener('pointermove',function(e){
-  if(!drag||e.pointerId!==drag.id)return;
-  var rr=root.getBoundingClientRect();
-  panel.style.left=clamp(e.clientX-rr.left-drag.dx,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
-  panel.style.top=clamp(e.clientY-rr.top-drag.dy,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
- });
- function finish(e){
-  if(!drag||drag.id!==e.pointerId)return;
-  var id=drag.id;drag=null;cad3dPaletteConstrain(panel);cad3dPaletteRemember('sun',panel);
-  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);}catch(_e){}
- }
- handle.addEventListener('pointerup',finish);
- handle.addEventListener('pointercancel',finish);
- handle.addEventListener('lostpointercapture',finish);
+ var shouldDock=false;
+ try{shouldDock=localStorage.getItem(cad3dSunDockKey)==='yes';}catch(_e){}
+ if(shouldDock)cad3dSunSetDocked(true);
 }
 
 function cad3dMakeSavePanelMovable(){
