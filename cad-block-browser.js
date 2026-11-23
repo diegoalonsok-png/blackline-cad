@@ -90,7 +90,13 @@
 .bl-light #cadBlockBrowser .hd{background:#e6edf2;border-color:#cbd6dd}.bl-light #cadBlockBrowser .hd b{color:#2b5468}.bl-light #cadBlockBrowser .hd button{color:#2a3a44}
 .bl-light #cadBlockBrowser .card{background:#fff;color:#1f2b33;border-color:#c8d3da}.bl-light #cadBlockBrowser .card .nm{color:#16212a}.bl-light #cadBlockBrowser .card .mt{color:#21708a}
 .bl-light #cadBlockBrowser .cats button,.bl-light #cadBlockBrowser .tabs button{color:#22323c}.bl-light #cadBlockBrowser .cats button.on{background:#d5e6ef}
-.bl-light #cadBlockBrowser input[type=search]{background:#fff;color:#16212a;border-color:#b8c5ce}`;
+.bl-light #cadBlockBrowser input[type=search]{background:#fff;color:#16212a;border-color:#b8c5ce}
+.bl-light #cadBlockBrowser.visual{background:#efe4cc;color:#272921}
+.bl-light #cadBlockBrowser.visual .hd{background:#ddcba8}
+.bl-light #cadBlockBrowser.visual .card{background:#fffaf0;color:#293238;border-color:#cbb796}
+.bl-light #cadBlockBrowser.visual .card .nm{color:#35362e}
+.bl-light #cadBlockBrowser.visual .card .mt{color:#725b39}
+.bl-light #cadBlockBrowser.visual input[type=search]{background:#fffaf0;color:#29302b;border-color:#c7b28c}`;
  document.head.append(css);
 
  let el=null,armedId=null,visibleCount=72;
@@ -178,9 +184,9 @@
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
-   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=v==='visual'?24:72;save();paint();return}
+   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=v==='visual'?12:72;save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=72;save();paint();return}
-   if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=72;paint();el.querySelector('.grid').scrollTop=pos;return}
+   if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=(st.view==='visual'?12:72);paint();el.querySelector('.grid').scrollTop=pos;return}
    const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
@@ -205,7 +211,7 @@
  function close(){if(el)el.style.display='none';armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
- function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=24;save();open();
+ function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=12;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
  window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,close});
