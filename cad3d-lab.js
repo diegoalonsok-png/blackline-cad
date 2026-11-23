@@ -2127,13 +2127,30 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
    point.set(screen.x,screen.y);ray.setFromCamera(point,camera);
    var hits=ray.intersectObjects(meshes,false);
    if(hits.length&&hits[0].object!==mesh&&hits[0].distance<ray.ray.origin.distanceTo(mid)-.04)continue;
-   var ux=dx/len,uy=dy/len,ex=opts.extension,steps=Math.max(2,Math.min(20,Math.ceil(len/32)));
-   ctx.lineWidth=opts.profile;ctx.beginPath();ctx.moveTo(x1-ux*ex,y1-uy*ex);
-   for(var t=1;t<steps;t++){
-    var frac=t/steps,wave=Math.sin(m*1.9+i*.13+frac*17)*opts.jitter;
-    ctx.lineTo(x1+dx*frac-uy*wave,y1+dy*frac+ux*wave);
+   var ux=dx/len,uy=dy/len,ex=opts.extension,steps=Math.max(3,Math.min(24,Math.ceil(len/25)));
+   // Deterministic procedural strokes, akin to Rough.js. Draw a stable
+   // jittered Bezier-like curve instead of replacing actual CAD geometry.
+   var passes=opts.multiStroke?2:1;
+   for(var pass=0;pass<passes;pass++){
+    var seed=m*2.31+i*.173+pass*11.7;
+    var direction=(Math.sin(seed*3.73)>=0?1:-1);
+    var bend=Math.min(5,opts.bowing*Math.min(1,len/90))*direction;
+    var lineAlpha=pass===0?1:.43;
+    ctx.save();ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength))*lineAlpha;
+    ctx.lineWidth=opts.profile*(pass===0?1:.68);
+    ctx.beginPath();
+    var off=pass===0?0:Math.min(1,opts.jitter*.48+.3);
+    ctx.moveTo(x1-ux*ex-uy*off,y1-uy*ex+ux*off);
+    for(var t=1;t<steps;t++){
+     var frac=t/steps;
+     var taper=Math.sin(Math.PI*frac);
+     var irregular=(Math.sin(seed+frac*16.1)*.63+Math.sin(seed*2.1+frac*29.5)*.37)*opts.jitter*taper;
+     var displacement=bend*taper+irregular+off;
+     ctx.lineTo(x1+dx*frac-uy*displacement,y1+dy*frac+ux*displacement);
+    }
+    ctx.lineTo(x2+ux*ex-uy*off,y2+uy*ex+ux*off);ctx.stroke();
+    ctx.restore();
    }
-   ctx.lineTo(x2+ux*ex,y2+uy*ex);ctx.stroke();
    if(opts.endpoints){
     ctx.beginPath();ctx.arc(x1,y1,opts.endpoints*.24,0,Math.PI*2);
     ctx.arc(x2,y2,opts.endpoints*.24,0,Math.PI*2);ctx.fill();
@@ -2163,6 +2180,7 @@ function cad3dSketchProcess(){
  var edgeColor=cad3dSketchHex(val('edgeColor')),skyColor=cad3dSketchHex(val('skyColor'));
  var groundColor=cad3dSketchHex(val('groundColor')),wallColor=cad3dSketchHex(val('wallColor'));
  var weight=Number(val('weight')||1),jitter=Number(val('jitter')||0),profile=Number(val('profile')||2),extension=Number(val('extension')||0),endpoints=Number(val('endpoints')||0),paperType=val('paper');
+ var bowing=Number(val('bowing')||0),multiStroke=checked('multiStroke');
  var sky=checked('sky'),ground=checked('ground'),clouds=checked('clouds'),trees=checked('trees');
  var recolor=val('wallMode')==='tint';
  var grey=new Uint8Array(w*h),edge=new Uint8Array(w*h),skyMask=new Uint8Array(w*h);
@@ -2235,7 +2253,7 @@ function cad3dSketchProcess(){
   for(var c=0;c<3;c++)data[k+c]=Math.max(0,Math.min(255,data[k+c]*(1-alpha)+edgeColor[c]*alpha));
  }
  ctx.putImageData(dst,0,0);
- if(checked('geometry'))cad3dSketchGeometryEdges(ctx,w,h,{color:val('edgeColor'),profile:profile,extension:extension,endpoints:endpoints,jitter:jitter,strength:strength});
+ if(checked('geometry'))cad3dSketchGeometryEdges(ctx,w,h,{color:val('edgeColor'),profile:profile,extension:extension,endpoints:endpoints,jitter:jitter,bowing:bowing,multiStroke:multiStroke,strength:strength});
  if(clouds&&skyMask.some(function(p){return !!p;})){
   // Clouds are drawn only on a valid sky mask, not over the building.
   var cloudLayer=document.createElement('canvas');cloudLayer.width=w;cloudLayer.height=h;
@@ -2304,10 +2322,10 @@ function cad3dInitSketchCapture(){
  panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchProcess);
  var preset=panel.querySelector('[data-sketch-preset]');
  preset.addEventListener('change',function(){
-  var styles={technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',paper:'white'},
-   ink:{style:'ink',profile:'3',extension:'4',endpoints:'2',jitter:'1',paper:'cream'},
-   watercolor:{style:'watercolor',profile:'2',extension:'4',endpoints:'1',jitter:'2',paper:'watercolor'},
-   pencil:{style:'pencil',profile:'2',extension:'5',endpoints:'2',jitter:'2',paper:'cream'}};
+  var styles={technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,paper:'white'},
+   ink:{style:'ink',profile:'3',extension:'4',endpoints:'2',jitter:'1',bowing:'1.2',multiStroke:true,paper:'cream'},
+   watercolor:{style:'watercolor',profile:'2',extension:'4',endpoints:'1',jitter:'2',bowing:'1.7',multiStroke:true,paper:'watercolor'},
+   pencil:{style:'pencil',profile:'2',extension:'5',endpoints:'2',jitter:'2',bowing:'2',multiStroke:true,paper:'cream'}};
   if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
  });
  panel.querySelector('[data-sketch-save-preset]').addEventListener('click',function(){
@@ -2436,6 +2454,8 @@ function build(){
  '<label>Color de líneas<input type="color" data-sketch-setting="edgeColor" value="#303843"></label>'+
  '<label>Grosor de trazo (1–5)<input type="range" min="1" max="5" value="2" data-sketch-setting="weight"></label>'+
  '<label>Trazo irregular<input type="range" min="0" max="3" value="0" data-sketch-setting="jitter"></label>'+
+ '<label>Curvatura de línea<input type="range" min="0" max="3" step=".2" value="1.2" data-sketch-setting="bowing"></label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="multiStroke" checked> Doble trazo manual</label>'+
  '<label>Perfiles<input type="range" min="1" max="5" value="2" data-sketch-setting="profile"></label>'+
  '<label>Extensiones<input type="range" min="0" max="10" value="3" data-sketch-setting="extension"></label>'+
  '<label>Puntos finales<input type="range" min="0" max="6" value="2" data-sketch-setting="endpoints"></label>'+
