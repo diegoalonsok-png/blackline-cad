@@ -789,6 +789,7 @@ css+="\n#cad3dLab .catalogItems .cad3dCatalogPreview{display:block;width:100%;he
 css+="\n#cad3dLab .sketchButton .cad3dSketchCube{width:25px!important;height:25px!important;display:block!important;flex:0 0 25px;stroke:none!important;fill:none;overflow:visible;filter:drop-shadow(0 1px 2px #0008)}\n#cad3dLab .sketchButton:hover .cad3dSketchCube{filter:drop-shadow(0 0 3px #8de8ff77)}\n";
 css+='\n#cad3dLab .sketchButton .cad3dSketchPhoto{width:28px!important;height:28px!important;object-fit:contain;display:block;border-radius:2px;flex:none;filter:drop-shadow(0 1px 2px #0008)}\n';
 css+="\n#cad3dLab .tools .styleControl > .styleLaunch{display:none!important}\n#cad3dLab .tools .styleControl{width:0!important;min-width:0!important;flex-basis:0!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .archLaunch svg{width:26px!important;height:26px!important}\n#cad3dLab .sunPanel{position:absolute!important;right:auto!important;bottom:auto!important;top:225px;left:28px;width:274px;max-width:calc(100% - 20px);max-height:calc(100% - 40px);overflow:auto;z-index:90!important;touch-action:auto;box-sizing:border-box}\n#cad3dLab .sunFloatingHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-12px -12px 6px;padding:9px 12px;background:#223443;border-bottom:1px solid #587081;border-radius:9px 9px 0 0;cursor:grab;user-select:none;touch-action:none;font-size:11px;letter-spacing:.5px}\n#cad3dLab .sunFloatingHeader:active{cursor:grabbing}\n#cad3dLab .sunFloatingClose{font:20px Arial,sans-serif;line-height:1;background:transparent;border:0;color:#e4edf3;cursor:pointer;padding:2px 5px}\n#cad3dLab .styleControl .stylePanel{right:auto;left:-30px;top:calc(100% + 8px)}\n";
+css+="\n#cad3dLab > .archPalette{position:absolute!important;right:auto!important;bottom:auto!important;z-index:110;max-width:calc(100% - 16px)!important;max-height:calc(100% - 16px)!important}\n#cad3dLab > .sunPanel{z-index:110;max-width:calc(100% - 16px)!important;max-height:calc(100% - 16px)!important}\n#cad3dLab .archTitle,#cad3dLab .sunFloatingHeader{cursor:grab!important;touch-action:none!important}\n#cad3dLab .archTitle:active,#cad3dLab .sunFloatingHeader:active{cursor:grabbing!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1099,63 +1100,106 @@ function renderArchPalette(){
    '<span>'+st.name+'</span><small>'+styleDimensions(activeCategory,st)+'</small></button>';
  }).join('');
 }
+function cad3dPaletteRemember(name,panel){
+ try{localStorage.setItem('blackline-cad3d-floating-'+name+'-v1',JSON.stringify({
+  left:parseFloat(panel.style.left),top:parseFloat(panel.style.top),
+  width:panel.offsetWidth,height:panel.offsetHeight
+ }));}catch(_e){}
+}
+function cad3dPaletteRestore(name,panel){
+ try{
+  var d=JSON.parse(localStorage.getItem('blackline-cad3d-floating-'+name+'-v1')||'null');
+  if(!d||!Number.isFinite(d.left)||!Number.isFinite(d.top))return false;
+  if(Number.isFinite(d.width)&&Number.isFinite(d.height)){
+   panel.style.width=Math.min(d.width,root.clientWidth-16)+'px';
+   panel.style.height=Math.min(d.height,root.clientHeight-16)+'px';
+  }
+  panel.style.left=d.left+'px';panel.style.top=d.top+'px';
+  panel.dataset.userPositioned='true';
+  return true;
+ }catch(_e){return false;}
+}
+function cad3dPaletteConstrain(panel){
+ if(!panel||panel.hidden)return;
+ var w=Math.min(panel.offsetWidth,root.clientWidth-16),h=Math.min(panel.offsetHeight,root.clientHeight-16);
+ if(panel.offsetWidth>w)panel.style.width=w+'px';
+ if(panel.offsetHeight>h)panel.style.height=h+'px';
+ var x=Number.parseFloat(panel.style.left),y=Number.parseFloat(panel.style.top);
+ if(!Number.isFinite(x))x=12;
+ if(!Number.isFinite(y))y=44;
+ panel.style.left=clamp(x,8,Math.max(8,root.clientWidth-w-8))+'px';
+ panel.style.top=clamp(y,8,Math.max(8,root.clientHeight-h-8))+'px';
+}
+function cad3dBringPaletteFront(panel){
+ root.querySelectorAll('.archPalette,.sunPanel').forEach(function(el){el.style.zIndex=el===panel?'130':'110';});
+}
 function showArchPalette(show){
- var palette=root.querySelector('.archPalette'), launcher=root.querySelector('.archLaunch');
+ var palette=root.querySelector('.archPalette'),launcher=root.querySelector('.archLaunch');
  palette.hidden=!show;launcher.setAttribute('aria-expanded',String(show));
  if(show){
   renderArchPalette();
   if(!palette.style.width)sizeArchPalette('small');
   else fitArchPalette();
-  palette.querySelector('[aria-pressed=true]').focus({preventScroll:true});
+  cad3dBringPaletteFront(palette);
+  palette.querySelector('[aria-pressed=true]')?.focus({preventScroll:true});
  }else if(palette.contains(document.activeElement))launcher.focus({preventScroll:true});
 }
 function fitArchPalette(){
- var body=root.querySelector('.body'), palette=root.querySelector('.archPalette');
+ var palette=root.querySelector('.archPalette');
  if(palette.hidden||!palette.style.width)return;
- var w=Math.min(parseFloat(palette.style.width),body.clientWidth-16);
- var h=Math.min(parseFloat(palette.style.height),body.clientHeight-16);
- palette.style.width=w+'px';palette.style.height=h+'px';
- palette.style.left=clamp(parseFloat(palette.style.left),8,body.clientWidth-8-w)+'px';
- palette.style.top=clamp(parseFloat(palette.style.top),8,body.clientHeight-8-h)+'px';
+ cad3dPaletteConstrain(palette);
 }
 function sizeArchPalette(size){
- var body=root.querySelector('.body'), palette=root.querySelector('.archPalette');
- var sizes={small:[340,340],medium:[body.clientWidth*.55,body.clientHeight*.78],large:[body.clientWidth-24,body.clientHeight-24]};
- var w=clamp(sizes[size][0],Math.min(240,body.clientWidth-16),body.clientWidth-16);
- var h=clamp(sizes[size][1],Math.min(220,body.clientHeight-16),body.clientHeight-16);
- var left=body.clientWidth-root.querySelector('.side').offsetWidth-w-12;
- Object.assign(palette.style,{width:w+'px',height:h+'px',left:Math.max(8,left)+'px',top:'8px'});
+ var palette=root.querySelector('.archPalette');
+ var sizes={small:[340,340],medium:[root.clientWidth*.55,root.clientHeight*.72],large:[root.clientWidth-24,root.clientHeight-55]};
+ var d=sizes[size]||sizes.small;
+ var w=clamp(d[0],Math.min(240,root.clientWidth-16),root.clientWidth-16);
+ var h=clamp(d[1],Math.min(220,root.clientHeight-16),root.clientHeight-16);
+ var wasPlaced=palette.dataset.userPositioned==='true';
+ var left=wasPlaced?parseFloat(palette.style.left):root.clientWidth-w-22;
+ var top=wasPlaced?parseFloat(palette.style.top):Math.min(210,Math.max(44,root.clientHeight-h-12));
+ Object.assign(palette.style,{width:w+'px',height:h+'px',left:Math.max(8,left)+'px',top:Math.max(8,top)+'px'});
+ cad3dPaletteConstrain(palette);cad3dPaletteRemember('architecture',palette);
 }
 function beginArchGesture(e){
- var grip=e.target.closest('[data-arch-grip]'), header=e.target.closest('.archTitle');
- if(e.button!==0||(!grip&&(!header||e.target.closest('button'))))return;
- var handle=grip||header, direction=grip?.dataset.archGrip||'';
- var body=root.querySelector('.body'), palette=e.currentTarget;
- var bounds=body.getBoundingClientRect(), rect=palette.getBoundingClientRect();
- var left=rect.left-bounds.left, top=rect.top-bounds.top, right=left+rect.width, bottom=top+rect.height;
- var minW=Math.min(240,body.clientWidth-16), minH=Math.min(220,body.clientHeight-16);
+ var grip=e.target.closest('[data-arch-grip]'),header=e.target.closest('.archTitle');
+ if(e.button!==0||(!grip&&(!header||e.target.closest('button,input,select'))))return;
+ var handle=grip||header,direction=grip?.dataset.archGrip||'',palette=e.currentTarget;
+ var bounds=root.getBoundingClientRect(),rect=palette.getBoundingClientRect();
+ var left=rect.left-bounds.left,top=rect.top-bounds.top,right=left+rect.width,bottom=top+rect.height;
+ var minW=Math.min(240,root.clientWidth-16),minH=Math.min(220,root.clientHeight-16);
  var x=e.clientX,y=e.clientY,id=e.pointerId;
- e.preventDefault();handle.setPointerCapture(id);
+ e.preventDefault();e.stopPropagation();
+ cad3dBringPaletteFront(palette);
+ palette.dataset.userPositioned='true';
+ handle.setPointerCapture(id);
  function move(ev){
   if(ev.pointerId!==id)return;
   var dx=ev.clientX-x,dy=ev.clientY-y;
   if(!direction){
-   palette.style.left=clamp(left+dx,8,body.clientWidth-8-rect.width)+'px';
-   palette.style.top=clamp(top+dy,8,body.clientHeight-8-rect.height)+'px';
+   palette.style.left=clamp(left+dx,8,Math.max(8,root.clientWidth-8-rect.width))+'px';
+   palette.style.top=clamp(top+dy,8,Math.max(8,root.clientHeight-8-rect.height))+'px';
    return;
   }
   var l=direction.includes('w')?clamp(left+dx,8,right-minW):left;
   var t=direction.includes('n')?clamp(top+dy,8,bottom-minH):top;
-  var r=direction.includes('e')?clamp(right+dx,left+minW,body.clientWidth-8):right;
-  var b=direction.includes('s')?clamp(bottom+dy,top+minH,body.clientHeight-8):bottom;
-  Object.assign(palette.style,{left:l+'px',top:t+'px',width:r-l+'px',height:b-t+'px'});
+  var r=direction.includes('e')?clamp(right+dx,l+minW,root.clientWidth-8):right;
+  var b=direction.includes('s')?clamp(bottom+dy,t+minH,root.clientHeight-8):bottom;
+  Object.assign(palette.style,{left:l+'px',top:t+'px',width:Math.max(minW,r-l)+'px',height:Math.max(minH,b-t)+'px'});
  }
  function done(ev){
   if(ev.pointerId!==id)return;
   handle.removeEventListener('pointermove',move);
+  handle.removeEventListener('pointerup',done);
+  handle.removeEventListener('pointercancel',done);
   handle.removeEventListener('lostpointercapture',done);
+  cad3dPaletteConstrain(palette);
+  cad3dPaletteRemember('architecture',palette);
+  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);}catch(_e){}
  }
  handle.addEventListener('pointermove',move);
+ handle.addEventListener('pointerup',done);
+ handle.addEventListener('pointercancel',done);
  handle.addEventListener('lostpointercapture',done);
 }
 function clickArchPalette(e){
@@ -1798,47 +1842,54 @@ function cad3dBasicBars(){
 
 function cad3dMakeSunPanelMovable(){
  var panel=root.querySelector('.sunPanel'),button=root.querySelector('.sunLaunch');
- var handle=panel.querySelector('.sunFloatingHeader'),close=panel.querySelector('.sunFloatingClose');
+ var handle=panel?.querySelector('.sunFloatingHeader'),close=panel?.querySelector('.sunFloatingClose');
  if(!panel||!handle||!button)return;
- // Detached only from the narrow toolbar; it remains inside the CAD3D workspace.
  root.appendChild(panel);
- var drag=null;
- function place(reset){
-  if(reset||!panel.dataset.userPositioned){
+ var drag=null,restored=cad3dPaletteRestore('sun',panel);
+ function place(){
+  if(panel.hidden)return;
+  if(!panel.dataset.userPositioned){
    var rr=root.getBoundingClientRect(),br=button.getBoundingClientRect();
-   var width=panel.offsetWidth||270,height=panel.offsetHeight||365;
+   var width=panel.offsetWidth||274,height=panel.offsetHeight||365;
    var x=br.left-rr.left,y=br.bottom-rr.top+8;
    if(x+width>rr.width-10)x=rr.width-width-10;
-   if(y+height>rr.height-10)y=Math.max(12,br.top-rr.top-height-8);
+   if(y+height>rr.height-10)y=Math.max(44,br.top-rr.top-height-8);
    panel.style.left=Math.max(10,x)+'px';
    panel.style.top=Math.max(10,y)+'px';
   }
+  cad3dPaletteConstrain(panel);
+  cad3dBringPaletteFront(panel);
  }
- button.addEventListener('click',function(){
-  queueMicrotask(function(){if(!panel.hidden)place(false);});
- });
- close.addEventListener('click',function(){
-  panel.hidden=true;
-  button.setAttribute('aria-expanded','false');
+ button.addEventListener('click',function(){queueMicrotask(place);});
+ if(restored){
+  var hidden=panel.hidden;panel.hidden=false;cad3dPaletteConstrain(panel);panel.hidden=hidden;
+ }
+ panel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(panel);});
+ close.addEventListener('click',function(e){
+  e.stopPropagation();panel.hidden=true;button.setAttribute('aria-expanded','false');
  });
  handle.addEventListener('pointerdown',function(e){
-  if(e.button!==0||e.target.closest('button'))return;
+  if(e.button!==0||e.target.closest('button,input'))return;
   e.preventDefault();e.stopPropagation();
-  var rr=root.getBoundingClientRect(),pr=panel.getBoundingClientRect();
+  var pr=panel.getBoundingClientRect();
   drag={id:e.pointerId,dx:e.clientX-pr.left,dy:e.clientY-pr.top};
-  handle.setPointerCapture(e.pointerId);
-  panel.dataset.userPositioned='true';
+  handle.setPointerCapture(e.pointerId);panel.dataset.userPositioned='true';
+  cad3dBringPaletteFront(panel);
  });
  handle.addEventListener('pointermove',function(e){
   if(!drag||e.pointerId!==drag.id)return;
   var rr=root.getBoundingClientRect();
-  panel.style.left=Math.max(0,Math.min(rr.width-panel.offsetWidth,e.clientX-rr.left-drag.dx))+'px';
-  panel.style.top=Math.max(0,Math.min(rr.height-panel.offsetHeight,e.clientY-rr.top-drag.dy))+'px';
+  panel.style.left=clamp(e.clientX-rr.left-drag.dx,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+  panel.style.top=clamp(e.clientY-rr.top-drag.dy,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
  });
- function finish(e){if(drag&&drag.id===e.pointerId)drag=null;}
+ function finish(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var id=drag.id;drag=null;cad3dPaletteConstrain(panel);cad3dPaletteRemember('sun',panel);
+  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);}catch(_e){}
+ }
  handle.addEventListener('pointerup',finish);
  handle.addEventListener('pointercancel',finish);
- handle.addEventListener('lostpointercapture',function(){drag=null;});
+ handle.addEventListener('lostpointercapture',finish);
 }
 
 function build(){
@@ -2129,6 +2180,14 @@ function build(){
  var palette=root.querySelector('.archPalette');
  palette.addEventListener('click',clickArchPalette);
  palette.addEventListener('pointerdown',beginArchGesture);
+ // Make the complete gallery a free floating workspace panel (not clipped by the viewport).
+ root.appendChild(palette);
+ if(cad3dPaletteRestore('architecture',palette)){
+  var wasHidden=palette.hidden;palette.hidden=false;
+  cad3dPaletteConstrain(palette);palette.hidden=wasHidden;
+ }
+ palette.addEventListener('pointerdown',function(){cad3dBringPaletteFront(palette);});
+
  root.querySelector('.archLaunch').addEventListener('click',function(){showArchPalette(palette.hidden);});
  renderArchPalette();
  root.querySelector('.fileInput').addEventListener('change',readJSON);
