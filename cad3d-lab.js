@@ -1090,6 +1090,47 @@ css+=`
  background:#23495f!important;border-color:#88c4df!important;
 }
 `;
+css+=`
+#cad3dLab .side.sidebar.cad3dArchDockCandidate{
+ background:rgba(74,134,166,.12)!important;
+ box-shadow:inset 0 0 0 3px #90c7e5!important;
+ transition:background .12s,box-shadow .12s;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked{
+ position:relative!important;z-index:auto!important;top:auto!important;left:auto!important;
+ right:auto!important;bottom:auto!important;
+ box-sizing:border-box!important;width:calc(100% - 8px)!important;max-width:calc(100% - 8px)!important;
+ min-width:0!important;height:350px;min-height:210px;max-height:70vh!important;
+ margin:4px!important;border-radius:9px!important;resize:vertical!important;
+ overflow:hidden!important;flex:0 0 auto!important;box-shadow:0 2px 7px #0007!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archTitle{
+ padding:7px 8px!important;gap:4px!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archTitle h2{
+ font-size:11px!important;letter-spacing:.025em!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archSizes{gap:3px!important}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archTitle .btn{
+ min-height:22px!important;padding:2px 4px!important;font-size:10px!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archTools{
+ padding:5px!important;gap:3px!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .catalogItems{
+ padding:4px!important;gap:5px!important;
+ grid-template-columns:repeat(auto-fill,minmax(min(100%,95px),1fr))!important;
+}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .catalogItems svg{height:48px!important}
+#cad3dLab .side.sidebar>.archPalette.cad3dArchDocked .archGrip{display:none!important}
+#cad3dLab .archTitle [data-arch-dock]{
+ font-size:10px!important;white-space:nowrap!important;
+ border:1px solid var(--cad-ui-edge,#53616b)!important;
+}
+#cad3dLab .archTitle [data-arch-dock][aria-pressed=true]{
+ background:var(--cad-ui-raised,#343b42)!important;border-color:#88bfd9!important;
+}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -3147,6 +3188,7 @@ function build(){
  '<button type="button" class="btn" data-arch-size="small">▯ Chica</button>'+
  '<button type="button" class="btn" data-arch-size="medium">◧ Media</button>'+
  '<button type="button" class="btn" data-arch-size="large">▣ Grande</button></div>'+
+ '<button type="button" class="btn" data-arch-dock aria-pressed="false" title="Acoplar junto a Layers">⇥ Acoplar</button>'+
  '<button type="button" class="btn" data-arch-close aria-label="Cerrar paleta">×</button></header>'+
  '<label class="cad3dStairsBeta"><input type="checkbox" data-stairs-beta checked> Escaleras y barandas paramétricas · Experimental (se puede desactivar)</label>'+
  '<div class="archTools" role="group" aria-label="Tipos paramétricos">'+
