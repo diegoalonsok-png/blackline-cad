@@ -3598,7 +3598,7 @@ function cad3dSketchWetPigment(layer,source,edge,sky,ground,w,h,amount){
 }
 function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style){
  if(amount<=0)return;
- var gap=style==='pencil'?5:style==='marker'?10:style==='watercolor'?11:8;
+ var gap=style==='pencil'?5:style==='charcoal'?6:style==='engraving'?8:style==='pastel'?10:style==='marker'?10:style==='watercolor'?11:8;
  var strokes=0;
  for(var y=gap;y<h-gap;y+=gap)for(var x=gap;x<w-gap;x+=gap){
   var i=y*w+x,k=i*4;
@@ -3611,7 +3611,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
    (style==='pencil'?-Math.PI/5:style==='marker'?0:Math.PI/7);
   var len=(style==='pencil'?6:style==='marker'?8:5)+Math.floor(noise*4);
   var ca=Math.cos(theta),sa=Math.sin(theta);
-  var tint=(style==='pencil'?-1:style==='marker'?.65:.45);
+  var tint=style==='charcoal'?-1.6:style==='engraving'?-1.1:style==='pencil'?-1:style==='marker'?.65:.45;
   for(var t=-len;t<=len;t++){
    var xx=Math.round(x+t*ca),yy=Math.round(y+t*sa+Math.sin(t*.37+noise*8)*.36);
    if(xx<1||yy<1||xx>=w-1||yy>=h-1)continue;
@@ -3619,7 +3619,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
    if(sky[j]!==sky[i]||ground[j]!==ground[i]||edge[j]>75||
     Math.abs(grey[j]-grey[i])>23)continue;
    var taper=1-Math.abs(t)/(len+1),fiber=cad3dSketchNoise(xx*2,yy*3);
-   var opacity=amount*taper*(style==='pencil'?.36:style==='marker'?.33:.28);
+   var opacity=amount*taper*(style==='charcoal'?.60:style==='engraving'?.16:style==='pencil'?.36:style==='pastel'?.38:style==='marker'?.33:.28);
    if(fiber<.24)opacity*=.22; // dry-brush gaps, paper texture underneath
    for(var c=0;c<3;c++){
     var stroke=source[k+c]*.66+layer[z+c]*.34+tint*(fiber-.5)*20;
@@ -3633,7 +3633,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
 function cad3dSketchFinalGrade(layer,grey,sky,ground,w,h,amount,style){
  // No global blur: keep silhouettes and openings exactly where source rendered them.
  if(amount<=0)return;
- var contrast=style==='pencil'?.080:style==='marker'?.040:style==='watercolor'?.025:.048;
+ var contrast=style==='charcoal'?.14:style==='engraving'?.11:style==='pencil'?.080:style==='pastel'?.03:style==='marker'?.040:style==='watercolor'?.025:.048;
  for(var i=0;i<w*h;i++){
   var k=i*4;
   var shade=sky[i]?0:Math.max(0,(155-grey[i])/155);
@@ -3766,10 +3766,15 @@ function cad3dSketchMultiPass(image,w,h,options){
   }else if(opt.recolor&&!isSky&&grey[i]>68&&grey[i]<240&&Math.max(r,g,b)-Math.min(r,g,b)<30){
    r=mix(r,wallRGB[0],.38);g=mix(g,wallRGB[1],.38);b=mix(b,wallRGB[2],.38);
   }
-  if(style==='pencil'){
-   var lum=grey[i];r=mix(r,lum,.78);g=mix(g,lum,.80);b=mix(b,lum,.84);
-  }else if(style==='wash'){var neutral=grey[i];r=mix(r,neutral,.20);g=mix(g,neutral,.24);b=mix(b,neutral,.25);}
-  var step=255/styleConfig.levels,quantBlend=style==='marker'?.32:.12;
+  if(style==='pencil'||style==='charcoal'||style==='engraving'){
+   var lum=grey[i],blend=style==='charcoal'?.96:style==='engraving'?.94:.78;
+   r=mix(r,lum,blend);g=mix(g,lum,blend);b=mix(b,lum,blend);
+  }else if(style==='wash'){
+   var neutral=grey[i];r=mix(r,neutral,.20);g=mix(g,neutral,.24);b=mix(b,neutral,.25);
+  }else if(style==='pastel'){
+   var mid=(r+g+b)/3;r=mix(r,mid,.15);g=mix(g,mid,.15);b=mix(b,mid,.15);
+  }
+  var step=255/styleConfig.levels,quantBlend=style==='marker'?.32:style==='engraving'?.22:style==='pastel'?.08:.12;
   var rgb=[r,g,b];
   var shade=(!isSky&&!isGround)?Math.pow(Math.max(0,(175-grey[i])/175),1.55)*userShadow*.14:0;
   var hsh=((x*374761393+y*668265263)|0)>>>0;
@@ -3797,22 +3802,27 @@ function cad3dSketchMultiPass(image,w,h,options){
    for(var c=0;c<3;c++)output[j+c]=mix(output[j+c],edgeRGB[c],alpha);
   }
  }
- // PASS 6: faint directional pencil hatch only in existing deep tonal shadows.
+ // PASS 6: crosshatching limited to tonal shadows from the actual model.
  var hatch=styleConfig.hatch*userShadow;
  if(hatch){
+  var spacing=style==='engraving'?8:style==='charcoal'?9:11;
   for(var y=3;y<h-3;y++)for(var x=3;x<w-3;x++){
    var i=y*w+x,k=i*4;
-   if(sky[i]||ground[i]||grey[i]>112)continue;
-   var stripe=(x+Math.round(y*.73))%11;
-   if(stripe>1)continue;
-   var alpha=hatch*(112-grey[i])/112;
+   if(sky[i]||ground[i]||line[i]||grey[i]>148)continue;
+   var shade=Math.max(0,(148-grey[i])/148);
+   var first=(x+Math.round(y*.73))%spacing===0;
+   var crossing=(style==='engraving'||style==='charcoal')&&
+    grey[i]<98&&((x-Math.round(y*.64)+spacing*1024)%spacing===0);
+   if(!first&&!crossing)continue;
+   var dry=.53+.47*cad3dSketchNoise((x/3)|0,(y/3)|0);
+   var alpha=hatch*shade*dry*(crossing?.72:1);
    for(var c=0;c<3;c++)output[k+c]=mix(output[k+c],edgeRGB[c],alpha);
   }
  }
  // PASS 7-9: local brush strokes, pigment diffusion and final color grade.
  // Style parameters are layered, not replacements for source illumination.
- var brushScale=style==='pencil'?.88:style==='marker'?.68:style==='watercolor'?.26:style==='wash'?.30:.42;
- var pigmentScale=style==='watercolor'?.87:style==='wash'?.74:style==='marker'?.28:style==='pencil'?.08:.33;
+ var brushScale=style==='pencil'?.88:style==='charcoal'?.95:style==='engraving'?.06:style==='pastel'?.73:style==='marker'?.68:style==='watercolor'?.26:style==='wash'?.30:.42;
+ var pigmentScale=style==='watercolor'?.87:style==='wash'?.74:style==='pastel'?.46:style==='marker'?.28:(style==='pencil'||style==='engraving'||style==='charcoal')?.05:.33;
  var brushAmount=Math.max(0,Math.min(1,Number(opt.brush??58)/100))*brushScale;
  var pigmentAmount=Math.max(0,Math.min(1,Number(opt.pigment??60)/100))*pigmentScale;
  cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount);
