@@ -1,0 +1,16 @@
+name = "cad2d3d-ai-render"
+main = "worker.js"
+compatibility_date = "2026-11-23"
+workers_dev = true
+
+# Configure dedicated ai.blackline-cad.org/render after testing.
+# Required secrets: OPENAI_API_KEY and RENDER_TEST_TOKEN.
+[vars]
+AI_IMAGE_MODEL = "gpt-image-2.6-sunburst"
+
+[[ratelimits]]
+name = "AI_RENDER_LIMITER"
+namespace_id = "98331"
+[ratelimits.simple]
+limit = 3
+period = 60
