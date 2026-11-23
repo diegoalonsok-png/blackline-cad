@@ -13,8 +13,14 @@
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
   dk:{en:'Blackline library',es:'Biblioteca Blackline',item:it=>/^dk-|^doc-/.test(it.id)},
-  plan:{en:'Plans',es:'Plantas',cats:c=>!['Cortes y vistas','Alzados','Símbolos','Documentación','Mobiliario en vista'].includes(c)},
-  section:{en:'Sections & elevations',es:'Cortes y vistas',cats:c=>c==='Cortes y vistas'||c==='Alzados'||c==='Mobiliario en vista'},
+  bath:{en:'Bathrooms',es:'Baños',family:'Baños'},
+  kitchen:{en:'Kitchens',es:'Cocinas',family:'Cocinas'},
+  bedroom:{en:'Bedrooms',es:'Dormitorios',family:'Dormitorios'},
+  vehicles:{en:'Vehicles',es:'Vehículos',family:'Vehículos'},
+  carpentry:{en:'Doors & windows',es:'Puertas y ventanas',family:'Puertas y ventanas'},
+  furniture:{en:'Furniture',es:'Mobiliario',family:'Mobiliario'},
+  plan:{en:'Plans',es:'Plantas',mode:'Planta'},
+  section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
   symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'},
   doc:{en:'Documentation (levels, axes, sections…)',es:'Documentación (niveles, ejes, cortes…)',cats:c=>c==='Documentación'}
  };
@@ -61,25 +67,54 @@
  document.head.append(css);
 
  let el=null,armedId=null;
- const items=()=>LIB.library.filter(it=>!it.hideFromGallery);
- const inView=it=>{const v=VIEWS[st.view];if(v?.item)return v.item(it);const f=v?.cats;return !f||f(it.cat)};
+ // Quality gate: the temporary schematic views26 set remains in source for
+ // backward compatibility, but is not advertised as production CAD drafting.
+ const items=()=>LIB.library.filter(it=>!it.hideFromGallery&&!/^views26-/.test(it.id));
+ const familyOf=it=>{
+  const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
+  if(/sanit|bañ|bath|inodoro|bidet|lavatorio|ducha|mingitorio|vanitory|bañera|jacuzzi|wc\b|toilet|urinal|shower/.test(c+' '+n)||/^san-|^ca_ba_/.test(id))return 'Baños';
+  if(/cocina|kitchen|heladera|freezer|horno|anafe|lavavajillas|microondas|campana|extractor|cafetera|lavarropas|secarropas|vinoteca|induc|refrig/.test(c+' '+n)||/^kq-|^ca_co_/.test(id))return 'Cocinas';
+  if(/dormitorio|bedroom|cama|cucheta|cuna|colchón|mattress|bunk|crib|placard/.test(c+' '+n)||/^dor-|^ca_dorm/.test(id))return 'Dormitorios';
+  if(/vehículo|auto|camión|colectivo|bus|pickup|furgón|coupé|tractor|moto|biciclet|vehic|truck|van\b|car\b/.test(c+' '+n)||/^veh-|^ca_auto|^ca_v_(?:bus|cam|moto)/.test(id))return 'Vehículos';
+  if(/puerta|ventana|carpinter|persiana|abertura|door|window|marco|muro cortina|dvh|opening|umbral/.test(c+' '+n)||/^alz-puerta|^ca_puerta/.test(id))return 'Puertas y ventanas';
+  if(/escritorio|oficina|office|mesa reunión/.test(c+' '+n)||/^ca_ofic/.test(id))return 'Oficina';
+  if(/mobili|furniture|sillón|sofá|silla|mesa|estante|biblioteca|mueble|shelf|sofa|chair|desk/.test(c+' '+n)||/^mob-|^ca_mueb/.test(id))return 'Mobiliario';
+  if(/exterior|outdoor|árbol|arbusto|planta ornamental|palmera|tree/.test(c+' '+n)||/^ext-|^ca_arb/.test(id))return 'Exterior';
+  if(/persona|people|person|figura humana/.test(c+' '+n)||/^pv-|^ca_pers/.test(id))return 'Personas';
+  if(/símbolo|symbol/.test(c+' '+n))return 'Símbolos';
+  if(/document|cota|nivel|eje/.test(c+' '+n))return 'Documentación';
+  return it.cat||'Otros';
+ };
+ const modeOf=it=>{
+  const n=String(it.name||'').toLowerCase(),id=String(it.id||'').toLowerCase(),c=String(it.cat||'');
+  if(/corte|sección|section|perfil|sectional/.test(n)||/\bsection\b/.test(id))return 'Corte';
+  if(/vista|alzado|elevac|frontal|posterior|lateral|elevation/.test(n)||c==='Alzados'||c==='Mobiliario en vista'||/^ca_puerta_elev/.test(id))return 'Alzado';
+  if(c==='Cortes y vistas')return 'Alzado';
+  return 'Planta';
+ };
+ const inView=it=>{const v=VIEWS[st.view];if(!v)return true;if(v.item)return v.item(it);
+  if(v.family)return familyOf(it)===v.family;
+  if(v.mode==='Planta')return modeOf(it)==='Planta'&&it.cat!=='Símbolos'&&it.cat!=='Documentación';
+  if(v.mode==='Vistas')return modeOf(it)!=='Planta';
+  return !v.cats||v.cats(it.cat)};
+ const groupOf=it=>VIEWS[st.view]?.family?modeOf(it):familyOf(it);
  const cm=v=>Math.round(v*100);
  function filtered(){
   const q=st.q.trim().toLowerCase();
-  return items().filter(it=>inView(it)&&(!st.cat||it.cat===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+it.id).toLowerCase().includes(q)));
+  return items().filter(it=>inView(it)&&(!st.cat||groupOf(it)===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)+' '+it.id).toLowerCase().includes(q)));
  }
  function paint(){
   if(!el)return;
   el.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.view));
-  const cats=[...new Set(items().filter(inView).map(i=>i.cat))];
+  const cats=[...new Set(items().filter(inView).map(groupOf))].sort((a,b)=>a.localeCompare(b,es()?'es':'en'));
   if(st.cat&&!cats.includes(st.cat))st.cat='';
-  const count=c=>items().filter(i=>inView(i)&&(!c||i.cat===c)).length;
+  const count=c=>items().filter(i=>inView(i)&&(!c||groupOf(i)===c)).length;
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
   const list=filtered(),grid=el.querySelector('.grid');
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${st.size}px,1fr))`;
   grid.innerHTML=list.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)}">${ARQ.thumb(it.id,Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:#8ea2ae;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
-  el.querySelector('.ft').textContent=T(`${list.length} of ${items().length} dynamic blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques dinámicos · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
+  el.querySelector('.ft').textContent=T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
  }
  function place(){
   const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
