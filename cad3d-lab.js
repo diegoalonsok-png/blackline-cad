@@ -1211,10 +1211,10 @@ css+=`
 #cad3dLab>.cad3dGiroPalette{
  display:flex!important;align-items:center!important;flex-direction:row!important;
  gap:2px!important;padding:5px 8px 5px 4px!important;
- width:min(392px,calc(100% - 16px))!important;
+ width:min(392px,calc(100% - 16px));
  min-width:min(376px,calc(100% - 16px))!important;
  max-width:min(640px,calc(100% - 16px))!important;
- height:46px!important;min-height:46px!important;max-height:78px!important;
+ height:46px;min-height:46px!important;max-height:78px!important;
  border-radius:999px!important;background:#202326!important;
  border:1.5px solid #7c838a!important;
  box-shadow:0 8px 22px #0008!important;
