@@ -312,3 +312,27 @@ test('Painterly palette exposes independent brush, pigment and tone controls wit
  assert(src.includes("cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount)"));
  assert(src.includes("cad3dSketchBrushwork(output,smooth,grey,line,sky,ground,w,h,brushAmount,style)"));
 });
+
+test('Sketch preview downscales but export retains full camera pixels',()=>{
+ const source=between('function cad3dSketchProcess(fullResolution,outputCanvas){', 'function cad3dSketchStyleData(');
+ for(const token of ["var exportMode=fullResolution===true",
+  "var downscale=exportMode?1:Math.min(1,680/source.width,440/source.height)",
+  "processing.width=Math.max(1,Math.round(source.width*downscale))",
+  "var out=outputCanvas||panel.querySelector('.cad3dSketchCapturePreview')",
+  "var w=processing.width,h=processing.height",
+  "cad3dSketchRenderPasses(panel,ctx,src,w,h)"])assert(source.includes(token),token);
+ const handler=between('function cad3dInitSketchCapture(){','function build(){');
+ assert(handler.includes("var canvas=document.createElement('canvas');"));
+ assert(handler.includes("cad3dSketchProcess(true,canvas);"));
+ assert(handler.includes("canvas.toBlob(function(blob){"));
+ assert(src.includes('Guardar PNG (alta resolución)'));
+});
+test('Sketch live sliders coalesce preview jobs instead of triggering full-resolution passes',()=>{
+ const code=between('function cad3dSketchRequestRedraw(){', 'function cad3dSketchStyleData(');
+ assert(code.includes('if(cad3dSketchRedrawPending)return'));
+ assert(code.includes('requestAnimationFrame(function(){'));
+ assert(code.includes('cad3dSketchProcess(false)'));
+ const events=between('function cad3dInitSketchCapture(){','function build(){');
+ assert(events.includes("addEventListener('input',cad3dSketchRequestRedraw)"));
+ assert(events.includes("addEventListener('change',cad3dSketchRequestRedraw)"));
+});
