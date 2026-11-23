@@ -226,7 +226,7 @@
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
-<div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}</div>
+<div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar paquete de bloques DXF local">${T("Import DXF pack","Importar bloques DXF")}</button></div>
 <div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
@@ -235,6 +235,7 @@
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();paint()});
   el.addEventListener('click',e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
+   if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
