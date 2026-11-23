@@ -846,6 +846,8 @@ css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;paddi
 css+="\n#cad3dLab .cad3dHistoryButton{font-family:Arial,sans-serif!important;font-size:21px!important;line-height:1!important;font-weight:600!important;min-width:35px!important}\n#cad3dLab .cad3dHistoryButton:disabled{opacity:.35!important;cursor:not-allowed!important;background:#14212c!important}\n#cad3dLab .cad3dHistoryButton:not(:disabled){color:#e3f6ff!important;border-color:#66899c!important}\n";
 css+="\n#cad3dLab .cad3dDraftPreview .cad3dPlateDimension{fill:#07587f;font:700 12px Inter,Arial,sans-serif;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n#cad3dLab .wireframeView .cad3dPlateDimension{fill:#e4f8ff;stroke:#000}\n";
 css+=`
+/* A docked hidden palette must not remain visible through the stronger sidebar display rule. */
+#cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked[hidden]{display:none!important}
 /* Materials dock directly under Layers; sidebar scroll contains its own content. */
 #cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked{
  position:relative!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
@@ -1822,7 +1824,8 @@ function renderArchPalette(){
 }
 function cad3dPaletteRemember(name,panel){
  if((name==='architecture'&&panel.classList.contains('cad3dArchDocked'))||
-    (name==='sun'&&panel.classList.contains('cad3dSunDocked')))return;
+    (name==='sun'&&panel.classList.contains('cad3dSunDocked'))||
+    (name==='materials'&&panel.classList.contains('cad3dMaterialsDocked')))return;
  try{localStorage.setItem('blackline-cad3d-floating-'+name+'-v1',JSON.stringify({
   left:parseFloat(panel.style.left),top:parseFloat(panel.style.top),
   width:panel.offsetWidth,height:panel.offsetHeight
@@ -1937,6 +1940,18 @@ function cad3dArchDockNear(clientX,clientY){
  var b=side.getBoundingClientRect();
  return clientX>=b.left-34&&clientX<=b.right+22&&
   clientY>=b.top-18&&clientY<=b.bottom+18;
+}
+function cad3dMaterialsDockNear(clientX,clientY,panel){
+ var side=root?.querySelector('.side.sidebar');
+ if(!side)return false;
+ var box=side.getBoundingClientRect();
+ var pointer=clientX>=box.left-75&&clientX<=box.right+22&&clientY>=box.top-20&&clientY<=box.bottom+20;
+ if(pointer)return true;
+ if(!panel)return false;
+ var p=panel.getBoundingClientRect();
+ // Snap before the user must push the entire large floating palette inside the sidebar.
+ return p.right>=box.left-28&&p.left<=box.left+90&&
+  p.bottom>=box.top+15&&p.top<=box.bottom-15;
 }
 function cad3dArchDockCandidate(value){
  root?.querySelector('.side.sidebar')?.classList.toggle('cad3dArchDockCandidate',!!value);
@@ -6616,7 +6631,7 @@ function cad3dMaterialSetup(){
    p.style.left=clamp(ev.clientX-rr.left-offsetX,8,Math.max(8,root.clientWidth-p.offsetWidth-8))+'px';
    p.style.top=clamp(ev.clientY-rr.top-offsetY,8,Math.max(8,root.clientHeight-p.offsetHeight-8))+'px';
    p.dataset.userPositioned='true';
-   cad3dArchDockCandidate(cad3dArchDockNear(ev.clientX,ev.clientY));
+   cad3dArchDockCandidate(cad3dMaterialsDockNear(ev.clientX,ev.clientY,p));
   }
   function finish(ev,canDock){
    if(ev.pointerId!==start)return;
@@ -6624,7 +6639,7 @@ function cad3dMaterialSetup(){
    window.removeEventListener('pointerup',end,true);
    window.removeEventListener('pointercancel',cancel,true);
    window.removeEventListener('blur',blur,true);
-   if(moved&&canDock&&cad3dArchDockNear(lastX,lastY))cad3dMaterialsSetDocked(true);
+   if(moved&&canDock&&cad3dMaterialsDockNear(lastX,lastY,p))cad3dMaterialsSetDocked(true);
    else if(!p.classList.contains('cad3dMaterialsDocked')){
     cad3dPaletteConstrain(p);cad3dPaletteRemember('materials',p);
    }
