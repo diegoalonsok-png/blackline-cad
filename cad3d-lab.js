@@ -3456,10 +3456,16 @@ function cad3dSketchMultiPass(image,w,h,options){
   var i=y*w+x,u=i-w,d=i+w;
   var gx=-grey[u-1]+grey[u+1]-2*grey[i-1]+2*grey[i+1]-grey[d-1]+grey[d+1];
   var gy=-grey[u-1]-2*grey[u]-grey[u+1]+grey[d-1]+2*grey[d]+grey[d+1];
-  var magnitude=Math.min(255,Math.hypot(gx,gy)*.35);
+  var kl=(i-1)*4,kr=(i+1)*4,ku=(i-w)*4,kd=(i+w)*4;
+  var chromaX=dist(smooth[kl],smooth[kl+1],smooth[kl+2],smooth[kr],smooth[kr+1],smooth[kr+2]);
+  var chromaY=dist(smooth[ku],smooth[ku+1],smooth[ku+2],smooth[kd],smooth[kd+1],smooth[kd+2]);
+  var luminanceEdge=Math.hypot(gx,gy)*.35;
+  var colorEdge=Math.max(chromaX,chromaY)*.72;
+  var magnitude=Math.min(255,Math.max(luminanceEdge,colorEdge));
   grad[i]=magnitude;
   var angle=(Math.atan2(gy,gx)+Math.PI)*180/Math.PI%180;
-  direction[i]=angle<22.5||angle>=157.5?0:angle<67.5?1:angle<112.5?2:3;
+  direction[i]=colorEdge>luminanceEdge?(chromaX>=chromaY?0:2):
+   angle<22.5||angle>=157.5?0:angle<67.5?1:angle<112.5?2:3;
  }
  var threshold=styleConfig.threshold+(1-detail)*14;
  for(var y=2;y<h-2;y++)for(var x=2;x<w-2;x++){
