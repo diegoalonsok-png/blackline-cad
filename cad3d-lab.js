@@ -995,6 +995,87 @@ css+=`
  #cad3dLab .cad3dGiroZoomStrip{flex-wrap:wrap}
 }
 `;
+css+=`
+/* Compacto según las paletas 2D: misma fila de ocho acciones y menor altura.
+   La geometría, los seis iconos originales y sus funciones se mantienen. */
+#cad3dLab>.cad3dGiroPalette{
+ width:min(695px,calc(100% - 22px))!important;
+ min-width:min(525px,calc(100% - 22px))!important;
+ max-width:min(820px,calc(100% - 22px))!important;
+ height:165px;min-height:48px;
+ padding:0 9px 6px!important;
+ border-radius:9px!important;border-width:1px!important;
+ overflow:auto!important;
+}
+#cad3dLab .cad3dGiroHead{
+ min-height:35px!important;padding:7px 6px 2px!important;
+ gap:4px!important;
+}
+#cad3dLab .cad3dGiroHead strong{
+ font:bold 14px/1.2 Arial,Helvetica,sans-serif!important;
+ letter-spacing:0!important;
+}
+#cad3dLab .cad3dGiroHeadControls button{
+ width:22px!important;height:22px!important;
+ font-size:15px!important;border-radius:4px!important;
+}
+#cad3dLab .cad3dGiroChoices{
+ grid-template-columns:repeat(8,minmax(0,1fr))!important;
+ gap:3px!important;padding:3px 0 1px!important;
+ overflow-x:auto;
+}
+#cad3dLab .cad3dGiroChoice{
+ gap:5px!important;
+ padding:1px 0!important;
+ font:700 11px/1.12 Arial,Helvetica,sans-serif!important;
+ text-shadow:0 1px 2px #0008;
+}
+#cad3dLab .cad3dGiroChoice small{
+ font:700 10px/1.05 Arial,Helvetica,sans-serif!important;
+}
+#cad3dLab .cad3dGiroDisk{
+ width:57px!important;height:57px!important;
+ border-width:2px!important;
+ box-shadow:inset 0 0 0 2px #23343e,inset 0 0 0 4px #0c151c,
+ 0 2px 0 #030709,0 -1px 0 #becbd1,0 3px 6px #000b!important;
+}
+#cad3dLab .cad3dGiroDisk svg{
+ width:37px!important;height:37px!important;
+ stroke-width:2.7!important;
+}
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk{
+ width:49px!important;height:49px!important;
+}
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep .cad3dGiroDisk svg{
+ width:29px!important;height:29px!important;
+}
+#cad3dLab .cad3dGiroChoice.cad3dGiroStep[data-held=true] .cad3dGiroDisk{
+ border-color:#c0e1f3!important;background:#3c5262!important;
+}
+#cad3dLab .cad3dGiroZoomStrip{display:none!important}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroDocked{
+ top:116px!important;right:8px!important;left:auto!important;
+ max-width:min(820px,calc(100% - 22px))!important;
+}
+#cad3dLab>.cad3dGiroPalette.cad3dGiroCollapsed{
+ width:min(330px,calc(100% - 22px))!important;
+ min-width:min(270px,calc(100% - 22px))!important;
+ height:39px!important;resize:none!important;
+ overflow:hidden!important;padding-bottom:0!important;
+}
+#cad3dLab .cad3dGiroCollapsed .cad3dGiroChoices{display:none!important}
+#cad3dLab .cad3dGiroLaunch[aria-expanded=true]{
+ background:#34566d!important;border-color:#a2d5eb!important;
+ color:#fff!important;
+}
+#cad3dLab .cad3dGiroLaunch[aria-expanded=false]{opacity:.85}
+@media(max-width:790px){
+ #cad3dLab .cad3dGiroChoices{
+  grid-template-columns:repeat(8,72px)!important;
+  overflow-x:auto!important;
+ }
+}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2278,7 +2359,7 @@ function cad3dCompact3DBar(){
  var views=['top','front','right','left','back','bottom'];
  return '<div class="cad3dNavToolbar" role="toolbar" aria-label="Navegación 3D">'+
   '<strong>NAVEGACIÓN</strong>'+tools.map(function(t){return b('nav-tool',t[0],t[1],t[2]);}).join('')+
-  '<button type="button" class="cad3dQuickTool" data-giro-open aria-expanded="false" aria-controls="cad3dGiroPalette" title="Variantes de interacción · Girar">⟳ Girar</button></div>'+
+  '<button type="button" class="cad3dQuickTool cad3dGiroLaunch" data-giro-open aria-expanded="false" aria-pressed="false" aria-controls="cad3dGiroPalette" title="Mostrar u ocultar la paleta Girar">⟳ Girar ▾</button></div>'+
   '<div class="cad3dStyleToolbar" role="toolbar" aria-label="Estilos visuales del modelo">'+
   '<strong>ESTILOS</strong>'+styles.map(function(t){return b('quick-style',t[0],t[1],cad3dApprovedStyleCube(t[0]));}).join('')+'</div>'+
   '<div class="cad3dQuickViews" role="toolbar" aria-label="Vistas y brújula BIM">'+
@@ -2350,6 +2431,7 @@ function cad3dGiroSvg(kind){
  }[kind];
  return '<svg viewBox="0 0 52 52" aria-hidden="true">'+p+'</svg>';
 }
+
 function cad3dGiroMarkup(){
  var items=[
   ['orbit','Giro libre',''],
@@ -2359,20 +2441,26 @@ function cad3dGiroMarkup(){
   ['center','Centrar','modelo'],
   ['fit','Ajustar','a todo']
  ];
+ function zoomButton(dir,label){
+  return '<button type="button" class="cad3dGiroChoice cad3dGiroStep" data-giro-zoom="'+dir+
+   '" aria-label="'+label+' · mantener presionado" title="'+label+' · mantener presionado">'+
+   '<span class="cad3dGiroDisk"><svg viewBox="0 0 52 52" aria-hidden="true">'+
+   (dir>0?'<path d="M26 43V9M14 21 26 9l12 12"/>':
+    '<path d="M26 9v34M14 31 26 43l12-12"/>')+'</svg></span>'+
+   '<span>'+label+'</span></button>';
+ }
  return '<section id="cad3dGiroPalette" class="cad3dGiroPalette" role="group" aria-label="Variantes de interacción (Botón Girar)">'+
   '<header class="cad3dGiroHead"><strong>Variantes de interacción (Botón Girar)</strong>'+
   '<span class="cad3dGiroHeadControls"><button type="button" data-giro-pin title="Anclar o liberar paleta" aria-label="Anclar o liberar paleta" aria-pressed="false">⌖</button>'+
-  '<button type="button" data-giro-close title="Cerrar paleta" aria-label="Cerrar paleta">×</button></span></header>'+
+  '<button type="button" data-giro-minimize title="Contraer o ampliar paleta" aria-label="Contraer o ampliar paleta" aria-expanded="true">−</button>'+
+  '<button type="button" data-giro-close title="Ocultar paleta" aria-label="Ocultar paleta">×</button></span></header>'+
   '<div class="cad3dGiroChoices">'+items.map(function(item){
    return '<button type="button" class="cad3dGiroChoice" data-giro-action="'+item[0]+'" aria-label="'+item[1]+' '+item[2]+'" aria-pressed="false">'+
     '<span class="cad3dGiroDisk">'+cad3dGiroSvg(item[0])+'</span>'+
     '<span>'+item[1]+(item[2]?'<small>'+item[2]+'</small>':'')+'</span></button>';
-  }).join('')+'</div>'+
-  '<div class="cad3dGiroZoomStrip" aria-label="Acercar y alejar con pulsación sostenida"><strong>Acercar / Alejar</strong>'+
-  '<button type="button" data-giro-zoom="1" aria-label="Acercar: mantener presionado" title="Mantener presionado para acercar">↑</button>'+
-  '<button type="button" data-giro-zoom="-1" aria-label="Alejar: mantener presionado" title="Mantener presionado para alejar">↓</button>'+
-  '<span>Mantené presionada la flecha</span></div></section>';
+  }).join('')+zoomButton(1,'Adelante')+zoomButton(-1,'Atrás')+'</div></section>';
 }
+
 function cad3dCenterModelWithoutZoom(){
  var b=cad3dBounds();
  if(b.empty){text('No hay objetos visibles para centrar');return;}
@@ -2408,15 +2496,20 @@ function cad3dInitGiroPalette(){
  var panel=document.createElement('div');panel.innerHTML=cad3dGiroMarkup();
  panel=panel.firstElementChild;root.appendChild(panel);
  var launch=root.querySelector('[data-giro-open]'),pin=panel.querySelector('[data-giro-pin]'),
-  head=panel.querySelector('.cad3dGiroHead'),docked=false,drag=null,zoom=null;
+  head=panel.querySelector('.cad3dGiroHead'),minimize=panel.querySelector('[data-giro-minimize]'),
+  docked=false,drag=null,zoom=null,collapsed=false;
  function show(open){
-  panel.hidden=!open;launch.setAttribute('aria-expanded',String(open));
+  panel.hidden=!open;
+  launch.setAttribute('aria-expanded',String(open));
+  launch.setAttribute('aria-pressed',String(open));
+  launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾';
+  launch.title=open?'Ocultar la paleta Girar':'Mostrar la paleta Girar';
   if(open)cad3dBringPaletteFront(panel);
  }
  function save(){
   try{localStorage.setItem('blackline-cad3d-giro-palette-v1',JSON.stringify({
    docked:docked,left:parseFloat(panel.style.left)||38,top:parseFloat(panel.style.top)||135,
-   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden
+   width:panel.offsetWidth,height:panel.offsetHeight,open:!panel.hidden,collapsed:collapsed
   }));}catch(_e){}
  }
  function dock(value){
@@ -2431,6 +2524,14 @@ function cad3dInitGiroPalette(){
   save();
  }
  launch.addEventListener('click',function(){show(panel.hidden);save();});
+ function setCollapsed(value){
+  collapsed=!!value;panel.classList.toggle('cad3dGiroCollapsed',collapsed);
+  minimize.setAttribute('aria-expanded',String(!collapsed));
+  minimize.textContent=collapsed?'+':'−';
+  minimize.title=collapsed?'Ampliar paleta Girar':'Contraer paleta Girar';
+  save();
+ }
+ minimize.addEventListener('click',function(){setCollapsed(!collapsed);});
  panel.querySelector('[data-giro-close]').addEventListener('click',function(){stopZoom();show(false);save();});
  pin.addEventListener('click',function(){dock(!docked);});
  panel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(panel);});
@@ -2492,8 +2593,9 @@ function cad3dInitGiroPalette(){
  if(initial&&typeof initial==='object'){
   panel.style.left=clamp(Number(initial.left)||38,8,Math.max(8,root.clientWidth-140))+'px';
   panel.style.top=clamp(Number(initial.top)||135,8,Math.max(8,root.clientHeight-110))+'px';
-  if(Number.isFinite(initial.width))panel.style.width=Math.min(initial.width,root.clientWidth-16)+'px';
-  if(Number.isFinite(initial.height))panel.style.height=Math.min(initial.height,root.clientHeight-16)+'px';
+  if(Number.isFinite(initial.width))panel.style.width=Math.min(initial.width,820,root.clientWidth-16)+'px';
+  if(Number.isFinite(initial.height))panel.style.height=Math.min(initial.height,185,root.clientHeight-16)+'px';
+  if(initial.collapsed)setCollapsed(true);
   if(initial.docked){
    docked=true;panel.classList.add('cad3dGiroDocked');pin.setAttribute('aria-pressed','true');
   }
