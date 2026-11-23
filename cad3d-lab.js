@@ -788,6 +788,7 @@ css+=`
 css+="\n#cad3dLab .catalogItems .cad3dCatalogPreview{display:block;width:100%;height:78px;margin:0 auto 2px;filter:drop-shadow(0 3px 3px #0005);overflow:visible}\n#cad3dLab .catalogItems .btn{justify-content:flex-start;min-height:126px}\n#cad3dLab .catalogItems .btn span{font-weight:500;line-height:1.2}\n#cad3dLab .catalogItems .btn:hover .cad3dCatalogPreview{filter:drop-shadow(0 3px 5px #0009) brightness(1.12)}\n";
 css+="\n#cad3dLab .sketchButton .cad3dSketchCube{width:25px!important;height:25px!important;display:block!important;flex:0 0 25px;stroke:none!important;fill:none;overflow:visible;filter:drop-shadow(0 1px 2px #0008)}\n#cad3dLab .sketchButton:hover .cad3dSketchCube{filter:drop-shadow(0 0 3px #8de8ff77)}\n";
 css+='\n#cad3dLab .sketchButton .cad3dSketchPhoto{width:28px!important;height:28px!important;object-fit:contain;display:block;border-radius:2px;flex:none;filter:drop-shadow(0 1px 2px #0008)}\n';
+css+="\n#cad3dLab .tools .styleControl > .styleLaunch{display:none!important}\n#cad3dLab .tools .styleControl{width:0!important;min-width:0!important;flex-basis:0!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .archLaunch svg{width:26px!important;height:26px!important}\n#cad3dLab .sunPanel{position:absolute!important;right:auto!important;bottom:auto!important;top:225px;left:28px;width:274px;max-width:calc(100% - 20px);max-height:calc(100% - 40px);overflow:auto;z-index:90!important;touch-action:auto;box-sizing:border-box}\n#cad3dLab .sunFloatingHeader{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-12px -12px 6px;padding:9px 12px;background:#223443;border-bottom:1px solid #587081;border-radius:9px 9px 0 0;cursor:grab;user-select:none;touch-action:none;font-size:11px;letter-spacing:.5px}\n#cad3dLab .sunFloatingHeader:active{cursor:grabbing}\n#cad3dLab .sunFloatingClose{font:20px Arial,sans-serif;line-height:1;background:transparent;border:0;color:#e4edf3;cursor:pointer;padding:2px 5px}\n#cad3dLab .styleControl .stylePanel{right:auto;left:-30px;top:calc(100% + 8px)}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1794,6 +1795,53 @@ function cad3dBasicBars(){
    tool('select','Select','cube')+tool('move','Move','move')+tool('copy','Copy','copy')+
    tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
+
+function cad3dMakeSunPanelMovable(){
+ var panel=root.querySelector('.sunPanel'),button=root.querySelector('.sunLaunch');
+ var handle=panel.querySelector('.sunFloatingHeader'),close=panel.querySelector('.sunFloatingClose');
+ if(!panel||!handle||!button)return;
+ // Detached only from the narrow toolbar; it remains inside the CAD3D workspace.
+ root.appendChild(panel);
+ var drag=null;
+ function place(reset){
+  if(reset||!panel.dataset.userPositioned){
+   var rr=root.getBoundingClientRect(),br=button.getBoundingClientRect();
+   var width=panel.offsetWidth||270,height=panel.offsetHeight||365;
+   var x=br.left-rr.left,y=br.bottom-rr.top+8;
+   if(x+width>rr.width-10)x=rr.width-width-10;
+   if(y+height>rr.height-10)y=Math.max(12,br.top-rr.top-height-8);
+   panel.style.left=Math.max(10,x)+'px';
+   panel.style.top=Math.max(10,y)+'px';
+  }
+ }
+ button.addEventListener('click',function(){
+  if(panel.hidden)return;
+  place(false);
+ });
+ close.addEventListener('click',function(){
+  panel.hidden=true;
+  button.setAttribute('aria-expanded','false');
+ });
+ handle.addEventListener('pointerdown',function(e){
+  if(e.button!==0||e.target.closest('button'))return;
+  e.preventDefault();e.stopPropagation();
+  var rr=root.getBoundingClientRect(),pr=panel.getBoundingClientRect();
+  drag={id:e.pointerId,dx:e.clientX-pr.left,dy:e.clientY-pr.top};
+  handle.setPointerCapture(e.pointerId);
+  panel.dataset.userPositioned='true';
+ });
+ handle.addEventListener('pointermove',function(e){
+  if(!drag||e.pointerId!==drag.id)return;
+  var rr=root.getBoundingClientRect();
+  panel.style.left=Math.max(0,Math.min(rr.width-panel.offsetWidth,e.clientX-rr.left-drag.dx))+'px';
+  panel.style.top=Math.max(0,Math.min(rr.height-panel.offsetHeight,e.clientY-rr.top-drag.dy))+'px';
+ });
+ function finish(e){if(drag&&drag.id===e.pointerId)drag=null;}
+ handle.addEventListener('pointerup',finish);
+ handle.addEventListener('pointercancel',finish);
+ handle.addEventListener('lostpointercapture',function(){drag=null;});
+}
+
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
@@ -1816,9 +1864,11 @@ function build(){
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Parametric 3D" aria-label="Parametric 3D">'+ico('wall')+'<span>Parametric 3D</span></button>'+cad3DBlockCatalog()+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Parametric 3D" aria-label="Parametric 3D">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>Parametric 3D</span></button>'+cad3DBlockCatalog()+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sun</span></button>'+
- '<div class="sunPanel" id="cad3dSunPanel" hidden><label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
+ '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
+ '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / SHADOWS</strong><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
+ '<label class="sunToggle"><input type="checkbox" data-sun-enabled> Sun / Shadows</label>'+
  '<label>Azimuth <output data-sun-azimuth>135°</output><input data-sun-setting="azimuth" type="range" min="0" max="360" step="5" value="135"></label>'+
  '<label>Elevation <output data-sun-elevation>45°</output><input data-sun-setting="elevation" type="range" min="5" max="85" step="5" value="45"></label>'+
  '<label class="sunToggle"><input type="checkbox" data-sun-ground checked> On ground</label>'+
@@ -1953,7 +2003,10 @@ function build(){
  root.addEventListener('click',function(e){
   var button=e.target.closest('.tools [data-action], .cad3dBar [data-action]'), menu=e.target.closest('.ioMenu');
   root.querySelectorAll('.ioMenu[open]').forEach(function(openMenu){if(button||openMenu!==menu)openMenu.open=false;});
-  if(button){if(menu)menu.querySelector('summary').focus();action(button.dataset.action);}
+  if(button){if(menu)menu.querySelector('summary').focus();if(button.dataset.action==='sketch'){
+   var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
+   root.querySelector('.styleLaunch').setAttribute('aria-expanded',String(!panel.hidden));
+  }else action(button.dataset.action);}
  });
  root.querySelector('.cad3dProfileTools').addEventListener('click',function(e){
   var button=e.target.closest('[data-action]');if(button)action(button.dataset.action);
@@ -2003,6 +2056,7 @@ function build(){
   root.querySelector('.styleLaunch').setAttribute('aria-expanded','false');
  });
  renderStyleControls();
+ cad3dMakeSunPanelMovable();
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
