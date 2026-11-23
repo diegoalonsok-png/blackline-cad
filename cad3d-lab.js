@@ -887,6 +887,24 @@ css+=`
  background:var(--cad-ui-toolbar);color:var(--cad-ui-text);
  cursor:pointer;font-size:12px;min-width:24px;min-height:22px}
 `;
+css+=`
+/* CAD3D Undo/Redo reuse the CAD2D header icons. */
+#cad3dLab .cad3dHistoryButton{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ flex:0 0 36px!important;width:36px!important;min-width:36px!important;
+ height:34px!important;min-height:34px!important;padding:4px!important;
+ color:var(--cad-ui-text,#f0f2f5)!important}
+#cad3dLab .cad3dHistoryButton svg{
+ display:block!important;visibility:visible!important;opacity:1!important;
+ width:20px!important;height:20px!important;flex:none!important;
+ fill:none!important;stroke:currentColor!important;stroke-width:2!important}
+#cad3dLab .cad3dHistoryButton:disabled{
+ opacity:.62!important;cursor:not-allowed!important;
+ color:var(--cad-ui-muted,#a6aeb9)!important;
+ background:var(--cad-ui-toolbar,#15171b)!important}
+#cad3dLab .cad3dHistoryButton:not(:disabled){
+ opacity:1!important;color:var(--cad-ui-text,#f0f2f5)!important}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2238,8 +2256,8 @@ function cad3dBasicBars(){
    tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
    tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
-   '<button type="button" class="btn cad3dHistoryButton" data-history="undo" title="Deshacer 3D · Ctrl+Z / Cmd+Z" aria-label="Deshacer último cambio 3D" disabled>↶</button>'+
-   '<button type="button" class="btn cad3dHistoryButton" data-history="redo" title="Rehacer 3D · Ctrl+Y / Ctrl+Shift+Z" aria-label="Rehacer cambio 3D" disabled>↷</button>'+
+   '<button type="button" class="btn cad3dHistoryButton" data-history="undo" title="Deshacer 3D · Ctrl+Z / Cmd+Z" aria-label="Deshacer último cambio 3D" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-2"/></svg></button>'+
+   '<button type="button" class="btn cad3dHistoryButton" data-history="redo" title="Rehacer 3D · Ctrl+Y / Ctrl+Shift+Z" aria-label="Rehacer cambio 3D" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h2"/></svg></button>'+
    tool('move','Move','move')+tool('copy','Copy','copy')+
    tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
