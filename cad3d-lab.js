@@ -786,6 +786,7 @@ css+=`
 #cad3dLab .camera3DBar button{padding:5px 9px}
 `;
 css+="\n#cad3dLab .catalogItems .cad3dCatalogPreview{display:block;width:100%;height:78px;margin:0 auto 2px;filter:drop-shadow(0 3px 3px #0005);overflow:visible}\n#cad3dLab .catalogItems .btn{justify-content:flex-start;min-height:126px}\n#cad3dLab .catalogItems .btn span{font-weight:500;line-height:1.2}\n#cad3dLab .catalogItems .btn:hover .cad3dCatalogPreview{filter:drop-shadow(0 3px 5px #0009) brightness(1.12)}\n";
+css+="\n#cad3dLab .sketchButton .cad3dSketchCube{width:25px!important;height:25px!important;display:block!important;flex:0 0 25px;stroke:none!important;fill:none;overflow:visible;filter:drop-shadow(0 1px 2px #0008)}\n#cad3dLab .sketchButton:hover .cad3dSketchCube{filter:drop-shadow(0 0 3px #8de8ff77)}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -793,7 +794,7 @@ function clamp(a,min,max){return Math.max(min,Math.min(max,a));}
 function text(s){if(root)root.querySelector('.cad3dStatus').textContent=s;}
 function ico(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[name]||icons.cube)+'</svg>';}
 function tool(id,name,shape,title){
- return '<button type="button" class="btn'+(id==='sketch'?' sketchButton':'')+'" data-action="'+id+'" title="'+(title||name)+'" aria-label="'+name+'">'+ico(shape||id)+'<span>'+name+'</span></button>';
+ return '<button type="button" class="btn'+(id==='sketch'?' sketchButton':'')+'" data-action="'+id+'" title="'+(title||name)+'" aria-label="'+name+'">'+(id==='sketch'?'<svg class="cad3dSketchCube" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="skcubeBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8ce6ff" stop-opacity=".75"/><stop offset="1" stop-color="#377de7" stop-opacity=".36"/></linearGradient></defs><path d="M16 2.5 28 9v14L16 29.5 4 23V9Z" fill="none" stroke="#e8f7ff" stroke-width="1.8"/><path d="M16 16 4 9 16 2.5 28 9Z" fill="url(#skcubeBlue)" stroke="#d6f7ff" stroke-width="1"/><path d="M4 9 16 16v13.5L4 23Z" fill="#ffb94f" fill-opacity=".68" stroke="#ffe2aa" stroke-width="1"/><path d="M28 9 16 16v13.5L28 23Z" fill="#af7aff" fill-opacity=".53" stroke="#e0c9ff" stroke-width="1"/><path d="M4 23 16 16 28 23" fill="none" stroke="#f8fbff" stroke-opacity=".60" stroke-width=".8"/></svg>':ico(shape||id))+'<span>'+name+'</span></button>';
 }
 
 /* Independent, original architectural style definitions. No Autodesk assets. */
@@ -959,7 +960,67 @@ function styleDimensions(kind,st){
  return st.w.toFixed(2)+' × '+(st.d||st.h).toFixed(2)+' m';
 }
 
+
+function cad3dDoorVoidThumbnail(kind,st){
+ var id=String(st.id||'').toLowerCase(),isDoor=kind==='door',sill=Number(st.sill)||0;
+ var n=/triple|three/.test(id)?3:/double|french/.test(id)?2:1;
+ var slide=/sliding|pocket|barn|terrace/.test(id),fold=/fold/.test(id),garage=/garage/.test(id);
+ var bare=/open-door/.test(id),glazed=/glass|glaz|french|terrace|steel|victorian/.test(id);
+ var slab=kind==='opening'&&st.host==='slab',width=kind==='opening'&&Number(st.w)>1.4?84:70;
+ if(isDoor&&n>1)width=92;
+ var x=(160-width)/2,y=15,top=y-4,bottom=90;
+ var p=function(d,fill,stroke,sw){return '<path d="'+d+'" fill="'+(fill||'none')+'" stroke="'+(stroke||'#e2ecf3')+'" stroke-width="'+(sw||1.4)+'" stroke-linejoin="round" stroke-linecap="round"/>';};
+ var r=function(x,y,w,h,fill,stroke,sw){return '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+sw+'"/>';};
+ var body='';
+ if(slab){
+  body=p('M19 47 109 27 143 44 52 66Z','#9eb0bf','#f0f5f8',2)+
+   p('M52 66v12l91-19V44','#546c7f','#d6e5ed',1.4)+
+   p('M67 46 105 38 119 45 81 53Z','#111e29','#f6fbff',2)+
+   p('M81 53v10l38-8V45','#263d4e','#b7d0de',1.3);
+ }else{
+  // Side piers and lintel surround a true dark opening. Doorways have NO bottom frame.
+  var left=x-12,right=x+width+12;
+  body=p('M'+left+' '+top+'H'+right+'V'+bottom+'h-12V'+y+'H'+x+'v'+(bottom-y)+'h-12Z','#8499a9','#eaf2f7',1.9);
+  body+=p('M'+left+' '+top+'l7 -6h'+(width+24)+'l-7 6Z','#bdcad4','#ecf4f8',1.3);
+  body+=p('M'+right+' '+top+'l7 -6v'+(bottom-top)+'l-7 6Z','#577082','#c9dbe5',1.2);
+  body+=r(x,y,width,bottom-y,'#14212c','#d5e4ed',1.4);
+  if(sill>0){
+   // Only window openings have a lower wall/spandrel.
+   body+=r(x,74,width,16,'#8fa3b1','#dce9f0',1.2);
+  }
+ }
+ if(isDoor&&!bare){
+  var lx=x+3,ly=y+3,lh=bottom-y-4,lw=width-6;
+  if(slide||garage){
+   var panelW=lw/n;
+   for(var j=0;j<n;j++){
+    var dx=lx+j*panelW+(j===0?7:-2);
+    body+=r(Math.round(dx),ly,Math.round(panelW-4),lh,glazed?'#4e7188':'#9fb0bd','#eaf4fa',1.9);
+    if(glazed)body+=r(Math.round(dx+4),ly+5,Math.max(3,Math.round(panelW-12)),lh-12,'#284a61','#b7d2df',1.1);
+    if(garage)for(var k=1;k<5;k++)body+=p('M'+dx+' '+(ly+k*lh/5)+'h'+(panelW-4),'none','#dce5eb',1);
+   }
+   body+=p('M68 80h23m-5-4 5 4-5 4','none','#f0fcff',1.8);
+  }else{
+   var count=fold?3:n,space=lw/count;
+   for(var i=0;i<count;i++){
+    var pivot=lx+(i+0.5)*space;
+    var direction=i%2===0?-1:1,depth=Math.min(22,Math.max(13,space*.46));
+    var far=pivot+direction*depth;
+    var edgeY=ly+10;
+    body+=p('M'+pivot+' '+ly+'L'+far+' '+edgeY+'V'+(ly+lh-6)+'L'+pivot+' '+(ly+lh)+'Z',
+      glazed?'#547d96':'#aebec9','#f1f7fc',2);
+    body+=p('M'+pivot+' '+(ly+12)+'L'+far+' '+(edgeY+9)+'M'+pivot+' '+(ly+lh-13)+'L'+far+' '+(ly+lh-19),'none','#e8eff4',1.2);
+    if(glazed)body+=p('M'+(pivot+direction*3)+' '+(ly+15)+'L'+(far-direction*3)+' '+(edgeY+12)+'V'+(ly+lh-21)+'L'+(pivot+direction*3)+' '+(ly+lh-16)+'Z','#2d5369','#b9d8e7',.9);
+   }
+   if(!fold)body+=p('M'+(x+7)+' '+(bottom-11)+'Q'+(x+width/2)+' '+(bottom-29)+' '+(x+width-7)+' '+(bottom-11),'none','#b9e2f5',1.2);
+  }
+ }
+ return '<svg class="cad3dCatalogPreview" viewBox="0 0 160 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista arquitectónica de '+escapeHtml(st.name)+'">'+
+ '<ellipse cx="80" cy="101" rx="51" ry="4" fill="#000" opacity=".14"/>'+body+'</svg>';
+}
+
 function cad3dCatalogPreview(kind,st){
+ if(kind==='door'||kind==='opening')return cad3dDoorVoidThumbnail(kind,st);
  var desc=(String(st.id||'')+' '+String(st.name||'')).toLowerCase();
  var has=function(k){return desc.includes(k);};
  var door=kind==='door',windowed=kind==='window';
