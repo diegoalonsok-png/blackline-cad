@@ -220,3 +220,31 @@ test('3D movement palette keeps original controls and grouping',()=>{
  assert(markup.includes('data-giro-pin')&&markup.includes('data-giro-minimize')&&markup.includes('data-giro-close'));
  assert(src.includes("launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾'"));
 });
+
+test('Giro palette v3 has a genuinely compact 334x42 default',()=>{
+ assert(src.includes('width:min(334px,calc(100% - 16px));'));
+ assert(src.includes('height:42px;min-height:42px!important;max-height:54px!important'));
+ assert(src.includes("collapsed:collapsed,version:3"));
+ assert(src.includes("var compactW=initial.version===3&&Number.isFinite(initial.width)?initial.width:334"));
+ assert(src.includes("var compactH=initial.version===3&&Number.isFinite(initial.height)?initial.height:42"));
+ assert(src.includes("panel.style.width=Math.min(334,root.clientWidth-16)+'px'"));
+ assert(src.includes("panel.style.height='42px'"));
+ assert(src.includes("max-width:min(560px,calc(100% - 16px))!important"));
+ const from=src.indexOf('function cad3dGiroSvg(kind){');
+ const to=src.indexOf('function cad3dCenterModelWithoutZoom(){',from);
+ const markup=new Function(src.slice(from,to)+'return cad3dGiroMarkup();')();
+ assert.equal((markup.match(/class="cad3dGiroChoice(?: |")/g)||[]).length,8);
+});
+test('Sol/Entorno keeps one live panel when docking into Layers',()=>{
+ const code=between('var cad3dSunDockKey=', 'function cad3dMakeSavePanelMovable(){');
+ for(const token of ["side.insertBefore(panel,anchor?anchor.nextSibling:side.firstChild)",
+  "root.appendChild(panel)","cad3dPaletteRestore('sun',panel)",
+  "cad3dArchDockNear(ev.clientX,ev.clientY)",
+  "cad3dSunSetDocked(true)","cad3dSunSetDocked(false,{rect:initial})",
+  "window.addEventListener('pointermove',move,true)",
+  "window.removeEventListener('pointermove',move,true)",
+  "blackline-cad3d-sun-docked-v1"])assert(code.includes(token),token);
+ assert(src.includes('data-sun-dock aria-pressed="false"'));
+ assert(src.includes('.side.sidebar>.sunPanel.cad3dSunDocked[hidden]'));
+ assert(src.includes("name==='sun'&&panel.classList.contains('cad3dSunDocked')"));
+});
