@@ -3398,7 +3398,7 @@ function cad3dSketchCapture(){
  var source=renderer?.domElement||fallbackCanvas;
  if(!source)return text('No hay una vista 3D disponible para capturar');
  var w=Math.max(1,source.width),h=Math.max(1,source.height);
- var factor=Math.min(1,1700/w,1100/h);
+ var factor=Math.min(1,2560/w,1600/h);
  var canvas=document.createElement('canvas');
  canvas.width=Math.max(1,Math.round(w*factor));
  canvas.height=Math.max(1,Math.round(h*factor));
@@ -3440,19 +3440,19 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
  var meshes=[];modelRoot.traverse(function(o){
   if(o.isMesh&&o.visible&&o.geometry&&!o.userData?.cadSketch&&!o.userData?.cadGlass)meshes.push(o);
  });
- var ray=new T.Raycaster(),point=new T.Vector2(),count=0,cap=1600;
+ var ray=new T.Raycaster(),point=new T.Vector2(),count=0,cap=1600,rayBudget=2400;
  ctx.save();ctx.strokeStyle=opts.color;ctx.fillStyle=opts.color;
  ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength));
- for(var m=0;m<meshes.length&&count<cap;m++){
+ for(var m=0;m<meshes.length&&count<cap&&rayBudget>0;m++){
   var mesh=meshes[m],edges;
   try{edges=new T.EdgesGeometry(mesh.geometry,28);}catch(_e){continue;}
   var attr=edges.getAttribute('position');
   if(!attr){edges.dispose();continue;}
-  for(var i=0;i+1<attr.count&&count<cap;i+=2){
+  for(var i=0;i+1<attr.count&&count<cap&&rayBudget>0;i+=2){
    var a=new T.Vector3().fromBufferAttribute(attr,i).applyMatrix4(mesh.matrixWorld);
    var b=new T.Vector3().fromBufferAttribute(attr,i+1).applyMatrix4(mesh.matrixWorld);
    var p=a.clone().project(camera),q=b.clone().project(camera);
-   if(![p.x,p.y,p.z,q.x,q.y,q.z].every(Number.isFinite)||p.z>1&&q.z>1)continue;
+   if(![p.x,p.y,p.z,q.x,q.y,q.z].every(Number.isFinite)||(p.z>1&&q.z>1)||p.z< -1||q.z< -1)continue;
    var x1=(p.x+1)*w/2,y1=(1-p.y)*h/2,x2=(q.x+1)*w/2,y2=(1-q.y)*h/2;
    var dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
    if(len<2||len>4*Math.max(w,h)||Math.max(x1,x2)<0||Math.min(x1,x2)>w||Math.max(y1,y2)<0||Math.min(y1,y2)>h)continue;
@@ -3471,38 +3471,51 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
     }
     if(support<Math.max(2,Math.floor(samples*.28)))continue;
    }
-   // Geometry-aware hidden edge rejection at the line midpoint.
-   var mid=a.clone().add(b).multiplyScalar(.5),screen=mid.clone().project(camera);
-   point.set(screen.x,screen.y);ray.setFromCamera(point,camera);
-   var hits=ray.intersectObjects(meshes,false);
-   if(hits.length&&hits[0].object!==mesh&&hits[0].distance<ray.ray.origin.distanceTo(mid)-.04)continue;
-   var ux=dx/len,uy=dy/len,ex=opts.extension,steps=Math.max(3,Math.min(24,Math.ceil(len/25)));
-   // Deterministic procedural strokes, akin to Rough.js. Draw a stable
-   // jittered Bezier-like curve instead of replacing actual CAD geometry.
-   var passes=opts.multiStroke?2:1;
-   for(var pass=0;pass<passes;pass++){
-    var seed=m*2.31+i*.173+pass*11.7;
-    var direction=(Math.sin(seed*3.73)>=0?1:-1);
-    var bend=Math.min(5,opts.bowing*Math.min(1,len/90))*direction;
-    var lineAlpha=pass===0?1:.43;
-    ctx.save();ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength))*lineAlpha;
-    ctx.lineWidth=opts.profile*(pass===0?1:.68);
-    ctx.beginPath();
-    var off=pass===0?0:Math.min(1,opts.jitter*.48+.3);
-    ctx.moveTo(x1-ux*ex-uy*off,y1-uy*ex+ux*off);
-    for(var t=1;t<steps;t++){
-     var frac=t/steps;
-     var taper=Math.sin(Math.PI*frac);
-     var irregular=(Math.sin(seed+frac*16.1)*.63+Math.sin(seed*2.1+frac*29.5)*.37)*opts.jitter*taper;
-     var displacement=bend*taper+irregular+off;
-     ctx.lineTo(x1+dx*frac-uy*displacement,y1+dy*frac+ux*displacement);
+   // Split edges into fragments and ray-test each one to prevent drawing through solids.
+   var slices=Math.max(2,Math.min(8,Math.ceil(len/65)));
+   if(slices>rayBudget)break;
+   var visible=new Uint8Array(slices),any=false;
+   for(var sn=0;sn<slices;sn++){
+    var fr=(sn+.5)/slices,world=a.clone().lerp(b,fr),projected=world.clone().project(camera);
+    if(projected.z< -1||projected.z>1)continue;
+    if(opts.edgeMask){
+     var sx=Math.round(x1+dx*fr),sy=Math.round(y1+dy*fr),evidence=false;
+     for(var oy=-3;oy<=3&&!evidence;oy++)for(var ox=-3;ox<=3;ox++){
+      var nx=sx+ox,ny=sy+oy;
+      if(nx>=0&&nx<w&&ny>=0&&ny<h&&opts.edgeMask[ny*w+nx]){evidence=true;break;}
+     }
+     if(!evidence)continue;
     }
-    ctx.lineTo(x2+ux*ex-uy*off,y2+uy*ex+ux*off);ctx.stroke();
-    ctx.restore();
+    point.set(projected.x,projected.y);ray.setFromCamera(point,camera);
+    var hits=ray.intersectObjects(meshes,false);rayBudget--;
+    var expected=ray.ray.origin.distanceTo(world);
+    if(hits.length&&hits[0].distance<expected-Math.max(.018,expected*.001))continue;
+    visible[sn]=1;any=true;
    }
-   if(opts.endpoints){
-    ctx.beginPath();ctx.arc(x1,y1,opts.endpoints*.24,0,Math.PI*2);
-    ctx.arc(x2,y2,opts.endpoints*.24,0,Math.PI*2);ctx.fill();
+   if(!any)continue;
+   var ux=dx/len,uy=dy/len;
+   for(var first=0;first<slices;){
+    if(!visible[first]){first++;continue;}
+    var last=first+1;while(last<slices&&visible[last])last++;
+    var from=first/slices,to=last/slices;
+    for(var pass=0;pass<(opts.multiStroke?2:1);pass++){
+     var seed=m*2.31+i*.173+pass*11.7,offset=pass?Math.min(.85,opts.jitter*.4+.2):0;
+     var steps=Math.max(3,Math.min(25,Math.ceil((to-from)*len/20)));
+     ctx.save();ctx.globalAlpha=Math.min(.9,opts.strength)*(pass?.35:1);
+     ctx.lineWidth=Math.max(.3,opts.profile)*(pass?.7:1);
+     ctx.beginPath();var ex=Number(opts.extension||0);
+     ctx.moveTo(x1+dx*from-ux*(first===0?ex:0)-uy*offset,
+      y1+dy*from-uy*(first===0?ex:0)+ux*offset);
+     for(var n=1;n<steps;n++){
+      var t=n/steps,z=from+(to-from)*t,taper=Math.sin(Math.PI*t);
+      var shift=(Math.sin(seed+t*16)*opts.jitter+Math.sin(seed*3)*opts.bowing)*taper+offset;
+      ctx.lineTo(x1+dx*z-uy*shift,y1+dy*z+ux*shift);
+     }
+     ctx.lineTo(x1+dx*to+ux*(last===slices?ex:0)-uy*offset,
+      y1+dy*to+uy*(last===slices?ex:0)+ux*offset);
+     ctx.stroke();ctx.restore();
+    }
+    first=last;
    }
    count++;
   }
@@ -3622,9 +3635,9 @@ function cad3dSketchMultiPass(image,w,h,options){
  var line=new Uint8Array(n),output=new Uint8ClampedArray(n*4);
  var style=opt.style||'ink',strength=Math.max(0,Math.min(1,opt.strength??.6));
  var styleConfig={
-  ink:{wash:.60,levels:19,edge:.80,threshold:47,grain:.7,hatch:.07},
+  ink:{wash:.66,levels:19,edge:.86,threshold:47,grain:.7,hatch:.14},
   watercolor:{wash:.84,levels:13,edge:.43,threshold:56,grain:1.45,hatch:0},
-  pencil:{wash:.31,levels:23,edge:.58,threshold:39,grain:1.15,hatch:.09},
+  pencil:{wash:.39,levels:23,edge:.65,threshold:39,grain:1.15,hatch:.24},
   marker:{wash:.89,levels:8,edge:.62,threshold:53,grain:.48,hatch:.03},
   wash:{wash:.75,levels:18,edge:.39,threshold:54,grain:1.12,hatch:.025}
  }[style]||{wash:.7,levels:16,edge:.6,threshold:48,grain:.8,hatch:.03};
@@ -3750,6 +3763,7 @@ function cad3dSketchMultiPass(image,w,h,options){
   var i=y*w+x,value=line[i],k=i*4;
   if(!value)continue;
   var intensity=Math.min(.82,Math.max(0,(value-threshold)/125)*strength*styleConfig.edge);
+   intensity*=.88+.22*cad3dSketchNoise((x/8)|0,(y/8)|0);
   if(intensity<=0)continue;
   for(var dy=-(thickness-1);dy<=thickness-1;dy++)for(var dx=-(thickness-1);dx<=thickness-1;dx++){
    var j=(i+dy*w+dx)*4,falloff=(dx===0&&dy===0)?1:.30;
@@ -3805,7 +3819,7 @@ function cad3dSketchRenderPasses(panel,ctx,src,w,h){
   color:value('edgeColor'),profile:Number(value('profile')||1),
   extension:Number(value('extension')||0),endpoints:Number(value('endpoints')||0),
   jitter:Number(value('jitter')||0),bowing:Number(value('bowing')||0),
-  multiStroke:checked('multiStroke'),strength:.25,edgeMask:result.edgeMask
+  multiStroke:checked('multiStroke'),strength:(panel.querySelector('.cad3dSketchCaptureStyle')?.value==='watercolor'?.19:.43),edgeMask:result.edgeMask
  });
 }
 
@@ -3994,16 +4008,16 @@ function cad3dInitSketchCapture(){
   var styles={
    technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
     paper:'white',passes:true,geometry:false,shadow:'20',grain:'12',detail:'82',brush:'6',pigment:'0',finish:'35'},
-   ink:{style:'ink',profile:'2',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'48',grain:'28',detail:'70',brush:'40',pigment:'23',finish:'75'},
-   watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
-   pencil:{style:'pencil',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
-   marker:{style:'marker',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'white',passes:true,geometry:false,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
-   wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'69',grain:'64',detail:'41',brush:'43',pigment:'79',finish:'73'}
+   ink:{style:'ink',profile:'1.4',extension:'0',endpoints:'0',jitter:'0.55',bowing:'0.25',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'48',grain:'28',detail:'70',brush:'40',pigment:'23',finish:'75'},
+   watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0.55',bowing:'0.22',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:true,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
+   pencil:{style:'pencil',profile:'1.1',extension:'0',endpoints:'0',jitter:'0.85',bowing:'0.45',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
+   marker:{style:'marker',profile:'1.2',extension:'0',endpoints:'0',jitter:'0.35',bowing:'0.18',multiStroke:false,
+    paper:'white',passes:true,geometry:true,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
+   wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0.5',bowing:'0.3',multiStroke:true,
+    paper:'watercolor',passes:true,geometry:true,shadow:'69',grain:'64',detail:'41',brush:'43',pigment:'79',finish:'73'}
   };
   if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
  });
