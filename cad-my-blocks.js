@@ -35,6 +35,8 @@ function libEntry(rec){
 function register(rec){
  if(LIB.library.some(x=>x.id===rec.id))return;
  LIB.library.push(libEntry(rec));
+ // Mis bloques: an owned door/window becomes dynamically resizable immediately.
+ window.CAD2D_DYNAMIC_OPENINGS?.enhance?.();
  if(Array.isArray(LIB.categories)&&!LIB.categories.includes(CAT))LIB.categories.push(CAT);
 }
 load().forEach(register);
