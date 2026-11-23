@@ -116,7 +116,7 @@ test('Giro preserves dock/move and continuous hold zoom stopping on release',()=
 test('Compact 2D-scale Giro palette keeps eight controls on one row with visibility toggle',()=>{
  const start=src.indexOf('function cad3dGiroSvg(kind){'),end=src.indexOf('function cad3dCenterModelWithoutZoom(){',start);
  const markup=new Function(src.slice(start,end)+'return cad3dGiroMarkup();')();
- assert.equal((markup.match(/class="cad3dGiroChoice(?:\\s|")/g)||[]).length,8);
+ assert.equal((markup.match(/class="cad3dGiroChoice(?: |")/g)||[]).length,8);
  assert(markup.includes('data-giro-zoom="1"'));
  assert(markup.includes('data-giro-zoom="-1"'));
  assert(!markup.includes('cad3dGiroZoomStrip'));
