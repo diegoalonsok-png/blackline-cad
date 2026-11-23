@@ -121,13 +121,13 @@ test('Compact 2D-scale Giro palette keeps eight controls on one row with visibil
  assert(markup.includes('data-giro-zoom="-1"'));
  assert(!markup.includes('cad3dGiroZoomStrip'));
  for(const prop of ['data-giro-minimize','data-giro-pin','data-giro-close'])assert(markup.includes(prop),prop);
- assert(src.includes('grid-template-columns:repeat(8,minmax(0,1fr))!important'));
- assert(src.includes('height:165px;min-height:48px'));
+ assert(src.includes('display:flex!important;align-items:center!important;flex-direction:row!important'));
+ assert(src.includes('height:42px;min-height:42px!important;max-height:54px!important'));
  assert(src.includes("launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾'"));
- assert(src.includes('Math.min(initial.width,initial.version===2?640:392,root.clientWidth-16)'));
+ assert(src.includes("var compactW=initial.version===3&&Number.isFinite(initial.width)?initial.width:334"));
  assert(src.includes('resize:both!important'));
- assert(src.includes('width:min(392px,calc(100% - 16px));'));
- assert(src.includes('height:46px;'));
+ assert(src.includes('width:min(334px,calc(100% - 16px));'));
+ assert(src.includes("panel.style.height='42px'"));
  assert(src.includes('if(initial.collapsed)setCollapsed(true);'));
 });
 
