@@ -4119,6 +4119,35 @@ function cad3dInitSketchCapture(){
  handle.addEventListener('pointercancel',end);
  handle.addEventListener('lostpointercapture',end);
 }
+function cad3dAICaptureFrame(){
+ // Screen pixels only: never send CAD layers or model records.
+ var source=renderer?.domElement||fallbackCanvas;
+ if(!source||!root||root.hidden)throw Error('Primero abrí la vista 3D');
+ var ow=Math.max(1,source.width),oh=Math.max(1,source.height);
+ var scale=Math.min(1,1400/ow,1000/oh,Math.sqrt(1800000/(ow*oh)));
+ var w=Math.max(1,Math.round(ow*scale)),h=Math.max(1,Math.round(oh*scale));
+ if(w<80||h<80)throw Error('La vista 3D es demasiado pequeña');
+ var out=document.createElement('canvas');out.width=w;out.height=h;
+ var ctx=out.getContext('2d');if(!ctx)throw Error('Canvas de captura no disponible');
+ var hidden=[];
+ function hide(o){if(o?.visible){hidden.push([o,o.visible]);o.visible=false;}}
+ try{
+  if(renderer&&scene&&camera){
+   hide(gridHelper);hide(axesHelper);hide(underlayGroup);
+   if(modelRoot)modelRoot.traverse(function(o){
+    if(o.userData?.cadSketch||o.userData?.cadSelectionHelper||o.userData?.cadDraftGuide)hide(o);
+   });
+   renderer.render(scene,camera);
+  }else if(fallbackCanvas)fallbackDraw();
+  ctx.drawImage(source,0,0,w,h);
+ }finally{
+  for(var i=hidden.length-1;i>=0;i--)hidden[i][0].visible=hidden[i][1];
+  if(renderer&&scene&&camera)renderer.render(scene,camera);
+  else if(fallbackCanvas)fallbackDraw();
+ }
+ return {dataURL:out.toDataURL('image/png'),width:w,height:h};
+}
+
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
@@ -4126,7 +4155,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button><button type="button" class="btn cad3dAIGenerateLaunch" title="Crear imagen nueva con IA a partir de la vista actual">RENDER IA</button></div>'+
 
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
@@ -4302,6 +4331,10 @@ function build(){
  root.querySelector('[data-camera-create]').addEventListener('click',cad3dCreateCamera);
  root.querySelector('[data-camera-back]').addEventListener('click',function(){cad3dWalkStep(-1);});
  root.querySelector('[data-camera-forward]').addEventListener('click',function(){cad3dWalkStep(1);});
+ root.querySelector('.cad3dAIGenerateLaunch').addEventListener('click',function(){
+  if(!window.CAD3DAIRender)return text('No está disponible el módulo de generación de imágenes IA');
+  window.CAD3DAIRender.open({root:root,capture:cad3dAICaptureFrame});
+ });
  root.querySelector('.camera3DList').addEventListener('change',function(){cad3dActivateCamera(this.value);});
  root.querySelector('.viewShortcuts').addEventListener('click',function(e){
   var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
