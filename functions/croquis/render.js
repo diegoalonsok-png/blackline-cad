@@ -16,8 +16,8 @@ export async function onRequestPost({request,env}){
   if(request.headers.get('Origin')!==expected)return reply('La solicitud debe provenir del mismo CAD2D3D.',403);
   var site=request.headers.get('Sec-Fetch-Site');
   if(site&&site!=='same-origin')return reply('Solicitud de otro origen rechazada.',403);
-  if(env.CROQUIS_ENABLED!=='true'||!env.AI)
-   return reply('Motor IA pendiente de activación en Cloudflare: configurar binding AI y variable CROQUIS_ENABLED=true.',503);
+  if(!env.AI)return reply('Falta agregar el binding Workers AI con el nombre AI en Cloudflare Pages, entorno Production, y volver a desplegar.',503);
+  if(env.CROQUIS_ENABLED!=='true')return reply('Falta configurar CROQUIS_ENABLED=true en las variables de Production de Cloudflare Pages, y volver a desplegar.',503);
   if(env.CROQUIS_RATE_LIMIT){
    var allowed=await env.CROQUIS_RATE_LIMIT.limit({key:request.headers.get('CF-Connecting-IP')||'unknown'});
    if(!allowed.success)return reply('Límite de renders alcanzado.',429);
@@ -60,6 +60,15 @@ export async function onRequestPost({request,env}){
   return reply('No se pudo producir el croquis con Cloudflare AI. Revisá binding, permisos, cuota e inferencias.',502);
  }
 }
-export async function onRequestGet(){
- return reply('La generación de croquis requiere el botón dentro del módulo 3D.',405);
+export async function onRequestGet({env}){
+ // Read-only health check. Never disclose keys, model costs or account data.
+ var bound=!!env.AI,enabled=env.CROQUIS_ENABLED==='true',ready=bound&&enabled;
+ var error=!bound
+  ?'Falta configurar Workers AI → binding AI (Production) en Cloudflare Pages y volver a desplegar.'
+  :!enabled
+   ?'Falta configurar la variable CROQUIS_ENABLED=true (Production) en Cloudflare Pages y volver a desplegar.'
+   :null;
+ return new Response(JSON.stringify({ready:ready,aiBinding:bound,enabled:enabled,error:error}),{
+  status:200,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}
+ });
 }
