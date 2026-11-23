@@ -255,18 +255,22 @@
  function close(){if(el)el.style.display='none';armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
+ function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
+  const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
+ }
  function openRecovered(){st.view='archive';st.cat='';st.q='';visibleCount=72;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
  function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=12;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,close,refresh:paint});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,openOlimpiadas,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
   for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
   for(const k of ['VISTASRECUPERADAS','VISTASBLOQUES'])EXT.commands[k]=openRecovered;
+  for(const k of ['OLIMPIADAS','OLIMPIADAS3','BLOQUESOLIMPIADAS'])EXT.commands[k]=openOlimpiadas;
  }
  // Botón grande en la cinta (Inicio y Arquitectura) y en la barra rápida.
  const ico='<rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="16" y="11" width="6" height="6" rx="1"/><path d="M4 21h16"/>';
