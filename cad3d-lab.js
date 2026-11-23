@@ -800,7 +800,7 @@ css+="\n#cad3dLab .viewCube{background:linear-gradient(140deg,#f9fbfd,#cfdae4)!i
 css+="\n#cad3dLab .cad3dNavToolbar,#cad3dLab .cad3dStyleToolbar,#cad3dLab .cad3dQuickViews{display:flex;align-items:center;flex:none;gap:3px;padding:4px 7px;background:#14212a;border-bottom:1px solid #415767;min-height:41px;white-space:nowrap}\n#cad3dLab .cad3dNavToolbar strong,#cad3dLab .cad3dStyleToolbar strong,#cad3dLab .cad3dQuickViews strong{font:700 9px Inter,Arial,sans-serif;letter-spacing:.9px;color:#b0c3cf;margin:0 5px 0 2px}\n#cad3dLab .cad3dQuickTool{min-width:30px;height:31px;border:1px solid #455968;border-radius:6px;background:#090f15;color:#ecf4f8;display:inline-grid;place-items:center;padding:0 5px;font:700 13px Inter,Arial,sans-serif;cursor:pointer;transition:background .15s,border-color .15s}\n#cad3dLab .cad3dQuickViews .cad3dQuickTool{font-size:10px;min-width:36px}\n#cad3dLab .cad3dQuickTool:hover{background:#2b4352;border-color:#a5cadd}\n#cad3dLab .cad3dQuickTool[aria-pressed=\"true\"]{background:#244e67;border:1px solid #9edff7;box-shadow:inset 0 -2px 0 #9edff7}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube{outline:2px solid #8caec9;outline-offset:5px}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewNavTop{position:relative}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube:before{content:\"N\";position:absolute;left:45%;top:0;z-index:7;font-weight:800;color:#113957;pointer-events:none}\n#cad3dLab .viewNav.cad3dBIMNavigator .viewCube:after{content:\"O  ·  S  ·  E\";position:absolute;bottom:1px;left:0;right:0;text-align:center;z-index:7;font-size:9px;font-weight:800;color:#14354e;pointer-events:none}\n#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dNavToolbar,#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dStyleToolbar,#cad3dLab.cad3dCompactMode .cad3dDockBar.cad3dQuickViews{gap:3px!important;padding:4px 5px!important}\n#cad3dLab.cad3dCompactMode .cad3dDockBar .cad3dQuickTool{min-height:31px;flex:0 0 auto}\n";
 css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:hidden}\n#cad3dLab .view.wire2dView{background:#fff!important}\n";
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
-css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
+css+="\n/* The six style cubes and the seventh Materials cube complement the full gallery. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
 css+="\n#cad3dLab > .viewSavePanel{position:absolute!important;left:36px;top:180px;right:auto!important;bottom:auto!important;z-index:145!important;box-sizing:border-box;max-width:calc(100% - 16px)!important;max-height:calc(100% - 32px)!important;overflow:auto}\n#cad3dLab > .viewSavePanel[hidden]{display:none!important}\n#cad3dLab .viewSaveHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-14px -14px 5px;padding:10px 14px;border-bottom:1px solid #587081;background:#223443;border-radius:10px 10px 0 0;cursor:grab;user-select:none;touch-action:none;font:700 11px Inter,Arial,sans-serif;letter-spacing:.4px}\n#cad3dLab .viewSaveHeader:active{cursor:grabbing}\n#cad3dLab .viewSaveClose{background:none!important;border:0!important;color:#e7f1f6!important;min-height:22px!important;padding:0 5px!important;font-size:20px!important;cursor:pointer}\n";
 css+="\n#cad3dLab > .cad3dSketchCapturePanel{position:absolute;z-index:160;left:45px;top:110px;width:min(760px,calc(100% - 40px));max-height:calc(100% - 35px);overflow:auto;box-sizing:border-box;background:#142431;color:#eaf4fa;border:1px solid #81acc1;border-radius:11px;padding:12px;box-shadow:0 18px 45px #000b}\n#cad3dLab > .cad3dSketchCapturePanel[hidden]{display:none!important}\n#cad3dLab .cad3dSketchCaptureHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-12px -12px 10px;padding:10px 12px;background:#25394a;border-bottom:1px solid #6b91a4;cursor:grab;user-select:none;touch-action:none}\n#cad3dLab .cad3dSketchCaptureHead:active{cursor:grabbing}\n#cad3dLab .cad3dSketchClose{font-size:20px;color:#eaf4fa;background:none;border:0;cursor:pointer}\n#cad3dLab .cad3dSketchCaptureControls{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-bottom:9px}\n#cad3dLab .cad3dSketchCaptureControls label{font:11px Inter,Arial,sans-serif;display:grid;gap:4px;flex:1;min-width:140px}\n#cad3dLab .cad3dSketchCaptureControls select,#cad3dLab .cad3dSketchCaptureControls input{width:100%;box-sizing:border-box;background:#213343;color:white;border:1px solid #617e8e;border-radius:5px;padding:6px}\n#cad3dLab .cad3dSketchCapturePreview{display:block;width:100%;height:auto;max-height:52vh;object-fit:contain;background:#faf7f0;border:1px solid #40566b}\n#cad3dLab .cad3dSketchCapturePanel small{font:10px Inter,Arial,sans-serif;color:#b3c8d5}\n";
 css+="\n#cad3dLab .cad3dNavToolbar [data-nav-tool=select]{font-size:22px!important;min-width:39px!important;font-weight:700!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{border:1px solid #79b9d0!important;background:#22506a!important;color:#f4fbff!important;font-weight:700!important;white-space:nowrap!important}\n#cad3dLab .view:not(.cad3dPanning):not(.placing) canvas{cursor:default}\n";
@@ -1896,12 +1896,13 @@ function cad3dEnableMovableToolbars(){
 var cad3dNavigationTool='select',cad3dBIMCompass=false;
 
 function cad3dApprovedStyleCube(mode){
- // Six original-layout cube pictograms, compact SVG rather than platform-dependent glyphs.
+ // Seven matching cube pictograms: six visual styles and Materials (M).
  var top='24,3 44,13 24,24 4,13',left='4,13 24,24 24,45 4,34',right='44,13 24,24 24,45 44,34';
  var line='#f3f8fc',dark='#23333e';
  var fill=mode==='shaded'?['#bcd0e0','#90a9bf','#738da3']:
    mode==='realistic'?['#91c7fd','#7fe67f','#ee7373']:
    mode==='sketch'?['#f3f4f4','#ededed','#dedede']:
+  mode==='materials'?['#d9cbb5','#bd7654','#879eaa']:
    mode==='xray'?['#80c0e92f','#75acc83b','#a3dcff2c']:
    ['none','none','none'];
  var edge=mode==='sketch'?'#28333a':mode==='shaded'?'#e6f2fc':line;
@@ -1914,18 +1915,26 @@ function cad3dApprovedStyleCube(mode){
  if(mode==='wire3d'||mode==='xray'||mode==='hidden')svg+='<path d="M24 24V45M4 13L24 3L44 13M4 34L24 45L44 34" fill="none" stroke="'+edge+'" stroke-width="1.45"/>';
  if(mode==='sketch')svg+='<path d="M18 10l7 3m7 8-1 7M11 25l6 4M27 32l6-2" fill="none" stroke="#7e868d" stroke-width="1.3" stroke-linecap="round"/>';
  if(mode==='shaded')svg+='<path d="M4 13L24 24L44 13" fill="none" stroke="#fff" stroke-opacity=".38"/>';
+ if(mode==='materials'){
+  svg+='<path d="M5.7 21.7L24 31.7M5.7 29.5L24 40.2M11 16.8V24M16.5 34.5V41.5" fill="none" stroke="#6b3d2e" stroke-width="1.1" opacity=".7"/>'+
+   '<path d="M24 31.7L43 21.5M24 39.8L43 29.7M31 20.1V27.9M36.9 33.1V38.2" fill="none" stroke="#415764" stroke-width="1.1" opacity=".75"/>'+
+   '<path d="M10.1 10L29.5 20M18.5 5.7L38 15.9" fill="none" stroke="#8c7860" stroke-width="1" opacity=".6"/>';
+ }
  return svg+'</svg>';
 }
 
 function cad3dCompact3DBar(){
- function b(group,key,label,display){return '<button type="button" class="cad3dQuickTool" data-'+group+'="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="false">'+display+'</button>';}
+ function b(group,key,label,display){
+  var materials=group==='quick-style'&&key==='materials';
+  return '<button type="button" class="cad3dQuickTool'+(materials?' cad3dMaterialLaunch':'')+'" data-'+group+'="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="false"'+(materials?' aria-controls="cad3dMaterialsPanel" aria-expanded="false"':'')+'>'+display+'</button>';
+ }
  var tools=[
  ['select','Seleccionar objetos 3D','↖'],['orbit','Giro libre','⟳'],['pan','Panorámica','✥'],['ring','Órbita con anillo','◎'],
  ['hand','Mano · desplazar','✋'],['center','Centrar modelo','⊙'],['fit','Ajustar todo','⛶']
  ];
  var styles=[
  ['shaded','Sólido'],['wire3d','Alámbrico'],['xray','Transparente'],
- ['realistic','Por colores'],['hidden','Contorno'],['sketch','Croquis']
+ ['realistic','Por colores'],['hidden','Contorno'],['sketch','Croquis'],['materials','Materiales · M · texturas JPG']
  ];
  var views=['top','front','right','left','back','bottom'];
  return '<div class="cad3dNavToolbar" role="toolbar" aria-label="Navegación 3D">'+
@@ -1940,7 +1949,7 @@ function cad3dSyncCompactBars(){
  if(!root)return;
  root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.navTool===cad3dNavigationTool||(b.dataset.navTool==='hand'&&cad3dNavigationTool==='pan')));});
  root.querySelectorAll('[data-quick-style]').forEach(function(b){
-  b.setAttribute('aria-pressed',String(b.dataset.quickStyle==='sun'?sunSettings.enabled:b.dataset.quickStyle===renderStyle));
+  b.setAttribute('aria-pressed',String(b.dataset.quickStyle==='materials'?!root.querySelector('.cad3dMaterialsPanel')?.hidden:b.dataset.quickStyle==='sun'?sunSettings.enabled:b.dataset.quickStyle===renderStyle));
  });
  root.querySelector('[data-quick-view="bim"]')?.setAttribute('aria-pressed',String(cad3dBIMCompass));
  root.querySelector('.viewNav')?.classList.toggle('cad3dBIMNavigator',cad3dBIMCompass);
@@ -1962,6 +1971,7 @@ function cad3dBindCompactBars(){
   }
   if(style){
    var mode=style.dataset.quickStyle;
+   if(mode==='materials'){cad3dShowMaterials();cad3dSyncCompactBars();return;}
    if(mode==='sun'){sunSettings.enabled=!sunSettings.enabled;applySunSettings();}
    else {
     if(mode==='wire3d'&&activeView==='top')setViewPreset('iso');
@@ -2401,7 +2411,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
  '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Parametric 3D" aria-label="Parametric 3D">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>Parametric 3D</span></button>'+cad3DBlockCatalog()+
- '<button type="button" class="btn cad3dMaterialLaunch" title="Materiales y texturas · M">▦ Materiales · M</button>'+
+ 
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
  '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / ENTORNO</strong><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
@@ -4300,7 +4310,7 @@ function bind3DGripOverlay(layer){
 
 /* Texturas originales y fotos JPG por cara, independientes de geometría. */
 function cad3dMaterialMarkup(){
- return '<aside class="cad3dMaterialsPanel" aria-label="Texturas de muros" hidden>'+
+ return '<aside class="cad3dMaterialsPanel" id="cad3dMaterialsPanel" aria-label="Texturas de muros" hidden>'+
  '<div class="cad3dMaterialsHeader"><strong>▦ MATERIALES / TEXTURAS · M</strong><button type="button" data-mat-close title="Cerrar">×</button></div>'+
  '<div class="cad3dMaterialsGrid"></div>'+
  '<div class="cad3dMaterialsControls"><button class="btn" type="button" data-mat-upload>＋ Importar JPG / PNG</button>'+
@@ -4325,6 +4335,7 @@ function cad3dShowMaterials(open){
  open=typeof open==='boolean'?open:panel.hidden;
  panel.hidden=!open;
  root.querySelector('.cad3dMaterialLaunch')?.setAttribute('aria-expanded',String(open));
+ cad3dSyncCompactBars();
  if(open){cad3dMaterialRender();cad3dPaletteConstrain(panel);}
 }
 function cad3dMaterialCanvas(id){
@@ -4462,7 +4473,7 @@ function cad3dApplyMaterialClick(e){
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
  if(!p)return;
- root.querySelector('.cad3dMaterialLaunch').addEventListener('click',function(){cad3dShowMaterials();});
+ // The seventh cube and the M shortcut use cad3dShowMaterials; delegated click handler above.
  p.querySelector('[data-mat-close]').addEventListener('click',function(){cad3dShowMaterials(false);});
  p.querySelector('[data-mat-upload]').addEventListener('click',function(){p.querySelector('[data-mat-input]').click();});
  p.querySelector('[data-mat-input]').addEventListener('change',async function(){
