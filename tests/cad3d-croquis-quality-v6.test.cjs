@@ -51,5 +51,43 @@ test('Artistic presets reuse the existing geometric line pass; technical remains
   assert(new RegExp(style+":\\{style:'"+style+"'[^}]+passes:true,geometry:true").test(presets),style);
  }
  assert(/technical:\{style:'ink'[^}]+passes:true,geometry:false/.test(presets));
- assert(src.includes('Math.min(1,2560/w,1600/h)'));
+ assert(src.includes('2560/sw')&&src.includes('1600/sh'));
+});
+
+test('Render Croquis has dedicated action and all 8 finish engines',()=>{
+ const markupSource=block('function cad3dSketchRenderMarkup(){','function cad3dInitSketchCapture(){');
+ const markup=vm.runInNewContext(markupSource+'\ncad3dSketchRenderMarkup()', {});
+ for(const style of ['ink','pencil','charcoal','engraving','watercolor','pastel','marker','wash']){
+  assert(markup.includes('<option value="'+style+'"'),style);
+ }
+ for(const selector of ['cad3dSketchCapturePreview','cad3dSketchCaptureOriginal',
+  'cad3dSketchDownload','cad3dSketchCaptureStyle','data-sketch-setting="baseStyle"',
+  'data-sketch-setting="resolution"'])assert(markup.includes(selector),selector);
+ assert(src.includes('cad3dRenderSketchLaunch'));
+ assert(src.includes('cad3dInitSketchCapture();'));
+});
+test('Capture restores original camera, render style and WebGL resolution',()=>{
+ const capture=block('function cad3dSketchCapture(){','function cad3dSketchGeometryEdges(');
+ for(const term of ["renderStyle='realistic'","renderStyle=oldStyle;applyRenderStyle()",
+  'renderer.setPixelRatio(oldPixelRatio)', 'camera.updateProjectionMatrix()',
+  'Math.sqrt(4000000/(sw*sh))','cad3dSketchSource=canvas',
+  "panel.querySelector('.cad3dSketchCaptureOriginal')"])assert(capture.includes(term),term);
+ assert(!/records\.(push|splice)|currentLayer\s*=/.test(capture));
+});
+test('Eight distinct art engines produce deterministic different images',()=>{
+ const {w,h,p}=facade();
+ const styles=['ink','pencil','charcoal','engraving','watercolor','pastel','marker','wash'];
+ const output={};
+ for(const style of styles){
+  const options={style,sky:true,ground:true,shadow:80,grain:70,pigment:65};
+  const a=render(p,w,h,options),b=render(p,w,h,options);
+  assert.deepEqual(Array.from(a.data),Array.from(b.data),'determinism: '+style);
+  output[style]=a.data;
+ }
+ for(let i=0;i<styles.length;i++)for(let j=i+1;j<styles.length;j++){
+  const a=output[styles[i]],b=output[styles[j]];
+  let delta=0;
+  for(let k=0;k<a.length;k++)delta+=Math.abs(a[k]-b[k]);
+  assert(delta>100,'not distinct: '+styles[i]+' '+styles[j]);
+ }
 });
