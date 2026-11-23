@@ -10,7 +10,8 @@ var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
-var CAD3D_WALL_FACE_KEYS=['right','left','front','back','top','bottom'];
+// Three.BoxGeometry groups: +X,-X,+Y,-Y,+Z,-Z.
+var CAD3D_WALL_FACE_KEYS=['right','left','top','bottom','front','back'];
 var CAD3D_MATERIALS=[
  ['brick','Ladrillo rojo','Muros'],['brick-white','Ladrillo blanco','Muros'],
  ['plaster','Revoque blanco','Muros'],['stucco','Revoque fino','Muros'],
@@ -4499,11 +4500,20 @@ function cad3dDecodeCustomMaterial(id){
  img.onerror=function(){delete item.loading;cad3dMaterialMsg('Imagen no válida: '+item.name);};
  img.src=item.image;
 }
-function cad3dGetMaterialTexture(id,repeat){
+function cad3dGetMaterialTexture(id,repeat,properties){
  if(!T)return null;
- var key=id+'/'+(repeat?'tile':'cover');
+ var mix=clamp(finite(properties?.mix,0),0,100)/100;
+ var tint=/^#[0-9a-f]{6}$/i.test(properties?.tint||'')?properties.tint:'#ffffff';
+ var key=id+'/'+(repeat?'tile':'cover')+'/'+(mix?mix+':'+tint:'original');
  if(cad3dTextureCache[key])return cad3dTextureCache[key];
  var source=cad3dMaterialCanvas(id);if(!source)return null;
+ if(mix){
+  var mixed=document.createElement('canvas');mixed.width=source.width;mixed.height=source.height;
+  var ctx=mixed.getContext('2d');
+  ctx.drawImage(source,0,0);
+  ctx.globalAlpha=mix;ctx.fillStyle=tint;ctx.fillRect(0,0,mixed.width,mixed.height);
+  ctx.globalAlpha=1;source=mixed;
+ }
  var tex=new T.CanvasTexture(source);tex.colorSpace=T.SRGBColorSpace;
  tex.wrapS=tex.wrapT=repeat?T.RepeatWrapping:T.ClampToEdgeWrapping;
  tex.anisotropy=Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.()||4);
@@ -4542,7 +4552,9 @@ function cad3dAddWallTextures(record,base,g,cx,cy,cz){
  g.groups.forEach(function(group){
   var face=CAD3D_WALL_FACE_KEYS[group.materialIndex],value=record.faceMaterials[face];
   if(!value||!cad3dHasMaterial(value.id))return;
-  var map=cad3dGetMaterialTexture(value.id,value.repeat!==false);if(!map)return;
+  var map=cad3dGetMaterialTexture(value.id,value.repeat!==false,value);if(!map)return;
+  var relief=clamp(finite(value.bump,1),0,8)/1000; // virtual millimetres
+  var bumpTexture=relief>0?cad3dGetMaterialTexture(value.id,value.repeat!==false,null):null;
   var xyz=[],uv=[],angle=finite(value.rotation,0)*Math.PI/180;
   var scX=clamp(finite(value.scaleX,1),.05,100),scY=clamp(finite(value.scaleY,1),.05,100);
   for(var n=group.start;n<group.start+group.count;n++){
@@ -4561,8 +4573,11 @@ function cad3dAddWallTextures(record,base,g,cx,cy,cz){
   geo.setAttribute('position',new T.Float32BufferAttribute(xyz,3));
   geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));
   geo.computeVertexNormals();
-  var paint=new T.Mesh(geo,new T.MeshStandardMaterial({map:map,color:0xffffff,roughness:.86,metalness:0,
-   side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1}));
+  var paint=new T.Mesh(geo,new T.MeshStandardMaterial({
+   map:map,color:0xffffff,roughness:clamp(finite(value.roughness,85),5,100)/100,metalness:0,
+   bumpMap:bumpTexture,bumpScale:relief,
+   side:T.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1
+  }));
   paint.userData.owner=record.id;paint.userData.cadWallTexture=true;paint.userData.cadWallFace=face;
   paint.castShadow=false;paint.receiveShadow=sunSettings.enabled&&sunSettings.onFaces;
   base.add(paint);
@@ -4579,9 +4594,9 @@ function cad3dApplyMaterialClick(e){
  modelRoot.updateMatrixWorld(true);
  var hit=raycaster.intersectObjects(mesh,false)[0];
  if(!hit){cad3dMaterialMsg('No se encontró una cara de muro en ese punto. Probá sobre la superficie sólida.');return text('Clic sobre una cara visible de un muro');}
- var record=records.find(function(r){return r.id===hit.object.userData.owner&&r.type==='wall'&&editableRecord(r);});
+ var record=records.find(function(r){return r.id===hit.object.userData.owner&&(r.type==='wall'||r.type==='slab')&&editableRecord(r);});
  if(!record||(!hit.object.userData.cadWallPart&&!hit.object.userData.cadWallTexture))
-  return text('Seleccioná una cara del muro (no una ventana o puerta)');
+  return text('Seleccioná una cara de muro o losa (no una puerta ni ventana)');
  var face=hit.object.userData.cadWallFace;
  if(!face){
   var n=hit.face.normal,axis=Math.abs(n.x)>Math.abs(n.y)&&Math.abs(n.x)>Math.abs(n.z)?'x':Math.abs(n.y)>Math.abs(n.z)?'y':'z';
@@ -4952,7 +4967,7 @@ function buildObject(r){
    x=y=z=0;
   }
   var component=addMesh(g,color,r.id,group,x,y,z);
-  if(r.type==='wall'&&openingId==null){
+  if((r.type==='wall'||r.type==='slab')&&openingId==null){
    component.userData.cadWallPart=true;
    cad3dAddWallTextures(r,component,g,x,y,z);
   }
@@ -6197,7 +6212,12 @@ async function readJSON(e){
     var m=data.materials[id];
     if(!/^user-[0-9]+$/.test(id)||!m||typeof m.image!=='string'||m.image.length>1800000)return;
     if(!m.image.startsWith('data:image/jpeg;base64,')&&!m.image.startsWith('data:image/png;base64,')&&!m.image.startsWith('data:image/webp;base64,'))return;
-    cad3dCustomMaterials[id]={name:String(m.name||'Textura JPG').slice(0,70),image:m.image};
+    cad3dCustomMaterials[id]={
+     name:String(m.name||'Textura JPG').slice(0,70),image:m.image,
+     tint:/^#[0-9a-f]{6}$/i.test(m.tint||'')?m.tint:'#ffffff',
+     mix:clamp(finite(m.mix,0),0,100),bump:clamp(finite(m.bump,1),0,8),
+     roughness:clamp(finite(m.roughness,85),5,100)
+    };
     cad3dMaterialCounter=Math.max(cad3dMaterialCounter,Number(id.slice(5))||0);
    });
   }
@@ -6242,14 +6262,17 @@ async function readJSON(e){
      return op;
     });
    }
-   if(r.type==='wall'&&r.faceMaterials&&typeof r.faceMaterials==='object'){
+   if((r.type==='wall'||r.type==='slab')&&r.faceMaterials&&typeof r.faceMaterials==='object'){
     var paint={};
     CAD3D_WALL_FACE_KEYS.forEach(function(face){
      var mat=r.faceMaterials[face];
      if(!mat||!cad3dHasMaterial(mat.id))return;
      paint[face]={id:mat.id,scaleX:clamp(finite(mat.scaleX,1),.05,100),
       scaleY:clamp(finite(mat.scaleY,1),.05,100),
-      rotation:clamp(finite(mat.rotation,0),-360,360),repeat:mat.repeat!==false};
+      rotation:clamp(finite(mat.rotation,0),-360,360),repeat:mat.repeat!==false,
+      tint:/^#[0-9a-f]{6}$/i.test(mat.tint||'')?mat.tint:'#ffffff',
+      mix:clamp(finite(mat.mix,0),0,100),bump:clamp(finite(mat.bump,1),0,8),
+      roughness:clamp(finite(mat.roughness,85),5,100)};
     });
     o.faceMaterials=paint;
    }
