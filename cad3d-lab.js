@@ -3716,10 +3716,20 @@ function cad3dInitSketchCapture(){
  panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchProcess);
  var preset=panel.querySelector('[data-sketch-preset]');
  preset.addEventListener('change',function(){
-  var styles={technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,paper:'white'},
-   ink:{style:'ink',profile:'3',extension:'4',endpoints:'2',jitter:'1',bowing:'1.2',multiStroke:true,paper:'cream'},
-   watercolor:{style:'watercolor',profile:'2',extension:'4',endpoints:'1',jitter:'2',bowing:'1.7',multiStroke:true,paper:'watercolor'},
-   pencil:{style:'pencil',profile:'2',extension:'5',endpoints:'2',jitter:'2',bowing:'2',multiStroke:true,paper:'cream'}};
+  var styles={
+   technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'white',passes:true,geometry:false,shadow:'20',grain:'12',detail:'82'},
+   ink:{style:'ink',profile:'2',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'cream',passes:true,geometry:false,shadow:'48',grain:'28',detail:'70'},
+   watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:false,shadow:'54',grain:'76',detail:'42'},
+   pencil:{style:'pencil',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'cream',passes:true,geometry:false,shadow:'60',grain:'67',detail:'82'},
+   marker:{style:'marker',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'white',passes:true,geometry:false,shadow:'35',grain:'18',detail:'53'},
+   wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:false,shadow:'69',grain:'64',detail:'41'}
+  };
   if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
  });
  panel.querySelector('[data-sketch-save-preset]').addEventListener('click',function(){
@@ -3846,9 +3856,9 @@ function build(){
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
  '<section class="cad3dSketchCapturePanel" role="dialog" aria-label="Render de croquis arquitectónico" hidden>'+
  '<header class="cad3dSketchCaptureHead"><strong>✎ RENDER CROQUIS · VISTA ACTUAL</strong><button type="button" class="cad3dSketchClose" aria-label="Cerrar">×</button></header>'+
- '<div class="cad3dSketchCaptureControls"><label>Preajuste<select data-sketch-preset><option value="custom">Personalizado</option><option value="technical">Técnico</option><option value="ink">Tinta</option><option value="watercolor">Acuarela</option><option value="pencil">Lápiz</option></select></label>'+
+ '<div class="cad3dSketchCaptureControls"><label>Preajuste<select data-sketch-preset><option value="custom">Personalizado</option><option value="technical">Técnico</option><option value="ink">Tinta</option><option value="watercolor">Acuarela</option><option value="pencil">Lápiz</option><option value="marker">Marcador</option><option value="wash">Aguada</option></select></label>'+
  '<button type="button" class="btn" data-sketch-save-preset>Guardar estilo</button><button type="button" class="btn" data-sketch-load-preset>Cargar estilo</button>'+
- '<label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador conceptual</option></select></label>'+
+ '<label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador y pastel</option><option value="wash">Aguada tonal</option></select></label>'+
  '<label>Color de líneas<input type="color" data-sketch-setting="edgeColor" value="#303843"></label>'+
  '<label>Grosor de trazo (1–5)<input type="range" min="1" max="5" value="2" data-sketch-setting="weight"></label>'+
  '<label>Trazo irregular<input type="range" min="0" max="3" value="0" data-sketch-setting="jitter"></label>'+
@@ -3858,7 +3868,11 @@ function build(){
  '<label>Extensiones<input type="range" min="0" max="10" value="3" data-sketch-setting="extension"></label>'+
  '<label>Puntos finales<input type="range" min="0" max="6" value="2" data-sketch-setting="endpoints"></label>'+
  '<label>Papel<select data-sketch-setting="paper"><option value="white">Blanco</option><option value="cream">Crema</option><option value="watercolor">Acuarela</option></select></label>'+
- '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="geometry" checked> Aristas geométricas</label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="passes" checked> Motor por pasadas (recomendado)</label>'+
+ '<label>Sombras naturales<input type="range" min="0" max="100" value="45" data-sketch-setting="shadow"></label>'+
+ '<label>Textura de papel<input type="range" min="0" max="100" value="40" data-sketch-setting="grain"></label>'+
+ '<label>Detalle de contornos<input type="range" min="0" max="100" value="50" data-sketch-setting="detail"></label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="geometry"> Reforzar aristas 3D (experimental)</label>'+
  '<label>Color de paredes<input type="color" data-sketch-setting="wallColor" value="#e8d7b9"></label>'+
  '<label>Caras<select data-sketch-setting="wallMode"><option value="original">Colores originales</option><option value="tint">Tintar superficies neutras</option></select></label>'+
  '<label>Color de cielo<input type="color" data-sketch-setting="skyColor" value="#b9dbf2"></label>'+
@@ -3871,7 +3885,7 @@ function build(){
  '<button type="button" class="btn cad3dSketchRecapture" title="Capturar de nuevo la cámara actual">Actualizar captura</button>'+
  '<button type="button" class="btn cad3dSketchDownload">Guardar PNG</button></div>'+
  '<canvas class="cad3dSketchCapturePreview" aria-label="Vista procesada como croquis"></canvas>'+
- '<small>Procesamiento local de la imagen: conserva el encuadre y la geometría. No agrega objetos ni utiliza IA.</small></section>'+
+ '<small>Motor local de seis pasadas: captura limpia → suavizado → máscaras → aguadas → contornos → sombras. Respeta el encuadre y la geometría; no agrega objetos ni utiliza IA.</small></section>'+
  cad3dMaterialMarkup()+
  '<div class="body">'+
  '<aside id="cad3dArchPalette" class="archPalette" aria-label="Galería paramétrica 3D" hidden>'+
