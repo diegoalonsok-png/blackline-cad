@@ -3411,7 +3411,7 @@ function cad3dSketchCapture(){
  var oldPixelRatio=renderer?.getPixelRatio(),oldAspect=camera?.aspect;
  var oldLeft=camera?.left,oldRight=camera?.right,oldTop=camera?.top,oldBottom=camera?.bottom;
  var resized=false,view=root.querySelector('.view');
- function hide(node){if(node?.visible){hidden.push(node);node.visible=false;}}
+ function hide(node){if(node?.visible){hidden.push([node,node.visible]);node.visible=false;}}
  cad3dSketchCleanCapture=true;
  try{
   if(renderer&&scene&&camera){
@@ -3442,7 +3442,7 @@ function cad3dSketchCapture(){
    }
    camera.updateProjectionMatrix();
   }
-  for(var i=hidden.length-1;i>=0;i--)hidden[i].visible=true;
+  for(var n=hidden.length-1;n>=0;n--)hidden[n][0].visible=hidden[n][1];
   if(changedStyle){renderStyle=oldStyle;applyRenderStyle();}
   cad3dSketchCleanCapture=oldClean;
   if(renderer&&scene&&camera)renderer.render(scene,camera);
