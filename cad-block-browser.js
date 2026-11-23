@@ -66,7 +66,7 @@
 .bl-light #cadBlockBrowser input[type=search]{background:#fff;color:#16212a;border-color:#b8c5ce}`;
  document.head.append(css);
 
- let el=null,armedId=null;
+ let el=null,armedId=null,visibleCount=72;
  // Quality gate: the temporary schematic views26 set remains in source for
  // backward compatibility, but is not advertised as production CAD drafting.
  const items=()=>LIB.library.filter(it=>!it.hideFromGallery&&!/^views26-/.test(it.id));
@@ -111,9 +111,10 @@
   const count=c=>items().filter(i=>inView(i)&&(!c||groupOf(i)===c)).length;
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
-  const list=filtered(),grid=el.querySelector('.grid');
+  const list=filtered(),grid=el.querySelector('.grid'),shown=list.slice(0,visibleCount);
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${st.size}px,1fr))`;
-  grid.innerHTML=list.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)}">${ARQ.thumb(it.id,Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:#8ea2ae;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)}">${ARQ.thumb(it.id,Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:#8ea2ae;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
  }
  function place(){
@@ -132,15 +133,16 @@
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
-  q.addEventListener('input',()=>{st.q=q.value;paint()});
+  q.addEventListener('input',()=>{st.q=q.value;visibleCount=72;paint()});
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();paint()});
   el.addEventListener('click',e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
-   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';save();paint();return}
-   const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;save();paint();return}
+   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=72;save();paint();return}
+   const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=72;save();paint();return}
+   if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=72;paint();el.querySelector('.grid').scrollTop=pos;return}
    const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
