@@ -795,6 +795,7 @@ css+="\n#cad3dLab .cad3dNavToolbar,#cad3dLab .cad3dStyleToolbar,#cad3dLab .cad3d
 css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:hidden}\n#cad3dLab .view.wire2dView{background:#fff!important}\n";
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
+css+="\n#cad3dLab > .viewSavePanel{position:absolute!important;left:36px;top:180px;right:auto!important;bottom:auto!important;z-index:145!important;box-sizing:border-box;max-width:calc(100% - 16px)!important;max-height:calc(100% - 32px)!important;overflow:auto}\n#cad3dLab > .viewSavePanel[hidden]{display:none!important}\n#cad3dLab .viewSaveHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-14px -14px 5px;padding:10px 14px;border-bottom:1px solid #587081;background:#223443;border-radius:10px 10px 0 0;cursor:grab;user-select:none;touch-action:none;font:700 11px Inter,Arial,sans-serif;letter-spacing:.4px}\n#cad3dLab .viewSaveHeader:active{cursor:grabbing}\n#cad3dLab .viewSaveClose{background:none!important;border:0!important;color:#e7f1f6!important;min-height:22px!important;padding:0 5px!important;font-size:20px!important;cursor:pointer}\n";
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
@@ -2032,6 +2033,52 @@ function cad3dMakeSunPanelMovable(){
  handle.addEventListener('lostpointercapture',finish);
 }
 
+function cad3dMakeSavePanelMovable(){
+ var panel=root.querySelector('.viewSavePanel'),menu=root.querySelector('.viewSaveMenu');
+ var handle=panel?.querySelector('.viewSaveHeader'),close=panel?.querySelector('.viewSaveClose');
+ if(!panel||!menu||!handle||!close)return;
+ root.appendChild(panel);
+ var drag=null,restored=cad3dPaletteRestore('save-image',panel);
+ function positionPanel(){
+  if(!panel.dataset.userPositioned){
+   var r=root.getBoundingClientRect(),b=menu.getBoundingClientRect();
+   panel.style.left=clamp(b.left-r.left,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+   panel.style.top=clamp(b.bottom-r.top+7,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+  }
+  cad3dPaletteConstrain(panel);cad3dBringPaletteFront(panel);
+ }
+ menu.querySelector('summary').addEventListener('click',function(e){
+  e.preventDefault();menu.open=false;
+  panel.hidden=!panel.hidden;
+  if(!panel.hidden)positionPanel();
+ });
+ if(restored){panel.hidden=false;cad3dPaletteConstrain(panel);panel.hidden=true;}
+ close.addEventListener('click',function(e){e.stopPropagation();panel.hidden=true;});
+ panel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(panel);});
+ handle.addEventListener('pointerdown',function(e){
+  if(e.button!==0||e.target.closest('button'))return;
+  e.preventDefault();e.stopPropagation();
+  var b=panel.getBoundingClientRect();
+  drag={id:e.pointerId,dx:e.clientX-b.left,dy:e.clientY-b.top};
+  handle.setPointerCapture(e.pointerId);
+  panel.dataset.userPositioned='true';cad3dBringPaletteFront(panel);
+ });
+ handle.addEventListener('pointermove',function(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var rr=root.getBoundingClientRect();
+  panel.style.left=clamp(e.clientX-rr.left-drag.dx,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+  panel.style.top=clamp(e.clientY-rr.top-drag.dy,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+ });
+ function finish(e){
+  if(!drag||drag.id!==e.pointerId)return;
+  var id=drag.id;drag=null;
+  cad3dPaletteConstrain(panel);cad3dPaletteRemember('save-image',panel);
+  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);}catch(_e){}
+ }
+ handle.addEventListener('pointerup',finish);
+ handle.addEventListener('pointercancel',finish);
+ handle.addEventListener('lostpointercapture',finish);
+}
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
@@ -2097,7 +2144,7 @@ function build(){
  '<details class="ioMenu"><summary class="btn" title="Import" aria-label="Import">'+ico('folder')+'<span>Import</span></summary><div>'+
  tool('open','Open .3DJSON','folder')+tool('cad','Import DWG / DXF','folder')+tool('plan','Use CAD2D plan','view')+'</div></details>'+
  '<details class="viewSaveMenu"><summary class="btn" title="Guardar vista en PNG, JPG o PDF" aria-label="Save view">'+ico('export')+'<span>Save view</span></summary>'+
- '<div class="viewSavePanel" role="group" aria-label="Exportar vista 3D">'+
+ '<div class="viewSavePanel" role="group" aria-label="Exportar vista 3D" hidden><div class="viewSaveHeader" title="Arrastrar para desplazar el cuadro"><strong>GUARDAR IMAGEN / PDF</strong><button type="button" class="viewSaveClose" aria-label="Cerrar cuadro de exportación">×</button></div>'+
  '<label>Formato<select data-save-format><option value="png">PNG</option><option value="jpg">JPG</option><option value="pdf">PDF</option></select></label>'+
  '<label>Tamaño<select data-save-size><option value="viewport">Vista actual</option><option value="hd">1920 × 1080 px</option><option value="2k">2560 × 1440 px</option><option value="4k">3840 × 2160 px</option><option value="a4">A4 horizontal</option><option value="a3">A3 horizontal</option><option value="a2">A2 horizontal</option><option value="custom">Personalizado (píxeles)</option></select></label>'+
  '<div class="saveRow"><label>Ancho (px)<input data-save-width type="number" min="128" max="8192" step="1" value="1920"></label>'+
@@ -2265,6 +2312,7 @@ function build(){
  });
  renderStyleControls();
  cad3dMakeSunPanelMovable();
+ cad3dMakeSavePanelMovable();
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
@@ -2280,8 +2328,8 @@ function build(){
   if(!preset)return;sunSettings.azimuth=preset[0];sunSettings.elevation=preset[1];sunSettings.enabled=true;applySunSettings();
  });});
  root.querySelectorAll('[data-sun-setting]').forEach(function(input){input.addEventListener('input',function(){sunSettings[this.dataset.sunSetting]=Number(this.value);applySunSettings();});});
- root.querySelector('.viewSaveMenu').addEventListener('change',updateSaveViewSettings);
- root.querySelector('.viewSaveMenu').addEventListener('input',updateSaveViewSettings);
+ root.querySelector('.viewSavePanel').addEventListener('change',updateSaveViewSettings);
+ root.querySelector('.viewSavePanel').addEventListener('input',updateSaveViewSettings);
  root.querySelector('[data-save-go]').addEventListener('click',saveCAD3DView);
  updateSaveViewSettings();
  root.querySelector('.draftBar form').addEventListener('submit',function(e){e.preventDefault();run3DCommand();});
@@ -4553,7 +4601,7 @@ function setSketchStyle(mode){
 }
 
 function saveViewSettings(){
- var menu=root.querySelector('.viewSaveMenu');
+ var menu=root.querySelector('.viewSavePanel');
  var size=menu.querySelector('[data-save-size]').value;
  var dpi=Number(menu.querySelector('[data-save-dpi]').value)||300;
  var dims={hd:[1920,1080],'2k':[2560,1440],'4k':[3840,2160],
@@ -4571,7 +4619,7 @@ function saveViewSettings(){
   format:menu.querySelector('[data-save-format]').value};
 }
 function updateSaveViewSettings(){
- var menu=root.querySelector('.viewSaveMenu'),settings=saveViewSettings();
+ var menu=root.querySelector('.viewSavePanel'),settings=saveViewSettings();
  if(settings.size!=='custom'&&Number.isFinite(settings.w)&&Number.isFinite(settings.h)){
   menu.querySelector('[data-save-width]').value=settings.w;
   menu.querySelector('[data-save-height]').value=settings.h;
@@ -4652,7 +4700,7 @@ async function saveCAD3DView(){
   }
   text('Vista exportada '+o.w+' × '+o.h+' px · '+o.format.toUpperCase()+
    (renderer?'':' · Vista de compatibilidad ampliada'));
-  root.querySelector('.viewSaveMenu').open=false;
+  root.querySelector('.viewSavePanel').hidden=true;
  }catch(err){text('No se pudo guardar la vista: '+(err.message||err));}
  finally{
   if(renderer){
