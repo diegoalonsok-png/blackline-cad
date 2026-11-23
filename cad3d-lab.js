@@ -800,6 +800,7 @@ css+="\n#cad3dLab > .cad3dSketchCapturePanel{position:absolute;z-index:160;left:
 css+="\n#cad3dLab .cad3dNavToolbar [data-nav-tool=select]{font-size:22px!important;min-width:39px!important;font-weight:700!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{border:1px solid #79b9d0!important;background:#22506a!important;color:#f4fbff!important;font-weight:700!important;white-space:nowrap!important}\n#cad3dLab .view:not(.cad3dPanning):not(.placing) canvas{cursor:default}\n";
 css+="\n#cad3dLab .cad3dSketchCaptureControls{max-height:182px;overflow:auto;align-items:center!important;gap:8px!important;padding-right:4px}\n#cad3dLab .cad3dSketchCaptureControls label{min-width:130px!important;max-width:210px!important;flex:1 1 150px!important}\n#cad3dLab .cad3dSketchCaptureControls label.cad3dSketchCheck{display:flex!important;align-items:center!important;gap:5px!important;min-width:105px!important;flex:0 1 auto!important;white-space:nowrap}\n#cad3dLab .cad3dSketchCaptureControls label.cad3dSketchCheck input{width:auto!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{display:inline-flex!important;align-items:center!important;gap:7px!important}\n";
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
+css+="\n/* The multicolour Croquis cube already opens Styles: hide its redundant black twin. */\n#cad3dLab .tools .styleControl,#cad3dLab .tools .styleControl > .styleLaunch{display:none!important;width:0!important;min-width:0!important;margin:0!important;padding:0!important}\n#cad3dLab .cad3dMarquee{position:absolute;z-index:28;pointer-events:none;box-sizing:border-box;border:1px solid #45a5ff;background:rgba(53,147,240,.21)}\n#cad3dLab .cad3dMarquee.crossing{border:1px dashed #45d780;background:rgba(52,190,103,.25)}\n#cad3dLab .cad3dMarquee[hidden]{display:none!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -3516,6 +3517,67 @@ function cad3dViewAlias(word){
  setViewPreset(aliases[key]);
  return true;
 }
+
+function cad3dMarqueeNode(){
+ var view=root?.querySelector('.view');if(!view)return null;
+ var box=view.querySelector('.cad3dMarquee');
+ if(!box){box=document.createElement('div');box.className='cad3dMarquee';box.hidden=true;view.appendChild(box);}
+ return box;
+}
+function cad3dMarqueeHide(){var box=root?.querySelector('.cad3dMarquee');if(box)box.hidden=true;}
+function cad3dMarqueeDraw(ax,ay,bx,by){
+ var box=cad3dMarqueeNode(),view=root?.querySelector('.view');if(!box||!view)return;
+ var r=view.getBoundingClientRect();
+ var x1=clamp(ax-r.left,0,r.width),x2=clamp(bx-r.left,0,r.width);
+ var y1=clamp(ay-r.top,0,r.height),y2=clamp(by-r.top,0,r.height);
+ box.hidden=false;box.classList.toggle('crossing',bx<ax);
+ box.style.left=Math.min(x1,x2)+'px';box.style.top=Math.min(y1,y2)+'px';
+ box.style.width=Math.abs(x2-x1)+'px';box.style.height=Math.abs(y2-y1)+'px';
+}
+function cad3dRecordScreenBounds(rec,view){
+ var pts=[];
+ if(fallbackCanvas){
+  var project=fallbackProjector(),angle=(rec.rot||0)*Math.PI/180,c=Math.cos(angle),si=Math.sin(angle);
+  if(rec.type==='profile2d'&&rec.profilePoints?.length){
+   rec.profilePoints.forEach(function(v){pts.push(project(rec.x+v[0]*c-v[1]*si,rec.y+v[0]*si+v[1]*c,rec.z||0));});
+  }else{
+   var radius=rec.radius||1,w=rec.w||radius*2,d=rec.d||radius*2,h=rec.h||radius*2;
+   if(rec.type==='sphere'||rec.type==='cylinder'||rec.type==='cone')w=d=radius*2;
+   for(var iz=0;iz<2;iz++)for(var iy=0;iy<2;iy++)for(var ix=0;ix<2;ix++){
+    var lx=(ix-.5)*w,ly=(iy-.5)*d;
+    pts.push(project(rec.x+lx*c-ly*si,rec.y+lx*si+ly*c,(rec.z||0)+iz*h));
+   }
+  }
+ }else if(modelRoot&&camera){
+  var group=modelRoot.children.find(function(g){return g.userData.owner===rec.id;});
+  if(!group)return null;
+  group.updateMatrixWorld(true);camera.updateMatrixWorld(true);
+  var bounds=new T.Box3().setFromObject(group);if(bounds.isEmpty())return null;
+  for(var iz=0;iz<2;iz++)for(var iy=0;iy<2;iy++)for(var ix=0;ix<2;ix++){
+   var v=new T.Vector3(ix?bounds.max.x:bounds.min.x,iy?bounds.max.y:bounds.min.y,iz?bounds.max.z:bounds.min.z).project(camera);
+   if(Number.isFinite(v.x+v.y+v.z))pts.push({x:(v.x+1)*view.clientWidth/2,y:(1-v.y)*view.clientHeight/2});
+  }
+ }
+ if(!pts.length)return null;
+ var left=Infinity,right=-Infinity,top=Infinity,bottom=-Infinity;
+ pts.forEach(function(p){left=Math.min(left,p.x);right=Math.max(right,p.x);top=Math.min(top,p.y);bottom=Math.max(bottom,p.y);});
+ return Number.isFinite(left+right+top+bottom)?{left:left,right:right,top:top,bottom:bottom}:null;
+}
+function cad3dMarqueeFinish(ax,ay,bx,by,add){
+ cad3dMarqueeHide();
+ var view=root?.querySelector('.view');if(!view)return;
+ var r=view.getBoundingClientRect(),left=Math.min(ax,bx)-r.left,right=Math.max(ax,bx)-r.left;
+ var top=Math.min(ay,by)-r.top,bottom=Math.max(ay,by)-r.top,crossing=bx<ax,ids=[];
+ records.filter(editableRecord).forEach(function(rec){
+  var b=cad3dRecordScreenBounds(rec,view);if(!b)return;
+  var contained=b.left>=left&&b.right<=right&&b.top>=top&&b.bottom<=bottom;
+  var overlaps=b.left<=right&&b.right>=left&&b.top<=bottom&&b.bottom>=top;
+  if(crossing?overlaps:contained)ids.push(rec.id);
+ });
+ selected=add?Array.from(new Set(selected.concat(ids))):ids;
+ selectedOpeningId=null;renderProps();highlight();
+ text((crossing?'Ventana verde · cruce':'Ventana azul · contenido')+' · '+selected.length+' objetos seleccionados');
+}
 function bindCanvas(el){
  el.tabIndex=0;
  el.addEventListener('contextmenu',function(e){
@@ -3559,7 +3621,7 @@ function bindCanvas(el){
     dragging.moved=true;dragging.lastX=e.clientX;dragging.lastY=e.clientY;
     el.dataset.navigationDrag='true';
     if(dragging.select){
-     // Selection must never orbit or pan the camera.
+     cad3dMarqueeDraw(dragging.x,dragging.y,e.clientX,e.clientY);
     }else if(dragging.pan)panView(dx,dy,el);
     else{
      orbit.az-=dx*.007;orbit.el=clamp(orbit.el+dy*.007,-1.45,1.45);
@@ -3584,12 +3646,17 @@ function bindCanvas(el){
    return;
   }
   var click=!dragging.moved&&Math.hypot(e.clientX-dragging.x,e.clientY-dragging.y)<=5;
+  var selectionWindow=dragging.select&&dragging.moved&&!placing;
+  var startX=dragging.x,startY=dragging.y;
   dragging=null;delete el.dataset.navigationDrag;
+  if(selectionWindow){cad3dMarqueeFinish(startX,startY,e.clientX,e.clientY,e.shiftKey);return;}
+  cad3dMarqueeHide();
   if(click&&e.button===0&&cad3dNavigationTool==='select'){hideObjectContextMenu();if(placing)placeAt(e);else selectAt(e);}
   if(click&&e.button===2&&!placing){selectAt(e);showObjectContextMenu(e);}
   if(draftModes.dyn)updateDynamicReadout(e);
  });
- el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId){dragging=null;delete el.dataset.navigationDrag;}});
+ el.addEventListener('lostpointercapture',function(e){if(dragging?.id===e.pointerId){dragging=null;delete el.dataset.navigationDrag;cad3dMarqueeHide();}});
+ el.addEventListener('pointercancel',function(e){if(dragging?.id===e.pointerId){dragging=null;delete el.dataset.navigationDrag;cad3dMarqueeHide();}});
  el.addEventListener('wheel',function(e){
   e.preventDefault();
   if(viewMode==='walk'){
