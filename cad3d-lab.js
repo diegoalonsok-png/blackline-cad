@@ -839,6 +839,7 @@ css+="\n#cad3dLab .cad3dMaterialCategory{display:flex;align-items:center;gap:8px
 css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px;border:1px solid #7398ac;border-radius:5px;background:#ddd}\n#cad3dLab .cad3dMaterialEditorBody .cad3dMatSave{background:#314c5f;border-color:#6f9bb5;font-weight:500}\n";
 css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;padding:7px 12px;font:11px Inter,Arial,sans-serif;color:#d4e9f6;background:#21394a;border-bottom:1px solid #577589;cursor:pointer}\n#cad3dLab .cad3dStairsBeta input{accent-color:#6bb8e6}\n#cad3dLab .archTools button[hidden]{display:none!important}\n#cad3dLab .cad3dStairStats{margin:9px 0;padding:8px;border:1px solid #4e748a;border-radius:6px;font-size:11px;color:#c7dbe6;background:#1a3342}\n";
 css+="\n#cad3dLab .cad3dHistoryButton{font-family:Arial,sans-serif!important;font-size:21px!important;line-height:1!important;font-weight:600!important;min-width:35px!important}\n#cad3dLab .cad3dHistoryButton:disabled{opacity:.35!important;cursor:not-allowed!important;background:#14212c!important}\n#cad3dLab .cad3dHistoryButton:not(:disabled){color:#e3f6ff!important;border-color:#66899c!important}\n";
+css+="\n#cad3dLab.cad3dPlanMode .view{background:#fff!important}\n#cad3dLab.cad3dPlanMode .cad3dPlanWallOverlay{pointer-events:none}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -5919,15 +5920,23 @@ function setVisualStyle(mode){
  if(renderer){applyRenderStyle();highlight();}
  else renderStyleControls();
  if(isCad3DSketch(mode))applySunSettings();
- // A visual style is a material operation, never a camera preset.
- viewMode=savedView.mode;activeView=savedView.active;
- orbit.az=savedView.az;orbit.el=savedView.el;orbit.dist=savedView.dist;
- if(target&&savedView.target)target.set(savedView.target.x,savedView.target.y,savedView.target.z);
+ // 2D Wireframe is a CAD drafting mode: top view, ortho camera and black-on-white.
+ // All geometry stays in the same editable CAD3D model; no files are converted.
+ if(mode==='wire2d'){
+  viewMode='ortho';activeView='top';orbit.az=0;orbit.el=Math.PI/2;
+ }else{
+  viewMode=savedView.mode;activeView=savedView.active;
+  orbit.az=savedView.az;orbit.el=savedView.el;orbit.dist=savedView.dist;
+  if(target&&savedView.target)target.set(savedView.target.x,savedView.target.y,savedView.target.z);
+ }
+ root?.classList.toggle('cad3dPlanMode',mode==='wire2d');
  if(renderer){applyViewCamera();renderer.shadowMap.needsUpdate=true;}
  syncViewControls();
+ if(mode==='wire2d')fit3DModel();
  apply3DEnvironment();
  if(fallbackCanvas)fallbackDraw();
- text('Visual Style: '+CAD3D_VISUAL_STYLES[mode]+' · cámara y geometría conservadas');
+ text(mode==='wire2d'?'2D Wireframe · Planta superior ortogonal · fondo blanco, líneas negras · edición CAD2D':
+  'Visual Style: '+CAD3D_VISUAL_STYLES[mode]+' · geometría conservada');
  return true;
 }
 function setSketchStyle(mode){
