@@ -999,7 +999,7 @@ css+=`
 /* Compacto según las paletas 2D: misma fila de ocho acciones y menor altura.
    La geometría, los seis iconos originales y sus funciones se mantienen. */
 #cad3dLab>.cad3dGiroPalette{
- width:min(695px,calc(100% - 22px))!important;
+ width:min(432px,calc(100% - 16px));
  min-width:min(525px,calc(100% - 22px))!important;
  max-width:min(820px,calc(100% - 22px))!important;
  height:165px;min-height:48px;
