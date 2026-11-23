@@ -290,4 +290,6 @@
  const qb=document.querySelector('#cadQuickBar [data-qb=blocks]');if(qb){const n=qb.cloneNode(true);n.title=T('Block browser · BB','Explorador de bloques · BB');n.addEventListener('click',e=>{e.stopPropagation();open()});qb.replaceWith(n)}
  // Cargar detalles constructivos CC0 en la misma galería, sin reemplazar bloques.
  const cc0Script=document.createElement('script');cc0Script.src='assets/cc0-details-loader.js?v=20261123-1';cc0Script.defer=true;document.head.append(cc0Script);
+ // Nuevos bloques arquitectónicos CC0: se añaden a la galería existente, sin sobrescribirla.
+ for(const asset of ["cc0-bathroom-blocks.js","cc0-door-blocks.js","cc0-kitchen-blocks.js"]){const script=document.createElement('script');script.src='assets/'+asset+'?v=20261123-2';document.head.appendChild(script)}
 })();
