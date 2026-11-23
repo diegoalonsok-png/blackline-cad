@@ -17,6 +17,7 @@ css.textContent=[
  '#cad3dLab .cad3dAICompare>div{min-width:0}',
  '#cad3dLab .cad3dAICompare strong{font-size:11px;display:block;margin-bottom:5px}',
  '#cad3dLab .cad3dAICompare img{display:block;width:100%;height:auto;max-height:400px;object-fit:contain;background:#fcfaf4;border:1px solid #4d6b7d}',
+ '#cad3dLab .cad3dAICompare img[hidden]{display:none!important}',
  '#cad3dLab .cad3dAIStatus{font-size:11px;margin:9px 0;color:#c2d6e2;min-height:17px}',
  '#cad3dLab .cad3dAINote{color:#b4c8d4;display:block;font:11px/1.5 Inter,Arial,sans-serif}',
  '@media(max-width:620px){#cad3dLab .cad3dAICompare{grid-template-columns:1fr}}'
