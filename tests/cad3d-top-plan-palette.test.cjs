@@ -248,3 +248,67 @@ test('Sol/Entorno keeps one live panel when docking into Layers',()=>{
  assert(src.includes('.side.sidebar>.sunPanel.cad3dSunDocked[hidden]'));
  assert(src.includes("name==='sun'&&panel.classList.contains('cad3dSunDocked')"));
 });
+
+test('Painterly sketch modules produce deterministic distinct five-style outputs',()=>{
+ const process=new Function(between('function cad3dSketchNoise(', 'function cad3dSketchRenderPasses(')+'return cad3dSketchMultiPass;')();
+ const w=80,h=56,rgba=new Uint8ClampedArray(w*h*4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const k=(y*w+x)*4;
+  const building=x>=14&&x<64&&y>=13&&y<44;
+  const glass=building&&x>38&&x<52&&y>19&&y<36;
+  const ground=y>=44;
+  const rgb=glass?[130,166,185]:building?[190,181,169]:ground?[207,205,196]:[183,215,237];
+  rgba.set([...rgb,255],k);
+ }
+ const original=Array.from(rgba),colors=new Set();
+ for(const style of ['ink','watercolor','pencil','marker','wash']){
+  const opts={style,sky:true,ground:true,brush:80,pigment:80,finish:70,shadow:60,grain:55,detail:75};
+  const got=process({data:rgba},w,h,opts);
+  const repeated=process({data:rgba},w,h,opts);
+  assert.equal(got.data.length,w*h*4);
+  assert.deepEqual(Array.from(got.data),Array.from(repeated.data),'Styles must be deterministic');
+  assert(got.data.every((v,i)=>i%4!==3||v===255),'Output must be opaque RGBA');
+  assert(got.edgeMask.filter(v=>v>0).length>100,'Building outline must survive');
+  assert(got.skyMask.filter(Boolean).length>100,'Sky segmentation expected');
+  assert(got.groundMask.filter(Boolean).length>100,'Ground segmentation expected');
+  colors.add(Array.from(got.data.slice((22*w+24)*4,(22*w+24)*4+3)).join(','));
+ }
+ assert.equal(colors.size,5,'Five styles must have visually distinct painting profiles');
+ assert.deepEqual(Array.from(rgba),original,'Input raster must never be mutated');
+});
+test('Painterly brush, wet pigment and finishing are independent adjustable passes',()=>{
+ const process=new Function(between('function cad3dSketchNoise(', 'function cad3dSketchRenderPasses(')+'return cad3dSketchMultiPass;')();
+ const w=52,h=40,rgba=new Uint8ClampedArray(w*h*4);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  let k=(y*w+x)*4,building=x>=8&&x<45&&y>=8&&y<34;
+  rgba.set(building?[157+(x%12),155,147,255]:[194,222,241,255],k);
+ }
+ const make=(brush,pigment,finish)=>process({data:rgba},w,h,{
+  style:'watercolor',sky:true,ground:false,brush,pigment,finish,grain:65,detail:70
+ }).data;
+ const none=make(0,0,0);
+ const all=make(100,100,100);
+ assert(all.some((v,i)=>v!==none[i]),'Passes should change the raster');
+ assert(make(100,0,0).some((v,i)=>v!==none[i]),'Brushwork should be independently visible');
+ assert(make(0,100,0).some((v,i)=>v!==none[i]),'Pigment should be independently visible');
+ assert(make(0,0,100).some((v,i)=>v!==none[i]),'Finishing should be independently visible');
+});
+test('Sketch capture is clean and restores 3D helper visibility safely',()=>{
+ const cap=between('function cad3dSketchCapture(){', 'function cad3dSketchGeometryEdges(');
+ for(const token of ['cad3dSketchCleanCapture=true','hide(gridHelper)','hide(axesHelper)',
+  'hide(underlayGroup)','finally{','hidden[n][0].visible=hidden[n][1]',
+  'cad3dSketchCleanCapture=oldClean','cad3dSketchProcess()'])assert(cap.includes(token),token);
+ assert(src.includes('if(!cad3dSketchCleanCapture&&cad3dShowsGrid())'));
+ assert(src.includes('if(!wire&&!cad3dSketchCleanCapture)'));
+});
+test('Painterly palette exposes independent brush, pigment and tone controls without default wire seams',()=>{
+ for(const key of ['passes','shadow','grain','detail','brush','pigment','finish','geometry'])
+  assert(src.includes('data-sketch-setting="'+key+'"'),key);
+ assert(src.includes('data-sketch-setting="passes" checked'));
+ assert(src.includes('data-sketch-setting="geometry"> Reforzar aristas 3D'));
+ assert(src.includes('if(opts.edgeMask){'),'Optional raw-geometry overlays must check actual visible raster edges');
+ for(const name of ['function cad3dSketchWetPigment(','function cad3dSketchBrushwork(','function cad3dSketchFinalGrade('])
+  assert(src.includes(name),name);
+ assert(src.includes("cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount)"));
+ assert(src.includes("cad3dSketchBrushwork(output,smooth,grey,line,sky,ground,w,h,brushAmount,style)"));
+});
