@@ -2967,7 +2967,7 @@ function cad3dBounds(){
   var angle=(r.rot||0)*Math.PI/180;
   var ex=Math.abs(Math.cos(angle))*halfW+Math.abs(Math.sin(angle))*halfD;
   var ey=Math.abs(Math.sin(angle))*halfW+Math.abs(Math.cos(angle))*halfD;
-  var height=r.type==='sphere'?(r.radius||1)*2:(r.h||2);
+  var height=r.type==='sphere'?(r.radius||1)*2:(r.h||2)+(r.type==='stair'?finite(r.railHeight,.95):r.type==='railing'?Math.max(0,finite(r.railRise,0)):0);
   add((r.x||0)-ex,(r.y||0)-ey,r.z||0);
   add((r.x||0)+ex,(r.y||0)+ey,(r.z||0)+height);
   if(r.type==='profile2d'&&Array.isArray(r.profilePoints)){
@@ -3433,6 +3433,36 @@ function fallbackDraw(){
    if(active&&rec.profileClosed){ctx.fillStyle='rgba(255,205,96,.19)';ctx.fill();}
    ctx.strokeStyle=active?'#ffcf60':'#82c6df';ctx.lineWidth=active?2.6:1.6;ctx.stroke();
    if(active)points.forEach(function(p){var x=rec.x+c*p[0]-sn*p[1],y=rec.y+sn*p[0]+c*p[1],v=projection(x,y,rec.z||0);ctx.fillStyle='#ffcf60';ctx.fillRect(v.x-3.5,v.y-3.5,7,7);});
+  }else if(rec.type==='stair'){
+   var st=cad3dStairSpec(rec);
+   for(var i=0;i<st.n;i++)fallbackBox(projection,rec,st.going+.001,st.width,(i+1)*st.rise,
+    -st.run/2+st.going*(i+.5),0,0,'#a5abb1');
+   if(['left','right','both'].includes(rec.rails)){
+    var ca=Math.cos(rec.rot*Math.PI/180),sa=Math.sin(rec.rot*Math.PI/180),sides=rec.rails==='both'?[-1,1]:[rec.rails==='left'?-1:1];
+    sides.forEach(function(sign){
+     var y=sign*(st.width/2-.055),rh=finite(rec.railHeight,.95),prev=null;
+     for(var i=0;i<=st.n;i++){
+      var x=-st.run/2+st.run*i/st.n,z=Math.min(st.n,Math.max(1,i))*st.rise+rh;
+      var a=projection(rec.x+x*ca-y*sa,rec.y+x*sa+y*ca,rec.z+z);
+      if(prev){ctx.strokeStyle=renderStyle==='wire2d'?'#111111':'#b5bdc3';ctx.lineWidth=2;
+       ctx.beginPath();ctx.moveTo(prev.x,prev.y);ctx.lineTo(a.x,a.y);ctx.stroke();}
+      prev=a;
+     }
+    });
+   }
+  }else if(rec.type==='railing'){
+   var ca=Math.cos(rec.rot*Math.PI/180),sa=Math.sin(rec.rot*Math.PI/180),rise=finite(rec.railRise,0);
+   ctx.strokeStyle=renderStyle==='wire2d'?'#111111':'#a5becd';ctx.lineWidth=3;
+   var a=projection(rec.x-rec.w/2*ca,rec.y-rec.w/2*sa,rec.z+rec.h);
+   var b=projection(rec.x+rec.w/2*ca,rec.y+rec.w/2*sa,rec.z+rec.h+rise);
+   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+   var count=Math.max(1,Math.ceil(rec.w/clamp(rec.postSpacing||1,.35,3)));
+   for(var k=0;k<=count;k++){
+    var t=k/count,x=(t-.5)*rec.w,z=t*rise;
+    var foot=projection(rec.x+x*ca,rec.y+x*sa,rec.z+z);
+    var top=projection(rec.x+x*ca,rec.y+x*sa,rec.z+z+rec.h);
+    ctx.beginPath();ctx.moveTo(foot.x,foot.y);ctx.lineTo(top.x,top.y);ctx.stroke();
+   }
   }else if(rec.type==='wall'||rec.type==='slab'){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
@@ -4109,6 +4139,8 @@ function cad3dFallbackSurfaceHit(rec,projection,x,y){
   });
  }
  if(rec.type==='box'||rec.type==='block3d')return box(rec.w,rec.d,rec.h,0,0,0,0);
+ if(rec.type==='stair')return box(rec.w,rec.d,rec.h,0,0,0,0);
+ if(rec.type==='railing')return box(rec.w,Math.max(.08,rec.d),rec.h+Math.max(0,rec.railRise||0),0,0,0,0);
  if(rec.type==='wall'||rec.type==='slab'){
   var hit=false;architectureParts(rec,function(w,d,h,ox,oy,oz,color,slope){
    if(!hit)hit=box(w,d,h,ox,oy,oz,slope);
