@@ -3828,17 +3828,17 @@ function cad3dInitSketchCapture(){
  preset.addEventListener('change',function(){
   var styles={
    technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'white',passes:true,geometry:false,shadow:'20',grain:'12',detail:'82'},
+    paper:'white',passes:true,geometry:false,shadow:'20',grain:'12',detail:'82',brush:'6',pigment:'0',finish:'35'},
    ink:{style:'ink',profile:'2',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'48',grain:'28',detail:'70'},
+    paper:'cream',passes:true,geometry:false,shadow:'48',grain:'28',detail:'70',brush:'40',pigment:'23',finish:'75'},
    watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'54',grain:'76',detail:'42'},
+    paper:'watercolor',passes:true,geometry:false,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
    pencil:{style:'pencil',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'60',grain:'67',detail:'82'},
+    paper:'cream',passes:true,geometry:false,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
    marker:{style:'marker',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'white',passes:true,geometry:false,shadow:'35',grain:'18',detail:'53'},
+    paper:'white',passes:true,geometry:false,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
    wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'69',grain:'64',detail:'41'}
+    paper:'watercolor',passes:true,geometry:false,shadow:'69',grain:'64',detail:'41',brush:'43',pigment:'79',finish:'73'}
   };
   if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
  });
@@ -3982,6 +3982,9 @@ function build(){
  '<label>Sombras naturales<input type="range" min="0" max="100" value="45" data-sketch-setting="shadow"></label>'+
  '<label>Textura de papel<input type="range" min="0" max="100" value="40" data-sketch-setting="grain"></label>'+
  '<label>Detalle de contornos<input type="range" min="0" max="100" value="50" data-sketch-setting="detail"></label>'+
+ '<label>Pinceladas<input type="range" min="0" max="100" value="58" data-sketch-setting="brush"></label>'+
+ '<label>Difusión de pigmento<input type="range" min="0" max="100" value="60" data-sketch-setting="pigment"></label>'+
+ '<label>Acabado tonal<input type="range" min="0" max="100" value="65" data-sketch-setting="finish"></label>'+
  '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="geometry"> Reforzar aristas 3D (experimental)</label>'+
  '<label>Color de paredes<input type="color" data-sketch-setting="wallColor" value="#e8d7b9"></label>'+
  '<label>Caras<select data-sketch-setting="wallMode"><option value="original">Colores originales</option><option value="tint">Tintar superficies neutras</option></select></label>'+
