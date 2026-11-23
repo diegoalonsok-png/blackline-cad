@@ -6,7 +6,7 @@
 'use strict';
 const A=window.CAD2D_ARQ_LIBRARY;
 if(!A||!Array.isArray(A.library))return;
-const rxOpen=/puerta|ventana|ventanal|carpinter(?:ía|ia)|abertura|paño fijo|pano fijo|banderola|corrediz|persiana|door|window|dvh/i;
+const rxOpen=/puerta|port[oó]n|ventana|ventanal|muro cortina|carpinter(?:ía|ia)|abertura|paño fijo|pano fijo|banderola|corrediz|persiana|door|window|dvh/i;
 const rxDoor=/puerta|portón|porton|door/i;
 const rxSection=/corte|secci[oó]n|section|umbral|jamba|perfil/i;
 const rxElevation=/alzado|elevaci[oó]n|vista (?:frontal|posterior|lateral)|view|frente|elevation/i;
