@@ -43,6 +43,14 @@ const trialDays=()=>{
  if(!status.trialEndsAt)return null;
  return Math.ceil((new Date(status.trialEndsAt).getTime()-Date.now())/864e5);
 };
+// The 90-day trial and its expiry are unchanged. Only the UI wording changes.
+const finalTrialDay=(plan,days)=>plan==='trial'&&days===1;
+const trialBadgeText=(plan,days)=>{
+ if(plan==='pro'||plan==='studio')return plan==='studio'?L('ESTUDIO','STUDIO'):'PRO';
+ if(plan==='trial'&&(days??0)>0)
+  return finalTrialDay(plan,days)?L('PRO · 1 día','PRO · 1 day'):L('PRO · prueba','PRO · trial');
+ return L('PLANES','PLANS');
+};
 function can(feature){
  if(!enforce||status.plan==='beta')return true;           // beta abierta: todo habilitado
  if(status.plan==='trial'&&(trialDays()??0)>0)return true;  // prueba vigente verificada por servidor
@@ -127,10 +135,12 @@ function showPlans(reason,notice){
  document.getElementById('cadPlanDlg')?.remove();
  track('view_plans',{reason:reason?String(reason).slice(0,60):'manual'});
  const d=document.createElement('div');d.id='cadPlanDlg';d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');
- const cur=status.plan,days=trialDays();
+ const cur=status.plan,days=trialDays(),lastDay=finalTrialDay(cur,days);
  const head=(notice?'<p class="note">'+notice+'</p>':'')+(reason?'<p class="note">'+reason+L(' es parte del plan Pro.',' is part of the Pro plan.')+'</p>':'');
  const state=!enforce?'<p>'+L('Estás usando la <b>beta abierta</b>: todo está habilitado sin cargo.','You are using the <b>open beta</b>: everything is enabled for free.')+'</p>'
-  :cur==='trial'?'<p>'+L('Prueba con todo incluido: <b>'+Math.max(0,days??0)+' días</b> restantes.','All-inclusive trial: <b>'+Math.max(0,days??0)+' days</b> left.')+'</p><p class="note">'+L('Podés pasar a Pro cuando quieras. Si te suscribís ahora, el primer cobro se hace recién cuando terminan tus días de prueba: no perdés ningún día.','You can go Pro at any time. If you subscribe now, the first charge happens only when your trial days end: you lose no days.')+'</p>'
+  :cur==='trial'?(lastDay
+   ?'<p>'+L('Último día de la prueba PRO.','Final day of your PRO trial.')+'</p><p class="note">'+L('Después podés seguir dibujando con las funciones gratuitas o elegir un plan, como prefieras.','Afterwards you can keep drawing with the free features or choose a plan, whichever you prefer.')+'</p>'
+   :'<p>'+L('Tu prueba PRO está activa. Disfrutá las herramientas sin interrupciones.','Your PRO trial is active. Enjoy the tools without interruption.')+'</p>')
   :'<p>'+L('Plan actual','Current plan')+': <b>'+(cur==='pro'?'Pro':cur==='studio'?L('Estudio','Studio'):L('Gratis','Free'))+'</b>'+(status.email?' · '+esc(status.email):'')+(status.teamOf?' · '+L('incluido en el equipo de ','included in the team of ')+esc(status.teamOf):'')+'</p>';
  const li=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
  const free=li([L('Dibujo 2D completo, capas y cotas','Full 2D drafting, layers and dimensions'),L('DXF, SVG, PNG y PDF A4','DXF, SVG, PNG and A4 PDF'),L('Galería básica de bloques','Basic block gallery')]);
@@ -185,22 +195,16 @@ function paintBadge(){
  const host=document.querySelector('.brand, header, .topbar')||document.body;
  if(!b){b=document.createElement('button');b.type='button';b.id='cadPlanBadge';b.onclick=()=>showPlans();host.append(b)}
  const days=trialDays();
- const inTrial=status.plan==='trial'&&(days??0)>0;
- // Durante la prueba también se puede comprar: el botón muestra los días que quedan.
+ // No day count before the final day; no automatic sales or expiry popups.
  b.hidden=!enforce||status.plan==='beta';
- b.textContent=status.plan==='pro'||status.plan==='studio'?(status.plan==='studio'?L('ESTUDIO','STUDIO'):'PRO'):inTrial?L('PRO · prueba: '+days+' d','PRO · trial: '+days+' d'):L('PASAR A PRO','GO PRO');
- b.title='Planes y suscripción (comando PLAN)';
- maybeTrialEnded();
-}
-/* Al terminar los 90 días: un aviso amable, como mucho una vez por semana. Nunca bloquea el dibujo. */
-function maybeTrialEnded(){
- if(!enforce||status.plan!=='free'||!status.trialEndsAt||Date.parse(status.trialEndsAt)>Date.now())return;
- const KEY='cad2d-trial-ended-notice';let last=0;try{last=Number(localStorage.getItem(KEY))||0}catch(e){}
- if(Date.now()-last<7*864e5||document.getElementById('cadPlanDlg'))return;
- try{localStorage.setItem(KEY,String(Date.now()))}catch(e){}
- setTimeout(()=>showPlans(null,L('¿Te está sirviendo Blackline CAD? Ya llevás 3 meses usándolo con todo incluido. Podés seguir dibujando gratis con lo básico, o conservar todo por 29,99 € al año (2,50 € por mes) y ayudar a que siga creciendo.','Is Blackline CAD working for you? You have been using it with everything included for 3 months. You can keep drawing for free with the basics, or keep everything for €29.99 a year (€2.50 a month) and help it keep growing.')),1500);
+ b.textContent=trialBadgeText(status.plan,days);
+ b.title=finalTrialDay(status.plan,days)?L('Último día de prueba · Ver planes','Final trial day · View plans'):L('Planes y suscripción (comando PLAN)','Plans & subscription (PLAN command)');
+ b.setAttribute('aria-label',b.title);
 }
 window.CAD2D_PLAN=Object.freeze({can,refresh,showPlans,upsell,plans:PLANS,get status(){return {...status}},enforced:enforce});
 paymentReturn();
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{paintBadge();refresh()});else{paintBadge();refresh()}
+// The last-day label appears without requiring a page reload.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)paintBadge()});
+setInterval(()=>{if(!document.hidden)paintBadge()},60*1000);
 })();
