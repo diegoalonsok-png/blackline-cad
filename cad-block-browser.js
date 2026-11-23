@@ -36,6 +36,7 @@
   plan:{en:'Plans',es:'Plantas',mode:'Planta'},
   section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
   archive:{en:'Recovered views',es:'Vistas recuperadas',item:it=>archivedView(it)},
+  olymp3:{en:'Olimpiadas 3 · 1,000+ vectors',es:'Olimpiadas 3 · 1.000+ vectores',item:it=>/^olymp3-/.test(it.id)},
   doorElev:{en:'Door elevations',es:'Puertas en vista',item:it=>/puerta|door/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   windowElev:{en:'Window elevations',es:'Ventanas en vista',item:it=>/ventana|ventanal|window|paño fijo|pano fijo/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   fridgeElev:{en:'Fridge elevations',es:'Heladeras en vista',item:it=>/heladera|refrigerador|fridge|freezer/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
@@ -126,7 +127,11 @@
 .bl-light #cadBlockBrowser.visual input[type=search]{background:#fffaf0;color:#29302b;border-color:#c7b28c}`;
  document.head.append(css);
 
- let el=null,armedId=null,visibleCount=72;
+ let el=null,armedId=null,visibleCount=st.view==='olymp3'?18:72;
+ const pageSize=()=>st.view==='visual'?12:st.view==='olymp3'?18:72;
+ function loadOlimpiadas(){const pkg=window.CAD2D_OLYMPIADAS3;
+  if(pkg&&!pkg.loading&&pkg.loaded<pkg.total)pkg.load().catch(err=>CORE.toast('Bloques Olimpiadas: '+err.message));
+ }
  // Quality gate: the temporary schematic views26 set remains in source for
  // backward compatibility, but is not advertised as production CAD drafting.
  // Quality review hid older schematic views, not their editable geometry.
@@ -196,6 +201,8 @@
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
    :T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
+  const pkg=window.CAD2D_OLYMPIADAS3;
+  if(pkg&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Olimpiadas '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
  function place(){
   const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
@@ -204,7 +211,7 @@
   Object.assign(el.style,{left:st.x+'px',top:st.y+'px',width:st.w+'px',height:st.h+'px'});
  }
  function open(){
-  if(el){el.classList.remove('min');el.style.display='flex';place();paint();el.querySelector('input').focus();return}
+  if(el){el.classList.remove('min');el.style.display='flex';place();paint();loadOlimpiadas();el.querySelector('input').focus();return}
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
@@ -221,9 +228,9 @@
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
-   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=v==='visual'?12:72;save();paint();return}
-   const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=72;save();paint();return}
-   if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=(st.view==='visual'?12:72);paint();el.querySelector('.grid').scrollTop=pos;return}
+   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
+   const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
+   if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=pageSize();paint();el.querySelector('.grid').scrollTop=pos;return}
    const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
@@ -243,7 +250,7 @@
    h.addEventListener('pointerup',()=>{if(r){r=null;save()}});
   });
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
-  paint();q.focus();
+  paint();loadOlimpiadas();q.focus();
  }
  function close(){if(el)el.style.display='none';armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
@@ -254,7 +261,7 @@
  function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=12;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,close});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
