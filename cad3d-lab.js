@@ -795,6 +795,7 @@ css+="\n#cad3dLab .cad3dNavToolbar,#cad3dLab .cad3dStyleToolbar,#cad3dLab .cad3d
 css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:hidden}\n#cad3dLab .view.wire2dView{background:#fff!important}\n";
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
+css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -1924,7 +1925,7 @@ function cad3dCompact3DBar(){
 }
 function cad3dSyncCompactBars(){
  if(!root)return;
- root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.navTool===cad3dNavigationTool));});
+ root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String((b.dataset.navTool===cad3dNavigationTool||(b.dataset.navTool==='hand'&&cad3dNavigationTool==='pan')));});
  root.querySelectorAll('[data-quick-style]').forEach(function(b){
   b.setAttribute('aria-pressed',String(b.dataset.quickStyle==='sun'?sunSettings.enabled:b.dataset.quickStyle===renderStyle));
  });
@@ -1938,6 +1939,8 @@ function cad3dBindCompactBars(){
    var kind=nav.dataset.navTool;
    if(kind==='center'||kind==='fit'){fit3DModel();return;}
    cad3dNavigationTool=kind==='hand'?'pan':kind;
+   if(cad3dNavigationTool==='pan'){cad3dEndZoom();if(placing)setPlacement(null);}
+   root.querySelector('.view')?.classList.toggle('cad3dPanning',cad3dNavigationTool==='pan');
    cad3dSyncCompactBars();
    if(kind==='ring'){root.querySelector('.orbitBall')?.focus({preventScroll:true});}
    else root.querySelector('.view canvas')?.focus({preventScroll:true});
@@ -3136,7 +3139,7 @@ function bindCanvas(el){
   // Drawing takes precedence over navigation. Commit a point at pointerdown,
   // so a slight mouse movement or a lost pointerup cannot pan/orbit instead.
   // Alt+left, middle and right buttons remain available for navigation.
-  if(e.button===0&&cad3dZoomActive&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+  if(e.button===0&&cad3dZoomActive&&cad3dNavigationTool!=='pan'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
    dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,zoom:true};
    el.setPointerCapture(e.pointerId);return;
   }
@@ -4965,7 +4968,7 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a){
- if(a==='select'){cad3dNavigationTool='select';cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
+ if(a==='select'){cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
