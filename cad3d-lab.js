@@ -3379,35 +3379,118 @@ function worldPerPixel(view){
 
 /* Architectural plan presentation over the parametric 3D model.
    The overlay never replaces or edits actual wall/opening records. */
+
+/* Architectural TOP view: external boundary of the union of wall footprints.
+   Render-only; no changes to the underlying editable wall/opening objects. */
+var cad3dPlanBoundaryCache={key:null,edges:[]};
+function cad3dPlanBoundarySegments(){
+ var walls=records.filter(function(r){return r.type==='wall'&&visibleRecord(r);});
+ var key=JSON.stringify(walls.map(function(r){return [r.id,r.x,r.y,r.z,r.w,r.d,r.rot,r.openings];}));
+ if(cad3dPlanBoundaryCache.key===key)return cad3dPlanBoundaryCache.edges;
+ var polys=[];
+ walls.forEach(function(r){
+  var half=(r.w||0)/2,d=(r.d||.2)/2;if(half<=0||d<=0)return;
+  var gaps=(r.openings||[]).filter(function(o){
+   return (o.kind==='door'||o.kind==='opening'||o.styleId==='open-door')&&(o.sill||0)<1.55;
+  }).map(function(o){return {a:Math.max(-half,(o.offset||0)-(o.w||0)/2),
+   b:Math.min(half,(o.offset||0)+(o.w||0)/2)};})
+   .filter(function(v){return v.b>v.a;}).sort(function(a,b){return a.a-b.a;});
+  var parts=[],start=-half;
+  gaps.forEach(function(v){if(v.a>start+.0001)parts.push([start,v.a]);start=Math.max(start,v.b);});
+  if(start<half-.0001)parts.push([start,half]);
+  var join=wallJoinOffsets(r),ang=(r.rot||0)*Math.PI/180,c=Math.cos(ang),sn=Math.sin(ang);
+  function world(x,y){return {x:(r.x||0)+x*c-y*sn,y:(r.y||0)+x*sn+y*c};}
+  parts.forEach(function(p){
+   var atStart=Math.abs(p[0]+half)<.0001?join.start:null;
+   var atEnd=Math.abs(p[1]-half)<.0001?join.end:null;
+   var pts=[world(p[0]+(atStart?atStart.minus:0),-d),
+    world(p[1]+(atEnd?atEnd.minus:0),-d),
+    world(p[1]+(atEnd?atEnd.plus:0),d),
+    world(p[0]+(atStart?atStart.plus:0),d)];
+   var xs=pts.map(function(v){return v.x;}),ys=pts.map(function(v){return v.y;});
+   polys.push({id:r.id,z:r.z||0,pts:pts,
+    minX:Math.min.apply(null,xs),maxX:Math.max.apply(null,xs),
+    minY:Math.min.apply(null,ys),maxY:Math.max.apply(null,ys)});
+  });
+ });
+ function cross(ax,ay,bx,by){return ax*by-ay*bx;}
+ function contains(vertices,p){
+  var inside=false;
+  for(var i=0,j=vertices.length-1;i<vertices.length;j=i++){
+   var a=vertices[i],b=vertices[j];
+   if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;
+  }
+  return inside;
+ }
+ function occupied(pt,z){
+  return polys.some(function(p){
+   return Math.abs(p.z-z)<.025&&pt.x>=p.minX&&pt.x<=p.maxX&&
+    pt.y>=p.minY&&pt.y<=p.maxY&&contains(p.pts,pt);
+  });
+ }
+ var edges=[],eps=1e-8;
+ polys.forEach(function(poly){
+  for(var i=0;i<poly.pts.length;i++){
+   var a=poly.pts[i],b=poly.pts[(i+1)%poly.pts.length];
+   var rx=b.x-a.x,ry=b.y-a.y,len2=rx*rx+ry*ry;
+   if(len2<1e-12)continue;
+   var cuts=[0,1],len=Math.sqrt(len2);
+   polys.forEach(function(other){
+    if(other===poly||Math.abs(other.z-poly.z)>=.025||
+     Math.max(a.x,b.x)<other.minX-eps||Math.min(a.x,b.x)>other.maxX+eps||
+     Math.max(a.y,b.y)<other.minY-eps||Math.min(a.y,b.y)>other.maxY+eps)return;
+    other.pts.forEach(function(c,j){
+     var d=other.pts[(j+1)%other.pts.length],sx=d.x-c.x,sy=d.y-c.y;
+     var qx=c.x-a.x,qy=c.y-a.y,den=cross(rx,ry,sx,sy);
+     if(Math.abs(den)>1e-12){
+      var t=cross(qx,qy,sx,sy)/den,u=cross(qx,qy,rx,ry)/den;
+      if(t>eps&&t<1-eps&&u>=-eps&&u<=1+eps)cuts.push(t);
+     }else if(Math.abs(cross(qx,qy,rx,ry))<1e-8*len){
+      [c,d].forEach(function(pt){
+       var t=((pt.x-a.x)*rx+(pt.y-a.y)*ry)/len2;
+       if(t>eps&&t<1-eps)cuts.push(t);
+      });
+     }
+    });
+   });
+   cuts.sort(function(a,b){return a-b;});
+   for(var k=1;k<cuts.length;k++){
+    var t0=cuts[k-1],t1=cuts[k];if(t1-t0<1e-7)continue;
+    var t=(t0+t1)/2,mid={x:a.x+rx*t,y:a.y+ry*t};
+    var shift=Math.min(.0003,len*(t1-t0)*.1),nx=-ry/len,ny=rx/len;
+    var inL=occupied({x:mid.x+nx*shift,y:mid.y+ny*shift},poly.z);
+    var inR=occupied({x:mid.x-nx*shift,y:mid.y-ny*shift},poly.z);
+    if(inL!==inR)edges.push({id:poly.id,z:poly.z,
+     a:{x:a.x+rx*t0,y:a.y+ry*t0},b:{x:a.x+rx*t1,y:a.y+ry*t1}});
+   }
+  }
+ });
+ cad3dPlanBoundaryCache={key:key,edges:edges};
+ return edges;
+}
+
 function cad3dRenderPlanWalls(){
  if(!root)return;
- var view=root.querySelector('.view');
- if(!view)return;
+ var view=root.querySelector('.view');if(!view)return;
  var overlay=view.querySelector('.cad3dPlanWallOverlay');
  if(!overlay){
   overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
   overlay.classList.add('cad3dPlanWallOverlay');
-  overlay.setAttribute('aria-hidden','true');
-  view.appendChild(overlay);
+  overlay.setAttribute('aria-hidden','true');view.appendChild(overlay);
  }
- var top=activeView==='top' || (viewMode==='ortho'&&orbit.el>1.555);
- var plan=renderStyle==='wire2d'&&top;
+ var top=activeView==='top'||(viewMode==='ortho'&&orbit.el>1.555);
+ var plan=top&&['wire2d','wire3d','hidden','shaded','shaded-edges','monochrome'].includes(renderStyle);
  overlay.style.display=plan?'block':'none';
- if(modelRoot){
-  modelRoot.children.forEach(function(group){
-   var isWall=records.some(function(r){return r.id===group.userData.owner&&r.type==='wall';});
-   group.traverse(function(obj){
-    if(obj.userData&&obj.userData.cadSketch) obj.visible=!(plan&&isWall);
-   });
-  });
- }
+ if(modelRoot)modelRoot.children.forEach(function(group){
+  var wall=records.some(function(r){return r.id===group.userData.owner&&r.type==='wall';});
+  group.traverse(function(o){if(o.userData&&o.userData.cadSketch)o.visible=!(plan&&wall);});
+ });
  if(!plan)return;
  var w=view.clientWidth,h=view.clientHeight;
- overlay.setAttribute('viewBox','0 0 '+w+' '+h);
- overlay.setAttribute('width',w);
- overlay.setAttribute('height',h);
- if(w<=0||h<=0)return;
+ overlay.setAttribute('viewBox','0 0 '+w+' '+h);overlay.setAttribute('width',w);
+ overlay.setAttribute('height',h);if(w<=0||h<=0)return;
  var xml=[],fmt=function(n){return Number(n).toFixed(2);};
+ var color=isCad3DWireframe(renderStyle)?'#ffffff':renderStyle==='shaded-edges'?'#394954':'#43535e';
  var project=function(rec,x,y,z){
   var a=(rec.rot||0)*Math.PI/180,c=Math.cos(a),sn=Math.sin(a);
   return pointOnScreen({x:(rec.x||0)+x*c-y*sn,y:(rec.y||0)+x*sn+y*c,z:(rec.z||0)+(z||0)},view);
@@ -3415,39 +3498,32 @@ function cad3dRenderPlanWalls(){
  var line=function(a,b,extra){
   xml.push('<line x1="'+fmt(a.x)+'" y1="'+fmt(a.y)+'" x2="'+fmt(b.x)+'" y2="'+fmt(b.y)+'" '+(extra||'')+'/>');
  };
+ // Joined outlines: no fake wall caps or interior crossing seams.
+ cad3dPlanBoundarySegments().forEach(function(seg){
+  var a=pointOnScreen({x:seg.a.x,y:seg.a.y,z:seg.z},view);
+  var b=pointOnScreen({x:seg.b.x,y:seg.b.y,z:seg.z},view);
+  xml.push('<line x1="'+fmt(a.x)+'" y1="'+fmt(a.y)+'" x2="'+fmt(b.x)+'" y2="'+fmt(b.y)+
+   '" stroke="'+color+'" stroke-width="'+(selected.includes(seg.id)?'2.5':'1.6')+
+   '" stroke-linecap="square"/>');
+ });
  records.filter(function(r){return r.type==='wall'&&visibleRecord(r);}).forEach(function(r){
   var half=(r.w||0)/2,d=(r.d||.2)/2;
-  // A doorway/open void must remain a gap on the architectural plan,
-  // even when wall material is present above its lintel.
-  var voids=(r.openings||[]).filter(function(o){
+  var openings=(r.openings||[]).filter(function(o){
    return (o.kind==='door'||o.kind==='opening'||o.styleId==='open-door')&&(o.sill||0)<1.55;
   }).map(function(o){return {a:Math.max(-half,(o.offset||0)-(o.w||0)/2),
-    b:Math.min(half,(o.offset||0)+(o.w||0)/2),o:o};}).filter(function(v){return v.b>v.a;})
-    .sort(function(a,b){return a.a-b.a;});
-  var start=-half,parts=[];
-  voids.forEach(function(v){if(v.a>start+.0001)parts.push([start,v.a]);start=Math.max(start,v.b);});
-  if(start<half-.0001)parts.push([start,half]);
-  var selectedWall=selected.includes(r.id);
-  xml.push('<g fill="none" stroke="#ffffff" stroke-width="'+(selectedWall?'2.5':'1.6')+'" stroke-linecap="square" stroke-linejoin="miter">');
-  parts.forEach(function(p){
-   var a=project(r,p[0],-d),b=project(r,p[1],-d),c=project(r,p[1],d),e=project(r,p[0],d);
-   xml.push('<path d="M'+fmt(a.x)+' '+fmt(a.y)+'L'+fmt(b.x)+' '+fmt(b.y)+'L'+fmt(c.x)+' '+fmt(c.y)+'L'+fmt(e.x)+' '+fmt(e.y)+'Z"/>');
-  });
-  // Window openings: frame and glass represented as architectural plan lines.
+   b:Math.min(half,(o.offset||0)+(o.w||0)/2),o:o};})
+   .filter(function(v){return v.b>v.a;});
+  xml.push('<g fill="none" stroke="'+color+'" stroke-width="'+(selected.includes(r.id)?'2.5':'1.6')+'">');
   (r.openings||[]).filter(function(o){return o.kind==='window';}).forEach(function(o){
-   var x=(o.offset||0),width=o.w||1;
-   var a=project(r,x-width/2,-d),b=project(r,x+width/2,-d);
-   var c=project(r,x-width/2,d),e=project(r,x+width/2,d);
-   line(a,c,'stroke-width="1.4"');
-   line(b,e,'stroke-width="1.4"');
-   line(project(r,x-width/2,0),project(r,x+width/2,0),'stroke-width="1"');
+   var x=o.offset||0,ww=o.w||1;
+   line(project(r,x-ww/2,-d),project(r,x-ww/2,d),'stroke-width="1.4"');
+   line(project(r,x+ww/2,-d),project(r,x+ww/2,d),'stroke-width="1.4"');
+   line(project(r,x-ww/2,0),project(r,x+ww/2,0),'stroke-width="1"');
   });
-  // Conventional door leaf and swing indication, without fake bottom frame.
-  voids.filter(function(v){return v.o.kind==='door';}).forEach(function(v){
-   var o=v.o,center=(v.a+v.b)/2,width=v.b-v.a;
-   var hingeRight=/right/.test(String(o.styleId||'')),hx=hingeRight?v.b:v.a;
-   var hinge=project(r,hx,0),tip=project(r,hx,hingeRight?width:-width);
-   line(hinge,tip,'stroke-width="1.1"');
+  openings.filter(function(v){return v.o.kind==='door';}).forEach(function(v){
+   var o=v.o,width=v.b-v.a,hingeRight=/right/.test(String(o.styleId||''));
+   var hx=hingeRight?v.b:v.a;
+   line(project(r,hx,0),project(r,hx,hingeRight?width:-width),'stroke-width="1.1"');
   });
   xml.push('</g>');
  });
