@@ -4783,7 +4783,7 @@ function visitMeshes(visitor){
  var group=modelRoot||new T.Group();
  if(!modelRoot)records.filter(visibleRecord).forEach(function(record){group.add(buildObject(record));});
  group.updateMatrixWorld(true);
- try{group.traverse(function(mesh){if(mesh.isMesh)visitor(mesh);});}
+ try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadWallTexture)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
 function redraw(){
@@ -5977,7 +5977,7 @@ async function importCADFile(ev){
  }catch(e){if(request===importSequence)text('Error importando plano: '+(e.message||e));}
 }
 function exportJSON(){
- var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer};
+ var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer,materials:cad3dCustomMaterials};
  download('blackline-cad3d.3djson',JSON.stringify(data,null,2),'application/json');text('Modelo editable .3DJSON exportado');
 }
 async function readJSON(e){
@@ -5987,6 +5987,19 @@ async function readJSON(e){
   var data=JSON.parse(await file.text());
   if(request!==importSequence)return;
   if(data.format!=='BLACKLINE-CAD3D-1'||!Array.isArray(data.records)||data.records.length>1000)throw Error('Formato o contenido inválido');
+  // Restore in-file JPG images, not external URLs; keep 2D records untouched.
+  cad3dCustomMaterials={};cad3dTextureCanvases={};
+  Object.keys(cad3dTextureCache).forEach(function(key){cad3dTextureCache[key].dispose();});
+  cad3dTextureCache={};cad3dMaterialCounter=0;cad3dLastPaintFace=null;
+  if(data.materials&&typeof data.materials==='object'){
+   Object.keys(data.materials).slice(0,24).forEach(function(id){
+    var m=data.materials[id];
+    if(!/^user-[0-9]+$/.test(id)||!m||typeof m.image!=='string'||m.image.length>1800000)return;
+    if(!m.image.startsWith('data:image/jpeg;base64,')&&!m.image.startsWith('data:image/png;base64,')&&!m.image.startsWith('data:image/webp;base64,'))return;
+    cad3dCustomMaterials[id]={name:String(m.name||'Textura JPG').slice(0,70),image:m.image};
+    cad3dMaterialCounter=Math.max(cad3dMaterialCounter,Number(id.slice(5))||0);
+   });
+  }
   var importedLayers=[{id:'0',name:'0',visible:true,locked:false}];
   if(Array.isArray(data.layers))data.layers.slice(0,100).forEach(function(l){
    if(!l||typeof l.id!=='string'||!l.id||l.id.length>60)return;
@@ -6028,10 +6041,22 @@ async function readJSON(e){
      return op;
     });
    }
+   if(r.type==='wall'&&r.faceMaterials&&typeof r.faceMaterials==='object'){
+    var paint={};
+    CAD3D_WALL_FACE_KEYS.forEach(function(face){
+     var mat=r.faceMaterials[face];
+     if(!mat||!cad3dHasMaterial(mat.id))return;
+     paint[face]={id:mat.id,scaleX:clamp(finite(mat.scaleX,1),.05,100),
+      scaleY:clamp(finite(mat.scaleY,1),.05,100),
+      rotation:clamp(finite(mat.rotation,0),-360,360),repeat:mat.repeat!==false};
+    });
+    o.faceMaterials=paint;
+   }
    if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
    return o;
   });
   records=sanitized;layers=importedLayers;
+  cad3dMaterialId='brick';cad3dMaterialPaint=false;cad3dMaterialRender();
   currentLayer=layers.some(function(l){return l.id===data.currentLayer;})?data.currentLayer:'0';
   renderLayerPanel();underlay=null;
   if(data.underlay&&Array.isArray(data.underlay.segments)&&data.underlay.segments.length<=30000){
