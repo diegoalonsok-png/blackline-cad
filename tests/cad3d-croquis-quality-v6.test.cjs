@@ -46,7 +46,7 @@ test('Geometry overlay uses bounded, segmented rays and source edge support',()=
  assert(!/records\.(push|splice)|camera\.position\.set\(/.test(segment));
 });
 test('Artistic presets reuse the existing geometric line pass; technical remains clean',()=>{
- const presets=block('var cad3dSketchSource=null;','function cad3dSketchStyleData(');
+ const presets=block("var preset=panel.querySelector('[data-sketch-preset]');","panel.querySelector('[data-sketch-save-preset]')");
  for(const style of ['ink','watercolor','pencil','marker','wash']){
   assert(new RegExp(style+":\\{style:'"+style+"'[^}]+passes:true,geometry:true").test(presets),style);
  }
