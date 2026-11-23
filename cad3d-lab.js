@@ -3680,14 +3680,35 @@ function cad3dSketchRenderPasses(panel,ctx,src,w,h){
  });
 }
 
-function cad3dSketchProcess(){
+var cad3dSketchRedrawPending=false;
+function cad3dSketchRequestRedraw(){
+ if(cad3dSketchRedrawPending)return;
+ cad3dSketchRedrawPending=true;
+ requestAnimationFrame(function(){
+  cad3dSketchRedrawPending=false;
+  cad3dSketchProcess(false);
+ });
+}
+function cad3dSketchProcess(fullResolution,outputCanvas){
  var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=cad3dSketchSource;
  if(!panel||!source||panel.hidden)return;
- var out=panel.querySelector('.cad3dSketchCapturePreview'),w=source.width,h=source.height;
+ var exportMode=fullResolution===true;
+ var processing=source;
+ var downscale=exportMode?1:Math.min(1,680/source.width,440/source.height);
+ if(downscale<1){
+  processing=document.createElement('canvas');
+  processing.width=Math.max(1,Math.round(source.width*downscale));
+  processing.height=Math.max(1,Math.round(source.height*downscale));
+  var reduced=processing.getContext('2d',{willReadFrequently:true});
+  if(!reduced)return;
+  reduced.drawImage(source,0,0,processing.width,processing.height);
+ }
+ var out=outputCanvas||panel.querySelector('.cad3dSketchCapturePreview');
+ var w=processing.width,h=processing.height;
  out.width=w;out.height=h;
  var ctx=out.getContext('2d',{willReadFrequently:true});
  if(!ctx)return;
- var src=source.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h);
+ var src=processing.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h);
  if(panel.querySelector('[data-sketch-setting="passes"]')?.checked){
   cad3dSketchRenderPasses(panel,ctx,src,w,h);return;
  }
@@ -3837,8 +3858,8 @@ function cad3dInitSketchCapture(){
  });
  panel.querySelector('.cad3dSketchClose').addEventListener('click',function(){panel.hidden=true;});
  panel.querySelector('.cad3dSketchRecapture').addEventListener('click',cad3dSketchCapture);
- panel.querySelector('.cad3dSketchCaptureStyle').addEventListener('change',cad3dSketchProcess);
- panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchProcess);
+ panel.querySelector('.cad3dSketchCaptureStyle').addEventListener('change',cad3dSketchRequestRedraw);
+ panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchRequestRedraw);
  var preset=panel.querySelector('[data-sketch-preset]');
  preset.addEventListener('change',function(){
   var styles={
@@ -3866,9 +3887,13 @@ function cad3dInitSketchCapture(){
    if(!saved)return text('No hay estilo guardado');preset.value='custom';cad3dSketchSetStyle(panel,saved);
   }catch(err){text('Error cargando estilo: '+err.message);}
  });
- panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchProcess);el.addEventListener('change',cad3dSketchProcess);});
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchRequestRedraw);el.addEventListener('change',cad3dSketchRequestRedraw);});
  panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
-  var canvas=panel.querySelector('.cad3dSketchCapturePreview');if(!cad3dSketchSource)return;
+  if(!cad3dSketchSource)return;
+  var canvas=document.createElement('canvas');
+  // Full-resolution PNG uses the same exact passes and captured source pixels,
+  // while the on-screen preview stays responsive.
+  cad3dSketchProcess(true,canvas);
   canvas.toBlob(function(blob){
    if(!blob)return text('No se pudo generar la imagen');
    var url=URL.createObjectURL(blob),link=document.createElement('a');
@@ -4011,7 +4036,7 @@ function build(){
  '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="trees"> Árboles ilustrados</label>'+
  '<label>Intensidad de líneas <input class="cad3dSketchCaptureStrength" type="range" min="15" max="95" value="60"></label>'+
  '<button type="button" class="btn cad3dSketchRecapture" title="Capturar de nuevo la cámara actual">Actualizar captura</button>'+
- '<button type="button" class="btn cad3dSketchDownload">Guardar PNG</button></div>'+
+ '<button type="button" class="btn cad3dSketchDownload" title="Procesar imagen completa sin reducir píxeles">Guardar PNG (alta resolución)</button></div>'+
  '<canvas class="cad3dSketchCapturePreview" aria-label="Vista procesada como croquis"></canvas>'+
  '<small>Motor local de seis pasadas: captura limpia → suavizado → máscaras → aguadas → contornos → sombras. Respeta el encuadre y la geometría; no agrega objetos ni utiliza IA.</small></section>'+
  cad3dMaterialMarkup()+
