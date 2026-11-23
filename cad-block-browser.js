@@ -12,8 +12,8 @@
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
-  visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^(?:olymp26-|olymp2-|cc0-fp-)/.test(it.id)||
-    /^(?:dk-arbol-vista|dk-arbol-invierno|dk-arbol-radial|dk-arbusto-arbol|dk-arbol-hojas|dk-arbol-ramas|dk-dos-arboles)$/.test(it.id)},
+  visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^(?:olymp26-|olymp2-|cc0-fp-|bl-view-window-)/.test(it.id)||
+    /^(?:dk-arbol-vista|dk-arbol-invierno|dk-arbol-radial|dk-arbusto-arbol|dk-arbol-hojas|dk-arbol-ramas|dk-dos-arboles|dk-ventana-2x2-vista|dk-ventana-bano-vista)$/.test(it.id)},
   dk:{en:'Blackline library',es:'Biblioteca Blackline',item:it=>/^dk-|^doc-/.test(it.id)},
   bath:{en:'Bathrooms',es:'Baños',family:'Baños'},
   kitchen:{en:'Kitchens',es:'Cocinas',family:'Cocinas'},
@@ -23,6 +23,9 @@
   furniture:{en:'Furniture',es:'Mobiliario',family:'Mobiliario'},
   plan:{en:'Plans',es:'Plantas',mode:'Planta'},
   section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
+  doorElev:{en:'Door elevations',es:'Puertas en vista',item:it=>/puerta|door/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
+  windowElev:{en:'Window elevations',es:'Ventanas en vista',item:it=>/ventana|ventanal|window|paño fijo|pano fijo/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
+  fridgeElev:{en:'Fridge elevations',es:'Heladeras en vista',item:it=>/heladera|refrigerador|fridge|freezer/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   symbol:{en:'Symbols',es:'Símbolos',cats:c=>c==='Símbolos'},
   doc:{en:'Documentation (levels, axes, sections…)',es:'Documentación (niveles, ejes, cortes…)',cats:c=>c==='Documentación'}
  };
@@ -121,7 +124,7 @@
  const modeOf=it=>{
   const n=String(it.name||'').toLowerCase(),id=String(it.id||'').toLowerCase(),c=String(it.cat||'');
   if(/corte|sección|section|perfil|sectional/.test(n)||/\bsection\b/.test(id))return 'Corte';
-  if(/vista|alzado|elevac|frontal|posterior|lateral|elevation/.test(n)||c==='Alzados'||c==='Mobiliario en vista'||/^ca_puerta_elev/.test(id))return 'Alzado';
+  if(/vista|alzado|elevac|frontal|posterior|lateral|elevation/.test(n)||c==='Alzados'||c==='Mobiliario en vista'||/^ca_puerta_elev|^bl-view-window-|^olymp2-ca-puerta-elev/.test(id))return 'Alzado';
   if(c==='Cortes y vistas')return 'Alzado';
   return 'Planta';
  };
