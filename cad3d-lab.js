@@ -4618,8 +4618,8 @@ function cad3dApplyMaterialClick(e){
  record.faceMaterials=record.faceMaterials||{};
  record.faceMaterials[face]=Object.assign({id:cad3dMaterialId},cad3dMaterialBrush);
  cad3dLastPaintFace={id:record.id,face:face};selected=[record.id];selectedOpeningId=null;
- redraw();renderProps();cad3dMaterialMsg('Textura aplicada: '+face+' del muro '+record.id);
- text('Textura aplicada · '+face+' · muro '+record.id);
+ redraw();renderProps();cad3dMaterialMsg('Textura aplicada: '+face+' de '+(record.type==='slab'?'losa':'muro')+' '+record.id);
+ text('Textura aplicada · '+face+' · '+(record.type==='slab'?'losa':'muro')+' '+record.id);
 }
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
