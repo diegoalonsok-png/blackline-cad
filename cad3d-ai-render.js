@@ -13,6 +13,8 @@ css.textContent=[
  '#cad3dLab .cad3dAIControls label{font:600 11px Inter,Arial,sans-serif;display:grid;gap:3px}',
  '#cad3dLab .cad3dAIControls select,#cad3dLab .cad3dAIControls input{height:33px;min-width:160px;max-width:225px;background:#0d202d;color:#fff;border:1px solid #688a9d;border-radius:5px;padding:5px 7px}',
  '#cad3dLab .cad3dAIControls button{min-height:34px}',
+ '#cad3dLab .cad3dAIConsent{display:flex!important;align-items:center!important;gap:5px;max-width:260px;line-height:1.25}',
+ '#cad3dLab .cad3dAIConsent input{width:15px!important;height:15px!important;min-width:15px!important;max-width:15px!important}',
  '#cad3dLab .cad3dAICompare{display:grid;grid-template-columns:1fr 1fr;gap:9px}',
  '#cad3dLab .cad3dAICompare>div{min-width:0}',
  '#cad3dLab .cad3dAICompare strong{font-size:11px;display:block;margin-bottom:5px}',
@@ -40,6 +42,9 @@ function build(root){
  var tl=el(controls,'label','','Token de prueba (solo esta sesión)');
  var token=el(tl,'input','cad3dAIToken');token.type='password';token.autocomplete='off';
  token.placeholder='Token del servicio IA';token.maxLength=256;
+ var consentLabel=el(controls,'label','cad3dAIConsent','');
+ var consent=el(consentLabel,'input');consent.type='checkbox';
+ el(consentLabel,'span','','Autorizo enviar esta captura al servicio IA');
  var generate=el(controls,'button','btn cad3dAIRun','GENERAR IMAGEN IA');generate.type='button';
  var download=el(controls,'button','btn cad3dAIDownload','Guardar PNG');download.type='button';download.disabled=true;
  var status=el(panel,'p','cad3dAIStatus','');status.setAttribute('role','status');
@@ -56,6 +61,7 @@ function build(root){
   try{url=new URL(endpoint);if(url.protocol!=='https:')throw Error('Se requiere HTTPS');}
   catch(_){status.textContent='URL del servicio IA inválida.';return;}
   if(!token.value.trim()){status.textContent='Ingresá el token privado de prueba del servicio IA.';return;}
+  if(!consent.checked){status.textContent='Para generar, autorizá el envío de esta captura al proveedor IA.';return;}
   if(typeof capture!=='function'){status.textContent='El CAD 3D aún no está disponible.';return;}
   var frame;
   try{frame=capture();if(!frame?.dataURL?.startsWith('data:image/png;base64,'))throw Error('Captura no válida');}
