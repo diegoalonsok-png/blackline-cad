@@ -796,7 +796,6 @@ css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:10
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
-css+="\n#cad3dLab .cad3dOriginal2DPortal{position:absolute;inset:0;z-index:155;display:flex;flex-direction:column;background:#111a21;overflow:hidden}\n#cad3dLab .cad3dOriginal2DPortal[hidden]{display:none!important}\n#cad3dLab .cad3dOriginal2DHeader{display:flex;align-items:center;gap:14px;padding:8px 11px;flex:0 0 auto;background:#1c303e;color:#e2f3ff;border-bottom:1px solid #5f8599;z-index:2}\n#cad3dLab .cad3dOriginal2DHeader strong{font-size:11px;letter-spacing:.4px;white-space:nowrap}\n#cad3dLab .cad3dOriginal2DHeader label{display:flex;align-items:center;flex:1;min-width:90px;gap:6px;color:#c6dce8;font-size:10px}\n#cad3dLab .cad3dOriginalCommandSlot{flex:1;min-width:30px;display:flex}\n#cad3dLab .cad3dOriginalCommandSlot input{width:100%!important;min-width:80px!important;max-width:100%!important;height:30px!important;background:#0f1821!important;color:#f0f7fa!important;border:1px solid #7199aa!important;border-radius:4px!important;padding:3px 9px!important}\n#cad3dLab .cad3dOriginal2DCanvasSlot{position:relative;flex:1;min-height:0;overflow:hidden}\n#cad3dLab .cad3dOriginal2DCanvasSlot #canvasWrap{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;display:block!important;overflow:hidden!important}\n#cad3dLab .cad3dOriginal2DCanvasSlot #cadCanvas{width:100%!important;height:100%!important;display:block!important}\n#cad3dLab .cad3dProfileTools .cad3dNative2DAction{flex:none!important;height:31px!important;min-width:36px!important;padding:3px 7px!important;color:#dae9f2!important;background:#111e27!important;border:1px solid #455f70!important;border-radius:5px!important;font:600 11px Inter,Arial,sans-serif!important;cursor:pointer}\n#cad3dLab .cad3dProfileTools .cad3dNative2DAction:hover{background:#314e63!important}\n#cad3dLab .cad3dOriginal2DHeader [data-original-2d-return]{white-space:nowrap;color:white;border:1px solid #9ed7ef;background:#28536d}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1966,128 +1965,6 @@ function cad3dBindCompactBars(){
  cad3dSyncCompactBars();
 }
 
-
-/* CAD2D workspace inside CAD3D. The engine and canvas are exactly the
-   original CAD2D instances; no second 2D implementation is constructed. */
-var cad3dNative2DActive=false,cad3dNative2DWrapAnchor=null,cad3dNative2DInputAnchor=null;
-function cad3dInstallNative2DTools(){
- var source=document.getElementById('cadFloatingList'),bar=root?.querySelector('.cad3dProfileTools');
- if(!source||!bar)return;
- var label=document.createElement('strong');label.textContent='2D · ORIGINAL';
- var nativeButtons=[...source.querySelectorAll('button[data-floating-cad]')].map(function(button){
-  var clone=button.cloneNode(true);
-  clone.classList.add('cad3dNative2DAction');
-  clone.type='button';
-  return clone;
- });
- bar.replaceChildren(label,...nativeButtons);
-}
-function cad3dNative2DGeometry(e){
- if(!e||typeof e!=='object')return null;
- var pt=function(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y)?[p.x,p.y]:null;};
- var kind=e.type,closed=false,points=[];
- if(kind==='line'){points=[pt(e.a),pt(e.b)];}
- else if(kind==='polyline'){points=(e.pts||[]).map(pt);closed=!!e.closed;}
- else if(kind==='rect'){
-  var a=pt(e.a),b=pt(e.b);
-  if(a&&b){points=[a,[b[0],a[1]],b,[a[0],b[1]]];closed=true;}
- }else if(kind==='circle'&&e.c&&Number.isFinite(e.r)&&e.r>0){
-  points=Array.from({length:96},(_,i)=>[e.c.x+e.r*Math.cos(i*Math.PI/48),e.c.y+e.r*Math.sin(i*Math.PI/48)]);
-  closed=true;
- }else if(kind==='ellipse'&&e.c&&e.rx>0&&e.ry>0){
-  var rotation=e.rotation||0,c=Math.cos(rotation),sn=Math.sin(rotation);
-  points=Array.from({length:96},(_,i)=>{
-   var a=i*Math.PI/48,x=e.rx*Math.cos(a),y=e.ry*Math.sin(a);
-   return [e.c.x+x*c-y*sn,e.c.y+x*sn+y*c];
-  });closed=true;
- }else if(kind==='arc'&&e.c&&e.r>0){
-  var from=e.a0||0,to=e.a1||0;
-  while(to<=from)to+=Math.PI*2;
-  points=Array.from({length:65},(_,i)=>{
-   var a=from+(to-from)*i/64;
-   return [e.c.x+e.r*Math.cos(a),e.c.y+e.r*Math.sin(a)];
-  });
- }
- if(points.length<2||points.some(p=>!p)||!points.every(p=>Number.isFinite(p[0])&&Number.isFinite(p[1])))return null;
- if(closed&&points.length<3)return null;
- return {points,closed,label:'CAD2D '+kind};
-}
-function cad3dNative2DSynchronize(){
- var engine=window.BlacklineCAD2DEngine;
- if(!engine)return;
- var snapshot=engine.snapshot(),changed=0,selectedIds=new Set(snapshot.entities.map(e=>String(e.id)));
- for(const e of snapshot.entities){
-  var geometry=cad3dNative2DGeometry(e);
-  if(!geometry)continue;
-  var minX=Math.min(...geometry.points.map(p=>p[0])),maxX=Math.max(...geometry.points.map(p=>p[0]));
-  var minY=Math.min(...geometry.points.map(p=>p[1])),maxY=Math.max(...geometry.points.map(p=>p[1]));
-  var cx=(minX+maxX)/2,cy=(minY+maxY)/2;
-  var rec=records.find(r=>r.type==='profile2d'&&r.cad2dSourceId===String(e.id));
-  if(!rec){rec=newRecord('profile2d');rec.cad2dSourceId=String(e.id);records.push(rec);}
-  Object.assign(rec,{x:cx,y:cy,z:0,rot:0,w:Math.max(.01,maxX-minX),d:Math.max(.01,maxY-minY),
-   h:0,profilePoints:geometry.points.map(p=>[p[0]-cx,p[1]-cy]),
-   profileClosed:geometry.closed,name:geometry.label,extrudedHeight:0});
-  changed++;
- }
- // Leave authored 3D solids and their geometry intact. A removed CAD2D entity
- // only removes its linked, nonextruded 2D outline in the 3D workspace.
- records=records.filter(r=>!r.cad2dSourceId||selectedIds.has(r.cad2dSourceId)||r.extrudedHeight>0);
- selected=selected.filter(id=>records.some(r=>r.id===id));
- if(changed){redraw();renderProps();}
- return changed;
-}
-function cad3dEnterOriginal2D(tool){
- var engine=window.BlacklineCAD2DEngine,view=root?.querySelector('.view');
- if(!engine||!view){text('El motor CAD2D original no está disponible');return false;}
- var portal=view.querySelector('.cad3dOriginal2DPortal');
- if(!portal){
-  portal=document.createElement('div');portal.className='cad3dOriginal2DPortal';
-  portal.innerHTML='<div class="cad3dOriginal2DHeader"><strong>BLACKLINE · CAD2D ORIGINAL · PLANO XY</strong>'+
-   '<label>COMMAND <span class="cad3dOriginalCommandSlot"></span></label>'+
-   '<button type="button" class="btn" data-original-2d-return>Volver a 3D · sincronizar</button></div>'+
-   '<div class="cad3dOriginal2DCanvasSlot"></div>';
-  view.appendChild(portal);
- }
- if(!cad3dNative2DActive){
-  var wrap=engine.getCanvasWrap(),input=engine.getCommandInput();
-  if(!wrap||!input||!wrap.parentNode||!input.parentNode)return false;
-  cad3dNative2DWrapAnchor=document.createComment('CAD2D original viewport position');
-  wrap.parentNode.insertBefore(cad3dNative2DWrapAnchor,wrap);
-  cad3dNative2DInputAnchor=document.createComment('CAD2D original command position');
-  input.parentNode.insertBefore(cad3dNative2DInputAnchor,input);
-  portal.querySelector('.cad3dOriginal2DCanvasSlot').appendChild(wrap);
-  portal.querySelector('.cad3dOriginalCommandSlot').appendChild(input);
-  cad3dNative2DActive=true;
-  root.classList.add('cad3dUsingOriginal2D');
-  portal.hidden=false;
-  engine.resize();
- }
- if(tool){
-  var aliases={rectangle:'rect',polyline:'polyline',line:'line',circle:'circle',arc:'arc'};
-  engine.activate(aliases[tool]||tool);
- }
- engine.redraw();
- text('Dibujando con el motor CAD2D original · los objetos se sincronizan al volver a 3D');
- return true;
-}
-function cad3dLeaveOriginal2D(){
- if(!cad3dNative2DActive)return;
- var engine=window.BlacklineCAD2DEngine,portal=root?.querySelector('.cad3dOriginal2DPortal');
- if(engine&&cad3dNative2DWrapAnchor&&cad3dNative2DInputAnchor){
-  cad3dNative2DWrapAnchor.replaceWith(engine.getCanvasWrap());
-  cad3dNative2DInputAnchor.replaceWith(engine.getCommandInput());
- }
- cad3dNative2DWrapAnchor=null;cad3dNative2DInputAnchor=null;
- cad3dNative2DActive=false;
- root.classList.remove('cad3dUsingOriginal2D');
- if(portal)portal.hidden=true;
- if(engine)engine.resize();
- var count=cad3dNative2DSynchronize();
- resize();
- if(count)fit3DModel();
- text('CAD2D original restaurado · '+(count||0)+' perfiles actualizados en CAD3D');
-}
-
 function cad3dBasicBars(){
  return '<div class="cad3dBasicBars" role="group" aria-label="CAD3D Draw and Modify toolbars">'+
   '<div class="cad3dBar" role="toolbar" aria-label="Draw"><strong>DRAW</strong>'+
@@ -2311,7 +2188,6 @@ function build(){
  root.querySelector('[data-max]').addEventListener('click',toggleMaximize);
  root.querySelector('.sideGrip').addEventListener('pointerdown',beginSideResize);
  root.querySelector('.head').addEventListener('pointerdown',moveWindow);
- cad3dInstallNative2DTools();
  cad3dToolbarLayout=cad3dEnableMovableToolbars();
  cad3dBindCompactBars();
  root.querySelector('.resizeGrip').addEventListener('pointerdown',beginResize);
@@ -2326,11 +2202,8 @@ function build(){
   }else action(button.dataset.action);}
  });
  root.querySelector('.cad3dProfileTools').addEventListener('click',function(e){
-  var original=e.target.closest('[data-floating-cad]');
-  if(original){cad3dEnterOriginal2D(original.dataset.floatingCad);return;}
-  var button=e.target.closest('[data-action]');if(button)cad3dEnterOriginal2D(button.dataset.action);
+  var button=e.target.closest('[data-action]');if(button)action(button.dataset.action);
  });
- root.addEventListener('click',function(e){if(e.target.closest('[data-original-2d-return]'))cad3dLeaveOriginal2D();});
  root.querySelector('.cad3dModelTools').addEventListener('click',function(e){
   var button=e.target.closest('[data-solid-command]');if(!button)return;
   var command=button.dataset.solidCommand;
@@ -3032,7 +2905,6 @@ async function open(){
 }
 function close(){
  if(!root)return;
- if(cad3dNative2DActive)cad3dLeaveOriginal2D();
  var launcher=document.getElementById('cad3dOpen');
  var focused=root.contains(document.activeElement);
  hideObjectContextMenu();root.hidden=true;launcher.setAttribute('aria-pressed','false');dragging=null;
@@ -5305,7 +5177,7 @@ async function readJSON(e){
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){
- if(!root||root.hidden||cad3dNative2DActive)return;
+ if(!root||root.hidden)return;
  // 3ds Max-like shortcuts: F3 = 3D wireframe, F4 = shaded solids.
  // Only intercept within CAD3D, never while a text input is being edited.
  if((ev.key==='F3'||ev.key==='F4')&&!ev.isComposing&&!ev.altKey&&!ev.ctrlKey&&!ev.metaKey){
