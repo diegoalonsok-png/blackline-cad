@@ -187,3 +187,33 @@ test('Gallery header drag can snap into sidebar and preserve Layers',()=>{
  assert(src.includes('cad3dArchRestoreDocking();'));
  assert(src.includes('if(!palette.hidden)cad3dPaletteRemember(\'architecture\',palette)'));
 });
+
+test('3D movement strip reuses the precise CAD2D quickbar design',()=>{
+ const twoD=fs.readFileSync('cad-quickbar.js','utf8');
+ const got=between('/* Copied from cad-quickbar.js (CAD2D)', "var cssNode=document.createElement('style');");
+ for(const value of ['border-radius:999px','background:#202326',
+  'border:1.5px solid #7c838a','box-shadow:0 8px 22px #0008',
+  'width:34px','height:34px','width:21px','height:21px',
+  'stroke-width:1.8','background:#3a4046','outline:2px solid #9adff3']) {
+  assert(twoD.includes(value),'CAD2D reference missing '+value);
+  assert(got.includes(value),'CAD3D movement style missing '+value);
+ }
+ assert(got.includes('width:min(392px,calc(100% - 16px));'),'Compact default width');
+ assert(got.includes('height:46px;'),'Compact default height');
+ assert(got.includes('resize:both!important'),'Keep configurable dimensions');
+ assert(got.includes('.cad3dGiroDisk')&&got.includes('box-shadow:none!important'),'No old metallic disks');
+ assert(got.includes('.cad3dGiroChoice > span:not(.cad3dGiroDisk){display:none!important')||
+  src.includes('.cad3dGiroChoice > span:not(.cad3dGiroDisk){display:none!important'),'Labels only in tooltips');
+});
+test('3D movement palette keeps original controls and grouping',()=>{
+ const from=src.indexOf('function cad3dGiroSvg(kind){');
+ const to=src.indexOf('function cad3dCenterModelWithoutZoom(){',from);
+ const markup=new Function(src.slice(from,to)+'return cad3dGiroMarkup();')();
+ assert.equal((markup.match(/class="cad3dGiroChoice(?: |")/g)||[]).length,8);
+ assert(markup.includes('class="cad3dGiroSep"'));
+ for(const id of ['orbit','panorama','ring','hand','center','fit']) assert(markup.includes('data-giro-action="'+id+'"')===false||src.includes("'"+id+"'"),id);
+ assert(markup.includes('data-giro-zoom="1"'));
+ assert(markup.includes('data-giro-zoom="-1"'));
+ assert(markup.includes('data-giro-pin')&&markup.includes('data-giro-minimize')&&markup.includes('data-giro-close'));
+ assert(src.includes("launch.textContent=open?'⟳ Girar ▴':'⟳ Girar ▾'"));
+});
