@@ -796,6 +796,7 @@ css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:10
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
 css+="\n#cad3dLab > .viewSavePanel{position:absolute!important;left:36px;top:180px;right:auto!important;bottom:auto!important;z-index:145!important;box-sizing:border-box;max-width:calc(100% - 16px)!important;max-height:calc(100% - 32px)!important;overflow:auto}\n#cad3dLab > .viewSavePanel[hidden]{display:none!important}\n#cad3dLab .viewSaveHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-14px -14px 5px;padding:10px 14px;border-bottom:1px solid #587081;background:#223443;border-radius:10px 10px 0 0;cursor:grab;user-select:none;touch-action:none;font:700 11px Inter,Arial,sans-serif;letter-spacing:.4px}\n#cad3dLab .viewSaveHeader:active{cursor:grabbing}\n#cad3dLab .viewSaveClose{background:none!important;border:0!important;color:#e7f1f6!important;min-height:22px!important;padding:0 5px!important;font-size:20px!important;cursor:pointer}\n";
+css+="\n#cad3dLab > .cad3dSketchCapturePanel{position:absolute;z-index:160;left:45px;top:110px;width:min(760px,calc(100% - 40px));max-height:calc(100% - 35px);overflow:auto;box-sizing:border-box;background:#142431;color:#eaf4fa;border:1px solid #81acc1;border-radius:11px;padding:12px;box-shadow:0 18px 45px #000b}\n#cad3dLab > .cad3dSketchCapturePanel[hidden]{display:none!important}\n#cad3dLab .cad3dSketchCaptureHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-12px -12px 10px;padding:10px 12px;background:#25394a;border-bottom:1px solid #6b91a4;cursor:grab;user-select:none;touch-action:none}\n#cad3dLab .cad3dSketchCaptureHead:active{cursor:grabbing}\n#cad3dLab .cad3dSketchClose{font-size:20px;color:#eaf4fa;background:none;border:0;cursor:pointer}\n#cad3dLab .cad3dSketchCaptureControls{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-bottom:9px}\n#cad3dLab .cad3dSketchCaptureControls label{font:11px Inter,Arial,sans-serif;display:grid;gap:4px;flex:1;min-width:140px}\n#cad3dLab .cad3dSketchCaptureControls select,#cad3dLab .cad3dSketchCaptureControls input{width:100%;box-sizing:border-box;background:#213343;color:white;border:1px solid #617e8e;border-radius:5px;padding:6px}\n#cad3dLab .cad3dSketchCapturePreview{display:block;width:100%;height:auto;max-height:52vh;object-fit:contain;background:#faf7f0;border:1px solid #40566b}\n#cad3dLab .cad3dSketchCapturePanel small{font:10px Inter,Arial,sans-serif;color:#b3c8d5}\n";
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
@@ -2079,6 +2080,109 @@ function cad3dMakeSavePanelMovable(){
  handle.addEventListener('pointercancel',finish);
  handle.addEventListener('lostpointercapture',finish);
 }
+
+/* Captures the actual viewport pixels and applies local, deterministic image
+   postprocessing. This is not a generative AI render or a change to 3D geometry. */
+var cad3dSketchSource=null;
+function cad3dSketchCapture(){
+ var source=renderer?.domElement||fallbackCanvas;
+ if(!source)return text('No hay una vista 3D disponible para capturar');
+ if(renderer){renderer.render(scene,camera);}
+ else fallbackDraw();
+ var w=Math.max(1,source.width),h=Math.max(1,source.height),factor=Math.min(1,1700/w,1100/h);
+ var canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(w*factor));canvas.height=Math.max(1,Math.round(h*factor));
+ var ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)return;
+ ctx.drawImage(source,0,0,canvas.width,canvas.height);
+ cad3dSketchSource=canvas;
+ cad3dSketchProcess();
+}
+function cad3dSketchProcess(){
+ var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=cad3dSketchSource;
+ if(!panel||!source||panel.hidden)return;
+ var out=panel.querySelector('.cad3dSketchCapturePreview'),w=source.width,h=source.height;
+ out.width=w;out.height=h;
+ var ctx=out.getContext('2d',{willReadFrequently:true});
+ if(!ctx)return;
+ var src=source.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h);
+ var dst=ctx.createImageData(w,h),pixels=src.data,data=dst.data;
+ var style=panel.querySelector('.cad3dSketchCaptureStyle').value;
+ var strength=Number(panel.querySelector('.cad3dSketchCaptureStrength').value)/100;
+ var grey=new Uint8Array(w*h);
+ for(var i=0;i<grey.length;i++){
+  var k=i*4;grey[i]=Math.round(.299*pixels[k]+.587*pixels[k+1]+.114*pixels[k+2]);
+ }
+ // Sobel edge detection, combined with a light paper wash.
+ for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+  var j=y*w+x,k=j*4;
+  var g=0;
+  if(x>0&&x<w-1&&y>0&&y<h-1){
+   var a=j-w,b=j+w;
+   var gx=-grey[a-1]+grey[a+1]-2*grey[j-1]+2*grey[j+1]-grey[b-1]+grey[b+1];
+   var gy=-grey[a-1]-2*grey[a]-grey[a+1]+grey[b-1]+2*grey[b]+grey[b+1];
+   g=Math.min(1,Math.hypot(gx,gy)/255)*strength;
+  }
+  var r=pixels[k],green=pixels[k+1],blue=pixels[k+2];
+  var paper=(Math.sin(x*.17+y*.11)*Math.sin(x*.071-y*.13)+1)*1.8;
+  if(style==='pencil'){
+   var v=242-(255-grey[j])*.22-g*155+paper;
+   data[k]=v+3;data[k+1]=v+2;data[k+2]=v;
+  }else{
+   var wash=style==='watercolor'?.44:style==='marker'?.65:.32;
+   var steps=style==='marker'?5:style==='watercolor'?10:16;
+   var base=[r,green,blue].map(v=>Math.round(v/(255/steps))*(255/steps));
+   var shade=style==='watercolor'?g*100:style==='marker'?g*140:g*175;
+   data[k]=Math.max(0,Math.min(255,249*(1-wash)+base[0]*wash-shade+paper));
+   data[k+1]=Math.max(0,Math.min(255,247*(1-wash)+base[1]*wash-shade+paper));
+   data[k+2]=Math.max(0,Math.min(255,240*(1-wash)+base[2]*wash-shade+paper));
+  }
+  data[k+3]=255;
+ }
+ ctx.putImageData(dst,0,0);
+}
+function cad3dInitSketchCapture(){
+ var panel=root.querySelector('.cad3dSketchCapturePanel');
+ if(!panel)return;
+ root.appendChild(panel);
+ var handle=panel.querySelector('.cad3dSketchCaptureHead'),drag=null;
+ root.querySelector('.cad3dRenderSketchLaunch').addEventListener('click',function(){
+  panel.hidden=false;cad3dBringPaletteFront(panel);
+  cad3dSketchCapture();
+ });
+ panel.querySelector('.cad3dSketchClose').addEventListener('click',function(){panel.hidden=true;});
+ panel.querySelector('.cad3dSketchRecapture').addEventListener('click',cad3dSketchCapture);
+ panel.querySelector('.cad3dSketchCaptureStyle').addEventListener('change',cad3dSketchProcess);
+ panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('change',cad3dSketchProcess);
+ panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
+  var canvas=panel.querySelector('.cad3dSketchCapturePreview');if(!cad3dSketchSource)return;
+  canvas.toBlob(function(blob){
+   if(!blob)return text('No se pudo generar la imagen');
+   var url=URL.createObjectURL(blob),link=document.createElement('a');
+   link.href=url;link.download='blackline-croquis-'+(activeView||'3d')+'.png';
+   document.body.appendChild(link);link.click();link.remove();
+   setTimeout(function(){URL.revokeObjectURL(url)},1000);
+  },'image/png');
+ });
+ handle.addEventListener('pointerdown',function(e){
+  if(e.button!==0||e.target.closest('button'))return;
+  e.preventDefault();var r=panel.getBoundingClientRect();
+  drag={id:e.pointerId,dx:e.clientX-r.left,dy:e.clientY-r.top};
+  handle.setPointerCapture(e.pointerId);cad3dBringPaletteFront(panel);
+ });
+ handle.addEventListener('pointermove',function(e){
+  if(!drag||e.pointerId!==drag.id)return;
+  var r=root.getBoundingClientRect();
+  panel.style.left=clamp(e.clientX-r.left-drag.dx,8,Math.max(8,root.clientWidth-panel.offsetWidth-8))+'px';
+  panel.style.top=clamp(e.clientY-r.top-drag.dy,8,Math.max(8,root.clientHeight-panel.offsetHeight-8))+'px';
+ });
+ function end(e){
+  if(!drag||e.pointerId!==drag.id)return;
+  var id=drag.id;drag=null;
+  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id)}catch(_e){}
+ }
+ handle.addEventListener('pointerup',end);
+ handle.addEventListener('pointercancel',end);
+ handle.addEventListener('lostpointercapture',end);
+}
 function build(){
  if(root)return;
  root=document.createElement('section');root.id='cad3dLab';root.hidden=true;root.setAttribute('role','dialog');root.setAttribute('aria-label','Blackline CAD 3D');
@@ -2114,6 +2218,7 @@ function build(){
  '<button type="button" class="btn" data-check-shadows title="Compare render with shadows on and off">Check visible shadows</button>'+
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
+ '<button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar la perspectiva y procesarla como croquis arquitectónico">✎ <span>Render Croquis</span></button>'+
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style" aria-label="Visual Style">'+ico('view')+'<span>Visual Style</span></button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D <small>SketchUp-inspired workspace</small></header>'+
@@ -2156,6 +2261,14 @@ function build(){
  '<details class="ioMenu"><summary class="btn" title="Export" aria-label="Export">'+ico('export')+'<span>Export</span></summary><div>'+
  tool('json','Editable .3DJSON','export')+tool('obj','OBJ','export')+tool('dxf','DXF 3D','export')+
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
+ '<section class="cad3dSketchCapturePanel" role="dialog" aria-label="Render de croquis arquitectónico" hidden>'+
+ '<header class="cad3dSketchCaptureHead"><strong>✎ RENDER CROQUIS · VISTA ACTUAL</strong><button type="button" class="cad3dSketchClose" aria-label="Cerrar">×</button></header>'+
+ '<div class="cad3dSketchCaptureControls"><label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador conceptual</option></select></label>'+
+ '<label>Intensidad de líneas <input class="cad3dSketchCaptureStrength" type="range" min="15" max="95" value="60"></label>'+
+ '<button type="button" class="btn cad3dSketchRecapture" title="Capturar de nuevo la cámara actual">Actualizar captura</button>'+
+ '<button type="button" class="btn cad3dSketchDownload">Guardar PNG</button></div>'+
+ '<canvas class="cad3dSketchCapturePreview" aria-label="Vista procesada como croquis"></canvas>'+
+ '<small>Procesamiento local de la imagen: conserva el encuadre y la geometría. No agrega objetos ni utiliza IA.</small></section>'+
  '<div class="body">'+
  '<aside id="cad3dArchPalette" class="archPalette" aria-label="Galería paramétrica 3D" hidden>'+
  '<header class="archTitle"><h2>PARAMETRIC 3D GALLERY</h2>'+
@@ -2313,6 +2426,7 @@ function build(){
  renderStyleControls();
  cad3dMakeSunPanelMovable();
  cad3dMakeSavePanelMovable();
+ cad3dInitSketchCapture();
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
