@@ -288,4 +288,6 @@
  try{CORE.ribbon.add('home','BLOCKS+',[{id:'blockBrowser',label:T('Block browser','Explorador'),icon:ico,run:open}]);CORE.ribbon.add('arq','BLOCKS+',[{id:'blockBrowser',label:T('Block browser','Explorador'),icon:ico,run:open}]);CORE.ribbon.rebuild()}catch(e){console.warn(e)}
  // Curated preview gallery is an additional view of the same insertion mechanism.
  const qb=document.querySelector('#cadQuickBar [data-qb=blocks]');if(qb){const n=qb.cloneNode(true);n.title=T('Block browser · BB','Explorador de bloques · BB');n.addEventListener('click',e=>{e.stopPropagation();open()});qb.replaceWith(n)}
+ // Cargar detalles constructivos CC0 en la misma galería, sin reemplazar bloques.
+ const cc0Script=document.createElement('script');cc0Script.src='assets/cc0-details-loader.js?v=20261123-1';cc0Script.defer=true;document.head.append(cc0Script);
 })();
