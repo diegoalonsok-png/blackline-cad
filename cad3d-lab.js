@@ -2066,7 +2066,10 @@ function cad3dBindCompactBars(){
    var kind=nav.dataset.navTool;
    if(kind==='center'||kind==='fit'){fit3DModel();return;}
    cad3dNavigationTool=kind==='hand'?'pan':kind;
-   if(cad3dNavigationTool==='select'){cad3dEndZoom();setPlacement(null);}
+   if(cad3dNavigationTool==='select'){
+    cad3dMaterialPaint=false;cad3dMaterialRender();
+    cad3dEndZoom();setPlacement(null);
+   }
    else if(cad3dNavigationTool==='pan'){cad3dEndZoom();if(placing)setPlacement(null);}
    root.querySelector('.view')?.classList.toggle('cad3dPanning',cad3dNavigationTool==='pan');
    cad3dSyncCompactBars();
@@ -4162,6 +4165,14 @@ function cad3dFallbackSurfaceHit(rec,projection,x,y){
    return cad3dFallbackPolyHit(face.map(function(i){return pts[i];}),x,y,tol);
   });
  }
+ if(rec.type==='profile2d'){
+  var angle=(rec.rot||0)*Math.PI/180,c=Math.cos(angle),sn=Math.sin(angle);
+  var points=(rec.profilePoints||[]).map(function(pt){
+   return projection(rec.x+pt[0]*c-pt[1]*sn,rec.y+pt[0]*sn+pt[1]*c,rec.z||0);
+  });
+  return !!rec.profileClosed&&cad3dFallbackPolyHit(points,x,y,tol);
+ }
+ if(rec.type==='imported3d'||rec.type==='boolean')return box(rec.w||2,rec.d||2,rec.h||2,0,0,0,0);
  if(rec.type==='box'||rec.type==='block3d')return box(rec.w,rec.d,rec.h,0,0,0,0);
  if(rec.type==='stair')return box(rec.w,rec.d,rec.h,0,0,0,0);
  if(rec.type==='railing')return box(rec.w,Math.max(.08,rec.d),rec.h+Math.max(0,rec.railRise||0),0,0,0,0);
@@ -4182,10 +4193,19 @@ function cad3dFallbackSurfaceHit(rec,projection,x,y){
  }
  return false;
 }
+function cad3dSelectAll(){
+ if(!root||root.hidden)return false;
+ selected=records.filter(editableRecord).map(function(r){return r.id;});
+ selectedOpeningId=null;
+ setPlacement(null);cad3dMaterialPaint=false;cad3dMaterialRender();
+ cad3dNavigationTool='select';cad3dSyncCompactBars();
+ renderProps();highlight();render3DGrips();
+ text(selected.length+' objetos 3D seleccionados');
+ return true;
+}
 function selectAt(e){
  if(fallbackCanvas){
   var r=fallbackCanvas.getBoundingClientRect(),best=null,limit=34,projection=fallbackProjector();
-  var wallOrSlab=fallbackHostHit(e,'wall')||fallbackHostHit(e,'slab');
   records.filter(editableRecord).forEach(function(rec){
    var p=projection(rec.x,rec.y,rec.type==='profile2d'?(rec.z||0):rec.z+(rec.h||rec.radius||1)*.5);
    var distance=Math.hypot((e.clientX-r.left)-p.x,(e.clientY-r.top)-p.y);
@@ -4205,7 +4225,7 @@ function selectAt(e){
   var surface=records.filter(editableRecord).slice().reverse().find(function(rec){
    return cad3dFallbackSurfaceHit(rec,projection,px,py);
   });
-  var id=surface?.id??wallOrSlab?.host.id??best?.id;
+  var id=surface?.id??best?.id;
   selectedOpeningId=null;
   if(id==null){if(!e.shiftKey)selected=[];}
   else if(e.shiftKey)selected=selected.includes(id)?selected.filter(function(v){return v!==id;}):selected.concat(id);
@@ -4217,10 +4237,16 @@ function selectAt(e){
  var p=new T.Vector2(2*(e.clientX-box.left)/box.width-1,-2*(e.clientY-box.top)/box.height+1);
  raycaster.setFromCamera(p,camera);
  raycaster.params.Line.threshold=.16;
- var hits=[];modelRoot.traverse(function(o){if((o.isMesh||(o.isLine&&!o.userData.cadSketch))&&!o.userData.cadProfileHandles)hits.push(o);});
+ var hits=[];modelRoot.updateMatrixWorld(true);
+ modelRoot.traverse(function(o){
+  if(!o.visible||o.userData.cadSketch||o.userData.cadProfileHandles)return;
+  if((o.isMesh||o.isLine||o.isLineSegments)&&o.userData.owner!=null)hits.push(o);
+ });
  var intersects=raycaster.intersectObjects(hits,false);
  var eligible=function(item){return records.some(function(r){return r.id===item.object.userData.owner&&editableRecord(r);});};
  var visibleHits=intersects.filter(eligible),front=visibleHits[0]||null;
+ var lineHit=visibleHits.find(function(item){return item.object.userData.cadProfileOutline;});
+ if(lineHit&&(!front||lineHit.distance<=front.distance+.12))front=lineHit;
  var tagged=front&&visibleHits.find(function(item){
   if(item.object.userData.openingId==null||item.object.userData.owner!==front.object.userData.owner)return false;
   var host=records.find(function(r){return r.id===item.object.userData.owner;});
@@ -4789,7 +4815,7 @@ function cad3dMaterialSetup(){
    cad3dCustomMaterials[id]={name:file.name.slice(0,70),image:c.toDataURL('image/jpeg',.78)};
    cad3dTextureCanvases[id]=c;cad3dMaterialId=id;cad3dMaterialPaint=true;
    if(placing)setPlacement(null);cad3dNavigationTool='select';cad3dSyncCompactBars();
-   cad3dMaterialRender();cad3dMaterialMsg('JPG listo. Ajustá ancho/alto y clic en el muro.');
+   cad3dMaterialRender();cad3dHistoryCapture();cad3dMaterialMsg('JPG listo. Ajustá ancho/alto y clic en el muro.');
   }catch(error){cad3dMaterialMsg('No se pudo abrir el JPG: '+String(error.message||error));}
  });
  p.querySelector('[data-mat-category]').addEventListener('change',function(){
@@ -4825,7 +4851,7 @@ function cad3dMaterialSetup(){
   cad3dTextureCanvases[id]=out;
   cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;
   p.querySelector('[data-mat-newname]').value='';
-  cad3dMaterialRender();
+  cad3dMaterialRender();cad3dHistoryCapture();
   cad3dMaterialMsg('Material «'+name+'» creado · clic sobre un muro o piso para pegar');
  });
  p.querySelector('[data-mat-save]').addEventListener('click',function(){
@@ -4833,7 +4859,7 @@ function cad3dMaterialSetup(){
   if(!custom)return cad3dMaterialMsg('Para guardar propiedades, primero creá un material propio');
   Object.assign(custom,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
    bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness});
-  cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
+  cad3dHistoryCapture();cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
  });
  p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness]').forEach(function(el){
   el.addEventListener('change',function(){
@@ -6346,7 +6372,7 @@ function run3DCommand(){
 }
 function action(a){
  if(a==='materials'){cad3dShowMaterials();return true;}
- if(a==='select'){cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
+ if(a==='select'){cad3dMaterialPaint=false;cad3dMaterialRender();cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
@@ -6654,6 +6680,18 @@ async function readJSON(e){
 }
 window.addEventListener('keydown',function(ev){
  if(!root||root.hidden)return;
+ // The CAD3D model owns its own shortcuts, never editable form inputs or CAD2D.
+ var editing=ev.target?.closest?.('input,textarea,select,[contenteditable],[role="textbox"]');
+ if((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&!ev.isComposing&&!editing){
+  var historyKey=String(ev.key||'').toLowerCase();
+  if(historyKey==='z'||historyKey==='y'||historyKey==='a'){
+   ev.preventDefault();ev.stopImmediatePropagation();
+   if(historyKey==='a')cad3dSelectAll();
+   else if(historyKey==='y'||ev.shiftKey)cad3dRedo();
+   else cad3dUndo();
+   return;
+  }
+ }
  // 3ds Max-like shortcuts: F3 = 3D wireframe, F4 = shaded solids.
  // Only intercept within CAD3D, never while a text input is being edited.
  if((ev.key==='F3'||ev.key==='F4')&&!ev.isComposing&&!ev.altKey&&!ev.ctrlKey&&!ev.metaKey){
