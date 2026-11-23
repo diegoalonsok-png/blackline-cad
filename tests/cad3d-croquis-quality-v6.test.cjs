@@ -54,17 +54,13 @@ test('Artistic presets reuse the existing geometric line pass; technical remains
  assert(src.includes('2560/sw')&&src.includes('1600/sh'));
 });
 
-test('Render Croquis has dedicated action and all 8 finish engines',()=>{
+test('Legacy Render Croquis is archived and never launched; AI uses separate image service',()=>{
  const markupSource=block('function cad3dSketchRenderMarkup(){','function cad3dInitSketchCapture(){');
  const markup=vm.runInNewContext(markupSource+'\ncad3dSketchRenderMarkup()', {});
- for(const style of ['ink','pencil','charcoal','engraving','watercolor','pastel','marker','wash']){
-  assert(markup.includes('<option value="'+style+'"'),style);
- }
- for(const selector of ['cad3dSketchCapturePreview','cad3dSketchCaptureOriginal',
-  'cad3dSketchDownload','cad3dSketchCaptureStyle','data-sketch-setting="baseStyle"',
-  'data-sketch-setting="resolution"'])assert(markup.includes(selector),selector);
- assert(src.includes('cad3dRenderSketchLaunch'));
- assert(src.includes('cad3dInitSketchCapture();'));
+ assert(markup.includes('cad3dSketchCapturePreview'),'Legacy code is retained but inactive');
+ assert(!src.includes('RENDER CROQUIS</button>'),'No obsolete render button');
+ assert(!src.includes('cad3dInitSketchCapture();'),'NPR UI stays deactivated');
+ assert(src.includes('cad3dAIGenerateLaunch'),'New AI entry point only');
 });
 test('Capture restores original camera, render style and WebGL resolution',()=>{
  const capture=block('function cad3dSketchCapture(){','function cad3dSketchGeometryEdges(');
