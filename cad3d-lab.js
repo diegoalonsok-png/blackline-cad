@@ -797,6 +797,7 @@ css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .ca
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
 css+="\n#cad3dLab > .viewSavePanel{position:absolute!important;left:36px;top:180px;right:auto!important;bottom:auto!important;z-index:145!important;box-sizing:border-box;max-width:calc(100% - 16px)!important;max-height:calc(100% - 32px)!important;overflow:auto}\n#cad3dLab > .viewSavePanel[hidden]{display:none!important}\n#cad3dLab .viewSaveHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:-14px -14px 5px;padding:10px 14px;border-bottom:1px solid #587081;background:#223443;border-radius:10px 10px 0 0;cursor:grab;user-select:none;touch-action:none;font:700 11px Inter,Arial,sans-serif;letter-spacing:.4px}\n#cad3dLab .viewSaveHeader:active{cursor:grabbing}\n#cad3dLab .viewSaveClose{background:none!important;border:0!important;color:#e7f1f6!important;min-height:22px!important;padding:0 5px!important;font-size:20px!important;cursor:pointer}\n";
 css+="\n#cad3dLab > .cad3dSketchCapturePanel{position:absolute;z-index:160;left:45px;top:110px;width:min(760px,calc(100% - 40px));max-height:calc(100% - 35px);overflow:auto;box-sizing:border-box;background:#142431;color:#eaf4fa;border:1px solid #81acc1;border-radius:11px;padding:12px;box-shadow:0 18px 45px #000b}\n#cad3dLab > .cad3dSketchCapturePanel[hidden]{display:none!important}\n#cad3dLab .cad3dSketchCaptureHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:-12px -12px 10px;padding:10px 12px;background:#25394a;border-bottom:1px solid #6b91a4;cursor:grab;user-select:none;touch-action:none}\n#cad3dLab .cad3dSketchCaptureHead:active{cursor:grabbing}\n#cad3dLab .cad3dSketchClose{font-size:20px;color:#eaf4fa;background:none;border:0;cursor:pointer}\n#cad3dLab .cad3dSketchCaptureControls{display:flex;align-items:end;gap:9px;flex-wrap:wrap;margin-bottom:9px}\n#cad3dLab .cad3dSketchCaptureControls label{font:11px Inter,Arial,sans-serif;display:grid;gap:4px;flex:1;min-width:140px}\n#cad3dLab .cad3dSketchCaptureControls select,#cad3dLab .cad3dSketchCaptureControls input{width:100%;box-sizing:border-box;background:#213343;color:white;border:1px solid #617e8e;border-radius:5px;padding:6px}\n#cad3dLab .cad3dSketchCapturePreview{display:block;width:100%;height:auto;max-height:52vh;object-fit:contain;background:#faf7f0;border:1px solid #40566b}\n#cad3dLab .cad3dSketchCapturePanel small{font:10px Inter,Arial,sans-serif;color:#b3c8d5}\n";
+css+="\n#cad3dLab .cad3dNavToolbar [data-nav-tool=select]{font-size:22px!important;min-width:39px!important;font-weight:700!important}\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{border:1px solid #79b9d0!important;background:#22506a!important;color:#f4fbff!important;font-weight:700!important;white-space:nowrap!important}\n#cad3dLab .view:not(.cad3dPanning):not(.placing) canvas{cursor:default}\n";
 css+="\n#cad3dLab .view.cad3dPanning canvas{cursor:grab!important;touch-action:none!important}\n#cad3dLab .view.cad3dPanning canvas:active{cursor:grabbing!important}\n";
 css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
@@ -1909,7 +1910,7 @@ function cad3dApprovedStyleCube(mode){
 function cad3dCompact3DBar(){
  function b(group,key,label,display){return '<button type="button" class="cad3dQuickTool" data-'+group+'="'+key+'" title="'+label+'" aria-label="'+label+'" aria-pressed="false">'+display+'</button>';}
  var tools=[
- ['orbit','Giro libre','⟳'],['pan','Panorámica','✥'],['ring','Órbita con anillo','◎'],
+ ['select','Seleccionar objetos 3D','↖'],['orbit','Giro libre','⟳'],['pan','Panorámica','✥'],['ring','Órbita con anillo','◎'],
  ['hand','Mano · desplazar','✋'],['center','Centrar modelo','⊙'],['fit','Ajustar todo','⛶']
  ];
  var styles=[
@@ -1941,12 +1942,13 @@ function cad3dBindCompactBars(){
    var kind=nav.dataset.navTool;
    if(kind==='center'||kind==='fit'){fit3DModel();return;}
    cad3dNavigationTool=kind==='hand'?'pan':kind;
-   if(cad3dNavigationTool==='pan'){cad3dEndZoom();if(placing)setPlacement(null);}
+   if(cad3dNavigationTool==='select'){cad3dEndZoom();setPlacement(null);}
+   else if(cad3dNavigationTool==='pan'){cad3dEndZoom();if(placing)setPlacement(null);}
    root.querySelector('.view')?.classList.toggle('cad3dPanning',cad3dNavigationTool==='pan');
    cad3dSyncCompactBars();
    if(kind==='ring'){root.querySelector('.orbitBall')?.focus({preventScroll:true});}
    else root.querySelector('.view canvas')?.focus({preventScroll:true});
-   text(kind==='pan'||kind==='hand'?'Mover vista: arrastrá sobre el dibujo':'Girar vista: arrastrá sobre el dibujo');return;
+   text(kind==='select'?'Seleccionar: clic sobre una cara del objeto 3D · Shift + clic selección múltiple':kind==='pan'||kind==='hand'?'Mover vista: arrastrá sobre el dibujo':'Girar vista: arrastrá sobre el dibujo');return;
   }
   if(style){
    var mode=style.dataset.quickStyle;
@@ -2190,7 +2192,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar y renderizar esta perspectiva como croquis">✎ Render Croquis</button><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
 
  '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
  '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
@@ -2218,7 +2220,6 @@ function build(){
  '<button type="button" class="btn" data-check-shadows title="Compare render with shadows on and off">Check visible shadows</button>'+
  '<output class="shadowFeedback" role="status">Shadow check requires WebGL and visible objects.</output>'+
  '<small>Visual simulation only, not geolocated solar analysis.</small></div></div>'+
- '<button type="button" class="btn cad3dRenderSketchLaunch" title="Capturar la perspectiva y procesarla como croquis arquitectónico">✎ <span>Render Croquis</span></button>'+
  tool('sketch','Croquis','view')+
  '<div class="styleControl"><button type="button" class="btn styleLaunch" aria-expanded="false" aria-controls="cad3dVisualStyles" title="Choose visual rendering style" aria-label="Visual Style">'+ico('view')+'<span>Visual Style</span></button>'+
  '<div class="stylePanel" id="cad3dVisualStyles" hidden><header>VISUAL STYLES · CAD3D <small>SketchUp-inspired workspace</small></header>'+
@@ -3332,8 +3333,8 @@ function bindCanvas(el){
    placeAt(e);
    return;
   }
-  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&(cad3dNavigationTool==='pan'||(cad3dNavigationTool==='select'&&viewMode==='ortho')));
-  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan};
+  var pan=e.button===2||(e.button===1&&!e.shiftKey)||(e.button===0&&cad3dNavigationTool==='pan');
+  dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,pan:pan,select:e.button===0&&cad3dNavigationTool==='select'};
   el.dataset.navigationDrag='false';
   el.setPointerCapture(e.pointerId);
  });
@@ -3353,13 +3354,15 @@ function bindCanvas(el){
     hideObjectContextMenu();
     dragging.moved=true;dragging.lastX=e.clientX;dragging.lastY=e.clientY;
     el.dataset.navigationDrag='true';
-    if(dragging.pan)panView(dx,dy,el);
+    if(dragging.select){
+     // Selection must never orbit or pan the camera.
+    }else if(dragging.pan)panView(dx,dy,el);
     else{
      orbit.az-=dx*.007;orbit.el=clamp(orbit.el+dy*.007,-1.45,1.45);
      if(viewMode==='ortho')activeView='orbit';
      syncViewControls();
     }
-    updateCamera();
+    if(!dragging.select)updateCamera();
    }
   }
   if(!dragging?.moved){updatePlacementGuide(e);updateDynamicReadout(e);
