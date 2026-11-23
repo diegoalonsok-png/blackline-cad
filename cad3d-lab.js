@@ -1815,8 +1815,7 @@ function cad3dMakeSunPanelMovable(){
   }
  }
  button.addEventListener('click',function(){
-  if(panel.hidden)return;
-  place(false);
+  queueMicrotask(function(){if(!panel.hidden)place(false);});
  });
  close.addEventListener('click',function(){
   panel.hidden=true;
