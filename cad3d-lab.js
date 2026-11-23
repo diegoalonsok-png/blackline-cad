@@ -2838,8 +2838,9 @@ function build(){
   if(button)changeLayer(button.dataset.layerToggle);
  });
  renderDraftModes();renderLayerPanel();
- root.querySelector('.cad3dBasicBars').addEventListener('click',function(e){
-  var button=e.target.closest('[data-history]');
+ root.addEventListener('click',function(e){
+  // Root delegation survives dragging MODIFY to a different dock or floating slot.
+  var button=e.target.closest('.cad3dHistoryButton[data-history]');
   if(!button||button.disabled)return;
   if(button.dataset.history==='undo')cad3dUndo();
   if(button.dataset.history==='redo')cad3dRedo();
