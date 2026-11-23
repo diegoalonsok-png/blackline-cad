@@ -24,17 +24,45 @@ test('Natural sunlight uses warm direct light, skylight and color-managed render
  assert(sun.includes("sunSettings.elevation*Math.PI/180"));
  assert(!sun.includes('records.push('),'Sun controls must never create CAD objects');
 });
-test('2D Wireframe uses black geometric edges and vertices in WebGL and compatibility canvas',()=>{
- const render=block('function applyRenderStyle(){','function setVisualStyle(mode){');
- for(const term of ["renderStyle==='wire2d'?0x111111","if(renderStyle==='wire2d'){",
-  'new T.Points(','new T.PointsMaterial({','depthTest:false,depthWrite:false',
-  'points.userData.cadSketch=true']){
-  assert(render.includes(term),term);
+test('Both wireframes override a custom sky and render white, unoccluded geometric edges',async()=>{
+ const T=await import('../assets/three-cad3d-r160.module.js');
+ const model=new T.Group(),scene=new T.Scene(),grid=new T.Group(),axes=new T.Group();
+ const ground=new T.Mesh(new T.PlaneGeometry(10,10),new T.MeshBasicMaterial());
+ const underlay=new T.Group(),reference=new T.LineSegments(new T.BufferGeometry(),new T.LineBasicMaterial());
+ underlay.add(reference);
+ for(const geometry of [new T.BoxGeometry(),new T.SphereGeometry(1,28,18)]){
+  model.add(new T.Mesh(geometry,new T.MeshStandardMaterial({color:0x8a7654})));
  }
- const compat=block('function fallbackBox(','function scheduleFallbackDraw(){');
- assert(compat.includes("renderStyle==='wire2d'?'#111111'"));
- assert(compat.includes('pts.forEach(function(p)'));
- assert(compat.includes("if(renderStyle!=='wire2d')ctx.fill()"));
+ const env={T,modelRoot:model,scene,gridHelper:grid,axesHelper:axes,sunGround:ground,underlayGroup:underlay,
+  root:null,fallbackCanvas:null,cloudTexture:null,cloudTextureKey:'',draftModes:{grid:true},sunSettings:{enabled:true,onGround:true},
+  environmentSettings:{customSky:true,sky:'#80bdcf',customGround:true,ground:'#abc123',clouds:'none',showGround:true},
+  CAD3D_SKETCH_PRESETS:{},renderStyleControls(){},isCad3DSketch(){return false;}};
+ const apply=vm.runInNewContext([
+  block('function isCad3DWireframe(','var environmentSettings='),
+  block('function cad3dSkyColor(){','/* Panorama procedimental'),
+  block('function apply3DEnvironment(){','function applySunSettings(){'),
+  block('function cad3dStyleUnderlay(','function drawUnderlay(){'),
+  block('function applyRenderStyle(){','function setVisualStyle(mode){'),
+  '(mode)=>{renderStyle=mode;applyRenderStyle();}'
+ ].join('\n'),env);
+ for(const mode of ['wire2d','wire3d']){
+  apply(mode);
+  assert.equal(scene.background.getHex(),0x000000);
+  assert.equal(grid.visible||axes.visible||ground.visible,false);
+  assert.equal(reference.material.color.getHex(),0xffffff);
+  for(const mesh of model.children){
+   assert.equal(mesh.material.colorWrite,false);
+   assert.equal(mesh.material.depthWrite,false);
+   const line=mesh.children.find(child=>child.isLineSegments);
+   assert.ok(line.geometry.getAttribute('position').count>0,mesh.geometry.type);
+   assert.equal(line.material.color.getHex(),0xffffff);
+   assert.equal(line.material.depthTest||line.material.toneMapped,false);
+  }
+ }
+ apply('shaded');
+ assert.equal(scene.background.getHexString(),'80bdcf');
+ assert.ok(grid.visible&&axes.visible&&ground.visible);
+ assert.ok(model.children.every(mesh=>mesh.material.colorWrite&&mesh.material.depthWrite&&!mesh.children.length));
 });
 test('TOP stays in same CAD3D workspace with selection, parametric grips and drawing active',()=>{
  const view=block('function setViewPreset(key){','function checkVisibleShadows(){');
