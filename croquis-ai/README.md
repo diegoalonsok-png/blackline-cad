@@ -21,3 +21,16 @@ El botón **✦ CREAR CROQUIS IA** aparece en la barra de cámaras del módulo 3
 Antes de abrirlo a usuarios, añadir autorización PRO real en el servidor, cuota de uso diaria, facturación y protección anti abuso Cloudflare WAF. No hay credenciales de servicios de IA en el navegador.
 
 **Precisión:** por ser IA generativa, puede reinterpretar materiales, aberturas o geometría. Es una imagen de presentación, no un plano constructivo. No reactivar el antiguo renderizador NPR deshabilitado por el usuario.
+## Diagnóstico verificado 23/11/2026
+
+La ruta pública **https://blackline-cad.org/croquis/render** responde ahora a GET con JSON sin secretos:
+`ready`, `aiBinding`, `enabled` y `error`.
+
+En la comprobación de la instalación actual, `aiBinding=false` y `enabled=false`: la Function está publicada, pero faltan dos opciones en el dashboard de Cloudflare:
+
+1. **Workers & Pages → [proyecto CAD2D3D] → Settings → Production → Bindings → Add → Workers AI → nombre AI**.
+2. **Settings → Variables and Secrets / Environment variables → Production → CROQUIS_ENABLED → true**.
+3. **Redeploy** la versión de producción. Reabrir el módulo 3D y elegir **Comprobar Cloudflare**.
+
+No se recomienda incorporar un `wrangler.jsonc` nuevo con `pages_build_output_dir` sin antes importar la configuración Pages existente: podría sobrescribir settings de producción.
+El botón ofrece **Guardar foto 3D** incluso sin Workers AI; esa captura se puede transformar aquí en ChatGPT como alternativa temporal.
