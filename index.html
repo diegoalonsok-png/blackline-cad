@@ -2337,6 +2337,11 @@ function cadDetailedArqOpening(ref){
  if(!item)return null;
  const physical=item.cat==='Carpinterías'&&/(puerta|ventana|ventanal|paño fijo|pano fijo|carpintería|corrediz|banderola)/i.test(item.name);
  const elevation=item.cat==='Alzados'&&/^(puerta|ventana|paño fijo|pano fijo|carpintería)/i.test(item.name);
+ if(item.dynamicOpening){
+  if(item.dynamicOpening.projection==='section')return null;
+  return {item,def,physical:item.dynamicOpening.projection==='plan',
+   door:item.dynamicOpening.projection==='plan'&&item.dynamicOpening.kind==='door'};
+ }
  if(!physical&&!elevation)return null;
  return {item,def,physical,door:physical&&/puerta/i.test(item.name)};
 }
@@ -2396,7 +2401,7 @@ function cadDrawGenericBlockGrips(ref){
 function cadOpeningQuickGrips(ref){
  const def=state.blocks?.[ref.blockName],arq=cadDetailedArqOpening(ref);
  if(arq){
-  const width=Number(def.arq.w)*(1000/U[state.unit])*(Number(ref.scale)||1);
+  const width=Number(arq.item.dynamicAxis==='d'?def.arq.d:def.arq.w)*(1000/U[state.unit])*(Number(ref.scale)||1);
   if(!(width>0&&Number.isFinite(width)))return [];
   const theta=(Number(ref.rotation)||0)*Math.PI/180;
   const ext=def.arq.ext,cx=(Number(ext?.x0??0)+Number(ext?.x1??def.arq.w))/2;
@@ -2453,7 +2458,8 @@ function cadOpeningQuickApply(grip){
 }
 function cadOpeningWidthMeters(ref){
  const def=state.blocks?.[ref?.blockName];
- if(cadDetailedArqOpening(ref))return Number(def.arq.w)*(Number(ref.scale)||1);
+ const detailed=cadDetailedArqOpening(ref);
+ if(detailed)return Number(detailed.item.dynamicAxis==='d'?def.arq.d:def.arq.w)*(Number(ref.scale)||1);
  return Number(ref.params?.width??def?.parametric?.defaults?.width)*(Number(ref.scale)||1)*U[state.unit]/1000;
 }
 function cadResizeOpening(ref,meters){
@@ -2462,10 +2468,13 @@ function cadResizeOpening(ref,meters){
  if(arq){
   if(layerFor(ref).locked||!layerFor(ref).visible)return {ok:false,reason:'Capa bloqueada o invisible'};
   if(!window.CAD2D_ARQ?.canEdit?.(arq.item.id))return {ok:false,reason:'Requiere plan PRO activo'};
-  const width=Number(meters),scale=Number(ref.scale)||1,W=width/scale,item=arq.item;
-  if(!Number.isFinite(W)||W<item.wMin-1e-8||W>item.wMax+1e-8||width<=0)
-   return {ok:false,reason:'Ancho permitido: '+item.wMin.toFixed(2)+' a '+item.wMax.toFixed(2)+' m (escala '+scale+')'};
-  const ok=window.CAD2D_ARQ?.resizeByRefId?.(ref.id,W,def.arq.d);
+  const width=Number(meters),scale=Number(ref.scale)||1,item=arq.item;
+  const alongY=item.dynamicAxis==='d',span=width/scale;
+  const lower=alongY?item.dMin:item.wMin,upper=alongY?item.dMax:item.wMax;
+  if(!Number.isFinite(span)||span<lower-1e-8||span>upper+1e-8||width<=0)
+   return {ok:false,reason:'Vano permitido: '+lower.toFixed(2)+' a '+upper.toFixed(2)+' m (escala '+scale+')'};
+  const W=alongY?span*(item.w/item.d):span,D=alongY?span:def.arq.d;
+  const ok=window.CAD2D_ARQ?.resizeByRefId?.(ref.id,W,D);
   return ok?{ok:true,width,cut:0}:{ok:false,reason:'No se pudo regenerar la abertura'};
  }
  if(!['swing-door','double-door','framed-window'].includes(kind)||layerFor(ref).locked)return {ok:false,reason:'Abertura no editable'};
@@ -2523,9 +2532,10 @@ function cadOpeningResizeEditor(ref,client){
  document.getElementById('cadOpeningResizeEditor')?.remove();
  const width=cadOpeningWidthMeters(ref)*1000/U[state.unit];
  if(!(width>0&&Number.isFinite(width)))return;
- const theta=(Number(ref.rotation)||0)*Math.PI/180;
- const detailed=cadDetailedArqOpening(ref),ext=detailed?.def?.arq?.ext;
- const first=detailed?(ref.flipBlockX?-Number(ext?.x1??detailed.def.arq.w):Number(ext?.x0??0))*(1000/U[state.unit])*(Number(ref.scale)||1):0;
+ const detailed=cadDetailedArqOpening(ref),alongY=detailed?.item.dynamicAxis==='d';
+ const theta=(Number(ref.rotation)||0)*Math.PI/180+(alongY?Math.PI/2:0);
+ const ext=detailed?.def?.arq?.ext;
+ const first=detailed?(alongY?Number(ext?.y0??0):(ref.flipBlockX?-Number(ext?.x1??detailed.def.arq.w):Number(ext?.x0??0)))*(1000/U[state.unit])*(Number(ref.scale)||1):0;
  const start=screen(P(ref.p.x+first*Math.cos(theta),ref.p.y+first*Math.sin(theta)));
  const end=screen(P(ref.p.x+(first+width)*Math.cos(theta),ref.p.y+(first+width)*Math.sin(theta)));
  const dx=end.x-start.x,dy=end.y-start.y,len=Math.hypot(dx,dy);
@@ -10895,8 +10905,9 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-olimpiadas-banos-20261123.js?v=20261123-v1"></script>
 <script src="assets/cad2d-olimpiadas-cocinas-20261123.js?v=20261123-v1"></script>
 <script src="assets/cad2d-views-cuts-20261123.js"></script>
+<script src="assets/cad2d-dynamic-openings-20261123.js?v=20261123-v1"></script>
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
-<script src="cad-arq-pro.js?v=20261122-openings-dynamic-v1"></script>
+<script src="cad-arq-pro.js?v=20261123-openings-dynamic-v2"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261123-families1"></script>
