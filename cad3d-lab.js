@@ -2099,6 +2099,51 @@ function cad3dSketchCapture(){
  cad3dSketchSource=canvas;
  cad3dSketchProcess();
 }
+
+function cad3dSketchGeometryEdges(ctx,w,h,opts){
+ if(!T||!renderer||!camera||!modelRoot)return;
+ camera.updateMatrixWorld(true);modelRoot.updateMatrixWorld(true);
+ var meshes=[];modelRoot.traverse(function(o){
+  if(o.isMesh&&o.visible&&o.geometry&&!o.userData?.cadSketch&&!o.userData?.cadGlass)meshes.push(o);
+ });
+ var ray=new T.Raycaster(),point=new T.Vector2(),count=0,cap=1600;
+ ctx.save();ctx.strokeStyle=opts.color;ctx.fillStyle=opts.color;
+ ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength));
+ for(var m=0;m<meshes.length&&count<cap;m++){
+  var mesh=meshes[m],edges;
+  try{edges=new T.EdgesGeometry(mesh.geometry,28);}catch(_e){continue;}
+  var attr=edges.getAttribute('position');
+  if(!attr){edges.dispose();continue;}
+  for(var i=0;i+1<attr.count&&count<cap;i+=2){
+   var a=new T.Vector3().fromBufferAttribute(attr,i).applyMatrix4(mesh.matrixWorld);
+   var b=new T.Vector3().fromBufferAttribute(attr,i+1).applyMatrix4(mesh.matrixWorld);
+   var p=a.clone().project(camera),q=b.clone().project(camera);
+   if(![p.x,p.y,p.z,q.x,q.y,q.z].every(Number.isFinite)||p.z>1&&q.z>1)continue;
+   var x1=(p.x+1)*w/2,y1=(1-p.y)*h/2,x2=(q.x+1)*w/2,y2=(1-q.y)*h/2;
+   var dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
+   if(len<2||len>4*Math.max(w,h)||Math.max(x1,x2)<0||Math.min(x1,x2)>w||Math.max(y1,y2)<0||Math.min(y1,y2)>h)continue;
+   // Geometry-aware hidden edge rejection at the line midpoint.
+   var mid=a.clone().add(b).multiplyScalar(.5),screen=mid.clone().project(camera);
+   point.set(screen.x,screen.y);ray.setFromCamera(point,camera);
+   var hits=ray.intersectObjects(meshes,false);
+   if(hits.length&&hits[0].object!==mesh&&hits[0].distance<ray.ray.origin.distanceTo(mid)-.04)continue;
+   var ux=dx/len,uy=dy/len,ex=opts.extension,steps=Math.max(2,Math.min(20,Math.ceil(len/32)));
+   ctx.lineWidth=opts.profile;ctx.beginPath();ctx.moveTo(x1-ux*ex,y1-uy*ex);
+   for(var t=1;t<steps;t++){
+    var frac=t/steps,wave=Math.sin(m*1.9+i*.13+frac*17)*opts.jitter;
+    ctx.lineTo(x1+dx*frac-uy*wave,y1+dy*frac+ux*wave);
+   }
+   ctx.lineTo(x2+ux*ex,y2+uy*ex);ctx.stroke();
+   if(opts.endpoints){
+    ctx.beginPath();ctx.arc(x1,y1,opts.endpoints*.24,0,Math.PI*2);
+    ctx.arc(x2,y2,opts.endpoints*.24,0,Math.PI*2);ctx.fill();
+   }
+   count++;
+  }
+  edges.dispose();
+ }
+ ctx.restore();
+}
 function cad3dSketchHex(hex){
  var v=String(hex||'#000000').replace('#','');return [0,2,4].map(function(i){return parseInt(v.slice(i,i+2),16)||0;});
 }
@@ -2117,7 +2162,7 @@ function cad3dSketchProcess(){
  var strength=Number(panel.querySelector('.cad3dSketchCaptureStrength').value)/100;
  var edgeColor=cad3dSketchHex(val('edgeColor')),skyColor=cad3dSketchHex(val('skyColor'));
  var groundColor=cad3dSketchHex(val('groundColor')),wallColor=cad3dSketchHex(val('wallColor'));
- var weight=Number(val('weight')||1), jitter=Number(val('jitter')||0);
+ var weight=Number(val('weight')||1),jitter=Number(val('jitter')||0),profile=Number(val('profile')||2),extension=Number(val('extension')||0),endpoints=Number(val('endpoints')||0),paperType=val('paper');
  var sky=checked('sky'),ground=checked('ground'),clouds=checked('clouds'),trees=checked('trees');
  var recolor=val('wallMode')==='tint';
  var grey=new Uint8Array(w*h),edge=new Uint8Array(w*h),skyMask=new Uint8Array(w*h);
@@ -2164,11 +2209,11 @@ function cad3dSketchProcess(){
   }else if(recolor&&!isSky&&y<h*.88&&edge[j]<54&&Math.max(r,g,b)-Math.min(r,g,b)<29&&grey[j]>65&&grey[j]<245){
    r=r*.32+wallColor[0]*.68;g=g*.32+wallColor[1]*.68;b=b*.32+wallColor[2]*.68;
   }
-  var paper=(Math.sin(x*.17+y*.11)*Math.sin(x*.071-y*.13)+1)*1.25;
+  var paper=(Math.sin(x*.17+y*.11)*Math.sin(x*.071-y*.13)+1)*(paperType==='watercolor'?3.1:1.25);
   var wash=style==='watercolor'?.57:style==='marker'?.82:style==='pencil'?.12:.55;
   var steps=style==='marker'?7:style==='watercolor'?13:20;
   var tone=[r,g,b].map(function(v){return Math.round(v/(255/steps))*(255/steps);});
-  var base=style==='pencil'?[243,242,239]:[247,246,242];
+  var base=paperType==='cream'?[249,241,224]:paperType==='watercolor'?[247,245,235]:style==='pencil'?[243,242,239]:[247,246,242];
   var v=(255-grey[j])/255*.11;
   for(var c=0;c<3;c++)data[k+c]=Math.max(0,Math.min(255,base[c]*(1-wash)+tone[c]*wash-v*25+paper));
   data[k+3]=255;
@@ -2190,6 +2235,7 @@ function cad3dSketchProcess(){
   for(var c=0;c<3;c++)data[k+c]=Math.max(0,Math.min(255,data[k+c]*(1-alpha)+edgeColor[c]*alpha));
  }
  ctx.putImageData(dst,0,0);
+ if(checked('geometry'))cad3dSketchGeometryEdges(ctx,w,h,{color:val('edgeColor'),profile:profile,extension:extension,endpoints:endpoints,jitter:jitter,strength:strength});
  if(clouds&&skyMask.some(function(p){return !!p;})){
   // Clouds are drawn only on a valid sky mask, not over the building.
   var cloudLayer=document.createElement('canvas');cloudLayer.width=w;cloudLayer.height=h;
@@ -2227,6 +2273,22 @@ function cad3dSketchProcess(){
   tree(w*.955,h*.79,Math.max(.6,Math.min(1.5,w/1050)));
  }
 }
+
+function cad3dSketchStyleData(panel){
+ var o={style:panel.querySelector('.cad3dSketchCaptureStyle').value,strength:panel.querySelector('.cad3dSketchCaptureStrength').value};
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){o[el.dataset.sketchSetting]=el.type==='checkbox'?el.checked:el.value;});
+ return o;
+}
+function cad3dSketchSetStyle(panel,o){
+ if(!o)return;
+ if(o.style)panel.querySelector('.cad3dSketchCaptureStyle').value=o.style;
+ if(o.strength!=null)panel.querySelector('.cad3dSketchCaptureStrength').value=o.strength;
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){
+  var v=o[el.dataset.sketchSetting];if(v==null)return;
+  if(el.type==='checkbox')el.checked=!!v;else el.value=String(v);
+ });
+ cad3dSketchProcess();
+}
 function cad3dInitSketchCapture(){
  var panel=root.querySelector('.cad3dSketchCapturePanel');
  if(!panel)return;
@@ -2240,6 +2302,23 @@ function cad3dInitSketchCapture(){
  panel.querySelector('.cad3dSketchRecapture').addEventListener('click',cad3dSketchCapture);
  panel.querySelector('.cad3dSketchCaptureStyle').addEventListener('change',cad3dSketchProcess);
  panel.querySelector('.cad3dSketchCaptureStrength').addEventListener('input',cad3dSketchProcess);
+ var preset=panel.querySelector('[data-sketch-preset]');
+ preset.addEventListener('change',function(){
+  var styles={technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',paper:'white'},
+   ink:{style:'ink',profile:'3',extension:'4',endpoints:'2',jitter:'1',paper:'cream'},
+   watercolor:{style:'watercolor',profile:'2',extension:'4',endpoints:'1',jitter:'2',paper:'watercolor'},
+   pencil:{style:'pencil',profile:'2',extension:'5',endpoints:'2',jitter:'2',paper:'cream'}};
+  if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
+ });
+ panel.querySelector('[data-sketch-save-preset]').addEventListener('click',function(){
+  try{localStorage.setItem('blackline-cad3d-sketch-user-style',JSON.stringify(cad3dSketchStyleData(panel)));text('Estilo de croquis guardado');}
+  catch(err){text('Error guardando estilo: '+err.message);}
+ });
+ panel.querySelector('[data-sketch-load-preset]').addEventListener('click',function(){
+  try{var saved=JSON.parse(localStorage.getItem('blackline-cad3d-sketch-user-style')||'null');
+   if(!saved)return text('No hay estilo guardado');preset.value='custom';cad3dSketchSetStyle(panel,saved);
+  }catch(err){text('Error cargando estilo: '+err.message);}
+ });
  panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchProcess);el.addEventListener('change',cad3dSketchProcess);});
  panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
   var canvas=panel.querySelector('.cad3dSketchCapturePreview');if(!cad3dSketchSource)return;
@@ -2351,10 +2430,17 @@ function build(){
  tool('shot','PNG','export')+tool('sketchSvg','SVG Croquis','export')+'</div></details></div>'+
  '<section class="cad3dSketchCapturePanel" role="dialog" aria-label="Render de croquis arquitectónico" hidden>'+
  '<header class="cad3dSketchCaptureHead"><strong>✎ RENDER CROQUIS · VISTA ACTUAL</strong><button type="button" class="cad3dSketchClose" aria-label="Cerrar">×</button></header>'+
- '<div class="cad3dSketchCaptureControls"><label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador conceptual</option></select></label>'+
+ '<div class="cad3dSketchCaptureControls"><label>Preajuste<select data-sketch-preset><option value="custom">Personalizado</option><option value="technical">Técnico</option><option value="ink">Tinta</option><option value="watercolor">Acuarela</option><option value="pencil">Lápiz</option></select></label>'+
+ '<button type="button" class="btn" data-sketch-save-preset>Guardar estilo</button><button type="button" class="btn" data-sketch-load-preset>Cargar estilo</button>'+
+ '<label>Estilo<select class="cad3dSketchCaptureStyle"><option value="ink">Tinta arquitectónica</option><option value="watercolor">Acuarela suave</option><option value="pencil">Lápiz grafito</option><option value="marker">Marcador conceptual</option></select></label>'+
  '<label>Color de líneas<input type="color" data-sketch-setting="edgeColor" value="#303843"></label>'+
  '<label>Grosor de trazo (1–5)<input type="range" min="1" max="5" value="2" data-sketch-setting="weight"></label>'+
  '<label>Trazo irregular<input type="range" min="0" max="3" value="0" data-sketch-setting="jitter"></label>'+
+ '<label>Perfiles<input type="range" min="1" max="5" value="2" data-sketch-setting="profile"></label>'+
+ '<label>Extensiones<input type="range" min="0" max="10" value="3" data-sketch-setting="extension"></label>'+
+ '<label>Puntos finales<input type="range" min="0" max="6" value="2" data-sketch-setting="endpoints"></label>'+
+ '<label>Papel<select data-sketch-setting="paper"><option value="white">Blanco</option><option value="cream">Crema</option><option value="watercolor">Acuarela</option></select></label>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-sketch-setting="geometry" checked> Aristas geométricas</label>'+
  '<label>Color de paredes<input type="color" data-sketch-setting="wallColor" value="#e8d7b9"></label>'+
  '<label>Caras<select data-sketch-setting="wallMode"><option value="original">Colores originales</option><option value="tint">Tintar superficies neutras</option></select></label>'+
  '<label>Color de cielo<input type="color" data-sketch-setting="skyColor" value="#b9dbf2"></label>'+
