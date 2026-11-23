@@ -10,6 +10,18 @@
  const es=()=>{try{return /^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){return false}};
  const T=(en,sp)=>es()?sp:en;
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
+ // Paper swatches only change thumbnail previews, never CAD geometry or print settings.
+ const PAPERS=[
+  {id:'cream',label:'crema',bg:'#fffaf0',ink:'#293238'},
+  {id:'white',label:'blanco',bg:'#ffffff',ink:'#20272d'},
+  {id:'ivory',label:'marfil',bg:'#f4ecd8',ink:'#293238'},
+  {id:'gray',label:'gris claro',bg:'#e5e7e9',ink:'#252b30'},
+  {id:'kraft',label:'papel kraft',bg:'#d5c19e',ink:'#292929'},
+  {id:'rose',label:'rosado',bg:'#f4ded8',ink:'#2a292b'},
+  {id:'blue',label:'azul técnico',bg:'#28465c',ink:'#f5f8fc'},
+  {id:'black',label:'negro',bg:'#22272b',ink:'#f7f7f3'}
+ ];
+ const paperControls=()=>'<span class="paper-palette" role="group" aria-label="Probar fondo de papel">'+PAPERS.map(p=>'<button type="button" data-paper="'+p.id+'" style="--paper-swatch:'+p.bg+'" title="Papel '+p.label+'" aria-label="Papel '+p.label+'"></button>').join('')+'</span>';
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
   visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^(?:olymp26-|olymp2-|cc0-fp-|bl-view-window-)/.test(it.id)||
@@ -30,7 +42,7 @@
   doc:{en:'Documentation (levels, axes, sections…)',es:'Documentación (niveles, ejes, cortes…)',cats:c=>c==='Documentación'}
  };
  const KEY='cad2d-block-browser';
- let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120};
+ let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120,paper:'cream'};
  try{Object.assign(st,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){}
  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
  const css=document.createElement('style');
@@ -82,7 +94,16 @@
 #cadBlockBrowser.visual .card{background:#fffaf0;color:#2c302f;border:1px solid #cbb796;border-radius:8px;padding:12px;box-shadow:0 3px 10px #765b3012}
 #cadBlockBrowser.visual .card:hover{background:#fffcf6;border-color:#897047;box-shadow:0 4px 16px #765b3033}
 #cadBlockBrowser.visual .card.armed{border-color:#815b28;box-shadow:0 0 0 3px #bfa16f66}
-#cadBlockBrowser.visual .card svg{color:#293238;max-width:100%;overflow:visible}
+#cadBlockBrowser.visual .card svg{max-width:100%;overflow:visible}
+#cadBlockBrowser .paper-palette{display:none;align-items:center;gap:9px;flex-wrap:wrap;padding:2px 0}
+#cadBlockBrowser.visual .paper-palette{display:flex}
+#cadBlockBrowser .paper-palette button{all:unset;display:block;box-sizing:border-box;cursor:pointer;width:23px;height:23px;flex:0 0 23px;border-radius:50%;background:var(--paper-swatch);border:1px solid #9c8b70}
+#cadBlockBrowser .paper-palette button:hover{transform:scale(1.1)}
+#cadBlockBrowser .paper-palette button[aria-pressed=true]{outline:2px solid #8a6231;outline-offset:2px}
+#cadBlockBrowser.visual .card .preview{display:grid;place-items:center;padding:7px;background:var(--paper-bg,#fffaf0);border:1px solid #c8bca8;border-radius:4px;color:var(--paper-ink,#293238);width:100%;box-sizing:border-box;min-width:0}
+#cadBlockBrowser.visual .card .preview svg{color:inherit}
+#cadBlockBrowser.visual .tools{flex-wrap:wrap}
+#cadBlockBrowser.visual .paper-palette{flex:1 0 auto}
 #cadBlockBrowser.visual .card .nm{color:#35362e;font-weight:600}
 #cadBlockBrowser.visual .card .mt{color:#725b39}
 #cadBlockBrowser.visual .ft{background:#eee0c1;border-color:#c6ae87;color:#4f493d}
@@ -142,6 +163,10 @@
  function paint(){
   if(!el)return;
   const visual=st.view==='visual';
+  const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
+  el.style.setProperty('--paper-bg',paper.bg);
+  el.style.setProperty('--paper-ink',paper.ink);
+  el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
   el.classList.toggle('visual',visual);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
@@ -158,7 +183,7 @@
   });
   const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
@@ -175,7 +200,7 @@
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
-<div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label></div>
+<div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}</div>
 <div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
@@ -187,6 +212,7 @@
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
+   const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=v==='visual'?12:72;save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=72;save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=(st.view==='visual'?12:72);paint();el.querySelector('.grid').scrollTop=pos;return}
