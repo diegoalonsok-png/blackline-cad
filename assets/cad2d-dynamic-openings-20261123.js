@@ -11,8 +11,9 @@ const rxDoor=/puerta|portón|porton|door/i;
 const rxSection=/corte|secci[oó]n|section|umbral|jamba|perfil/i;
 const rxElevation=/alzado|elevaci[oó]n|vista (?:frontal|posterior|lateral)|view|frente|elevation/i;
 let changed=0,doors=0,windows=0,sections=0;
-const finite=(v,f)=>Number.isFinite(v)&&v>0?v:f;
+function enhance(){
 for(const it of A.library){
+ if(it?.dynamicOpening)continue;
  if(!it||!it.id||!it.name||!(it.w>0&&it.d>0)||typeof it.gen!=='function')continue;
  if(/\b(?:roca|ferrum)\b/i.test([it.name,it.author,it.source].join(' ')))continue;
  const name=String(it.name),cat=String(it.cat||'');
@@ -49,5 +50,11 @@ for(const it of A.library){
   it.family='blackline-opening-'+kind+'-plan';
  changed++;if(kind==='door')doors++;else windows++;if(projection==='section')sections++;
 }
-window.CAD2D_DYNAMIC_OPENINGS=Object.freeze({version:20261123,count:changed,doors,windows,sections});
+ return changed;
+}
+enhance();
+window.CAD2D_DYNAMIC_OPENINGS=Object.freeze({version:20261123,enhance,
+ get count(){return changed},get doors(){return doors},
+ get windows(){return windows},get sections(){return sections}
+});
 })();
