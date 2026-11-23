@@ -7244,7 +7244,12 @@ function cad3dLightSetup(){
    if(!v)return;
    var key=this.dataset.lightField;
    v[key]=this.type==='checkbox'?this.checked:this.type==='number'?Number(this.value):this.value;
-   refresh();
+   // Keep the active input mounted while editing coordinates, power and colors.
+   cad3dLightsSave();cad3dLightsUpdateScene();
+   if(key==='name'){
+    var option=panel.querySelector('[data-light-select] option:checked');
+    if(option)option.textContent=v.name;
+   }
   });
  });
  refresh();
