@@ -1510,6 +1510,7 @@ function renderArchPalette(){
  }).join('');
 }
 function cad3dPaletteRemember(name,panel){
+ if(name==='architecture'&&panel.classList.contains('cad3dArchDocked'))return;
  try{localStorage.setItem('blackline-cad3d-floating-'+name+'-v1',JSON.stringify({
   left:parseFloat(panel.style.left),top:parseFloat(panel.style.top),
   width:panel.offsetWidth,height:panel.offsetHeight
@@ -1545,7 +1546,7 @@ function cad3dWatchPaletteResize(name,panel){
  if(!panel||typeof ResizeObserver==='undefined')return;
  var last='';
  new ResizeObserver(function(){
-  if(panel.hidden||!panel.isConnected)return;
+  if(panel.hidden||!panel.isConnected||(name==='architecture'&&panel.classList.contains('cad3dArchDocked')))return;
   var current=panel.offsetWidth+'x'+panel.offsetHeight;
   if(current===last)return;last=current;
   cad3dPaletteRemember(name,panel);
@@ -1612,24 +1613,94 @@ function cad3dBindSidebarPalettes(){
 function cad3dBringPaletteFront(panel){
  root.querySelectorAll('.archPalette,.sunPanel,.viewSavePanel,.cad3dMaterialsPanel,.cad3dDetachedPanel,.cad3dGiroPalette').forEach(function(el){el.style.zIndex=el===panel?'165':'110';});
 }
+
+/* One original Gallery DOM node moves into the Layers sidebar or floats.
+   Dragging within 34px of the sidebar snaps it into the same column. */
+var cad3dArchDockStorageKey='blackline-cad3d-architecture-docked-v1';
+function cad3dArchDockNear(clientX,clientY){
+ var side=root?.querySelector('.side.sidebar');
+ if(!side)return false;
+ var b=side.getBoundingClientRect();
+ return clientX>=b.left-34&&clientX<=b.right+22&&
+  clientY>=b.top-18&&clientY<=b.bottom+18;
+}
+function cad3dArchDockCandidate(value){
+ root?.querySelector('.side.sidebar')?.classList.toggle('cad3dArchDockCandidate',!!value);
+}
+function cad3dArchSetDocked(want,options){
+ var palette=root?.querySelector('.archPalette'),side=root?.querySelector('.side.sidebar');
+ if(!palette||!side)return false;
+ var docked=palette.classList.contains('cad3dArchDocked');
+ options=options||{};
+ if(!!want===docked)return docked;
+ if(want){
+  cad3dPaletteRemember('architecture',palette);
+  palette.classList.add('cad3dArchDocked');
+  var layers=Array.from(side.querySelectorAll(':scope > .panel')).find(function(p){
+   return /^layers$/i.test(p.querySelector('.panel-title')?.textContent.trim()||'');
+  });
+  // Real stacking beside Layers: preserves Layers and Properties.
+  side.insertBefore(palette,layers?layers.nextSibling:side.firstChild);
+  palette.style.left='';palette.style.top='';palette.style.right='';palette.style.bottom='';
+  palette.style.width='';palette.style.height='';
+  palette.dataset.userPositioned='false';
+ }else{
+  palette.classList.remove('cad3dArchDocked');
+  root.appendChild(palette);
+  var restored=cad3dPaletteRestore('architecture',palette);
+  if(!restored){
+   palette.style.width=Math.min(340,root.clientWidth-20)+'px';
+   palette.style.height=Math.min(340,root.clientHeight-50)+'px';
+  }
+  if(options.rect){
+   var host=root.getBoundingClientRect();
+   palette.style.left=clamp(options.rect.left-host.left,8,Math.max(8,root.clientWidth-palette.offsetWidth-8))+'px';
+   palette.style.top=clamp(options.rect.top-host.top,8,Math.max(8,root.clientHeight-palette.offsetHeight-8))+'px';
+  }
+  palette.dataset.userPositioned='true';
+  cad3dPaletteConstrain(palette);
+  cad3dBringPaletteFront(palette);
+ }
+ var button=palette.querySelector('[data-arch-dock]');
+ if(button){
+  button.textContent=want?'↗ Desacoplar':'⇥ Acoplar';
+  button.title=want?'Separar la galería de Layers':'Acoplar la galería junto a Layers';
+  button.setAttribute('aria-pressed',String(!!want));
+ }
+ cad3dArchDockCandidate(false);
+ try{localStorage.setItem(cad3dArchDockStorageKey,want?'yes':'no');}catch(_e){}
+ return !!want;
+}
+function cad3dArchRestoreDocking(){
+ var docked=false;
+ try{docked=localStorage.getItem(cad3dArchDockStorageKey)==='yes';}catch(_e){}
+ if(docked)cad3dArchSetDocked(true);
+}
+
 function showArchPalette(show){
  var palette=root.querySelector('.archPalette'),launcher=root.querySelector('.archLaunch');
  palette.hidden=!show;launcher.setAttribute('aria-expanded',String(show));
  if(show){
   renderArchPalette();
-  if(!palette.style.width)sizeArchPalette('small');
-  else fitArchPalette();
-  cad3dBringPaletteFront(palette);
+  if(!palette.classList.contains('cad3dArchDocked')){
+   if(!palette.style.width)sizeArchPalette('small');
+   else fitArchPalette();
+   cad3dBringPaletteFront(palette);
+  }else palette.scrollIntoView({block:'nearest'});
   palette.querySelector('[aria-pressed=true]')?.focus({preventScroll:true});
  }else if(palette.contains(document.activeElement))launcher.focus({preventScroll:true});
 }
 function fitArchPalette(){
  var palette=root.querySelector('.archPalette');
- if(palette.hidden||!palette.style.width)return;
+ if(palette.hidden||palette.classList.contains('cad3dArchDocked')||!palette.style.width)return;
  cad3dPaletteConstrain(palette);
 }
 function sizeArchPalette(size){
  var palette=root.querySelector('.archPalette');
+ if(palette.classList.contains('cad3dArchDocked')){
+  palette.style.height=({small:290,medium:410,large:Math.min(580,root.clientHeight-110)}[size]||290)+'px';
+  return;
+ }
  var sizes={small:[340,340],medium:[root.clientWidth*.55,root.clientHeight*.72],large:[root.clientWidth-24,root.clientHeight-55]};
  var d=sizes[size]||sizes.small;
  var w=clamp(d[0],Math.min(240,root.clientWidth-16),root.clientWidth-16);
@@ -1691,6 +1762,9 @@ function clickArchPalette(e){
   return;
  }
  if(e.target.closest('[data-arch-close]')){showArchPalette(false);return;}
+ if(e.target.closest('[data-arch-dock]')){
+  cad3dArchSetDocked(!e.currentTarget.classList.contains('cad3dArchDocked'));return;
+ }
  var size=e.target.closest('[data-arch-size]');
  if(size){sizeArchPalette(size.dataset.archSize);return;}
  var category=e.target.closest('[data-arch-tool]');
@@ -3463,6 +3537,7 @@ function build(){
  root.querySelector('.archLaunch').addEventListener('click',function(){showArchPalette(palette.hidden);});
  renderArchPalette();
  cad3dBindSidebarPalettes();
+ cad3dArchRestoreDocking();
  root.querySelector('.fileInput').addEventListener('change',readJSON);
  root.querySelector('.cadInput').addEventListener('change',importCADFile);
  observer=new ResizeObserver(function(){resize();});
