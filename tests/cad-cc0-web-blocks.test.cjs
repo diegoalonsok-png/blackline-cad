@@ -35,7 +35,8 @@ test('each new block has useful vector detail and nominal real-world dimensions'
   assert.ok(Math.abs(g.d-nominal[id][1])<1e-6);
   assert.equal(g.entities.length,nominal[id][2]);
   assert.ok(g.entities.every(e=>['circle','polyline'].includes(e.type)));
-  assert.ok(g.entities.some(e=>e.type==='polyline'&&e.pts.length>9),id+' lacks useful detailed contour');
+  const vertices=g.entities.reduce((n,e)=>n+(e.type==='polyline'?e.pts.length:1),0);
+  assert.ok(vertices>=45,id+' lacks sufficient vector detail: '+vertices);
  }
 });
 test('previous curation and professionally detailed Olimpiadas blocks remain untouched',()=>{
