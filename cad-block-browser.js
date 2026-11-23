@@ -173,6 +173,17 @@
   const q=st.q.trim().toLowerCase();
   return items().filter(it=>inView(it)&&(!st.cat||groupOf(it)===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)+' '+it.id).toLowerCase().includes(q)));
  }
+ // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
+ function simpleBlockNames(){
+  const counters=Object.create(null),out=new Map();
+  const patterns=[['Puerta',/\b(?:puerta|door|porton|portón)\b/i],['Ventana',/\b(?:ventana|ventanal|window)\b/i],['Escalera',/\b(?:escalera|stair)\b/i],['Inodoro',/\b(?:inodoro|toilet|wc)\b/i],['Bañadera',/\b(?:bañadera|bañera|bathtub)\b/i],['Auto',/\b(?:auto|automóvil|coche|car)\b/i],['Camión',/\b(?:camión|camion|truck)\b/i],['Árbol',/\b(?:árbol|arbol|tree)\b/i],['Heladera',/\b(?:heladera|refrigerador|fridge)\b/i],['Cocina',/\b(?:cocina|kitchen)\b/i]];
+  for(const it of LIB.library.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))){
+   const candidate=patterns.find(p=>p[1].test(String(it.name||'')))?.[0];
+   if(candidate){counters[candidate]=(counters[candidate]||0)+1;out.set(it.id,candidate+' '+counters[candidate]);}
+  }
+  return out;
+ }
+ const simpleName=it=>simpleBlockNames().get(it.id)||tr(it.name);
  function paint(){
   if(!el)return;
   const visual=st.view==='visual'||st.view==='olymp3';
@@ -196,7 +207,7 @@
   });
   const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
