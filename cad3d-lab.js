@@ -134,6 +134,7 @@ var css=`
 #cad3dLab .block3DPanel .cad3dBlockCard:hover,#cad3dLab .block3DPanel .cad3dBlockCard:focus-visible{border-color:#9cdaee;background:#30485b}
 #cad3dLab .block3DPanel .cad3dBlockPreview{display:grid;place-items:center;height:74px;background:#1b2b36;border-radius:6px}
 #cad3dLab .block3DPanel .cad3dBlockPreview svg{width:88%;height:63px;stroke:#b5d5e5;fill:#486c80;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+#cad3dLab .block3DPanel .cad3dBlockPreview img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}
 #cad3dLab .block3DPanel .cad3dBlockName{font-size:12px;font-weight:600}
 #cad3dLab .block3DPanel .cad3dBlockMeta{font-size:10px;color:#abc1ce}
 #cad3dLab .block3DPanel .cad3dBlockEmpty{font-size:12px;color:#b6cbd7;line-height:1.5;padding:12px;border:1px dashed #536c7d;border-radius:9px}
@@ -2184,7 +2185,7 @@ var CAD3D_COMPONENTS={
   C['cutout'+(i+1)]={name:(a[0]==='person'?'Persona':a[0]==='palm'?'Palmera':a[0]==='bush'?'Arbusto':'Árbol')+' 2.5D '+(i+1),group:a[0]==='person'?'2.5D Personas':'2.5D Vegetación',w:a[1],d:.05,h:a[2],parts:[],cutout:a[0]};
  });
 })();
-function cad3dCutoutTexture(kind,id){
+function cad3dCutoutCanvas(kind,id){
  var canvas=document.createElement('canvas');canvas.width=256;canvas.height=512;var ctx=canvas.getContext('2d');
  function ellipse(x,y,w,h,color){ctx.fillStyle=color;ctx.beginPath();ctx.ellipse(x,y,w,h,0,0,Math.PI*2);ctx.fill();}
  function line(x,y,X,Y,width,color){ctx.lineWidth=width;ctx.strokeStyle=color;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(X,Y);ctx.stroke();}
@@ -2198,29 +2199,55 @@ function cad3dCutoutTexture(kind,id){
   for(var i=0;i<12;i++){var a=i*2.399,rad=bush?74:palm?92:64;
    ellipse(128+Math.cos(a)*rad,top+45+Math.sin(a)*rad*.75,palm?60:48,palm?15:49,['#426e4e','#648757','#829968','#527b55'][i%4]);}
  }
- var tex=new T.CanvasTexture(canvas);tex.colorSpace=T.SRGBColorSpace;return tex;
+ return canvas;
+}
+function cad3dCutoutTexture(kind,id){
+ var tex=new T.CanvasTexture(cad3dCutoutCanvas(kind,id));tex.colorSpace=T.SRGBColorSpace;return tex;
 }
 
 
 var activeCAD3DBlock='chair';
 var cad3dBlockView='3d',cad3dBlockCategory='all';
 function cad3dBlockKind(spec){return spec.cutout?'2.5d':'3d';}
-function cad3dBlockPreview(spec){
- // Lightweight category-specific SVG previews, not false photographic thumbnails.
- var group=spec.group.toLowerCase(),cut=!!spec.cutout;
- var shape=cut?(spec.cutout==='person'?
- '<circle cx="50" cy="17" r="9"/><path d="M40 30h20l8 34H32zM41 64l-6 25m24-25 6 25"/>':
- '<path d="M50 85V39" fill="none"/><path d="M50 12 28 45l20 9 20-9z"/><path d="M25 37q25-42 50 0q-25 28-50 0z"/>'):
- group.includes('veh')?
- '<path d="M14 59h73l-10-26H31z"/><rect x="17" y="50" width="66" height="20" rx="4"/><circle cx="32" cy="72" r="9"/><circle cx="70" cy="72" r="9"/>':
- group.includes('veget')||group.includes('exterior')?
- '<path d="M49 90V39" fill="none"/><circle cx="49" cy="32" r="24"/><rect x="25" y="84" width="49" height="7" rx="2"/>':
- group.includes('bañ')?
- '<path d="M15 37h72v28q0 15-18 15H33Q15 80 15 65z"/><path d="M15 37v-8q0-9 10-9h10" fill="none"/>':
- group.includes('cocin')?
- '<rect x="17" y="27" width="66" height="54" rx="3"/><path d="M17 48h66M50 48v33"/><circle cx="31" cy="35" r="3"/><circle cx="69" cy="35" r="3"/>':
- '<path d="M18 47h64v17H18z"/><path d="M22 64v24m56-24v24M24 47V29h52v18"/><path d="M34 31v16m32-16v16"/>';
- return '<svg viewBox="0 0 100 100" aria-hidden="true">'+shape+'</svg>';
+var cad3dPreviewCache={};
+function cad3dBlockPreview(spec,id){
+ // Preview is derived from the actual block definition, not a category icon.
+ if(cad3dPreviewCache[id])return cad3dPreviewCache[id];
+ var canvas=document.createElement('canvas');canvas.width=280;canvas.height=160;
+ var c=canvas.getContext('2d');c.clearRect(0,0,280,160);
+ if(spec.cutout){
+  var source=cad3dCutoutCanvas(spec.cutout,id);
+  var ratio=Math.max(.18,Math.min(1.35,spec.w/spec.h));
+  var h=144,w=Math.min(226,Math.max(28,h*ratio));
+  c.drawImage(source,140-w/2,8,w,h);
+ }else{
+  var parts=spec.parts||[], polys=[], minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  var iso=function(x,y,z){return {x:(x-y)*.84,y:(x+y)*.40-z*.98};};
+  parts.forEach(function(p){
+   var x=p[0],y=p[1],z=p[2],w=p[3],d=p[4],h=p[5];
+   var verts=[[x-w/2,y-d/2,z],[x+w/2,y-d/2,z],[x+w/2,y+d/2,z],[x-w/2,y+d/2,z],
+    [x-w/2,y-d/2,z+h],[x+w/2,y-d/2,z+h],[x+w/2,y+d/2,z+h],[x-w/2,y+d/2,z+h]].map(function(v){return iso(v[0],v[1],v[2]);});
+   var faces=[[3,2,6,7],[1,2,6,5],[4,5,6,7]];
+   faces.forEach(function(face,i){
+    var pts=face.map(function(n){return verts[n];});
+    pts.forEach(function(pt){minX=Math.min(minX,pt.x);maxX=Math.max(maxX,pt.x);minY=Math.min(minY,pt.y);maxY=Math.max(maxY,pt.y);});
+    polys.push({pts:pts,depth:x+y+z+i*.001,shade:[.77,.65,1][i],color:p[6]});
+   });
+  });
+  if(isFinite(minX)&&maxX>minX&&maxY>minY){
+   var scale=Math.min(250/(maxX-minX),134/(maxY-minY)),dx=140-(minX+maxX)*scale/2,dy=79-(minY+maxY)*scale/2;
+   polys.sort(function(a,b){return a.depth-b.depth;});
+   polys.forEach(function(face){
+    var col=face.color||0x8c9ba3,red=(col>>16)&255,green=(col>>8)&255,blue=col&255;
+    c.fillStyle='rgb('+Math.round(red*face.shade)+','+Math.round(green*face.shade)+','+Math.round(blue*face.shade)+')';
+    c.strokeStyle='rgba(19,32,42,.55)';c.lineWidth=1;
+    c.beginPath();face.pts.forEach(function(v,i){var px=dx+v.x*scale,py=dy+v.y*scale;if(i)c.lineTo(px,py);else c.moveTo(px,py);});
+    c.closePath();c.fill();c.stroke();
+   });
+  }
+ }
+ var img='<img alt="" loading="lazy" draggable="false" src="'+canvas.toDataURL('image/png')+'">';
+ cad3dPreviewCache[id]=img;return img;
 }
 function cad3dBlockCatalogItems(){
  var ids=Object.keys(CAD3D_COMPONENTS).filter(function(id){
@@ -2235,7 +2262,7 @@ function cad3dBlockCatalogItems(){
  holder.innerHTML='<div class="cad3dBlockGrid">'+ids.map(function(id){
   var spec=CAD3D_COMPONENTS[id];
   return '<button type="button" class="cad3dBlockCard" data-3d-block="'+id+'" title="Insertar '+escapeHtml(spec.name)+'">'+
-    '<span class="cad3dBlockPreview">'+cad3dBlockPreview(spec)+'</span>'+
+    '<span class="cad3dBlockPreview">'+cad3dBlockPreview(spec,id)+'</span>'+
     '<span class="cad3dBlockName">'+escapeHtml(spec.name)+'</span>'+
     '<span class="cad3dBlockMeta">'+escapeHtml(spec.group)+' · '+(spec.cutout?'2.5D':'3D')+'</span></button>';
  }).join('')+'</div>';
