@@ -1711,47 +1711,70 @@ function sizeArchPalette(size){
  Object.assign(palette.style,{width:w+'px',height:h+'px',left:Math.max(8,left)+'px',top:Math.max(8,top)+'px'});
  cad3dPaletteConstrain(palette);cad3dPaletteRemember('architecture',palette);
 }
+
 function beginArchGesture(e){
- var grip=e.target.closest('[data-arch-grip]'),header=e.target.closest('.archTitle');
+ var palette=e.currentTarget,grip=e.target.closest('[data-arch-grip]'),
+  header=e.target.closest('.archTitle');
  if(e.button!==0||(!grip&&(!header||e.target.closest('button,input,select'))))return;
- var handle=grip||header,direction=grip?.dataset.archGrip||'',palette=e.currentTarget;
- var bounds=root.getBoundingClientRect(),rect=palette.getBoundingClientRect();
- var left=rect.left-bounds.left,top=rect.top-bounds.top,right=left+rect.width,bottom=top+rect.height;
+ if(grip&&palette.classList.contains('cad3dArchDocked'))return;
+ var resizeDirection=grip?.dataset.archGrip||'';
+ var b=palette.getBoundingClientRect(),host=root.getBoundingClientRect();
+ var startX=e.clientX,startY=e.clientY,id=e.pointerId;
+ var startLeft=b.left-host.left,startTop=b.top-host.top;
+ var startRight=startLeft+b.width,startBottom=startTop+b.height;
  var minW=Math.min(240,root.clientWidth-16),minH=Math.min(220,root.clientHeight-16);
- var x=e.clientX,y=e.clientY,id=e.pointerId;
+ var started=false,fromDock=palette.classList.contains('cad3dArchDocked');
  e.preventDefault();e.stopPropagation();
  cad3dBringPaletteFront(palette);
- palette.dataset.userPositioned='true';
- handle.setPointerCapture(id);
  function move(ev){
   if(ev.pointerId!==id)return;
-  var dx=ev.clientX-x,dy=ev.clientY-y;
-  if(!direction){
-   palette.style.left=clamp(left+dx,8,Math.max(8,root.clientWidth-8-rect.width))+'px';
-   palette.style.top=clamp(top+dy,8,Math.max(8,root.clientHeight-8-rect.height))+'px';
-   return;
+  var dx=ev.clientX-startX,dy=ev.clientY-startY;
+  if(!started){
+   if(Math.hypot(dx,dy)<4)return;
+   started=true;
+   if(fromDock){
+    // Detach without re-creating content or losing pointer events.
+    cad3dArchSetDocked(false,{rect:b});
+    startLeft=clamp(startLeft,8,Math.max(8,root.clientWidth-palette.offsetWidth-8));
+    startTop=clamp(startTop,8,Math.max(8,root.clientHeight-palette.offsetHeight-8));
+   }
   }
-  var l=direction.includes('w')?clamp(left+dx,8,right-minW):left;
-  var t=direction.includes('n')?clamp(top+dy,8,bottom-minH):top;
-  var r=direction.includes('e')?clamp(right+dx,l+minW,root.clientWidth-8):right;
-  var b=direction.includes('s')?clamp(bottom+dy,t+minH,root.clientHeight-8):bottom;
-  Object.assign(palette.style,{left:l+'px',top:t+'px',width:Math.max(minW,r-l)+'px',height:Math.max(minH,b-t)+'px'});
+  palette.dataset.userPositioned='true';
+  if(!resizeDirection){
+   palette.style.left=clamp(startLeft+dx,8,Math.max(8,root.clientWidth-palette.offsetWidth-8))+'px';
+   palette.style.top=clamp(startTop+dy,8,Math.max(8,root.clientHeight-palette.offsetHeight-8))+'px';
+   cad3dArchDockCandidate(cad3dArchDockNear(ev.clientX,ev.clientY));
+  }else{
+   var l=resizeDirection.includes('w')?clamp(startLeft+dx,8,startRight-minW):startLeft;
+   var t=resizeDirection.includes('n')?clamp(startTop+dy,8,startBottom-minH):startTop;
+   var right=resizeDirection.includes('e')?clamp(startRight+dx,l+minW,root.clientWidth-8):startRight;
+   var bottom=resizeDirection.includes('s')?clamp(startBottom+dy,t+minH,root.clientHeight-8):startBottom;
+   Object.assign(palette.style,{left:l+'px',top:t+'px',width:Math.max(minW,right-l)+'px',height:Math.max(minH,bottom-t)+'px'});
+  }
  }
- function done(ev){
+ function finish(ev,canDock){
   if(ev.pointerId!==id)return;
-  handle.removeEventListener('pointermove',move);
-  handle.removeEventListener('pointerup',done);
-  handle.removeEventListener('pointercancel',done);
-  handle.removeEventListener('lostpointercapture',done);
-  cad3dPaletteConstrain(palette);
-  cad3dPaletteRemember('architecture',palette);
-  try{if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);}catch(_e){}
+  window.removeEventListener('pointermove',move,true);
+  window.removeEventListener('pointerup',done,true);
+  window.removeEventListener('pointercancel',cancel,true);
+  window.removeEventListener('blur',blur,true);
+  if(canDock&&started&&!resizeDirection&&cad3dArchDockNear(ev.clientX,ev.clientY)){
+   cad3dArchSetDocked(true);
+  }else if(!palette.classList.contains('cad3dArchDocked')){
+   cad3dPaletteConstrain(palette);
+   cad3dPaletteRemember('architecture',palette);
+  }
+  cad3dArchDockCandidate(false);
  }
- handle.addEventListener('pointermove',move);
- handle.addEventListener('pointerup',done);
- handle.addEventListener('pointercancel',done);
- handle.addEventListener('lostpointercapture',done);
+ function done(ev){finish(ev,true);}
+ function cancel(ev){finish(ev,false);}
+ function blur(){finish({pointerId:id},false);}
+ window.addEventListener('pointermove',move,true);
+ window.addEventListener('pointerup',done,true);
+ window.addEventListener('pointercancel',cancel,true);
+ window.addEventListener('blur',blur,true);
 }
+
 function clickArchPalette(e){
  if(e.target.closest('[data-stairs-beta]')){
   cad3dStairsBetaEnabled=e.target.checked;
