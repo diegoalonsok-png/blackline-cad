@@ -292,4 +292,6 @@
  const cc0Script=document.createElement('script');cc0Script.src='assets/cc0-details-loader.js?v=20261123-1';cc0Script.defer=true;document.head.append(cc0Script);
  // Nuevos bloques arquitectónicos CC0: se añaden a la galería existente, sin sobrescribirla.
  for(const asset of ["cc0-bathroom-blocks.js","cc0-door-blocks.js","cc0-kitchen-blocks.js"]){const script=document.createElement('script');script.src='assets/'+asset+'?v=20261123-2';document.head.appendChild(script)}
+ // Ventanas CC0 en planta, integradas sin modificar las herramientas existentes.
+ const windowsScript=document.createElement('script');windowsScript.src='assets/cc0-window-blocks.js?v=20261123-2';document.head.appendChild(windowsScript);
 })();
