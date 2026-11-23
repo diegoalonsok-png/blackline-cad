@@ -3661,6 +3661,9 @@ function cad3dSketchMultiPass(image,w,h,options){
   ink:{wash:.66,levels:19,edge:.86,threshold:47,grain:.7,hatch:.14},
   watercolor:{wash:.84,levels:13,edge:.43,threshold:56,grain:1.45,hatch:0},
   pencil:{wash:.39,levels:23,edge:.65,threshold:39,grain:1.15,hatch:.24},
+  charcoal:{wash:.43,levels:25,edge:.91,threshold:38,grain:2.15,hatch:.43},
+  engraving:{wash:.58,levels:18,edge:.96,threshold:34,grain:.75,hatch:.51},
+  pastel:{wash:.80,levels:12,edge:.36,threshold:56,grain:1.85,hatch:.025},
   marker:{wash:.89,levels:8,edge:.62,threshold:53,grain:.48,hatch:.03},
   wash:{wash:.75,levels:18,edge:.39,threshold:54,grain:1.12,hatch:.025}
  }[style]||{wash:.7,levels:16,edge:.6,threshold:48,grain:.8,hatch:.03};
@@ -4038,6 +4041,12 @@ function cad3dInitSketchCapture(){
     paper:'watercolor',passes:true,geometry:true,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
    pencil:{style:'pencil',profile:'1.1',extension:'0',endpoints:'0',jitter:'0.85',bowing:'0.45',multiStroke:true,
     paper:'cream',passes:true,geometry:true,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
+   charcoal:{style:'charcoal',profile:'1.6',extension:'0',endpoints:'0',jitter:'1.15',bowing:'0.65',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'82',grain:'88',detail:'56',brush:'93',pigment:'8',finish:'76'},
+   engraving:{style:'engraving',profile:'0.8',extension:'0',endpoints:'0',jitter:'0.15',bowing:'0.10',multiStroke:false,
+    paper:'cream',passes:true,geometry:true,shadow:'86',grain:'30',detail:'94',brush:'5',pigment:'0',finish:'84'},
+   pastel:{style:'pastel',profile:'1',extension:'0',endpoints:'0',jitter:'0.48',bowing:'0.32',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:true,shadow:'34',grain:'83',detail:'42',brush:'66',pigment:'46',finish:'66'},
    marker:{style:'marker',profile:'1.2',extension:'0',endpoints:'0',jitter:'0.35',bowing:'0.18',multiStroke:false,
     paper:'white',passes:true,geometry:true,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
    wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0.5',bowing:'0.3',multiStroke:true,
