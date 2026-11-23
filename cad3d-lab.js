@@ -3369,6 +3369,192 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
 function cad3dSketchHex(hex){
  var v=String(hex||'#000000').replace('#','');return [0,2,4].map(function(i){return parseInt(v.slice(i,i+2),16)||0;});
 }
+
+/* Image-space architectural sketch renderer, all local browser CPU passes.
+   The model/viewpoint are immutable. This pipeline never adds imaginary objects.
+   Can later move individual passes to C++/WebAssembly without changing inputs. */
+function cad3dSketchMultiPass(image,w,h,options){
+ var p=image.data||image,n=w*h,opt=options||{};
+ if(!w||!h||p.length!==n*4)throw Error('Invalid sketch source image');
+ var clamp255=function(v){return Math.max(0,Math.min(255,v));};
+ var mix=function(a,b,t){return a+(b-a)*t;};
+ var dist=function(a,b,c,d,e,f){return Math.abs(a-d)+Math.abs(b-e)+Math.abs(c-f);};
+ var smooth=new Uint8ClampedArray(n*4);
+ var offsets=[[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[1,-1],[-1,1],[1,1]];
+ var sky=new Uint8Array(n),ground=new Uint8Array(n),queue=new Int32Array(n);
+ var grey=new Uint8Array(n),grad=new Uint8Array(n),direction=new Uint8Array(n);
+ var line=new Uint8Array(n),output=new Uint8ClampedArray(n*4);
+ var style=opt.style||'ink',strength=Math.max(0,Math.min(1,opt.strength??.6));
+ var styleConfig={
+  ink:{wash:.60,levels:19,edge:.80,threshold:47,grain:.7,hatch:.07},
+  watercolor:{wash:.84,levels:13,edge:.43,threshold:56,grain:1.45,hatch:0},
+  pencil:{wash:.31,levels:23,edge:.58,threshold:39,grain:1.15,hatch:.09},
+  marker:{wash:.89,levels:8,edge:.62,threshold:53,grain:.48,hatch:.03},
+  wash:{wash:.75,levels:18,edge:.39,threshold:54,grain:1.12,hatch:.025}
+ }[style]||{wash:.7,levels:16,edge:.6,threshold:48,grain:.8,hatch:.03};
+ var edgeRGB=opt.edgeRGB||[48,56,67],skyRGB=opt.skyRGB||[185,219,242];
+ var groundRGB=opt.groundRGB||[221,214,200],wallRGB=opt.wallRGB||[232,215,185];
+ var paper=opt.paper==='cream'?[249,243,232]:opt.paper==='watercolor'?[248,246,235]:[250,249,246];
+ var userGrain=Math.max(0,Math.min(1,Number(opt.grain??40)/100));
+ var userShadow=Math.max(0,Math.min(1,Number(opt.shadow??45)/100));
+ var detail=Math.max(0,Math.min(1,Number(opt.detail??50)/100));
+ // PASS 1: gentle edge-aware spatial smoothing, no geometry or view changes.
+ for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+  var i=y*w+x,k=i*4;
+  var r=p[k],g=p[k+1],b=p[k+2],rs=r*2,gs=g*2,bs=b*2,total=2;
+  for(var v=0;v<offsets.length;v++){
+   var xx=x+offsets[v][0],yy=y+offsets[v][1];
+   if(xx<0||xx>=w||yy<0||yy>=h)continue;
+   var j=(yy*w+xx)*4,delta=dist(r,g,b,p[j],p[j+1],p[j+2]);
+   var wgt=delta<24?1:delta<55?.45:delta<85?.12:0;
+   if(v>=4)wgt*=.5;
+   rs+=p[j]*wgt;gs+=p[j+1]*wgt;bs+=p[j+2]*wgt;total+=wgt;
+  }
+  smooth[k]=rs/total;smooth[k+1]=gs/total;smooth[k+2]=bs/total;smooth[k+3]=255;
+  grey[i]=Math.round(.299*smooth[k]+.587*smooth[k+1]+.114*smooth[k+2]);
+ }
+ // PASS 2: connect flat sky/ground backgrounds from the image edges.
+ // A boundary can never become sky or ground merely because it has the same hue.
+ function seedFill(mask,fromTop,ref,limit){
+  var head=0,tail=0;
+  function push(i){
+   if(mask[i])return;
+   var k=i*4;
+   if(dist(smooth[k],smooth[k+1],smooth[k+2],ref[0],ref[1],ref[2])>limit)return;
+   mask[i]=1;queue[tail++]=i;
+  }
+  for(var x=0;x<w;x++)push((fromTop?0:h-1)*w+x);
+  while(head<tail){
+   var i=queue[head++],x=i%w,y=(i/w)|0;
+   if(x>0)push(i-1);
+   if(x<w-1)push(i+1);
+   if(y>0)push(i-w);
+   if(y<h-1)push(i+w);
+  }
+ }
+ function borderSample(y){
+  var offsets=[0,Math.round(w*.1),Math.round(w*.5),Math.round(w*.9),w-1];
+  var samples=offsets.map(function(x){
+   var k=(y*w+Math.min(w-1,x))*4;
+   return [smooth[k],smooth[k+1],smooth[k+2]];
+  });
+  var best=samples[0],score=Infinity;
+  samples.forEach(function(v){
+   var sum=samples.reduce(function(a,t){return a+dist(v[0],v[1],v[2],t[0],t[1],t[2]);},0);
+   if(sum<score){score=sum;best=v;}
+  });
+  return best;
+ }
+ var skySample=borderSample(0),groundSample=borderSample(h-1);
+ if(opt.sky!==false)seedFill(sky,true,skySample,66);
+ if(opt.ground&&dist(skySample[0],skySample[1],skySample[2],groundSample[0],groundSample[1],groundSample[2])>30){
+  seedFill(ground,false,groundSample,53);
+ }
+ // PASS 3: detect meaningful edges after smoothing (Sobel + non-max suppression).
+ // Spurious low-contrast joins between coplanar CAD elements are attenuated.
+ for(var y=1;y<h-1;y++)for(var x=1;x<w-1;x++){
+  var i=y*w+x,u=i-w,d=i+w;
+  var gx=-grey[u-1]+grey[u+1]-2*grey[i-1]+2*grey[i+1]-grey[d-1]+grey[d+1];
+  var gy=-grey[u-1]-2*grey[u]-grey[u+1]+grey[d-1]+2*grey[d]+grey[d+1];
+  var magnitude=Math.min(255,Math.hypot(gx,gy)*.35);
+  grad[i]=magnitude;
+  var angle=(Math.atan2(gy,gx)+Math.PI)*180/Math.PI%180;
+  direction[i]=angle<22.5||angle>=157.5?0:angle<67.5?1:angle<112.5?2:3;
+ }
+ var threshold=styleConfig.threshold+(1-detail)*14;
+ for(var y=2;y<h-2;y++)for(var x=2;x<w-2;x++){
+  var i=y*w+x,v=grad[i];if(v<threshold)continue;
+  var shift=[1,w+1,w,w-1][direction[i]];
+  if(v<grad[i-shift]||v<grad[i+shift])continue;
+  // Ground shading is valuable, but the ground's tiny repetitive details are not.
+  if(ground[i]&&v<105)continue;
+  if(sky[i]&&sky[i-1]&&sky[i+1]&&v<110)continue;
+  line[i]=v;
+ }
+ // PASS 4: tonal painting and paper, working on source light/dark information.
+ // The source renderer is responsible for actual sun/shadow placement.
+ var grainScale=styleConfig.grain*userGrain;
+ for(var y=0;y<h;y++)for(var x=0;x<w;x++){
+  var i=y*w+x,k=i*4;
+  var r=smooth[k],g=smooth[k+1],b=smooth[k+2];
+  var isSky=sky[i]===1,isGround=ground[i]===1;
+  if(isSky&&opt.sky!==false){
+   r=mix(r,skyRGB[0],.73);g=mix(g,skyRGB[1],.73);b=mix(b,skyRGB[2],.73);
+  }else if(isGround&&opt.ground){
+   r=mix(r,groundRGB[0],.38);g=mix(g,groundRGB[1],.38);b=mix(b,groundRGB[2],.38);
+  }else if(opt.recolor&&!isSky&&grey[i]>68&&grey[i]<240&&Math.max(r,g,b)-Math.min(r,g,b)<30){
+   r=mix(r,wallRGB[0],.38);g=mix(g,wallRGB[1],.38);b=mix(b,wallRGB[2],.38);
+  }
+  if(style==='pencil'){
+   var lum=grey[i];r=mix(r,lum,.78);g=mix(g,lum,.80);b=mix(b,lum,.84);
+  }else if(style==='wash'){var neutral=grey[i];r=mix(r,neutral,.20);g=mix(g,neutral,.24);b=mix(b,neutral,.25);}
+  var step=255/styleConfig.levels,quantBlend=style==='marker'?.32:.12;
+  var rgb=[r,g,b];
+  var shade=(!isSky&&!isGround)?Math.pow(Math.max(0,(175-grey[i])/175),1.55)*userShadow*.14:0;
+  var hsh=((x*374761393+y*668265263)|0)>>>0;
+  hsh=Math.imul(hsh^(hsh>>>13),1274126177)>>>0;
+  var grain=(((hsh>>>15)&65535)/65535-.5)*grainScale*5.5;
+  var washTexture=Math.sin(x*.051+y*.027)*Math.sin(x*.016-y*.063)*grainScale*2.3;
+  for(var c=0;c<3;c++){
+   var toned=mix(rgb[c],Math.round(rgb[c]/step)*step,quantBlend);
+   var painted=mix(paper[c],toned,styleConfig.wash)*(1-shade);
+   output[k+c]=clamp255(painted+grain+washTexture);
+  }
+  output[k+3]=255;
+ }
+ // PASS 5: ink/graphite marks only on significant contours.
+ var thickness=Math.max(1,Math.min(4,Math.round(Number(opt.weight||2)/2)));
+ for(var y=2;y<h-2;y++)for(var x=2;x<w-2;x++){
+  var i=y*w+x,value=line[i],k=i*4;
+  if(!value)continue;
+  var intensity=Math.min(.82,Math.max(0,(value-threshold)/125)*strength*styleConfig.edge);
+  if(intensity<=0)continue;
+  for(var dy=-(thickness-1);dy<=thickness-1;dy++)for(var dx=-(thickness-1);dx<=thickness-1;dx++){
+   var j=(i+dy*w+dx)*4,falloff=(dx===0&&dy===0)?1:.30;
+   var alpha=intensity*falloff;
+   for(var c=0;c<3;c++)output[j+c]=mix(output[j+c],edgeRGB[c],alpha);
+  }
+ }
+ // PASS 6: faint directional pencil hatch only in existing deep tonal shadows.
+ var hatch=styleConfig.hatch*userShadow;
+ if(hatch){
+  for(var y=3;y<h-3;y++)for(var x=3;x<w-3;x++){
+   var i=y*w+x,k=i*4;
+   if(sky[i]||ground[i]||grey[i]>112)continue;
+   var stripe=(x+Math.round(y*.73))%11;
+   if(stripe>1)continue;
+   var alpha=hatch*(112-grey[i])/112;
+   for(var c=0;c<3;c++)output[k+c]=mix(output[k+c],edgeRGB[c],alpha);
+  }
+ }
+ return {data:output,skyMask:sky,groundMask:ground,edgeMask:line};
+}
+function cad3dSketchRenderPasses(panel,ctx,src,w,h){
+ var control=function(key){return panel.querySelector('[data-sketch-setting="'+key+'"]');};
+ var value=function(key){return control(key)?.value;};
+ var checked=function(key){return !!control(key)?.checked;};
+ var result=cad3dSketchMultiPass(src,w,h,{
+  style:panel.querySelector('.cad3dSketchCaptureStyle')?.value||'ink',
+  strength:Number(panel.querySelector('.cad3dSketchCaptureStrength')?.value||60)/100,
+  edgeRGB:cad3dSketchHex(value('edgeColor')),
+  skyRGB:cad3dSketchHex(value('skyColor')),groundRGB:cad3dSketchHex(value('groundColor')),
+  wallRGB:cad3dSketchHex(value('wallColor')),paper:value('paper'),
+  grain:Number(value('grain')??40),shadow:Number(value('shadow')??45),
+  detail:Number(value('detail')??50),weight:Number(value('weight')||2),
+  sky:checked('sky'),ground:checked('ground'),recolor:value('wallMode')==='tint'
+ });
+ var image=ctx.createImageData(w,h);
+ image.data.set(result.data);ctx.putImageData(image,0,0);
+ // Optional geometry overlay, never the default: filtering by source gradient
+ // avoids printing invisible joints where materials/coplanar panels agree.
+ if(checked('geometry'))cad3dSketchGeometryEdges(ctx,w,h,{
+  color:value('edgeColor'),profile:Number(value('profile')||1),
+  extension:Number(value('extension')||0),endpoints:Number(value('endpoints')||0),
+  jitter:Number(value('jitter')||0),bowing:Number(value('bowing')||0),
+  multiStroke:checked('multiStroke'),strength:.25,edgeMask:result.edgeMask
+ });
+}
+
 function cad3dSketchProcess(){
  var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=cad3dSketchSource;
  if(!panel||!source||panel.hidden)return;
@@ -3377,6 +3563,9 @@ function cad3dSketchProcess(){
  var ctx=out.getContext('2d',{willReadFrequently:true});
  if(!ctx)return;
  var src=source.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h);
+ if(panel.querySelector('[data-sketch-setting="passes"]')?.checked){
+  cad3dSketchRenderPasses(panel,ctx,src,w,h);return;
+ }
  var dst=ctx.createImageData(w,h),pixels=src.data,data=dst.data;
  var val=function(key){return panel.querySelector('[data-sketch-setting="'+key+'"]')?.value;};
  var checked=function(key){return !!panel.querySelector('[data-sketch-setting="'+key+'"]')?.checked;};
