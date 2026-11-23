@@ -3454,10 +3454,10 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
    if(sky[j]!==sky[i]||ground[j]!==ground[i]||edge[j]>75||
     Math.abs(grey[j]-grey[i])>23)continue;
    var taper=1-Math.abs(t)/(len+1),fiber=cad3dSketchNoise(xx*2,yy*3);
-   var opacity=amount*taper*(style==='pencil'?.21:style==='marker'?.14:.095);
+   var opacity=amount*taper*(style==='pencil'?.36:style==='marker'?.33:.28);
    if(fiber<.24)opacity*=.22; // dry-brush gaps, paper texture underneath
    for(var c=0;c<3;c++){
-    var stroke=source[k+c]*.64+layer[z+c]*.36+tint*(fiber-.5)*16;
+    var stroke=source[k+c]*.66+layer[z+c]*.34+tint*(fiber-.5)*20;
     layer[z+c]=Math.max(0,Math.min(255,layer[z+c]*(1-opacity)+stroke*opacity));
    }
    strokes++;
