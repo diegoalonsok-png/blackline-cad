@@ -65,3 +65,20 @@ test('M shortcut directly OPENS Materials without accidentally toggling it close
  assert(src.includes("if(key==='m'&&!ev.repeat){ev.preventDefault();ev.stopImmediatePropagation();cad3dShowMaterials(true);return;}"));
  assert(src.includes("if(key==='M')cad3dShowMaterials(true)"));
 });
+
+test('CAD3D Undo/Redo icons match visible CAD2D SVGs and keep history bindings', () => {
+ const html = fs.readFileSync('index.html','utf8');
+ function svg(source, marker){
+  const start = source.indexOf(marker);
+  assert(start >= 0, 'Missing '+marker);
+  const a=source.indexOf('<svg',start), b=source.indexOf('</svg>',a);
+  assert(a >= 0 && b >= a, 'Missing SVG for '+marker);
+  return source.slice(a,b+6);
+ }
+ assert.equal(svg(src,'data-history="undo"'),svg(html,'id="cadHeaderUndo"'));
+ assert.equal(svg(src,'data-history="redo"'),svg(html,'id="cadHeaderRedo"'));
+ assert(src.includes("if(button.dataset.history==='undo')cad3dUndo();"));
+ assert(src.includes("if(button.dataset.history==='redo')cad3dRedo();"));
+ assert(src.includes('.cad3dHistoryButton:disabled{'));
+ assert(src.includes('.cad3dHistoryButton svg{'));
+});
