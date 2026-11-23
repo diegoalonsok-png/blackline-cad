@@ -785,6 +785,7 @@ css+=`
 #cad3dLab .camera3DBar select{min-width:140px;max-width:210px;height:27px;background:#edf0f2;color:#1b252b;border-radius:4px}
 #cad3dLab .camera3DBar button{padding:5px 9px}
 `;
+css+="\n#cad3dLab .catalogItems .cad3dCatalogPreview{display:block;width:100%;height:78px;margin:0 auto 2px;filter:drop-shadow(0 3px 3px #0005);overflow:visible}\n#cad3dLab .catalogItems .btn{justify-content:flex-start;min-height:126px}\n#cad3dLab .catalogItems .btn span{font-weight:500;line-height:1.2}\n#cad3dLab .catalogItems .btn:hover .cad3dCatalogPreview{filter:drop-shadow(0 3px 5px #0009) brightness(1.12)}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -957,13 +958,80 @@ function styleDimensions(kind,st){
  if(kind==='slab')return Math.round(st.h*100)+' cm'+(st.pitch?' · '+st.pitch+'°':'');
  return st.w.toFixed(2)+' × '+(st.d||st.h).toFixed(2)+' m';
 }
+
+function cad3dCatalogPreview(kind,st){
+ var desc=(String(st.id||'')+' '+String(st.name||'')).toLowerCase();
+ var has=function(k){return desc.includes(k);};
+ var door=kind==='door',windowed=kind==='window';
+ var n=has('triple')||has('three')?3:(has('double')||has('two')||has('french')||has('twin')?2:1);
+ if(has('industrial')||has('shoji')||has('ribbon'))n=Math.max(3,n);
+ var sliding=has('slid')||has('pocket')||has('barn'),fold=has('fold');
+ var grid=has('georgian')||has('pane')||has('colonial')||has('shoji')||has('grid')||has('industrial')||has('mullion')||has('tudor')||has('victorian')||has('renaissance');
+ var arch=has('gothic')||has('arched')||has('mediterranean');
+ var glazing=windowed||(door&&(has('glass')||has('glaz')||has('french')||has('terrace')||has('modern steel')||has('victorian')));
+ var opaque=door&&!glazing;
+ var W=kind==='wall'?112:kind==='slab'?108:Math.max(45,Math.min(112,76*(Number(st.w)||1.2)/Math.max(.85,Number(st.h)||1.2)));
+ var H=kind==='wall'?62:kind==='slab'?42:Math.max(42,Math.min(77,90*(Number(st.h)||1.2)/Math.max(1.2,Number(st.w)||1.2)));
+ var x=(160-W)/2-5,y=(108-H)/2+4,off=8;
+ var esc=function(v){return Math.round(v*10)/10;};
+ var rect=function(x,y,w,h,fill,stroke,sw){return '<rect x="'+esc(x)+'" y="'+esc(y)+'" width="'+esc(Math.max(0,w))+'" height="'+esc(Math.max(0,h))+'" fill="'+fill+'" stroke="'+(stroke||'none')+'" stroke-width="'+(sw||0)+'"/>';};
+ var path=function(d,stroke,sw,fill){return '<path d="'+d+'" stroke="'+(stroke||'#dbe8ef')+'" stroke-width="'+(sw||1.6)+'" fill="'+(fill||'none')+'" stroke-linecap="round" stroke-linejoin="round"/>';};
+ var body='';
+ if(kind==='wall'){
+  body=path('M24 45 121 30 139 42 43 58Z','#e4edf3',2,'#aab9c6')+
+   path('M43 58V88L139 72V42M24 45V75L43 88','#e4edf3',2,'#5e7180')+
+   path('M24 75 121 59 139 72','#9aafbd',1.4);
+  if(has('masonry'))body+=path('M50 58v13m27-17v13m28-17v13M45 72l88-15','#d8e2e9',.9);
+ }else if(kind==='slab'){
+  body=path('M20 51 120 34 142 48 42 67Z','#f1f4f7',2,'#aebcc8')+
+   path('M42 67v15l100-19V48M20 51v15l22 16','#e4eef4',2,'#5b6e7f');
+ }else if(kind==='opening'){
+  body=path('M30 20H126V90H30Z','#e4ecf3',5)+rect(39,29,78,52,'#111d28','#b6c8d3',2);
+ }else{
+  // Extruded three-quarter-view frame: light front, darker inset and a visible right-hand side.
+  body=path('M'+esc(x+W)+' '+esc(y)+'l'+off+' -5v'+esc(H)+'l-'+off+' 5Z','#d7e1ea',1,'#708496');
+  body+=path('M'+esc(x)+' '+esc(y)+'l'+off+' -5h'+esc(W)+'l-'+off+' 5Z','#d9e5ed',1,'#dce8ef');
+  body+=rect(x,y,W,H,'#dae6ee','#f3f6f8',2.2);
+  body+=rect(x+5,y+5,W-10,H-10,glazing?'#324b60':opaque?'#778897':'#111b23','#91a9b9',1.3);
+  var inset=6,usable=W-inset*2,leafW=usable/n;
+  for(var i=0;i<n;i++){
+   var lx=x+inset+i*leafW,ly=y+inset,lw=leafW,lh=H-inset*2;
+   if(i)body+=path('M'+esc(lx)+' '+esc(ly)+'v'+esc(lh),'#e4ecf1',2.4);
+   if(glazing){
+    body+=rect(lx+2,ly+2,lw-4,lh-4,'#36566b','#9fb7c5',1);
+    body+=path('M'+esc(lx+5)+' '+esc(ly+lh*.42)+'l'+esc(Math.max(5,lw*.38))+' -'+esc(Math.max(8,lh*.3)),'#95b8ce',1.6);
+   }else if(opaque){
+    body+=rect(lx+4,ly+4,lw-8,lh*.39,'#80909e','#aebec8',1);
+    body+=rect(lx+4,ly+lh*.52,lw-8,lh*.36,'#6b7f8f','#aebec8',1);
+   }
+   if(grid){
+    var rows=has('twelve')||has('12')||has('shoji')?4:has('six')||has('9')?3:has('industrial')?4:2;
+    for(var r=1;r<rows;r++)body+=path('M'+esc(lx+2)+' '+esc(ly+lh*r/rows)+'h'+esc(lw-4),'#d6e4ed',1.2);
+    if(has('diamond')||has('tudor'))body+=path('M'+esc(lx+3)+' '+esc(ly+lh*.5)+'l'+esc(lw*.4)+' -'+esc(lh*.4)+' '+esc(lw*.4)+' '+esc(lh*.4)+' -'+esc(lw*.4)+' '+esc(lh*.4)+'Z','#dbe6ec',1);
+   }
+   if(!sliding&&!has('fixed')&&!has('picture')&&!has('clerestory')&&!has('opening')&&!has('ribbon')&&!has('garage')){
+    var hx=lx+(i%2===0?lw-5:5),hy=ly+lh*.56;
+    body+=path('M'+esc(hx)+' '+esc(hy-4)+'v8','#fafcff',2.4);
+   }
+  }
+  if(arch)body+=path('M'+esc(x+3)+' '+esc(y+15)+'Q'+esc(x+W/2)+' '+esc(y-11)+' '+esc(x+W-3)+' '+esc(y+15),'#eaf1f6',2.1);
+  if(has('garage'))for(var gr=1;gr<5;gr++)body+=path('M'+esc(x+5)+' '+esc(y+H*gr/5)+'h'+esc(W-10),'#c2d1dc',1.5);
+  if(sliding)body+=path('M'+esc(x+W*.34)+' '+esc(y+H*.83)+'h'+esc(W*.34)+'m-5-4 5 4-5 4','#eaf9ff',1.8);
+  if(fold)body+=path('M'+esc(x+W*.15)+' '+esc(y+H*.83)+'l'+esc(W*.15)+' -10 '+esc(W*.15)+' 10','#eaf9ff',1.8);
+  if(has('awning')||has('hopper')||has('casement')||has('swing'))body+=path('M'+esc(x+W*.35)+' '+esc(y+H*.65)+'q'+esc(W*.16)+' -9 '+esc(W*.3)+' -3','#ecf6fd',1.4);
+  if(has('pivot'))body+=path('M'+esc(x+W*.75)+' '+esc(y+H*.2)+'v'+esc(H*.6),'#f8fbff',1.7);
+ }
+ return '<svg class="cad3dCatalogPreview" viewBox="0 0 160 108" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista 3D de '+escapeHtml(st.name)+'">'+
+ '<ellipse cx="82" cy="98" rx="53" ry="5" fill="#000" opacity=".14"/>'+body+'</svg>';
+}
+
 function renderArchPalette(){
  var palette=root.querySelector('.archPalette');
  palette.querySelectorAll('[data-arch-tool]').forEach(function(button){
   button.setAttribute('aria-pressed',String(button.dataset.archTool===activeCategory));
  });
  palette.querySelector('.catalogItems').innerHTML=ARCH_STYLES[activeCategory].map(function(st){
-  return '<button type="button" class="btn" data-style="'+st.id+'">'+ico(activeCategory)+
+  return '<button type="button" class="btn" data-style="'+st.id+'">'+cad3dCatalogPreview(activeCategory,st)+
    '<span>'+st.name+'</span><small>'+styleDimensions(activeCategory,st)+'</small></button>';
  }).join('');
 }
