@@ -2039,7 +2039,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
 
  '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
  '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
@@ -2173,6 +2173,7 @@ function build(){
   viewPresets.map(function(v){return '<option value="'+v[0]+'">'+v[1]+'</option>';}).join('');
  syncViewControls();renderNavigationCube();
  viewSelect.addEventListener('change',function(){setViewPreset(this.value);});
+ root.querySelector('[data-camera-restore]').addEventListener('click',cad3dRestorePerspective);
  root.querySelector('[data-camera-create]').addEventListener('click',cad3dCreateCamera);
  root.querySelector('[data-camera-back]').addEventListener('click',function(){cad3dWalkStep(-1);});
  root.querySelector('[data-camera-forward]').addEventListener('click',function(){cad3dWalkStep(1);});
@@ -2476,7 +2477,7 @@ function fit3DModel(){
   var half=Math.max(spanY/2,spanX/(2*aspect)) * 1.25;
   orbit.dist=clamp(half/.38,1.4,450);
  }else{
-  var fov=50*Math.PI/180;
+  var fov=(perspectiveCamera?.fov||35)*Math.PI/180;
   orbit.dist=clamp(b.span*.75/Math.tan(fov/2),2,450);
  }
  applyViewCamera();
@@ -2917,7 +2918,7 @@ function close(){
 }
 function init(){
  scene=new T.Scene();scene.background=new T.Color(MODEL_BACKGROUND);
- perspectiveCamera=new T.PerspectiveCamera(50,1,.02,2000);perspectiveCamera.up.set(0,0,1);
+ perspectiveCamera=new T.PerspectiveCamera(35,1,.02,2000);perspectiveCamera.up.set(0,0,1);
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
@@ -3071,6 +3072,26 @@ function cad3dSetProjection(mode){
  return true;
 }
 function cad3dOrthographicView(){return cad3dSetProjection('ortho');}
+/* Architectural camera correction: use a moderate focal length instead of a wide
+   angle. Walking mode is converted to an orbit around a point in front of the
+   existing eye, preserving the eye position and facing direction. */
+function cad3dRestorePerspective(){
+ cad3dEndZoom();
+ var wasWalk=viewMode==='walk';
+ var oldEye=wasWalk?{x:target.x,y:target.y,z:1.65}:null;
+ if(perspectiveCamera){perspectiveCamera.fov=35;perspectiveCamera.zoom=1;perspectiveCamera.filmOffset=0;perspectiveCamera.updateProjectionMatrix();}
+ if(wasWalk){
+  var dist=8,az=orbit.az,el=clamp(orbit.el,-.5,.5);
+  target.x=oldEye.x-dist*Math.cos(el)*Math.cos(az);
+  target.y=oldEye.y-dist*Math.cos(el)*Math.sin(az);
+  target.z=oldEye.z-dist*Math.sin(el);
+  orbit.dist=dist;orbit.el=el;
+ }
+ viewMode='perspective';activeView='perspective';
+ syncViewControls();applyViewCamera();
+ text('Perspectiva restaurada · lente arquitectónica 35° · cámara corregida sin cambiar el modelo');
+ return true;
+}
 function cad3dCreateCamera(){
  var entry={id:'camera-'+camera3DSequence,name:'Cámara '+camera3DSequence,position:{x:target.x,y:target.y,z:target.z},az:orbit.az,el:orbit.el,dist:orbit.dist,mode:viewMode};
  camera3DSequence++;saved3DCameras.push(entry);
@@ -3117,6 +3138,7 @@ function cad3dViewAlias(word){
  if(key==='C'||key==='CAMERA'||key==='CAMARAS'||key==='CÁMARAS')return cad3dCameraMenu();
  if(key==='Z'||key==='ZOOM'||key==='ZE'||key==='ZOOMEXTENTS'){cad3dEndZoom();fit3DModel();return true;}
  if(key==='ZI'||key==='ZOOMINTERACTIVE'){cad3dStartZoom();return true;}
+ if(key==='RP'||key==='RESTOREPERSPECTIVE'||key==='RESTAURARPERSPECTIVA')return cad3dRestorePerspective();
  if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA')return cad3dViewMenu();
  if(key==='O'||key==='ORTHO'||key==='ORTHOGRAPHIC')return cad3dOrthographicView();
  if(key==='P'||key==='PERSPECTIVE'||key==='PERSPECTIVA')return cad3dSetProjection('perspective');
