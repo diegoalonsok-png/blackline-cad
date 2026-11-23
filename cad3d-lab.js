@@ -1925,7 +1925,7 @@ function cad3dCompact3DBar(){
 }
 function cad3dSyncCompactBars(){
  if(!root)return;
- root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String((b.dataset.navTool===cad3dNavigationTool||(b.dataset.navTool==='hand'&&cad3dNavigationTool==='pan')));});
+ root.querySelectorAll('[data-nav-tool]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.navTool===cad3dNavigationTool||(b.dataset.navTool==='hand'&&cad3dNavigationTool==='pan')));});
  root.querySelectorAll('[data-quick-style]').forEach(function(b){
   b.setAttribute('aria-pressed',String(b.dataset.quickStyle==='sun'?sunSettings.enabled:b.dataset.quickStyle===renderStyle));
  });
