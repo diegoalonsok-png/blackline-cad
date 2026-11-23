@@ -9,6 +9,8 @@ var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var cad3dStairsBetaEnabled=true;
 try{cad3dStairsBetaEnabled=localStorage.getItem('blackline-cad3d-stairs-beta-v1')!=='off';}catch(_e){}
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
+/* Document-only Undo/Redo, isolated from CAD2D. Memory bounded for large models. */
+var cad3dHistory={entries:[],index:-1,limit:45,charBudget:24*1024*1024,chars:0,replaying:false,suspended:0};
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
@@ -836,6 +838,7 @@ css+="\n#cad3dLab > .cad3dMaterialsPanel{\n  resize:both!important;overflow:auto
 css+="\n#cad3dLab .cad3dMaterialCategory{display:flex;align-items:center;gap:8px;font-size:11px;margin:0 0 9px}\n#cad3dLab .cad3dMaterialCategory select{flex:1;min-width:0;background:#243b4a;color:#f2f7fa;border:1px solid #728fa0;border-radius:5px;padding:6px}\n#cad3dLab .cad3dMaterialEditor{border:1px solid #5b7c91;border-radius:8px;padding:9px;margin:7px 0 11px;background:#1e3443}\n#cad3dLab .cad3dMaterialEditor summary{font:700 12px Inter,Arial,sans-serif;color:#d7edfc;cursor:pointer;user-select:none}\n#cad3dLab .cad3dMaterialEditorBody{display:grid;gap:8px;margin-top:10px}\n#cad3dLab .cad3dMaterialEditorBody label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:11px}\n#cad3dLab .cad3dMaterialEditorBody label input[type=text]{min-width:0;flex:1}\n#cad3dLab .cad3dMaterialEditorBody input[type=text],#cad3dLab .cad3dMaterialEditorBody input[type=number]{background:#102835;color:#f6fbfe;border:1px solid #69869a;border-radius:4px;padding:6px}\n#cad3dLab .cad3dMaterialEditorBody input[type=color]{width:60px;height:29px;min-width:60px;border-radius:5px;border:1px solid #678ca2;background:#152736;padding:2px}\n#cad3dLab .cad3dMaterialEditorBody input[type=range]{width:145px;max-width:50%;accent-color:#74bfe8}\n#cad3dLab .cad3dMaterialEditorBody output{width:45px;font-variant-numeric:tabular-nums;color:#d1ebf9}\n#cad3dLab .cad3dMaterialEditorBody button{min-height:34px;background:#225976;border:1px solid #87c7e6;border-radius:6px;color:#fff;cursor:pointer;font-weight:700}\n#cad3dLab .cad3dMaterialGroupTitle{font:700 11px Inter,Arial,sans-serif;color:#a5c3d5;margin:4px 0}\n";
 css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px;border:1px solid #7398ac;border-radius:5px;background:#ddd}\n#cad3dLab .cad3dMaterialEditorBody .cad3dMatSave{background:#314c5f;border-color:#6f9bb5;font-weight:500}\n";
 css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;padding:7px 12px;font:11px Inter,Arial,sans-serif;color:#d4e9f6;background:#21394a;border-bottom:1px solid #577589;cursor:pointer}\n#cad3dLab .cad3dStairsBeta input{accent-color:#6bb8e6}\n#cad3dLab .archTools button[hidden]{display:none!important}\n#cad3dLab .cad3dStairStats{margin:9px 0;padding:8px;border:1px solid #4e748a;border-radius:6px;font-size:11px;color:#c7dbe6;background:#1a3342}\n";
+css+="\n#cad3dLab .cad3dHistoryButton{font-family:Arial,sans-serif!important;font-size:21px!important;line-height:1!important;font-weight:600!important;min-width:35px!important}\n#cad3dLab .cad3dHistoryButton:disabled{opacity:.35!important;cursor:not-allowed!important;background:#14212c!important}\n#cad3dLab .cad3dHistoryButton:not(:disabled){color:#e3f6ff!important;border-color:#66899c!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -2102,6 +2105,8 @@ function cad3dBasicBars(){
    tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
    tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
+   '<button type="button" class="btn cad3dHistoryButton" data-history="undo" title="Deshacer 3D · Ctrl+Z / Cmd+Z" aria-label="Deshacer último cambio 3D" disabled>↶</button>'+
+   '<button type="button" class="btn cad3dHistoryButton" data-history="redo" title="Rehacer 3D · Ctrl+Y / Ctrl+Shift+Z" aria-label="Rehacer cambio 3D" disabled>↷</button>'+
    tool('select','Select','cube')+tool('move','Move','move')+tool('copy','Copy','copy')+
    tool('rotate','Rotate','rotate')+tool('erase','Erase','erase')+'</div></div>';
 }
@@ -2830,6 +2835,22 @@ function build(){
   if(button)changeLayer(button.dataset.layerToggle);
  });
  renderDraftModes();renderLayerPanel();
+ root.querySelector('.cad3dBasicBars').addEventListener('click',function(e){
+  var button=e.target.closest('[data-history]');
+  if(!button||button.disabled)return;
+  if(button.dataset.history==='undo')cad3dUndo();
+  if(button.dataset.history==='redo')cad3dRedo();
+ });
+ // Property-slider dragging counts as a single edit.
+ root.querySelector('.props').addEventListener('pointerdown',function(e){
+  if(e.target.matches('input[type=range][data-opening-param]'))cad3dHistory.suspended++;
+ },true);
+ var finishHistorySlider=function(){
+  if(cad3dHistory.suspended>0){cad3dHistory.suspended=0;cad3dHistoryCapture();}
+ };
+ window.addEventListener('pointerup',finishHistorySlider);
+ window.addEventListener('pointercancel',finishHistorySlider);
+ cad3dHistoryStart();
  root.querySelector('.props').addEventListener('input',function(e){
   var field=e.target.closest('input[type="range"][data-opening-param]');
   if(!field)return;
@@ -5211,7 +5232,80 @@ function visitMeshes(visitor){
  try{group.traverse(function(mesh){if(mesh.isMesh&&!mesh.userData.cadWallTexture)visitor(mesh);});}
  finally{if(!modelRoot)disposeMeshes(group);}
 }
+
+/* Snapshots store only CAD3D document state. Cameras, UI focus and render caches are excluded. */
+function cad3dHistoryJSON(){
+ var materials={};
+ Object.keys(cad3dCustomMaterials).forEach(function(id){
+  var m=cad3dCustomMaterials[id];if(!m)return;
+  materials[id]={name:m.name||'',image:m.image||'',tint:m.tint||'#ffffff',
+   mix:finite(m.mix,0),bump:finite(m.bump,1),roughness:finite(m.roughness,85)};
+ });
+ return JSON.stringify({records:records,layers:layers,currentLayer:currentLayer,
+  serial:serial,underlay:underlay,materials:materials});
+}
+function cad3dHistoryButtons(){
+ if(!root)return;
+ var undo=root.querySelector('[data-history="undo"]'),redo=root.querySelector('[data-history="redo"]');
+ if(undo){undo.disabled=cad3dHistory.index<=0;undo.title='Deshacer 3D · Ctrl+Z / Cmd+Z ('+Math.max(0,cad3dHistory.index)+' disponibles)';}
+ if(redo){redo.disabled=cad3dHistory.index>=cad3dHistory.entries.length-1;}
+}
+function cad3dHistoryStart(){
+ if(cad3dHistory.index>=0)return;
+ var json=cad3dHistoryJSON();
+ cad3dHistory.entries=[json];cad3dHistory.index=0;cad3dHistory.chars=json.length;
+ cad3dHistoryButtons();
+}
+function cad3dHistoryCapture(){
+ if(cad3dHistory.replaying||cad3dHistory.suspended||active3DGrip)return;
+ if(cad3dHistory.index<0)cad3dHistoryStart();
+ var json;
+ try{json=cad3dHistoryJSON();}catch(e){console.warn('CAD3D history snapshot error',e);return;}
+ if(json===cad3dHistory.entries[cad3dHistory.index])return;
+ if(json.length>cad3dHistory.charBudget){
+  text('Modelo grande: historial 3D no disponible para este cambio');
+  return;
+ }
+ // Drop redo only after a genuinely new editing operation.
+ if(cad3dHistory.index<cad3dHistory.entries.length-1){
+  cad3dHistory.entries.splice(cad3dHistory.index+1);
+  cad3dHistory.chars=cad3dHistory.entries.reduce(function(n,s){return n+s.length;},0);
+ }
+ cad3dHistory.entries.push(json);cad3dHistory.chars+=json.length;
+ cad3dHistory.index=cad3dHistory.entries.length-1;
+ while(cad3dHistory.entries.length>2&&(cad3dHistory.entries.length>cad3dHistory.limit||cad3dHistory.chars>cad3dHistory.charBudget)){
+  cad3dHistory.chars-=cad3dHistory.entries.shift().length;cad3dHistory.index--;
+ }
+ cad3dHistoryButtons();
+}
+function cad3dHistoryRestore(index){
+ if(index<0||index>=cad3dHistory.entries.length||index===cad3dHistory.index)return false;
+ var state;
+ try{state=JSON.parse(cad3dHistory.entries[index]);}catch(e){text('No se pudo recuperar el estado 3D');return false;}
+ cad3dHistory.replaying=true;
+ try{
+  setPlacement(null);cad3dMaterialPaint=false;selectedOpeningId=null;dragging=null;
+  records=state.records;layers=state.layers;currentLayer=state.currentLayer;
+  serial=state.serial;underlay=state.underlay;
+  cad3dCustomMaterials=state.materials||{};
+  // Cached textures must never leak newer images into an older restored state.
+  Object.keys(cad3dTextureCache).forEach(function(key){cad3dTextureCache[key]?.dispose?.();});
+  cad3dTextureCache={};
+  Object.keys(cad3dTextureCanvases).forEach(function(key){if(key.startsWith('user-'))delete cad3dTextureCanvases[key];});
+  selected=selected.filter(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});});
+  cad3dLastPaintFace=null;
+  cad3dHistory.index=index;
+  renderLayerPanel();cad3dMaterialRender();drawUnderlay();
+  redraw();renderProps();cad3dHistoryButtons();
+  text('CAD3D · '+(index<cad3dHistory.entries.length-1?'Cambio deshecho · Ctrl+Y rehace':'Cambio rehecho'));
+  return true;
+ }finally{cad3dHistory.replaying=false;}
+}
+function cad3dUndo(){cad3dHistoryStart();if(!cad3dHistoryRestore(cad3dHistory.index-1))text('No hay más cambios 3D para deshacer');}
+function cad3dRedo(){cad3dHistoryStart();if(!cad3dHistoryRestore(cad3dHistory.index+1))text('No hay más cambios 3D para rehacer');}
+
 function redraw(){
+ cad3dHistoryCapture();
  if(fallbackCanvas){fallbackDraw();render3DGrips();cad3dRenderPlanWalls();return;}
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
