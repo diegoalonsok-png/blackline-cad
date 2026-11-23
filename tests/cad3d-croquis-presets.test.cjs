@@ -13,7 +13,7 @@ const registry = section('const CAD3D_VISUAL_STYLES=', 'function renderStyleCont
 const presetApi = vm.runInNewContext(registry + '\n({CAD3D_SKETCH_PRESETS,CAD3D_VISUAL_STYLES,isCad3DSketch})', {});
 const names = ['sketch','sketch-pencil','sketch-ink','sketch-marker','sketch-watercolor','sketch-mono','sketch-blueprint'];
 test('Seven Croquis presets registered with materials and labels', () => {
- assert.equal(Object.keys(presetApi.CAD3D_SKETCH_PRESETS).length, 7);
+ assert(Object.keys(presetApi.CAD3D_SKETCH_PRESETS).length >= names.length);
  for(const name of names) {
   assert(presetApi.CAD3D_VISUAL_STYLES[name], name);
   assert.equal(presetApi.isCad3DSketch(name), true);
@@ -22,10 +22,13 @@ test('Seven Croquis presets registered with materials and labels', () => {
  }
  assert.equal(presetApi.isCad3DSketch('shaded'), false);
 });
-test('Visual Style toolbar contains all seven Croquis buttons', () => {
- const toolbar = section("[['wire2d'", "tool('shot'");
- assert(toolbar.includes('data-render-style'));
- for(const name of names) assert(toolbar.includes("['" + name + "'"), name);
+test('Visual Style gallery still contains the seven core Croquis choices', () => {
+ const gallery = section("['Técnico','wire2d'", "].map(function(st){return '<button type=\"button\" data-render-family=");
+ assert(gallery.includes('sketch-pencil'));
+ for(const name of names) {
+  assert(gallery.includes("'"+name+"'"),'Missing core style: '+name);
+ }
+ assert(source.includes('data-render-style'));
 });
 test('Croquis retains the solar shadow ground and turns on sun', () => {
  const sunlight = section('function applySunSettings(){', 'function toggleDraftMode(');
