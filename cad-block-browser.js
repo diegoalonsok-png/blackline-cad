@@ -12,6 +12,8 @@
  const tr=t=>window.BlacklineUILanguage?.translate?.(t)??t;
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
+  visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^(?:olymp26-|olymp2-|cc0-fp-)/.test(it.id)||
+    /^(?:dk-arbol-vista|dk-arbol-invierno|dk-arbol-radial|dk-arbusto-arbol|dk-arbol-hojas|dk-arbol-ramas|dk-dos-arboles)$/.test(it.id)},
   dk:{en:'Blackline library',es:'Biblioteca Blackline',item:it=>/^dk-|^doc-/.test(it.id)},
   bath:{en:'Bathrooms',es:'Baños',family:'Baños'},
   kitchen:{en:'Kitchens',es:'Cocinas',family:'Cocinas'},
@@ -56,6 +58,31 @@
 #cadBlockBrowser .rz{position:absolute;z-index:2}#cadBlockBrowser .rz.e{right:0;top:0;bottom:0;width:7px;cursor:ew-resize}#cadBlockBrowser .rz.s{left:0;right:0;bottom:0;height:7px;cursor:ns-resize}
 #cadBlockBrowser .rz.w{left:0;top:0;bottom:0;width:7px;cursor:ew-resize}#cadBlockBrowser .rz.n{left:0;right:0;top:0;height:5px;cursor:ns-resize}
 #cadBlockBrowser .rz.se{right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 55%,#6c8597 55%,#6c8597 62%,transparent 62%,transparent 72%,#6c8597 72%,#6c8597 79%,transparent 79%)}
+/* Architectural cream-background visual catalog: no changes to CAD workspace/theme. */
+#cadBlockBrowser.visual{background:#efe4cc;border-color:#a88b60;color:#272921}
+#cadBlockBrowser.visual .hd{background:#ddcba8;border-color:#baa17c}
+#cadBlockBrowser.visual .hd b{color:#47392c}
+#cadBlockBrowser.visual .hd button{color:#3c3429}
+#cadBlockBrowser.visual .hd button:hover{background:#d1bd98}
+#cadBlockBrowser.visual .tabs{background:#eee0c1}
+#cadBlockBrowser.visual .tabs button{color:#4b4232;border-color:#c4ad83}
+#cadBlockBrowser.visual .tabs button.on{background:#73562e;border-color:#73562e;color:#fffaf0}
+#cadBlockBrowser.visual .tools{background:#f3e8d3;border-color:#ccb997}
+#cadBlockBrowser.visual .tools label{color:#4b4539}
+#cadBlockBrowser.visual input[type=search]{background:#fffaf0;color:#29302b;border-color:#c7b28c}
+#cadBlockBrowser.visual .cats{background:#e7d7b9;border-color:#cab38b}
+#cadBlockBrowser.visual .cats button{color:#3e3a31}
+#cadBlockBrowser.visual .cats button.on{background:#fdf7e9;color:#2d2920}
+#cadBlockBrowser.visual .cats button:hover{background:#f4e8d0}
+#cadBlockBrowser.visual .cats small{color:#695943}
+#cadBlockBrowser.visual .grid{background:#f3ead8;gap:14px}
+#cadBlockBrowser.visual .card{background:#fffaf0;color:#2c302f;border:1px solid #cbb796;border-radius:8px;padding:12px;box-shadow:0 3px 10px #765b3012}
+#cadBlockBrowser.visual .card:hover{background:#fffcf6;border-color:#897047;box-shadow:0 4px 16px #765b3033}
+#cadBlockBrowser.visual .card.armed{border-color:#815b28;box-shadow:0 0 0 3px #bfa16f66}
+#cadBlockBrowser.visual .card svg{color:#293238;max-width:100%;overflow:visible}
+#cadBlockBrowser.visual .card .nm{color:#35362e;font-weight:600}
+#cadBlockBrowser.visual .card .mt{color:#725b39}
+#cadBlockBrowser.visual .ft{background:#eee0c1;border-color:#c6ae87;color:#4f493d}
 #cadBlockBrowser.min .tabs,#cadBlockBrowser.min .tools,#cadBlockBrowser.min .main,#cadBlockBrowser.min .ft,#cadBlockBrowser.min .rz{display:none}
 #cadBlockBrowser.min{min-height:0;height:auto!important}
 @media (max-width:640px){#cadBlockBrowser .main{grid-template-columns:1fr}#cadBlockBrowser .cats{display:none}}
@@ -105,17 +132,28 @@
  }
  function paint(){
   if(!el)return;
+  const visual=st.view==='visual';
+  el.classList.toggle('visual',visual);
+  el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
+  el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
   el.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.view));
   const cats=[...new Set(items().filter(inView).map(groupOf))].sort((a,b)=>a.localeCompare(b,es()?'es':'en'));
   if(st.cat&&!cats.includes(st.cat))st.cat='';
   const count=c=>items().filter(i=>inView(i)&&(!c||groupOf(i)===c)).length;
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
-  const list=filtered(),grid=el.querySelector('.grid'),shown=list.slice(0,visibleCount);
-  grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${st.size}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)}">${ARQ.thumb(it.id,Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:#8ea2ae;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  const list=filtered(),grid=el.querySelector('.grid');
+  if(visual)list.sort((a,b)=>{
+   const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
+   return rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
+  });
+  const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
+  grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${tr(it.name)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}${it.pro?'<span class="pro">PRO</span>':''}<span class="nm">${tr(it.name)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
-  el.querySelector('.ft').textContent=T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
+  el.querySelector('.ft').textContent=visual
+   ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
+   :T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
  }
  function place(){
   const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
@@ -140,7 +178,7 @@
    if(a==='close')return close();
    if(a==='min'){el.classList.toggle('min');return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
-   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=72;save();paint();return}
+   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=v==='visual'?24:72;save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=72;save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=72;paint();el.querySelector('.grid').scrollTop=pos;return}
    const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
@@ -167,11 +205,18 @@
  function close(){if(el)el.style.display='none';armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,close});
+ function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=24;save();open();
+  const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
+ }
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,close});
  const EXT=window.CAD2D_EXTENSIONS;
- if(EXT?.commands)for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
+ if(EXT?.commands){
+  for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
+  for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
+ }
  // Botón grande en la cinta (Inicio y Arquitectura) y en la barra rápida.
  const ico='<rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="16" y="11" width="6" height="6" rx="1"/><path d="M4 21h16"/>';
  try{CORE.ribbon.add('home','BLOCKS+',[{id:'blockBrowser',label:T('Block browser','Explorador'),icon:ico,run:open}]);CORE.ribbon.add('arq','BLOCKS+',[{id:'blockBrowser',label:T('Block browser','Explorador'),icon:ico,run:open}]);CORE.ribbon.rebuild()}catch(e){console.warn(e)}
+ // Curated preview gallery is an additional view of the same insertion mechanism.
  const qb=document.querySelector('#cadQuickBar [data-qb=blocks]');if(qb){const n=qb.cloneNode(true);n.title=T('Block browser · BB','Explorador de bloques · BB');n.addEventListener('click',e=>{e.stopPropagation();open()});qb.replaceWith(n)}
 })();
