@@ -3373,6 +3373,98 @@ function cad3dSketchHex(hex){
 /* Image-space architectural sketch renderer, all local browser CPU passes.
    The model/viewpoint are immutable. This pipeline never adds imaginary objects.
    Can later move individual passes to C++/WebAssembly without changing inputs. */
+
+/* Independent raster layers. No geometry mutation and no new objects:
+   each renderer can be tuned independently, then accelerated with WASM. */
+function cad3dSketchNoise(x,y){
+ var n=(Math.imul(x+1,374761393)^Math.imul(y+1,668265263))>>>0;
+ n=Math.imul(n^(n>>>13),1274126177)>>>0;
+ return ((n^(n>>>16))>>>0)/4294967295;
+}
+function cad3dSketchWetPigment(layer,source,edge,sky,ground,w,h,amount){
+ // Granulating, translucent pigments flow inside areas of similar color.
+ // Work on a copy so results do not depend on scanning direction.
+ if(amount<=0)return;
+ var previous=new Uint8ClampedArray(layer),limit=28;
+ var clamp=function(n){return Math.max(0,Math.min(255,n));};
+ for(var y=2;y<h-2;y++)for(var x=2;x<w-2;x++){
+  var i=y*w+x,k=i*4;
+  if(edge[i]>105||sky[i])continue;
+  var r=source[k],g=source[k+1],b=source[k+2];
+  var sum=[previous[k]*2,previous[k+1]*2,previous[k+2]*2],total=2;
+  var neighbors=[i-1,i+1,i-w,i+w];
+  for(var t=0;t<neighbors.length;t++){
+   var j=neighbors[t],z=j*4;
+   if(sky[j]!==sky[i]||ground[j]!==ground[i]||edge[j]>120)continue;
+   var delta=Math.abs(source[z]-r)+Math.abs(source[z+1]-g)+Math.abs(source[z+2]-b);
+   if(delta>limit*3)continue;
+   var weight=delta<limit?1:.32;
+   sum[0]+=previous[z]*weight;sum[1]+=previous[z+1]*weight;sum[2]+=previous[z+2]*weight;total+=weight;
+  }
+  var flow=amount*.64;
+  var bloom=Math.sin(x*.041+Math.sin(y*.022)*1.7)*Math.cos(y*.052-x*.016);
+  // Edge pooling occurs only along diffuse same-surface tonal transitions.
+  var pool=0;
+  if(edge[i]<80&&!sky[i]&&!ground[i]){
+   var j=(i+w)*4;
+   var gradient=(source[j]+source[j+1]+source[j+2]-r-g-b)/3;
+   if(gradient>4&&gradient<22)pool=Math.min(4.5,gradient*.16)*amount;
+  }
+  for(var c=0;c<3;c++){
+   var merged=previous[k+c]*(1-flow)+(sum[c]/total)*flow;
+   layer[k+c]=clamp(merged+bloom*amount*1.8-pool);
+  }
+ }
+}
+function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style){
+ if(amount<=0)return;
+ var gap=style==='pencil'?5:style==='marker'?10:style==='watercolor'?11:8;
+ var strokes=0;
+ for(var y=gap;y<h-gap;y+=gap)for(var x=gap;x<w-gap;x+=gap){
+  var i=y*w+x,k=i*4;
+  if(sky[i]||edge[i]>80)continue;
+  var noise=cad3dSketchNoise(x,y);
+  if(noise>(style==='pencil'?.92:.78))continue;
+  var dx=grey[i+1]-grey[i-1],dy=grey[i+w]-grey[i-w];
+  // Tangential to local tonal gradients, like hand-laid strokes following faces.
+  var theta=Math.abs(dx)+Math.abs(dy)>8?Math.atan2(dx,-dy):
+   (style==='pencil'?-Math.PI/5:style==='marker'?0:Math.PI/7);
+  var len=(style==='pencil'?6:style==='marker'?8:5)+Math.floor(noise*4);
+  var ca=Math.cos(theta),sa=Math.sin(theta);
+  var tint=(style==='pencil'?-1:style==='marker'?.65:.45);
+  for(var t=-len;t<=len;t++){
+   var xx=Math.round(x+t*ca),yy=Math.round(y+t*sa+Math.sin(t*.37+noise*8)*.36);
+   if(xx<1||yy<1||xx>=w-1||yy>=h-1)continue;
+   var j=yy*w+xx,z=j*4;
+   if(sky[j]!==sky[i]||ground[j]!==ground[i]||edge[j]>75||
+    Math.abs(grey[j]-grey[i])>23)continue;
+   var taper=1-Math.abs(t)/(len+1),fiber=cad3dSketchNoise(xx*2,yy*3);
+   var opacity=amount*taper*(style==='pencil'?.21:style==='marker'?.14:.095);
+   if(fiber<.24)opacity*=.22; // dry-brush gaps, paper texture underneath
+   for(var c=0;c<3;c++){
+    var stroke=source[k+c]*.64+layer[z+c]*.36+tint*(fiber-.5)*16;
+    layer[z+c]=Math.max(0,Math.min(255,layer[z+c]*(1-opacity)+stroke*opacity));
+   }
+   strokes++;
+  }
+ }
+ return strokes;
+}
+function cad3dSketchFinalGrade(layer,grey,sky,ground,w,h,amount,style){
+ // No global blur: keep silhouettes and openings exactly where source rendered them.
+ if(amount<=0)return;
+ var contrast=style==='pencil'?.080:style==='marker'?.040:style==='watercolor'?.025:.048;
+ for(var i=0;i<w*h;i++){
+  var k=i*4;
+  var shade=sky[i]?0:Math.max(0,(155-grey[i])/155);
+  var high=ground[i]?.12:.23;
+  for(var c=0;c<3;c++){
+   var v=layer[k+c],m=(v-128)*contrast*amount;
+   layer[k+c]=Math.max(0,Math.min(255,v+m-shade*amount*2.8+high*amount));
+  }
+ }
+}
+
 function cad3dSketchMultiPass(image,w,h,options){
  var p=image.data||image,n=w*h,opt=options||{};
  if(!w||!h||p.length!==n*4)throw Error('Invalid sketch source image');
@@ -3533,7 +3625,17 @@ function cad3dSketchMultiPass(image,w,h,options){
    for(var c=0;c<3;c++)output[k+c]=mix(output[k+c],edgeRGB[c],alpha);
   }
  }
- return {data:output,skyMask:sky,groundMask:ground,edgeMask:line};
+ // PASS 7-9: local brush strokes, pigment diffusion and final color grade.
+ // Style parameters are layered, not replacements for source illumination.
+ var brushScale=style==='pencil'?.88:style==='marker'?.68:style==='watercolor'?.26:style==='wash'?.30:.42;
+ var pigmentScale=style==='watercolor'?.87:style==='wash'?.74:style==='marker'?.28:style==='pencil'?.08:.33;
+ var brushAmount=Math.max(0,Math.min(1,Number(opt.brush??58)/100))*brushScale;
+ var pigmentAmount=Math.max(0,Math.min(1,Number(opt.pigment??60)/100))*pigmentScale;
+ cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount);
+ cad3dSketchBrushwork(output,smooth,grey,line,sky,ground,w,h,brushAmount,style);
+ cad3dSketchFinalGrade(output,grey,sky,ground,w,h,
+  Math.max(0,Math.min(1,Number(opt.finish??65)/100)),style);
+  return {data:output,skyMask:sky,groundMask:ground,edgeMask:line};
 }
 function cad3dSketchRenderPasses(panel,ctx,src,w,h){
  var control=function(key){return panel.querySelector('[data-sketch-setting="'+key+'"]');};
@@ -3546,6 +3648,8 @@ function cad3dSketchRenderPasses(panel,ctx,src,w,h){
   skyRGB:cad3dSketchHex(value('skyColor')),groundRGB:cad3dSketchHex(value('groundColor')),
   wallRGB:cad3dSketchHex(value('wallColor')),paper:value('paper'),
   grain:Number(value('grain')??40),shadow:Number(value('shadow')??45),
+  brush:Number(value('brush')??58),pigment:Number(value('pigment')??60),
+  finish:Number(value('finish')??65),
   detail:Number(value('detail')??50),weight:Number(value('weight')||2),
   sky:checked('sky'),ground:checked('ground'),recolor:value('wallMode')==='tint'
  });
