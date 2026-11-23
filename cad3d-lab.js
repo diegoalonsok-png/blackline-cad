@@ -4,8 +4,10 @@
 if(window.BlacklineCAD3D)return;
 var T=null, root=null, renderer=null, scene=null, camera=null, modelRoot=null, raycaster=null;
 var selectedOpeningId=null;
-var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening'};
+var records=[], selected=[], serial=1, orbit={az:-.85,el:.55,dist:17}, target=null, frame=0, fallbackFrame=0, dragging=null, winDrag=null, observer=null, placing=null, firstPoint=null, cursorPoint=null, underlay=null, underlayGroup=null, restoredWindow=null, fallbackCanvas=null, fallbackCtx=null, cad3dLoading=false, activeCategory='wall', activePreset={wall:'exterior-20',door:'single-swing',window:'fixed',slab:'floor-20',opening:'wall-opening',stair:'stair-concrete',railing:'rail-metal'};
 var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
+var cad3dStairsBetaEnabled=true;
+try{cad3dStairsBetaEnabled=localStorage.getItem('blackline-cad3d-stairs-beta-v1')!=='off';}catch(_e){}
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
@@ -833,6 +835,7 @@ css+="\n#cad3dLab .cad3dMaterialsPanel{position:absolute;z-index:150;left:55px;t
 css+="\n#cad3dLab > .cad3dMaterialsPanel{\n  resize:both!important;overflow:auto!important;\n  width:min(370px,calc(100% - 24px));height:min(670px,calc(100% - 80px));\n  min-width:275px;min-height:240px;\n  max-width:calc(100% - 16px);max-height:calc(100% - 16px);\n  scrollbar-color:#8c9eaa #253744;\n}\n#cad3dLab .cad3dMaterialSizes{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:0 0 10px}\n#cad3dLab .cad3dMaterialSizes button{font:11px Inter,Arial,sans-serif;min-height:27px;padding:4px 7px;background:#274355;color:#eaf3f9;border:1px solid #6b91a6;border-radius:5px;cursor:pointer}\n#cad3dLab .cad3dMaterialSizes button:hover{background:#38647d}\n#cad3dLab .cad3dMaterialResizeTip{font-size:10px;color:#abc3d2;margin-left:auto}\n#cad3dLab .cad3dMaterialsPanel .cad3dMaterialStatus{display:block;min-height:26px;padding:6px 0;font-size:11px;color:#cde7f5}\n";
 css+="\n#cad3dLab .cad3dMaterialCategory{display:flex;align-items:center;gap:8px;font-size:11px;margin:0 0 9px}\n#cad3dLab .cad3dMaterialCategory select{flex:1;min-width:0;background:#243b4a;color:#f2f7fa;border:1px solid #728fa0;border-radius:5px;padding:6px}\n#cad3dLab .cad3dMaterialEditor{border:1px solid #5b7c91;border-radius:8px;padding:9px;margin:7px 0 11px;background:#1e3443}\n#cad3dLab .cad3dMaterialEditor summary{font:700 12px Inter,Arial,sans-serif;color:#d7edfc;cursor:pointer;user-select:none}\n#cad3dLab .cad3dMaterialEditorBody{display:grid;gap:8px;margin-top:10px}\n#cad3dLab .cad3dMaterialEditorBody label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:11px}\n#cad3dLab .cad3dMaterialEditorBody label input[type=text]{min-width:0;flex:1}\n#cad3dLab .cad3dMaterialEditorBody input[type=text],#cad3dLab .cad3dMaterialEditorBody input[type=number]{background:#102835;color:#f6fbfe;border:1px solid #69869a;border-radius:4px;padding:6px}\n#cad3dLab .cad3dMaterialEditorBody input[type=color]{width:60px;height:29px;min-width:60px;border-radius:5px;border:1px solid #678ca2;background:#152736;padding:2px}\n#cad3dLab .cad3dMaterialEditorBody input[type=range]{width:145px;max-width:50%;accent-color:#74bfe8}\n#cad3dLab .cad3dMaterialEditorBody output{width:45px;font-variant-numeric:tabular-nums;color:#d1ebf9}\n#cad3dLab .cad3dMaterialEditorBody button{min-height:34px;background:#225976;border:1px solid #87c7e6;border-radius:6px;color:#fff;cursor:pointer;font-weight:700}\n#cad3dLab .cad3dMaterialGroupTitle{font:700 11px Inter,Arial,sans-serif;color:#a5c3d5;margin:4px 0}\n";
 css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px;border:1px solid #7398ac;border-radius:5px;background:#ddd}\n#cad3dLab .cad3dMaterialEditorBody .cad3dMatSave{background:#314c5f;border-color:#6f9bb5;font-weight:500}\n";
+css+="\n#cad3dLab .cad3dStairsBeta{display:flex;align-items:center;gap:7px;padding:7px 12px;font:11px Inter,Arial,sans-serif;color:#d4e9f6;background:#21394a;border-bottom:1px solid #577589;cursor:pointer}\n#cad3dLab .cad3dStairsBeta input{accent-color:#6bb8e6}\n#cad3dLab .archTools button[hidden]{display:none!important}\n#cad3dLab .cad3dStairStats{margin:9px 0;padding:8px;border:1px solid #4e748a;border-radius:6px;font-size:11px;color:#c7dbe6;background:#1a3342}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -923,6 +926,16 @@ const ARCH_STYLES={
   {id:'roof-flat',name:'Flat roof',h:.18,pitch:0,slabKind:'roof'},
   {id:'roof-pitch',name:'Pitched roof',h:.18,pitch:12,slabKind:'roof'}
  ],
+ stair:[
+  {id:'stair-concrete',name:'Escalera recta · hormigón',w:4.16,d:1.1,h:2.80,stepCount:16,rails:'both',railStyle:'metal',railHeight:.95},
+  {id:'stair-wood',name:'Escalera recta · madera',w:3.78,d:.95,h:2.70,stepCount:15,rails:'left',railStyle:'wood',railHeight:.90},
+  {id:'stair-wide',name:'Escalera ancha · acceso',w:4.50,d:1.60,h:3.00,stepCount:17,rails:'both',railStyle:'glass',railHeight:1.00}
+ ],
+ railing:[
+  {id:'rail-metal',name:'Baranda metálica recta',w:3,d:.06,h:1.00,railStyle:'metal',postSpacing:1,railRise:0},
+  {id:'rail-wood',name:'Pasamanos de madera',w:3,d:.07,h:.95,railStyle:'wood',postSpacing:.9,railRise:0},
+  {id:'rail-glass',name:'Baranda con vidrio',w:3,d:.07,h:1.05,railStyle:'glass',postSpacing:1.20,railRise:0}
+ ],
  opening:[
   {id:'wall-opening',name:'Standard doorway · 90 × 210 cm',host:'wall',w:.90,h:2.10,sill:0},
   {id:'wide-opening',name:'Wide passage · 180 × 210 cm',host:'wall',w:1.80,h:2.10,sill:0},
@@ -1000,10 +1013,12 @@ function archStyle(kind,id){
 }
 
 var importSequence=0;
-var archLabels={wall:'Walls',door:'Doors',window:'Windows',slab:'Slabs / roofs',opening:'Openings'};
+var archLabels={wall:'Walls',door:'Doors',window:'Windows',slab:'Slabs / roofs',opening:'Openings',stair:'Escaleras β',railing:'Barandas β'};
 function styleDimensions(kind,st){
  if(kind==='wall')return Math.round(st.d*100)+' cm · '+st.h.toFixed(2)+' m alto';
  if(kind==='slab')return Math.round(st.h*100)+' cm'+(st.pitch?' · '+st.pitch+'°':'');
+ if(kind==='stair')return st.stepCount+' peldaños · '+st.d.toFixed(2)+' m ancho · '+st.h.toFixed(2)+' m alto';
+ if(kind==='railing')return st.w.toFixed(2)+' m largo · '+st.h.toFixed(2)+' m alto';
  return st.w.toFixed(2)+' × '+(st.d||st.h).toFixed(2)+' m';
 }
 
@@ -1067,6 +1082,17 @@ function cad3dDoorVoidThumbnail(kind,st){
 }
 
 function cad3dCatalogPreview(kind,st){
+ if(kind==='stair'||kind==='railing'){
+  var step=kind==='stair',body='';
+  if(step){
+   for(var k=0;k<6;k++){
+    var x=23+k*16,y=89-k*9;
+    body+='<path d="M'+x+' '+y+'h20v-9h-20z" fill="'+(k%2?'#94a9b8':'#c9d6df')+'" stroke="#e5f0f6" stroke-width="1.5"/>';
+   }
+  }
+  body+='<path d="M20 38L137 25M20 38v57m117-70v60M73 32v58" stroke="'+(step?'#d8e9f3':'#86aec6')+'" stroke-width="4" fill="none"/>';
+  return '<svg class="cad3dCatalogPreview" viewBox="0 0 160 108" role="img" aria-label="'+escapeHtml(st.name)+'">'+body+'</svg>';
+ }
  if(kind==='door'||kind==='opening')return cad3dDoorVoidThumbnail(kind,st);
  var desc=(String(st.id||'')+' '+String(st.name||'')).toLowerCase();
  var has=function(k){return desc.includes(k);};
@@ -1135,7 +1161,11 @@ function cad3dCatalogPreview(kind,st){
 
 function renderArchPalette(){
  var palette=root.querySelector('.archPalette');
+ if(!cad3dStairsBetaEnabled&&['stair','railing'].includes(activeCategory))activeCategory='wall';
+ var betaToggle=palette.querySelector('[data-stairs-beta]');
+ if(betaToggle)betaToggle.checked=cad3dStairsBetaEnabled;
  palette.querySelectorAll('[data-arch-tool]').forEach(function(button){
+  button.hidden=!cad3dStairsBetaEnabled&&['stair','railing'].includes(button.dataset.archTool);
   button.setAttribute('aria-pressed',String(button.dataset.archTool===activeCategory));
  });
  palette.querySelector('.catalogItems').innerHTML=ARCH_STYLES[activeCategory].map(function(st){
@@ -1246,6 +1276,14 @@ function beginArchGesture(e){
  handle.addEventListener('lostpointercapture',done);
 }
 function clickArchPalette(e){
+ if(e.target.closest('[data-stairs-beta]')){
+  cad3dStairsBetaEnabled=e.target.checked;
+  try{localStorage.setItem('blackline-cad3d-stairs-beta-v1',cad3dStairsBetaEnabled?'on':'off');}catch(_e){}
+  if(!cad3dStairsBetaEnabled&&['stair','railing'].includes(placing))setPlacement(null);
+  renderArchPalette();
+  text(cad3dStairsBetaEnabled?'Escaleras y barandas experimentales activadas':'Creación de escaleras y barandas desactivada · los modelos existentes permanecen');
+  return;
+ }
  if(e.target.closest('[data-arch-close]')){showArchPalette(false);return;}
  var size=e.target.closest('[data-arch-size]');
  if(size){sizeArchPalette(size.dataset.archSize);return;}
@@ -2533,6 +2571,7 @@ function build(){
  '<button type="button" class="btn" data-arch-size="medium">◧ Media</button>'+
  '<button type="button" class="btn" data-arch-size="large">▣ Grande</button></div>'+
  '<button type="button" class="btn" data-arch-close aria-label="Cerrar paleta">×</button></header>'+
+ '<label class="cad3dStairsBeta"><input type="checkbox" data-stairs-beta checked> Escaleras y barandas paramétricas · Experimental (se puede desactivar)</label>'+
  '<div class="archTools" role="group" aria-label="Tipos paramétricos">'+
  Object.keys(archLabels).map(function(kind){
   return '<button type="button" class="btn" data-arch-tool="'+kind+'">'+archLabels[kind]+'</button>';
