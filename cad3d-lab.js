@@ -1634,7 +1634,7 @@ function cad3dArchSetDocked(want,options){
  options=options||{};
  if(!!want===docked)return docked;
  if(want){
-  cad3dPaletteRemember('architecture',palette);
+  if(!palette.hidden)cad3dPaletteRemember('architecture',palette);
   palette.classList.add('cad3dArchDocked');
   var layers=Array.from(side.querySelectorAll(':scope > .panel')).find(function(p){
    return /^layers$/i.test(p.querySelector('.panel-title')?.textContent.trim()||'');
