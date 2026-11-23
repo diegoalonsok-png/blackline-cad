@@ -3390,69 +3390,93 @@ function cad3dMakeSavePanelMovable(){
  handle.addEventListener('lostpointercapture',finish);
 }
 
+css+="\n/* Separate render action, preserves all previously approved CAD3D toolbars and buttons. */\n#cad3dLab .camera3DBar .cad3dRenderSketchLaunch{display:inline-flex!important;margin-left:auto!important;padding:5px 10px!important;border:1px solid #7ab6d1!important;background:#23576f!important;color:#fff!important;font-weight:750!important;letter-spacing:.3px!important}\n#cad3dLab .cad3dSketchCapturePanel{resize:both;min-width:330px;min-height:260px}\n#cad3dLab .cad3dSketchCaptureControls{max-height:min(30vh,230px)!important;overflow:auto!important;align-items:center!important}\n#cad3dLab .cad3dSketchCaptureActions{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 9px}\n#cad3dLab .cad3dSketchCaptureActions button{flex:1 1 145px}\n#cad3dLab .cad3dSketchCaptureActions .cad3dSketchDownload{background:#295c73!important;border:1px solid #8bc9e1!important;color:#fff!important;font-weight:700}\n#cad3dLab .cad3dSketchCompare{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:3px 0 8px}\n#cad3dLab .cad3dSketchCompare>div{min-width:0}\n#cad3dLab .cad3dSketchCompare strong{display:block;font:600 11px Inter,Arial,sans-serif;margin-bottom:5px;color:#d8e8f2}\n#cad3dLab .cad3dSketchCompare canvas{display:block;width:100%;height:auto;max-height:47vh;object-fit:contain;background:#faf7f0;border:1px solid #64788a}\n@media(max-width:650px){#cad3dLab .cad3dSketchCompare{grid-template-columns:1fr}#cad3dLab .cad3dSketchCapturePanel{min-width:260px}}\n";
+css+="\n#cad3dLab .cad3dSketchCaptureActions .cad3dSketchOutputLabel{display:flex;align-items:center;gap:7px;font:600 11px Inter,Arial,sans-serif;color:#e8f3fa}\n#cad3dLab .cad3dSketchOutputFormat{height:32px;border:1px solid #7c9caf;border-radius:6px;background:#23394c;color:#fff;padding:5px 8px}\n";
 /* Captures the actual viewport pixels and applies local, deterministic image
    postprocessing. This is not a generative AI render or a change to 3D geometry. */
 var cad3dSketchSource=null;
 var cad3dSketchCleanCapture=false;
 function cad3dSketchCapture(){
- var source=renderer?.domElement||fallbackCanvas;
- if(!source)return text('No hay una vista 3D disponible para capturar');
- var w=Math.max(1,source.width),h=Math.max(1,source.height);
- var factor=Math.min(1,1700/w,1100/h);
- var canvas=document.createElement('canvas');
- canvas.width=Math.max(1,Math.round(w*factor));
- canvas.height=Math.max(1,Math.round(h*factor));
+ var panel=root?.querySelector('.cad3dSketchCapturePanel'),source=renderer?.domElement||fallbackCanvas;
+ if(!panel||!source)return text('No hay una vista 3D disponible para capturar');
+ var scale=Number(panel.querySelector('[data-sketch-setting="resolution"]')?.value)||1;
+ var sw=Math.max(1,source.width),sh=Math.max(1,source.height);
+ var max=renderer?.capabilities?.maxTextureSize||4096;
+ var factor=Math.min(scale,2560/sw,1600/sh,max/sw,max/sh,Math.sqrt(4000000/(sw*sh)));
+ var w=Math.max(1,Math.round(sw*factor)),h=Math.max(1,Math.round(sh*factor));
+ var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
  var ctx=canvas.getContext('2d',{willReadFrequently:true});
- if(!ctx)return;
- // Camera, construction and editing data are not modified. Only the render-only
- // helpers become temporarily invisible while the source pixels are sampled.
- var hidden=[],oldClean=cad3dSketchCleanCapture;
- function hide(node){
-  if(!node||!node.visible)return;
-  hidden.push([node,node.visible]);node.visible=false;
- }
+ if(!ctx)return text('Canvas para render no disponible');
+ var oldStyle=renderStyle,changedStyle=false,hidden=[],oldClean=cad3dSketchCleanCapture;
+ var oldPixelRatio=renderer?.getPixelRatio(),oldAspect=camera?.aspect;
+ var oldLeft=camera?.left,oldRight=camera?.right,oldTop=camera?.top,oldBottom=camera?.bottom;
+ var resized=false,view=root.querySelector('.view');
+ function hide(node){if(node?.visible){hidden.push([node,node.visible]);node.visible=false;}}
  cad3dSketchCleanCapture=true;
  try{
   if(renderer&&scene&&camera){
+   if(panel.querySelector('[data-sketch-setting="baseStyle"]')?.value==='realistic'&&
+    renderStyle!=='realistic'){renderStyle='realistic';changedStyle=true;applyRenderStyle();}
    hide(gridHelper);hide(axesHelper);hide(underlayGroup);
    if(modelRoot)modelRoot.traverse(function(o){
     if(o.userData?.cadSketch||o.userData?.cadSelectionHelper||o.userData?.cadDraftGuide)hide(o);
    });
-   renderer.render(scene,camera);
-  }else fallbackDraw();
-  ctx.drawImage(source,0,0,canvas.width,canvas.height);
- }catch(err){
-  text('No se pudo capturar el croquis: '+String(err?.message||err));
-  return;
- }finally{
+   if(w!==source.width||h!==source.height){
+    renderer.setPixelRatio(1);renderer.setSize(w,h,false);resized=true;
+    if(camera.isPerspectiveCamera)camera.aspect=w/h;
+    else if(camera.isOrthographicCamera){
+     var cx=(oldLeft+oldRight)/2,halfHeight=(oldTop-oldBottom)/2;
+     camera.left=cx-halfHeight*w/h;camera.right=cx+halfHeight*w/h;
+    }
+    camera.updateProjectionMatrix();
+   }
+   renderer.render(scene,camera);ctx.drawImage(renderer.domElement,0,0,w,h);
+  }else{fallbackDraw();ctx.drawImage(source,0,0,w,h);}
+ }catch(err){text('Error de captura: '+String(err?.message||err));return;}
+ finally{
+  if(renderer&&resized){
+   renderer.setPixelRatio(oldPixelRatio);renderer.setSize(view.clientWidth,view.clientHeight,false);
+   if(camera.isPerspectiveCamera)camera.aspect=oldAspect;
+   else if(camera.isOrthographicCamera){
+    camera.left=oldLeft;camera.right=oldRight;camera.top=oldTop;camera.bottom=oldBottom;
+   }
+   camera.updateProjectionMatrix();
+  }
   for(var n=hidden.length-1;n>=0;n--)hidden[n][0].visible=hidden[n][1];
+  if(changedStyle){renderStyle=oldStyle;applyRenderStyle();}
   cad3dSketchCleanCapture=oldClean;
   if(renderer&&scene&&camera)renderer.render(scene,camera);
-  else fallbackDraw();
+  else if(fallbackCanvas)fallbackDraw();
  }
  cad3dSketchSource=canvas;
+ var original=panel.querySelector('.cad3dSketchCaptureOriginal');
+ if(original){
+  var f=Math.min(1,680/w,440/h);
+  original.width=Math.max(1,Math.round(w*f));
+  original.height=Math.max(1,Math.round(h*f));
+  original.getContext('2d').drawImage(canvas,0,0,original.width,original.height);
+ }
  cad3dSketchProcess();
 }
-
 function cad3dSketchGeometryEdges(ctx,w,h,opts){
  if(!T||!renderer||!camera||!modelRoot)return;
  camera.updateMatrixWorld(true);modelRoot.updateMatrixWorld(true);
  var meshes=[];modelRoot.traverse(function(o){
   if(o.isMesh&&o.visible&&o.geometry&&!o.userData?.cadSketch&&!o.userData?.cadGlass)meshes.push(o);
  });
- var ray=new T.Raycaster(),point=new T.Vector2(),count=0,cap=1600;
+ var ray=new T.Raycaster(),point=new T.Vector2(),count=0,cap=1600,rayBudget=2400;
  ctx.save();ctx.strokeStyle=opts.color;ctx.fillStyle=opts.color;
  ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength));
- for(var m=0;m<meshes.length&&count<cap;m++){
+ for(var m=0;m<meshes.length&&count<cap&&rayBudget>0;m++){
   var mesh=meshes[m],edges;
   try{edges=new T.EdgesGeometry(mesh.geometry,28);}catch(_e){continue;}
   var attr=edges.getAttribute('position');
   if(!attr){edges.dispose();continue;}
-  for(var i=0;i+1<attr.count&&count<cap;i+=2){
+  for(var i=0;i+1<attr.count&&count<cap&&rayBudget>0;i+=2){
    var a=new T.Vector3().fromBufferAttribute(attr,i).applyMatrix4(mesh.matrixWorld);
    var b=new T.Vector3().fromBufferAttribute(attr,i+1).applyMatrix4(mesh.matrixWorld);
    var p=a.clone().project(camera),q=b.clone().project(camera);
-   if(![p.x,p.y,p.z,q.x,q.y,q.z].every(Number.isFinite)||p.z>1&&q.z>1)continue;
+   if(![p.x,p.y,p.z,q.x,q.y,q.z].every(Number.isFinite)||(p.z>1&&q.z>1)||p.z< -1||q.z< -1)continue;
    var x1=(p.x+1)*w/2,y1=(1-p.y)*h/2,x2=(q.x+1)*w/2,y2=(1-q.y)*h/2;
    var dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
    if(len<2||len>4*Math.max(w,h)||Math.max(x1,x2)<0||Math.min(x1,x2)>w||Math.max(y1,y2)<0||Math.min(y1,y2)>h)continue;
@@ -3471,38 +3495,51 @@ function cad3dSketchGeometryEdges(ctx,w,h,opts){
     }
     if(support<Math.max(2,Math.floor(samples*.28)))continue;
    }
-   // Geometry-aware hidden edge rejection at the line midpoint.
-   var mid=a.clone().add(b).multiplyScalar(.5),screen=mid.clone().project(camera);
-   point.set(screen.x,screen.y);ray.setFromCamera(point,camera);
-   var hits=ray.intersectObjects(meshes,false);
-   if(hits.length&&hits[0].object!==mesh&&hits[0].distance<ray.ray.origin.distanceTo(mid)-.04)continue;
-   var ux=dx/len,uy=dy/len,ex=opts.extension,steps=Math.max(3,Math.min(24,Math.ceil(len/25)));
-   // Deterministic procedural strokes, akin to Rough.js. Draw a stable
-   // jittered Bezier-like curve instead of replacing actual CAD geometry.
-   var passes=opts.multiStroke?2:1;
-   for(var pass=0;pass<passes;pass++){
-    var seed=m*2.31+i*.173+pass*11.7;
-    var direction=(Math.sin(seed*3.73)>=0?1:-1);
-    var bend=Math.min(5,opts.bowing*Math.min(1,len/90))*direction;
-    var lineAlpha=pass===0?1:.43;
-    ctx.save();ctx.globalAlpha=Math.min(.92,Math.max(.2,opts.strength))*lineAlpha;
-    ctx.lineWidth=opts.profile*(pass===0?1:.68);
-    ctx.beginPath();
-    var off=pass===0?0:Math.min(1,opts.jitter*.48+.3);
-    ctx.moveTo(x1-ux*ex-uy*off,y1-uy*ex+ux*off);
-    for(var t=1;t<steps;t++){
-     var frac=t/steps;
-     var taper=Math.sin(Math.PI*frac);
-     var irregular=(Math.sin(seed+frac*16.1)*.63+Math.sin(seed*2.1+frac*29.5)*.37)*opts.jitter*taper;
-     var displacement=bend*taper+irregular+off;
-     ctx.lineTo(x1+dx*frac-uy*displacement,y1+dy*frac+ux*displacement);
+   // Split edges into fragments and ray-test each one to prevent drawing through solids.
+   var slices=Math.max(2,Math.min(8,Math.ceil(len/65)));
+   if(slices>rayBudget)break;
+   var visible=new Uint8Array(slices),any=false;
+   for(var sn=0;sn<slices;sn++){
+    var fr=(sn+.5)/slices,world=a.clone().lerp(b,fr),projected=world.clone().project(camera);
+    if(projected.z< -1||projected.z>1)continue;
+    if(opts.edgeMask){
+     var sx=Math.round(x1+dx*fr),sy=Math.round(y1+dy*fr),evidence=false;
+     for(var oy=-3;oy<=3&&!evidence;oy++)for(var ox=-3;ox<=3;ox++){
+      var nx=sx+ox,ny=sy+oy;
+      if(nx>=0&&nx<w&&ny>=0&&ny<h&&opts.edgeMask[ny*w+nx]){evidence=true;break;}
+     }
+     if(!evidence)continue;
     }
-    ctx.lineTo(x2+ux*ex-uy*off,y2+uy*ex+ux*off);ctx.stroke();
-    ctx.restore();
+    point.set(projected.x,projected.y);ray.setFromCamera(point,camera);
+    var hits=ray.intersectObjects(meshes,false);rayBudget--;
+    var expected=ray.ray.origin.distanceTo(world);
+    if(hits.length&&hits[0].distance<expected-Math.max(.018,expected*.001))continue;
+    visible[sn]=1;any=true;
    }
-   if(opts.endpoints){
-    ctx.beginPath();ctx.arc(x1,y1,opts.endpoints*.24,0,Math.PI*2);
-    ctx.arc(x2,y2,opts.endpoints*.24,0,Math.PI*2);ctx.fill();
+   if(!any)continue;
+   var ux=dx/len,uy=dy/len;
+   for(var first=0;first<slices;){
+    if(!visible[first]){first++;continue;}
+    var last=first+1;while(last<slices&&visible[last])last++;
+    var from=first/slices,to=last/slices;
+    for(var pass=0;pass<(opts.multiStroke?2:1);pass++){
+     var seed=m*2.31+i*.173+pass*11.7,offset=pass?Math.min(.85,opts.jitter*.4+.2):0;
+     var steps=Math.max(3,Math.min(25,Math.ceil((to-from)*len/20)));
+     ctx.save();ctx.globalAlpha=Math.min(.9,opts.strength)*(pass?.35:1);
+     ctx.lineWidth=Math.max(.3,opts.profile)*(pass?.7:1);
+     ctx.beginPath();var ex=Number(opts.extension||0);
+     ctx.moveTo(x1+dx*from-ux*(first===0?ex:0)-uy*offset,
+      y1+dy*from-uy*(first===0?ex:0)+ux*offset);
+     for(var n=1;n<steps;n++){
+      var t=n/steps,z=from+(to-from)*t,taper=Math.sin(Math.PI*t);
+      var shift=(Math.sin(seed+t*16)*opts.jitter+Math.sin(seed*3)*opts.bowing)*taper+offset;
+      ctx.lineTo(x1+dx*z-uy*shift,y1+dy*z+ux*shift);
+     }
+     ctx.lineTo(x1+dx*to+ux*(last===slices?ex:0)-uy*offset,
+      y1+dy*to+uy*(last===slices?ex:0)+ux*offset);
+     ctx.stroke();ctx.restore();
+    }
+    first=last;
    }
    count++;
   }
@@ -3562,7 +3599,7 @@ function cad3dSketchWetPigment(layer,source,edge,sky,ground,w,h,amount){
 }
 function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style){
  if(amount<=0)return;
- var gap=style==='pencil'?5:style==='marker'?10:style==='watercolor'?11:8;
+ var gap=style==='pencil'?5:style==='charcoal'?6:style==='engraving'?8:style==='pastel'?10:style==='marker'?10:style==='watercolor'?11:8;
  var strokes=0;
  for(var y=gap;y<h-gap;y+=gap)for(var x=gap;x<w-gap;x+=gap){
   var i=y*w+x,k=i*4;
@@ -3575,7 +3612,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
    (style==='pencil'?-Math.PI/5:style==='marker'?0:Math.PI/7);
   var len=(style==='pencil'?6:style==='marker'?8:5)+Math.floor(noise*4);
   var ca=Math.cos(theta),sa=Math.sin(theta);
-  var tint=(style==='pencil'?-1:style==='marker'?.65:.45);
+  var tint=style==='charcoal'?-1.6:style==='engraving'?-1.1:style==='pencil'?-1:style==='marker'?.65:.45;
   for(var t=-len;t<=len;t++){
    var xx=Math.round(x+t*ca),yy=Math.round(y+t*sa+Math.sin(t*.37+noise*8)*.36);
    if(xx<1||yy<1||xx>=w-1||yy>=h-1)continue;
@@ -3583,7 +3620,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
    if(sky[j]!==sky[i]||ground[j]!==ground[i]||edge[j]>75||
     Math.abs(grey[j]-grey[i])>23)continue;
    var taper=1-Math.abs(t)/(len+1),fiber=cad3dSketchNoise(xx*2,yy*3);
-   var opacity=amount*taper*(style==='pencil'?.36:style==='marker'?.33:.28);
+   var opacity=amount*taper*(style==='charcoal'?.60:style==='engraving'?.16:style==='pencil'?.36:style==='pastel'?.38:style==='marker'?.33:.28);
    if(fiber<.24)opacity*=.22; // dry-brush gaps, paper texture underneath
    for(var c=0;c<3;c++){
     var stroke=source[k+c]*.66+layer[z+c]*.34+tint*(fiber-.5)*20;
@@ -3597,7 +3634,7 @@ function cad3dSketchBrushwork(layer,source,grey,edge,sky,ground,w,h,amount,style
 function cad3dSketchFinalGrade(layer,grey,sky,ground,w,h,amount,style){
  // No global blur: keep silhouettes and openings exactly where source rendered them.
  if(amount<=0)return;
- var contrast=style==='pencil'?.080:style==='marker'?.040:style==='watercolor'?.025:.048;
+ var contrast=style==='charcoal'?.14:style==='engraving'?.11:style==='pencil'?.080:style==='pastel'?.03:style==='marker'?.040:style==='watercolor'?.025:.048;
  for(var i=0;i<w*h;i++){
   var k=i*4;
   var shade=sky[i]?0:Math.max(0,(155-grey[i])/155);
@@ -3622,9 +3659,12 @@ function cad3dSketchMultiPass(image,w,h,options){
  var line=new Uint8Array(n),output=new Uint8ClampedArray(n*4);
  var style=opt.style||'ink',strength=Math.max(0,Math.min(1,opt.strength??.6));
  var styleConfig={
-  ink:{wash:.60,levels:19,edge:.80,threshold:47,grain:.7,hatch:.07},
+  ink:{wash:.66,levels:19,edge:.86,threshold:47,grain:.7,hatch:.14},
   watercolor:{wash:.84,levels:13,edge:.43,threshold:56,grain:1.45,hatch:0},
-  pencil:{wash:.31,levels:23,edge:.58,threshold:39,grain:1.15,hatch:.09},
+  pencil:{wash:.39,levels:23,edge:.65,threshold:39,grain:1.15,hatch:.24},
+  charcoal:{wash:.43,levels:25,edge:.91,threshold:38,grain:2.15,hatch:.43},
+  engraving:{wash:.58,levels:18,edge:.96,threshold:34,grain:.75,hatch:.51},
+  pastel:{wash:.80,levels:12,edge:.36,threshold:56,grain:1.85,hatch:.025},
   marker:{wash:.89,levels:8,edge:.62,threshold:53,grain:.48,hatch:.03},
   wash:{wash:.75,levels:18,edge:.39,threshold:54,grain:1.12,hatch:.025}
  }[style]||{wash:.7,levels:16,edge:.6,threshold:48,grain:.8,hatch:.03};
@@ -3727,10 +3767,15 @@ function cad3dSketchMultiPass(image,w,h,options){
   }else if(opt.recolor&&!isSky&&grey[i]>68&&grey[i]<240&&Math.max(r,g,b)-Math.min(r,g,b)<30){
    r=mix(r,wallRGB[0],.38);g=mix(g,wallRGB[1],.38);b=mix(b,wallRGB[2],.38);
   }
-  if(style==='pencil'){
-   var lum=grey[i];r=mix(r,lum,.78);g=mix(g,lum,.80);b=mix(b,lum,.84);
-  }else if(style==='wash'){var neutral=grey[i];r=mix(r,neutral,.20);g=mix(g,neutral,.24);b=mix(b,neutral,.25);}
-  var step=255/styleConfig.levels,quantBlend=style==='marker'?.32:.12;
+  if(style==='pencil'||style==='charcoal'||style==='engraving'){
+   var lum=grey[i],blend=style==='charcoal'?.96:style==='engraving'?.94:.78;
+   r=mix(r,lum,blend);g=mix(g,lum,blend);b=mix(b,lum,blend);
+  }else if(style==='wash'){
+   var neutral=grey[i];r=mix(r,neutral,.20);g=mix(g,neutral,.24);b=mix(b,neutral,.25);
+  }else if(style==='pastel'){
+   var mid=(r+g+b)/3;r=mix(r,mid,.15);g=mix(g,mid,.15);b=mix(b,mid,.15);
+  }
+  var step=255/styleConfig.levels,quantBlend=style==='marker'?.32:style==='engraving'?.22:style==='pastel'?.08:.12;
   var rgb=[r,g,b];
   var shade=(!isSky&&!isGround)?Math.pow(Math.max(0,(175-grey[i])/175),1.55)*userShadow*.14:0;
   var hsh=((x*374761393+y*668265263)|0)>>>0;
@@ -3750,6 +3795,7 @@ function cad3dSketchMultiPass(image,w,h,options){
   var i=y*w+x,value=line[i],k=i*4;
   if(!value)continue;
   var intensity=Math.min(.82,Math.max(0,(value-threshold)/125)*strength*styleConfig.edge);
+   intensity*=.88+.22*cad3dSketchNoise((x/8)|0,(y/8)|0);
   if(intensity<=0)continue;
   for(var dy=-(thickness-1);dy<=thickness-1;dy++)for(var dx=-(thickness-1);dx<=thickness-1;dx++){
    var j=(i+dy*w+dx)*4,falloff=(dx===0&&dy===0)?1:.30;
@@ -3757,22 +3803,27 @@ function cad3dSketchMultiPass(image,w,h,options){
    for(var c=0;c<3;c++)output[j+c]=mix(output[j+c],edgeRGB[c],alpha);
   }
  }
- // PASS 6: faint directional pencil hatch only in existing deep tonal shadows.
+ // PASS 6: crosshatching limited to tonal shadows from the actual model.
  var hatch=styleConfig.hatch*userShadow;
  if(hatch){
+  var spacing=style==='engraving'?8:style==='charcoal'?9:11;
   for(var y=3;y<h-3;y++)for(var x=3;x<w-3;x++){
    var i=y*w+x,k=i*4;
-   if(sky[i]||ground[i]||grey[i]>112)continue;
-   var stripe=(x+Math.round(y*.73))%11;
-   if(stripe>1)continue;
-   var alpha=hatch*(112-grey[i])/112;
+   if(sky[i]||ground[i]||line[i]||grey[i]>148)continue;
+   var shade=Math.max(0,(148-grey[i])/148);
+   var first=(x+Math.round(y*.73))%spacing===0;
+   var crossing=(style==='engraving'||style==='charcoal')&&
+    grey[i]<98&&((x-Math.round(y*.64)+spacing*1024)%spacing===0);
+   if(!first&&!crossing)continue;
+   var dry=.53+.47*cad3dSketchNoise((x/3)|0,(y/3)|0);
+   var alpha=hatch*shade*dry*(crossing?.72:1);
    for(var c=0;c<3;c++)output[k+c]=mix(output[k+c],edgeRGB[c],alpha);
   }
  }
  // PASS 7-9: local brush strokes, pigment diffusion and final color grade.
  // Style parameters are layered, not replacements for source illumination.
- var brushScale=style==='pencil'?.88:style==='marker'?.68:style==='watercolor'?.26:style==='wash'?.30:.42;
- var pigmentScale=style==='watercolor'?.87:style==='wash'?.74:style==='marker'?.28:style==='pencil'?.08:.33;
+ var brushScale=style==='pencil'?.88:style==='charcoal'?.95:style==='engraving'?.06:style==='pastel'?.73:style==='marker'?.68:style==='watercolor'?.26:style==='wash'?.30:.42;
+ var pigmentScale=style==='watercolor'?.87:style==='wash'?.74:style==='pastel'?.46:style==='marker'?.28:(style==='pencil'||style==='engraving'||style==='charcoal')?.05:.33;
  var brushAmount=Math.max(0,Math.min(1,Number(opt.brush??58)/100))*brushScale;
  var pigmentAmount=Math.max(0,Math.min(1,Number(opt.pigment??60)/100))*pigmentScale;
  cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount);
@@ -3805,7 +3856,7 @@ function cad3dSketchRenderPasses(panel,ctx,src,w,h){
   color:value('edgeColor'),profile:Number(value('profile')||1),
   extension:Number(value('extension')||0),endpoints:Number(value('endpoints')||0),
   jitter:Number(value('jitter')||0),bowing:Number(value('bowing')||0),
-  multiStroke:checked('multiStroke'),strength:.25,edgeMask:result.edgeMask
+  multiStroke:checked('multiStroke'),strength:(panel.querySelector('.cad3dSketchCaptureStyle')?.value==='watercolor'?.19:.43),edgeMask:result.edgeMask
  });
 }
 
@@ -3976,6 +4027,7 @@ function cad3dSketchSetStyle(panel,o){
  });
  cad3dSketchProcess();
 }
+function cad3dSketchRenderMarkup(){return "<section class=\"cad3dSketchCapturePanel\" hidden role=\"dialog\" aria-label=\"Render arquitectónico Croquis\">\n <div class=\"cad3dSketchCaptureHead\"><strong>RENDER CROQUIS · ESTUDIO NPR</strong><button type=\"button\" class=\"cad3dSketchClose\" aria-label=\"Cerrar render\">×</button></div>\n <div class=\"cad3dSketchCaptureControls\">\n  <label>Estilo artístico<select data-sketch-preset aria-label=\"Estilo de render de croquis\">\n   <option value=\"technical\">Técnico limpio</option><option value=\"ink\">Tinta arquitectónica</option>\n   <option value=\"pencil\">Lápiz y grafito</option><option value=\"charcoal\">Carboncillo</option>\n   <option value=\"engraving\">Grabado a plumilla</option><option value=\"watercolor\" selected>Acuarela arquitectónica</option>\n   <option value=\"pastel\">Pastel sobre papel</option><option value=\"marker\">Marcadores</option>\n   <option value=\"wash\">Lavado ilustrado</option><option value=\"custom\">Personalizado</option>\n  </select></label>\n  <label>Motor de acabado<select class=\"cad3dSketchCaptureStyle\" aria-label=\"Acabado de croquis\">\n   <option value=\"ink\">Tinta</option><option value=\"pencil\">Grafito</option>\n   <option value=\"charcoal\">Carboncillo</option><option value=\"engraving\">Grabado</option>\n   <option value=\"watercolor\" selected>Acuarela</option><option value=\"pastel\">Pastel</option>\n   <option value=\"marker\">Marcador</option><option value=\"wash\">Lavado</option>\n  </select></label>\n  <label>Base cromática<select data-sketch-setting=\"baseStyle\">\n   <option value=\"realistic\" selected>Materiales originales del 3D</option>\n   <option value=\"current\">Colores de la vista actual</option>\n  </select></label>\n  <label>Resolución WebGL<select data-sketch-setting=\"resolution\">\n   <option value=\"1\">Original</option><option value=\"1.5\" selected>Alta · 1,5×</option>\n   <option value=\"2\">Máxima · 2×</option></select></label>\n  <label>Fuerza del trazo<input class=\"cad3dSketchCaptureStrength\" type=\"range\" min=\"0\" max=\"100\" value=\"68\"></label>\n  <label>Papel<select data-sketch-setting=\"paper\">\n   <option value=\"white\">Blanco</option><option value=\"cream\">Crema</option>\n   <option value=\"watercolor\" selected>Algodón acuarela</option></select></label>\n  <label>Contorno<input type=\"range\" data-sketch-setting=\"profile\" min=\".4\" max=\"3.2\" step=\".1\" value=\"1.2\"></label>\n  <label>Trazo irregular<input type=\"range\" data-sketch-setting=\"jitter\" min=\"0\" max=\"3\" step=\".1\" value=\".55\"></label>\n  <label>Curvatura<input type=\"range\" data-sketch-setting=\"bowing\" min=\"0\" max=\"2\" step=\".1\" value=\".2\"></label>\n  <label>Detalle<input type=\"range\" data-sketch-setting=\"detail\" min=\"0\" max=\"100\" value=\"65\"></label>\n  <label>Grosor de tinta<input type=\"range\" data-sketch-setting=\"weight\" min=\"1\" max=\"6\" value=\"2\"></label>\n  <label>Sombras<input type=\"range\" data-sketch-setting=\"shadow\" min=\"0\" max=\"100\" value=\"55\"></label>\n  <label>Grano del papel<input type=\"range\" data-sketch-setting=\"grain\" min=\"0\" max=\"100\" value=\"58\"></label>\n  <label>Pinceladas<input type=\"range\" data-sketch-setting=\"brush\" min=\"0\" max=\"100\" value=\"50\"></label>\n  <label>Pigmento / agua<input type=\"range\" data-sketch-setting=\"pigment\" min=\"0\" max=\"100\" value=\"78\"></label>\n  <label>Acabado<input type=\"range\" data-sketch-setting=\"finish\" min=\"0\" max=\"100\" value=\"65\"></label>\n  <label>Color del trazo<input type=\"color\" data-sketch-setting=\"edgeColor\" value=\"#303843\"></label>\n  <label>Cielo<input type=\"color\" data-sketch-setting=\"skyColor\" value=\"#b9dbf2\"></label>\n  <label>Suelo<input type=\"color\" data-sketch-setting=\"groundColor\" value=\"#ddd6c8\"></label>\n  <label>Muros<input type=\"color\" data-sketch-setting=\"wallColor\" value=\"#e8d7b9\"></label>\n  <label>Muros coloreados<select data-sketch-setting=\"wallMode\"><option value=\"original\" selected>Material original</option><option value=\"tint\">Veladura suave</option></select></label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"passes\" checked> Pasadas artísticas</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"geometry\" checked> Aristas visibles del 3D</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"multiStroke\"> Doble trazo</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"sky\" checked> Cielo pintado</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"ground\" checked> Suelo pintado</label>\n  <input type=\"hidden\" data-sketch-setting=\"extension\" value=\"0\"><input type=\"hidden\" data-sketch-setting=\"endpoints\" value=\"0\">\n </div>\n <div class=\"cad3dSketchCaptureActions\">\n  <label class=\"cad3dSketchOutputLabel\">Salida\n    <select class=\"cad3dSketchOutputFormat\" aria-label=\"Formato para exportar el croquis\">\n      <option value=\"png\" selected>PNG</option><option value=\"jpg\">JPG</option><option value=\"pdf\">PDF</option>\n    </select>\n  </label>\n  <button type=\"button\" class=\"btn cad3dSketchRecapture\">Actualizar desde cámara</button>\n  <button type=\"button\" class=\"btn\" data-sketch-save-preset>Guardar ajustes</button>\n  <button type=\"button\" class=\"btn\" data-sketch-load-preset>Cargar ajustes</button>\n  <button type=\"button\" class=\"btn cad3dSketchDownload\">Exportar croquis PNG</button>\n </div>\n <div class=\"cad3dSketchCompare\">\n  <div><strong>Vista 3D · origen</strong><canvas class=\"cad3dSketchCaptureOriginal\" aria-label=\"Captura original 3D\"></canvas></div>\n  <div><strong>Croquis · pasadas NPR</strong><canvas class=\"cad3dSketchCapturePreview\" aria-label=\"Vista previa del croquis\"></canvas></div>\n </div>\n <small>Render local: geometría, iluminación, trazos, papel y pigmento. No modifica objetos, capas ni herramientas CAD.</small>\n</section>";}
 function cad3dInitSketchCapture(){
  var panel=root.querySelector('.cad3dSketchCapturePanel');
  if(!panel)return;
@@ -3994,16 +4046,22 @@ function cad3dInitSketchCapture(){
   var styles={
    technical:{style:'ink',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
     paper:'white',passes:true,geometry:false,shadow:'20',grain:'12',detail:'82',brush:'6',pigment:'0',finish:'35'},
-   ink:{style:'ink',profile:'2',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'48',grain:'28',detail:'70',brush:'40',pigment:'23',finish:'75'},
-   watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
-   pencil:{style:'pencil',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'cream',passes:true,geometry:false,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
-   marker:{style:'marker',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'white',passes:true,geometry:false,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
-   wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0',bowing:'0',multiStroke:false,
-    paper:'watercolor',passes:true,geometry:false,shadow:'69',grain:'64',detail:'41',brush:'43',pigment:'79',finish:'73'}
+   ink:{style:'ink',profile:'1.4',extension:'0',endpoints:'0',jitter:'0.55',bowing:'0.25',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'48',grain:'28',detail:'70',brush:'40',pigment:'23',finish:'75'},
+   watercolor:{style:'watercolor',profile:'1',extension:'0',endpoints:'0',jitter:'0.55',bowing:'0.22',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:true,shadow:'54',grain:'76',detail:'42',brush:'47',pigment:'85',finish:'65'},
+   pencil:{style:'pencil',profile:'1.1',extension:'0',endpoints:'0',jitter:'0.85',bowing:'0.45',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'60',grain:'67',detail:'82',brush:'91',pigment:'8',finish:'70'},
+   charcoal:{style:'charcoal',profile:'1.6',extension:'0',endpoints:'0',jitter:'1.15',bowing:'0.65',multiStroke:true,
+    paper:'cream',passes:true,geometry:true,shadow:'82',grain:'88',detail:'56',brush:'93',pigment:'8',finish:'76'},
+   engraving:{style:'engraving',profile:'0.8',extension:'0',endpoints:'0',jitter:'0.15',bowing:'0.10',multiStroke:false,
+    paper:'cream',passes:true,geometry:true,shadow:'86',grain:'30',detail:'94',brush:'5',pigment:'0',finish:'84'},
+   pastel:{style:'pastel',profile:'1',extension:'0',endpoints:'0',jitter:'0.48',bowing:'0.32',multiStroke:false,
+    paper:'watercolor',passes:true,geometry:true,shadow:'34',grain:'83',detail:'42',brush:'66',pigment:'46',finish:'66'},
+   marker:{style:'marker',profile:'1.2',extension:'0',endpoints:'0',jitter:'0.35',bowing:'0.18',multiStroke:false,
+    paper:'white',passes:true,geometry:true,shadow:'35',grain:'18',detail:'53',brush:'78',pigment:'20',finish:'67'},
+   wash:{style:'wash',profile:'1',extension:'0',endpoints:'0',jitter:'0.5',bowing:'0.3',multiStroke:true,
+    paper:'watercolor',passes:true,geometry:true,shadow:'69',grain:'64',detail:'41',brush:'43',pigment:'79',finish:'73'}
   };
   if(styles[this.value])cad3dSketchSetStyle(panel,styles[this.value]);
  });
@@ -4016,20 +4074,29 @@ function cad3dInitSketchCapture(){
    if(!saved)return text('No hay estilo guardado');preset.value='custom';cad3dSketchSetStyle(panel,saved);
   }catch(err){text('Error cargando estilo: '+err.message);}
  });
- panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){el.addEventListener('input',cad3dSketchRequestRedraw);el.addEventListener('change',cad3dSketchRequestRedraw);});
+ panel.querySelectorAll('[data-sketch-setting]').forEach(function(el){
+  if(el.dataset.sketchSetting==='baseStyle'||el.dataset.sketchSetting==='resolution'){
+   el.addEventListener('change',cad3dSketchCapture);return;
+  }
+  el.addEventListener('input',cad3dSketchRequestRedraw);
+  el.addEventListener('change',cad3dSketchRequestRedraw);
+ });
  panel.querySelector('.cad3dSketchDownload').addEventListener('click',function(){
-  if(!cad3dSketchSource)return;
-  var canvas=document.createElement('canvas');
-  // Full-resolution PNG uses the same exact passes and captured source pixels,
-  // while the on-screen preview stays responsive.
-  cad3dSketchProcess(true,canvas);
-  canvas.toBlob(function(blob){
-   if(!blob)return text('No se pudo generar la imagen');
+  if(!cad3dSketchSource)return text('Primero renderizá un croquis');
+  var out=document.createElement('canvas'),fmt=panel.querySelector('.cad3dSketchOutputFormat')?.value||'png';
+  cad3dSketchProcess(true,out);
+  var filename='cad2d3d-croquis-'+(activeView||'3d')+'.'+fmt;
+  function saveBlob(blob){
+   if(!blob)return text('No se pudo generar el archivo de croquis');
    var url=URL.createObjectURL(blob),link=document.createElement('a');
-   link.href=url;link.download='blackline-croquis-'+(activeView||'3d')+'.png';
+   link.href=url;link.download=filename;
    document.body.appendChild(link);link.click();link.remove();
-   setTimeout(function(){URL.revokeObjectURL(url)},1000);
-  },'image/png');
+   setTimeout(function(){URL.revokeObjectURL(url)},1500);
+  }
+  try{
+   if(fmt==='pdf')saveBlob(cad3dPDFfromJPEG(out.toDataURL('image/jpeg',.94),out.width,out.height,150));
+   else out.toBlob(saveBlob,fmt==='jpg'?'image/jpeg':'image/png',.95);
+  }catch(err){text('Error exportando croquis: '+String(err?.message||err));}
  });
  handle.addEventListener('pointerdown',function(e){
   if(e.button!==0||e.target.closest('button'))return;
@@ -4059,7 +4126,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button><button type="button" class="btn cad3dRenderSketchLaunch" title="Dibujar croquis arquitectónicos a tinta, acuarela y grafito">RENDER CROQUIS</button></div>'+cad3dSketchRenderMarkup()+
 
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
@@ -4376,7 +4443,7 @@ function build(){
  cad3dLightSetup();
  cad3dMakeSunPanelMovable();
  cad3dMakeSavePanelMovable();
- // Render Croquis dialog retired; normal CAD3D style gallery remains available.
+ cad3dInitSketchCapture(); // Render Croquis reactivado sin reemplazar la paleta visual.
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));

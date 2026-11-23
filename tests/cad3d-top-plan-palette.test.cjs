@@ -301,31 +301,35 @@ test('Sketch capture is clean and restores 3D helper visibility safely',()=>{
  assert(src.includes('if(!cad3dSketchCleanCapture&&cad3dShowsGrid())'));
  assert(src.includes('if(!wire&&!cad3dSketchCleanCapture)'));
 });
-test('Painterly palette exposes independent brush, pigment and tone controls without default wire seams',()=>{
+test('Painterly palette exposes independent brush, pigment and tone controls',()=>{
+ const markupCode=between('function cad3dSketchRenderMarkup(){','function cad3dInitSketchCapture(){');
+ const markup=vm.runInNewContext(markupCode+'\ncad3dSketchRenderMarkup()', {});
  for(const key of ['passes','shadow','grain','detail','brush','pigment','finish','geometry'])
-  assert(src.includes('data-sketch-setting="'+key+'"'),key);
- assert(src.includes('data-sketch-setting="passes" checked'));
- assert(src.includes('data-sketch-setting="geometry"> Reforzar aristas 3D'));
- assert(src.includes('if(opts.edgeMask){'),'Optional raw-geometry overlays must check actual visible raster edges');
+  assert(markup.includes('data-sketch-setting="'+key+'"'),key);
+ assert(markup.includes('data-sketch-setting="passes" checked'));
+ assert(markup.includes('data-sketch-setting="geometry" checked'));
+ assert(src.includes('if(opts.edgeMask){'),'Geometry must match the visible source raster');
  for(const name of ['function cad3dSketchWetPigment(','function cad3dSketchBrushwork(','function cad3dSketchFinalGrade('])
   assert(src.includes(name),name);
- assert(src.includes("cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount)"));
- assert(src.includes("cad3dSketchBrushwork(output,smooth,grey,line,sky,ground,w,h,brushAmount,style)"));
+ assert(src.includes('cad3dSketchWetPigment(output,smooth,line,sky,ground,w,h,pigmentAmount)'));
+ assert(src.includes('cad3dSketchBrushwork(output,smooth,grey,line,sky,ground,w,h,brushAmount,style)'));
 });
-
-test('Sketch preview downscales but export retains full camera pixels',()=>{
- const source=between('function cad3dSketchProcess(fullResolution,outputCanvas){', 'function cad3dSketchStyleData(');
- for(const token of ["var exportMode=fullResolution===true",
-  "var downscale=exportMode?1:Math.min(1,680/source.width,440/source.height)",
-  "processing.width=Math.max(1,Math.round(source.width*downscale))",
+test('Croquis preview is downscaled but all export formats use full camera resolution',()=>{
+ const source=between('function cad3dSketchProcess(fullResolution,outputCanvas){','function cad3dSketchStyleData(');
+ for(const token of ['var exportMode=fullResolution===true',
+  'var downscale=exportMode?1:Math.min(1,680/source.width,440/source.height)',
+  'processing.width=Math.max(1,Math.round(source.width*downscale))',
   "var out=outputCanvas||panel.querySelector('.cad3dSketchCapturePreview')",
-  "var w=processing.width,h=processing.height",
-  "cad3dSketchRenderPasses(panel,ctx,src,w,h)"])assert(source.includes(token),token);
+  'var w=processing.width,h=processing.height',
+  'cad3dSketchRenderPasses(panel,ctx,src,w,h)'])assert(source.includes(token),token);
  const handler=between('function cad3dInitSketchCapture(){','function build(){');
- assert(handler.includes("var canvas=document.createElement('canvas');"));
- assert(handler.includes("cad3dSketchProcess(true,canvas);"));
- assert(handler.includes("canvas.toBlob(function(blob){"));
- assert(src.includes('Guardar PNG (alta resolución)'));
+ assert(handler.includes("var out=document.createElement('canvas')"));
+ assert(handler.includes('cad3dSketchProcess(true,out)'));
+ assert(handler.includes('cad3dPDFfromJPEG'));
+ assert(handler.includes('out.toBlob(saveBlob'));
+ const markupCode=between('function cad3dSketchRenderMarkup(){','function cad3dInitSketchCapture(){');
+ const markup=vm.runInNewContext(markupCode+'\ncad3dSketchRenderMarkup()', {});
+ for(const format of ['png','jpg','pdf'])assert(markup.includes('value="'+format+'"'),format);
 });
 test('Sketch live sliders coalesce preview jobs instead of triggering full-resolution passes',()=>{
  const code=between('function cad3dSketchRequestRedraw(){', 'function cad3dSketchStyleData(');
