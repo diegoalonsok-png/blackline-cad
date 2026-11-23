@@ -3,7 +3,7 @@
 Fecha: **23/11/2026**. Esta nota preserva la clasificación de la colección entregada por el titular del proyecto; **no contiene ningún DWG ni geometría**.
 
 - SHA-256 del ZIP entregado: `0deea653a915a5cb89e1419b1036a2ee6f1199db01b54109568acef36544b2b1`
-- Contenido: **625 DWG** y **1 ZIP anidado**. Todos los DWG principales tienen firmas binarias antiguas `AC1014` (R14) o `AC1006` (R10).
+- Contenido: **625 DWG** y **1 ZIP anidado**. Las firmas binarias detectadas son `AC1009` (512 DWG), `AC1006` (60), `AC1014` (46) y `AC1012` (7). Los 22 candidatos están en `AC1014` (R14).
 - No se encontró un archivo de licencia que permita **redistribuir los dibujos de este ZIP** en una biblioteca comercial.
 - La biblioteca pública de Blackline **no recibe ningún archivo de este ZIP** hasta verificar derechos de redistribución y la geometría con una conversión de fidelidad comprobada.
 - Ningún bloque de ROCA, FERRUM o Glastender se importa. Ningún dibujo previo se borra o modifica.
@@ -53,7 +53,7 @@ Los hashes siguientes son los primeros 16 dígitos hexadecimales del SHA-256 del
 
 ## Comprobación técnica
 
-El lector DWG disponible (`ezdxf.addons.dwg`) rechaza las versiones `AC1014` y `AC1006` de la colección. Convertir a DXF correctamente requiere un lector/conversor compatible, por ejemplo LibreDWG, que documenta compatibilidad R14 y R10; **la conversión aún no se realizó**.
+El lector DWG disponible (`ezdxf.addons.dwg`) rechaza las versiones `AC1014` y `AC1006` comprobadas en muestras de la colección. Convertir a DXF correctamente requiere un lector/conversor compatible, por ejemplo LibreDWG, que documenta compatibilidad R14 y R10; **la conversión aún no se realizó**.
 
 La ausencia de marca visible en un DWG no acredita que sea de dominio público. En algunos metadatos binarios aparecen rutas antiguas de terceros (p.ej. carpetas personales de bloques), que tampoco constituyen licencia.
 
