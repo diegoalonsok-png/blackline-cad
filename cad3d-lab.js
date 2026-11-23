@@ -9,6 +9,7 @@ var draftModes={ortho:true,osnap:true,grid:true,dyn:false};
 var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
+var saved3DCameras=[],camera3DSequence=1;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
  ['perspective','Perspectiva libre','perspective',-.85,.55],
@@ -771,6 +772,18 @@ var css=`
 #cad3dLab.cad3dCompactMode .cad3dDockRight .ioMenu > div{
  right:calc(100% + 5px)!important;left:auto!important;top:0!important;
 }
+`;
+css+=`
+#cad3dLab .viewCube{background:linear-gradient(145deg,#f9f9f9,#bfc2c6)!important;border-color:#52565a!important;box-shadow:0 3px 10px #0007,inset 0 1px 2px #fff!important}
+#cad3dLab .cubePlane{fill:#e5e5e5!important;stroke:#262626!important}
+#cad3dLab .cubeFaceLabel{fill:#101010!important;stroke:#fff!important;stroke-width:.7px!important}
+#cad3dLab .cubeCornerZone{fill:#f5f5f5!important;stroke:#222!important}
+#cad3dLab .cubeFaceZone:hover .cubePlane{fill:#a7a7a7!important}
+#cad3dLab .styleLaunch{display:flex;align-items:center;gap:7px}
+#cad3dLab .styleColorCube{width:24px;height:24px;display:inline-block;flex:none;transform:rotate(-24deg) skewY(10deg);border:1px solid #222;border-radius:3px;background:conic-gradient(from 45deg,#ed5966 0 25%,#f4c64c 25% 50%,#55b9a3 50% 75%,#6388df 75% 100%);box-shadow:inset 0 0 0 2px #ffffff55,1px 2px 4px #0008}
+#cad3dLab .camera3DBar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:#18232c;border-bottom:1px solid #3a4b55;padding:5px 12px}
+#cad3dLab .camera3DBar select{min-width:140px;max-width:210px;height:27px;background:#edf0f2;color:#1b252b;border-radius:4px}
+#cad3dLab .camera3DBar button{padding:5px 9px}
 `;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
@@ -1657,6 +1670,8 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+
+
  '<div class="cad3dProfileTools" role="toolbar" aria-label="2D drawing in 3D" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 12px;border-bottom:1px solid #354552;background:#14212c">'+
  '<strong style="font-size:11px;color:#aabecb;margin-right:5px">2D DRAW</strong>'+
  tool('line','Line','line')+tool('polyline','Polyline','polyline')+tool('rectangle','Rectangle','rectangle')+
@@ -1782,6 +1797,10 @@ function build(){
   viewPresets.map(function(v){return '<option value="'+v[0]+'">'+v[1]+'</option>';}).join('');
  syncViewControls();renderNavigationCube();
  viewSelect.addEventListener('change',function(){setViewPreset(this.value);});
+ root.querySelector('[data-camera-create]').addEventListener('click',cad3dCreateCamera);
+ root.querySelector('[data-camera-back]').addEventListener('click',function(){cad3dWalkStep(-1);});
+ root.querySelector('[data-camera-forward]').addEventListener('click',function(){cad3dWalkStep(1);});
+ root.querySelector('.camera3DList').addEventListener('change',function(){cad3dActivateCamera(this.value);});
  root.querySelector('.viewShortcuts').addEventListener('click',function(e){
   var key=e.target.closest('[data-view-shortcut]')?.dataset.viewShortcut;
   if(!key)return;
@@ -2526,10 +2545,50 @@ function cad3dSetProjection(mode){
  return true;
 }
 function cad3dOrthographicView(){return cad3dSetProjection('ortho');}
+function cad3dCreateCamera(){
+ var entry={id:'camera-'+camera3DSequence,name:'Cámara '+camera3DSequence,position:{x:target.x,y:target.y,z:target.z},az:orbit.az,el:orbit.el,dist:orbit.dist,mode:viewMode};
+ camera3DSequence++;saved3DCameras.push(entry);
+ var list=root.querySelector('.camera3DList');
+ list.add(new Option(entry.name,entry.id));list.value=entry.id;
+ text(entry.name+' guardada · Utilizá Adelante/Atrás para recorrer');
+ return true;
+}
+function cad3dActivateCamera(id){
+ if(!id){cad3dViewMenu();return true;}
+ var entry=saved3DCameras.find(function(c){return c.id===id;});
+ if(!entry)return false;
+ target.x=entry.position.x;target.y=entry.position.y;target.z=entry.position.z;
+ orbit.az=entry.az;orbit.el=entry.el;orbit.dist=entry.dist;
+ viewMode=entry.mode;activeView='orbit';
+ syncViewControls();applyViewCamera();
+ text(entry.name+' activada');return true;
+}
+function cad3dCameraMenu(){
+ var list=root.querySelector('.camera3DList');
+ if(!saved3DCameras.length){text('No hay cámaras guardadas · Crear cámara para guardar la perspectiva actual');root.querySelector('[data-camera-create]').focus();return true;}
+ list.focus({preventScroll:true});
+ if(typeof list.showPicker==='function'){try{list.showPicker();return true;}catch(_err){}}
+ list.click();return true;
+}
+function cad3dWalkStep(direction){
+ if(viewMode!=='walk'){
+  viewMode='walk';activeView='walk';
+  // The walk target is the actual eye position, not an orbit center.
+  if(camera&&camera.position){target.x=camera.position.x;target.y=camera.position.y;}
+  syncViewControls();
+ }
+ var step=.75*direction;
+ target.x-=Math.cos(orbit.az)*step;
+ target.y-=Math.sin(orbit.az)*step;
+ applyViewCamera();
+ text((direction>0?'Cámara adelante':'Cámara atrás')+' · 0,75 m');
+ return true;
+}
 function cad3dViewAlias(word){
  var aliases={T:'top',TOP:'top',F:'front',FRONT:'front',L:'left',LEFT:'left',R:'right',RIGHT:'right',B:'back',BACK:'back',
   P:'perspective',PERSPECTIVE:'perspective',I:'iso',ISO:'iso'};
  var key=String(word||'').trim().toUpperCase();
+ if(key==='C'||key==='CAMERA'||key==='CAMARAS'||key==='CÁMARAS')return cad3dCameraMenu();
  if(key==='Z'||key==='ZOOM'){cad3dStartZoom();return true;}
  if(key==='V'||key==='VIEW'||key==='VIEWS'||key==='VISTA')return cad3dViewMenu();
  if(key==='O'||key==='ORTHO'||key==='ORTHOGRAPHIC')return cad3dOrthographicView();
@@ -3726,7 +3785,7 @@ function renderStyleControls(){
   button.setAttribute('aria-pressed',String(button.dataset.renderStyle===renderStyle));
  });
  var launcher=root.querySelector('.styleLaunch');
- if(launcher){launcher.innerHTML=ico('view')+'<span>Visual Style</span>';
+ if(launcher){launcher.innerHTML='<span class="styleColorCube" aria-hidden="true"></span><span>Visual Style</span>';
   launcher.title='Visual Style · '+(CAD3D_VISUAL_STYLES[renderStyle]||'Shaded');
   launcher.setAttribute('aria-label',launcher.title);
  }
@@ -4585,7 +4644,7 @@ async function readJSON(e){
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){
- if(!root||root.hidden||!root.contains(document.activeElement))return;
+ if(!root||root.hidden)return;
  // 3ds Max-like shortcuts: F3 = 3D wireframe, F4 = shaded solids.
  // Only intercept within CAD3D, never while a text input is being edited.
  if((ev.key==='F3'||ev.key==='F4')&&!ev.isComposing&&!ev.altKey&&!ev.ctrlKey&&!ev.metaKey){
@@ -4617,7 +4676,7 @@ window.addEventListener('keydown',function(ev){
  }
  if(ev.ctrlKey||ev.metaKey||ev.altKey||ev.isComposing||ev.target?.closest?.('input,textarea,select,[contenteditable=true]'))return;
  var key=ev.key.toLowerCase();
- if(['t','l','r','v','p','o'].includes(key)&&!ev.repeat){
+ if(['t','l','r','v','p','o','c'].includes(key)&&!ev.repeat){
   ev.preventDefault();ev.stopImmediatePropagation();cad3dViewAlias(key);return;
  }
  if(viewMode==='walk'&&['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){
