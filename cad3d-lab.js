@@ -1649,14 +1649,16 @@ function cad3dUpdateDraftPreview(point){
 function cad3dDrawProfilePoint(pt){
  var kind=placing,p=[pt.x,pt.y];
  if(kind==='line'||kind==='polyline'){
-  if(cad3dDraftProfile.length&&Math.hypot(p[0]-cad3dDraftProfile[0][0],p[1]-cad3dDraftProfile[0][1])<.1&&kind==='polyline'&&cad3dDraftProfile.length>=3){
+  if(cad3dDraftProfile.length&&Math.hypot(p[0]-cad3dDraftProfile[0][0],p[1]-cad3dDraftProfile[0][1])<Math.max(.015,worldPerPixel(root.querySelector('.view'))*10)&&kind==='polyline'&&cad3dDraftProfile.length>=3){
    var closePoints=cad3dDraftProfile.slice();cad3dProfileRecord(closePoints,true,'Closed polyline');
    cad3dDraftProfile=[];setPlacement(null);text('Polilínea cerrada · seleccioná Extrude para crear un sólido');return;
   }
   if(kind==='line'&&cad3dDraftProfile.length){
+   if(Math.hypot(p[0]-cad3dDraftProfile[0][0],p[1]-cad3dDraftProfile[0][1])<1e-6)return;
    cad3dProfileRecord([cad3dDraftProfile[0],p],false,'Line');
    cad3dDraftProfile=[p];cad3dUpdateDraftPreview();text('Línea creada · siguiente punto / Enter finaliza');return;
   }
+  if(cad3dDraftProfile.length&&Math.hypot(p[0]-cad3dDraftProfile[cad3dDraftProfile.length-1][0],p[1]-cad3dDraftProfile[cad3dDraftProfile.length-1][1])<1e-6)return;
   cad3dDraftProfile.push(p);cad3dUpdateDraftPreview();text(kind==='polyline'?'Polilínea: siguiente vértice · clic cerca del inicio para cerrar · Enter termina':'Línea: siguiente punto · Enter termina');return;
  }
  if(!cad3dDraftProfile.length){cad3dDraftProfile=[p];cad3dUpdateDraftPreview();text(kind==='arc'?'Arco: indicá punto intermedio y final':'Indicá el segundo punto');return;}
@@ -2702,27 +2704,45 @@ function renderRulers(){
  yRuler.innerHTML=markup;
 }
 function assistedPoint(p,view){
+ // CAD2D-style drafting over the 3D XY workplane: ORTHO for lines and
+ // polylines, OSNAP on true vertices and midpoints, never the visual grid alone.
  var x=p.x,y=p.y,snapped=false,tol=worldPerPixel(view)*9,nearest=tol*tol;
- var axis=draftModes.ortho&&firstPoint&&['wall','move','copy'].includes(placing)?
-  Math.abs(x-firstPoint.x)>=Math.abs(y-firstPoint.y)?'x':'y':null;
+ var draftPoint=cad3dDraftProfile.length?cad3dDraftProfile[cad3dDraftProfile.length-1]:null;
+ var base=draftPoint?{x:draftPoint[0],y:draftPoint[1]}:firstPoint;
+ var useOrtho=draftModes.ortho&&base&&['wall','move','copy','line','polyline'].includes(placing);
+ var axis=useOrtho?(Math.abs(p.x-base.x)>=Math.abs(p.y-base.y)?'x':'y'):null;
  function consider(sx,sy){
-  if(axis==='x'&&Math.abs(sy-firstPoint.y)>1e-7||axis==='y'&&Math.abs(sx-firstPoint.x)>1e-7)return;
+  if(!Number.isFinite(sx)||!Number.isFinite(sy))return;
+  if(axis==='x'&&Math.abs(sy-base.y)>1e-7||axis==='y'&&Math.abs(sx-base.x)>1e-7)return;
   var dx=sx-p.x,dy=sy-p.y,d=dx*dx+dy*dy;
   if(d<nearest){nearest=d;x=sx;y=sy;snapped=true;}
  }
  if(draftModes.osnap){
-  (underlay?.segments||[]).forEach(function(s){consider(s[0],s[1]);consider(s[2],s[3]);consider((s[0]+s[2])/2,(s[1]+s[3])/2);});
+  (underlay?.segments||[]).forEach(function(g){
+   consider(g[0],g[1]);consider(g[2],g[3]);consider((g[0]+g[2])/2,(g[1]+g[3])/2);
+  });
   records.forEach(function(r){
    if(!visibleRecord(r))return;
-   if(r.type==='wall'){
+   if(r.type==='profile2d'&&Array.isArray(r.profilePoints)){
+    var ang=(r.rot||0)*Math.PI/180,c=Math.cos(ang),sn=Math.sin(ang),pts=r.profilePoints;
+    var world=pts.map(function(v){return [(r.x||0)+v[0]*c-v[1]*sn,(r.y||0)+v[0]*sn+v[1]*c];});
+    world.forEach(function(v,i){
+     consider(v[0],v[1]);
+     if(i)consider((v[0]+world[i-1][0])/2,(v[1]+world[i-1][1])/2);
+    });
+    if(r.profileClosed&&world.length>2){
+     var first=world[0],last=world[world.length-1];
+     consider((first[0]+last[0])/2,(first[1]+last[1])/2);
+    }
+   }else if(r.type==='wall'){
     var a=(r.rot||0)*Math.PI/180,dx=Math.cos(a)*r.w/2,dy=Math.sin(a)*r.w/2;
-    consider(r.x-dx,r.y-dy);consider(r.x+dx,r.y+dy);
-   }
-   consider(r.x,r.y);
+    consider(r.x-dx,r.y-dy);consider(r.x+dx,r.y+dy);consider(r.x,r.y);
+   }else consider(r.x,r.y);
   });
+  cad3dDraftProfile.forEach(function(pt){consider(pt[0],pt[1]);});
  }
- if(axis==='x')y=firstPoint.y;
- if(axis==='y')x=firstPoint.x;
+ if(axis==='x')y=base.y;
+ if(axis==='y')x=base.x;
  return {x:x,y:y,z:0,snapped:snapped};
 }
 function updatePlacementGuide(e){
