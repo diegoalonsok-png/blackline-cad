@@ -832,6 +832,7 @@ css+="\n#cad3dLab .cad3dEnvironment{min-width:0;margin:8px 0;padding:10px;border
 css+="\n#cad3dLab .cad3dMaterialsPanel{position:absolute;z-index:150;left:55px;top:160px;width:min(370px,calc(100% - 20px));max-height:calc(100% - 32px);overflow-y:auto;padding:12px;box-sizing:border-box;background:#142733;color:#eaf4fc;border:1px solid #789db2;border-radius:10px;box-shadow:0 16px 34px #0009;font:12px Inter,Arial,sans-serif}\n#cad3dLab .cad3dMaterialsPanel[hidden]{display:none!important}\n#cad3dLab .cad3dMaterialsHeader{margin:-12px -12px 12px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-radius:10px 10px 0 0;background:#263f50;cursor:grab;touch-action:none;user-select:none}\n#cad3dLab .cad3dMaterialsHeader button{background:none;border:0;color:white;font-size:20px;cursor:pointer}\n#cad3dLab .cad3dMaterialsGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}\n#cad3dLab .cad3dMaterialCard{display:grid;gap:5px;padding:6px;background:#253744;border:1px solid #536e80;border-radius:8px;color:white;text-align:left;font-size:11px;cursor:pointer}\n#cad3dLab .cad3dMaterialCard canvas{width:100%;height:60px;object-fit:cover;border-radius:4px}\n#cad3dLab .cad3dMaterialCard[aria-pressed=true]{border:2px solid #8bd9f5;background:#315567}\n#cad3dLab .cad3dMaterialsControls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:9px 0}\n#cad3dLab .cad3dMaterialsControls label{display:flex;align-items:center;gap:4px}\n#cad3dLab .cad3dMaterialsControls input[type=number]{width:56px;padding:5px;background:#203747;border:1px solid #56788d;border-radius:4px;color:white}\n#cad3dLab .cad3dMaterialsPanel small{display:block;color:#acc3d1;line-height:1.4;margin-top:7px}\n#cad3dLab .view.cad3dMaterialPaint canvas{cursor:crosshair!important}\n";
 css+="\n#cad3dLab > .cad3dMaterialsPanel{\n  resize:both!important;overflow:auto!important;\n  width:min(370px,calc(100% - 24px));height:min(670px,calc(100% - 80px));\n  min-width:275px;min-height:240px;\n  max-width:calc(100% - 16px);max-height:calc(100% - 16px);\n  scrollbar-color:#8c9eaa #253744;\n}\n#cad3dLab .cad3dMaterialSizes{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:0 0 10px}\n#cad3dLab .cad3dMaterialSizes button{font:11px Inter,Arial,sans-serif;min-height:27px;padding:4px 7px;background:#274355;color:#eaf3f9;border:1px solid #6b91a6;border-radius:5px;cursor:pointer}\n#cad3dLab .cad3dMaterialSizes button:hover{background:#38647d}\n#cad3dLab .cad3dMaterialResizeTip{font-size:10px;color:#abc3d2;margin-left:auto}\n#cad3dLab .cad3dMaterialsPanel .cad3dMaterialStatus{display:block;min-height:26px;padding:6px 0;font-size:11px;color:#cde7f5}\n";
 css+="\n#cad3dLab .cad3dMaterialCategory{display:flex;align-items:center;gap:8px;font-size:11px;margin:0 0 9px}\n#cad3dLab .cad3dMaterialCategory select{flex:1;min-width:0;background:#243b4a;color:#f2f7fa;border:1px solid #728fa0;border-radius:5px;padding:6px}\n#cad3dLab .cad3dMaterialEditor{border:1px solid #5b7c91;border-radius:8px;padding:9px;margin:7px 0 11px;background:#1e3443}\n#cad3dLab .cad3dMaterialEditor summary{font:700 12px Inter,Arial,sans-serif;color:#d7edfc;cursor:pointer;user-select:none}\n#cad3dLab .cad3dMaterialEditorBody{display:grid;gap:8px;margin-top:10px}\n#cad3dLab .cad3dMaterialEditorBody label{display:flex;gap:8px;align-items:center;justify-content:space-between;font-size:11px}\n#cad3dLab .cad3dMaterialEditorBody label input[type=text]{min-width:0;flex:1}\n#cad3dLab .cad3dMaterialEditorBody input[type=text],#cad3dLab .cad3dMaterialEditorBody input[type=number]{background:#102835;color:#f6fbfe;border:1px solid #69869a;border-radius:4px;padding:6px}\n#cad3dLab .cad3dMaterialEditorBody input[type=color]{width:60px;height:29px;min-width:60px;border-radius:5px;border:1px solid #678ca2;background:#152736;padding:2px}\n#cad3dLab .cad3dMaterialEditorBody input[type=range]{width:145px;max-width:50%;accent-color:#74bfe8}\n#cad3dLab .cad3dMaterialEditorBody output{width:45px;font-variant-numeric:tabular-nums;color:#d1ebf9}\n#cad3dLab .cad3dMaterialEditorBody button{min-height:34px;background:#225976;border:1px solid #87c7e6;border-radius:6px;color:#fff;cursor:pointer;font-weight:700}\n#cad3dLab .cad3dMaterialGroupTitle{font:700 11px Inter,Arial,sans-serif;color:#a5c3d5;margin:4px 0}\n";
+css+="\n#cad3dLab .cad3dMaterialLivePreview{display:block;width:100%;height:77px;border:1px solid #7398ac;border-radius:5px;background:#ddd}\n#cad3dLab .cad3dMaterialEditorBody .cad3dMatSave{background:#314c5f;border-color:#6f9bb5;font-weight:500}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -4353,12 +4354,14 @@ function cad3dMaterialMarkup(){
  '<option value="Propios">Materiales creados</option></select></label>'+
  '<details class="cad3dMaterialEditor" open><summary>＋ Crear material · Mezclar color y relieve</summary>'+
  '<div class="cad3dMaterialEditorBody">'+
+ '<canvas class="cad3dMaterialLivePreview" data-mat-livepreview width="320" height="78" aria-label="Vista previa de color y textura"></canvas>'+
  '<label>Nombre <input type="text" maxlength="70" data-mat-newname placeholder="Mi material nuevo"></label>'+
  '<label>Color de mezcla <input type="color" data-mat-color value="#ffffff"></label>'+
  '<label>Mezclar color <input type="range" data-mat-mix min="0" max="100" step="5" value="0"><output data-mat-mix-value>0%</output></label>'+
  '<label>Relieve suave <input type="range" data-mat-bump min="0" max="8" step=".5" value="1"><output data-mat-bump-value>1 mm</output></label>'+
  '<label>Rugosidad <input type="range" data-mat-roughness min="5" max="100" step="5" value="85"><output data-mat-roughness-value>85%</output></label>'+
- '<button type="button" data-mat-create>＋ Crear nuevo material a partir del elegido</button>'+
+ '<button type="button" data-mat-create>＋ Crear nuevo material a partir del elegido</button>'+ 
+ '<button type="button" class="cad3dMatSave" data-mat-save>Guardar propiedades de mi material</button>'+
  '<small>El tinte se mezcla con la textura sin reemplazarla. El relieve es visual (bump mapping), no altera muros ni medidas.</small>'+
  '</div></details>'+
  '<div class="cad3dMaterialsGrid"></div>'+
@@ -4543,6 +4546,16 @@ function cad3dMaterialRender(){
  panel.querySelector('[data-mat-mix-value]').textContent=cad3dMaterialBrush.mix+'%';
  panel.querySelector('[data-mat-bump-value]').textContent=cad3dMaterialBrush.bump+' mm';
  panel.querySelector('[data-mat-roughness-value]').textContent=cad3dMaterialBrush.roughness+'%';
+ var preview=panel.querySelector('[data-mat-livepreview]'),ctx=preview?.getContext('2d');
+ if(ctx){
+  ctx.clearRect(0,0,preview.width,preview.height);
+  var source=cad3dMaterialCanvas(cad3dMaterialId);
+  if(source){
+   ctx.drawImage(source,0,0,preview.width,preview.height);
+   ctx.fillStyle=cad3dMaterialBrush.tint;ctx.globalAlpha=cad3dMaterialBrush.mix/100;
+   ctx.fillRect(0,0,preview.width,preview.height);ctx.globalAlpha=1;
+  }
+ }
  panel.querySelector('[data-mat-paint]').textContent='Pintar: '+(cad3dMaterialPaint?'ON':'OFF');
  root.querySelector('.view')?.classList.toggle('cad3dMaterialPaint',cad3dMaterialPaint);
 }
@@ -4666,6 +4679,13 @@ function cad3dMaterialSetup(){
   p.querySelector('[data-mat-newname]').value='';
   cad3dMaterialRender();
   cad3dMaterialMsg('Material «'+name+'» creado · clic sobre un muro o piso para pegar');
+ });
+ p.querySelector('[data-mat-save]').addEventListener('click',function(){
+  var custom=cad3dCustomMaterials[cad3dMaterialId];
+  if(!custom)return cad3dMaterialMsg('Para guardar propiedades, primero creá un material propio');
+  Object.assign(custom,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
+   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness});
+  cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
  });
  p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness]').forEach(function(el){
   el.addEventListener('change',function(){
