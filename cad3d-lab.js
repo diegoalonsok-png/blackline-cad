@@ -872,6 +872,11 @@ css+=`
 #cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked .cad3dMaterialsGrid{
  grid-template-columns:repeat(2,minmax(0,1fr))!important;
 }
+#cad3dLab .cad3dSectionPanel .cad3dSectionTools{display:flex;flex-direction:column;gap:8px;padding:9px!important}
+#cad3dLab .cad3dSectionTools label{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font:11px Inter,Arial,sans-serif}
+#cad3dLab .cad3dSectionTools input[type=range]{width:100%}
+#cad3dLab .cad3dSectionTools select,#cad3dLab .cad3dSectionTools input[type=number]{max-width:100%;min-width:0;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:5px;padding:5px}
+#cad3dLab .cad3dSectionTools button{font-size:11px}
 /* Palette surfaces share the exact CAD2D theme tokens, including light/custom themes. */
 #cad3dLab .archPalette,#cad3dLab .sunPanel,#cad3dLab .cad3dMaterialsPanel,#cad3dLab .viewSavePanel,#cad3dLab .cad3dDetachedPanel{
  background:var(--cad-ui-base,#141519)!important;color:var(--cad-ui-text,#f0f2f5)!important;
@@ -4160,6 +4165,16 @@ function build(){
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
  '<button type="button" class="btn" data-layer-toggle="locked"></button></div></section>'+
+ '<section class="panel cad3dSectionPanel" aria-label="Planos de sección 3D"><header class="panel-title">SECCIÓN 3D · CORTE MÓVIL</header>'+
+ '<div class="panel-content cad3dSectionTools">'+
+ '<label><input type="checkbox" data-section-enable> Corte activo</label>'+
+ '<label>Plano <select data-section-axis><option value="x">Vertical X · derecha / izquierda</option><option value="y">Vertical Y · frente / fondo</option><option value="z">Horizontal · planta</option></select></label>'+
+ '<label>Desplazar corte <input type="range" min="-30" max="30" step=".1" value="0" data-section-offset></label>'+
+ '<label>Posición (m) <input type="number" min="-500" max="500" step=".1" value="0" data-section-number></label>'+
+ '<button type="button" class="btn" data-section-reverse aria-pressed="false" title="Invertir hacia dónde mira el corte">↔ Invertir dirección</button>'+
+ '<button type="button" class="btn" data-section-center>Situar en el modelo</button>'+
+ '<label><input type="checkbox" data-section-visible checked> Mostrar plano y flecha</label>'+
+ '</div></section>'+
  '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
  '<div class="props panel-content"></div><div class="solidCheck" role="status"></div><button type="button" class="btn" data-verify-solids title="Check 3D geometry">Check 3D solids</button></section></aside></div>'+
  '<div class="draftBar"><form><label for="cad3dCommand">Command</label>'+
@@ -4324,6 +4339,7 @@ function build(){
  });
  renderStyleControls();
  cad3dMaterialSetup();
+ cad3dSectionSetup();
  cad3dMakeSunPanelMovable();
  cad3dMakeSavePanelMovable();
  // Render Croquis dialog retired; normal CAD3D style gallery remains available.
@@ -5253,6 +5269,7 @@ function init(){
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
  var initialTarget=target||{x:0,y:0,z:1};target=new T.Vector3(initialTarget.x,initialTarget.y,initialTarget.z);updateCamera();
  renderer=new T.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=T.PCFSoftShadowMap;
+ renderer.localClippingEnabled=true;
  renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.12;
  root.querySelector('.view').appendChild(renderer.domElement);
  sunAmbient=new T.HemisphereLight(0xdceefb,0x918c83,1.15);scene.add(sunAmbient);
@@ -7052,13 +7069,95 @@ function cad3dHistoryRestore(index){
 function cad3dUndo(){cad3dHistoryStart();if(!cad3dHistoryRestore(cad3dHistory.index-1))text('No hay más cambios 3D para deshacer');}
 function cad3dRedo(){cad3dHistoryStart();if(!cad3dHistoryRestore(cad3dHistory.index+1))text('No hay más cambios 3D para rehacer');}
 
+
+// Section planes: non-destructive clipping in world coordinates, independent of CAD2D.
+var cad3dSection={enabled:false,axis:'x',offset:0,reverse:false,showPlane:true};
+var cad3dSectionPlane=null,cad3dSectionGuide=null;
+function cad3dSectionNormal(){
+ var n={x:[1,0,0],y:[0,1,0],z:[0,0,1]}[cad3dSection.axis]||[1,0,0];
+ return n.map(function(v){return cad3dSection.reverse?-v:v;});
+}
+function cad3dSectionApply(){
+ if(!root)return;
+ var panel=root.querySelector('.cad3dSectionPanel');
+ if(panel){
+  panel.querySelector('[data-section-enable]').checked=cad3dSection.enabled;
+  panel.querySelector('[data-section-axis]').value=cad3dSection.axis;
+  panel.querySelector('[data-section-offset]').value=String(cad3dSection.offset);
+  panel.querySelector('[data-section-number]').value=String(cad3dSection.offset);
+  panel.querySelector('[data-section-reverse]').setAttribute('aria-pressed',String(cad3dSection.reverse));
+  panel.querySelector('[data-section-visible]').checked=cad3dSection.showPlane;
+ }
+ if(!T||!scene||!renderer)return;
+ if(!cad3dSectionPlane)cad3dSectionPlane=new T.Plane();
+ var n=cad3dSectionNormal();
+ // Plane passes through the chosen coordinate; reversing changes only its normal.
+ var origin=cad3dSection.axis==='x'?[cad3dSection.offset,0,0]:cad3dSection.axis==='y'?[0,cad3dSection.offset,0]:[0,0,cad3dSection.offset];
+ cad3dSectionPlane.setFromNormalAndCoplanarPoint(new T.Vector3(n[0],n[1],n[2]),new T.Vector3(origin[0],origin[1],origin[2]));
+ renderer.localClippingEnabled=true;
+ if(modelRoot)modelRoot.traverse(function(o){
+  if(!o.isMesh||!o.material)return;
+  (Array.isArray(o.material)?o.material:[o.material]).forEach(function(m){
+   m.clippingPlanes=cad3dSection.enabled?[cad3dSectionPlane]:null;
+   m.clipShadows=cad3dSection.enabled;
+  });
+ });
+ if(cad3dSectionGuide){
+  scene.remove(cad3dSectionGuide);
+  cad3dSectionGuide.traverse(function(o){if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();});
+  cad3dSectionGuide=null;
+ }
+ if(cad3dSection.enabled&&cad3dSection.showPlane){
+  var bounds=cad3dBounds(),span=Math.max(7,Math.min(120,bounds.span*1.15)),g=new T.Group();
+  var outline=new T.LineLoop(new T.BufferGeometry().setFromPoints([
+   new T.Vector3(-span/2,-span/2,0),new T.Vector3(span/2,-span/2,0),
+   new T.Vector3(span/2,span/2,0),new T.Vector3(-span/2,span/2,0)
+  ]),new T.LineBasicMaterial({color:0xf2aa38,depthTest:false}));
+  g.add(outline);
+  var sheet=new T.Mesh(new T.PlaneGeometry(span,span),new T.MeshBasicMaterial({color:0xf4a32c,transparent:true,opacity:.065,depthWrite:false,side:T.DoubleSide,depthTest:false}));
+  g.add(sheet);
+  var arrow=new T.ArrowHelper(new T.Vector3(n[0],n[1],n[2]),new T.Vector3(0,0,0),Math.min(1.5,span*.15),0xf2aa38,.28,.16);
+  g.add(arrow);
+  if(cad3dSection.axis==='x'){g.rotation.y=Math.PI/2;g.position.x=cad3dSection.offset;}
+  else if(cad3dSection.axis==='y'){g.rotation.x=-Math.PI/2;g.position.y=cad3dSection.offset;}
+  else g.position.z=cad3dSection.offset;
+  // Arrow is world-oriented and must not inherit plane rotation.
+  g.add(arrow);
+  arrow.position.set(0,0,0);
+  // Arrow's world direction is converted to the local plane coordinate frame.
+  arrow.quaternion.premultiply(g.quaternion.clone().invert());
+  g.renderOrder=140;g.traverse(function(o){o.renderOrder=140;});
+  scene.add(g);cad3dSectionGuide=g;
+ }
+ try{localStorage.setItem('blackline-cad3d-section-v1',JSON.stringify(cad3dSection));}catch(_e){}
+}
+function cad3dSectionSetup(){
+ var p=root.querySelector('.cad3dSectionPanel');if(!p)return;
+ try{var v=JSON.parse(localStorage.getItem('blackline-cad3d-section-v1')||'null');
+  if(v&&['x','y','z'].includes(v.axis)){cad3dSection={enabled:!!v.enabled,axis:v.axis,offset:Math.max(-500,Math.min(500,Number(v.offset)||0)),reverse:!!v.reverse,showPlane:v.showPlane!==false};}
+ }catch(_e){}
+ function update(){cad3dSectionApply();}
+ p.querySelector('[data-section-enable]').addEventListener('change',function(){cad3dSection.enabled=this.checked;update();});
+ p.querySelector('[data-section-axis]').addEventListener('change',function(){
+  cad3dSection.axis=this.value;cad3dSection.offset=0;update();
+ });
+ p.querySelector('[data-section-offset]').addEventListener('input',function(){cad3dSection.offset=Number(this.value);update();});
+ p.querySelector('[data-section-number]').addEventListener('change',function(){cad3dSection.offset=Math.max(-500,Math.min(500,Number(this.value)||0));update();});
+ p.querySelector('[data-section-reverse]').addEventListener('click',function(){cad3dSection.reverse=!cad3dSection.reverse;update();});
+ p.querySelector('[data-section-visible]').addEventListener('change',function(){cad3dSection.showPlane=this.checked;update();});
+ p.querySelector('[data-section-center]').addEventListener('click',function(){
+  var b=cad3dBounds();cad3dSection.offset=cad3dSection.axis==='x'?b.x:cad3dSection.axis==='y'?b.y:b.z;update();
+ });
+ update();
+}
+
 function redraw(){
  cad3dHistoryCapture();
  if(fallbackCanvas){fallbackDraw();render3DGrips();cad3dRenderPlanWalls();return;}
  if(!modelRoot)return;
  disposeMeshes(modelRoot);
  modelRoot.clear();records.filter(visibleRecord).forEach(function(record){modelRoot.add(buildObject(record));});
- modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();render3DGrips();cad3dRenderPlanWalls();
+ modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();cad3dSectionApply();render3DGrips();cad3dRenderPlanWalls();
 }
 function highlight(){
  if(fallbackCanvas){fallbackDraw();return;}
