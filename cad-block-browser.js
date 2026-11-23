@@ -88,6 +88,20 @@
 #cadBlockBrowser.visual .tabs button.on{background:#73562e;border-color:#73562e;color:#fffaf0}
 #cadBlockBrowser.visual .tools{background:#f3e8d3;border-color:#ccb997}
 #cadBlockBrowser.visual .tools label{color:#4b4539}
+/* Match local DXF import and thumbnail size controls to each palette theme. */
+#cadBlockBrowser .tools{--bb-control-bg:#1b252e;--bb-control-border:#3b4f5d;--bb-control-text:#cfdbe2;--bb-control-hover:#273943;--bb-range-track:#0f171e;--bb-range-thumb:#82bbd2;--bb-focus:#82bbd2}
+#cadBlockBrowser.visual .tools{--bb-control-bg:#f3e8d3;--bb-control-border:#c4ad83;--bb-control-text:#4b4232;--bb-control-hover:#e7d7b9;--bb-range-track:#e1d1b3;--bb-range-thumb:#927447;--bb-focus:#927447}
+.bl-light #cadBlockBrowser:not(.visual) .tools{--bb-control-bg:#f4f6f7;--bb-control-border:#9aaab3;--bb-control-text:#354550;--bb-control-hover:#e4ebef;--bb-range-track:#dbe3e7;--bb-range-thumb:#57778a;--bb-focus:#57778a}
+#cadBlockBrowser .tools button[data-a="local-pack"]{appearance:none;-webkit-appearance:none;box-sizing:border-box;background:var(--bb-control-bg);border:1px solid var(--bb-control-border);color:var(--bb-control-text);font:inherit;font-weight:500;border-radius:9px;padding:7px 14px;min-height:34px;cursor:pointer;white-space:nowrap;box-shadow:none}
+#cadBlockBrowser .tools button[data-a="local-pack"]:hover{background:var(--bb-control-hover);border-color:var(--bb-focus)}
+#cadBlockBrowser .tools button[data-a="local-pack"]:active{filter:brightness(.94)}
+#cadBlockBrowser .tools input[type=range]{appearance:none;-webkit-appearance:none;width:clamp(84px,10vw,150px);height:24px;margin:0;background:transparent;border:0;border-radius:6px;padding:0;box-shadow:none;cursor:pointer;accent-color:var(--bb-range-thumb)}
+#cadBlockBrowser .tools input[type=range]::-webkit-slider-runnable-track{height:7px;border-radius:999px;border:1px solid var(--bb-control-border);background:var(--bb-range-track)}
+#cadBlockBrowser .tools input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:15px;height:15px;margin-top:-5px;border:1px solid var(--bb-control-border);border-radius:50%;background:var(--bb-range-thumb);box-shadow:none}
+#cadBlockBrowser .tools input[type=range]::-moz-range-track{height:5px;border-radius:999px;border:1px solid var(--bb-control-border);background:var(--bb-range-track)}
+#cadBlockBrowser .tools input[type=range]::-moz-range-thumb{width:13px;height:13px;border:1px solid var(--bb-control-border);border-radius:50%;background:var(--bb-range-thumb)}
+#cadBlockBrowser .tools :is(button[data-a="local-pack"],input[type=range]):focus-visible{outline:2px solid var(--bb-focus);outline-offset:3px}
+
 #cadBlockBrowser.visual input[type=search]{background:#fffaf0;color:#29302b;border-color:#c7b28c}
 #cadBlockBrowser.visual .cats{background:#e7d7b9;border-color:#cab38b}
 #cadBlockBrowser.visual .cats button{color:#3e3a31}
