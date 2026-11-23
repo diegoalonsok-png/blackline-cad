@@ -14,7 +14,7 @@ function init(){
   box.innerHTML='<header><strong>✦ CROQUIS IA · DESDE PERSPECTIVA</strong><button data-close title="Cerrar">×</button></header>'+
    '<div class="cadCroquisAIOptions"><label>Estilo<select data-style><option value="watercolor">Acuarela arquitectónica</option><option value="pencil">Lápiz y grafito</option><option value="ink">Tinta y plumilla</option><option value="marker">Marcadores</option><option value="pastel">Pastel</option></select></label>'+
    '<label>Motor<select data-quality><option value="fast">FLUX.2 · prueba rápida</option><option value="high">FLUX.2 · mayor detalle</option></select></label></div>'+
-   '<div class="cadCroquisAIActions"><button data-photo>📷 Fotografiar perspectiva</button><button data-create>✦ Generar croquis</button><button data-save disabled>Guardar PNG</button></div>'+
+   '<div class="cadCroquisAIActions"><button data-photo>📷 Fotografiar perspectiva</button><button data-export-photo disabled>Guardar foto 3D</button><button data-check>Comprobar Cloudflare</button><button data-create disabled>✦ Generar croquis</button><button data-save disabled>Guardar croquis PNG</button></div>'+
    '<div class="cadCroquisAICompare"><figure><figcaption>Perspectiva original</figcaption><img data-original alt="Captura original del modelo CAD"></figure>'+
    '<figure><figcaption>Croquis generado</figcaption><img data-result alt="Croquis arquitectónico generado"></figure></div>'+
    '<output data-status role="status" aria-live="polite">Elegí una perspectiva y fotografiala.</output>'+
@@ -43,8 +43,23 @@ function init(){
   }
   var pic=box.querySelector('[data-original]'),art=box.querySelector('[data-result]'),save=box.querySelector('[data-save]'),
       create=box.querySelector('[data-create]'),status=box.querySelector('[data-status]');
-  var state={source:null,photoURL:null,resultURL:null,busy:false};
+  var exportPhoto=box.querySelector('[data-export-photo]'),check=box.querySelector('[data-check]');
+  var state={source:null,photoURL:null,resultURL:null,busy:false,ready:false};
   function tell(s){status.textContent=s;}
+  function saveURL(url,name){if(!url)return;var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+  async function checkBackend(){
+   if(state.busy)return;
+   check.disabled=true;create.disabled=true;state.ready=false;
+   try{
+    var res=await fetch('/croquis/render',{method:'GET',headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'});
+    var type=res.headers.get('content-type')||'';
+    if(!res.ok||!type.includes('application/json'))throw Error('El servicio de Cloudflare no responde en esta publicación. Abrí CAD2D3D desde Cloudflare Pages y comprobá el despliegue.');
+    var body=await res.json();
+    if(body.ready===true){state.ready=true;create.disabled=false;tell('Motor de IA conectado y listo. Elegí un estilo y pulsá Generar croquis.');}
+    else{tell('Cloudflare pendiente: '+(body.error||'Verificá el binding AI y la activación del motor en Production.'));}
+   }catch(e){tell('Sin conexión con el motor IA: '+(e.message||String(e))+' Podés guardar la foto y convertirla en ChatGPT.');}
+   finally{check.disabled=false;}
+  }
   function clearURL(key){if(state[key])URL.revokeObjectURL(state[key]);state[key]=null;}
   function sourceCanvas(){
    return Array.from(root.querySelectorAll('.view > canvas')).find(function(c){
@@ -65,13 +80,14 @@ function init(){
    var blobs=await Promise.all([blobFrom(input),blobFrom(preview)]);
    if(!blobs[0]||!blobs[0].size)throw Error('La perspectiva produjo una imagen vacía.');
    state.source=blobs[0];clearURL('photoURL');
-   state.photoURL=URL.createObjectURL(blobs[1]||blobs[0]);pic.src=state.photoURL;
+   state.photoURL=URL.createObjectURL(blobs[1]||blobs[0]);pic.src=state.photoURL;exportPhoto.disabled=false;
    clearURL('resultURL');art.removeAttribute('src');save.disabled=true;
    tell('Foto tomada de la perspectiva ('+width+' × '+height+' píxeles).');
    return {width:width,height:height};
   }
   async function generate(){
    if(state.busy)return;
+   if(!state.ready){await checkBackend();if(!state.ready)return;}
    state.busy=true;create.disabled=true;save.disabled=true;
    try{
     var size=await photo(),style=box.querySelector('[data-style]').value,quality=box.querySelector('[data-quality]').value;
@@ -92,18 +108,19 @@ function init(){
     clearURL('resultURL');state.resultURL=URL.createObjectURL(blob);
     art.src=state.resultURL;save.disabled=false;tell('Croquis generado. Compará la foto y guardá el PNG.');
    }catch(e){tell('No se pudo generar: '+(e.message||String(e)));}
-   finally{state.busy=false;create.disabled=false;}
+   finally{state.busy=false;create.disabled=!state.ready;}
   }
-  btn.addEventListener('click',function(){box.hidden=false;if(!state.source)photo().catch(function(e){tell(e.message);});});
-  box.querySelector('[data-close]').addEventListener('click',function(){box.hidden=true;});
-  box.querySelector('[data-photo]').addEventListener('click',function(){photo().catch(function(e){tell(e.message);});});
-  create.addEventListener('click',generate);
-  save.addEventListener('click',function(){
-   if(!state.resultURL)return;
-   var a=document.createElement('a');a.href=state.resultURL;
-   a.download='CAD2D3D-croquis-'+box.querySelector('[data-style]').value+'.png';
-   document.body.appendChild(a);a.click();a.remove();
+  btn.addEventListener('click',function(){
+   box.hidden=false;
+   if(!state.source)photo().then(checkBackend).catch(function(e){tell(e.message);});
+   else checkBackend();
   });
+  box.querySelector('[data-close]').addEventListener('click',function(){box.hidden=true;});
+  box.querySelector('[data-photo]').addEventListener('click',function(){photo().then(checkBackend).catch(function(e){tell(e.message);});});
+  exportPhoto.addEventListener('click',function(){saveURL(state.photoURL,'CAD2D3D-perspectiva-original.png');});
+  check.addEventListener('click',checkBackend);
+  create.addEventListener('click',generate);
+  save.addEventListener('click',function(){saveURL(state.resultURL,'CAD2D3D-croquis-'+box.querySelector('[data-style]').value+'.png');});
  }
  var root=document.getElementById('cad3dLab');if(root)install(root);
  var obs=new MutationObserver(function(){
