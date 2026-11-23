@@ -134,7 +134,7 @@ function thumb(item,height){
 }
 const sizeLabel=item=>cm(item.w)+'×'+cm(item.d)+' cm';
 const isDynamic=item=>item.wMax>item.wMin||item.dMax>item.dMin;
-const familyOf=item=>LIB.library.filter(x=>x.family===item.family);
+const familyOf=item=>LIB.library.filter(x=>x.family===item.family&&!x.hideFromGallery&&!/^views26-/.test(x.id));
 
 /* ---------- Estilos del módulo (mismo lenguaje visual del CAD) ---------- */
 const css=document.createElement('style');
@@ -324,8 +324,13 @@ function gripsFor(ref){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return [];
  const g=[],e=extOf(a);
  // Pinzas sobre el borde real del dibujo, para que no queden dentro ni lejos del bloque.
- if(item.wMax>item.wMin)g.push({kind:'w',local:P(e.x1,(e.y0+e.y1)/2)});
- if(item.dMax>item.dMin&&!item.lockAspect)g.push({kind:'d',local:P((e.x0+e.x1)/2,e.y1)});
+ // Proportional openings on the Y axis have their usable length along Y.
+ if(item.lockAspect&&item.dynamicAxis==='d'){
+  if(item.dMax>item.dMin)g.push({kind:'d',local:P((e.x0+e.x1)/2,e.y1)});
+ }else{
+  if(item.wMax>item.wMin)g.push({kind:'w',local:P(e.x1,(e.y0+e.y1)/2)});
+  if(item.dMax>item.dMin&&!item.lockAspect)g.push({kind:'d',local:P((e.x0+e.x1)/2,e.y1)});
+ }
  if(familyOf(item).length>1)g.push({kind:'v',local:P(e.x1,e.y0)});
  return g.map(x=>({...x,world:localToWorld(ref,x.local.x,x.local.y),screen:CORE.screen(localToWorld(ref,x.local.x,x.local.y))}));
 }
@@ -365,7 +370,11 @@ function snapMeters(v,fine){const step=fine?.01:.05;return Math.round(v/step)*st
 function resizeRef(ref,W,D){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return;
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- const w=Math.max(item.wMin,Math.min(item.wMax,W)),d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
+ let requestedW=W;
+ if(item.lockAspect&&item.dynamicAxis==='d'&&Math.abs(D-a.d)>1e-6)
+  requestedW=D*(item.w/item.d);
+ const w=Math.max(item.wMin,Math.min(item.wMax,requestedW));
+ const d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
  if(Math.abs(w-a.w)<1e-6&&Math.abs(d-a.d)<1e-6)return CORE.toast('Sin cambios · rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm');
  CORE.saveHistory();
  ref.blockName=ensureDefinition(item,w,d);delete ref.dynamic;
@@ -414,7 +423,10 @@ function onPointerMove(ev){
  const q=worldToLocal(ref,CORE.snapPoint(CORE.world(P(ev.offsetX,ev.offsetY))));
  const e=extOf(a);
  if(gripDrag.kind==='w'){gripDrag.W=Math.max(item.wMin,Math.min(item.wMax,snapMeters(q.x-(e.x1-a.w),ev.shiftKey)));if(item.lockAspect)gripDrag.D=gripDrag.W*(item.d/item.w)}
- else gripDrag.D=Math.max(item.dMin,Math.min(item.dMax,snapMeters(q.y-(e.y1-a.d),ev.shiftKey)));
+ else{
+  gripDrag.D=Math.max(item.dMin,Math.min(item.dMax,snapMeters(q.y-(e.y1-a.d),ev.shiftKey)));
+  if(item.lockAspect)gripDrag.W=gripDrag.D*(item.w/item.d);
+ }
  CORE.schedule();
 }
 window.addEventListener('keydown',ev=>{
@@ -507,7 +519,8 @@ reg(['MOBILIARIO','MUEBLES','FURNITURE'],()=>openModal('Mobiliario'));
 reg(['ARQPARAM','BPARAM','DIMBLOQUE'],()=>{const ref=selectedArqRef();if(!ref)return CORE.toast('Seleccioná un bloque ARQ de la galería');paramPrompt(ref)});
 function paramPrompt(ref){
  const a=arqOf(ref),item=byId(a.id);
- const raw=ask(item.name+'\nAncho × Profundidad en cm (rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+')',cm(a.w)+'x'+cm(a.d));
+ const elevation=item.dynamicOpening?.projection==='elevation';
+ const raw=ask(item.name+'\nAncho × '+(elevation?'Alto':'Profundidad')+' en cm (rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+')',cm(a.w)+'x'+cm(a.d));
  if(raw===null)return;const m=raw.toLowerCase().split(/\s*[x×*]\s*/).map(Number);
  if(!(m[0]>0))return CORE.toast('Formato: 180x240');resizeRef(ref,m[0]/100,(m[1]>0?m[1]:cm(a.d))/100);
 }
