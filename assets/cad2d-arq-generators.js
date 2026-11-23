@@ -648,7 +648,7 @@ one('cv-pickup-lat','Pickup · vista lateral',CV,5.30,1.80,(b,W,D)=>{piso(b,W);c
 /* ---------- API ---------- */
 function build(id,W,D){
  const d=LIB.find(x=>x.id===id);if(!d)throw Error('Bloque inexistente: '+id);
- const w=clamp(Number(W)||d.w,d.wMin,d.wMax),h=d.lockAspect?w:clamp(Number(D)||d.d,d.dMin,d.dMax);
+ const w=clamp(Number(W)||d.w,d.wMin,d.wMax),h=d.lockAspect?w*(d.d/d.w):clamp(Number(D)||d.d,d.dMin,d.dMax);
  const b=new Builder();d.gen(b,w,h);
  const bad=b.out.find(e=>JSON.stringify(e).includes('null')||JSON.stringify(e).includes('NaN'));
  if(bad)throw Error('Geometría inválida en '+id);
