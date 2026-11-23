@@ -207,12 +207,23 @@ function chips(container,onPick){
  }
 }
 window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
+function fillPanelGrid(items){
+ const grid=$('arqPanelGrid');if(!grid)return;
+ const cap=48;
+ grid.replaceChildren(...items.slice(0,cap).map(x=>makeCard(x,74)));
+ if(items.length>cap){
+  const more=document.createElement('button');more.type='button';more.className='btn slim';
+  more.style.gridColumn='1 / -1';more.textContent='Ver '+(items.length-cap)+' bloques más en el explorador';
+  more.onclick=()=>window.CAD2D_BLOCK_BROWSER?.open?.();
+  grid.appendChild(more);
+ }
+}
 function renderPanel(){
  const grid=$('arqPanelGrid');if(!grid)return;
  const sel=$('arqPanelCat');
  if(!sel.options.length){for(const cat of ['Todos',...LIB.categories.filter(c=>LIB.library.some(x=>x.cat===c&&!x.hideFromGallery))]){const o=document.createElement('option');o.value=cat;o.textContent=cat+' ('+(cat==='Todos'?LIB.library.filter(x=>!x.hideFromGallery).length:LIB.library.filter(x=>x.cat===cat&&!x.hideFromGallery).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
  sel.value=activeCat;
- grid.replaceChildren(...cardsFor(activeCat,query).map(x=>makeCard(x,74)));
+ fillPanelGrid(cardsFor(activeCat,query));
 }
 function buildPanel(){
  if($('arqPanel'))return;
@@ -225,6 +236,7 @@ function buildPanel(){
  <div id="arqPanelBody" class="panel-content" style="padding:8px">
   <div style="display:flex;gap:5px"><input type="search" id="arqPanelSearch" placeholder="Buscar: baño, isla, bañera, escalera…" aria-label="Buscar bloque arquitectónico"><button type="button" class="btn slim" id="arqOpenBig" title="Galería grande (GALERIA)">⤢</button></div>
   <button type="button" class="btn slim" id="arqOpenVisual" title="Galería visual en fondo crema · clic en imagen y luego en plano" style="display:block;width:100%;margin:7px 0 4px;text-align:center;background:#e6d3a9;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ Galería visual · bloques detallados</button>
+  <button type="button" class="btn slim" id="arqOpenOlimpiadas" title="Abrir biblioteca Olimpiadas · más de 1000 bloques en vista y planta" style="display:block;width:100%;margin:3px 0 6px;text-align:center;background:#e4dccb;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ BLOQUES 2D OLIMPIADAS · 1.000+</button>
   <select id="arqPanelCat" aria-label="Categoría de bloques"></select>
   <div class="arq-grid" id="arqPanelGrid"></div>
   <div id="arqSizeRow" hidden><label>Ancho cm<input type="number" id="arqW" step="5"></label><label>Prof. cm<input type="number" id="arqD" step="5"></label><button type="button" class="btn" id="arqApplySize">Aplicar</button></div>
@@ -232,11 +244,15 @@ function buildPanel(){
  </div>`;
  if(neighbour)neighbour.before(panel);else dock.prepend(panel);
  $('arqCollapse').onclick=()=>{const body=$('arqPanelBody');body.hidden=!body.hidden;$('arqCollapse').textContent=body.hidden?'+':'−'};
- $('arqPanelSearch').oninput=e=>{query=e.target.value;$('arqPanelGrid').replaceChildren(...cardsFor(activeCat,query).map(x=>makeCard(x,74)))};
+ $('arqPanelSearch').oninput=e=>{query=e.target.value;fillPanelGrid(cardsFor(activeCat,query))};
  $('arqOpenBig').onclick=()=>openModal();
  $('arqOpenVisual').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
   if(browser?.openVisual)return browser.openVisual();
   CORE.toast('La galería visual todavía no está disponible');
+ };
+ $('arqOpenOlimpiadas').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
+  if(browser?.openOlimpiadas)return browser.openOlimpiadas();
+  CORE.toast('El explorador de bloques todavía no está disponible');
  };
  $('arqApplySize').onclick=applySizeRow;
  for(const id of ['arqW','arqD'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applySizeRow()}});
