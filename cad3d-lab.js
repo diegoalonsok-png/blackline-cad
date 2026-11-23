@@ -795,6 +795,7 @@ css+="\n#cad3dLab .cad3dNavToolbar,#cad3dLab .cad3dStyleToolbar,#cad3dLab .cad3d
 css+="\n#cad3dLab .view .cad3dPlanWallOverlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;overflow:hidden}\n#cad3dLab .view.wire2dView{background:#fff!important}\n";
 css+="\n#cad3dLab .cad3dStyleToolbar{gap:4px!important;flex:none}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool{width:42px!important;min-width:42px!important;max-width:42px!important;height:38px!important;min-height:38px!important;max-height:38px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:2px!important;background:#081018!important;overflow:visible!important;border-radius:6px!important}\n#cad3dLab .cad3dStyleToolbar .cad3dApprovedCubeSvg{display:block!important;width:31px!important;height:31px!important;min-width:31px!important;min-height:31px!important;flex:none!important;overflow:visible}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool[aria-pressed=\"true\"]{background:#24445a!important;border:2px solid #76cefb!important;box-shadow:0 0 0 1px #76cefb55,inset 0 -2px 0 #a9e8ff!important}\n#cad3dLab .cad3dStyleToolbar .cad3dQuickTool:hover{background:#253b4e!important}\n";
 css+="\n/* Full Visual Style gallery and six fast style cubes are complementary, not alternatives. */\n#cad3dLab .tools .styleControl{display:flex!important;position:relative!important;width:auto!important;min-width:36px!important;flex:0 0 auto!important;flex-basis:auto!important;margin:0!important;padding:0!important}\n#cad3dLab .tools .styleControl > .styleLaunch{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:36px!important;width:36px!important;height:36px!important;padding:3px!important}\n#cad3dLab .tools .styleControl > .styleLaunch .styleColorCube{display:block!important;width:24px!important;height:24px!important;flex:none!important}\n#cad3dLab > .stylePanel{position:absolute!important;top:185px;left:12px;right:auto!important;z-index:140!important;max-width:calc(100% - 16px)!important;max-height:calc(100% - 52px)!important;overflow:auto}\n#cad3dLab > .stylePanel[hidden]{display:none!important}\n";
+css+="\n#cad3dLab .view .cad3dDraftPreview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:12;overflow:hidden}\n#cad3dLab .view .cad3dDraftPreview[hidden]{display:none!important}\n";
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -1585,7 +1586,6 @@ function cad3dProfileRecord(points,closed,label){
 function cad3dFinishPolyline(){
  if(!['polyline','line'].includes(placing))return false;
  if(cad3dDraftProfile.length>=2){
-  var closed=placing==='polyline'&&cad3dDraftProfile.length>=3;
   // A polyline is open by default; clicking near its first point closes it.
   cad3dProfileRecord(cad3dDraftProfile,!!cad3dDraftProfile.closed,placing==='line'?'Line':'Polyline');
  }
@@ -1607,6 +1607,45 @@ function cad3dThreePointArc(a,b,c){
  for(var i=0;i<=48;i++)points.push(cad3dPointOnCircle(center,r,start+sweep*i/48));
  return points;
 }
+
+function cad3dUpdateDraftPreview(point){
+ if(!root)return;
+ var view=root.querySelector('.view');
+ if(!view)return;
+ var overlay=view.querySelector('.cad3dDraftPreview');
+ if(!overlay){
+  overlay=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  overlay.classList.add('cad3dDraftPreview');
+  overlay.setAttribute('aria-hidden','true');
+  view.appendChild(overlay);
+ }
+ var kind=placing,points=cad3dDraftProfile;
+ if(!['line','polyline','rectangle','circle','arc'].includes(kind)||!points.length){
+  overlay.replaceChildren();overlay.style.display='none';return;
+ }
+ var w=view.clientWidth,h=view.clientHeight;
+ if(!w||!h)return;
+ overlay.style.display='block';
+ overlay.setAttribute('viewBox','0 0 '+w+' '+h);
+ var projected=function(p){return pointOnScreen({x:p[0],y:p[1],z:0},view);};
+ var pts=points.slice();
+ if(point&&Number.isFinite(point.x)&&Number.isFinite(point.y))pts.push([point.x,point.y]);
+ if(pts.length<2){overlay.replaceChildren();return;}
+ var shape=pts;
+ if(kind==='rectangle'){
+  var a=pts[0],b=pts[pts.length-1];
+  shape=[a,[b[0],a[1]],b,[a[0],b[1]],a];
+ }else if(kind==='circle'){
+  var a=pts[0],b=pts[pts.length-1],r=Math.hypot(a[0]-b[0],a[1]-b[1]);
+  shape=Array.from({length:65},(_,i)=>[a[0]+r*Math.cos(i*Math.PI/32),a[1]+r*Math.sin(i*Math.PI/32)]);
+ }else if(kind==='arc'&&pts.length===3){
+  shape=cad3dThreePointArc(pts[0],pts[1],pts[2])||pts;
+ }
+ var path=shape.map(function(p,i){var q=projected(p);return (i?'L':'M')+q.x.toFixed(2)+','+q.y.toFixed(2);}).join(' ');
+ overlay.innerHTML='<path d="'+path+'" fill="none" stroke="'+(renderStyle==='wire2d'?'#0071b5':'#72ddff')+'" stroke-width="2.2" stroke-linejoin="round" stroke-dasharray="7 4"/>'+
+  pts.map(function(p){var q=projected(p);return '<circle cx="'+q.x+'" cy="'+q.y+'" r="3.3" fill="#ffcd64" stroke="#23445d" stroke-width="1.3"/>';}).join('');
+}
+
 function cad3dDrawProfilePoint(pt){
  var kind=placing,p=[pt.x,pt.y];
  if(kind==='line'||kind==='polyline'){
@@ -1616,12 +1655,12 @@ function cad3dDrawProfilePoint(pt){
   }
   if(kind==='line'&&cad3dDraftProfile.length){
    cad3dProfileRecord([cad3dDraftProfile[0],p],false,'Line');
-   cad3dDraftProfile=[p];text('Línea creada · siguiente punto / Enter finaliza');return;
+   cad3dDraftProfile=[p];cad3dUpdateDraftPreview();text('Línea creada · siguiente punto / Enter finaliza');return;
   }
-  cad3dDraftProfile.push(p);text(kind==='polyline'?'Polilínea: siguiente vértice · clic cerca del inicio para cerrar · Enter termina':'Línea: siguiente punto · Enter termina');return;
+  cad3dDraftProfile.push(p);cad3dUpdateDraftPreview();text(kind==='polyline'?'Polilínea: siguiente vértice · clic cerca del inicio para cerrar · Enter termina':'Línea: siguiente punto · Enter termina');return;
  }
- if(!cad3dDraftProfile.length){cad3dDraftProfile=[p];text(kind==='arc'?'Arco: indicá punto intermedio y final':'Indicá el segundo punto');return;}
- if(kind==='arc'&&cad3dDraftProfile.length===1){cad3dDraftProfile.push(p);text('Arco: indicá punto final');return;}
+ if(!cad3dDraftProfile.length){cad3dDraftProfile=[p];cad3dUpdateDraftPreview();text(kind==='arc'?'Arco: indicá punto intermedio y final':'Indicá el segundo punto');return;}
+ if(kind==='arc'&&cad3dDraftProfile.length===1){cad3dDraftProfile.push(p);cad3dUpdateDraftPreview();text('Arco: indicá punto final');return;}
  var start=cad3dDraftProfile[0],points,closed=true;
  if(kind==='rectangle'){
   if(Math.hypot(p[0]-start[0],p[1]-start[1])<.01)return;
@@ -1641,7 +1680,8 @@ function cad3dBuildProfile(r,group){
  var vertices=pts.map(p=>new T.Vector3(p[0],p[1],0));
  if(r.profileClosed)vertices.push(vertices[0].clone());
  var outline=new T.Line(new T.BufferGeometry().setFromPoints(vertices),
-  new T.LineBasicMaterial({color:0x82c6df,depthTest:true,depthWrite:false}));
+  new T.LineBasicMaterial({color:0x82c6df,depthTest:false,depthWrite:false}));
+ outline.renderOrder=9;
  outline.userData.owner=r.id;outline.userData.cadProfileOutline=true;group.add(outline);
  if(r.profileClosed&&pts.length>=3){
   var shape2d=new T.Shape();shape2d.moveTo(pts[0][0],pts[0][1]);pts.slice(1).forEach(p=>shape2d.lineTo(p[0],p[1]));shape2d.closePath();
@@ -2494,6 +2534,10 @@ function toggleDraftMode(mode){
 function setPlacement(which){
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
+ if(which&&['line','polyline','rectangle','circle','arc','wall','slab','floor','dist'].includes(which)){
+  cad3dNavigationTool='select';cad3dSyncCompactBars();
+ }
+ cad3dUpdateDraftPreview();
  if(!root)return;
  root.querySelectorAll('.cad3dBar button[data-action],.cad3dProfileTools button[data-action]').forEach(function(b){
   var armed=b.dataset.action===which;b.classList.toggle('armed',armed);
@@ -3111,7 +3155,11 @@ function bindCanvas(el){
     updateCamera();
    }
   }
-  if(!dragging?.moved){updatePlacementGuide(e);updateDynamicReadout(e);}
+  if(!dragging?.moved){updatePlacementGuide(e);updateDynamicReadout(e);
+   if(cad3dDraftProfile.length&&['line','polyline','rectangle','circle','arc'].includes(placing)){
+    var gp=groundAt(e);if(gp)cad3dUpdateDraftPreview(assistedPoint(gp,root.querySelector('.view')));
+   }
+  }
  });
  el.addEventListener('pointerup',function(e){
   if(!dragging||dragging.id!==e.pointerId)return;
@@ -3866,7 +3914,7 @@ function highlight(){
   var active=selected.includes(g.userData.owner);
   g.traverse(function(o){
    if(o.isMesh&&o.material.emissive)o.material.emissive.setHex(active&&(selectedOpeningId==null||o.userData.openingId===selectedOpeningId)?0x183848:0x000000);
-   if(o.userData.cadProfileOutline)o.material.color.setHex(active?0xffcb52:0x82c6df);
+   if(o.userData.cadProfileOutline)o.material.color.setHex(active?0xffcb52:renderStyle==='wire2d'?0x111111:0x82c6df);
    if(o.userData.cadProfileFace){o.material.opacity=active?.18:.018;o.material.color.setHex(active?0xffce68:0x78c7e8);}
    if(o.userData.cadProfileHandles)o.visible=active;
   });
@@ -4828,8 +4876,10 @@ function run3DCommand(){
  if(placing&&xy.length===2&&xy.every(function(v){return number.test(v);})&&!['door','window','opening','rotate'].includes(placing)){
   var x=Number(xy[0]),y=Number(xy[1]);
   if(!Number.isFinite(x)||!Number.isFinite(y))return text('Ingresá coordenadas válidas');
-  if(relative&&!firstPoint)return text('Indicá primero un punto base para usar coordenadas relativas');
-  if(relative){x+=firstPoint.x;y+=firstPoint.y;}
+  var lastDraft=cad3dDraftProfile.length?cad3dDraftProfile[cad3dDraftProfile.length-1]:null;
+  var base=lastDraft?{x:lastDraft[0],y:lastDraft[1]}:firstPoint;
+  if(relative&&!base)return text('Indicá primero un punto base para usar coordenadas relativas');
+  if(relative){x+=base.x;y+=base.y;}
   placePoint({x:x,y:y,z:0});return;
  }
  if(firstPoint&&number.test(raw)&&['wall','move','copy','dist'].includes(placing)){
@@ -4837,7 +4887,7 @@ function run3DCommand(){
   if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
   placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
  }
- var aliases={MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
+ var aliases={L:'line',PL:'polyline',POLI:'polyline',POLILINEA:'polyline',RECT:'rectangle',REC:'rectangle',C:'circle',CIRCULO:'circle',ARC:'arc',ARCO:'arc',MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
