@@ -10,8 +10,8 @@ var layers=[{id:'0',name:'0',visible:true,locked:false}],currentLayer='0';
 var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
-// Three.BoxGeometry groups: +X,-X,+Y,-Y,+Z,-Z.
-var CAD3D_WALL_FACE_KEYS=['right','left','top','bottom','front','back'];
+// BoxGeometry face groups +X,-X,+Y,-Y,+Z,-Z; Blackline uses Z as vertical.
+var CAD3D_WALL_FACE_KEYS=['right','left','front','back','top','bottom'];
 var CAD3D_MATERIALS=[
  ['brick','Ladrillo rojo','Muros'],['brick-white','Ladrillo blanco','Muros'],
  ['plaster','Revoque blanco','Muros'],['stucco','Revoque fino','Muros'],
