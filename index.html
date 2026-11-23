@@ -3557,8 +3557,12 @@ function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=
 
 function snapPoint(p){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
+// Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
+// the drawing endpoint, not which geometry the cursor may inspect for tracking.
+const rawPointer=P(p.x,p.y);
+const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)&&!(state.tool==='stretch'&&state.modifyCandidate?.phase==='window');
  // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en AutoCAD).
- if(state.orthoOn&&state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)&&!(state.tool==='stretch'&&state.modifyCandidate?.phase==='window')){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
+ if(orthoLocksPointer){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
   else if(state.polarOn&&state.stage.length&&['line','polyline','rect','polygon','dimension','move','copy'].includes(state.tool)){
    const a=state.stage[state.stage.length-1],vx=q.x-a.x,vy=q.y-a.y,r=Math.hypot(vx,vy);
    if(r>1e-10){
@@ -3568,11 +3572,14 @@ function snapPoint(p){
    }
   }
  if(state.osnapOn||cadOneShotOsnap){
+  // With ORTHO + OTRACK, search OSNAP around the physical cursor, not the
+  // axis-constrained endpoint. This allows acquiring a second, off-axis vertex.
+  const osnapProbe=orthoLocksPointer&&trackingEligible()?rawPointer:q;
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
   for(const e of state.entities){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
-   const box=boundsEntity(e),tol=11/state.view.scale;if(!box||q.x<box.minX-tol||q.x>box.maxX+tol||q.y<box.minY-tol||q.y>box.maxY+tol)continue;
+   const box=boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
    // not just their insertion point. Read-only: never alter block entities.
@@ -3611,7 +3618,7 @@ function snapPoint(p){
    if(e.type==='line'){
     if(window.BlacklineOSNAPMath){
      if(cadOsnapEnabled('NEAREST')){
-      const pt=BlacklineOSNAPMath.nearestOnSegment(q,e.a,e.b);
+      const pt=BlacklineOSNAPMath.nearestOnSegment(osnapProbe,e.a,e.b);
       if(pt)candidates.push([pt,'NEAREST']);
      }
      if(cadOsnapEnabled('PERP')&&state.stage.length&&['line','polyline','dimension','move','copy'].includes(state.tool)){
@@ -3631,7 +3638,7 @@ function snapPoint(p){
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
-   for(const [v,kind] of candidates){const d=dist(screen(v),screen(q));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
+   for(const [v,kind] of candidates){const d=dist(screen(v),screen(osnapProbe));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
   if(cadOsnapEnabled('INT'))for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
@@ -3640,13 +3647,20 @@ function snapPoint(p){
    if(!cross)continue;
    const along=(p,x,y)=>{const v=sub(y,x),length=v.x*v.x+v.y*v.y;if(length<1e-12)return false;const t=((p.x-x.x)*v.x+(p.y-x.y)*v.y)/length;return t>=-1e-8&&t<=1+1e-8};
    if(!along(cross,a.a,a.b)||!along(cross,b.a,b.b))continue;
-   const distance=dist(screen(cross),screen(q));
+   const distance=dist(screen(cross),screen(osnapProbe));
    if(distance<=minPixels+1e-8){minPixels=distance;nearest=cross;type='INT'}
   }
   if(nearest){
    snapIndicator={point:P(nearest.x,nearest.y),type};
    if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type))cadOtrackHover(nearest);
    else cadOtrackReleaseHover();
+   // An off-axis vertex may be acquired as an OTRACK reference, but it must
+   // not move the committed drawing point off the active ORTHO axis.
+   if(orthoLocksPointer&&osnapProbe===rawPointer){
+    const base=state.stage.at(-1),horizontal=Math.abs(q.y-base.y)<1e-9;
+    const offAxis=horizontal?Math.abs(nearest.y-base.y)>1e-9:Math.abs(nearest.x-base.x)>1e-9;
+    if(offAxis)return q;
+   }
    return snapIndicator.point;
   }
  }
