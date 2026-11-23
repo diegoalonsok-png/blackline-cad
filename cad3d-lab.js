@@ -877,6 +877,11 @@ css+=`
 #cad3dLab .cad3dSectionTools input[type=range]{width:100%}
 #cad3dLab .cad3dSectionTools select,#cad3dLab .cad3dSectionTools input[type=number]{max-width:100%;min-width:0;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:5px;padding:5px}
 #cad3dLab .cad3dSectionTools button{font-size:11px}
+#cad3dLab .cad3dLightTools{display:flex;flex-direction:column;gap:7px;padding:8px!important}
+#cad3dLab .cad3dLightTools [data-light-edit]{display:grid;gap:6px}
+#cad3dLab .cad3dLightTools label{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11px}
+#cad3dLab .cad3dLightTools input[type=number],#cad3dLab .cad3dLightTools input[type=text],#cad3dLab .cad3dLightTools select{min-width:0;max-width:100%;background:#25333d;color:#eaf4fc;border:1px solid #536a77;border-radius:5px;padding:4px}
+#cad3dLab .cad3dLightTools input[type=number]{width:85px}
 /* Palette surfaces share the exact CAD2D theme tokens, including light/custom themes. */
 #cad3dLab .archPalette,#cad3dLab .sunPanel,#cad3dLab .cad3dMaterialsPanel,#cad3dLab .viewSavePanel,#cad3dLab .cad3dDetachedPanel{
  background:var(--cad-ui-base,#141519)!important;color:var(--cad-ui-text,#f0f2f5)!important;
@@ -4165,6 +4170,27 @@ function build(){
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
  '<button type="button" class="btn" data-layer-toggle="locked"></button></div></section>'+
+ '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
+ '<div class="panel-content cad3dLightTools">'+
+ '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
+ '<small data-light-count>0 luces</small><select data-light-select aria-label="Seleccionar luz"></select>'+
+ '<div data-light-edit>'+
+ '<label><input type="checkbox" data-light-field="enabled"> Encendida</label>'+
+ '<label>Nombre <input type="text" maxlength="60" data-light-field="name"></label>'+
+ '<label>Potencia relativa <input type="number" min="0" max="80" step=".5" data-light-field="power"></label>'+
+ '<label>Color <input type="color" data-light-field="color"></label>'+
+ '<label>Alcance (m) <input type="number" min="1" max="100" step=".5" data-light-field="range"></label>'+
+ '<label>X (m) <input type="number" step=".1" data-light-field="x"></label>'+
+ '<label>Y (m) <input type="number" step=".1" data-light-field="y"></label>'+
+ '<label>Z (m) <input type="number" step=".1" data-light-field="z"></label>'+
+ '<label>Dirección horizontal (°) <input type="number" min="-360" max="360" step="5" data-light-field="azimuth"></label>'+
+ '<label>Inclinación (°) <input type="number" min="-90" max="90" step="5" data-light-field="elevation"></label>'+
+ '<label>Apertura foco (rad) <input type="number" min=".05" max="1.57" step=".05" data-light-field="angle"></label>'+
+ '<label>Longitud tubo (m) <input type="number" min=".1" max="12" step=".1" data-light-field="length"></label>'+
+ '<label><input type="checkbox" data-light-field="shadow"> Sombras (puntual / foco)</label>'+
+ '</div><button type="button" class="btn" data-light-remove>Eliminar luz</button>'+
+ '<small>Luces editables del visor 3D. La luz lineal se aproxima con cinco emisores; no es una luz de área V-Ray.</small>'+
+ '</div></section>'+
  '<section class="panel cad3dSectionPanel" aria-label="Planos de sección 3D"><header class="panel-title">SECCIÓN 3D · CORTE MÓVIL</header>'+
  '<div class="panel-content cad3dSectionTools">'+
  '<label><input type="checkbox" data-section-enable> Corte activo</label>'+
@@ -4340,6 +4366,7 @@ function build(){
  renderStyleControls();
  cad3dMaterialSetup();
  cad3dSectionSetup();
+ cad3dLightSetup();
  cad3dMakeSunPanelMovable();
  cad3dMakeSavePanelMovable();
  // Render Croquis dialog retired; normal CAD3D style gallery remains available.
@@ -5264,6 +5291,7 @@ function close(){
 }
 function init(){
  scene=new T.Scene();scene.background=new T.Color(MODEL_BACKGROUND);
+ cad3dLightObjects=[];
  perspectiveCamera=new T.PerspectiveCamera(35,1,.02,2000);perspectiveCamera.up.set(0,0,1);
  orthographicCamera=new T.OrthographicCamera(-7,7,7,-7,.02,2500);orthographicCamera.up.set(0,0,1);
  camera=viewMode==='ortho'?orthographicCamera:perspectiveCamera;camera.up.set(0,0,1);
@@ -5275,6 +5303,7 @@ function init(){
  sunAmbient=new T.HemisphereLight(0xdceefb,0x918c83,1.15);scene.add(sunAmbient);
  sunLight=new T.DirectionalLight(0xffeed1,2.1);sunLight.position.set(-8,-6,16);scene.add(sunLight);
  sunFill=new T.DirectionalLight(0xc4e4fa,.7);sunFill.position.set(7,9,7);scene.add(sunFill);
+ cad3dLightsUpdateScene();
  // The grid is lines, not a shadow receiver. Keep visual ground separate from editable model.
  sunGround=new T.Mesh(new T.PlaneGeometry(2000,2000),
   new T.MeshStandardMaterial({color:0xd1cbc0,roughness:.98,metalness:0,side:T.DoubleSide}));
@@ -7131,6 +7160,96 @@ function cad3dSectionApply(){
  }
  try{localStorage.setItem('blackline-cad3d-section-v1',JSON.stringify(cad3dSection));}catch(_e){}
 }
+
+/* Blackline native CAD3D light sources. No V-Ray components or assets are redistributed. */
+var cad3dLights=[],cad3dLightObjects=[],cad3dLightSequence=1;
+function cad3dLightsSave(){
+ try{localStorage.setItem('blackline-cad3d-light-sources-v1',JSON.stringify(cad3dLights));}catch(_e){}
+}
+function cad3dLightsUpdateScene(){
+ if(!scene||!T)return;
+ cad3dLightObjects.forEach(function(o){scene.remove(o);if(o.target)scene.remove(o.target);});
+ cad3dLightObjects=[];
+ cad3dLights.filter(function(v){return v.enabled!==false;}).forEach(function(v){
+  var color=new T.Color(v.color||'#fff2df'),power=Math.max(0,Math.min(80,Number(v.power)||0));
+  var at=new T.Vector3(v.x,v.y,v.z);
+  if(v.type==='spot'){
+   var spot=new T.SpotLight(color,power);
+   spot.position.copy(at);
+   spot.angle=Math.max(.05,Math.min(Math.PI/2,Number(v.angle)||.55));
+   spot.penumbra=.28;spot.decay=2;spot.distance=Math.max(1,Number(v.range)||12);
+   var az=(Number(v.azimuth)||0)*Math.PI/180,el=(Number(v.elevation)||-65)*Math.PI/180;
+   spot.target.position.copy(at).add(new T.Vector3(Math.cos(el)*Math.cos(az),Math.cos(el)*Math.sin(az),Math.sin(el)).multiplyScalar(3));
+   spot.castShadow=!!v.shadow;
+   if(spot.castShadow){spot.shadow.mapSize.set(512,512);spot.shadow.bias=-.0005;}
+   scene.add(spot,spot.target);cad3dLightObjects.push(spot);
+  }else if(v.type==='linear'){
+   // Three.js core does not support tube-area lights: short distributed point sources approximate the emitting length.
+   var count=5,length=Math.max(.1,Math.min(12,Number(v.length)||1.2)),az2=(Number(v.azimuth)||0)*Math.PI/180;
+   for(var i=0;i<count;i++){
+    var p=new T.PointLight(color,power/count,Math.max(1,Number(v.range)||8),2);
+    p.position.copy(at).add(new T.Vector3(Math.cos(az2),Math.sin(az2),0).multiplyScalar((i/(count-1)-.5)*length));
+    p.castShadow=false;scene.add(p);cad3dLightObjects.push(p);
+   }
+  }else{
+   var point=new T.PointLight(color,power,Math.max(1,Number(v.range)||10),2);
+   point.position.copy(at);point.castShadow=!!v.shadow;
+   if(point.castShadow){point.shadow.mapSize.set(512,512);point.shadow.bias=-.0005;}
+   scene.add(point);cad3dLightObjects.push(point);
+  }
+ });
+}
+function cad3dLightPaletteRender(){
+ if(!root)return;
+ var panel=root.querySelector('.cad3dLightsPanel');if(!panel)return;
+ var select=panel.querySelector('[data-light-select]'),old=select.value;
+ select.innerHTML=cad3dLights.map(function(v){return '<option value="'+v.id+'">'+escapeHtml(v.name)+'</option>';}).join('');
+ var light=cad3dLights.find(function(v){return String(v.id)===old;})||cad3dLights[0];
+ if(light)select.value=String(light.id);
+ panel.querySelectorAll('[data-light-field]').forEach(function(el){
+  el.disabled=!light;
+  if(light)el.type==='checkbox'?el.checked=!!light[el.dataset.lightField]:el.value=String(light[el.dataset.lightField]??'');
+ });
+ panel.querySelector('[data-light-edit]').hidden=!light;
+ panel.querySelector('[data-light-remove]').disabled=!light;
+ panel.querySelector('[data-light-count]').textContent=cad3dLights.length+' luces';
+}
+function cad3dLightSetup(){
+ var panel=root.querySelector('.cad3dLightsPanel');if(!panel)return;
+ try{
+  var saved=JSON.parse(localStorage.getItem('blackline-cad3d-light-sources-v1')||'[]');
+  if(Array.isArray(saved))cad3dLights=saved.filter(function(v){
+   return v&&['point','spot','linear'].includes(v.type)&&[v.x,v.y,v.z].every(Number.isFinite);
+  }).slice(0,48);
+  cad3dLightSequence=cad3dLights.reduce(function(n,v){return Math.max(n,Number(v.id)||0);},0)+1;
+ }catch(_e){}
+ function refresh(){cad3dLightsSave();cad3dLightsUpdateScene();cad3dLightPaletteRender();}
+ panel.querySelector('[data-light-add]').addEventListener('click',function(){
+  if(cad3dLights.length>=48)return;
+  var kind=panel.querySelector('[data-light-newtype]').value;
+  var b=cad3dBounds(),names={point:'Luz globular',spot:'Foco',linear:'Luz lineal'};
+  var v={id:cad3dLightSequence++,type:kind,name:names[kind]+' '+cad3dLightSequence,
+   enabled:true,x:b.x,y:b.y,z:Math.max(2.4,b.z),power:kind==='linear'?22:kind==='spot'?14:12,
+   color:'#fff2dd',range:kind==='linear'?7:10,angle:.5,azimuth:0,elevation:-75,length:1.2,shadow:false};
+  cad3dLights.push(v);refresh();panel.querySelector('[data-light-select]').value=String(v.id);cad3dLightPaletteRender();
+ });
+ panel.querySelector('[data-light-select]').addEventListener('change',cad3dLightPaletteRender);
+ panel.querySelector('[data-light-remove]').addEventListener('click',function(){
+  var id=panel.querySelector('[data-light-select]').value;
+  cad3dLights=cad3dLights.filter(function(v){return String(v.id)!==id;});refresh();
+ });
+ panel.querySelectorAll('[data-light-field]').forEach(function(el){
+  el.addEventListener('input',function(){
+   var id=panel.querySelector('[data-light-select]').value,v=cad3dLights.find(function(o){return String(o.id)===id;});
+   if(!v)return;
+   var key=this.dataset.lightField;
+   v[key]=this.type==='checkbox'?this.checked:this.type==='number'?Number(this.value):this.value;
+   refresh();
+  });
+ });
+ refresh();
+}
+
 function cad3dSectionSetup(){
  var p=root.querySelector('.cad3dSectionPanel');if(!p)return;
  try{var v=JSON.parse(localStorage.getItem('blackline-cad3d-section-v1')||'null');
