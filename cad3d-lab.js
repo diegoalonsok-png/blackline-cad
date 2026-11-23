@@ -11,10 +11,29 @@ var MODEL_BACKGROUND='#202a32', MODEL_GRID='#384b56';
 var environmentSettings=read3DEnvironment(),cloudTexture=null,cloudTextureKey='';
 var sunSettings={enabled:false,azimuth:135,elevation:45,onGround:true,onFaces:true},sunLight=null,sunGround=null,sunAmbient=null,sunFill=null;
 var CAD3D_WALL_FACE_KEYS=['right','left','front','back','top','bottom'];
-var CAD3D_MATERIALS=[['brick','Ladrillo rojo'],['concrete','Hormigón visto'],['plaster','Revoque blanco'],['stone','Piedra'],['wood','Madera'],['travertine','Travertino'],['slate','Pizarra'],['ceramic','Cerámica']];
+var CAD3D_MATERIALS=[
+ ['brick','Ladrillo rojo','Muros'],['brick-white','Ladrillo blanco','Muros'],
+ ['plaster','Revoque blanco','Muros'],['stucco','Revoque fino','Muros'],
+ ['concrete','Hormigón visto','Hormigón'],['concrete-form','Hormigón encofrado','Hormigón'],
+ ['concrete-polished','Hormigón pulido','Hormigón'],['microcement','Microcemento','Hormigón'],
+ ['stone','Piedra natural','Piedra'],['travertine','Travertino','Piedra'],
+ ['slate','Pizarra','Piedra'],['marble','Mármol claro','Piedra'],
+ ['granite','Granito','Piedra'],['limestone','Caliza','Piedra'],
+ ['wood','Madera natural','Maderas'],['wood-oak','Piso roble','Pisos de madera'],
+ ['wood-walnut','Piso nogal','Pisos de madera'],['wood-parquet','Parquet espiga','Pisos de madera'],
+ ['wood-light','Piso madera clara','Pisos de madera'],['deck','Deck exterior','Pisos de madera'],
+ ['bamboo','Bambú','Pisos de madera'],
+ ['ceramic','Cerámica','Cerámicos'],['porcelain','Porcelanato','Cerámicos'],
+ ['terrazzo','Terrazo','Cerámicos'],['tile-cement','Baldosa calcárea','Cerámicos'],
+ ['tile-stone','Laja irregular','Cerámicos'],
+ ['grass','Pasto verde','Terreno'],['grass-dry','Pasto seco','Terreno'],
+ ['soil','Tierra','Terreno'],['sand','Arena','Terreno'],['gravel','Grava','Terreno'],
+ ['asphalt','Asfalto','Terreno'],['white','Color liso','Colores']
+];
 var cad3dCustomMaterials={},cad3dTextureCanvases={},cad3dTextureCache={},cad3dMaterialCounter=0;
 var cad3dMaterialId='brick',cad3dMaterialPaint=false,cad3dLastPaintFace=null;
-var cad3dMaterialBrush={scaleX:1,scaleY:1,rotation:0,repeat:true};
+var cad3dMaterialBrush={scaleX:1,scaleY:1,rotation:0,repeat:true,tint:'#ffffff',mix:0,bump:1,roughness:85};
+var cad3dMaterialCategory='Todos';
 var saved3DCameras=[],camera3DSequence=1;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
 var viewPresets=[
@@ -4358,37 +4377,99 @@ function cad3dMaterialCanvas(id){
   if(!cad3dCustomMaterials[id].loading)cad3dDecodeCustomMaterial(id);
   return null;
  }
- if(!CAD3D_MATERIALS.some(function(x){return x[0]===id;}))return null;
+ if(!CAD3D_MATERIALS.some(function(m){return m[0]===id;}))return null;
  var c=document.createElement('canvas');c.width=c.height=512;
  var g=c.getContext('2d');
- var palette={brick:'#a65c48',concrete:'#afb1ae',plaster:'#ede7d9',stone:'#b7ada2',wood:'#a67b56',travertine:'#d8c9aa',slate:'#616a70',ceramic:'#bd825f'};
- g.fillStyle=palette[id];g.fillRect(0,0,512,512);
- var seed=19+id.length*17;
- function rnd(){seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;}
- if(['brick','stone','travertine','slate','ceramic'].includes(id)){
-  var h=id==='brick'?42:id==='slate'?45:id==='ceramic'?80:77,w=id==='brick'?125:id==='ceramic'?100:155;
-  for(var row=0,y=0;y<512;row++,y+=h){
-   for(var x=-w;x<512+w;x+=w){
-    var xx=x+(row%2)*w*.5+3;
-    g.fillStyle='rgba(255,255,255,'+(.04+rnd()*.16)+')';g.fillRect(xx,y+3,w-6,h-6);
-    g.strokeStyle='rgba(30,26,22,.25)';g.lineWidth=2;g.strokeRect(xx,y+3,w-6,h-6);
-    for(var k=0;k<12;k++){
-     g.fillStyle=rnd()>.5?'rgba(255,255,255,.09)':'rgba(34,25,20,.09)';
-     g.fillRect(xx+rnd()*(w-7),y+3+rnd()*(h-7),1+rnd()*7,1+rnd()*3);
+ var colors={
+  brick:'#ab604b','brick-white':'#d7d1c5',plaster:'#e9e3d8',stucco:'#dcd4c3',
+  concrete:'#afb1ae','concrete-form':'#a4a8a8','concrete-polished':'#c0c3bd',
+  microcement:'#bab7ad',stone:'#b6aba0',travertine:'#d8c9aa',slate:'#59636d',
+  marble:'#e3e0d7',granite:'#929999',limestone:'#c9c0a9',
+  wood:'#a27753','wood-oak':'#b88c60','wood-walnut':'#76523c',
+  'wood-parquet':'#bf9a70','wood-light':'#dfc59b',deck:'#866a4c',bamboo:'#c0a477',
+  ceramic:'#c28c6d',porcelain:'#c6c6bf',terrazzo:'#bdb7ad',
+  'tile-cement':'#afaba0','tile-stone':'#8c8c7c',
+  grass:'#628b42','grass-dry':'#ae9c65',soil:'#745a43',
+  sand:'#d5bd8c',gravel:'#92908a',asphalt:'#555b5e',white:'#ffffff'
+ };
+ g.fillStyle=colors[id]||'#cccccc';g.fillRect(0,0,512,512);
+ var seed=17;for(var q=0;q<id.length;q++)seed+=id.charCodeAt(q)*(q+1)*491;
+ function rand(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
+ function speckles(count,scale,bright,dark){
+  for(var i=0;i<count;i++){
+   g.fillStyle=rand()>.5?bright:dark;
+   var sz=(.4+rand()*scale);g.fillRect(rand()*512,rand()*512,sz,sz);
+  }
+ }
+ var brick=id.includes('brick'),tile=['stone','travertine','slate','limestone','ceramic','porcelain','tile-cement','tile-stone'].includes(id);
+ if(brick||tile){
+  var bh=brick?41:id==='ceramic'?88:id==='porcelain'?145:id==='slate'?59:78;
+  var bw=brick?126:id==='porcelain'?145:id==='ceramic'?112:152;
+  for(var row=0,y=0;y<512;y+=bh,row++){
+   for(var x=-bw;x<512+bw;x+=bw){
+    var xx=x+(row%2&&id!=='porcelain'?bw/2:0)+3;
+    g.fillStyle=rand()>.5?'rgba(255,255,255,.09)':'rgba(0,0,0,.065)';
+    g.fillRect(xx,y+3,bw-6,bh-6);
+    g.strokeStyle=brick?'rgba(80,71,63,.36)':'rgba(65,60,54,.23)';
+    g.lineWidth=2;g.strokeRect(xx,y+3,bw-6,bh-6);
+    for(var n=0;n<13;n++){
+     g.fillStyle=rand()>.5?'rgba(255,255,255,.09)':'rgba(0,0,0,.09)';
+     g.fillRect(xx+rand()*(bw-7),y+rand()*(bh-4),1+rand()*7,1+rand()*3);
     }
    }
   }
- }else if(id==='wood'){
-  for(var i=0;i<10;i++){
-   var x=i*52;g.fillStyle=i%2?'rgba(50,30,10,.12)':'rgba(255,240,210,.12)';g.fillRect(x,0,51,512);
-   g.strokeStyle='rgba(55,30,18,.36)';g.beginPath();g.moveTo(x,0);g.lineTo(x,512);g.stroke();
-   for(var n=0;n<16;n++){var a=x+rnd()*52;g.strokeStyle='rgba(55,34,19,.11)';g.beginPath();g.moveTo(a,0);g.bezierCurveTo(a+7,150,a-7,330,a,512);g.stroke();}
+ }else if(id==='wood'||id.startsWith('wood-')||id==='deck'||id==='bamboo'){
+  var plank=id==='wood-parquet'?80:id==='deck'?65:id==='bamboo'?36:70;
+  for(var x=0,k=0;x<512;x+=plank,k++){
+   g.fillStyle=k%2?'rgba(255,255,255,.085)':'rgba(36,20,13,.08)';
+   g.fillRect(x,0,plank,512);
+   g.strokeStyle='rgba(55,34,18,.35)';g.lineWidth=2;g.beginPath();g.moveTo(x,0);g.lineTo(x,512);g.stroke();
+   if(id!=='wood'&&id!=='deck')for(var y=0;y<512;y+=170){
+    var yy=y+(k%2)*80;g.beginPath();g.moveTo(x,yy);g.lineTo(x+plank,yy);g.stroke();
+   }
+   for(var n=0;n<22;n++){
+    var xx=x+rand()*plank;
+    g.strokeStyle=rand()>.5?'rgba(59,35,19,.13)':'rgba(245,215,154,.10)';
+    g.lineWidth=.7+rand();g.beginPath();g.moveTo(xx,0);g.bezierCurveTo(xx+5,120,xx-6,290,xx,512);g.stroke();
+   }
+  }
+  if(id==='wood-parquet'){
+   g.strokeStyle='rgba(50,28,16,.34)';g.lineWidth=3;
+   for(var i=-512;i<1050;i+=106){g.beginPath();g.moveTo(i,0);g.lineTo(i+512,512);g.stroke();}
+  }
+ }else if(id==='concrete-form'){
+  g.strokeStyle='rgba(65,74,77,.34)';g.lineWidth=3;
+  for(var y=0;y<512;y+=100){g.beginPath();g.moveTo(0,y);g.lineTo(512,y);g.stroke();}
+  for(var x=70;x<512;x+=185)for(var y=65;y<512;y+=105){
+   g.fillStyle='rgba(60,68,72,.22)';g.beginPath();g.arc(x,y,3,0,Math.PI*2);g.fill();
+  }
+ }else if(id==='marble'){
+  for(var j=0;j<17;j++){
+   g.strokeStyle=rand()>.5?'rgba(85,93,97,.16)':'rgba(184,159,133,.24)';
+   g.lineWidth=.6+rand()*2;
+   var x=rand()*512,y=rand()*512;
+   g.beginPath();g.moveTo(x-100,y-100);
+   g.bezierCurveTo(x+40,y+180,x+60,y-80,x+320,y+300);g.stroke();
+  }
+ }else if(id==='terrazzo'||id==='granite'||id==='gravel'||id==='asphalt'){
+  for(var i=0;i<3500;i++){
+   g.fillStyle=rand()>.52?'rgba(255,255,255,.20)':'rgba(0,0,0,.17)';
+   var rr=(id==='terrazzo'||id==='gravel')?1+rand()*7:1+rand()*2;
+   g.beginPath();g.ellipse(rand()*512,rand()*512,rr,rr*.6,rand()*3,0,Math.PI*2);g.fill();
+  }
+ }else if(id==='grass'||id==='grass-dry'){
+  for(var i=0;i<11000;i++){
+   g.strokeStyle=rand()>.5?'rgba(16,74,24,.24)':'rgba(233,221,117,.22)';
+   var x=rand()*512,y=rand()*512;g.lineWidth=.5+rand();
+   g.beginPath();g.moveTo(x,y);g.lineTo(x+rand()*4-2,y-rand()*9);g.stroke();
+  }
+ }else if(id==='tile-cement'){
+  g.strokeStyle='rgba(60,57,53,.27)';g.lineWidth=2;
+  for(var xy=0;xy<512;xy+=92){
+   g.beginPath();g.moveTo(xy,0);g.lineTo(xy,512);g.moveTo(0,xy);g.lineTo(512,xy);g.stroke();
   }
  }
- for(var n=0;n<2500;n++){
-  g.fillStyle=rnd()>.5?'rgba(255,255,255,.06)':'rgba(0,0,0,.045)';
-  g.fillRect(rnd()*512,rnd()*512,1+rnd()*3,1+rnd()*3);
- }
+ if(id!=='white')speckles(id.includes('grass')?1600:2200,2.8,'rgba(255,255,255,.06)','rgba(0,0,0,.048)');
  cad3dTextureCanvases[id]=c;return c;
 }
 function cad3dDecodeCustomMaterial(id){
