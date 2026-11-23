@@ -848,6 +848,13 @@ css+="\n#cad3dLab .cad3dDraftPreview .cad3dPlateDimension{fill:#07587f;font:700 
 css+=`
 /* A docked hidden palette must not remain visible through the stronger sidebar display rule. */
 #cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked[hidden]{display:none!important}
+#cad3dLab .cad3dLayerList{display:flex;flex-direction:column;gap:3px;max-height:210px;overflow:auto;margin-top:7px}
+#cad3dLab .cad3dLayerRow{display:grid;grid-template-columns:25px 25px 30px minmax(0,1fr);align-items:center;gap:4px;padding:3px;border:1px solid #455665;border-radius:5px}
+#cad3dLab .cad3dLayerCurrent{border-color:#83b9d8;background:#2b4353}
+#cad3dLab .cad3dLayerRow button{font-size:12px;padding:3px;border:0;background:transparent;color:inherit;cursor:pointer}
+#cad3dLab .cad3dLayerRow input[type=color]{width:27px;height:24px;padding:0;border:0;background:transparent}
+#cad3dLab .cad3dLayerRow .cad3dLayerName{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cad3dLab .draftBar .draftCoordinates{order:-1;margin-right:auto;white-space:nowrap}
 /* Materials dock directly under Layers; sidebar scroll contains its own content. */
 #cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked{
  position:relative!important;top:auto!important;left:auto!important;right:auto!important;bottom:auto!important;
@@ -4169,7 +4176,7 @@ function build(){
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
- '<button type="button" class="btn" data-layer-toggle="locked"></button></div></section>'+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
  '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
@@ -4211,7 +4218,7 @@ function build(){
  '<button type="button" class="btn" data-draft-mode="grid" title="Grilla · F7">GRID</button>'+ 
  '<button type="button" class="btn" data-draft-mode="dyn" title="Dynamic coordinate feedback · DYN">DYN</button>'+
  '<button type="button" class="btn" data-draft-action="dist" title="Medir dos puntos">DIST</button>'+
- '<output class="draftCoordinates">X 0 · Y 0 m</output></div>'+
+ '<output class="draftCoordinates">X: 0.00 · Y: 0.00 · Z: 0.00 m</output></div>'+
  '<footer><span class="cad3dStatus" role="status"></span></footer>'+
  '<div class="edgeResizeR" data-resize="x" title="Arrastrar borde para ajustar ancho 3D"></div>'+
  '<div class="edgeResizeB" data-resize="y" title="Arrastrar borde para ajustar altura 3D"></div>'+
@@ -4433,8 +4440,22 @@ function build(){
  });
  root.querySelector('.layerPanel select').addEventListener('change',function(){currentLayer=this.value;renderLayerPanel();});
  root.querySelector('.layerPanel').addEventListener('click',function(e){
+  var rowButton=e.target.closest('[data-cad3d-layer-action]');
+  if(rowButton){
+   var l=layers.find(function(item){return item.id===rowButton.dataset.layerId;});
+   if(!l)return;
+   var a=rowButton.dataset.cad3dLayerAction;
+   if(a==='select')currentLayer=l.id;
+   else if(a==='visible'||a==='locked')l[a]=!l[a];
+   selected=selected.filter(function(id){return records.some(function(rec){return rec.id===id&&editableRecord(rec);});});
+   renderLayerPanel();redraw();renderProps();return;
+  }
   var button=e.target.closest('[data-layer-toggle]');
   if(button)changeLayer(button.dataset.layerToggle);
+ });
+ root.querySelector('.layerPanel').addEventListener('input',function(e){
+  var input=e.target.closest('[data-cad3d-layer-action="color"]');if(!input)return;
+  var l=layers.find(function(item){return item.id===input.dataset.layerId;});if(l)l.color=input.value;
  });
  renderDraftModes();renderLayerPanel();
  root.addEventListener('click',function(e){
@@ -4566,6 +4587,15 @@ function renderLayerPanel(){
  panel.querySelector('select').innerHTML=layerOptions(layer.id);
  panel.querySelector('[data-layer-toggle=visible]').textContent=layer.visible?'Hide':'Show';
  panel.querySelector('[data-layer-toggle=locked]').textContent=layer.locked?'Unlock':'Lock';
+ var list=panel.querySelector('.cad3dLayerList');
+ if(list)list.innerHTML=layers.map(function(l){
+  var color=/^#[0-9a-f]{6}$/i.test(l.color||'')?l.color:'#92b3c8';
+  return '<div class="cad3dLayerRow'+(l.id===currentLayer?' cad3dLayerCurrent':'')+'">'+
+   '<button type="button" data-cad3d-layer-action="visible" data-layer-id="'+escapeHtml(l.id)+'" title="Mostrar u ocultar">'+(l.visible?'◉':'○')+'</button>'+
+   '<button type="button" data-cad3d-layer-action="locked" data-layer-id="'+escapeHtml(l.id)+'" title="Bloquear o desbloquear">'+(l.locked?'🔒':'♢')+'</button>'+
+   '<input type="color" data-cad3d-layer-action="color" data-layer-id="'+escapeHtml(l.id)+'" aria-label="Color de capa" value="'+color+'">'+
+   '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+escapeHtml(l.name)+'</button></div>';
+ }).join('');
 }
 function changeLayer(kind){
  if(kind==='add'){
@@ -5070,7 +5100,7 @@ function updatePlacementGuide(e){
  if(!raw){marker.hidden=true;guide.hidden=true;if(cad3dIsRectangle(placing))cad3dUpdateDraftPreview();return;}
  cursorPoint=placing?assistedPoint(raw,view):raw;
  if(cad3dIsRectangle(placing)||cad3dDraftProfile.length)cad3dUpdateDraftPreview(cursorPoint);
- root.querySelector('.draftCoordinates').textContent='X '+cursorPoint.x.toFixed(2)+' · Y '+cursorPoint.y.toFixed(2)+' m';
+ root.querySelector('.draftCoordinates').textContent='X: '+cursorPoint.x.toFixed(2)+' · Y: '+cursorPoint.y.toFixed(2)+' · Z: '+(cursorPoint.z||0).toFixed(2)+' m';
  if(!placing)return;
  var p=pointOnScreen(cursorPoint,view);
  Object.assign(marker.style,{left:p.x+'px',top:p.y+'px'});marker.hidden=!cursorPoint.snapped;
