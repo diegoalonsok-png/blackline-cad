@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::*;
 
 const MAX_BYTES: usize = 64 * 1024 * 1024;
 
-fn convert(input: &[u8], to_dwg: bool) -> Result<Vec<u8>, String> {
+fn convert_checked(input: &[u8], to_dwg: bool, allow_partial: bool) -> Result<Vec<u8>, String> {
     if input.is_empty() || input.len() > MAX_BYTES {
         return Err("Archivo vacío o superior a 64 MiB".into());
     }
@@ -26,8 +26,17 @@ fn convert(input: &[u8], to_dwg: bool) -> Result<Vec<u8>, String> {
         bytes
     } else {
         let writer = DxfWriter::new(&doc);
-        if !writer.omitted_architecture_records().is_empty() {
-            return Err("El archivo contiene objetos arquitectónicos que el escritor DXF omitiría".into());
+        let omitted = writer.omitted_architecture_records();
+        let omitted_entities = omitted.iter().filter(|r| doc.get_entity(r.handle).is_some()).count();
+        if !omitted.is_empty() && !allow_partial {
+            let mut classes: Vec<&str> = omitted.iter().map(|r| r.name.as_str()).collect();
+            classes.sort_unstable();
+            classes.dedup();
+            return Err(format!("AEC_OMISSIONS: {} entidades y {} registros auxiliares no exportables. Clases: {}.", omitted_entities, omitted.len().saturating_sub(omitted_entities), classes.join(", ")));
+        }
+        let expected = expected.checked_sub(omitted_entities).ok_or("Inventario de entidades incoherente")?;
+        if expected == 0 && omitted_entities > 0 {
+            return Err("No queda geometría exportable; se conserva el DWG original".into());
         }
         let bytes = writer.write_to_vec().map_err(|e| e.to_string())?;
         let check = DxfReader::from_reader(Cursor::new(bytes.clone())).and_then(|r| r.read())
@@ -37,6 +46,16 @@ fn convert(input: &[u8], to_dwg: bool) -> Result<Vec<u8>, String> {
     };
     if output.is_empty() || output.len() > MAX_BYTES * 4 { return Err("Salida vacía o excesiva".into()); }
     Ok(output)
+}
+
+fn convert(input: &[u8], to_dwg: bool) -> Result<Vec<u8>, String> {
+    convert_checked(input, to_dwg, false)
+}
+
+// Explicitly requested by the UI after warning about the listed omissions.
+#[wasm_bindgen]
+pub fn dwg_to_dxf_partial(input: &[u8]) -> Result<Vec<u8>, JsValue> {
+    convert_checked(input, false, true).map_err(|e| JsValue::from_str(&e))
 }
 
 #[wasm_bindgen]
