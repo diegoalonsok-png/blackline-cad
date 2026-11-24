@@ -1765,7 +1765,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   }
   const generated=state.entities;
   for(const e of generated)e.arqBatch=batch;
-  if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[],origin:clone(origin),unit:state.unit,signature:signature(generated)};
+  if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[],sourcePlan:plan.rooms?.length===1&&plan.walls.length===4?clone(plan):null,origin:clone(origin),unit:state.unit,signature:signature(generated)};
   state.entities=original.filter(e=>!replaceBatch||e.arqBatch!==replaceBatch).concat(generated);state.selected=[];updateAll();return generated.length;
  }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
 }
@@ -11687,7 +11687,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261124-bath-catalogue-v3"></script>
+<script src="cad-arq-pro.js?v=20261124-dynamic-room-v1"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-zip-organize-v4"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
