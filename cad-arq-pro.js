@@ -938,7 +938,7 @@ let arqCataloguePromise=null;
 function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-house-v1',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
 function arqCatalogueCategory(raw){
  const s=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m\s*(?:2|²|\^2)|mts?\s*(?:2|²)?|sqm)?)?$/.test(s))return 'house';
+ if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m\s*(?:2|²|\^2)|mts?\s*(?:2|²)?|sqm|metros?(?:\s+cuadrados?)?)?)?[\s.]*$/.test(s))return 'house';
  if(/^(?:bnao|bno|banio|banios|bnaos|banoo|banoss)$/.test(s))return 'bathroom';
  if(/^(?:bano|banos|toilette|mostrar banos|listado de banos|bathroom|bathrooms|salle de bains|bagno|bagni|banheiro|banheiros|badezimmer|浴室|卫生间|衛生間|ванная|حمام|욕실)$/.test(s))return 'bathroom';
  if(/^(?:cocina|cocinas|kitchen|kitchens|cuisine|cucina|cozinha|kuche|厨房|キッチン|кухня|مطبخ)$/.test(s))return 'kitchen';
