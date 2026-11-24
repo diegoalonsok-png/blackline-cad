@@ -4,6 +4,7 @@
 (function(root){
 'use strict';
 const C=Object.freeze({
+ locker:['mob-locker',.40,.50],changingBench:['mob-banco-vest',1.50,.40],
  toilet:['san-wc',.40,.70],bidet:['san-bidet',.38,.58],basin:['san-lav',.60,.48],
  shower:['san-ducha',.90,.90],shower75:['san-ducha',.75,.75],basin45:['san-lav',.45,.40],toiletCompact:['san-wc-susp',.38,.60],bathtub:['san-banera',1.70,.75],bathtub150:['san-banera',1.50,.75],
  bed:['dor-queen',2.60,2],wardrobe:['mob-placard',1.80,.62],
@@ -232,7 +233,7 @@ function solve(spec){
    out.virtualDimensions.push({room:p+id,axis:'width',value:rw,between:[p+'side'+i,p+(rw===w?'side'+(i+1):'bathside'+i)],editable:rw===w},{room:p+id,axis:'depth',value:h,between:[p+front,p+back],editable:true});
   };
   const blocks=(layout,x,y,kind)=>{for(const o of layout){const [id,bw,bd]=C[o.key],r=o.r,[ox,oy]=({0:[0,0],90:[r.w,0],180:[r.w,r.d],270:[0,r.d]})[o.rot];
-   out.blocks.push({catalogId:id,role:o.key,point:pt(x+r.x+ox,y+r.y+oy),rotation:o.rot,scale:1,layer:kind==='bathroom'?'FIXTURES':kind==='kitchen'?'KITCHEN':'FURNITURE',envelope:[x+r.x+dx,y+r.y+dy,r.w,r.d],nominalSize:[bw,bd]})}};
+   out.blocks.push({catalogId:id,role:o.key,point:pt(x+r.x+ox,y+r.y+oy),rotation:o.rot,scale:1,layer:['locker','changingBench'].includes(o.key)?'FURNITURE':kind==='bathroom'?'FIXTURES':kind==='kitchen'?'KITCHEN':'FURNITURE',envelope:[x+r.x+dx,y+r.y+dy,r.w,r.d],nominalSize:[bw,bd]})}};
   for(let i=0;i<=n;i++){const x=t/2+i*step;const A=[x,t/2],B=[x,compactSuite&&i===n?d+1.5*t:fullD+1.5*t];wall('side'+i,...(side==='left'&&i===0?[B,A]:[A,B]));}
   for(let i=0;i<n;i++){
    const x=t+i*step,a=x-t/2,b=a+step,front='front'+i,back='back'+i,rear='rear'+i;
@@ -600,7 +601,7 @@ function collectiveCabins(spec){
  for(let i=0;i<n;i++){
   const x=t+i*(w+t),y=t,back=y+d,front=back-cellD-t/2,pre='v0-cab'+i+'-';
   const wall=(id,a,b)=>p.walls.push({id:pre+id,a,b,thickness:t,layer:'WALLS',join:'native'});
-  const put=(key,xx,yy,rot=0)=>{const [catalogId,bw,bd]=C[key],fw=rot%180?bd:bw,fd=rot%180?bw:bd;const [ox,oy]=({0:[0,0],90:[fw,0],180:[fw,fd],270:[0,fd]})[rot];p.blocks.push({catalogId,role:key,point:[xx+ox,yy+oy],rotation:rot,scale:1,layer:'FIXTURES',envelope:[xx,yy,fw,fd],nominalSize:[bw,bd]});};
+  const put=(key,xx,yy,rot=0)=>{const [catalogId,bw,bd]=C[key],fw=rot%180?bd:bw,fd=rot%180?bw:bd;const [ox,oy]=({0:[0,0],90:[fw,0],180:[fw,fd],270:[0,fd]})[rot];p.blocks.push({catalogId,role:key,point:[xx+ox,yy+oy],rotation:rot,scale:1,layer:['locker','changingBench'].includes(key)?'FURNITURE':'FIXTURES',envelope:[xx,yy,fw,fd],nominalSize:[bw,bd]});};
   for(let j=0;j<cells.length;j++){
    const a=x-t/2+j*(cellW+t),b=a+cellW+t,host='front'+j;
    if(b>x+w+t/2+1e-7)throw Error('Cabinas fuera del recinto.');
@@ -624,21 +625,21 @@ function run(raw){
  // Quantified collective sanitary fixtures, preserving requested counts.
  const collective=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?(?:(\d+)\s+)?(?:banos?|vestuarios?)\s+(?:colectivos?\s+)?(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)\s*(?:m|mts|metros)?\s+con\s+(.+)$/);
  if(collective){
-  const names={ducha:'shower',duchas:'shower',inodoro:'toilet',inodoros:'toilet',lavatorio:'basin',lavatorios:'basin',bidet:'bidet',bidets:'bidet'};
+  const names={ducha:'shower',duchas:'shower',inodoro:'toilet',inodoros:'toilet',lavatorio:'basin',lavatorios:'basin',bidet:'bidet',bidets:'bidet',locker:'locker',lockers:'locker',casillero:'locker',casilleros:'locker',banco:'changingBench',bancos:'changingBench'};
   const cabins=/\b(?:en cabinas|con cabinas)(?: individuales)?\b/.test(collective[4]);
   const tail=collective[4].replace(/\s+(?:en|con) cabinas(?: individuales)?\s*$/,'').replace(/\s+cada uno\s*$/,'').trim();
   const pieces=tail.split(/\s*(?:,|\+|\by\b)\s*/);
   const fixtures=[];
   let quantified=true;
   for(const piece of pieces){
-   const m=piece.match(/^(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(duchas?|inodoros?|lavatorios?|bidets?)$/);
+   const m=piece.match(/^(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(duchas?|inodoros?|lavatorios?|bidets?|lockers?|casilleros?|bancos?)$/);
    if(!m){quantified=false;break;}
    const n=Number(numberWords[m[1]]||m[1]);if(n<1||n>12)throw Error('Cantidad de artefactos fuera de rango (1 a 12).');
    for(let i=0;i<n;i++)fixtures.push(names[m[2]]);
   }
   if(quantified&&fixtures.length){
    if(fixtures.length>12)throw Error('Hasta doce artefactos por baño colectivo.');
-   const spec={kind:'bathroom',count:Number(collective[1]||1),width:num(collective[2]),depth:num(collective[3]),wall:.15,door:.9,window:1.2,fixtures,assumptions:['Baño colectivo preliminar: cantidades explícitas de artefactos respetadas.','Sin cabinas, bancos ni lockers; comprobar privacidad, circulación y normativa.']};
+   const spec={kind:'bathroom',count:Number(collective[1]||1),width:num(collective[2]),depth:num(collective[3]),wall:.15,door:.9,window:1.2,fixtures,assumptions:['Baño colectivo preliminar: cantidades explícitas de artefactos respetadas.','Comprobar privacidad, circulación y normativa; bancos y lockers solo si se solicitan.']};
    if(cabins){spec.assumptions=['Cantidades explícitas de artefactos respetadas. Cabinas de medida inicial.'];return collectiveCabins(spec);}
    const p=solve(spec);p.status='approximate';p.warning=spec.assumptions.join(' ');return p;
   }
