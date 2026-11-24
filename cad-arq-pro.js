@@ -774,7 +774,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-compact-bath-v2');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-bath-section-v1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -789,24 +789,31 @@ function solveGeometry(text,brief=null,semantic=false){
 
 function applyArchitectureDetail(plan,origin){
  if(plan.units!=='m'||!Array.isArray(plan.entities)||!plan.entities.length||plan.entities.length>500)throw Error('Detalle inválido.');
- const st=S(),k=f(),names=new Set(['STAIRS','RAILS','SECTIONS']),layers=new Map(),add=[];
- for(const e of plan.entities){
-  if(e.type!=='line'||!names.has(e.layer)||![e.a,e.b].every(p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=100)))throw Error('Geometría de detalle inválida.');
-  if(Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Segmento de longitud cero.');
-  if(!layers.has(e.layer)){
-   const old=st.layers.find(l=>l.name.toUpperCase()===e.layer);
-   if(old&&(old.locked||old.visible===false))throw Error('Capa bloqueada u oculta: '+e.layer);
-   const id=old?.id||'arq-detail-'+e.layer.toLowerCase();
-   if(!old&&st.layers.some(l=>l.id===id))throw Error('Colisión de capa.');
-   const l=old||{id,name:e.layer,color:'#e5e7eb',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'};
-   layers.set(e.layer,l);if(!old)add.push(l);
-  }
- }
+ const st=S(),k=f(),names=new Set(['STAIRS','RAILS','SECTIONS','SECTION-CUT','SECTION-FINISH','SECTION-FIXTURES']),layers=new Map(),add=[];
+ const validPoint=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=100);
+ const getLayer=name=>{
+  if(!names.has(name))throw Error('Capa de detalle inválida');
+  if(!layers.has(name)){
+   const old=st.layers.find(l=>l.name.toUpperCase()===name);
+   if(old&&(old.locked||old.visible===false))throw Error('Capa bloqueada u oculta: '+name);
+   const id=old?.id||'arq-detail-'+name.toLowerCase();if(!old&&st.layers.some(l=>l.id===id))throw Error('Colisión de capa.');
+   const l=old||{id,name,color:name==='SECTION-CUT'?'#777b80':name==='SECTION-FINISH'?'#8d9295':'#e5e7eb',visible:true,locked:false,width:name==='SECTIONS'?.35:.13,linetype:'CONTINUOUS'};
+   layers.set(name,l);if(!old)add.push(l);
+  }return layers.get(name).id;
+ };
+ for(const e of plan.entities){if(e.type!=='line'||![e.a,e.b].every(validPoint)||Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Geometría de detalle inválida.');getLayer(e.layer);}
+ const fills=plan.fills||[],blocks=plan.blocks||[];
+ if(!Array.isArray(fills)||fills.length>50||!Array.isArray(blocks)||blocks.length>50)throw Error('Detalle demasiado complejo.');
+ for(const e of fills){if(e.layer!=='SECTION-CUT'||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint))throw Error('Relleno inválido.');getLayer(e.layer);}
+ const prepared=blocks.map(b=>{const it=byId(b.catalogId),[w,d]=b.nominalSize||[];if(b.layer!=='SECTION-FIXTURES'||!it||!allowed(it)||it.dxfPlan||!validPoint(b.point)||![w,d].every(Number.isFinite)||w<it.wMin-1e-8||w>it.wMax+1e-8||d<it.dMin-1e-8||d>it.dMax+1e-8)throw Error('Bloque de detalle no disponible: '+b.catalogId);getLayer(b.layer);LIB.build(it.id,w,d);return {b,it,w,d};});
  CORE.saveHistory();
+ const resolved=prepared.map(({b,it,w,d})=>({b,name:ensureDefinition(it,w,d,true)}));
  st.layers.push(...add);
- const batch='arq-detail-'+CORE.nextId();
- for(const e of plan.entities)st.entities.push({id:CORE.nextId(),type:'line',a:P(origin.x+e.a[0]*k,origin.y+e.a[1]*k),b:P(origin.x+e.b[0]*k,origin.y+e.b[1]*k),layer:layers.get(e.layer).id,width:.18,arqBatch:batch});
- st.selected=[];CORE.updateAll();return plan.entities.length;
+ const batch='arq-detail-'+CORE.nextId(),p=a=>P(origin.x+a[0]*k,origin.y+a[1]*k);
+ for(const e of fills)st.entities.push({id:CORE.nextId(),type:'hatch',pts:e.pts.map(p),layer:getLayer(e.layer),hatchStyle:'solid',width:.05,arqBatch:batch});
+ for(const e of plan.entities)st.entities.push({id:CORE.nextId(),type:'line',a:p(e.a),b:p(e.b),layer:getLayer(e.layer),width:e.layer==='SECTIONS'&&plan.brief?.kind==='bath_section'?.35:e.layer==='SECTION-FINISH'?.09:.18,arqBatch:batch});
+ for(const {b,name} of resolved)st.entities.push({id:CORE.nextId(),type:'blockRef',blockName:name,p:p(b.point),scale:1,rotation:0,layer:getLayer(b.layer),arqBatch:batch});
+ st.selected=[];CORE.updateAll();return plan.entities.length+fills.length+blocks.length;
 }
 
 function applyArchitecture(plan,origin,replaceBatch=null){
