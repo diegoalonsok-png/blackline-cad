@@ -1450,7 +1450,7 @@ function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallL
 // 75 complete copies of a very large imported drawing.
 var cadHistorySizes=new WeakMap(),cadHistoryBudget=96*1024*1024;
 function historySnapshot(){
- const json=JSON.stringify({entities:state.entities,layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId,layerStates:state.layerStates||[]});
+ const json=JSON.stringify({entities:state.entities,layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId,layerStates:state.layerStates||[],unit:state.unit,grid:state.grid});
  const snap=JSON.parse(json);cadHistorySizes.set(snap,json.length*4);return snap;
 }
 function cadHistoryBytes(){
@@ -1466,8 +1466,22 @@ function cadTrimHistory(){
  }
 }function syncCadHeaderHistoryButtons(){const u=$('cadHeaderUndo'),r=$('cadHeaderRedo');if(u)u.disabled=!state.history.length;if(r)r.disabled=!state.future.length}
 function saveHistory(){state.history.push(historySnapshot());state.future=[];cadTrimHistory();syncCadHeaderHistoryButtons()}
-function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
-function redo(){clearOtrackAnchors(false);if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());Object.assign(state,state.future.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('REDO')}
+function cadRestoreHistorySnapshot(snap){
+ const previousUnit=state.unit;
+ Object.assign(state,snap);
+ // Geometry and its declared units must always be restored together.
+ if(previousUnit!==state.unit&&U[previousUnit]&&U[state.unit]){
+  state.view.scale*=U[state.unit]/U[previousUnit];
+  // A pending command may contain coordinates expressed in the previous units.
+  state.stage=[];state.scaleReference=null;
+ }
+ $('units').value=state.unit;
+ $('gridSpacing').value=Number(state.grid.toPrecision(9));
+ $('canvasUnits').textContent='· '+state.unit;
+ if(state.activeDimStyle&&state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);
+}
+function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());cadRestoreHistorySnapshot(state.history.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
+function redo(){clearOtrackAnchors(false);if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());cadRestoreHistorySnapshot(state.future.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('REDO')}
 $('cadHeaderUndo')?.addEventListener('click',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();syncCadHeaderHistoryButtons()});
 $('cadHeaderRedo')?.addEventListener('click',()=>{redo();syncCadHeaderHistoryButtons()});
 syncCadHeaderHistoryButtons();
