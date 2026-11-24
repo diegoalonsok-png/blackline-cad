@@ -244,7 +244,7 @@ function parseArqRequest(raw){
  
  const bath=/\b(?:bano(?:s)?|bathroom(?:s)?|toilette(?:s)?)\b/.test(s);
  const kitchen=/\b(?:cocina(?:s)?|kitchen(?:s)?)\b/.test(s);
- const gym=/\b(?:gimnasio(?:s)?|gym(?:s)?|vestuario(?:s)?|sanitarios colectivos)\b/.test(s);
+ const gym=/\b(?:gimnasio(?:s)?|gym(?:s)?|vestuario(?:s)?|changing rooms?|sanitarios colectivos|club(?:es)?|escuela(?:s)?|school(?:s)?)\b/.test(s);
  const hotelKitchen=kitchen&&/\b(?:hotel(?:es)?|hotelera(?:s)?|hotelero(?:s)?|banquete(?:s)?|banquet(?:s)?)\b/.test(s);
  if(!gym&&!hotelKitchen&&!room&&!wardrobe&&bath===kitchen)return {kind:'unsupported'};
  const category=room?'Habitaciones completas':wardrobe?'Vestidores completos':bath?'Baños completos':'Cocinas completas';
@@ -252,15 +252,22 @@ function parseArqRequest(raw){
  const unit=(n,u)=>Number(n.replace(',','.'))/({cm:100,mm:1000,m:1}[u]||1);
  const dims=match?[unit(match[1],match[2]||match[4]),unit(match[3],match[4]||match[2])]:null;
  if(dims&&dims.some(n=>!Number.isFinite(n)||n<=0||n>30))return {kind:'invalid'};
- if(gym&&(bath||/\b(?:wc|inodoro(?:s)?|ducha(?:s)?|shower(?:s)?|toilet(?:s)?|sanitarios|vestuario(?:s)?)\b/.test(s))){
+ if(gym&&(bath||/\b(?:wc|inodoro(?:s)?|ducha(?:s)?|shower(?:s)?|toilet(?:s)?|sanitarios|vestuario(?:s)?|changing rooms?)\b/.test(s))){
   if(/\b(?:accesible|accessible|mixto|mixed)\b/.test(s))return {kind:'unsupported'};
-  const q=s.match(/\b(\d+)\s+(?:wc|inodoro(?:s)?|toilet(?:s)?|cabina(?:s)?|bano(?:s)?)\b/);
-  const d=s.match(/\b(\d+)\s+(?:ducha(?:s)?|shower(?:s)?)\b/);
-  const n=q?Number(q[1]):d?Number(d[1]):null;
-  if(n!==null&&(!Number.isInteger(n)||n<2||n>8))return {kind:'invalid'};
-  const showers=/\b(?:sin duchas|without showers|no showers)\b/.test(s)?false:d||/\b(?:ducha(?:s)?|shower(?:s)?)\b/.test(s)?true:null;
-  if(d&&n!==Number(d[1]))return {kind:'unsupported'};
-  return {kind:'catalog',category:'Sanitarios colectivos',dims,count:null,filters:[],stallCount:n,showers};
+  const numbers={cero:0,uno:1,una:1,un:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8};
+  const num='(\\d+|'+Object.keys(numbers).join('|')+')';
+  const q=s.match(new RegExp('\\b'+num+'\\s+(?:wc|inodoro(?:s)?|toilet(?:s)?|cabina(?:s)?|bano(?:s)?)\\b'));
+  const d=s.match(new RegExp('\\b'+num+'\\s+(?:ducha(?:s)?|shower(?:s)?)\\b'));
+  const parse=m=>m?(numbers[m[1]]??Number(m[1])):null;
+  const n=parse(q),m=parse(d);
+  const noShowers=/\b(?:sin duchas|without showers|no showers)\b/.test(s);
+  if(n!==null&&(!Number.isInteger(n)||n<2||n>8)||m!==null&&(!Number.isInteger(m)||m<0||m>8))return {kind:'invalid'};
+  if(noShowers&&m>0)return {kind:'invalid'};
+  const showerCount=noShowers?0:m;
+  const showers=showerCount!==null?showerCount>0:/\b(?:ducha(?:s)?|shower(?:s)?)\b/.test(s)?true:null;
+  const bench=/\b(?:banco(?:s)?|bench(?:es)?|vestuario(?:s)?|changing rooms?)\b/.test(s)?true:null;
+  const lockers=/\b(?:locker(?:s)?|casillero(?:s)?|taquilla(?:s)?|vestuario(?:s)?|changing rooms?)\b/.test(s)?true:null;
+  return {kind:'catalog',category:'Sanitarios colectivos',dims,count:null,filters:[],stallCount:n,showerCount,showers,bench,lockers};
  }
  if(hotelKitchen){
   if(/\b\d+\s*(?:comensales|cubiertos|huespedes|guests|covers)\b/.test(s))return {kind:'unsupported'};
@@ -335,8 +342,8 @@ function runArqRequest(raw){
   return true;
  }
  const normalize=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
- const {category,dims,count,filters,stallCount,showers}=request;
- const items=LIB.library.filter(x=>x.cat===category&&!x.hideFromGallery&&(stallCount==null||x.stallCount===stallCount)&&(showers==null||(x.showerCount>0)===showers)&&filters.every(rx=>rx.test(normalize(x.name)))&&(!dims||(typeof x.gen==='function'&&!x.lockAspect&&dims[0]>=(x.wMin??x.w)&&dims[0]<=(x.wMax??x.w)&&dims[1]>=(x.dMin??x.d)&&dims[1]<=(x.dMax??x.d))));
+ const {category,dims,count,filters,stallCount,showerCount,showers,bench,lockers}=request;
+ const items=LIB.library.filter(x=>x.cat===category&&!x.hideFromGallery&&(stallCount==null||x.stallCount===stallCount)&&(showerCount==null||x.showerCount===showerCount)&&(showers==null||(x.showerCount>0)===showers)&&(bench==null||x.hasBench===bench)&&(lockers==null||x.hasLockers===lockers)&&filters.every(rx=>rx.test(normalize(x.name)))&&(!dims||(typeof x.gen==='function'&&!x.lockAspect&&dims[0]>=(x.wMin??x.w)&&dims[0]<=(x.wMax??x.w)&&dims[1]>=(x.dMin??x.d)&&dims[1]<=(x.dMax??x.d))));
  activeCat=category;query='';$('arqPanelCat').value=category;
  const shown=count===null?items:items.slice(0,count);
  $('arqPanelGrid').replaceChildren(...shown.map(x=>makeCard(x,74,dims)));
