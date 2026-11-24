@@ -159,7 +159,7 @@ function solve(spec){
  const doorX=spec.doorX??(w-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>w-.03)throw Error('Posición de puerta inválida.');
  const doorZones=door?[R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay;try{lay=spec.templateLayout||arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+  let lay,blay;try{lay=(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
@@ -252,25 +252,19 @@ function correctText(raw){const corrections=[];if(typeof raw!=='string'||raw.len
    WC and bidet against a side. Rotate to exploit a wide, shallow room.
    Retain independent catalogue blocks, and validate envelope/door collisions. */
 function compactBathTemplate(spec){
- const {width:w,depth:d,wall:t,door}=spec;
- if(spec.kind!=='bathroom'||!spec.fixtures.includes('bathtub')||!spec.fixtures.includes('toilet')||!spec.fixtures.includes('bidet')||w<2.05||d<1.4)return null;
+ const {width:w,depth:d,door}=spec;
+ if(spec.kind!=='bathroom'||!spec.fixtures.includes('bathtub')||!spec.fixtures.includes('toilet')||!spec.fixtures.includes('bidet')||w<2.05||d<1.4||spec.alternatives>1)return null;
  const required=['bathtub','toilet','bidet'];
  if(spec.fixtures.some(k=>!required.includes(k)&&k!=='basin'))return null;
  const doorX=.08;
  if(doorX+door>w-.03)return null;
- const layout=[
- {key:'bathtub',rot:180,r:R(w-1.70,d-.75,1.70,.75)},
- {key:'toilet',rot:270,r:R(w-.70,.02,.70,.40)},
- {key:'bidet',rot:270,r:R(w-.58,.44,.58,.38)}
- ];
- // For this short room the fixtures sit opposite the bath, not on top of it.
- if(d<1.57){layout[0].r=R(0,d-.75,1.70,.75);layout[1].r=R(w-.70,0,.70,.40);layout[2].r=R(w-.58,.42,.58,.38)}
- const swing=R(doorX,0,door,door);
- if(layout.some(o=>!inside(o.r,w,d)||overlap(o.r,swing,.01)))return null;
+ const layout=[{key:'bathtub',rot:180,r:R(w-1.70,d-.75,1.70,.75)},{key:'toilet',rot:0,r:R(w-.90,0,.40,.70)},{key:'bidet',rot:0,r:R(w-.42,0,.38,.58)}];
+ // A quarter-circle swing is more precise than its bounding rectangle.
+ const hitsSwing=r=>{if(!door)return false;const x=Math.max(0,r.x-doorX),y=Math.max(0,r.y);return r.x+r.w>doorX&&x*x+y*y<(door+.03)**2};
+ if(layout.some(o=>!inside(o.r,w,d)||hitsSwing(o.r)))return null;
  for(let i=0;i<layout.length;i++)for(let j=i+1;j<layout.length;j++)if(overlap(layout[i].r,layout[j].r,.01))return null;
  return {layout,doorX};
 }
-
 function run(raw){
  const {text,corrections}=correctText(raw);
  const d=detailInstruction(text);if(d){const p=solveDetail(d);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
@@ -306,7 +300,7 @@ function run(raw){
    try{const omitted=spec.fixtures.filter(k=>!fixtures.includes(k));
     const missing=essential.filter(k=>!fixtures.includes(k));
     const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',shower:'ducha'};
-    const warning='APROXIMACIÓN: baño preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
+    const warning='APROXIMACIÓN: distribución preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
     const p=solve({...spec,fixtures,doorX,compact:true,assumptions:[...spec.assumptions,warning]});p.status='approximate';p.warning=[...notes,warning].join(' ');return p;
    }catch(e){}
   }
