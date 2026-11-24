@@ -814,26 +814,56 @@ EXT.drawArchitectureCommand=async raw=>{
 };
 
 /* Free-text architecture bar is separate from the CAD command interpreter. */
+
 function openArchitectureBar(focus=true){
  let bar=document.getElementById('cadArqInstructionBar');
  if(!bar){
   const host=document.getElementById('canvasWrap');if(!host)return;
+  const css=document.createElement('style');css.id='cadArqBarStyle';css.textContent=`
+#cadArqInstructionBar{position:absolute;z-index:40;display:flex;align-items:center;gap:2px;padding:5px 8px 5px 4px;border-radius:999px;background:#202326;border:1.5px solid #7c838a;box-shadow:0 8px 22px #0008;user-select:none;width:min(620px,calc(100% - 12px));box-sizing:border-box;color:#f2f5f7}
+#cadArqInstructionBar button{all:unset;cursor:pointer;flex:none;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;color:#f2f5f7}
+#cadArqInstructionBar button:hover{background:#3a4046}
+#cadArqInstructionBar button:focus-visible,#cadArqInstructionBar input:focus-visible{outline:2px solid #9adff3}
+#cadArqInstructionBar button:disabled{opacity:.4;cursor:wait}
+#cadArqInstructionBar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#cadArqInstructionBar .arq-handle{cursor:grab;width:22px;color:#c9d0d6;font-size:15px;letter-spacing:-2px;touch-action:none}
+#cadArqInstructionBar .arq-handle:active{cursor:grabbing}
+#cadArqInstructionBar .arq-sep{width:1px;height:22px;background:#4e555c;margin:0 4px;flex:none}
+#cadArqInstructionBar b{font:600 11px Arial,sans-serif;white-space:nowrap;padding:0 3px}
+#cadArqInstructionBar input{flex:1;min-width:0;width:100%;height:30px;background:transparent;border:0;border-radius:15px;padding:0 8px;color:inherit;font:12px Arial,sans-serif;user-select:text}
+#cadArqInstructionBar input::placeholder{color:#929aa1}
+.bl-light #cadArqInstructionBar{background:#fff;border-color:#9aa6ae;color:#18232b}
+.bl-light #cadArqInstructionBar button{color:#18232b}
+.bl-light #cadArqInstructionBar button:hover{background:#e6edf2}
+.bl-light #cadArqInstructionBar .arq-handle{color:#64727b}
+#cadArqInstructionBar.arq-min{width:auto}
+#cadArqInstructionBar.arq-min input,#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .arq-sep{display:none}
+`;document.head.append(css);
   bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
-  bar.style.cssText='position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:6px;padding:5px 7px;width:min(620px,calc(100% - 24px));box-sizing:border-box;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);box-shadow:0 2px 9px #0004;font-size:11px';
-  bar.innerHTML='<b style="white-space:nowrap;color:var(--cyan)">ARQASSIST</b><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Ej.: Habitación de 4 x 5 con baño / Bedroom 4 x 5" style="flex:1;min-width:0;width:100%;height:27px;padding:4px 7px;color:var(--text);background:var(--input);border:1px solid var(--border);border-radius:4px"><button type="button" class="btn slim" data-arq-run title="Draw instruction">Dibujar</button><button type="button" class="btn slim" data-arq-close title="Hide ARQASSIST">×</button>';
+  bar.innerHTML='<button class="arq-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="arq-sep"></span><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"><span class="arq-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
   host.append(bar);
-  const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]');
+  const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.arq-handle');
+  const KEY='cad2d-arqbar-pos';
+  const place=(x,y)=>{const w=host.clientWidth,h=host.clientHeight;x=Math.max(4,Math.min(w-bar.offsetWidth-4,x));y=Math.max(4,Math.min(h-bar.offsetHeight-4,y));bar.style.left=x+'px';bar.style.top=y+'px'};
+  let pos=null;try{pos=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+  requestAnimationFrame(()=>{const quick=document.getElementById('cadQuickBar');if(Array.isArray(pos)&&pos.length===2&&pos.every(Number.isFinite))place(...pos);else if(quick&&quick.offsetWidth){const x=quick.offsetLeft+quick.offsetWidth+8;place(x+bar.offsetWidth<=host.clientWidth?x:quick.offsetLeft,x+bar.offsetWidth<=host.clientWidth?quick.offsetTop:quick.offsetTop+quick.offsetHeight+8)}else place((host.clientWidth-bar.offsetWidth)/2,60)});
+  window.addEventListener('resize',()=>{if(bar.style.display!=='none')place(bar.offsetLeft,bar.offsetTop)});
+  let drag=null;handle.addEventListener('pointerdown',e=>{drag={dx:e.clientX-bar.offsetLeft,dy:e.clientY-bar.offsetTop};handle.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation()});
+  handle.addEventListener('pointermove',e=>{if(drag)place(e.clientX-drag.dx,e.clientY-drag.dy)});
+  const endDrag=()=>{if(!drag)return;drag=null;try{localStorage.setItem(KEY,JSON.stringify([bar.offsetLeft,bar.offsetTop]))}catch(e){}};
+  handle.addEventListener('pointerup',endDrag);handle.addEventListener('pointercancel',endDrag);
+  handle.addEventListener('dblclick',()=>{bar.classList.toggle('arq-min');place(bar.offsetLeft,bar.offsetTop)});
   const submit=async()=>{
    const raw=input.value.trim();if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
   };
   input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
-  for(const type of ['pointerdown','pointerup','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
+  for(const type of ['pointerdown','pointerup','mousedown','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
   run.addEventListener('click',submit);
   bar.querySelector('[data-arq-close]').onclick=()=>{EXT.cancelArchitectureCommand();bar.style.display='none'};
  }
- bar.style.display='flex';if(focus)bar.querySelector('[data-arq-text]').focus();
+ bar.style.display='flex';if(focus){bar.classList.remove('arq-min');bar.querySelector('[data-arq-text]').focus();}
 }
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
