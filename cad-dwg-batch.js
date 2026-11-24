@@ -47,7 +47,7 @@ async function convertLocal(file,direction){
   }
  }
  return new Promise((resolve,reject)=>{
-  const worker=new Worker(new URL('cad-dwg-local-worker.js',document.baseURI)),timer=setTimeout(()=>finish('Tiempo límite de conversión'),180000);
+  const worker=new Worker(new URL('cad-dwg-local-worker.js?v=20261123-wasm-v2',document.baseURI),{type:'module'}),timer=setTimeout(()=>finish('Tiempo límite de conversión'),180000);
   let done=false;
   function finish(error,output){if(done)return;done=true;clearTimeout(timer);worker.terminate();if(error)reject(Error(error));else resolve(output)}
   worker.onmessage=e=>finish(e.data.error,e.data.output);
