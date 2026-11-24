@@ -157,13 +157,15 @@
  const items=()=>LIB.library.filter(it=>!/^views26-/.test(it.id)&&
    (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view))));
  const familyOf=it=>{
+  const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
+  // Explicit botanical names and source IDs take precedence over generic keyword matches.
+  if(/árbol|arbol|arbusto|palmera|vegetaci[oó]n|planta ornamental|planta en maceta|follaje|con[ií]fera|cactus|\b(?:tree|trees|shrub|shrubs|bush|bushes|foliage|potted plant)\b/.test(n)||/^(?:olymp3-|olymp2-)?ca[-_]arb[-_]/.test(id))return 'Exterior';
   if(stairFamily(it))return 'Escaleras';
   if(/^userdx4-/.test(it.id))return it.cat||'Sin clasificar';
-  const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
   if(/sanit|bañ|bath|inodoro|bidet|lavatorio|ducha|mingitorio|vanitory|bañera|jacuzzi|wc\b|toilet|urinal|shower/.test(c+' '+n)||/^san-|^ca_ba_/.test(id))return 'Baños';
   if(/cocina|kitchen|heladera|freezer|horno|anafe|lavavajillas|microondas|campana|extractor|cafetera|lavarropas|secarropas|vinoteca|induc|refrig/.test(c+' '+n)||/^kq-|^ca_co_/.test(id))return 'Cocinas';
   if(/dormitorio|bedroom|cama|cucheta|cuna|colchón|mattress|bunk|crib|placard/.test(c+' '+n)||/^dor-|^ca_dorm/.test(id))return 'Dormitorios';
-  if(/vehículo|auto|camión|colectivo|bus|pickup|furgón|coupé|tractor|moto|biciclet|vehic|truck|van\b|car\b/.test(c+' '+n)||/^veh-|^ca_auto|^ca_v_(?:bus|cam|moto)/.test(id))return 'Vehículos';
+  if(/vehículo|\bauto(?:s|móvil|móviles)?\b|camión|colectivo|\b(?:bus|buses|autobús|autobuses|omnibus|ómnibus|pickup|van|vans|car|cars|truck|trucks)\b|furgón|coupé|tractor|\bmoto(?:s|cicleta|cicletas)?\b|biciclet|vehic/.test(c+' '+n)||/^veh-|^ca_auto|^ca_v_(?:bus|cam|moto)/.test(id))return 'Vehículos';
   if(/puerta|ventana|carpinter|persiana|abertura|door|window|marco|muro cortina|dvh|opening|umbral/.test(c+' '+n)||/^alz-puerta|^ca_puerta/.test(id))return 'Puertas y ventanas';
   if(/escritorio|oficina|office|mesa reunión/.test(c+' '+n)||/^ca_ofic/.test(id))return 'Oficina';
   if(/mobili|furniture|sillón|sofá|silla|mesa|estante|biblioteca|mueble|shelf|sofa|chair|desk/.test(c+' '+n)||/^mob-|^ca_mueb/.test(id))return 'Mobiliario';
