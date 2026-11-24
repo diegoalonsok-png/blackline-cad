@@ -6518,7 +6518,33 @@ function updateProps(){const ids=state.selected,selectedIds=new Set(ids),items=s
  }}
 $('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');cadUpdateImagePropertiesEditor(items.length===1&&items[0].type==='image'?items[0]:null);$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
-function scaleDrawingEntity(e,ratio){const v=transformEntity(e,p=>mul(p,ratio));if(v.type==='blockRef'){if(v.params){for(const k of ['width','depth','frameWidth','frameDepth'])if(Number.isFinite(v.params[k]))v.params[k]*=ratio;}return v;}for(const key of ['r','rx','ry','h'])if(v[key]!==undefined)v[key]*=ratio;if(v.type==='dimension'&&v.style){v.style.textHeight*=ratio;v.style.arrow*=ratio}return v}
+function cadScaleLengthFields(obj,keys,ratio){
+ if(!obj)return obj;
+ for(const key of keys)if(Number.isFinite(obj[key]))obj[key]*=ratio;
+ return obj;
+}
+function cadConvertDimStyle(style,ratio){
+ if(!style)return style;
+ cadScaleLengthFields(style,['textHeight','arrow','tolerance','extOffset'],ratio);
+ if(Number.isFinite(style.extBeyond)&&style.extBeyond>=0)style.extBeyond*=ratio;
+ return style;
+}
+function scaleDrawingEntity(e,ratio){
+ const v=transformEntity(e,p=>mul(p,ratio));
+ if(v.type==='blockRef'){
+  cadScaleLengthFields(v.params,['width','depth','frameWidth','frameDepth'],ratio);
+  cadScaleLengthFields(v.dynamic,['width','height'],ratio);
+  return v;
+ }
+ cadScaleLengthFields(v,['r','rx','ry','h'],ratio);
+ if(v.type==='text')cadScaleLengthFields(v,['mtextWidth','textRadius'],ratio);
+ if(v.type==='dimension')cadConvertDimStyle(v.style,ratio);
+ if(v.wall2d){
+  cadScaleLengthFields(v.wall2d,['thickness'],ratio);
+  for(const key of ['guideA','guideB'])if(v.wall2d[key])v.wall2d[key]=mul(v.wall2d[key],ratio);
+ }
+ return v;
+}
 function openCadUnitsDialog(){
  const labels={mm:'Milímetros / Millimeters',cm:'Centímetros / Centimeters',m:'Metros / Meters',in:'Pulgadas / Inches',ft:'Pies / Feet'};
  const answer=window.prompt('UNITS / UNIDADES — unidad actual: '+labels[state.unit]+'\\nEscribí mm, cm, m, in o ft. La geometría se convierte manteniendo medidas físicas.',state.unit);
@@ -6526,7 +6552,7 @@ function openCadUnitsDialog(){
  const to=answer.trim().toLowerCase();if(!U[to])return toast('Unidad no válida / Invalid unit: mm, cm, m, in, ft');
  $('units').value=to;convertUnits(to);toast('Unidad de dibujo / Drawing units: '+labels[to]);
 }
-function convertUnits(to){if(!U[to]||state.unit===to)return;const ratio=U[state.unit]/U[to];saveHistory();state.entities=state.entities.map(e=>scaleDrawingEntity(e,ratio));for(const block of Object.values(state.blocks))block.entities=block.entities.map(e=>scaleDrawingEntity(e,ratio));for(const style of Object.values(state.dimStyles||{})){style.textHeight*=ratio;style.arrow*=ratio}if(state.activeDimStyle&&state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.view.scale/=ratio;state.grid=Math.max(.000001,state.grid*ratio);state.unit=to;$('gridSpacing').value=Number(state.grid.toPrecision(9));$('canvasUnits').textContent='· '+to;updateAll();log(`UNITS ${to}`)}
+function convertUnits(to){if(!U[to]||state.unit===to)return;const ratio=U[state.unit]/U[to];saveHistory();state.entities=state.entities.map(e=>scaleDrawingEntity(e,ratio));for(const block of Object.values(state.blocks)){block.entities=block.entities.map(e=>scaleDrawingEntity(e,ratio));cadScaleLengthFields(block.parametric?.defaults,['width','depth','frameWidth','frameDepth'],ratio);}for(const style of Object.values(state.dimStyles||{}))cadConvertDimStyle(style,ratio);if(state.activeDimStyle&&state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.view.scale/=ratio;state.grid=Math.max(.000001,state.grid*ratio);state.unit=to;$('gridSpacing').value=Number(state.grid.toPrecision(9));$('canvasUnits').textContent='· '+to;updateAll();log(`UNITS ${to}`)}
 $('units').onchange=e=>convertUnits(e.target.value);$('gridSpacing').onchange=e=>{const n=Number(e.target.value);if(n>0&&Number.isFinite(n)){state.grid=n;schedule()}else e.target.value=state.grid};$('precision').onchange=e=>state.precision=Number(e.target.value);$('lineWidth').onchange=e=>state.lineWidth=Math.max(0,Number.isFinite(Number(e.target.value))?Number(e.target.value):.25);
 $('newLayer').onclick=()=>{let name=window.prompt('Layer name:','NEW-LAYER');if(!name?.trim())return;saveHistory();const id='layer_'+Date.now();state.layers.push({id,name:name.trim(),color:'#b8cad6',visible:true,locked:false});state.layerId=id;updateAll()};$('cadLayerStatesBtn').onclick=cadLayerStatesDialog;$('removeLayer').onclick=()=>{if(state.layerId==='0'||state.layers.length<=1)return toast('Cannot delete base layer');if(state.entities.some(e=>e.layer===state.layerId))return toast('Move or delete entities on this layer first');saveHistory();state.layers=state.layers.filter(l=>l.id!==state.layerId);state.layerId='0';updateAll()};$('deleteBtn').onclick=eraseSelected;$('duplicateBtn').onclick=duplicateSelected;$('gridToggle').onclick=()=>toggle('gridOn','gridToggle');$('snapToggle').onclick=()=>toggle('snapOn','snapToggle');$('orthoToggle').onclick=()=>toggle('orthoOn','orthoToggle');$('dynToggle').onclick=cadToggleDyn;$('dynToggle').classList.toggle('on',cadDynOn);$('dynToggle').setAttribute('aria-pressed',String(cadDynOn));$('polarToggle').onclick=()=>togglePolar();$('osnapToggle').onclick=()=>{toggle('osnapOn','osnapToggle');if(!state.osnapOn){otrkGuide=null;otrkAnchors=[]}};
 $('otrackToggle').onclick=toggleOtrack;
