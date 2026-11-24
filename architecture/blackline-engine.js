@@ -159,7 +159,7 @@ function solve(spec){
  const doorX=spec.doorX??(w-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>w-.03)throw Error('Posición de puerta inválida.');
  const doorZones=door?[R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay;try{lay=arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+  let lay,blay;try{lay=spec.templateLayout||arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
@@ -245,16 +245,59 @@ function solveDetail(spec){
  return {schema:'blackline.architecture.detail.v1',units:'m',entities,brief:spec,assumptions};
 }
 
-function run(text){
- const d=detailInstruction(text);if(d)return solveDetail(d);
- const spec=interpret(text);
- try{return solve(spec)}catch(error){
- if(spec.kind!=='bathroom'||!error.message.includes('sin interferencias'))throw error;
+/* Architectural spelling aliases: never touch numbers or units. */
+const spelling={habtiacion:'habitacion',havitacion:'habitacion',abitacion:'habitacion',habitaicon:'habitacion',habitacoines:'habitaciones',dormiotrio:'dormitorio',dormtorio:'dormitorio',bnao:'bano',bnaos:'banos',baadera:'banadera',banadra:'banadera',inodro:'inodoro',bidte:'bidet',videt:'bidet',dcuha:'ducha',lavatirio:'lavatorio',cosina:'cocina',cocnia:'cocina',heladrea:'heladera',pueta:'puerta',pureta:'puerta',bentana:'ventana',ventnaa:'ventana',placrad:'placard',bestidor:'vestidor',vestidro:'vestidor',escalra:'escalera',escalear:'escalera',pasamnos:'pasamanos',discapasitados:'discapacitados',acesible:'accesible',acesibles:'accesibles',tandme:'tandem',tadem:'tandem',altua:'altura',ahnco:'ancho',lagro:'largo',escrtorio:'escritorio'};
+function correctText(raw){const corrections=[];if(typeof raw!=='string'||raw.length>4000)return {text:raw,corrections};const text=normalize(raw).replace(/\b[a-z]+\b/g,w=>{if(!Object.hasOwn(spelling,w))return w;corrections.push(w+' → '+spelling[w]);return spelling[w]});return {text,corrections}}
+/* Layout derived from the library's bano-completo: bath against rear wall,
+   WC and bidet against a side. Rotate to exploit a wide, shallow room.
+   Retain independent catalogue blocks, and validate envelope/door collisions. */
+function compactBathTemplate(spec){
+ const {width:w,depth:d,wall:t,door}=spec;
+ if(spec.kind!=='bathroom'||!spec.fixtures.includes('bathtub')||!spec.fixtures.includes('toilet')||!spec.fixtures.includes('bidet')||w<2.05||d<1.4)return null;
+ const required=['bathtub','toilet','bidet'];
+ if(spec.fixtures.some(k=>!required.includes(k)&&k!=='basin'))return null;
+ const doorX=.08;
+ if(doorX+door>w-.03)return null;
+ const layout=[
+ {key:'bathtub',rot:180,r:R(w-1.70,d-.75,1.70,.75)},
+ {key:'toilet',rot:270,r:R(w-.70,.02,.70,.40)},
+ {key:'bidet',rot:270,r:R(w-.58,.44,.58,.38)}
+ ];
+ // For this short room the fixtures sit opposite the bath, not on top of it.
+ if(d<1.57){layout[0].r=R(0,d-.75,1.70,.75);layout[1].r=R(w-.70,0,.70,.40);layout[2].r=R(w-.58,.42,.58,.38)}
+ const swing=R(doorX,0,door,door);
+ if(layout.some(o=>!inside(o.r,w,d)||overlap(o.r,swing,.01)))return null;
+ for(let i=0;i<layout.length;i++)for(let j=i+1;j<layout.length;j++)if(overlap(layout[i].r,layout[j].r,.01))return null;
+ return {layout,doorX};
+}
+
+function run(raw){
+ const {text,corrections}=correctText(raw);
+ const d=detailInstruction(text);if(d){const p=solveDetail(d);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
+ let spec,notes=[];
+ try{spec=interpret(text)}catch(error){
+  let clean=text;
+  if(/Accesibilidad:/.test(error.message)&&/\bbanos?\b/.test(text)){
+   clean=clean.replace(/\b(?:para\s+|con\s+)?(?:accesibles?|adaptad[oa]s?|sillas? de ruedas|wheelchair|discapacitados?)\b/g,'');
+   spec=interpret(clean);if(spec.kind!=='bathroom')throw error;
+   if(!dimensions(text)&&!/\b(?:ancho|largo|profundidad|m2|metros cuadrados)\b|m²/.test(text)){spec.width=2.6;spec.depth=2.6;spec.assumptions=spec.assumptions.filter(a=>!a.startsWith('Dimensiones iniciales'));spec.assumptions.push('Medidas iniciales propuestas: 2,60 × 2,60 m');}
+   if(!/\bpuerta\b/.test(text))spec.door=.9;
+   notes.push('Baño preliminar: accesibilidad NO verificada; faltan giro, transferencia y barras.');
+  }else if(/\b(?:vestidor|walk-in closet)\b/.test(text)&&/\b(?:habitacion|dormitorio|pieza)\b/.test(text)&&/La geometría solicitada/.test(error.message)){
+   spec=interpret(clean.replace(/\b(?:con\s+)?(?:vestidor|walk-in closet)\b/g,''));notes.push('Vestidor independiente no generado.');
+  }else throw error;
+ }
+ if(corrections.length)spec.assumptions.push('Correcciones de tipeo: '+corrections.join(', '));
+ const mark=p=>{if(notes.length){p.status='approximate';p.warning='APROXIMACIÓN: '+notes.join(' ');p.assumptions.push(p.warning)}return p};
+ try{return mark(solve(spec))}catch(error){
+ if(!error.message.includes('sin interferencias'))throw error;
  const s=normalize(text),explicit=new Set();
  for(const m of s.matchAll(/[a-z]+/g)){const k=concept(m[0]);if(C[k])explicit.add(k)}
  const requested=spec.fixtures.filter(k=>explicit.has(k));
  const essential=requested.length?requested:spec.fixtures;
  const attempts=[spec.fixtures,essential];
+ const tpl=compactBathTemplate(spec);
+ if(tpl){try{const p=solve({...spec,fixtures:['bathtub','toilet','bidet'],doorX:tpl.doorX,templateLayout:tpl.layout});notes.push('Modelo compacto basado en baño completo de biblioteca; lavatorio no colocado. Holguras y circulación no verificadas.');return mark(p)}catch(e){}}
  // Try the original dimensions, all requested fixtures and alternate door positions first.
  // A partial plan is a last resort and must disclose each missing fixture.
  for(let i=0;i<essential.length;i++)attempts.push(essential.slice(0,essential.length-i-1));
@@ -264,13 +307,13 @@ function run(text){
     const missing=essential.filter(k=>!fixtures.includes(k));
     const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',shower:'ducha'};
     const warning='APROXIMACIÓN: baño preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
-    const p=solve({...spec,fixtures,doorX,compact:true,assumptions:[...spec.assumptions,warning]});p.status='approximate';p.warning=warning;return p;
+    const p=solve({...spec,fixtures,doorX,compact:true,assumptions:[...spec.assumptions,warning]});p.status='approximate';p.warning=[...notes,warning].join(' ');return p;
    }catch(e){}
   }
  }
  throw error;
  }
 }
-const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,catalog:C});
+const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,correctText,catalog:C});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BlacklineArchitectureAI=api;
 })(typeof self!=='undefined'?self:globalThis);
