@@ -6164,7 +6164,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
 });
 const CAD_COMMANDS=[
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
- ['SAVE','QSAVE','Guardar dibujo (DXF)'],['SAVEAS','','Guardar una copia con otro nombre (DXF o proyecto)'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
+ ['SAVE','QSAVE','Guardar dibujo (DXF)'],['SAVEAS','','Guardar una copia con otro nombre (DXF, DWG o proyecto)'],['SAVEDWG','GUARDARDWG','Guardar dibujo como DWG binario editable'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
  ['BREAKATPOINT','BAP','Partir línea en un punto, sin eliminar tramo'],['ALIGN','ALN','Alinear objetos por dos pares de puntos sin escalar'],['LIST','LI','Mostrar geometría y propiedades de la selección'],['QSELECT','QS','Selección rápida por tipo y capa'],['REGEN','RE','Redibujar la vista'],
  ['ZOOM','Z','Z Enter · - aleja · + acerca · E extensión · P anterior · 2x factor · W ventana'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['ZOOMPREVIOUS','ZP','Volver a la vista anterior'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
  ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
@@ -6489,14 +6489,14 @@ function cadDispatchNamed(value){
 
  if(cmd==='REGENERAR'||cmd==='REDIBUJAR')return schedule();
  if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
- if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();
+ if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();if(cmd==='SAVEDWG'||cmd==='GUARDARDWG')return saveJSON(true,'dwg');
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){
   if(!window.confirm('Crear un dibujo nuevo? Guardá primero el trabajo actual.'))return;
   const suggested=window.prompt('Nombre del dibujo nuevo (ej.: casa 2d):','Untitled Drawing');
   if(suggested===null)return;
   if(!suggested.trim())return toast('Ingresá un nombre para crear el dibujo');
-  saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
+  cadProjectSaveHandle=null;saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
   cadSetDrawingName(suggested);state.nextId=1;renderBlockLibrary();updateAll();zoomExtents();return
  }
  if(['BSAVE','BCLOSE','GUARDARBLOQUE'].includes(cmd)){if(!cadBlockEdit)return toast('No block is being edited');return cadBlockEditClose(true)}
@@ -6845,8 +6845,8 @@ async function download(name,data,mime='application/octet-stream'){
  const blob=data instanceof Blob?data:new Blob([data],{type:mime});
  const filename=String(name||'Dibujo.cadjson').replace(/[\\/:*?"<>|]/g,'_');
  const ext=(filename.match(/\.[^.]+$/)||['.cadjson'])[0].toLowerCase();
- const descriptions={'.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
- const mimeTypes={'.dxf':'application/dxf','.cadjson':'application/json','.svg':'image/svg+xml','.pdf':'application/pdf','.png':'image/png','.txt':'text/plain'};
+ const descriptions={'.dwg':'Dibujo DWG (AutoCAD)','.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
+ const mimeTypes={'.dwg':'application/acad','.dxf':'application/dxf','.cadjson':'application/json','.svg':'image/svg+xml','.pdf':'application/pdf','.png':'image/png','.txt':'text/plain'};
  if(typeof window.showSaveFilePicker==='function'&&window.isSecureContext){
   try{
    const handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:descriptions[ext]||'Archivo CAD',accept:{[mimeTypes[ext]||'application/octet-stream']:[ext]}}]});
@@ -6877,15 +6877,44 @@ function cadProjectSnapshot(filename){
   layers:state.layers,layerId:state.layerId,unit:state.unit,grid:state.grid,
   precision:state.precision,nextId:state.nextId,ltscale:state.ltscale||1,layout:collectLayoutState(),layouts:cadLayoutsSnapshot(),...(state.ctb?{ctb:state.ctb}:{})};
 }
-async function saveJSON(forceNew=false){
+// Export the editable 2D model as a real binary DWG, never a renamed DXF.
+async function cadBuildDWG(name){
+ if(cadBlockEdit)throw Error('Cerrá el editor de bloques antes de guardar el plano completo en DWG.');
+ const local=window.CAD2D_DWG_BATCH?.convertLocal;
+ if(typeof local!=='function')throw Error('El conversor DWG local no está disponible. Recargá CAD2D3D.');
+ // The standard exporter retains model units and native INSERTs. Select a modern
+ // exchange version for DWG so true colors and extended records are supported.
+ const dxf=buildDXFText(state.entities,name,state.layers).replace(/(\$ACADVER\r?\n1\r?\n)AC1015(?=\r?\n)/,'$1AC1027');
+ const file=new File([dxf],name+'.dxf',{type:'application/dxf'});
+ const bytes=await local(file,'dxf-dwg');
+ if(!(bytes instanceof ArrayBuffer)||bytes.byteLength<128||!/^AC10\d{2}$/.test(new TextDecoder('ascii').decode(bytes.slice(0,6))))throw Error('El conversor no devolvió un DWG binario válido.');
+ return bytes;
+}
+function cadWarnDWG(){
+ return window.confirm('Guardar la geometría 2D editable como DWG. Los objetos AEC originales no recuperados, las propiedades paramétricas propias de CAD2D3D y los layouts pueden no conservarse. Guardá también una copia DXF/proyecto y conservá el DWG original. ¿Continuar?');
+}
+let cadSaveBusy=false;
+async function saveJSON(forceNew=false,preferred=''){
+ if(cadSaveBusy)return toast('Ya se está guardando un dibujo.');
+ cadSaveBusy=true;
+ try{return await cadSaveDrawing(forceNew,preferred)}finally{cadSaveBusy=false}
+}
+async function cadSaveDrawing(forceNew=false,preferred=''){
  const canPick=typeof window.showSaveFilePicker==='function'&&window.isSecureContext;
  let name=state.file;
+ const dwgOnly=preferred==='dwg';
+ let requestedFormat=dwgOnly?'dwg':'dxf';
+ if(dwgOnly&&cadBlockEdit)return toast('Cerrá el editor de bloques antes de guardar el plano completo.');
+ if(dwgOnly&&!cadWarnDWG())return false;
  // A browser without file-handle support downloads files instead of silently overwriting.
  // Offer a distinct name for Save As there.
  if(forceNew&&!canPick){
-  const requested=window.prompt('Save As · nombre del proyecto:',state.file);
+  const requested=window.prompt(dwgOnly?'Guardar DWG · nombre del archivo:':'Guardar como · nombre y extensión (.dxf, .dwg, .cadjson):',state.file+(dwgOnly?'-editado.dwg':'.dxf'));
   if(requested===null)return false;
   if(!requested.trim())return toast('Escribí un nombre para guardar');
+  if(!dwgOnly&&/\.dwg$/i.test(requested))requestedFormat='dwg';
+  else if(!dwgOnly&&/\.cadjson$/i.test(requested))requestedFormat='cadjson';
+  if(requestedFormat==='dwg'&&!dwgOnly&&!cadWarnDWG())return false;
   name=cadCleanDrawingName(requested);
  }
  // Por defecto se guarda en DXF (abre en AutoCAD y cualquier CAD). Después del EOF se agrega el
@@ -6895,15 +6924,23 @@ async function saveJSON(forceNew=false){
  if(canPick){
   try{
    const handle=forceNew||!cadProjectSaveHandle
-    ?await window.showSaveFilePicker({suggestedName:name+'.dxf',types:[
+    ?await window.showSaveFilePicker({suggestedName:dwgOnly?name+'-editado.dwg':name+'.dxf',types:dwgOnly?[{description:'Dibujo DWG (AutoCAD)',accept:{'application/acad':['.dwg']}}]:[
       {description:'Dibujo DXF (AutoCAD)',accept:{'application/dxf':['.dxf']}},
+      {description:'Dibujo DWG (AutoCAD)',accept:{'application/acad':['.dwg']}},
       {description:'Proyecto Blackline CAD',accept:{'application/json':['.cadjson']}}
-     ]})
+     ],excludeAcceptAllOption:true})
     :cadProjectSaveHandle;
-   const isJSON=/\.(cadjson|json)$/i.test(handle.name);
+   const isDWG=/\.dwg$/i.test(handle.name),isJSON=/\.(cadjson|json)$/i.test(handle.name);
+   if(!isDWG&&!isJSON&&!/\.dxf$/i.test(handle.name))throw Error('Elegí una extensión .dxf, .dwg o .cadjson.');
+   if(dwgOnly&&!isDWG)throw Error('La extensión debe ser .dwg.');
+   if(isDWG&&!dwgOnly&&handle!==cadProjectSaveHandle&&!cadWarnDWG())return false;
+   const sig=cad2dDrawingSignature();
+   if(isDWG)toast('Generando DWG localmente…');
+   const contents=isDWG?await cadBuildDWG(cadCleanDrawingName(handle.name)):isJSON?projectText():dxfText();
+   // Convert and verify before opening a writable stream to protect the previous file.
    const writable=await handle.createWritable();
-   await writable.write(isJSON?projectText():dxfText());await writable.close();
-   cadProjectSaveHandle=handle;cad2dLastAutoSig=cad2dDrawingSignature();cad2dLastAutoTime=Date.now();
+   try{await writable.write(contents);await writable.close()}catch(error){try{await writable.abort()}catch(e){}throw error}
+   cadProjectSaveHandle=handle;cad2dLastAutoSig=sig;cad2dLastAutoTime=Date.now();
    cadSetDrawingName(handle.name);
    queueLocalBackup();
    log('SAVE: '+handle.name);
@@ -6916,9 +6953,14 @@ async function saveJSON(forceNew=false){
    return false;
   }
  }
- const result=await download(name+'.dxf',dxfText(),'application/dxf');
- if(result&&forceNew){cadSetDrawingName(name);queueLocalBackup()}
- return result;
+ try{
+  if(requestedFormat==='dwg')toast('Generando DWG localmente…');
+  const content=requestedFormat==='dwg'?await cadBuildDWG(name):requestedFormat==='cadjson'?projectText():dxfText();
+  const mime=requestedFormat==='dwg'?'application/acad':requestedFormat==='cadjson'?'application/json':'application/dxf';
+  const result=await download(name+'.'+requestedFormat,content,mime);
+  if(result&&forceNew){cadSetDrawingName(name);queueLocalBackup()}
+  return result;
+ }catch(error){toast('SAVE: no se pudo guardar · '+(error?.message||'error'));return false}
 }
 const CAD2D_DXF_PROJECT_MARK='CAD2D-PROJECT-JSON';
 function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.entities:state.entities,name,state.layers)+CAD2D_DXF_PROJECT_MARK+'\n'+JSON.stringify(cadProjectSnapshot(name))+'\n'}
@@ -7198,6 +7240,8 @@ async function cadDxfDecode(buf){
  try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
 }
 async function loadDrawingFile(f){if(!f)return;
+ // Do not reuse a previous drawing's save destination after opening a different file.
+ if(!/\.(pdf|png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name))cadProjectSaveHandle=null;
  // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
  if(/\.(dwt|dws)$/i.test(f.name)){const tpl=/\.dwt$/i.test(f.name);await loadDrawingFile(new File([f],f.name.replace(/\.(dwt|dws)$/i,'.dwg'),{type:f.type}));
   if(tpl){state.file='Dibujo nuevo';try{$('filename').textContent='Dibujo nuevo.dxf'}catch(e){}cadProjectSaveHandle=null;toast('Plantilla '+f.name+' cargada como dibujo nuevo: capas, estilos y bloques listos')}return}
@@ -10440,6 +10484,7 @@ function initCadExportPopover(){
  const option=(name,detail,fn)=>{const b=document.createElement('button');b.type='button';b.className='cad-export-option';const left=document.createElement('strong');left.textContent=name;const right=document.createElement('small');right.textContent=detail;b.append(left,right);b.onclick=()=>{close();fn()};p.append(b)};
  label('Dibujo editable');
  option('Guardar .DXF','CAD 2D · 1:1',()=>exportDXF());
+ option('Guardar .DWG','AutoCAD · conversión local',()=>saveJSON(true,'dwg'));
  option('Guardar proyecto .CADJSON','Edición en CAD2D',()=>saveJSON());
  option('Exportar notas .TXT','Texto plano de anotaciones, sin geometría',()=>exportCADTextNotes());
  label('Gráficos e impresión');
@@ -10454,7 +10499,7 @@ function initCadExportPopover(){
  label('Importar');
  option('Importar imagen, Word, Excel, CSV o TXT','PNG · JPG · WEBP · GIF · BMP · DOCX · XLSX · CSV · TXT · DXF · SVG',()=>$('fileInput').click());
  label('Formato DWG');
- const note=document.createElement('div');note.className='cad-export-note';note.textContent='DWG no se exporta directamente: no hay conversor DWG configurado. Usá DXF para abrir el plano en AutoCAD, LibreCAD, QCAD u otras aplicaciones compatibles y guardar como DWG desde un conversor externo que lo admita. DXF es el formato de intercambio editable recomendado.';p.append(note);
+ const note=document.createElement('div');note.className='cad-export-note';note.textContent='El DWG se genera localmente desde el modelo 2D editable. Conservá el original y una copia DXF/proyecto para mantener los datos específicos de CAD2D3D.';p.append(note);
  btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-haspopup','dialog');
  btn.onclick=()=>p.hidden?openCadExportPopover():close();
  $('cadSaveDxfStatus').onclick=()=>exportDXF();
