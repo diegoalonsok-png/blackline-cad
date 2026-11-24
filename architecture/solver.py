@@ -6,6 +6,7 @@ The CAD adapter is responsible for native walls, hosted openings and block refer
 import json
 import math
 import re
+import random
 import unicodedata
 import sys
 from dataclasses import dataclass
@@ -81,16 +82,20 @@ def clearance(kind,rot,r):
             Rect(r.x,r.y-a,r.w,r.d+a) if rot==180 else
             Rect(r.x,r.y,r.w+a,r.d))
 
-def arrange(w,d,fixtures,door,extra_protected=()):
+def arrange(w,d,fixtures,door,extra_protected=(),seed=0):
     protected = Rect((w-door)/2,0,door,door)  # full conservative door swing envelope
     order = sorted(fixtures,key=lambda key: CATALOG[key][1]*CATALOG[key][2],reverse=True)
     result=[]
     nodes=0
+    rng=random.Random(seed)
+    options={key:list(candidates(key,w,d)) for key in set(order)}
+    if seed:
+        for key in sorted(options): rng.shuffle(options[key])
     def search(i):
         nonlocal nodes
         if i==len(order): return True
         kind=order[i]
-        for rot,r in candidates(kind,w,d):
+        for rot,r in options[kind]:
             nodes+=1
             if nodes>50000: return False
             access=clearance(kind,rot,r)
@@ -118,7 +123,7 @@ def solve(spec):
     fixtures=spec.get("fixtures",DEFAULTS[kind])
     if not isinstance(fixtures,list) or len(fixtures)>12 or any(f not in CATALOG for f in fixtures):
         raise ValueError("Unsupported fixtures")
-    layout=arrange(w,d,fixtures,door)
+    layout=arrange(w,d,fixtures,door,seed=spec.get('seed',0))
     plan={"schema":"blackline.architecture.v1","units":"m","walls":[],"openings":[],"blocks":[],"virtualDimensions":[],"rooms":[]}
     def wall(id,a,b):
         plan["walls"].append({"id":id,"a":a,"b":b,"thickness":t,"layer":"WALLS","join":"native"})
@@ -255,8 +260,54 @@ def solve_suite_row(spec):
             "between":[("bath-"+b if b.startswith("back") else b.replace("front","back",1) if b.startswith("front") else b) for b in a["between"]]})
     return plan
 
+def solve_variants(spec,amount):
+    """Generate independent alternatives in a spaced drawing grid; no copied room blocks."""
+    if type(amount) is not int or not 1<=amount<=20:
+        raise ValueError("Choose 1–20 alternatives per request.")
+    if spec["kind"]=="suite_row" or spec.get("count",1)!=1:
+        raise ValueError("Alternative generation currently supports one individual room at a time.")
+    result={"schema":"blackline.architecture.v1","units":"m","walls":[],"openings":[],"blocks":[],
+            "virtualDimensions":[],"rooms":[],"variants":[]}
+    w,d,t=spec["width"],spec["depth"],spec["wall"]
+    cols=math.ceil(math.sqrt(amount))
+    seen=set()
+    for seed in range(amount*5):
+        try: plan=solve({**spec,"seed":seed})
+        except ValueError: continue
+        # Reject duplicates and tiny shifts: use 30 cm positional bins and rotation.
+        signature=tuple(sorted((b["role"],b["rotation"],round(b["envelope"][0]/.3),round(b["envelope"][1]/.3)) for b in plan["blocks"]))
+        if signature in seen: continue
+        seen.add(signature)
+        i=len(result["variants"])
+        prefix=f"variant{i+1}-"
+        dx=(i%cols)*(w+2*t+1.5)
+        dy=(i//cols)*(d+2*t+1.5)
+        for a in plan["walls"]:
+            result["walls"].append({**a,"id":prefix+a["id"],"a":[a["a"][0]+dx,a["a"][1]+dy],"b":[a["b"][0]+dx,a["b"][1]+dy]})
+        for a in plan["openings"]:
+            result["openings"].append({**a,"host":prefix+a["host"]})
+        for a in plan["blocks"]:
+            x,y=a["point"];ex,ey,ew,ed=a["envelope"]
+            result["blocks"].append({**a,"point":[x+dx,y+dy],"envelope":[ex+dx,ey+dy,ew,ed]})
+        for a in plan["rooms"]:
+            x,y,rw,rd=a["clearBounds"]
+            result["rooms"].append({**a,"id":prefix+a["id"],"clearBounds":[x+dx,y+dy,rw,rd]})
+        for a in plan["virtualDimensions"]:
+            result["virtualDimensions"].append({**a,"room":prefix+a["room"],"between":[prefix+b for b in a["between"]]})
+        result["variants"].append({"id":prefix[:-1],"room":prefix+"room0","number":i+1})
+        if len(result["variants"])==amount: break
+    if not result["variants"]: raise ValueError("No feasible layout found.")
+    result["assumptions"]=list(spec.get("assumptions",[]))+[f"{len(result['variants'])}/{amount} distinct alternatives found; each preserves clear dimensions and fixture sizes."]
+    result["brief"]={**spec,"alternatives":amount}
+    return result
+
 def solve_instruction(text):
-    spec=interpret(text)
+    s="".join(ch for ch in unicodedata.normalize("NFD",text.lower()) if unicodedata.category(ch)!="Mn")
+    m=re.search(r"\b(\d+)\s+(?:versiones?|variantes?|alternativas?|versions?|variants?|alternatives?)\s+(?:de\s+|of\s+)?",s)
+    amount=int(m[1]) if m else None
+    brief_text=(s[:m.start()]+s[m.end():]) if m else text
+    spec=interpret(brief_text)
+    if amount is not None: return solve_variants(spec,amount)
     plan=solve_suite_row(spec) if spec['kind']=='suite_row' else solve(spec)
     plan['assumptions']=spec['assumptions']
     plan['brief']=spec
@@ -300,6 +351,11 @@ def selftest():
     assert interpret("Cocina 5 x 5 con isla")["fixtures"][-1]=="island"
     assert interpret("Bathroom 2.5 x 3 with bathtub")["fixtures"][-1]=="bathtub"
     assert interpret("Bedroom 13 x 16 ft")["width"]==13*.3048
+    variants=solve_instruction("5 versiones de habitaciones de 5 x 4")
+    assert len(variants["variants"])==5 and len(variants["rooms"])==5
+    assert len({a["id"] for a in variants["walls"]})==len(variants["walls"])
+    assert all(a["scale"]==1 for a in variants["blocks"])
+    assert all(a["clearBounds"][2:]==[5.,4.] for a in variants["rooms"])
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
