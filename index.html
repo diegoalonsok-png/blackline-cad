@@ -6664,7 +6664,10 @@ function cadAuditScan(doc){
  function report(kind,where){total++;counts[kind]=(counts[kind]||0)+1;if(issues.length<limit)issues.push(kind+' · '+where)}
  const layers=Array.isArray(doc.layers)?doc.layers:[],entities=Array.isArray(doc.entities)?doc.entities:[],blocks=doc.blocks&&typeof doc.blocks==='object'?doc.blocks:{};
  const layerIds=new Set(),ids=new Set(),graph=new Map(),own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
- let maxId=0,validIds=true;
+ if(!Array.isArray(doc.entities))report('Colección de entidades inválida','modelo');
+ if(!Array.isArray(doc.layers))report('Colección de capas inválida','capas');
+ if(!doc.blocks||typeof doc.blocks!=='object'||Array.isArray(doc.blocks))report('Colección de bloques inválida','bloques');
+ let maxId=0,validIds=Array.isArray(doc.entities);
  for(const l of layers){
   if(!l||typeof l.id!=='string'||!l.id){report('ID de capa inválido','capas');continue}
   if(layerIds.has(l.id))report('ID de capa duplicado',l.id);
@@ -6688,7 +6691,10 @@ function cadAuditScan(doc){
   if(e.type==='line'&&point(e.a)&&point(e.b)&&e.a.x===e.b.x&&e.a.y===e.b.y)report('Línea de longitud cero',where);
   if(e.type==='arc'&&(!Number.isFinite(e.a0)||!Number.isFinite(e.a1)))report('Ángulos de arco inválidos',where);
   if(e.type==='text'&&(!Number.isFinite(e.h)||e.h<=0))report('Altura de texto inválida',where);
+  if(e.type==='hatch'&&e.hatchStyle&&e.hatchStyle!=='solid'&&!/^gradient/.test(e.hatchStyle)&&(!Number.isFinite(e.hatchSpacing)||e.hatchSpacing<=0))report('Separación de sombreado inválida',where);
   if(e.type==='blockRef'){
+   if(e.scale!=null&&(!Number.isFinite(e.scale)||e.scale<=0))report('Escala de bloque inválida',where);
+   if(e.rotation!=null&&!Number.isFinite(e.rotation))report('Rotación de bloque inválida',where);
    if(typeof e.blockName!=='string'||!own(blocks,e.blockName))report('Definición de bloque ausente',where);
    else if(edges)edges.add(e.blockName);
   }
@@ -6718,6 +6724,7 @@ function cadAuditScan(doc){
  return {total,counts,issues,nextId,entities:entities.length,layers:layers.length,blocks:graph.size};
 }
 function cadAuditDrawing(){
+ if(cadBlockEdit)return toast('Cerrá BEDIT antes de auditar el dibujo completo.');
  const initial=cadAuditScan(state);
  $('cadAuditResult')?.remove();
  const box=document.createElement('section');box.id='cadAuditResult';box.className='modal-backdrop show';
@@ -6799,6 +6806,7 @@ function purgeUnusedCadLayers(){
  d.onclick=e=>{if(e.target===d)d.remove()};
  d.querySelector('[data-apply]').onclick=()=>{
   if(cadBlockEdit)return toast('Cerrá BEDIT antes de limpiar.');
+  if(!Array.isArray(state.entities)||!Array.isArray(state.layers)||Object.values(state.blocks||{}).some(d=>!Array.isArray(d?.entities)))return toast('PURGE: estructura inválida; ejecutá AUDIT antes de limpiar.');
   const p=render();if(!total(p))return;
   if(!window.confirm('Eliminar '+total(p)+' recursos listados del proyecto? No se elimina geometría del modelo.'))return;
   saveHistory();
