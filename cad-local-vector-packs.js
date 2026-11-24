@@ -45,7 +45,8 @@ function filterNew(rows){const k=known(),result=[];
 }
 function register(rows){
  const fresh=filterNew(rows);
- for(const [id,source,name,cat,w,d,data,hash,flags] of fresh){
+ for(const [id,source,name,oldCat,w,d,data,hash,flags] of fresh){
+ const cat=restoredCategory(name,oldCat);
  L.library.push({id,source,name:name+(flags&1?' · escala estimada':'')+(flags&6?' · parcial':''),cat,w,d,family:'DXF importado localmente',sourceHash:hash,
   originalDXF:true,nominalDimensions:true,importFlags:flags,hideFromGallery:false,pro:false,paidOnly:false,
   wMin:flags&1?Math.max(.001,w*.05):w,wMax:flags&1?Math.min(100,w*20):w,dMin:flags&1?Math.max(.001,d*.05):d,dMax:flags&1?Math.min(100,d*20):d,lockAspect:true,
@@ -99,10 +100,35 @@ async function importFile(file){
 }
 
 const METRES={1:.0254,2:.3048,4:.001,5:.01,6:1,7:1000,8:2.54e-8,9:2.54e-5,10:.9144,11:1e-10,12:1e-9,13:1e-6,14:.1};
-function categoryFor(file){
- const s=(file.webkitRelativePath||file.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- const groups=[[/abertura|puerta|ventana|carpinter/,'Aberturas'],[/bano|bacha|bidet|inodoro|sanitari|lavatorio|ducha|banera/,'Sanitarios'],[/cocina|anafe|horno|heladera/,'Cocinas'],[/ascensor/,'Ascensores'],[/arbol|vegetacion|planta vegetal/,'Vegetación'],[/animal/,'Animales'],[/gym|deport/,'Deportes'],[/avion|barco|auto|camion|vehicul/,'Vehículos'],[/escalera/,'Escaleras'],[/mueble|silla|mesa|sofa/,'Mobiliario']];
- return groups.find(x=>x[0].test(s))?.[1]||'Importados';
+function classify(value){
+ const s=String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]/g,' ');
+ const groups=[
+ [/abertura|puerta|ventana|carpinter|persiana|\bdoor\b|\bwindow\b|porton/,'Puertas y ventanas'],
+ [/bano|bacha|bidet|inodoro|sanitari|lavatorio|ducha|banera|toilet|urinal|shower|bathtub|\bwc\b/,'Baños'],
+ [/cocina|anafe|horno|heladera|kitchen|fridge|refriger|lavavajillas|microondas/,'Cocinas'],
+ [/dormitorio|bedroom|\bcama\b|\bbed\b|colchon|cucheta|placard/,'Dormitorios'],
+ [/ascensor|elevator|\blift\b/,'Ascensores'],
+ [/arbol|vegetacion|arbusto|palmera|tree|shrub|jardin|outdoor/,'Exterior'],
+ [/animal|fauna|perro|gato|caballo|\bdog\b|\bcat\b/,'Animales'],
+ [/gym|gimnasio|deport|fitness|sport/,'Deportes'],
+ [/avion|barco|auto|camion|vehicul|truck|airplane|boat|bicycle|bicicleta|moto|\bcar\b|\bbus\b|aparcamiento|estacionamiento/,'Vehículos'],
+ [/escalera|stair|pasamanos|baranda|railing/,'Escaleras'],
+ [/ilumin|luminaria|lampara|lighting|light fixture/,'Iluminación'],
+ [/oficina|office|escritorio/,'Oficina'],
+ [/persona|people|human|figura humana/,'Personas'],
+ [/detalle construct|construction detail|estructura|fundacion|cimientos/,'Obra'],
+ [/simbolo|symbol|norte|north arrow/,'Símbolos'],
+ [/cota|nivel|eje|documentacion/,'Documentación'],
+ [/mueble|mobiliario|silla|mesa|sofa|sillon|furniture|chair|table|piano/,'Mobiliario']];
+ return groups.find(([re])=>re.test(s))?.[1]||null;
+}
+function categoryFor(file,label){
+ const name=file.name||'',path=file.webkitRelativePath||name;
+ return classify(label)||classify(name)||path.split(/[\\/]/).slice(0,-1).reverse().map(classify).find(Boolean)||'Sin clasificar';
+}
+function restoredCategory(name,cat){
+ const aliases={'Aberturas':'Puertas y ventanas','Sanitarios':'Baños','Vegetación':'Exterior','Importados':'Sin clasificar','Otros':'Sin clasificar'};
+ return classify(name)||aliases[cat]||cat||'Sin clasificar';
 }
 function vectorize(entities,recover=false){
  let skipped=0;
@@ -192,7 +218,7 @@ async function fileRow(file,unknownUnit,recover=true){
  let binary='';for(let i=0;i<raw.length;i+=8192)binary+=String.fromCharCode(...raw.subarray(i,i+8192));
  const hash=(await hexHash(new TextEncoder().encode(w+'|'+d+'|'+btoa(binary)))).slice(0,24);
  const name=safe(label||file.name.replace(/\.(dwg|dxf)$/i,'').replace(/__[a-f0-9]{12}$/i,'').replace(/_/g,' '))||'Bloque';
- return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,cat,w,d,btoa(binary),hash,flags];
+ return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,categoryFor(file,label),w,d,btoa(binary),hash,flags];
  }
  // A standalone drawing needs no INSERT: the lower-left bounds give the block's local origin.
  try{return [await encode(parsed.entities||[],null,flags)]}catch(modelError){
@@ -308,7 +334,7 @@ function openDrawingImport(){
  if(busy)return;
  const pane=document.createElement('dialog');
  pane.style.cssText='background:#23313b;color:#f2f5f6;border:1px solid #657985;border-radius:10px;padding:16px;width:min(480px,90vw)';
- pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Se admiten dibujos sin punto de inserción y definiciones de bloques sin INSERT. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
+ pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Los bloques se organizan automáticamente por nombre y carpetas del ZIP. Se admiten dibujos sin punto de inserción y definiciones de bloques sin INSERT. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
  document.body.appendChild(pane);
  const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input[type=file]'),unit=pane.querySelector('select'),recovery=pane.querySelector('[data-recover]');
  let active=false,stop=false;
