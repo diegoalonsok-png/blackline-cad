@@ -11456,7 +11456,7 @@ function cad2dDrawExtensions(){
 /* ARCHGEN experimental bridge. Atomic insert; uses native opening fragments. */
 window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
  if(state.unit!=='m')throw Error('ARCHGEN requiere un dibujo configurado en metros');
- if(!Array.isArray(models)||!models.length||models.length>25||!origin||![origin.x,origin.y].every(Number.isFinite))throw Error('Selección ARCHGEN inválida');
+ if(!Array.isArray(models)||!models.length||models.length>100||!origin||![origin.x,origin.y].every(Number.isFinite))throw Error('Selección ARCHGEN inválida');
  const lib=window.CAD2D_ARQ_LIBRARY;if(!lib?.build)throw Error('Biblioteca arquitectónica no disponible');
  const before=historySnapshot(),selected=state.selected.slice();
  const layer=(name,color,width=.13)=>{
@@ -11764,7 +11764,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-local-vector-packs.js?v=20261123-selection-v1"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script src="cad-archgen.js?v=20261124-prototype"></script>
+<script src="cad-archgen.js?v=20261124-diverse-v2"></script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
 <script defer src="cad3d-lab.js?v=20261124-massprop-interfere-v1"></script>
 </body></html>
