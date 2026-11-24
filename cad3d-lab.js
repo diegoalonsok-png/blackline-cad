@@ -9021,6 +9021,21 @@ function checkVisibleShadows(){
  }catch(err){report('Shadow image comparison unavailable: '+String(err?.message||err));}
  finally{sunLight.castShadow=lightWasCasting;renderer.shadowMap.needsUpdate=true;renderer.render(scene,camera);}
 }
+// Diagnostic only: quantized edge matching does not resolve T-junctions.
+function cad3dMeshTopology(t){
+ if(!Array.isArray(t)||!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite))return {invalid:true,degenerate:0,open:0,nonManifold:0,orientation:0};
+ const edges=new Map(),eps=1e-7,origin=t.slice(0,3);let degenerate=0;
+ const key=p=>p.map((v,i)=>Math.round((v-origin[i])/eps)).join(',');
+ for(let i=0;i<t.length;i+=9){
+  const p=t.slice(i,i+3),q=t.slice(i+3,i+6),r=t.slice(i+6,i+9),keys=[key(p),key(q),key(r)];
+  const u=q.map((v,j)=>v-p[j]),v=r.map((v,j)=>v-p[j]);
+  if(new Set(keys).size<3||Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])<=eps*eps){degenerate++;continue}
+  for(let j=0;j<3;j++){const a=keys[j],b=keys[(j+1)%3],forward=a<b,k=forward?a+'|'+b:b+'|'+a,e=edges.get(k)||[0,0];e[0]++;e[1]+=forward?1:-1;edges.set(k,e)}
+ }
+ let open=0,nonManifold=0,orientation=0;
+ for(const [count,balance] of edges.values()){if(count===1)open++;else if(count>2)nonManifold++;else if(balance!==0)orientation++}
+ return {invalid:false,degenerate,open,nonManifold,orientation};
+}
 function verify3DSolids(){
  var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean','stair','railing']);
  var invalid=records.filter(function(r){
@@ -9028,12 +9043,15 @@ function verify3DSolids(){
   var dims=r.type==='sphere'?[r.radius]:r.type==='cylinder'||r.type==='cone'?[r.radius,r.h]:r.type==='boolean'?[]:[r.w,r.d,r.h];
   return dims.some(function(v){return !Number.isFinite(v)||v<=0;});
  });
+ var topologyWarnings=0,topologyChecked=0;
+ for(const r of records){if(r.type!=='boolean')continue;topologyChecked++;const q=cad3dMeshTopology(r.triangles);if(q.invalid||q.degenerate||q.open||q.nonManifold||q.orientation){topologyWarnings++;console.warn('[CHECK3D] malla '+r.id,q)}}
  var meshCount=0,geometryValid=true;
  if(T&&modelRoot)modelRoot.traverse(function(o){if(o.isMesh){meshCount++;var p=o.geometry?.getAttribute('position');if(!p||p.count<3)geometryValid=false;}});
  var ok=!invalid.length&&geometryValid&&(records.length===0||!T||!modelRoot||meshCount>0);
  var message=records.length===0?'No 3D objects yet. Create a Box, Wall or Sphere.':
  (ok?'3D geometry OK: '+records.length+' object(s)'+(T&&modelRoot?' · '+meshCount+' mesh(es)':' · compatibility preview mode'):
  '3D geometry warning: '+invalid.length+' invalid record(s), '+meshCount+' mesh(es).');
+ if(topologyChecked)message+=' · Topología: '+topologyWarnings+'/'+topologyChecked+' mallas con indicios (incluye posibles uniones en T; no certifica cierre).';
  root.querySelector('.solidCheck').textContent=message;text(message);return ok;
 }
 function updateDynamicReadout(e){
