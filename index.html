@@ -1676,11 +1676,13 @@ function cadGenerateRoomRow(spec,origin){
 
 /* Import geometry computed by the independent architecture solver as native CAD entities.
  * Work on an isolated entity set, then commit as a single undo step. */
-function cadApplyArchitecturePlan(plan,origin,resolveBlock){
+function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
  if(plan?.schema!=='blackline.architecture.v1'||plan.units!=='m'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks)||plan.walls.length>500||plan.openings.length>300||plan.blocks.length>500)throw Error('Invalid architecture plan');
  if(!autoOpeningEnabled||!window.BlacklineAutoOpening)throw Error('Enable automatic wall openings.');
  const k=1000/U[state.unit],point=(x,y)=>{if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>1000||Math.abs(y)>1000)throw Error('Invalid plan coordinate');return P(origin.x+x*k,origin.y+y*k)};
  const before=historySnapshot(),history=state.history.slice(),future=state.future.slice(),original=state.entities;
+ const signature=items=>JSON.stringify(items.map(e=>{const {arqPlan,...rest}=e;return rest}));
+ if(replaceBatch){const old=original.filter(e=>e.arqBatch===replaceBatch),meta=old.find(e=>e.arqPlan)?.arqPlan;if(!meta||meta.signature!==signature(old))throw Error('El ambiente contiene modificaciones manuales. No se reemplazará automáticamente.');}
  const batch='arq-'+state.nextId,hosts=new Map();
  function layer(name){let l=state.layers.find(l=>l.name.toUpperCase()===name);if(!l){l={id:'arq-'+name.toLowerCase(),name,color:'#e5e7eb',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'};if(state.layers.some(x=>x.id===l.id))throw Error('Layer ID collision');state.layers.push(l)}if(l.locked||!l.visible)throw Error('Layer unavailable: '+name);return l.id}
  try{
@@ -1721,8 +1723,8 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock){
    state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:point(...b.point),scale:1,rotation:b.rotation,layer:layer(b.layer),arqBatch:batch,arqRole:b.role});
   }
   const generated=state.entities;
-  if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[]};
-  state.entities=original.concat(generated);state.selected=[];updateAll();return generated.length;
+  if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[],origin:clone(origin),unit:state.unit,signature:signature(generated)};
+  state.entities=original.filter(e=>!replaceBatch||e.arqBatch!==replaceBatch).concat(generated);state.selected=[];updateAll();return generated.length;
  }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
 }
 function cadWallCenterline(meta){
@@ -11578,7 +11580,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261124-python-engine-v6"></script>
+<script src="cad-arq-pro.js?v=20261124-room-dimensions-v7"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-zip-organize-v4"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
