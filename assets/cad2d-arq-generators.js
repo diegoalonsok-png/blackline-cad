@@ -630,6 +630,89 @@ for(const bedType of ['double','queen','king'])for(const side of ['left','right'
  layoutSpec:(W,D)=>suiteSpec(W,D,bedType,side,closetKind),gen(b,W,D){suiteDraw(b,W,D,bedType,side,closetKind)}});
 }
 
+
+/* Collective architecture: preliminary planning modules, not a hygiene, fire,
+   accessibility or occupancy certification. Dimensions are exterior metres. */
+const GYM='Sanitarios colectivos';
+function gymSpec(W,D,n,showers){
+ const t=.15,p=(W-2*t-1.80)/n,depth=1.65,entry=.95;
+ const rowY=D-t-depth,frontY=t,aisle=rowY-(frontY+depth);
+ if(p<1.05-1e-8||aisle<1.50-1e-8)throw Error('Espacio colectivo insuficiente');
+ const rects=[];
+ for(let i=0;i<n;i++){
+  const x=t+1.80+i*p;
+  rects.push({key:'wc',x:x+(p-.40)/2,y:D-t-.75,w:.40,h:.75});
+  if(showers)rects.push({key:'shower',x:x+(p-.90)/2,y:t+.10,w:.90,h:.90});
+  else rects.push({key:'locker',x:x+.10,y:t+.10,w:p-.20,h:.60});
+ }
+ rects.push({key:'sink',x:t+.15,y:D-t-.55,w:1.20,h:.55});
+ return {t,p,depth,rowY,frontY,aisle,rects,entry};
+}
+function gymDraw(b,W,D,n,showers){
+ const s=gymSpec(W,D,n,showers),t=s.t,a=(D-s.entry)/2,z=a+s.entry;
+ for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
+ b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180);
+ const x0=t+1.80;
+ for(let i=0;i<n;i++){
+  const x=x0+i*s.p,xx=x+s.p,door=.75,h=x+(s.p-door)/2,k=h+door;
+  b.line(x,s.rowY,x,D-t,{width:.20});
+  b.line(x,s.rowY,h,s.rowY);b.line(k,s.rowY,xx,s.rowY);
+  b.line(h,s.rowY,h,s.rowY+door);b.arc(h,s.rowY,door,0,90);
+  if(showers){
+   const y=t+s.depth;
+   b.line(x,t,x,y,{width:.20});b.line(x,y,h,y);b.line(k,y,xx,y);
+   b.line(k,y+.03,Math.min(xx,k+.40),y+.03);
+  }
+ }
+ for(const r of s.rects){
+  if(r.key==='locker')wardrobe(b,r.x,r.y,r.w,r.h,false);
+  else if(r.key==='wc')b.at(r.x+r.w,D-t,180,q=>F.wc(q));
+  else if(r.key==='shower')b.at(r.x,r.y,0,q=>F.ducha(q,r.w,r.h,false));
+  else b.at(r.x+r.w,D-t,180,q=>F.lavatorioDoble(q,r.w,r.h));
+ }
+ b.text(x0+.10,s.rowY-.25,'CABINAS WC',.12);
+ b.text(x0+.10,t+s.depth+.15,showers?'DUCHAS':'GUARDADO',.12);
+ b.text(t+.20,D/2+.12,'ACCESO',.11);
+}
+for(let n=2;n<=8;n++)for(const showers of [true,false]){
+ const mw=Math.ceil((.30+1.80+n*1.10)*20)/20;
+ def({id:'arq-gym-'+n+'-'+(showers?'showers':'lockers'),name:'Gimnasio · '+n+' WC + '+(showers?n+' duchas':'guardado'),cat:GYM,family:'arq-gym-'+n,w:mw+.40,d:5.60,wMin:mw,wMax:mw+3,dMin:5.20,dMax:8,arqGym:true,stallCount:n,showerCount:showers?n:0,
+ layoutSpec:(W,D)=>gymSpec(W,D,n,showers),gen(b,W,D){gymDraw(b,W,D,n,showers)}});
+}
+const HOTEL='Cocinas hoteleras';
+function hotelSpec(W,D,mode,large){
+ const t=.15,L=W-2*t,back=D-t-.75,front=t,mid=(D-.90)/2;
+ const islandW=large?3.60:2.40,rects=[
+ {key:'cold',x:t,y:back,w:1.50,h:.75},
+ {key:'prep',x:t+1.50,y:back,w:L-3.90,h:.75},
+ {key:'cook',x:W-t-2.40,y:back,w:2.40,h:.75},
+ {key:'wash',x:t,y:front,w:2.40,h:.75},
+ {key:'store',x:W-t-1.80,y:front,w:1.80,h:.75},
+ {key:mode==='banquet'?'plating':mode==='breakfast'?'breakfast':'prep-island',x:(W-islandW)/2,y:mid,w:islandW,h:.90}];
+ const aisle=Math.min(mid-(front+.75),back-(mid+.90),(W-islandW)/2-t);
+ if(L<6.30||aisle<1.20-1e-8)throw Error('Cocina colectiva sin circulación suficiente');
+ return {t,rects,aisle,entry:1.20};
+}
+function hotelDraw(b,W,D,mode,large){
+ const s=hotelSpec(W,D,mode,large),t=s.t,a=(D-s.entry)/2,z=a+s.entry;
+ // Separate receiving and dispatch access gaps on opposite sides.
+ for(const p of [[0,0,W,0],[0,D,W,D],[0,0,0,a],[0,z,0,D],[W,0,W,a],[W,z,W,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[W-t,t,W-t,a],[W-t,z,W-t,D-t],[0,a,t,a],[0,z,t,z],[W-t,a,W,a],[W-t,z,W,z]])b.line(...p,{width:.22});
+ for(const r of s.rects){
+  b.rect(r.x,r.y,r.w,r.h);
+  if(r.key==='cold'){b.at(r.x,r.y,0,q=>F.heladera(q,.75,.75));b.at(r.x+.75,r.y,0,q=>F.heladera(q,.75,.75))}
+  else if(r.key==='cook'){for(let i=0;i<3;i++)b.at(r.x+i*.80,r.y+.06,0,q=>F.anafe(q,.80,.60))}
+  else if(r.key==='wash'){b.at(r.x,r.y,0,q=>F.bachaDoble(q,1.20,.70));b.at(r.x+1.20,r.y,0,q=>F.lavavajillas(q,.60,.70))}
+  else{const n=Math.ceil(r.w/.75);for(let i=1;i<n;i++)b.line(r.x+r.w*i/n,r.y,r.x+r.w*i/n,r.y+r.h)}
+  const names={cold:'FRÍO',prep:'PREPARACIÓN',cook:'COCCIÓN',wash:'LAVADO',store:'DEPÓSITO',plating:'EMPLATADO',breakfast:'DESAYUNOS','prep-island':'PREPARACIÓN'};
+  b.text(r.x+.08,r.y+r.h+.08,names[r.key],.11);
+ }
+ b.text(t+.12,D/2+.15,'RECEPCIÓN',.12);b.text(W-1.35,D/2+.15,'DESPACHO',.12);
+}
+for(const [mode,label] of [['restaurant','Restaurante'],['banquet','Banquetes'],['breakfast','Desayunos']])for(const large of [false,true]){
+ def({id:'arq-hotel-'+mode+'-'+(large?'large':'standard'),name:'Cocina hotelera · '+label+' · '+(large?'amplia':'estándar'),cat:HOTEL,family:'arq-hotel-'+mode,w:8,d:6.80,wMin:7,wMax:14,dMin:6,dMax:12,arqHotel:true,
+ layoutSpec:(W,D)=>hotelSpec(W,D,mode,large),gen(b,W,D){hotelDraw(b,W,D,mode,large)}});
+}
+
 /* ===== EXTERIOR Y VEGETACIÓN ===== */
 const EXT='Exterior';
 one('ext-arbol','Árbol caducifolio',EXT,3.00,3.00,(b,W)=>{const r=W/2,n=14,pts=[];for(let i=0;i<=n*2;i++){const a=i*180/n*DEG,rr=i%2?r*.86:r;pts.push([r+rr*Math.cos(a),r+rr*Math.sin(a)])}b.poly(pts,true);b.circle(r,r,r*.12);for(let i=0;i<6;i++){const a=i*60*DEG;b.line(r,r,r+r*.6*Math.cos(a),r+r*.6*Math.sin(a))}},{wMin:1.0,wMax:8.0,lockAspect:true,family:'arbol'});
