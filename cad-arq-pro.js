@@ -235,19 +235,30 @@ function renderPanel(){
  fillPanelGrid(cardsFor(activeCat,query));
 }
 function parseArqRequest(raw){
- const s=String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ const s=String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/^cad2d3d[,:\s]+/,'');
  if(!/^(?:mostra(?:me|r)?|muestra(?:me)?|mostrar|ver|lista(?:me|r|do)?|show(?: me)?|list|construi(?:me|r)?|construye(?:me)?|crea(?:me|r)?|genera(?:me|r)?|disena(?:me|r)?|build|create|generate|design)\b/.test(s))return null;
  const generate=/^(?:construi|construye|crea|genera|disena|build|create|generate|design)/.test(s);
  const room=/\b(?:habitacion(?:es)?|dormitorio(?:s)?|hotel(?:es)?|bedroom(?:s)?|room(?:s)?|tandem|vestidor(?:es)?)\b/.test(s);
- if(room)return {kind:'unsupported'};
+ 
  const bath=/\b(?:bano(?:s)?|bathroom(?:s)?|toilette(?:s)?)\b/.test(s);
  const kitchen=/\b(?:cocina(?:s)?|kitchen(?:s)?)\b/.test(s);
- if(bath===kitchen)return {kind:'unsupported'};
- const category=bath?'Baños completos':'Cocinas completas';
+ if(!room&&bath===kitchen)return {kind:'unsupported'};
+ const category=room?'Habitaciones completas':bath?'Baños completos':'Cocinas completas';
  const match=s.match(/(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\b/);
  const unit=(n,u)=>Number(n.replace(',','.'))/({cm:100,mm:1000,m:1}[u]||1);
  const dims=match?[unit(match[1],match[2]||match[4]),unit(match[3],match[4]||match[2])]:null;
  if(dims&&dims.some(n=>!Number.isFinite(n)||n<=0||n>30))return {kind:'invalid'};
+ if(room){
+  if(/\b(?:vestidor(?:es)?|walk-in|closet|accesible|accessible|sin pasillo|without corridor|cocina|kitchen|bano compartido|shared bathroom)\b/.test(s))return {kind:'unsupported'};
+  const words={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+  const q=s.match(/\b(\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:hotel\s+)?(?:habitacion(?:es)?|dormitorio(?:s)?|bedroom(?:s)?|room(?:s)?)\b/);
+  const n=q?(words[q[1]]??Number(q[1])):1;
+  if(!Number.isInteger(n)||n<1||n>12)return {kind:'invalid'};
+  const noBath=/\b(?:sin bano|without (?:a )?bathroom|no bathroom)\b/.test(s);
+  const privateBath=noBath?false:bath||/\b(?:suite|ensuite|en-suite|hotel|private bath)\b/.test(s)?true:null;
+  const moduleDims=dims||[4,6];
+  return {kind:'rooms',category,n,privateBath,dims:[moduleDims[0]*n,moduleDims[1]+1.5],moduleDims};
+ }
  const number=s.match(/\b(\d+)\s+(?:distribuciones|alternativas|variantes|layouts|options|bano(?:s)?|cocina(?:s)?|bathroom(?:s)?|kitchen(?:s)?)\b/);
  const count=number?Number(number[1]):null;
  if(count!==null&&(count<1||count>500))return {kind:'invalid'};
@@ -271,8 +282,16 @@ function runArqRequest(raw){
  const request=parseArqRequest(raw);
  if(!request)return false;
  const msg=$('arqHelp');
+ if(request.kind==='rooms'){
+  const {category,n,privateBath,dims,moduleDims}=request;
+  const items=LIB.library.filter(x=>x.cat===category&&x.roomCount===n&&(privateBath===null||x.privateBath===privateBath)&&dims[0]>=x.wMin&&dims[0]<=x.wMax&&dims[1]>=x.dMin&&dims[1]<=x.dMax);
+  activeCat=category;query='';$('arqPanelCat').value=category;
+  $('arqPanelGrid').replaceChildren(...items.map(x=>makeCard(x,100,dims)));
+  msg.textContent=items.length?items.length+' alternativas · '+n+' habitación(es), módulo nominal '+cm(moduleDims[0])+' × '+cm(moduleDims[1])+' cm + corredor de 150 cm. Medidas libres interiores menores por muros. Revisá normativa y circulación. Clic para insertar.':'No hay una configuración para esas dimensiones. Probá módulos de 3,80–6 m por 5–10 m.';
+  return true;
+ }
  if(request.kind!=='catalog'){
-  msg.textContent=request.kind==='invalid'?'Medidas o cantidad inválidas.':'Esta orden requiere el generador de habitaciones o conjuntos; todavía no disponible. No se modificó el dibujo.';
+  msg.textContent=request.kind==='invalid'?'Medidas o cantidad inválidas.':'Esta configuración todavía no está disponible. No se modificó el dibujo.';
   return true;
  }
  const normalize=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
