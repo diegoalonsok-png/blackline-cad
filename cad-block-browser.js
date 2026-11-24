@@ -24,7 +24,7 @@
  const paperControls=()=>'<span class="paper-palette" role="group" aria-label="Probar fondo de papel">'+PAPERS.map(p=>'<button type="button" data-paper="'+p.id+'" style="--paper-swatch:'+p.bg+'" title="Papel '+p.label+'" aria-label="Papel '+p.label+'"></button>').join('')+'</span>';
  const VIEWS={
   all:{en:'All',es:'Todo',cats:null},
-  visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^(?:olymp26-|olymp2-|cc0-fp-|bl-view-window-)/.test(it.id)||
+  visual:{en:'Visual gallery',es:'Galería visual',item:it=>/^userdx4-/.test(it.id)||/^(?:olymp26-|olymp2-|cc0-fp-|bl-view-window-)/.test(it.id)||
     /^(?:dk-arbol-vista|dk-arbol-invierno|dk-arbol-radial|dk-arbusto-arbol|dk-arbol-hojas|dk-arbol-ramas|dk-dos-arboles|dk-ventana-2x2-vista|dk-ventana-bano-vista)$/.test(it.id)},
   dk:{en:'Blackline library',es:'Biblioteca Blackline',item:it=>/^dk-|^doc-/.test(it.id)},
   bath:{en:'Bathrooms',es:'Baños',family:'Baños'},
@@ -36,7 +36,8 @@
   plan:{en:'Plans',es:'Plantas',mode:'Planta'},
   section:{en:'Sections & elevations',es:'Cortes y vistas',mode:'Vistas'},
   archive:{en:'Recovered views',es:'Vistas recuperadas',item:it=>archivedView(it)},
-  olymp3:{en:'2D blocks · 1,000+ vectors',es:'Bloques 2D · 1.000+ vectores',item:it=>/^olymp3-/.test(it.id)},
+  olymp3:{en:'2D blocks · 1,000+ vectors',es:'Bloques 2D · 1.000+ vectores',item:it=>/^(?:olymp3-|userdx4-)/.test(it.id)},
+  imported:{en:'Imported blocks',es:'Bloques importados',item:it=>/^userdx4-/.test(it.id)},
   doorElev:{en:'Door elevations',es:'Puertas en vista',item:it=>/puerta|door/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   windowElev:{en:'Window elevations',es:'Ventanas en vista',item:it=>/ventana|ventanal|window|paño fijo|pano fijo/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
   fridgeElev:{en:'Fridge elevations',es:'Heladeras en vista',item:it=>/heladera|refrigerador|fridge|freezer/i.test(it.name)&&/vista|alzado|elevaci/i.test(it.name)},
@@ -153,6 +154,7 @@
  const items=()=>LIB.library.filter(it=>!/^views26-/.test(it.id)&&
    (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))));
  const familyOf=it=>{
+  if(/^userdx4-/.test(it.id))return it.cat||'Sin clasificar';
   const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
   if(/sanit|bañ|bath|inodoro|bidet|lavatorio|ducha|mingitorio|vanitory|bañera|jacuzzi|wc\b|toilet|urinal|shower/.test(c+' '+n)||/^san-|^ca_ba_/.test(id))return 'Baños';
   if(/cocina|kitchen|heladera|freezer|horno|anafe|lavavajillas|microondas|campana|extractor|cafetera|lavarropas|secarropas|vinoteca|induc|refrig/.test(c+' '+n)||/^kq-|^ca_co_/.test(id))return 'Cocinas';
@@ -195,7 +197,7 @@
   }
   return out;
  }
- const simpleName=it=>simpleBlockNames().get(it.id)||tr(it.name);
+ const simpleName=it=>{const n=simpleBlockNames().get(it.id)||tr(it.name);return /^userdx4-/.test(it.id)?n.replace(/ · escala estimada| · parcial/g,'')+(it.importFlags&1?' · '+T('check scale','revisar escala'):'')+(it.importFlags&6?' · '+T('partial','parcial'):''):n};
  function paint(){
   if(!el)return;
   const visual=st.view==='visual'||st.view==='olymp3';
