@@ -253,6 +253,12 @@ function solve(spec){
 
 function detailInstruction(raw){
  const s=normalize(raw);
+ if(/\b(?:bano|banos|bathroom)\b/.test(s)&&/\b(?:corte|seccion|elevacion|alzado|section|elevation)\b/.test(s)){
+  if(/\b(?:este|existente|seleccionado|anterior|ultima|ultimo|mueve|modifica)\b/.test(s))throw Error('Corte de baño existente: aún no vinculado a la planta. Pedí un corte preliminar independiente con sus medidas.');
+  const read=(labels,def)=>{const m=s.match(new RegExp('(?:'+labels+')\\s*(?:de|:|=)?\\s*'+N+'\\s*'+U,'i'));return m?num(m[1])*unitScale(m[2]):def};
+  const mode=/\b(?:ducha|mampara|shower)\b/.test(s)?'shower':/\b(?:banadera|banera|bathtub)\b/.test(s)?'tub':/\bpuerta\b/.test(s)?'door':'vanity';
+  return {kind:'bath_section',mode,width:dimensions(s)?.[0]??read('ancho|luz',mode==='tub'?2.6:2.2),height:read('altura libre|altura|alto',2.4),wall:read('espesor|muro',.15),slab:read('losa',.2),tileW:.6,tileH:1.2};
+ }
  const stair=/\b(?:escaleras?|stairs?|staircase)\b/.test(s),rail=/\b(?:pasamanos|barandillas?|barandas?|handrail)\b/.test(s),section=/\b(?:en corte|en seccion|section view)\b/.test(s);
  if(!stair&&!rail&&!section)return null;
  if(/\b(?:agranda|achica|modifica|mueve|desplaza|cambia)\b/.test(s))throw Error('Edición de detalles existentes aún no soportada.');
@@ -294,6 +300,23 @@ function solveDetail(spec){
   line([0,h],[l,h],'RAILS');line([0,h-.04],[l,h-.04],'RAILS');const n=Math.ceil(l/1.2);
   for(let i=0;i<=n;i++)rect(i*l/n-.02,0,.04,h-.04,'RAILS');
   assumptions.push('Separación preliminar entre postes ≤ 1,20 m; no implica resistencia ni cumplimiento.');
+ }else if(kind==='bath_section'){
+  const t=spec.wall,b=spec.slab;
+  if(!finite(w,1.2,8)||!finite(h,2.2,4)||!finite(t,.08,.5)||!finite(b,.1,.5))throw Error('Dimensiones de corte de baño fuera de rango.');
+  const blocks=[],fills=[];
+  const fill=(x,y,W,H)=>{fills.push({pts:[[x,y],[x+W,y],[x+W,y+H],[x,y+H]],layer:'SECTION-CUT'});rect(x,y,W,H,'SECTIONS')};
+  fill(-t,0,t,h);fill(w,0,t,h);fill(-t,-b,w+2*t,b);fill(-t,h,w+2*t,b);
+  for(let x=spec.tileW;x<w-.02;x+=spec.tileW)line([x,0],[x,h],'SECTION-FINISH');
+  for(let y=spec.tileH;y<h-.02;y+=spec.tileH)line([0,y],[w,y],'SECTION-FINISH');
+  line([0,h-.05],[w,h-.05],'SECTION-FINISH');
+  const put=(id,x,W,D)=>blocks.push({catalogId:id,point:[x,0],nominalSize:[W,D],layer:'SECTION-FIXTURES'});
+  const pieces=spec.mode==='shower'?[['cv-inodoro-fre-det',.4,.8],['cv-ducha-fre',.9,2.1]]:spec.mode==='tub'?[['cv-banera-corte',1.7,.55],['cv-inodoro-fre-det',.4,.8]]:spec.mode==='door'?[['alz-puerta-placa',.7,2],['cv-vanitory-fre',.6,.9]]:[['cv-vanitory-fre',.6,.9],['cv-inodoro-fre-det',.4,.8],['cv-bidet-fre',.38,.42]];
+  const total=pieces.reduce((n,p)=>n+p[1],0),gap=(w-total)/(pieces.length+1);
+  if(gap<.14)throw Error('Ancho insuficiente para los artefactos de esta elevación; indicá otro ancho o configuración.');
+  let x=gap;
+  for(const [id,W,D] of pieces){put(id,x,W,D);x+=W+gap;}
+  assumptions.push('Elevación interior esquemática independiente de una planta; revestimiento modular de 0,60 × 1,20 m, alturas preliminares. No representa especificaciones de fabricante ni estructura calculada.');
+  return {schema:'blackline.architecture.detail.v1',units:'m',entities,blocks,fills,brief:spec,assumptions,status:'approximate',warning:assumptions.join(' ')};
  }else if(kind==='room_section'){
   const t=spec.wall,b=spec.slab;if(!finite(w,1.2,20)||!finite(h,2,6)||!finite(t,.08,.5)||!finite(b,.1,.5))throw Error('Dimensiones de corte fuera de rango.');
   rect(-t,0,t,h,'SECTIONS');rect(w,0,t,h,'SECTIONS');rect(-t,-b,w+2*t,b,'SECTIONS');rect(-t,h,w+2*t,b,'SECTIONS');
