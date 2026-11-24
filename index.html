@@ -2893,7 +2893,7 @@ let cadDrawEpoch=0;const cadChildCache=new WeakMap();
 const cadDefSigCache=new WeakMap();
 function cadDefSig(def){
  if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
- let sig;try{sig=(def.entities?.length||0)+'|'+JSON.stringify(def.entities)+'|'+JSON.stringify(def.base||null)}catch(e){sig=String(Math.random())}
+ let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.arq,state.unit])}catch(e){sig=String(Math.random())}
  cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
 }
 function cadBlockChildrenCached(ref){
@@ -3511,12 +3511,18 @@ function cadScreenColor(c){
    Se rearma solo si cambia el bloque o el dibujo (no al hacer zoom o desplazar). */
 const cadRefPathCache=new WeakMap();let cadRefStyle={epoch:-1,sig:''};
 function cadRefStyleSig(){if(cadRefStyle.epoch!==cadDrawEpoch){let sig;try{sig=JSON.stringify(state.layers.map(l=>[l.id,l.visible,l.frozen,l.color,l.width,l.linetype]))+'|'+cadScreenColor('#ffffff')+cadScreenColor('#000000')+'|'+(state.ltscale||1)}catch(e){sig=String(cadDrawEpoch)}cadRefStyle={epoch:cadDrawEpoch,sig}}return cadRefStyle.sig}
+function cadRefHasLinetype(e,lay){
+ let lt=String(e.linetype||'BYLAYER').toUpperCase();
+ if(lt==='BYLAYER'||lt==='BYBLOCK')lt=String(lay?.linetype||'CONTINUOUS').toUpperCase();
+ // Pattern existence does not depend on zoom; tiny dashes may become visible later.
+ return !!(CAD2D_LT_PATTERNS[lt]||CAD2D_LT_PATTERNS[cadLinetypeAlias(lt)]);
+}
 function cadDrawRefFast(e){
  const kids=cadBlockChildrenCached(e),ss=cadRefStyleSig();let c=cadRefPathCache.get(e);
  if(!c||c.kids!==kids||c.ss!==ss){
   const groups=new Map(),rest=[];
   for(const k of kids){const lay=layerFor(k);if(!lay.visible)continue;
-   const simple=['line','polyline','arc','circle','rect'].includes(k.type)&&!(k.pwidth>0)&&!cadLinetypeDash(k,lay);
+   const simple=['line','polyline','arc','circle','rect'].includes(k.type)&&!(k.pwidth>0)&&!cadRefHasLinetype(k,lay);
    if(!simple){rest.push(k);continue}
    const col=cadScreenColor(k.color||lay.color),w=Math.max(.75,(k.width??lay.width??.25)*3),key=col+'|'+w;
    let g=groups.get(key);if(!g){g={col,w,path:new Path2D()};groups.set(key,g)}const P2=g.path;
