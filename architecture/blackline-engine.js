@@ -4,6 +4,7 @@
 (function(root){
 'use strict';
 const C=Object.freeze({
+ industrialRange:['kq-industrial-range',1.20,.80],prepTable:['kq-industrial-prep',1.80,.75],industrialWash:['kq-industrial-wash',1.60,.70],industrialFridge:['kq-industrial-fridge',1.40,.85],
  locker:['mob-locker',.40,.50],changingBench:['mob-banco-vest',1.50,.40],
  toilet:['san-wc',.40,.70],bidet:['san-bidet',.38,.58],basin:['san-lav',.60,.48],
  shower:['san-ducha',.90,.90],shower75:['san-ducha',.75,.75],basin45:['san-lav',.45,.40],toiletCompact:['san-wc-susp',.38,.60],bathtub:['san-banera',1.70,.75],bathtub150:['san-banera',1.50,.75],
@@ -622,6 +623,20 @@ function collectiveCabins(spec){
 function run(raw){
  const {text,corrections}=correctText(internationalText(raw));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
+ const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
+ if(industrial){
+  const names={'cocina':'industrialRange','cocinas':'industrialRange','anafe':'industrialRange','anafes':'industrialRange','mesa de preparacion':'prepTable','mesas de preparacion':'prepTable','mesada':'prepTable','mesadas':'prepTable','bacha':'industrialWash','bachas':'industrialWash','lavado':'industrialWash','heladera':'industrialFridge','heladeras':'industrialFridge','refrigerador':'industrialFridge','refrigeradores':'industrialFridge','horno':'oven','hornos':'oven','lavavajillas':'dishwasher'};
+  const fixtures=[];
+  if(industrial[3])for(const part of industrial[3].split(/\s*(?:,|\+|\by\b)\s*/)){
+   const m=part.match(/^(\d+|un|una|dos|tres|cuatro|cinco|seis)\s+(.+)$/);
+   if(!m||!names[m[2]])throw Error('Equipamiento gastronómico no reconocido: '+part);
+   const n=Number(numberWords[m[1]]||m[1]);if(n<1||n>12)throw Error('Cantidad fuera de rango.');
+   for(let i=0;i<n;i++)fixtures.push(names[m[2]]);
+  }else fixtures.push('industrialRange','prepTable','industrialWash','industrialFridge');
+  if(fixtures.length>12)throw Error('Hasta doce equipos por cocina.');
+  const spec={kind:'kitchen',count:1,width:num(industrial[1]),depth:num(industrial[2]),wall:.15,door:1,window:1.2,fixtures,assumptions:['Cocina gastronómica preliminar; verificar flujos limpios y sucios, extracción, instalaciones, seguridad y normativa.']};
+  const p=solve(spec);p.status='approximate';p.warning=spec.assumptions[0];return p;
+ }
  // Quantified collective sanitary fixtures, preserving requested counts.
  const collective=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?(?:(\d+)\s+)?(?:banos?|vestuarios?)\s+(?:colectivos?\s+)?(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)\s*(?:m|mts|metros)?\s+con\s+(.+)$/);
  if(collective){
