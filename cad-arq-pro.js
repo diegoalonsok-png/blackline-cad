@@ -814,7 +814,7 @@ function applyArchitecture(plan,origin,replaceBatch=null){
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
  // Validate individual library objects before touching the drawing.
  for(const b of plan.blocks){const it=byId(b.catalogId);if(!it||!allowed(it)||it.dxfPlan)throw Error('Block unavailable: '+b.catalogId)}
- return CORE.wall.applyPlan(plan,origin,b=>{const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true)},replaceBatch);
+ return CORE.wall.applyPlan(plan,origin,b=>{const it=byId(b.catalogId);const [w,d]=b.nominalSize||[it.w,it.d];if(![w,d].every(Number.isFinite)||w<it.wMin-1e-8||w>it.wMax+1e-8||d<it.dMin-1e-8||d>it.dMax+1e-8)throw Error('Medidas de bloque fuera del catálogo: '+b.catalogId);return ensureDefinition(it,w,d,true)},replaceBatch);
 }
 
 /* Room-level virtual dimensions, screen only, never printed. */
