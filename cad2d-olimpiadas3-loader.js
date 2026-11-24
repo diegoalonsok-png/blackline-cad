@@ -6,7 +6,50 @@
  if(window.CAD2D_OLYMPIADAS3)return;
  const TOTAL=16,ready=new Set(),errors=new Set();
  let inFlight=null;
- const API={total:TOTAL,loaded:0,added:0,errors:[],loading:false,load,refresh};
+ let catalogPromise=null;
+ const catalogRows=new Map(),pendingBlocks=new Map();
+ const API={total:TOTAL,loaded:0,added:0,errors:[],loading:false,load,refresh,loadCatalog,ensureBlock,get catalog(){return Array.from(catalogRows.values())},get catalogReady(){return catalogRows.size>1000}};
+ async function loadCatalog(){
+  if(catalogPromise)return catalogPromise;
+  catalogPromise=(async()=>{
+   const response=await fetch('/assets/block-library/v1/catalog.json');
+   if(!response.ok)throw Error('Catálogo CDN no disponible');
+   const doc=await response.json();
+   if(doc.version!==1||doc.parts!==TOTAL||!Array.isArray(doc.blocks)||doc.blocks.length<=1000||doc.blocks.length>20000)throw Error('Catálogo incompleto');
+   const validated=new Map();
+   for(const x of doc.blocks){
+    if(!/^olymp3-[a-z0-9_-]+$/i.test(x.id)||typeof x.source!=='string'||typeof x.name!=='string'||typeof x.category!=='string'||[x.name,x.category,x.source].some(v=>v.length>250||/[<>"&]/.test(v))||!Number.isFinite(x.width)||x.width<=0||!Number.isFinite(x.depth)||x.depth<=0||!(/^[a-f0-9]{16,64}$/i.test(x.sourceHash))||!Number.isSafeInteger(x.segments)||x.segments<1||x.segments>100000||validated.has(x.id))throw Error('Registro inválido del catálogo');
+    validated.set(x.id,{id:x.id,source:x.source,name:x.name,cat:x.category,w:x.width,d:x.depth,sourceHash:x.sourceHash,segments:x.segments,family:'Olimpiadas 3',originalDXF:true,nominalDimensions:true,hideFromGallery:false,pro:false,paidOnly:false,wMin:x.width,wMax:x.width,dMin:x.depth,dMax:x.depth,lockAspect:true,remoteCatalog:true});
+   }
+   // Publish metadata only once the complete catalog passes validation.
+   for(const [id,row] of validated)catalogRows.set(id,row);
+   return API.catalog;
+  })().catch(err=>{catalogPromise=null;throw err});
+  return catalogPromise;
+ }
+ async function ensureBlock(id){
+  const L=window.CAD2D_ARQ_LIBRARY;if(!L)throw Error('Biblioteca CAD no disponible');
+  const existing=L.library.find(x=>x.id===id);if(existing)return existing.id;
+  if(pendingBlocks.has(id))return pendingBlocks.get(id);
+  const job=(async()=>{
+   await loadCatalog();
+   const meta=catalogRows.get(id);if(!meta)throw Error('Bloque no encontrado');
+   const response=await fetch('/assets/block-library/v1/'+encodeURIComponent(id)+'.json');
+   if(!response.ok)throw Error('No se pudo descargar el bloque');
+   const x=await response.json();
+   if(x.id!==id||x.source!==meta.source||x.sourceHash!==meta.sourceHash||typeof x.data!=='string'||x.data.length>1100000)throw Error('Geometría incompatible');
+   const raw=atob(x.data);if(raw.length!==meta.segments*8)throw Error('Geometría incompleta');
+   const again=L.library.find(b=>b.id===id||String(b.source||'').toLowerCase()===meta.source.toLowerCase());
+   if(again)return again.id;
+   const item={...meta,remoteCatalog:false,author:'Colección Olimpiadas (3) · archivo aportado por el usuario',
+    gen(b,W,D){for(let i=0;i+7<raw.length;i+=8){const u=j=>raw.charCodeAt(i+j)|(raw.charCodeAt(i+j+1)<<8);b.line(u(0)/65535*W,u(2)/65535*D,u(4)/65535*W,u(6)/65535*D)}}
+   };
+   L.library.push(item);if(!L.categories.includes(item.cat))L.categories.push(item.cat);
+   upgradeOpenings();
+   return item.id;
+  })();
+  pendingBlocks.set(id,job);try{return await job}finally{pendingBlocks.delete(id)}
+ }
  window.CAD2D_OLYMPIADAS3=API;
  function refresh(){
   const parts=window.CAD2D_OLYMPIADAS3_PROGRESS||[];
