@@ -733,11 +733,37 @@ function drawRoomRow(spec,origin){
 }
 
 let arqWorker=null,arqIdle=null,arqPending=null,arqSeq=0;
-function solveArchitecture(text,brief=null){
+let arqSemanticBusy=false;
+async function understandArchitecture(text){
+ if(arqSemanticBusy)throw Error('ARQASSIST está interpretando otra instrucción.');
+ if(!navigator.gpu)throw Error('La IA local necesita WebGPU. Activá la aceleración gráfica o usá un navegador compatible.');
+ arqSemanticBusy=true;
+ let worker;
+ try{
+  if(!localStorage.getItem('cad-arq-ai-download-ok')){
+   if(!window.confirm('ARQASSIST usa una IA gratuita local. La primera vez descargará un modelo de aproximadamente 1 GB y requerirá memoria gráfica. ¿Activar?'))throw Error('Carga de IA cancelada.');
+   try{localStorage.setItem('cad-arq-ai-download-ok','1')}catch(e){}
+  }
+  worker=new Worker('architecture/semantic-worker.mjs?v=20261124-local-ai-v1',{type:'module'});
+  return await new Promise((resolve,reject)=>{
+   const timeout=setTimeout(()=>reject(Error('Tiempo de espera de la IA local agotado. Verificá la conexión o la memoria gráfica.')),300000);
+   let last=0;
+   const done=(err,value)=>{clearTimeout(timeout);if(err)reject(err);else resolve(value)};
+   worker.onmessage=e=>{const d=e.data;if(d.id!==1)return;if(d.error)return done(Error(d.error));if(d.brief)return done(null,d.brief);if(d.message&&Date.now()-last>1500){last=Date.now();CORE.toast('ARQASSIST · '+d.message)}};
+   worker.onerror=e=>done(Error(e.message||'No se pudo cargar la IA local.'));
+   worker.postMessage({id:1,text});
+  });
+ }finally{worker?.terminate();arqSemanticBusy=false}
+}
+async function solveArchitecture(text,brief=null){
+ const interpreted=brief||await understandArchitecture(text);
+ return solveGeometry('',interpreted);
+}
+function solveGeometry(text,brief=null){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-v2');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-semantic-v3');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
