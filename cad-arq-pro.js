@@ -945,6 +945,7 @@ function arqCatalogueCategory(raw){
  if(/^(?:oficina|oficinas|office|bureau|ufficio)$/.test(s))return 'office';
  if(/^(?:comedor|comedores|dining room|sala da pranzo)$/.test(s))return 'dining';
  if(/^(?:vestidor|vestidores|dressing|walk-in closet)$/.test(s))return 'closet';
+ if(/^(?:escalera|escaleras|stair|stairs|staircase|staircases|escalera en [lu]|escalera caracol|escalera recta|escalera curva|escalera compensada)$/.test(s))return 'stairs';
  return null;
 }
 function arqPlanThumbnail(plan){
@@ -971,7 +972,7 @@ async function openArqPlanCatalogue(category){
  const dlg=document.createElement('dialog');dlg.id='arqPlanCatalogue';
  dlg.style.cssText='position:fixed;inset:auto;margin:0;z-index:1200;width:min(760px,94vw);height:min(620px,80vh);min-width:min(300px,94vw);min-height:min(220px,80vh);max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);resize:both;overflow:hidden;background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:14px;box-sizing:border-box';
  const header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex:none;cursor:move;touch-action:none;user-select:none';header.title='Arrastrar para mover / Drag to move';
- const title=document.createElement('strong');title.textContent='ARQASSIST · '+({bathroom:'Baños / Bathrooms',kitchen:'Cocinas / Kitchens',bedroom:'Habitaciones / Bedrooms',laundry:'Lavaderos / Laundry',office:'Oficinas / Offices',dining:'Comedores / Dining',closet:'Vestidores / Dressing'}[category]||'Plantas');
+ const title=document.createElement('strong');title.textContent='ARQASSIST · '+({bathroom:'Baños / Bathrooms',kitchen:'Cocinas / Kitchens',bedroom:'Habitaciones / Bedrooms',laundry:'Lavaderos / Laundry',office:'Oficinas / Offices',dining:'Comedores / Dining',closet:'Vestidores / Dressing',stairs:'Escaleras / Stairs'}[category]||'Plantas');
  const close=document.createElement('button');close.className='btn slim';close.textContent='×';close.setAttribute('aria-label','Cerrar / Close');close.onclick=()=>dlg.close();const handle=document.createElement('span');handle.textContent='⠿';handle.setAttribute('aria-hidden','true');handle.style.cssText='opacity:.75;font-size:18px;line-height:1';title.style.flex='1';header.append(handle,title,close);dlg.append(header);
  const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(min(158px,100%),1fr));gap:9px;overflow:auto;min-height:0;flex:1;align-content:start;padding-right:3px';dlg.append(grid);
  const fmt=n=>n.toFixed(2);
@@ -997,6 +998,15 @@ async function openArqPlanCatalogue(category){
  window.addEventListener('resize',onResize);
  dlg.addEventListener('close',()=>{observer?.disconnect();window.removeEventListener('resize',onResize);dlg.remove();});
  dlg.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();dlg.close();}});
+ if(category==='stairs'){
+  status.remove();
+  for(const item of LIB.library.filter(x=>x.cat==='Escaleras'&&!x.hideFromGallery&&x.id!=='esc-rampa')){
+   const card=document.createElement('button');card.type='button';card.className='btn arq-card';card.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
+   const preview=document.createElement('div');preview.style.cssText='background:#f4efe3;color:#343e40;border-radius:4px;width:100%';preview.innerHTML=svgFor(item,item.w,item.d,{height:142});const label=document.createElement('span');label.textContent=item.name;const size=document.createElement('small');size.textContent=fmt(item.w)+' × '+fmt(item.d)+' · planta preliminar';card.append(preview,label,size);
+   card.onclick=()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(armInsert(item)!==false)dlg.close();};grid.append(card);
+  }
+  return;
+ }
  let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;status.remove();
  for(const item of items.filter(x=>x.category===category).sort((a,b)=>a.area-b.area)){
   const button=document.createElement('button');button.className='btn arq-card';button.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
@@ -1038,7 +1048,7 @@ function openArchitectureBar(focus=true){
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
-  const updateCatalogue=()=>{const category=arqCatalogueCategory(input.value);catalogue.hidden=!category;catalogue.style.display=category?'':'none';if(category){catalogue.textContent=(arqCatalogueCounts[category]||0)+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
+  const updateCatalogue=()=>{const category=arqCatalogueCategory(input.value);catalogue.hidden=!category;catalogue.style.display=category?'':'none';if(category){catalogue.textContent=(category==='stairs'?LIB.library.filter(x=>x.cat==='Escaleras'&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
   catalogue.onclick=()=>{const cat=arqCatalogueCategory(input.value);if(!cat)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat);};
 
   const KEY='cad2d-arqbar-pos';

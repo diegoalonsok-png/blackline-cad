@@ -347,6 +347,21 @@ def({id:'esc-caracol',name:'Escalera caracol',cat:ST,family:'escalera',w:1.60,d:
 def({id:'esc-rampa',name:'Rampa accesible 8%',cat:ST,family:'escalera',w:1.20,d:6.00,wMin:.90,wMax:2.00,dMin:2.00,dMax:9.00,
  gen(b,W,D){b.rect(0,0,W,D);b.rect(-.05,0,.05,D);b.rect(W,0,.05,D);b.line(W/2,.2,W/2,D-.2);b.line(W/2,D-.2,W/2-.08,D-.38);b.line(W/2,D-.2,W/2+.08,D-.38);b.text(.08,.08,'8%',.10)}});
 
+
+// Original schematic stair variants; footprints in metres, not a floor-to-floor solver.
+def({id:'esc-recta-descanso',name:'Escalera recta con descanso',cat:ST,family:'escalera',w:1.20,d:5.40,wMin:1,dMin:4,wMax:1.8,dMax:7,
+ gen(b,W,D){const l=(D-W)/2;steps(b,0,0,W,l,Math.max(3,Math.round(l/.28)));b.rect(0,l,W,W);steps(b,0,l+W,W,l,Math.max(3,Math.round(l/.28)));}});
+def({id:'esc-L-inversa',name:'Escalera en L · giro izquierdo',cat:ST,family:'escalera',w:3.2,d:3.4,wMin:2.5,wMax:4.5,dMin:2.5,dMax:5,
+ gen(b,W,D){const a=Math.min(1.4,W*.4),l=D-a;steps(b,W-a,0,a,l,Math.max(3,Math.round(l/.28)));b.rect(W-a,l,a,a);b.rect(0,l,W-a,a);const n=Math.max(3,Math.round((W-a)/.28));for(let i=1;i<n;i++)b.line(i*(W-a)/n,l,i*(W-a)/n,D);b.line(W-a-.1,l+a/2,.15,l+a/2);b.line(.15,l+a/2,.3,l+a/2+.08);b.line(.15,l+a/2,.3,l+a/2-.08);}});
+def({id:'esc-U-ojo',name:'Escalera en U con ojo central',cat:ST,family:'escalera',w:3,d:4.2,wMin:2.5,wMax:4,dMin:3,dMax:6,
+ gen(b,W,D){const a=W*.36,l=D-a,n=Math.max(4,Math.round(l/.28));steps(b,0,0,a,l,n);b.rect(0,l,W,a);b.rect(W-a,0,a,l);for(let i=1;i<n;i++)b.line(W-a,i*l/n,W,i*l/n);b.line(W-a/2,l-.1,W-a/2,.15);b.line(W-a/2,.15,W-a/2-.08,.3);b.line(W-a/2,.15,W-a/2+.08,.3);}});
+def({id:'esc-compensada-L',name:'Escalera en L compensada',cat:ST,family:'escalera',w:2.8,d:3.4,wMin:2.4,wMax:4,dMin:2.6,dMax:5,
+ gen(b,W,D){const a=Math.min(W*.4,1.3),l=D-a;steps(b,0,0,a,l,Math.max(3,Math.round(l/.28)));b.rect(0,l,a,a);b.line(a,l,0,l+a*.5);b.line(a,l,a*.5,D);b.line(a,l,0,D);b.rect(a,l,W-a,a);const n=Math.max(3,Math.round((W-a)/.28));for(let i=1;i<n;i++)b.line(a+i*(W-a)/n,l,a+i*(W-a)/n,D);}});
+def({id:'esc-curva',name:'Escalera curva semicircular',cat:ST,family:'escalera',w:3.6,d:1.8,wMin:3,wMax:5,dMin:1.5,dMax:2.5,
+ gen(b,W,D){const r=Math.min(W/2,D),q=r*.4,c=W/2;b.arc(c,0,r,0,180);b.arc(c,0,q,0,180);for(let i=0;i<=12;i++){const a=i*Math.PI/12;b.line(c+q*Math.cos(a),q*Math.sin(a),c+r*Math.cos(a),r*Math.sin(a));}b.arc(c,0,(q+r)/2,15,165,{dashed:true});}});
+def({id:'esc-caracol-inversa',name:'Escalera caracol · giro inverso',cat:ST,family:'escalera',w:1.8,d:1.8,wMin:1.2,wMax:2.6,dMin:1.2,dMax:2.6,lockAspect:true,
+ gen(b,W,D){const r=Math.min(W,D)/2,c=W/2,y=D/2;b.circle(c,y,r);b.circle(c,y,.10);for(let i=0;i<=14;i++){const a=-i*300/14*DEG;b.line(c+.10*Math.cos(a),y+.10*Math.sin(a),c+r*Math.cos(a),y+r*Math.sin(a));}b.arc(c,y,r*.65,60,360,{dashed:true});}});
+
 /* ===== MOBILIARIO ===== */
 const MOB='Mobiliario';
 one('mob-mesa4','Mesa comedor 4 personas',MOB,1.20,1.80,(b,W,D)=>mesaConSillas(b,W,D),{wMin:.90,wMax:1.40,dMin:1.70,dMax:2.00,family:'mesa'});
