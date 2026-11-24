@@ -733,11 +733,11 @@ function drawRoomRow(spec,origin){
 }
 
 let arqWorker=null,arqIdle=null,arqPending=null,arqSeq=0;
-function solveArchitecture(text){
+function solveArchitecture(text,brief=null){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
- if(!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
+ if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-v1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-v2');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -746,15 +746,50 @@ function solveArchitecture(text){
   const timeout=setTimeout(()=>done(Error('Architecture engine timed out.'),null,true),60000);
   arqPending=id;worker.onmessage=e=>{if(e.data.id===id)done(e.data.error?Error(e.data.error):null,e.data.plan)};
   worker.onerror=e=>done(Error(e.message||'Python engine unavailable'),null,true);
-  worker.postMessage({id,text});
+  worker.postMessage({id,text,brief});
  });
 }
-function applyArchitecture(plan,origin){
+function applyArchitecture(plan,origin,replaceBatch=null){
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
  // Validate individual library objects before touching the drawing.
  for(const b of plan.blocks){const it=byId(b.catalogId);if(!it||!allowed(it)||it.dxfPlan)throw Error('Block unavailable: '+b.catalogId)}
- return CORE.wall.applyPlan(plan,origin,b=>{const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true)});
+ return CORE.wall.applyPlan(plan,origin,b=>{const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true)},replaceBatch);
 }
+
+/* Room-level virtual dimensions, screen only, never printed. */
+let arqRoomHits=[];
+EXT.overlays.push(ctx=>{
+ arqRoomHits=[];const st=S();if(st.tool!=='select')return;
+ const batches=new Set(st.entities.filter(e=>st.selected.includes(e.id)&&e.arqBatch).map(e=>e.arqBatch));
+ if(batches.size!==1)return;const batch=[...batches][0],meta=st.entities.find(e=>e.arqBatch===batch&&e.arqPlan)?.arqPlan;
+ if(!meta?.origin||meta.unit!==st.unit)return;
+ const k=f(),p=(x,y)=>CORE.screen(P(meta.origin.x+x*k,meta.origin.y+y*k));
+ const editable=meta.rooms.length===1&&meta.brief&&meta.brief.kind!=='suite_row'&&!meta.brief.alternatives;
+ ctx.save();ctx.font='bold 12px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=1;ctx.setLineDash([]);
+ for(const room of meta.rooms){
+  const [x,y,w,d]=room.clearBounds,A=p(x,y),B=p(x+w,y+d),top=Math.min(A.y,B.y),left=Math.min(A.x,B.x),right=Math.max(A.x,B.x),bottom=Math.max(A.y,B.y);
+  if(right-left<30||bottom-top<30)continue;
+  const color=editable?'#59d0ff':'#9fb9c6';ctx.strokeStyle=color;ctx.fillStyle=color;
+  const dim=(a,b,axis,value)=>{
+   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+   if(axis==='width'){ctx.moveTo(a.x,a.y-4);ctx.lineTo(a.x,a.y+4);ctx.moveTo(b.x,b.y-4);ctx.lineTo(b.x,b.y+4)}
+   else{ctx.moveTo(a.x-4,a.y);ctx.lineTo(a.x+4,a.y);ctx.moveTo(b.x-4,b.y);ctx.lineTo(b.x+4,b.y)}
+   ctx.stroke();const label=value.toFixed(2),cx=(a.x+b.x)/2,cy=(a.y+b.y)/2,tw=ctx.measureText(label).width+12;
+   ctx.fillStyle='rgba(6,22,32,.94)';ctx.fillRect(cx-tw/2,cy-10,tw,20);ctx.strokeRect(cx-tw/2,cy-10,tw,20);ctx.fillStyle=color;ctx.fillText(label,cx,cy);
+   if(editable)arqRoomHits.push({batch,meta,axis,value,x:cx-tw/2,y:cy-10,w:tw,h:20});
+  };
+  dim(P(left,top-16),P(right,top-16),'width',w);
+  dim(P(left-18,top),P(left-18,bottom),'depth',d);
+ }
+ ctx.restore();
+});
+CORE.canvas.addEventListener('pointerdown',async e=>{
+ if(e.button!==0)return;const h=arqRoomHits.find(a=>e.offsetX>=a.x&&e.offsetX<=a.x+a.w&&e.offsetY>=a.y&&e.offsetY<=a.y+a.h);if(!h)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const raw=window.prompt((h.axis==='width'?'Ancho / Width':'Largo / Depth')+' (m)',h.value.toFixed(2));if(raw===null)return;
+ const value=Number(raw.replace(',','.'));if(!(value>=1.2&&value<=20))return CORE.toast('Medida inválida / Invalid dimension');
+ try{const plan=await solveArchitecture('',{...h.meta.brief,[h.axis]:value});applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
+},true);
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
