@@ -3,11 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const tracking=require('../cad-object-tracking.js');
 
 // Exercise the same snapPoint implementation loaded by the 2D editor, with
 // the minimum canvas/geometry state needed to reproduce ORTHO + OTRACK.
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-const from = html.indexOf('function snapPoint(p){');
+const from = html.indexOf('function snapPoint(p,gripBase=null){');
 const to = html.indexOf('\nfunction segmentDist(', from);
 assert.ok(from >= 0 && to > from, 'CAD2D snapPoint source is available');
 const source = html.slice(from, to);
@@ -23,7 +24,7 @@ function editor({orthoOn = true, otrackOn = true} = {}) {
  const context = vm.createContext({
   state, Math, P:(x,y)=>({x,y}),
   snapIndicator:null, otrkGuide:null, cadOtrkHoverPt:null, cadOneShotOsnap:null,
-  window:{BlacklineTrackingMath:{}},
+  window:{BlacklineTrackingMath:tracking}, BlacklineTrackingMath:tracking,
   trackingEligible:()=>otrackOn,
   cadOtrackHover:p=>{
    acquired.push({x:p.x,y:p.y});
@@ -74,4 +75,21 @@ test('with ORTHO disabled, standard endpoint snapping still works',()=>{
  const p=cad.point(7,5);
  assert.equal(p.x,7);assert.equal(p.y,5);
  assert.equal(cad.acquired.length,1);
+});
+
+test('near a real horizontal intersection, tracking must not be reprojected to vertical',()=>{
+ const cad=editor();
+ cad.anchors.push({x:10.5,y:5});
+ const p=cad.point(10.45,.55);
+ assert.equal(p.x,10.5);
+ assert.equal(p.y,0);
+ assert.equal(cad.context.otrkGuide.axis,'h');
+});
+test('ORT​HO + OTRACK rejects a distant intersection and never creates a diagonal',()=>{
+ const cad=editor();
+ cad.anchors.push({x:7,y:5});
+ const p=cad.point(12,5.05);
+ assert.equal(p.x,10);
+ assert.equal(p.y,5.05);
+ assert.equal(cad.context.otrkGuide,null);
 });
