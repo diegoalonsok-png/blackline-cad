@@ -1673,6 +1673,58 @@ function cadGenerateRoomRow(spec,origin){
   renderBlockLibrary();updateAll();queueLocalBackup();return count;
  }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
 }
+
+/* Import geometry computed by the independent architecture solver as native CAD entities.
+ * Work on an isolated entity set, then commit as a single undo step. */
+function cadApplyArchitecturePlan(plan,origin,resolveBlock){
+ if(plan?.schema!=='blackline.architecture.v1'||plan.units!=='m'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks)||plan.walls.length>500||plan.openings.length>300||plan.blocks.length>500)throw Error('Invalid architecture plan');
+ if(!autoOpeningEnabled||!window.BlacklineAutoOpening)throw Error('Enable automatic wall openings.');
+ const k=1000/U[state.unit],point=(x,y)=>{if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>1000||Math.abs(y)>1000)throw Error('Invalid plan coordinate');return P(origin.x+x*k,origin.y+y*k)};
+ const before=historySnapshot(),history=state.history.slice(),future=state.future.slice(),original=state.entities;
+ const batch='arq-'+state.nextId,hosts=new Map();
+ function layer(name){let l=state.layers.find(l=>l.name.toUpperCase()===name);if(!l){l={id:'arq-'+name.toLowerCase(),name,color:'#e5e7eb',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'};if(state.layers.some(x=>x.id===l.id))throw Error('Layer ID collision');state.layers.push(l)}if(l.locked||!l.visible)throw Error('Layer unavailable: '+name);return l.id}
+ try{
+  saveHistory();state.entities=[];
+  const wallLayer=layer('WALLS');
+  for(const w of plan.walls){
+   if(hosts.has(w.id)||!Array.isArray(w.a)||!Array.isArray(w.b)||!(w.thickness>=.08&&w.thickness<=.5))throw Error('Invalid wall');
+   const A=point(...w.a),B=point(...w.b),L=dist(A,B)/k;if(!(L>.1))throw Error('Invalid wall length');
+   const openings=plan.openings.filter(o=>o.host===w.id).sort((a,b)=>a.offset-b.offset);
+   for(let i=0;i<openings.length;i++){const o=openings[i];if(!['swing-door','double-door','framed-window'].includes(o.kind)||!Number.isFinite(o.offset)||!(o.width>=.3&&o.width<=5)||o.offset-o.width/2<=w.thickness/2||o.offset+o.width/2>=L-w.thickness/2||i&&openings[i-1].offset+openings[i-1].width/2>=o.offset-o.width/2)throw Error('Invalid or overlapping opening: '+w.id)}
+   const at=t=>P(A.x+(B.x-A.x)*t/L,A.y+(B.y-A.y)*t/L);
+   // Each opening owns a separate host segment; later moving it cannot destroy another opening.
+   const boundaries=[0,...openings.slice(0,-1).map((o,i)=>(o.offset+o.width/2+openings[i+1].offset-openings[i+1].width/2)/2),L];
+   const segments=[];
+   for(let j=0;j<boundaries.length-1;j++){
+    const a=at(boundaries[j]),b=at(boundaries[j+1]),faces=cadWallFaces(a,b,w.thickness*k,'center'),group='wall-'+state.nextId;
+    const pair=faces.map((face,i)=>({id:state.nextId++,type:'line',...face,layer:wallLayer,width:.25,wall2d:{group,face:i,thickness:w.thickness*k,justify:'center',guideA:clone(a),guideB:clone(b)},arqBatch:batch,arqWall:w.id}));
+    state.entities.push(...pair);segments.push(pair);
+   }
+   hosts.set(w.id,{w,A,B,L,at,openings,segments});
+  }
+  // Native junction solver on generated walls only, before cutting openings.
+  for(const host of hosts.values())for(const pair of host.segments)cadWallJoinNewFaces(pair);
+  for(const o of plan.openings)if(!hosts.has(o.host))throw Error('Unknown opening host');
+  for(const host of hosts.values())for(let i=0;i<host.openings.length;i++){
+   const o=host.openings[i],w=host.w,center=host.at(o.offset),start=host.at(o.offset-o.width/2);
+   const name='ARQ · '+o.kind+' · '+Math.round(o.width*1000)+' · '+Math.round(w.thickness*1000)+' · '+state.unit;
+   const openingLayer=layer(o.kind==='framed-window'?'WINDOWS':'DOORS');
+   const defaults={width:o.width*k,frameWidth:.035*k,frameDepth:w.thickness*k,mirror:false};
+   if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(o.width*k,0),layer:'0'}],parametric:{kind:o.kind,defaults}};
+   const definition=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI,layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.segments[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
+   state.entities.push(ref);
+   if(autoCutWallForOpening(ref,definition)!==2)throw Error('Could not cut both wall faces: '+w.id);
+  }
+  for(const b of plan.blocks){
+   if(!['FIXTURES','FURNITURE','KITCHEN','EQUIPMENT'].includes(b.layer)||b.scale!==1||!Number.isFinite(b.rotation)||!Array.isArray(b.point))throw Error('Invalid fixture');
+   const name=resolveBlock(b);if(!state.blocks[name])throw Error('Missing block: '+b.catalogId);
+   state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:point(...b.point),scale:1,rotation:b.rotation,layer:layer(b.layer),arqBatch:batch,arqRole:b.role});
+  }
+  const generated=state.entities;
+  if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[]};
+  state.entities=original.concat(generated);state.selected=[];updateAll();return generated.length;
+ }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
+}
 function cadWallCenterline(meta){
  if(!meta?.guideA||!meta?.guideB)return null;
  const a=meta.guideA,b=meta.guideB,v=sub(b,a),len=Math.hypot(v.x,v.y);
@@ -11286,7 +11338,7 @@ window.CAD2D_CORE=Object.freeze({
  explicitWallLayerName,eraseSelected,copySelectedCadObjects,pasteCadObjects,
  command:text=>{$('command').value=String(text);runCommand()},
  lastCommand:()=>cad2dLastCommand,
- wall:Object.freeze({roomRow:cadGenerateRoomRow,faces:(a,b,w,j)=>cadWallFaces(a,b,w,j),join:faces=>cadWallJoinNewFaces(faces),centerline:meta=>cadWallCenterline(meta)}),
+ wall:Object.freeze({roomRow:cadGenerateRoomRow,applyPlan:cadApplyArchitecturePlan,faces:(a,b,w,j)=>cadWallFaces(a,b,w,j),join:faces=>cadWallJoinNewFaces(faces),centerline:meta=>cadWallCenterline(meta)}),
  layout:Object.freeze({get viewports(){return cadLayoutViewports},set viewports(v){cadLayoutViewports=Array.isArray(v)?v:[]},render:()=>renderLayoutWorkspace(),switchTo:space=>switchCadSpace(space),get active(){return cadActiveSpace},options:()=>layoutPlotOptions(),svg:o=>makeSVG(o),pdf:o=>makePDF(o)}),
  ribbon:Object.freeze({add:(tab,group,items)=>cad2dAddRibbonGroup(tab,group,items),rebuild:()=>buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home')}),
  openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
