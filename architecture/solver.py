@@ -191,8 +191,8 @@ def solve_suite_row(spec):
     n=spec["count"]
     if not math.isclose(w,bw,abs_tol=1e-8):
         raise ValueError("This version requires bathroom width equal to bedroom width; no silent resizing.")
-    if w<3.0:
-        raise ValueError("Bedroom width must accommodate both entrance and external window.")
+    if w<3.6:
+        raise ValueError("Bedroom width must be at least 3.60 m for this entrance and window arrangement.")
     # Reuse the dimensional validation, not a pre-drawn room.
     front=solve(dict(kind="bedroom",width=w,depth=d,wall=t,count=n,fixtures=[]))
     rear=solve(dict(kind="bathroom",width=bw,depth=bd,wall=t,count=n,fixtures=spec.get("bathFixtures",DEFAULTS["bathroom"])))
@@ -260,6 +260,13 @@ def selftest():
         assert len(p["walls"])==13 and len(p["virtualDimensions"])==12
         assert all(a["scale"]==1 for a in p["blocks"])
         assert all(a["host"] in {w["id"] for w in p["walls"]} for a in p["openings"])
+        for wall in p["walls"]:
+            length=math.dist(wall["a"],wall["b"])
+            intervals=sorted((a["offset"]-a["width"]/2,a["offset"]+a["width"]/2) for a in p["openings"] if a["host"]==wall["id"])
+            assert all(lo>=wall["thickness"]/2-1e-8 and hi<=length-wall["thickness"]/2+1e-8 for lo,hi in intervals)
+            assert all(a[1]<=b[0] for a,b in zip(intervals,intervals[1:]))
+        rects=[Rect(*a["envelope"]) for a in p["blocks"]]
+        assert not any(a.overlaps(b) for i,a in enumerate(rects) for b in rects[i+1:])
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
