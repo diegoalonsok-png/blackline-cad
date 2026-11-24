@@ -2171,13 +2171,13 @@ function draw(){drawPending=false;const perfStart=performance.now();let painted=
   ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
   : inViewport(e,w,h);
  for(const e of state.entities){
-  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e);painted++;}
+  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e,undefined,selectedIds);painted++;}
  }
  cadDrawArqPoche(visibleForPaint);
  for(const e of state.entities){
   if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
-  drawEntity(e);painted++;
+  drawEntity(e,undefined,selectedIds);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
@@ -3536,21 +3536,23 @@ function cadDrawRefFast(e){
  }
  for(const k of c.rest)drawEntity(k,null);
 }
-function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,forceColor);if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor);return}if(e.type==='blockRef'){
+function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selectedIds.has(e.id):state.selected.includes(e.id);if(e.type==='image')return drawImageEntity(e,forceColor);if(e.type==='line'&&cadTGapCache?.has(e.id)&&!e.__tPiece){for(const part of cadLineWithoutGaps(e,cadTGapCache.get(e.id)))drawEntity({...part,__tPiece:true},forceColor,selectedIds);return}if(e.type==='blockRef'){
   if(!forceColor&&!layerFor(e).visible)return;
-  const fade=e.xref&&!forceColor&&!state.selected.includes(e.id);if(fade){ctx.save();ctx.globalAlpha*=cadXrefFade}
-  if(!forceColor&&!state.selected.includes(e.id))cadDrawRefFast(e);
-  else for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
+  const fade=e.xref&&!forceColor&&!isSelected;if(fade){ctx.save();ctx.globalAlpha*=cadXrefFade}
+  if(!forceColor&&!isSelected)cadDrawRefFast(e);
+  else for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(isSelected?displayColors.selection:null),selectedIds);
   if(fade)ctx.restore();
-  if(state.selected.includes(e.id)&&!forceColor){
+  if(isSelected&&!forceColor){
    drawBlockGrips(e);
   }
   return;
- }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
+ }if(e.type==='dimension'){const color=forceColor||(isSelected?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color,selectedIds);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
   ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();for(const hole of e.holes||[]){if(hole?.length>2){tracePath({type:'polyline',pts:hole,closed:true});ctx.closePath()}}ctx.setLineDash([]);
   if(cadIsGradient(e)&&!forceColor&&!isSelected){
-   const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y),c=screen(P((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2));
-   const R=Math.hypot(Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys))/2*state.view.scale||1,a=(Number(e.hatchAngle)||0)*Math.PI/180;
+   const b=boundsEntity(e);
+   if(!b){ctx.restore();return}
+   const c=screen(P(b.minX/2+b.maxX/2,b.minY/2+b.maxY/2));
+   const radius=Math.hypot(b.maxX-b.minX,b.maxY-b.minY)/2*state.view.scale,R=Number.isFinite(radius)&&radius>0?radius:1,a=(Number(e.hatchAngle)||0)*Math.PI/180;
    const g=e.hatchStyle==='gradient-radial'?ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,R):ctx.createLinearGradient(c.x-Math.cos(a)*R,c.y+Math.sin(a)*R,c.x+Math.cos(a)*R,c.y-Math.sin(a)*R);
    g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill('evenodd');
   }
@@ -3564,7 +3566,7 @@ function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,f
    ctx.restore();
   }
   ctx.restore();return;
- }if(e.type==='text'){if(e.attdef){ctx.restore();const t={...e,text:String(e.attdef.tag||'ATRIBUTO'),italic:true};delete t.attdef;drawEntity(t,forceColor);return}if(cadIsMText(e)){ctx.restore();for(const line of cadMTextLines(e))drawEntity(line,forceColor);return}if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor);return}
+ }if(e.type==='text'){if(e.attdef){ctx.restore();const t={...e,text:String(e.attdef.tag||'ATRIBUTO'),italic:true};delete t.attdef;drawEntity(t,forceColor,selectedIds);return}if(cadIsMText(e)){ctx.restore();for(const line of cadMTextLines(e))drawEntity(line,forceColor,selectedIds);return}if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor,selectedIds);return}
  const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=ctx.measureText(label).width;
  if(e.highlight){
   const size=Math.max(7,e.h*state.view.scale),pad=Math.max(3,size*.14);
