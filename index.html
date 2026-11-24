@@ -1713,7 +1713,10 @@ function cadJoinGeneratedArqFaces(pairs){
     const toward=perpendicular.find(x=>dot(x.u,offset)>eps);
     const away=perpendicular.find(x=>dot(x.u,offset)<-eps);
     const shift=toward?toward.t/2:!opposite&&away?-away.t/2:0;
-    face[arm.tip]={x:base.x+arm.u.x*shift,y:base.y+arm.u.y*shift};
+    // Rebuild from the immutable guide node, not a previously trimmed face.
+    const normal={x:-arm.u.y,y:arm.u.x};
+    const lateral=dot(offset,normal)>=0?arm.t/2:-arm.t/2;
+    face[arm.tip]={x:p.x+normal.x*lateral+arm.u.x*shift,y:p.y+normal.y*lateral+arm.u.y*shift};
    }
   }
  }
@@ -3355,8 +3358,8 @@ function cadCircularTextGlyphs(e){
 function cadComputeWallTGaps(entities=state.entities){
  const faces=entities.filter(e=>e.type==='line'&&e.wall2d&&!e.cadHidden&&layerFor(e).visible);
  if(faces.length<4)return null;
- const groups=new Map();for(const f of faces){if(!groups.has(f.wall2d.group))groups.set(f.wall2d.group,[]);groups.get(f.wall2d.group).push(f)}
- const tips=[];for(const g of groups.values()){if(g.length!==2)continue;for(const k of ['a','b'])tips.push({group:g[0].wall2d.group,p:[g[0][k],g[1][k]]})}
+ const groups=new Map();for(const f of faces){const key=JSON.stringify([f.wall2d.group,f.autoOpeningRef??null,f.autoOpeningRole??null]);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(f)}
+ const tips=[];for(const g of groups.values()){if(g.length!==2||g[0].wall2d.face===g[1].wall2d.face)continue;for(const k of ['a','b'])tips.push({group:g[0].wall2d.group,p:[g[0][k],g[1][k]]})}
  const tol=Math.max(1e-6,.002*1000/U[state.unit]),gaps=new Map();
  // Only wall-end pairs whose bounding box can overlap this wall face.
  const tipBounds=tip=>({minX:Math.min(tip.p[0].x,tip.p[1].x),maxX:Math.max(tip.p[0].x,tip.p[1].x),minY:Math.min(tip.p[0].y,tip.p[1].y),maxY:Math.max(tip.p[0].y,tip.p[1].y)});
