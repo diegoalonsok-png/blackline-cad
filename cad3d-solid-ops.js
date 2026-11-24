@@ -3,7 +3,7 @@
 'use strict';
 const EPS=1e-7,MAX=120000;
 const sub=(a,b)=>a.map((x,i)=>x-b[i]),dot=(a,b)=>a.reduce((n,x,i)=>n+x*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-function volume(t){let v=0;for(let i=0;i<t.length;i+=9)v+=dot(t.slice(i,i+3),cross(t.slice(i+3,i+6),t.slice(i+6,i+9)))/6;return v}
+function volume(t){if(!t.length)return 0;const origin=t.slice(0,3);let v=0,correction=0;for(let i=0;i<t.length;i+=9){const a=sub(t.slice(i,i+3),origin),b=sub(t.slice(i+3,i+6),origin),c=sub(t.slice(i+6,i+9),origin);const term=dot(a,cross(b,c))/6-correction,next=v+term;correction=(next-v)-term;v=next}return v}
 function poly(v){let n;for(let i=2;i<v.length;i++){const c=cross(sub(v[i-1],v[0]),sub(v[i],v[0])),l=Math.hypot(...c);if(l>EPS*EPS){n=c.map(x=>x/l);break}}return n?{v,n,w:dot(n,v[0])}:null}
 function flip(p){return {v:p.v.slice().reverse(),n:p.n.map(x=>-x),w:-p.w}}
 function boolean(a,b,op){
@@ -24,7 +24,7 @@ function boolean(a,b,op){
   clipTo(n){this.p=n.clip(this.p);if(this.f)this.f.clipTo(n);if(this.b)this.b.clipTo(n)}
   all(){return this.p.concat(this.f?this.f.all():[],this.b?this.b.all():[])}
  }
- function input(t){if(!Array.isArray(t)||!t.length||t.length%9||t.length>MAX||!t.every(Number.isFinite))throw Error('Malla inválida o demasiado grande');const out=[],reverse=volume(t)<0;for(let i=0;i<t.length;i+=9){let p=poly([t.slice(i,i+3),t.slice(i+3,i+6),t.slice(i+6,i+9)]);if(p)out.push(reverse?flip(p):p)}if(Math.abs(volume(t))<EPS*EPS)throw Error('El objeto no encierra volumen');return out}
+ function input(t){if(!Array.isArray(t)||!t.length||t.length%9||t.length>MAX||!t.every(Number.isFinite))throw Error('Malla inválida o demasiado grande');const signed=volume(t);if(!Number.isFinite(signed)||Math.abs(signed)<EPS*EPS)throw Error('El objeto no encierra volumen válido');const out=[],reverse=signed<0;for(let i=0;i<t.length;i+=9){let p=poly([t.slice(i,i+3),t.slice(i+3,i+6),t.slice(i+6,i+9)]);if(p)out.push(reverse?flip(p):p)}return out}
  const A=new Node(input(a)),B=new Node(input(b));
  if(op==='subtract'){A.invert();A.clipTo(B);B.clipTo(A);B.invert();B.clipTo(A);B.invert();A.build(B.all());A.invert()}
  else if(op==='intersect'){A.invert();B.clipTo(A);B.invert();A.clipTo(B);B.clipTo(A);A.build(B.all());A.invert()}
@@ -35,15 +35,15 @@ function boolean(a,b,op){
  return out;
 }
 function revolve(profile,angle,faces){
- if(profile.length<3||profile.length>128||!Number.isFinite(angle)||angle<=0||angle>360||profile.some(p=>p[0]<-EPS||!p.every(Number.isFinite)))throw Error('Perfil o ángulo inválido');
+ if(!Array.isArray(profile)||profile.length<3||profile.length>128||!Number.isFinite(angle)||angle<=0||angle>360||profile.some(p=>!Array.isArray(p)||p.length!==2||p[0]<-EPS||!p.every(Number.isFinite)))throw Error('Perfil o ángulo inválido');
  const area=profile.reduce((v,p,i)=>{const q=profile[(i+1)%profile.length];return v+p[0]*q[1]-p[1]*q[0]},0);if(area<=EPS)throw Error('El perfil debe tener orientación antihoraria y área positiva');
  const full=Math.abs(angle-360)<EPS,n=Math.max(8,Math.ceil(angle/5)),a=angle*Math.PI/180,out=[];
  const pt=(p,j)=>[p[0]*Math.cos(a*j/n),p[0]*Math.sin(a*j/n),p[1]];
  function tri(a,b,c){if(poly([a,b,c]))out.push(...a,...b,...c)}
  for(let j=0;j<n;j++)for(let i=0;i<profile.length;i++){const p=profile[i],q=profile[(i+1)%profile.length],u=pt(p,j),v=pt(q,j),w=pt(q,j+1),x=pt(p,j+1);tri(u,w,v);tri(u,x,w)}
- if(!full){for(const f of faces){let [i,j,k]=f;const p=profile[i],q=profile[j],r=profile[k];if((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0])<0)[j,k]=[k,j];tri(pt(profile[i],0),pt(profile[j],0),pt(profile[k],0));tri(pt(profile[k],n),pt(profile[j],n),pt(profile[i],n))}}
- if(out.length>MAX||Math.abs(volume(out))<EPS*EPS)throw Error('Revolución sin volumen válido');
- if(volume(out)<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
+ if(!full){if(!Array.isArray(faces)||faces.length!==profile.length-2||faces.some(f=>!Array.isArray(f)||f.length!==3||new Set(f).size!==3||f.some(i=>!Number.isInteger(i)||i<0||i>=profile.length)))throw Error('Triangulación de tapas inválida');for(const f of faces){let [i,j,k]=f;const p=profile[i],q=profile[j],r=profile[k];if((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0])<0)[j,k]=[k,j];tri(pt(profile[i],0),pt(profile[j],0),pt(profile[k],0));tri(pt(profile[k],n),pt(profile[j],n),pt(profile[i],n))}}
+ const signed=volume(out);if(out.length>MAX||!Number.isFinite(signed)||Math.abs(signed)<EPS*EPS)throw Error('Revolución sin volumen válido');
+ if(signed<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
  return out;
 }
 root.CAD3DSolidOps={boolean,revolve,volume};
