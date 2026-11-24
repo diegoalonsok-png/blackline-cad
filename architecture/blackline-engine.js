@@ -65,12 +65,21 @@ function interpret(raw){
  let count=qty(tokens[at-1])||1;if(alt)count=1;
  if(count>1&&!tokens.some(t=>t.k==='row'))throw Error('Indicá cómo se relacionan los ambientes: contiguos o alternativas.');
  if(suite&&count>1&&!tokens.some(t=>t.k==='private'))throw Error('Indicá si cada habitación tiene su propio baño.');
+ if(suite&&/\b(?:compartid[oa]s?|shared|comun)\b/.test(s))throw Error('Baño compartido: requiere una distribución conectada todavía no implementada.');
+ if(/\b(?:frente a|enfrente de|a la izquierda|a la derecha|junto a|al fondo|centrad[oa]|esquina|opposite|next to)\b/.test(s))throw Error('La posición relativa solicitada todavía no está soportada; no se omitirá silenciosamente.');
  const assumptions=[],main=suite?s.slice(0,bath.i):s;
- let size=dimensions(main);if(!size){size=DEFAULT[base].slice(0,2);assumptions.push('Dimensiones iniciales: '+size.join(' × ')+' m')}
+ let size=dimensions(main);
+ if(!size){
+  const named=(labels)=>{const m=main.match(new RegExp('(?:'+labels+')\\s*(?:de|:|=)?\\s*'+N+'\\s*'+U,'i'))||main.match(new RegExp(N+'\\s*'+U+'\\s*(?:de\\s+)?(?:'+labels+')\\b','i'));return m?num(m[1])*unitScale(m[2]):null};
+  const width=named('ancho|anchura|width'),depth=named('largo|longitud|profundidad|depth|length');
+  if(width!==null&&depth!==null)size=[width,depth];
+  else if(width!==null||depth!==null){size=[width??DEFAULT[base][0],depth??DEFAULT[base][1]];assumptions.push('Dimensión no indicada: valor inicial');}
+ }
+ if(!size){size=DEFAULT[base].slice(0,2);assumptions.push('Dimensiones iniciales: '+size.join(' × ')+' m')}
  const spec={kind:suite?'suite_row':base,count,alternatives,width:size[0],depth:size[1],wall:.15,door:.8,window:1.2,assumptions};
  for(const [key,def] of [['wall',.15],['door',.8],['window',1.2]]){
   const t=tokens.find(x=>x.k===key);if(!t){assumptions.push(key+': '+def+' m');continue}
-  const tail=s.slice(t.end).replace(/^\s*(?:de|of|von|da|di|com|con|ancho|width|espesor|thickness|de ancho|de espesor)\s+/,'');
+  const tail=s.slice(t.end).replace(/^\s*(?:(?:de|of|von|da|di|com|con|ancho|width|espesor|thickness)\s+)*/,'');
   const v=measure(tail);
   if(/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+)?$/.test(s.slice(Math.max(0,t.i-24),t.i)))spec[key]=0;
   else if(v!==null)spec[key]=v;
@@ -82,8 +91,9 @@ function interpret(raw){
   const neg=t=>/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+|a\s+)?$/.test(s.slice(Math.max(part[0],t.i-24),t.i));
   for(const t of ts){if(!C[t.k])continue;if(neg(t))out.delete(t.k);else out.add(t.k)}
   if(kind==='bathroom'&&out.has('bathtub')&&!ts.some(t=>t.k==='shower'&&!neg(t)))out.delete('shower');
-  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
+  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed|dormitorio individual|habitacion individual)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
   if(kind==='living'){const m=words.match(/\b(?:mesa|table)\s+(?:para|for)\s+(4|6|8|cuatro|seis|ocho|four|six|eight)\b/);if(m){out.delete('table6');out.add('table'+(numberWords[m[1]]||m[1]))}if(/\b(?:mesa ratona|coffee table)\b/.test(words))out.add('coffee')}
+  if(/\b(?:sin muebles|sin mobiliario|without furniture|vaci[oa])\b/.test(words))out.clear();
   return [...out];
  };
  spec.fixtures=selected(base,[0,suite?bath.i:s.length]);
@@ -99,7 +109,7 @@ function arrange(w,d,fixtures,protectedZones,seed=0){
  for(const key of sorted){if(options.has(key))continue;const [,bw,bd]=C[key],opts=[];
   for(const rot of [0,90,180,270]){
    const fw=rot%180?bd:bw,fd=rot%180?bw:bd;if(fw>w||fd>d)continue;
-   if(key==='island'){const r=R((w-fw)/2,(d-fd)/2,fw,fd),a=R(r.x-.9,r.y-.9,fw+1.8,fd+1.8);if(inside(a,w,d))opts.push({key,rot,r,a});continue}
+   if(key==='island'){const r=R((w-fw)/2,(d-fd)/2,fw,fd),a=R(r.x-.9,r.y-.9,fw+1.8,fd+1.8);if(inside(a,w,d)&&!protectedZones.some(p=>overlap(r,p,.03)))opts.push({key,rot,r,a});continue}
    const horizontal=rot%180===0,edge=horizontal?w-fw:d-fd,step=.15;
    for(let j=0;j<=Math.ceil(edge/step);j++){
     const accessRot=['bed','singlebed','doublebed','kingbed'].includes(key)?(rot+180)%360:rot;
@@ -121,16 +131,16 @@ function arrange(w,d,fixtures,protectedZones,seed=0){
 function solve(spec){
  const {width:w,depth:d,wall:t,door,window:win,count:n}=spec;
  const kind=spec.kind,suite=kind==='suite_row',base=suite?'bedroom':kind;
- if(!DEFAULT[base]||![w,d,t,door,win].every(Number.isFinite)||w<1.2||d<1.2||w>20||d>20||t<.08||t>.5||door<.6||door>Math.min(1.2,w-.3)||win<0||win>w-.3||!Number.isInteger(n)||n<1||n>30)throw Error('Dimensiones o cantidad fuera del rango del motor.');
+ if(!DEFAULT[base]||![w,d,t,door,win].every(Number.isFinite)||w<1.2||d<1.2||w>20||d>20||t<.08||t>.5||(door!==0&&door<.6)||door>Math.min(1.2,w-.3)||win<0||win>w-.3||!Number.isInteger(n)||n<1||n>30)throw Error('Dimensiones o cantidad fuera del rango del motor.');
  const bd=suite?spec.bathDepth:0;
  if(suite&&(Math.abs(spec.bathWidth-w)>1e-6||!Number.isFinite(bd)||bd<1.5||bd>20))throw Error('Por ahora el baño privado debe tener el mismo ancho que el dormitorio.');
  const amount=spec.alternatives||1;if(!Number.isInteger(amount)||amount<1||amount>20||amount>1&&n>1)throw Error('Hasta 20 alternativas individuales o 30 ambientes contiguos.');
  const items=spec.fixtures||DEFAULT[base][2],bathItems=spec.bathFixtures||DEFAULT.bathroom[2];if(!Array.isArray(items)||!Array.isArray(bathItems)||[...items,...bathItems].some(k=>!C[k])||items.length>12||bathItems.length>12)throw Error('Equipamiento no reconocido.');
  const out={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks:[],rooms:[],virtualDimensions:[],connections:[],variants:[],brief:spec,assumptions:[...(spec.assumptions||[])]};
  const step=w+t,fullD=d+(suite?bd+t:0),cols=Math.ceil(Math.sqrt(amount)),seen=new Set();
- const doorZone=R((w-door)/2,0,door,door),bathDoor=.8;
+ const doorZones=door?[R((w-door)/2,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay;try{lay=arrange(w,d,items,[doorZone,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed);
+  let lay,blay;try{lay=arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
