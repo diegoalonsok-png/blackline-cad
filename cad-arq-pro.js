@@ -781,7 +781,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-room-row-v2');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-suite-v3');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
