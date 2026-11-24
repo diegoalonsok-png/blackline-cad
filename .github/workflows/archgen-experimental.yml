@@ -16,3 +16,6 @@ jobs:
           node-version: '22'
       - run: node --check cad-archgen.js
       - run: node --test tests/archgen-modules.test.cjs
+
+      - name: Test ARCHGEN in Chromium
+        run: node --test tests/archgen-browser.test.cjs
