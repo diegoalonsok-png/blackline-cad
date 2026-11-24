@@ -14,10 +14,17 @@ const detailedPlanSources=Object.freeze({
  'dor-cama1':['dk-cama-1p',180],
  'kq-anafe4':['dk-anafe-4',0]
 });
+// Fixture symbols are pure vector geometry, without source drawing annotations.
+function fixtureGeometry(id,lib=root.CAD2D_ARQ_LIBRARY){
+ const built=lib.build(id);
+ const entities=built.entities.filter(e=>!['text','mtext','dimension','leader','mleader','attribute','attdef'].includes(String(e.type).toLowerCase()));
+ if(!entities.length)throw Error('Bloque sin geometría gráfica: '+id);
+ return {...built,entities};
+}
 function preferredBlock(id,lib){
  const entry=detailedPlanSources[id],available=entry&&lib.library.find(v=>v.id===entry[0]&&!v.hideFromGallery&&!v.pro&&!v.paidOnly);
  const sourceId=available?entry[0]:id,offset=available?entry[1]:0;
- const box=lib.bounds(lib.build(sourceId).entities),w=box.maxX-box.minX,d=box.maxY-box.minY;
+ const box=lib.bounds(fixtureGeometry(sourceId,lib).entities),w=box.maxX-box.minX,d=box.maxY-box.minY;
  if(![w,d].every(v=>Number.isFinite(v)&&v>0))throw Error('Bloque sin medidas válidas: '+sourceId);
  const swap=offset%180!==0;
  return {sourceId,offset,w:swap?d:w,d:swap?w:d,quality:available?'detailed-gallery':'standard-fallback'};
@@ -203,7 +210,7 @@ function resizeModel(model,width,depth){
  }
  return {...model,width,depth,area:width*depth,items,door,window};
 }
-root.CAD2D_ARCHGEN=Object.freeze({generate,resizeModel,preferredBlock});
+root.CAD2D_ARCHGEN=Object.freeze({generate,resizeModel,preferredBlock,fixtureGeometry});
 if(typeof document==='undefined'||!root.CAD2D_CORE)return;
 function openPalette(){
  const core=root.CAD2D_CORE,lib=root.CAD2D_ARQ_LIBRARY;
@@ -230,7 +237,7 @@ function openPalette(){
   wallOutline([[dx0,-t],[-t,-t],[-t,d+t],[wx0,d+t],[wx0,d],[0,d],[0,0],[dx0,0]]);
   wallOutline([[dx1,-t],[w+t,-t],[w+t,d+t],[wx1,d+t],[wx1,d],[w,d],[w,0],[dx1,0]]);
   for(const item of m.items){
-   const b=lib.build(item.sourceId||item.id),bb=lib.bounds(b.entities),r=(item.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+   const b=fixtureGeometry(item.sourceId||item.id,lib),bb=lib.bounds(b.entities),r=(item.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
    const cs=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([x,y])=>[x*c-y*s,x*s+y*c]),ox=item.x-Math.min(...cs.map(v=>v[0])),oy=item.y-Math.min(...cs.map(v=>v[1]));
    const tr=p=>({x:ox+p.x*c-p.y*s,y:oy+p.x*s+p.y*c});
    for(const e of b.entities){
