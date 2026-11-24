@@ -826,39 +826,53 @@ function openArchitectureBar(focus=true){
 #cadArqInstructionBar .qb-handle{touch-action:none}
 #cadArqInstructionBar .qb-sep{flex:none}
 #cadArqInstructionBar b{font:600 11px Arial,sans-serif;white-space:nowrap;padding:0 3px}
-#cadArqInstructionBar input{flex:1;min-width:0;width:100%;height:30px;background:transparent;border:0;border-radius:15px;padding:0 8px;color:inherit;font:12px Arial,sans-serif;user-select:text;touch-action:auto}
-#cadArqInstructionBar input:focus-visible{outline:2px solid #9adff3}
-#cadArqInstructionBar input::placeholder{color:#929aa1}
+#cadArqInstructionBar textarea{flex:1;min-width:0;width:100%;height:30px;min-height:30px;max-height:192px;resize:none;overflow-y:hidden;box-sizing:border-box;background:transparent;border:0;border-radius:15px;padding:6px 8px;color:inherit;font:12px/18px Arial,sans-serif;user-select:text;touch-action:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+#cadArqInstructionBar textarea:focus-visible{outline:2px solid #9adff3}
+#cadArqInstructionBar textarea::placeholder{color:#929aa1}
 .bl-light #cadArqInstructionBar{color:#18232b}
 #cadArqInstructionBar.arq-min{width:auto}
-#cadArqInstructionBar.arq-min input,#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .qb-sep{display:none}
+#cadArqInstructionBar.arq-expanded{border-radius:22px;align-items:flex-start}
+#cadArqInstructionBar.arq-expanded b{margin-top:11px}
+#cadArqInstructionBar.arq-expanded .qb-sep{margin-top:6px}
+#cadArqInstructionBar.arq-min textarea,#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .qb-sep{display:none}
 `;document.head.append(css);
   bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
-  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><textarea rows="1" wrap="soft" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"></textarea><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const KEY='cad2d-arqbar-pos';
   const place=(x,y)=>{const w=host.clientWidth,h=host.clientHeight;x=Math.max(4,Math.min(w-bar.offsetWidth-4,x));y=Math.max(4,Math.min(h-bar.offsetHeight-4,y));bar.style.left=x+'px';bar.style.top=y+'px'};
+  const resizeText=()=>{if(bar.style.display==='none'||bar.classList.contains('arq-min'))return;input.style.height='30px';const h=Math.max(30,Math.min(192,input.scrollHeight));input.style.height=h+'px';input.style.overflowY=input.scrollHeight>h?'auto':'hidden';bar.classList.toggle('arq-expanded',h>34);place(bar.offsetLeft,bar.offsetTop)};
+  input.addEventListener('input',resizeText);bar.arqResize=resizeText;
   let pos=null;try{pos=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
   requestAnimationFrame(()=>{const quick=document.getElementById('cadQuickBar');if(Array.isArray(pos)&&pos.length===2&&pos.every(Number.isFinite))place(...pos);else if(quick&&quick.offsetWidth){const x=quick.offsetLeft+quick.offsetWidth+8;place(x+bar.offsetWidth<=host.clientWidth?x:quick.offsetLeft,x+bar.offsetWidth<=host.clientWidth?quick.offsetTop:quick.offsetTop+quick.offsetHeight+8)}else place((host.clientWidth-bar.offsetWidth)/2,60)});
-  window.addEventListener('resize',()=>{if(bar.style.display!=='none')place(bar.offsetLeft,bar.offsetTop)});
+  window.addEventListener('resize',()=>{if(bar.style.display!=='none')resizeText()});
   let drag=null;handle.addEventListener('pointerdown',e=>{drag={dx:e.clientX-bar.offsetLeft,dy:e.clientY-bar.offsetTop};handle.setPointerCapture(e.pointerId);e.preventDefault();e.stopPropagation()});
   handle.addEventListener('pointermove',e=>{if(drag)place(e.clientX-drag.dx,e.clientY-drag.dy)});
   const endDrag=()=>{if(!drag)return;drag=null;try{localStorage.setItem(KEY,JSON.stringify([bar.offsetLeft,bar.offsetTop]))}catch(e){}};
   handle.addEventListener('pointerup',endDrag);handle.addEventListener('pointercancel',endDrag);
-  handle.addEventListener('dblclick',()=>{bar.classList.toggle('arq-min');place(bar.offsetLeft,bar.offsetTop)});
+  handle.addEventListener('dblclick',()=>{bar.classList.toggle('arq-min');if(!bar.classList.contains('arq-min'))resizeText();else{bar.classList.remove('arq-expanded');place(bar.offsetLeft,bar.offsetTop)}});
   const submit=async()=>{
-   const raw=input.value.trim();if(!raw){input.focus();return}
+   const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
   };
-  input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
+  input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
   for(const type of ['pointerdown','pointerup','mousedown','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
   run.addEventListener('click',submit);
-  bar.querySelector('[data-arq-close]').onclick=()=>{EXT.cancelArchitectureCommand();bar.style.display='none'};
+  bar.querySelector('[data-arq-close]').onclick=()=>{EXT.cancelArchitectureCommand();bar.style.display='none';syncArchitectureToggle()};
  }
- bar.style.display='flex';if(focus){bar.classList.remove('arq-min');bar.querySelector('[data-arq-text]').focus();}
+ bar.style.display='flex';if(focus){bar.classList.remove('arq-min');bar.querySelector('[data-arq-text]').focus();}bar.arqResize?.();syncArchitectureToggle();
 }
+function syncArchitectureToggle(){
+ const bar=document.getElementById('cadArqInstructionBar'),on=!!bar&&bar.style.display!=='none';
+ for(const b of document.querySelectorAll('[data-tool="arqAssistantOpen"],[data-tool="arqAssistantHome"],[data-qb="arqassist"]')){b.setAttribute('aria-pressed',String(on));b.classList.toggle('arq-toggle-active',on)}
+}
+function toggleArchitectureBar(){
+ const bar=document.getElementById('cadArqInstructionBar');
+ if(bar&&bar.style.display!=='none'){EXT.cancelArchitectureCommand();bar.style.display='none';syncArchitectureToggle()}else openArchitectureBar();
+}
+EXT.toggleArchitectureBar=toggleArchitectureBar;
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
@@ -922,8 +936,8 @@ function openArchitectureAssistant(category){
 EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureBar();
 EXT.commands.BANO=EXT.commands.BANOS=EXT.commands['BAÑO']=EXT.commands['BAÑOS']=()=>openArchitectureAssistant('Baños completos');
 EXT.commands.COCINA=EXT.commands.COCINAS=()=>openArchitectureAssistant('Cocinas completas');
-CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureBar()}]);
-CORE.ribbon.add('home','ASISTENTE',[{id:'arqAssistantHome',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureBar()}]);
+CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>toggleArchitectureBar()}]);
+CORE.ribbon.add('home','ASISTENTE',[{id:'arqAssistantHome',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>toggleArchitectureBar()}]);
 CORE.ribbon.rebuild();
 
 /* ---------- Conexión ---------- */
@@ -931,6 +945,6 @@ const canvas=CORE.canvas;
 canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
-buildPanel();buildModal();updateIsoBadge();openArchitectureBar(false);
+buildPanel();buildModal();updateIsoBadge();
 window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
