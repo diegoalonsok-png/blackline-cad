@@ -121,7 +121,7 @@ if(neg(t))out.delete(t.k);else out.add(t.k)}
 const R=(x,y,w,d)=>({x,y,w,d});
 const inside=(r,w,d)=>r.x>=-1e-7&&r.y>=-1e-7&&r.x+r.w<=w+1e-7&&r.y+r.d<=d+1e-7;
 const overlap=(a,b,g=0)=>a.x<b.x+b.w+g-1e-7&&b.x<a.x+a.w+g-1e-7&&a.y<b.y+b.d+g-1e-7&&b.y<a.y+a.d+g-1e-7;
-function arrange(w,d,fixtures,protectedZones,seed=0){
+function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
  let rng=seed+1;const rand=()=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296};
  const sorted=fixtures.slice().sort((a,b)=>C[b][1]*C[b][2]-C[a][1]*C[a][2]),placed=[],options=new Map();let nodes=0;
  for(const key of sorted){if(options.has(key))continue;const [,bw,bd]=C[key],opts=[];
@@ -132,7 +132,7 @@ function arrange(w,d,fixtures,protectedZones,seed=0){
    for(let j=0;j<=Math.ceil(edge/step);j++){
     const accessRot=['bed','singlebed','doublebed','kingbed'].includes(key)?(rot+180)%360:rot;
     const z=Math.min(edge,j*step),r=horizontal?R(z,accessRot===0?0:d-fd,fw,fd):R(accessRot===90?w-fw:0,z,fw,fd);
-    const gap=['toilet','bidet','basin','shower','bathtub'].includes(key)?.60:.75;
+    const gap=['toilet','bidet','basin','shower','bathtub'].includes(key)?(compact?.25:.60):.75;
     // Bed catalogue headboard is local +Y; place headboard at wall (rotation 180/90).
     // Beds have their headboard at local +Y; their access direction is reversed.
     const a=accessRot===0?R(r.x,r.y,r.w,r.d+gap):accessRot===90?R(r.x-gap,r.y,r.w+gap,r.d):accessRot===180?R(r.x,r.y-gap,r.w,r.d+gap):R(r.x,r.y,r.w+gap,r.d);
@@ -156,9 +156,10 @@ function solve(spec){
  const items=spec.fixtures||DEFAULT[base][2],bathItems=spec.bathFixtures||DEFAULT.bathroom[2];if(!Array.isArray(items)||!Array.isArray(bathItems)||[...items,...bathItems].some(k=>!C[k])||items.length>12||bathItems.length>12)throw Error('Equipamiento no reconocido.');
  const out={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks:[],rooms:[],virtualDimensions:[],connections:[],variants:[],brief:spec,assumptions:[...(spec.assumptions||[])]};
  const step=w+t,fullD=d+(suite?bd+t:0),cols=Math.ceil(Math.sqrt(amount)),seen=new Set();
- const doorZones=door?[R((w-door)/2,0,door,door)]:[],bathDoor=.8;
+ const doorX=spec.doorX??(w-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>w-.03)throw Error('Posición de puerta inválida.');
+ const doorZones=door?[R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay;try{lay=arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed);
+  let lay,blay;try{lay=arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
@@ -174,7 +175,7 @@ function solve(spec){
   for(let i=0;i<=n;i++){const x=t/2+i*step;wall('side'+i,[x,t/2],[x,fullD+1.5*t])}
   for(let i=0;i<n;i++){
    const x=t+i*step,a=x-t/2,b=a+step,front='front'+i,back='back'+i,rear='rear'+i;
-   wall(front,[a,t/2],[b,t/2]);wall(back,[a,d+1.5*t],[b,d+1.5*t]);opening(front,'swing-door',step/2,door);
+   wall(front,[a,t/2],[b,t/2]);wall(back,[a,d+1.5*t],[b,d+1.5*t]);opening(front,'swing-door',t/2+doorX+door/2,door);
    room('room'+i,base,x,t,d,front,back,i);blocks(lay,x,t,base);
    if(suite){
     const offset=step/2-door/2-win/2-.2;
@@ -244,6 +245,32 @@ function solveDetail(spec){
  return {schema:'blackline.architecture.detail.v1',units:'m',entities,brief:spec,assumptions};
 }
 
-const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run:text=>{const d=detailInstruction(text);return d?solveDetail(d):solve(interpret(text))},catalog:C});
+function run(text){
+ const d=detailInstruction(text);if(d)return solveDetail(d);
+ const spec=interpret(text);
+ try{return solve(spec)}catch(error){
+ if(spec.kind!=='bathroom'||!error.message.includes('sin interferencias'))throw error;
+ const s=normalize(text),explicit=new Set();
+ for(const m of s.matchAll(/[a-z]+/g)){const k=concept(m[0]);if(C[k])explicit.add(k)}
+ const requested=spec.fixtures.filter(k=>explicit.has(k));
+ const essential=requested.length?requested:spec.fixtures;
+ const attempts=[spec.fixtures,essential];
+ // Try the original dimensions, all requested fixtures and alternate door positions first.
+ // A partial plan is a last resort and must disclose each missing fixture.
+ for(let i=0;i<essential.length;i++)attempts.push(essential.slice(0,essential.length-i-1));
+ for(const fixtures of attempts){
+  for(const doorX of [(spec.width-spec.door)/2,.08,spec.width-spec.door-.08]){
+   try{const omitted=spec.fixtures.filter(k=>!fixtures.includes(k));
+    const missing=essential.filter(k=>!fixtures.includes(k));
+    const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',shower:'ducha'};
+    const warning='APROXIMACIÓN: baño preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
+    const p=solve({...spec,fixtures,doorX,compact:true,assumptions:[...spec.assumptions,warning]});p.status='approximate';p.warning=warning;return p;
+   }catch(e){}
+  }
+ }
+ throw error;
+ }
+}
+const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,catalog:C});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BlacklineArchitectureAI=api;
 })(typeof self!=='undefined'?self:globalThis);
