@@ -104,8 +104,9 @@ function arrange(w,d,fixtures,protectedZones,seed=0){
     const z=Math.min(edge,j*step),r=horizontal?R(z,rot===0?0:d-fd,fw,fd):R(rot===90?w-fw:0,z,fw,fd);
     const gap=['toilet','bidet','basin','shower','bathtub'].includes(key)?.60:.75;
     // Bed catalogue headboard is local +Y; place headboard at wall (rotation 180/90).
-    if(['bed','singlebed','doublebed','kingbed'].includes(key)&&rot!==180&&rot!==90&&rot!==270&&rot!==0)continue;
-    const a=rot===0?R(r.x,r.y,r.w,r.d+gap):rot===90?R(r.x-gap,r.y,r.w+gap,r.d):rot===180?R(r.x,r.y-gap,r.w,r.d+gap):R(r.x,r.y,r.w+gap,r.d);
+    // Beds have their headboard at local +Y; their access direction is reversed.
+    const accessRot=['bed','singlebed','doublebed','kingbed'].includes(key)?(rot+180)%360:rot;
+    const a=accessRot===0?R(r.x,r.y,r.w,r.d+gap):accessRot===90?R(r.x-gap,r.y,r.w+gap,r.d):accessRot===180?R(r.x,r.y-gap,r.w,r.d+gap):R(r.x,r.y,r.w+gap,r.d);
     if(inside(a,w,d)&&!protectedZones.some(p=>overlap(r,p,.03)))opts.push({key,rot,r,a});
    }
   }
