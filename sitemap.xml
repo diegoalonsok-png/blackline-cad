@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://blackline-cad.org/</loc><lastmod>2026-11-19</lastmod></url>
+  <url><loc>https://blackline-cad.org/</loc><lastmod>2026-11-23</lastmod></url>
   <url><loc>https://blackline-cad.org/manual-comandos</loc></url>
   <url><loc>https://blackline-cad.org/legal</loc></url>
   <url><loc>https://blackline-cad.org/acerca</loc><lastmod>2026-11-20</lastmod></url>
@@ -12,4 +12,6 @@
   <url><loc>https://blackline-cad.org/cad2d-online</loc><lastmod>2026-11-19</lastmod></url>
   <url><loc>https://blackline-cad.org/online-2d-cad</loc><lastmod>2026-11-19</lastmod></url>
   <url><loc>https://blackline-cad.org/online-dxf-editor</loc><lastmod>2026-11-20</lastmod></url>
+  <url><loc>https://blackline-cad.org/cad-2d-3d-online</loc><lastmod>2026-11-23</lastmod></url>
+  <url><loc>https://blackline-cad.org/online-2d-3d-cad</loc><lastmod>2026-11-23</lastmod></url>
 </urlset>
