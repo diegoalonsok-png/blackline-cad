@@ -10,7 +10,7 @@ self.addEventListener('fetch',ev=>{
  if(req.method!=='GET'||url.origin!==self.location.origin)return;   // API, Stripe, Google: siempre por red
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
  // The converter must never run with a stale or mixed JS/WASM runtime.
- if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
+ if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|cad-(?:block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
   ev.respondWith(fetch(req,{cache:'reload'}));return;
  }
  const appEntry=req.mode==='navigate'&&(url.pathname==='/'||url.pathname==='/index.html');
