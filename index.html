@@ -6988,8 +6988,6 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(cadZoomOptionPending&&['E','EXTENTS','EXTENSION'].includes(value.toUpperCase())){cadZoomOptionPending=false;setTool('select');return zoomExtents()}
  if(cadZoomOptionPending&&['W','VENTANA'].includes(value.toUpperCase())){cadZoomOptionPending=false;return setTool('zoomWindow')}
  if(value&&!['Z','ZOOM','ZW','ZOOMVENTANA'].includes(value.toUpperCase()))cadZoomOptionPending=false;
- const arqText=value.match(/^(?:ARQASSIST|ASISTENTEARQ)\s+(.+)$/i);
- if(arqText&&state.tool==='select'&&!state.stage.length&&!cad2dCmdOpt.pending){const draw=window.CAD2D_EXTENSIONS?.drawArchitectureCommand;if(!draw)return toast('ARQASSIST no disponible');cad2dLastCommand=value;return draw(arqText[1]);}
  if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}
  const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
@@ -7186,7 +7184,6 @@ document.addEventListener('keydown',ev=>{
  cmd.focus();cmd.value+=ev.key;cmd.dispatchEvent(new Event('input',{bubbles:true}));
  cmd.setSelectionRange(cmd.value.length,cmd.value.length);
 });$('command').addEventListener('keydown',ev=>{
- if(ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&state.tool==='select'&&/^(?:ARQASSIST|ASISTENTEARQ)(?:\s|$)/i.test($('command').value.trimStart()))return;
  if(ev.key==='Enter'||ev.code==='Space'&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey){ev.preventDefault();ev.stopPropagation();runCommand();return}
  if((ev.key==='ArrowUp'||ev.key==='ArrowDown')&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey&&!ev.shiftKey){
   if(!cad2dCommandHistory.length)return;
@@ -11585,7 +11582,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261124-command-text-v8"></script>
+<script src="cad-arq-pro.js?v=20261124-separate-instruction-bar-v9"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-zip-organize-v4"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
