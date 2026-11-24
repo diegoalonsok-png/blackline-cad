@@ -10,7 +10,7 @@ self.addEventListener('fetch',ev=>{
  const req=ev.request,url=new URL(req.url);
  if(req.method!=='GET'||url.origin!==self.location.origin||req.headers.has('range')||req.cache==='no-store')return;   // API, Stripe, Google: siempre por red
  // Library geometry must never enter the service-worker cache. Metadata and thumbnails are separate.
- if(/\/assets\/block-library\/v1\/(?!catalog\.json$)/i.test(url.pathname)||/\/assets\/cad2d-olimpiadas3-\d+\.js$/i.test(url.pathname)){
+ if(/\/assets\/block-library\/v1\/(?!catalog\.json$)/i.test(url.pathname)||/\/assets\/(?:architecture-demand-v1|blackline-dk-demand-v1)\/(?!catalog\.json$)[^/]+\.json$/i.test(url.pathname)||/\/assets\/cad2d-olimpiadas3-\d+\.js$/i.test(url.pathname)){
   ev.respondWith(fetch(req,{cache:'no-store'}));return;
  }
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
