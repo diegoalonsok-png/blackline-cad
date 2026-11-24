@@ -71,8 +71,7 @@ function refresh(){
 async function loadExisting(){
  const p=window.CAD2D_OLYMPIADAS3;
  if(!p||p.catalogReady||p.loaded===p.total)return;
- try{await p.loadCatalog();return}catch(e){}
- const out=await p.load();if(out.loaded!==p.total)throw Error('No se completó la carga de la biblioteca existente. Reintentá antes de importar para evitar duplicados.');
+ try{await p.loadCatalog();return}catch(e){throw Error('Catálogo de bloques no disponible. Reintentá antes de importar para evitar duplicados.');}
 }
 async function verifyStored(){
  const saved=await readAll(),registered=new Map(L.library.filter(x=>/^userdx4-/.test(x.id)).map(x=>[x.id,x]));
