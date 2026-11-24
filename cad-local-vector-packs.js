@@ -166,9 +166,13 @@ async function fileRow(file,unknownUnit,recover=true){
  }
  if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('Archivo vacío');
  const parser=globalThis.CAD2DDxfParser;if(!parser)throw Error('Motor DXF no disponible');
- const parsed=parser.parse(new TextDecoder('windows-1252').decode(bytes),{explodeInserts:true});
+ const text=new TextDecoder('windows-1252').decode(bytes);
+ const parsed=parser.parse(text,{explodeInserts:true});
  if(parsed.warnings?.length){if(!recover)throw Error('DXF incompleto: '+parsed.warnings.join(', ').slice(0,200));flags|=2}
- const g=vectorize(parsed.entities||[],recover),cat=categoryFor(file);
+ const cat=categoryFor(file);
+ async function encode(entities,label,baseFlags){
+ let flags=baseFlags;
+ const g=vectorize(entities,recover);
  if(g.skipped)flags|=2;
  let scale=METRES[parsed.unitCode]||(!parsed.unitCode&&unknownUnit>0?unknownUnit:0);
  if(!scale&&unknownUnit===-1&&!parsed.unitCode){scale=estimatedScale(g,cat);flags|=1}
@@ -187,8 +191,20 @@ async function fileRow(file,unknownUnit,recover=true){
  unique.forEach((a,i)=>a.forEach((v,j)=>view.setUint16(i*8+j*2,v,true)));
  let binary='';for(let i=0;i<raw.length;i+=8192)binary+=String.fromCharCode(...raw.subarray(i,i+8192));
  const hash=(await hexHash(new TextEncoder().encode(w+'|'+d+'|'+btoa(binary)))).slice(0,24);
- const name=safe(file.name.replace(/\.(dwg|dxf)$/i,'').replace(/__[a-f0-9]{12}$/i,'').replace(/_/g,' '))||'Bloque';
- return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,categoryFor(file),w,d,btoa(binary),hash,flags];
+ const name=safe(label||file.name.replace(/\.(dwg|dxf)$/i,'').replace(/__[a-f0-9]{12}$/i,'').replace(/_/g,' '))||'Bloque';
+ return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,cat,w,d,btoa(binary),hash,flags];
+ }
+ // A standalone drawing needs no INSERT: the lower-left bounds give the block's local origin.
+ try{return [await encode(parsed.entities||[],null,flags)]}catch(modelError){
+  const defs=parser.parse(text,{explodeInserts:true,collectDefinitions:true});
+  if(defs.warnings?.length&&!recover)throw modelError;
+  const rows=[],errors=[];
+  for(const def of Object.values(defs.blocks||{})){
+   try{rows.push(await encode(def.entities||[],def.name,flags|(defs.warnings?.length?2:0)))}catch(e){errors.push(def.name+': '+String(e.message||e))}
+  }
+  if(!rows.length)throw Error(String(modelError.message||modelError)+(errors.length?' · Definiciones: '+errors.slice(0,3).join('; '):' · Sin definiciones utilizables'));
+  return rows;
+ }
 }
 
 // ZIP classic (stored/deflate), parsed locally. No extraction to disk or network.
@@ -277,10 +293,11 @@ async function importDrawings(files,unknownUnit=-1,onProgress=()=>{},shouldStop=
    if(shouldStop())break;
    try{
     if(!/\.(dwg|dxf)$/i.test(file.name)||!file.size||file.size>64*1024*1024)throw Error('Archivo no compatible o mayor a 64 MiB');
-    const row=validate(await fileRow(file,unknownUnit,recover));
-    if(!row)throw Error('Bloque vectorial no válido');
-    const fresh=filterNew([row]);
-    if(fresh.length){await persist(fresh);added+=register(fresh);if(row[8]&1)estimated++;if(row[8]&6)partial++;}else duplicates++;
+    const rows=(await fileRow(file,unknownUnit,recover)).map(validate).filter(Boolean);
+    if(!rows.length)throw Error('Bloque vectorial no válido');
+    const fresh=filterNew(rows);
+    duplicates+=rows.length-fresh.length;
+    if(fresh.length){await persist(fresh);added+=register(fresh);estimated+=fresh.filter(row=>row[8]&1).length;partial+=fresh.filter(row=>row[8]&6).length;}
    }catch(e){lastError=String(e.message||e);failed.push({file:file.webkitRelativePath||file.name,error:lastError})}
    processed++;onProgress({processed,total:files.length,added,duplicates,estimated,partial,failed:failed.length,file:file.name,lastError});
   }
@@ -291,7 +308,7 @@ function openDrawingImport(){
  if(busy)return;
  const pane=document.createElement('dialog');
  pane.style.cssText='background:#23313b;color:#f2f5f6;border:1px solid #657985;border-radius:10px;padding:16px;width:min(480px,90vw)';
- pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
+ pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Se admiten dibujos sin punto de inserción y definiciones de bloques sin INSERT. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
  document.body.appendChild(pane);
  const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input[type=file]'),unit=pane.querySelector('select'),recovery=pane.querySelector('[data-recover]');
  let active=false,stop=false;
