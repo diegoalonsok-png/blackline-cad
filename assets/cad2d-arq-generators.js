@@ -794,6 +794,10 @@ one('pv-sentado-fre','Persona sentada · vista frontal',PV,.60,1.30,(b,W,D)=>{co
 one('pv-grupo-fre','Grupo de tres personas · vista frontal',PV,1.70,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:.32*s});frontal(b,s*.96,{x:.85*s,skirt:true});frontal(b,s*.62,{x:1.35*s})},{family:'pers-vista',wMin:1.2,wMax:2.4,dMin:1.2,dMax:2.1});
 one('mob-locker','Locker individual de vestuario',MOB,.40,.50,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.025,.025,W-.05,D-.05);b.line(.04,D-.06,W-.04,D-.06);b.circle(W-.065,.07,.015);for(let i=0;i<3;i++)b.line(W*.25,D*.45+i*.035,W*.75,D*.45+i*.035)},{wMin:.30,wMax:.60,dMin:.40,dMax:.65});
 one('mob-banco-vest','Banco de vestuario',MOB,1.50,.40,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<4;i++)b.line(0,i*D/4,W,i*D/4);b.rect(.08,.04,.08,D-.08);b.rect(W-.16,.04,.08,D-.08)},{wMin:1,wMax:2.5,dMin:.35,dMax:.55});
+one('kq-industrial-range','Cocina industrial seis hornallas',KEQ,1.20,.80,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.04,.08,W-.08,D-.16);for(let i=0;i<3;i++)for(let j=0;j<2;j++){const x=W*(i+.5)/3,y=D*(j+.5)/2;b.circle(x,y,.13);b.circle(x,y,.065);b.line(x-.15,y,x+.15,y);b.line(x,y-.15,x,y+.15)}for(let i=0;i<6;i++)b.circle(W*(i+.5)/6,.035,.012)});
+one('kq-industrial-prep','Mesa de preparación inoxidable',KEQ,1.80,.75,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.035,.035,W-.07,D-.07);for(const x of [.08,W-.08])for(const y of [.08,D-.08])b.circle(x,y,.025)});
+one('kq-industrial-wash','Lavado gastronómico doble',KEQ,1.60,.70,(b,W,D)=>{F.bachaDoble(b,W,D);b.line(0,.035,W,.035)});
+one('kq-industrial-fridge','Refrigerador gastronómico doble',KEQ,1.40,.85,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.04,.06,W-.08,D-.10);b.line(W/2,.06,W/2,D-.04);b.line(W/2-.06,.12,W/2-.06,.38);b.line(W/2+.06,.12,W/2+.06,.38)});
 const api={library:LIB,build,bounds,categories:[...new Set(LIB.map(x=>x.cat))],Builder,F};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.CAD2D_ARQ_LIBRARY=api;
