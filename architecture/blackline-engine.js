@@ -546,9 +546,41 @@ function internationalText(raw){
  return s.replace(/\s+/g,' ').trim();
 }
 
+// Add a common corridor to an already solved suite row. Existing native wall
+// guides remain unchanged; the front wall becomes the shared corridor wall.
+function suiteCorridor(plan,passage){
+ if(plan.brief?.kind!=='suite_row'||plan.variants.length!==1)throw Error('Pasillo de suites: se requiere una fila de habitaciones con baño privado.');
+ const t=plan.brief.wall,front=plan.walls.filter(w=>/^v0-front\d+$/.test(w.id));
+ if(!front.length||front.some(w=>Math.abs(w.a[1]-w.b[1])>1e-7))throw Error('Fachada de suites no válida.');
+ const y=front[0].a[1],left=Math.min(...front.flatMap(w=>[w.a[0],w.b[0]])),right=Math.max(...front.flatMap(w=>[w.a[0],w.b[0]])),bottom=y-passage-t;
+ const wall=(id,a,b)=>plan.walls.push({id,a,b,thickness:t,layer:'WALLS',join:'native'});
+ wall('v0-hall-left',[left,bottom],[left,y]);wall('v0-hall-right',[right,bottom],[right,y]);wall('v0-hall-front',[left,bottom],[right,bottom]);
+ plan.openings.push({host:'v0-hall-left',kind:'swing-door',offset:(passage+t)/2,width:.9,layer:'OPENINGS'});
+ // Internal corridor glazing is not an exterior bedroom window.
+ const frontIds=new Set(front.map(w=>w.id));
+ plan.openings=plan.openings.filter(o=>!frontIds.has(o.host)||o.kind!=='framed-window');
+ // A narrower rear bathroom leaves an exposed portion of bedroom rear wall.
+ const bw=plan.brief.bathWidth,w=plan.brief.width,available=w-bw;
+ if(available>=1.05&&!plan.brief.closetDepth){
+  for(const f of front){const host=plan.walls.find(q=>q.id===f.id.replace('front','back'));if(host)plan.openings.push({host:host.id,kind:'framed-window',offset:t/2+bw+available/2,width:Math.min(1.2,available-.3),layer:'OPENINGS'});}
+ }
+ plan.rooms.push({id:'v0-hall',kind:'circulation',clearBounds:[left+t/2,bottom+t/2,right-left-t,passage]});
+ for(const room of plan.rooms.filter(r=>r.kind==='bedroom'))plan.connections.push({from:'v0-hall',to:room.id,via:room.id.replace('room','front'),private:false});
+ plan.brief.passage=passage;plan.status='approximate';
+ const note='Pasillo común de '+passage+' m de ancho libre. '+(available>=1.05&&!plan.brief.closetDepth?'Ventanas de dormitorios en tramo posterior libre.':'Dormitorios sin ventana exterior resuelta; revisar iluminación y ventilación.');
+ plan.assumptions.push(note);plan.warning=(plan.warning||'Anteproyecto editable; verificar normativa y evacuación.')+' '+note;
+ return plan;
+}
 function run(raw){
  const {text,corrections}=correctText(internationalText(raw));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
+ const suiteHall=text.match(/\b(?:con\s+)?(?:pasillo|corredor)\s*(?:comun\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|metros?|m)?\b/);
+ if(suiteHall&&/\b(?:habitaciones?|dormitorios?)\b/.test(text)&&/\bbanos?\b/.test(text)&&!/\b(?:casa|vivienda|mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia)\b/.test(text)){
+  const passage=num(suiteHall[1])*unitScale(suiteHall[2]);
+  if(passage<1.2||passage>4)throw Error('Pasillo de suites: ancho libre entre 1,20 y 4 m.');
+  const clean=(text.slice(0,suiteHall.index)+' '+text.slice(suiteHall.index+suiteHall[0].length)).replace(/\b(?:de\s+)?hotel\b/g,'').replace(/\s+(?:y|con)\s*$/,'').trim();
+  return suiteCorridor(run(clean),passage);
+ }
  const compound=compoundInstruction(text);if(compound){const p=compoundPlan(compound);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
  const d=detailInstruction(text);if(d){const p=solveDetail(d);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
  let spec,notes=[];
