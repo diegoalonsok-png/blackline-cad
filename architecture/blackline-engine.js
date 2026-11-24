@@ -16,7 +16,7 @@ const C=Object.freeze({
 const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']]};
 const aliases={
  bedroom:'habitacion habitaciones dormitorio dormitorios cuarto cuartos pieza piezas recamara recamaras alcoba alcobas bedroom bedrooms chambre chambres schlafzimmer quarto quartos camera camere',
- bathroom:'bano banos sanitario sanitarios bathroom bathrooms restroom restrooms badezimmer banheiro banheiros bagno bagni',
+ bathroom:'bano banos toilette toilettes sanitario sanitarios bathroom bathrooms restroom restrooms badezimmer banheiro banheiros bagno bagni',
  kitchen:'cocina cocinas kitchen kitchens cuisine cuisines kuche kuchen cozinha cozinhas cucina cucine',
  living:'living livings salon salones lounge lounges wohnzimmer soggiorno soggiorni',
  wall:'muro muros pared paredes tabique tabiques wall walls mur murs wand wande parede paredes muro muri',
@@ -53,13 +53,13 @@ function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by
 function interpret(raw){
  if(typeof raw!=='string'||!raw.trim()||raw.length>4000)throw Error('Escribí una instrucción arquitectónica.');
  let s=normalize(raw).replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
- if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre\w*|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
+ if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre(?:r|lo|la|los|las)?|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
  const tokens=[...s.matchAll(/[a-z]+|\d+(?:[.,]\d+)?/g)].map(m=>({t:m[0],i:m.index,end:m.index+m[0].length,k:concept(m[0])}));
  const rooms=tokens.filter(x=>Object.hasOwn(DEFAULT,x.k));
  if(!rooms.length)throw Error('No reconozco un ambiente de arquitectura. Indicá qué querés dibujar.');
  const first=rooms[0],base=first.k,bath=rooms.find((r,i)=>i>0&&r.k==='bathroom'),suite=base==='bedroom'&&!!bath;
  if(rooms.some(r=>r.k!==base&&!(suite&&r.k==='bathroom')))throw Error('Todavía no puedo resolver conjuntos de ambientes diferentes.');
- if(/\b(?:pasillo|corridor|balcon|balcony|vestidor|walk-in closet|escalera|stairs|planta alta|second floor)\b/.test(s))throw Error('La geometría solicitada incluye elementos aún no soportados.');
+ if(/\b(?:pasillo|corredor|corridor|balcon|balcony|vestidor|walk-in closet|escalera|stairs|planta alta|second floor)\b/.test(s))throw Error('La geometría solicitada incluye elementos aún no soportados.');
  const qty=t=>t?(/^\d+$/.test(t.t)?+t.t:numberWords[t.t]):undefined;
  const at=tokens.indexOf(first),alt=tokens.find(x=>x.k==='alternative'),alternatives=alt?(qty(tokens[tokens.indexOf(alt)-1])||1):1;
  let count=qty(tokens[at-1])||1;if(alt)count=1;
@@ -67,6 +67,8 @@ function interpret(raw){
  if(suite&&count>1&&!tokens.some(t=>t.k==='private'))throw Error('Indicá si cada habitación tiene su propio baño.');
  if(suite&&/\b(?:compartid[oa]s?|shared|comun)\b/.test(s))throw Error('Baño compartido: requiere una distribución conectada todavía no implementada.');
  if(/\b(?:frente a|enfrente de|a la izquierda|a la derecha|junto a|al fondo|centrad[oa]|esquina|opposite|next to)\b/.test(s))throw Error('La posición relativa solicitada todavía no está soportada; no se omitirá silenciosamente.');
+ if(/\b(?:accesible|adaptad[oa]|silla de ruedas|wheelchair|discapacitados?)\b/.test(s))throw Error('Accesibilidad: falta implementar y verificar las áreas de maniobra y transferencia.');
+ if(/\b(?:cocina en [ul]|kitchen in [ul]|integrada? (?:al|a la)|doble lavabo|doble bacha|doble lavatorio)\b/.test(s))throw Error('Esta configuración específica todavía no está soportada.');
  const assumptions=[],main=suite?s.slice(0,bath.i):s;
  let size=dimensions(main);
  if(!size){
@@ -75,6 +77,12 @@ function interpret(raw){
   if(width!==null&&depth!==null)size=[width,depth];
   else if(width!==null||depth!==null){size=[width??DEFAULT[base][0],depth??DEFAULT[base][1]];assumptions.push('Dimensión no indicada: valor inicial');}
  }
+ const areaMatch=main.match(/(\d+(?:[.,]\d+)?)\s*(?:m²|m2|m\^2|metros cuadrados|square meters)/);
+ if(areaMatch){const area=num(areaMatch[1]);if(!(area>0&&area<=400))throw Error('Superficie fuera del rango.');
+  if(size&&Math.abs(size[0]*size[1]-area)>.05)throw Error('La superficie y las dimensiones solicitadas no coinciden.');
+  if(!size){const ratio=DEFAULT[base][0]/DEFAULT[base][1];const w=Math.round(Math.sqrt(area*ratio)*100)/100;size=[w,area/w];assumptions.push('Proporción inicial estimada para '+area+' m²');}
+ }
+ if(!size&&/\btoilettes?\b/.test(main)){size=[1.5,2];assumptions.push('Toilette: medidas iniciales 1.50 × 2.00 m');}
  if(!size){size=DEFAULT[base].slice(0,2);assumptions.push('Dimensiones iniciales: '+size.join(' × ')+' m')}
  const spec={kind:suite?'suite_row':base,count,alternatives,width:size[0],depth:size[1],wall:.15,door:.8,window:1.2,assumptions};
  for(const [key,def] of [['wall',.15],['door',.8],['window',1.2]]){
@@ -88,10 +96,13 @@ function interpret(raw){
  const selected=(kind,part)=>{
   const ts=tokens.filter(t=>t.i>=part[0]&&t.i<part[1]),out=new Set(DEFAULT[kind][2]);
   const words=s.slice(...part);
-  const neg=t=>/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+|a\s+)?$/.test(s.slice(Math.max(part[0],t.i-24),t.i));
-  for(const t of ts){if(!C[t.k])continue;if(neg(t))out.delete(t.k);else out.add(t.k)}
+  if(kind==='bathroom'&&/\btoilettes?\b/.test(words)){out.clear();out.add('toilet');out.add('basin');}
+  const neg=t=>/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+|a\s+)?$/.test(s.slice(Math.max(part[0],t.i-24),t.i))||/\bni\s*$/.test(s.slice(Math.max(part[0],t.i-12),t.i));
+  for(const t of ts){if(!C[t.k])continue;
+   const q=qty(tokens[tokens.indexOf(t)-1]);if(q>1)throw Error('Equipamiento repetido: aún no se puede garantizar la cantidad solicitada.');
+if(neg(t))out.delete(t.k);else out.add(t.k)}
   if(kind==='bathroom'&&out.has('bathtub')&&!ts.some(t=>t.k==='shower'&&!neg(t)))out.delete('shower');
-  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed|dormitorio individual|habitacion individual)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
+  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed|dormitorio individual|habitacion individual|dormitorio infantil|habitacion infantil)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
   if(kind==='living'){const m=words.match(/\b(?:mesa|table)\s+(?:para|for)\s+(4|6|8|cuatro|seis|ocho|four|six|eight)\b/);if(m){out.delete('table6');out.add('table'+(numberWords[m[1]]||m[1]))}if(/\b(?:mesa ratona|coffee table)\b/.test(words))out.add('coffee')}
   if(/\b(?:sin muebles|sin mobiliario|without furniture|vaci[oa])\b/.test(words))out.clear();
   return [...out];
