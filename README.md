@@ -9,10 +9,10 @@
 - **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
 - **CAD 2D online guide / guía de dibujo técnico:** https://blackline-cad.org/guia-cad-2d-online.html
 - **House-plan drawing exercise / plano de casa CAD 2D:** https://blackline-cad.org/plano-casa-cad-2d-online.html
-- **Features:** 2D drafting, layers, object snaps, associative dimensions and named dimension styles, blocks with attributes, dynamic architectural block library, XREF, layouts and plotting to PDF with CTB, DWG opening, DXF import/export, PDF import (vector, with layers), cloud projects
+- **Features:** 2D drafting, layers, object snaps, associative dimensions and named dimension styles, blocks with attributes, dynamic architectural block library, XREF, layouts and plotting to PDF with CTB, DXF import/export, PDF import (vector, with layers), cloud projects
 - **License:** Proprietary, all rights reserved. Public source visibility does not grant reuse rights; see [LICENSE](LICENSE).
 
-**Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye dibujo 2D, capas, referencias a objetos, cotas asociativas con estilos, bloques con atributos y biblioteca de bloques dinámicos, XREF, presentaciones y ploteo a PDF con CTB, apertura de DWG, importación y exportación DXF, importación de PDF vectorial con capas y proyectos en la nube.
+**Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye dibujo 2D, capas, referencias a objetos, cotas asociativas con estilos, bloques con atributos y biblioteca de bloques dinámicos, XREF, presentaciones y ploteo a PDF con CTB, importación y exportación DXF, importación de PDF vectorial con capas y proyectos en la nube.
 
 A self-contained, dependency-free, English-language CAD workspace. Dark ribbon interface inspired by conventional CAD UI patterns and scholarly dark UI design.
 
@@ -28,21 +28,21 @@ Open `index.html` in a modern Chromium, Firefox, or Safari browser. Or serve wit
 - 2D LINE, POLYLINE, RECTANGLE, CIRCLE, ARC, ELLIPSE, TEXT and DIMENSION
 - Selection, duplicate, delete, move, copy, rotate, scale, mirror, basic offset, basic trim, undo and redo
 - Editable drawing layers with color, visibility and locking
-- DXF R2000 import and export (blocks, attributes, MTEXT, hatches, dimensions), DWG opening through the conversion service
+- DXF R2000 import and export (blocks, attributes, MTEXT, hatches, dimensions), optional remote DWG conversion (currently disabled)
 - Vector PDF export with ISO A0–A4, US Letter, Legal, ARCH D/E, custom page size, model-to-paper scale and title block
 - SVG and PNG exports; JSON project save/open
 - Bottom command bar, coordinate entry, selection properties and keyboard shortcuts
 
 ## Compatibilidad / Compatibility
 
-- **DWG:** se abre mediante un servicio de conversión (LibreDWG) que convierte a DXF y borra el archivo al terminar. Los objetos propios de AutoCAD Architecture (AEC) sin representación gráfica guardada no se convierten.
+- **DWG:** la conversión remota está desactivada (`DWG_ACTIVO=false` en `cad2d-config.js`) para evitar costes. Usar DXF como intercambio principal; cualquier alternativa local debe verificarse con archivos reales.
 - **DXF:** importación y exportación R2000 con capas, tipos de línea, bloques e INSERT, atributos, MTEXT, sombreados y cotas (lineales y alineadas como cotas nativas).
 - **PDF:** exportación vectorial con capas (OCG) y estilos de ploteo CTB; importación de PDF vectorial con capas y escala de ploteo.
 - **Recomendación:** como con cualquier intercambio entre programas CAD, revisá el archivo resultante antes de entregarlo.
 
 ## Deployment
 
-Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted GitHub Pages frontend currently runs CAD drawing and ASCII DXF/SVG import locally, without a live conversion backend. The production-domain configuration enables an HTTPS DWG-to-DXF conversion endpoint with explicit user confirmation; verify live service availability separately. GitHub Pages without that configuration works with DXF/SVG directly. See `backend/README.md`. Stripe and login can be integrated subsequently with a trusted server / verified webhook; never add Stripe secret keys to the frontend.
+Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted GitHub Pages frontend currently runs CAD drawing and ASCII DXF/SVG import locally, without a live conversion backend. The production-domain configuration currently disables remote DWG-to-DXF conversion to avoid hosting costs. GitHub Pages without that configuration works with DXF/SVG directly. See `backend/README.md`. Stripe and login can be integrated subsequently with a trusted server / verified webhook; never add Stripe secret keys to the frontend.
 
 ## Intellectual property
 
@@ -62,7 +62,7 @@ DXF files with missing/unsupported `$INSUNITS` require explicit user unit select
 
 ## DWG import and DXF conversion
 
-CAD2D accepts `.dwg` files through its Open/Import workflow. On the official domain, `cad2d-config.js` configures an HTTPS converter endpoint; after consent, the app sends the DWG to the service, imports its DXF response, and saves/exports as DXF. The browser itself does not natively decode or write binary DWG. Converter availability is deployment-dependent and was not live-tested in this documentation update. Advanced blocks, layouts, xrefs, hatches and proxy objects may not be preserved; test representative files and 1:1 units.
+Remote DWG-to-DXF conversion is currently disabled in `cad2d-config.js`. DXF is the recommended exchange format. Local DWG decoding and binary DWG writing are not certified by this documentation update. Advanced blocks, layouts, xrefs, hatches and proxy objects may not be preserved; test representative files and 1:1 units.
 
 ## Desktop-CAD interaction improvements (November 2026)
 
@@ -105,11 +105,11 @@ CAD2D accepts `.dwg` files through its Open/Import workflow. On the official dom
 
 The floating **Text / Typography** palette offers browser-installed fonts (Arial, Helvetica, Georgia, Times New Roman, Courier New, monospace), text height in model units, rotation in degrees, bold and italic display. Click **Place text**, then the insertion point; or select existing text, adjust settings and **Apply to selected**. Double-click a text entity in Select mode to load its attributes in the typography editor. The project JSON retains these settings. SVG export carries font-family, weight, style and rotation. DXF export writes TEXT rotation and a simplified STYLE table for sans, serif and monospaced fonts; **not every CAD application will map fonts identically**. The custom vector PDF writer currently substitutes standard Helvetica/Times/Courier fonts; italic, Unicode and exact matching to installed desktop fonts are **not guaranteed**.
 
-The **File formats** palette indicates operational formats. DWG upload/conversion is enabled by production-domain configuration, conditional on availability of the configured HTTPS conversion service and consent. A recognized DWG header alone does not establish a successful import; verify the converted DXF geometry in the editor.
+The **File formats** palette indicates operational formats. Remote DWG upload/conversion is currently disabled by production-domain configuration. A recognized DWG header alone does not establish a successful import; verify the converted DXF geometry in the editor.
 
 ## Scaling to hundreds or thousands of simultaneous users
 
-The hosted app runs client-side (static assets on a CDN) with a separate billing/cloud API and a DWG conversion service. Hosting the HTML/JS/CSS assets through a CDN can distribute the same application to many visitors without running an individual CAD backend for each drawing. It does **not** guarantee that hundreds or thousands of users can work smoothly, nor that every browser can handle tens of thousands of entities. Validate hosting quotas and realistic concurrent load before release.
+The hosted app runs client-side (static assets on a CDN) with a separate billing/cloud API and an optional remote DWG conversion service (currently disabled). Hosting the HTML/JS/CSS assets through a CDN can distribute the same application to many visitors without running an individual CAD backend for each drawing. It does **not** guarantee that hundreds or thousands of users can work smoothly, nor that every browser can handle tens of thousands of entities. Validate hosting quotas and realistic concurrent load before release.
 
 The November 2026 rendering pass adds viewport culling, geometric bounding-box prechecks in object selection and OSNAP, and loop-based bounds for long polylines. These improvements lower unnecessary drawing work, but do not replace a proper spatial index. Still required before launch:
 
@@ -339,7 +339,7 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 **Cloudflare y archivos .dwg.** Ver `CLOUDFLARE.md`.
 - `cad2d-config.js` concentra la configuración del despliegue: dominio, conversor y cuentas. En GitHub Pages queda vacío.
 - `dwg-converter/` convierte DWG a DXF en un contenedor de Cloudflare con GNU LibreDWG, como programa aparte en el servidor. Así LibreDWG no se distribuye a los usuarios y el código de CAD2D puede seguir siendo propietario.
-- Al elegir un .dwg, CAD2D pide permiso, lo envía, lo convierte y lo borra sin guardar copias.
+- Este flujo remoto está desactivado actualmente; no debe presentarse como disponible.
 
 **Cobro con Stripe (España / EUR).** Precios en euros con IVA incluido, Checkout en castellano, métodos de pago dinámicos (tarjeta, PayPal, SEPA, Apple Pay y Google Pay se activan desde el Dashboard) e IVA automático opcional (`STRIPE_TAX=1`). El diagnóstico de la cuenta actual y los pasos para una cuenta propia de CAD2D están en `billing/README.md`.
 
@@ -351,4 +351,4 @@ Blackline CAD es una aplicación independiente; no está afiliada, patrocinada n
 
 **Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia no equivale a certificación legal completa.
 
-**Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG por sí sola es diagnóstica y no importa geometría. La configuración del dominio principal activa un conversor HTTPS que transforma DWG a DXF tras consentimiento del usuario; la importación efectiva depende de que el servicio responda correctamente. Comprobar licencias, condiciones de distribución, entidades admitidas y fidelidad técnica antes de garantizar compatibilidad.
+**Formatos:** favorecer el formato nativo JSON/CADJSON y el intercambio DXF con alcance declarado. El parser actual admite solamente un subconjunto de entidades DXF. La lectura de cabeceras DWG por sí sola es diagnóstica y no importa geometría. La configuración del dominio principal desactiva actualmente el conversor HTTPS DWG a DXF para evitar costes. Comprobar licencias, condiciones de distribución, entidades admitidas y fidelidad técnica antes de garantizar compatibilidad.
