@@ -6498,7 +6498,7 @@ function cadDispatchNamed(value){
   const suggested=window.prompt('Nombre del dibujo nuevo (ej.: casa 2d):','Untitled Drawing');
   if(suggested===null)return;
   if(!suggested.trim())return toast('Ingresá un nombre para crear el dibujo');
-  cadProjectSaveHandle=null;cadDrawingExt='dxf';saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
+  cadProjectSaveHandle=null;cadDwgLastSaved=null;cadDrawingExt='dxf';saveHistory();state.entities=[];state.blocks={};state.dimStyles={};state.activeDimStyle='';renderDimStyles();state.selected=[];
   cadSetDrawingName(suggested);state.nextId=1;renderBlockLibrary();updateAll();zoomExtents();return
  }
  if(['BSAVE','BCLOSE','GUARDARBLOQUE'].includes(cmd)){if(!cadBlockEdit)return toast('No block is being edited');return cadBlockEditClose(true)}
@@ -6908,6 +6908,51 @@ async function cadBuildDWG(name){
 function cadWarnDWG(){
  return window.confirm('Guardar la geometría 2D editable como DWG. Los objetos AEC originales no recuperados, las propiedades paramétricas propias de CAD2D3D y los layouts pueden no conservarse. Guardá también una copia DXF/proyecto y conservá el DWG original. ¿Continuar?');
 }
+// DWG backups are native binary files, independent of the DXF autosave.
+var cadDwgBakDir=null,cadDwgLastSaved=null;
+function cadDwgIsBinary(bytes){return bytes instanceof ArrayBuffer&&bytes.byteLength>=128&&/^AC10\d{2}$/.test(new TextDecoder('ascii').decode(bytes.slice(0,6)))}
+async function cadDwgChooseBakDir(){
+ if(!window.showDirectoryPicker){toast('Este navegador no permite elegir carpeta; las copias DWG quedan en COPIAS y se descargan como .bak.');return false}
+ try{
+  const dir=await window.showDirectoryPicker({id:'cad2d-dwg-backup',mode:'readwrite'});
+  cadDwgBakDir=dir;
+  if(backupDb)try{await backupTransaction('readwrite',st=>st.put(dir,'dwgBakDir'))}catch(e){}
+  toast('Copias DWG .bak: '+dir.name);return true;
+ }catch(e){if(e.name!=='AbortError')toast('No se pudo autorizar la carpeta: '+e.message);return false}
+}
+async function cadDwgBackup(name,bytes){
+ if(!cadDwgIsBinary(bytes))throw Error('La copia de seguridad no contiene un DWG válido.');
+ const base=cadCleanDrawingName(name),stamp=Date.now(),filename=base+'.bak';
+ let local=false,disk=false;
+ if(backupDb)try{
+  const prefix='bak:dwg:'+encodeURIComponent(base)+':';
+  await backupTransaction('readwrite',st=>st.put({name:base,format:'dwg',bytes,savedAt:new Date(stamp).toISOString(),objects:state.entities.length},prefix+stamp));
+  local=true;
+  const mine=(await cadBakKeys()).filter(k=>k.startsWith(prefix)).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
+  for(const k of mine.slice(CAD2D_BAK_KEEP))await backupTransaction('readwrite',st=>st.delete(k));
+ }catch(e){console.warn('[CAD2D DWG backup]',e)}
+ if(cadDwgBakDir)try{
+  if(!cadDwgBakDir.queryPermission||await cadDwgBakDir.queryPermission({mode:'readwrite'})==='granted'){
+   const file=await cadDwgBakDir.getFileHandle(filename,{create:true}),w=await file.createWritable();
+   try{await w.write(bytes);await w.close();disk=true}catch(e){try{await w.abort()}catch(_){}throw e}
+  }
+ }catch(e){console.warn('[CAD2D DWG backup folder]',e)}
+ if(!disk&&!local)throw Error('No se pudo crear la copia .bak. Autorizá una carpeta con CARPETADWGBAK antes de guardar.');
+ return {filename,bytes,disk,local};
+}
+function cadDwgBackupDownload(copy){
+ if(copy.disk)return;
+ const url=URL.createObjectURL(new Blob([copy.bytes],{type:'application/octet-stream'})),a=document.createElement('a');
+ a.href=url;a.download=copy.filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+async function cadDwgPrevious(handle,contents){
+ const old=await handle.getFile();
+ if(!old.size)return contents;
+ if(old.size>256*1024*1024)throw Error('El DWG anterior es demasiado grande para respaldarlo localmente.');
+ const bytes=await old.arrayBuffer();
+ if(!cadDwgIsBinary(bytes))throw Error('El destino existente no contiene un DWG válido. Elegí otro nombre para conservarlo.');
+ return bytes;
+}
 let cadSaveBusy=false;
 async function saveJSON(forceNew=false,preferred=''){
  if(cadSaveBusy)return toast('Ya se está guardando un dibujo.');
@@ -6918,7 +6963,7 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
  const canPick=typeof window.showSaveFilePicker==='function'&&window.isSecureContext;
  let name=state.file;
  const dwgOnly=preferred==='dwg';
- let requestedFormat=dwgOnly?'dwg':'dxf';
+ let requestedFormat=dwgOnly||(!forceNew&&cadDrawingExt==='dwg')?'dwg':'dxf';
  if(dwgOnly&&cadBlockEdit)return toast('Cerrá el editor de bloques antes de guardar el plano completo.');
  if(dwgOnly&&!cadWarnDWG())return false;
  // A browser without file-handle support downloads files instead of silently overwriting.
@@ -6952,6 +6997,8 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
    const sig=cad2dDrawingSignature();
    if(isDWG)toast('Generando DWG localmente…');
    const contents=isDWG?await cadBuildDWG(cadCleanDrawingName(handle.name)):isJSON?projectText():dxfText();
+   // Save the previous DWG (or the first generated DWG) before changing the destination.
+   const dwgBak=isDWG?await cadDwgBackup(handle.name,await cadDwgPrevious(handle,contents)):null;
    // Convert and verify before opening a writable stream to protect the previous file.
    const writable=await handle.createWritable();
    try{await writable.write(contents);await writable.close()}catch(error){try{await writable.abort()}catch(e){}throw error}
@@ -6959,7 +7006,8 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
    cadSetDrawingName(handle.name);
    queueLocalBackup();
    log('SAVE: '+handle.name);
-   toast('Saved: '+handle.name);
+   if(dwgBak){cadDwgBackupDownload(dwgBak);toast('Saved: '+handle.name+(dwgBak.disk?' · .bak guardado':' · .bak en COPIAS; descarga solicitada'))}
+   else toast('Saved: '+handle.name);
    return true;
   }catch(error){
    if(error?.name==='AbortError')return false;
@@ -6972,7 +7020,9 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
   if(requestedFormat==='dwg')toast('Generando DWG localmente…');
   const content=requestedFormat==='dwg'?await cadBuildDWG(name):requestedFormat==='cadjson'?projectText():dxfText();
   const mime=requestedFormat==='dwg'?'application/acad':requestedFormat==='cadjson'?'application/json':'application/dxf';
+  const dwgBak=requestedFormat==='dwg'?await cadDwgBackup(name,cadDwgLastSaved?.name===name?cadDwgLastSaved.bytes:content):null;
   const result=await download(name+'.'+requestedFormat,content,mime);
+  if(result&&dwgBak){cadDwgLastSaved={name,bytes:content};cadDwgBackupDownload(dwgBak);toast(dwgBak.disk?'DWG y .bak guardados':'DWG y .bak: descargas solicitadas; copia disponible en COPIAS')}
   if(result&&forceNew){cadSetDrawingName(name+'.'+requestedFormat);queueLocalBackup()}
   return result;
  }catch(error){toast('SAVE: no se pudo guardar · '+(error?.message||'error'));return false}
@@ -7011,15 +7061,16 @@ async function cadWriteBak(){
   const mine=(await cadBakKeys()).filter(k=>k.startsWith('bak:'+name+':')).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
   for(const k of mine.slice(CAD2D_BAK_KEEP))await backupTransaction('readwrite',st=>st.delete(k));
  }
- if(cadBakDir){try{if(!cadBakDir.queryPermission||await cadBakDir.queryPermission({mode:'readwrite'})==='granted'){const fh=await cadBakDir.getFileHandle(name+'.bak',{create:true}),w=await fh.createWritable();await w.write(text);await w.close()}}catch(e){console.warn('[CAD2D BAK dir]',e)}}
+ if(cadBakDir){try{if(!cadBakDir.queryPermission||await cadBakDir.queryPermission({mode:'readwrite'})==='granted'){const fh=await cadBakDir.getFileHandle(name+'-autosave.bak',{create:true}),w=await fh.createWritable();await w.write(text);await w.close()}}catch(e){console.warn('[CAD2D BAK dir]',e)}}
 }
 async function cadBakLoadDir(){try{if(backupDb)cadBakDir=await backupTransaction('readonly',st=>st.get('bakdir'))||null}catch(e){}}
 setTimeout(cadBakLoadDir,1500);
+setTimeout(async()=>{try{if(backupDb&&!cadDwgBakDir)cadDwgBakDir=await backupTransaction('readonly',st=>st.get('dwgBakDir'))||null}catch(e){}},1600);
 async function cadBakChooseDir(){
  if(!window.showDirectoryPicker)return toast('Este navegador no permite elegir carpeta: usá Chrome o Edge. Las copias igual se guardan en el navegador.');
  try{const d=await window.showDirectoryPicker({id:'cad2d-bak',mode:'readwrite'});cadBakDir=d;await backupTransaction('readwrite',st=>st.put(d,'bakdir'));toast('Copias .bak en la carpeta «'+d.name+'» cada '+(cad2dSaveMinutes||5)+' min');cadWriteBak().catch(()=>{})}catch(e){}
 }
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','RECUPERAR','RECOVER'])X.commands[k]=()=>cadShowBackups();X.commands.CARPETABAK=()=>cadBakChooseDir()}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','RECUPERAR','RECOVER'])X.commands[k]=()=>cadShowBackups();X.commands.CARPETABAK=()=>cadBakChooseDir();X.commands.CARPETADWGBAK=()=>cadDwgChooseBakDir()}
 async function cadShowBackups(){
  document.getElementById('cadBakDlg')?.remove();
  const keys=(await cadBakKeys()).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
@@ -7028,16 +7079,17 @@ async function cadShowBackups(){
  const perm=cadBakDir?(cadBakDir.queryPermission?await cadBakDir.queryPermission({mode:'readwrite'}):'granted'):'';
  d.innerHTML='<div style="background:#141c24;color:#e5eef7;border:1px solid #4d6676;border-radius:14px;padding:16px 18px;width:min(640px,94vw);max-height:86vh;overflow:auto;font:13px system-ui">'+
   '<div style="display:flex;justify-content:space-between;align-items:center"><b style="letter-spacing:.06em">COPIAS DE SEGURIDAD (.bak)</b><button class="btn" data-x>✕</button></div>'+
-  '<p style="color:#a9bfcc;margin:6px 0 10px">Cada '+(cad2dSaveMinutes||5)+' min, si hubo cambios, CAD2D guarda una copia aunque el dibujo ya tenga nombre (últimas '+CAD2D_BAK_KEEP+' por dibujo). Un .bak se abre con «Abrir», o renombrándolo a .dxf.</p>'+
-  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn" data-dir>'+(cadBakDir?'Carpeta: '+escapeHTML(cadBakDir.name)+(perm==='granted'?'':' (tocar para reautorizar)'):'Elegir carpeta para copias .bak…')+'</button><button class="btn" data-now>Hacer copia ahora</button></div>'+
-  (rows.length?rows.map(([k,r])=>'<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #2c3a44"><span style="flex:1">'+escapeHTML(r.name)+'<br><small style="color:#8fa7b4">'+new Date(r.savedAt).toLocaleString()+' · '+r.objects+' objetos</small></span><button class="btn" data-open="'+escapeHTML(k)+'">Abrir</button><button class="btn" data-dl="'+escapeHTML(k)+'">Descargar .bak</button></div>').join(''):'<p style="color:#ffd27f">Todavía no hay copias: se crean solas al dibujar.</p>')+'</div>';
+  '<p style="color:#a9bfcc;margin:6px 0 10px">Cada '+(cad2dSaveMinutes||5)+' min, si hubo cambios, CAD2D guarda una copia aunque el dibujo ya tenga nombre (últimas '+CAD2D_BAK_KEEP+' por dibujo). Un .bak se abre con «Abrir», o renombrándolo a .dwg o .dxf según su formato. Cada guardado DWG conserva además una copia binaria.</p>'+
+  '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="btn" data-dir>'+(cadBakDir?'Carpeta: '+escapeHTML(cadBakDir.name)+(perm==='granted'?'':' (tocar para reautorizar)'):'Elegir carpeta para copias .bak…')+'</button><button class="btn" data-dwg-dir>Carpeta DWG .bak</button><button class="btn" data-now>Hacer copia ahora</button></div>'+
+  (rows.length?rows.map(([k,r])=>'<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid #2c3a44"><span style="flex:1">'+escapeHTML(r.name)+'<br><small style="color:#8fa7b4">'+new Date(r.savedAt).toLocaleString()+' · '+(r.format==='dwg'?'DWG binario · ':'DXF · ')+r.objects+' objetos</small></span><button class="btn" data-open="'+escapeHTML(k)+'">Abrir</button><button class="btn" data-dl="'+escapeHTML(k)+'">Descargar .bak</button></div>').join(''):'<p style="color:#ffd27f">Todavía no hay copias: se crean solas al dibujar.</p>')+'</div>';
  document.body.append(d);
  d.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t){if(e.target===d)d.remove();return}
   if(t.hasAttribute('data-x'))return d.remove();
   if(t.hasAttribute('data-dir')){if(cadBakDir&&perm!=='granted'&&cadBakDir.requestPermission){if(await cadBakDir.requestPermission({mode:'readwrite'})==='granted'){toast('Carpeta reautorizada');d.remove();return cadShowBackups()}}else{await cadBakChooseDir();d.remove();return cadShowBackups()}}
+  if(t.hasAttribute('data-dwg-dir')){await cadDwgChooseBakDir();d.remove();return cadShowBackups()}
   if(t.hasAttribute('data-now')){await cadWriteBak();toast('Copia hecha');d.remove();return cadShowBackups()}
   const k=t.dataset.open||t.dataset.dl;if(!k)return;const r=await backupTransaction('readonly',st=>st.get(k));if(!r)return;
-  const stamp=new Date(r.savedAt).toISOString().replace(/[-:T]/g,'').slice(0,12),file=new File([r.text],r.name+'_'+stamp.slice(0,8)+'-'+stamp.slice(8)+'.bak',{type:'application/dxf'});
+  const stamp=new Date(r.savedAt).toISOString().replace(/[-:T]/g,'').slice(0,12),file=new File([r.format==='dwg'?r.bytes:r.text],r.name+'_'+stamp.slice(0,8)+'-'+stamp.slice(8)+'.bak',{type:r.format==='dwg'?'application/acad':'application/dxf'});
   if(t.dataset.dl){const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
   else{if(state.entities.length&&!window.confirm('¿Abrir la copia «'+file.name+'»? El dibujo actual se reemplaza (podés deshacer con Ctrl+Z).'))return;d.remove();await loadDrawingFile(file)}
  });
@@ -7257,7 +7309,7 @@ async function cadDxfDecode(buf){
 }
 async function loadDrawingFile(f){if(!f)return;
  // Do not reuse a previous drawing's save destination after opening a different file.
- if(!/\.(pdf|png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name))cadProjectSaveHandle=null;
+ if(!/\.(pdf|png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name)){cadProjectSaveHandle=null;cadDwgLastSaved=null;}
  // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
  if(/\.(dwt|dws)$/i.test(f.name)){const tpl=/\.dwt$/i.test(f.name);await loadDrawingFile(new File([f],f.name.replace(/\.(dwt|dws)$/i,'.dwg'),{type:f.type}));
   if(tpl){state.file='Dibujo nuevo';try{$('filename').textContent='Dibujo nuevo.dxf'}catch(e){}cadProjectSaveHandle=null;toast('Plantilla '+f.name+' cargada como dibujo nuevo: capas, estilos y bloques listos')}return}
@@ -10500,7 +10552,8 @@ function initCadExportPopover(){
  const option=(name,detail,fn)=>{const b=document.createElement('button');b.type='button';b.className='cad-export-option';const left=document.createElement('strong');left.textContent=name;const right=document.createElement('small');right.textContent=detail;b.append(left,right);b.onclick=()=>{close();fn()};p.append(b)};
  label('Dibujo editable');
  option('Guardar .DXF','CAD 2D · 1:1',()=>exportDXF());
- option('Guardar .DWG','AutoCAD · conversión local',()=>saveJSON(true,'dwg'));
+ option('Guardar .DWG','AutoCAD · conversión local + .bak',()=>saveJSON(true,'dwg'));
+ option('Carpeta de copias DWG .BAK','Autorizar ubicación una vez',()=>cadDwgChooseBakDir());
  option('Guardar proyecto .CADJSON','Edición en CAD2D',()=>saveJSON());
  option('Exportar notas .TXT','Texto plano de anotaciones, sin geometría',()=>exportCADTextNotes());
  label('Gráficos e impresión');
