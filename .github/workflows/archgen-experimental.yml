@@ -29,3 +29,35 @@ jobs:
           path: archgen-previews/*.png
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Package isolated local CAD preview
+        run: |
+          mkdir -p archgen-local
+          git archive HEAD -- '*.html' '*.js' '*.css' 'assets' 'dwg-wasm/pkg' 'manifest.webmanifest' 'LICENSE' | tar -x -C archgen-local
+          # Include only the static CAD frontend; no backend, deployment config or test code.
+          find archgen-local -mindepth 1 -maxdepth 1 -type d ! -name assets ! -name dwg-wasm -exec rm -rf {} +
+          test -s archgen-local/index.html
+          test -s archgen-local/cad-archgen.js
+          test -s archgen-local/assets/cad2d-arq-generators.js
+          cat > archgen-local/LEEME-ARCHGEN.txt <<'EOF'
+          CAD2D3D BLACKLINE - ARCHGEN EXPERIMENTAL
+          No reemplaza la version online. Usar un dibujo nuevo y no archivos de trabajo.
+          1. Descomprimir el ZIP en una carpeta.
+          2. Abrir Terminal en esa carpeta (la que contiene index.html).
+          3. Ejecutar: python3 -m http.server 8765 --bind 127.0.0.1
+          4. Abrir http://127.0.0.1:8765/ en el navegador.
+          5. En el espacio 2D escribir ARCHGEN y pulsar Enter.
+          6. Elegir familia, ancho, largo, espesor, cantidad y generar.
+          7. Seleccionar variantes y pulsar Insertar seleccionados.
+          8. Probar con cotas y HATCH activados y desactivados; usar Deshacer.
+          No iniciar sesion ni usar funciones de nube/pago en esta copia.
+          Para detener el servidor, Ctrl+C en la terminal.
+          Version de ensayo: no certifica cumplimiento de normativa ni medidas de obra.
+          EOF
+      - name: Upload local ARCHGEN preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: CAD2D3D-ARCHGEN-beta-local
+          path: archgen-local/
+          if-no-files-found: error
+          retention-days: 14
