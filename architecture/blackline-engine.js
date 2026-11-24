@@ -79,7 +79,8 @@ function interpret(raw){
  const explicit=qty(tokens[at-1])??(after?+after[1]:undefined)??(beforeRow>=0?qty(tokens[beforeRow-1]):undefined);
  const assumedCount=explicit===undefined&&row&&!alt;
  let count=explicit??(assumedCount?3:1);if(alt)count=1;
- if(count>1&&!tokens.some(t=>t.k==='row'))throw Error('Indicá cómo se relacionan los ambientes: contiguos o alternativas.');
+ const implicitRow=count>1&&!row;
+ if(implicitRow&&/\b(?:separad[oa]s?|independientes?|separate|detached)\b/.test(s))throw Error('Ambientes separados: indicá una distribución compatible.');
  if(suite&&count>1&&!tokens.some(t=>t.k==='private'))throw Error('Indicá si cada habitación tiene su propio baño.');
  if(suite&&/\b(?:compartid[oa]s?|shared|comun)\b/.test(s))throw Error('Baño compartido: requiere una distribución conectada todavía no implementada.');
  if(/\b(?:frente a|enfrente de|a la izquierda|a la derecha|junto a|al fondo|centrad[oa]|esquina|opposite|next to)\b/.test(s))throw Error('La posición relativa solicitada todavía no está soportada; no se omitirá silenciosamente.');
@@ -87,6 +88,7 @@ function interpret(raw){
  if(/\b(?:cocina en [ul]|kitchen in [ul]|integrada? (?:al|a la)|doble lavabo|doble bacha|doble lavatorio)\b/.test(s))throw Error('Esta configuración específica todavía no está soportada.');
  const assumptions=[],main=s.slice(0,Math.min(bath&&suite?bath.i:s.length,closet?closet.i:s.length));
  if(assumedCount)assumptions.push('Cantidad no indicada: 3 ambientes en tándem como propuesta inicial.');
+ if(implicitRow)assumptions.push('Distribución no indicada: ambientes contiguos con muros compartidos.');
  let size=dimensions(main);
  if(!size){
   const named=(labels)=>{const m=main.match(new RegExp('(?:'+labels+')\\s*(?:de|:|=)?\\s*'+N+'\\s*'+U,'i'))||main.match(new RegExp(N+'\\s*'+U+'\\s*(?:de\\s+)?(?:'+labels+')\\b','i'));return m?num(m[1])*unitScale(m[2]):null};
