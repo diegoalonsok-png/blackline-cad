@@ -1867,7 +1867,7 @@ document.querySelector('.brandbar>.right')?.addEventListener('click',event=>{
  if(proxy)$(proxy.dataset.cadHeaderAction)?.click();
 });
 $('filename')?.addEventListener('click',cadRenameDrawing);
-function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
+function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));schedule()}
 function schedule(){if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
@@ -7499,7 +7499,7 @@ function importDXF(text,name,opts){
  }
 
  // INSERT de primer nivel → referencia de bloque CAD2D (se mantiene como bloque, no se explota).
- const importedBlocks={},defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
+ const importedBlocks=Object.create(null),defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
  const importedDimStyles={};
  function cadDxfBlockRef(def,o,lname,common,sub){
   if(o.cols>1||o.rows>1)return null;
@@ -7575,9 +7575,15 @@ function importDXF(text,name,opts){
   }
  }
  walk(modelRecs,ID,null,0);
+ // Preserve named definitions even when they have no INSERT in model space.
+ if(!opts?.explodeInserts)for(const def of blocksDef.values()){
+  if(!def.name||def.name.startsWith('*')||Object.prototype.hasOwnProperty.call(importedBlocks,defName(def.name)))continue;
+  const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:'0',color:undefined,linetype:'BYLAYER',width:.25},1,list);
+  if(list.length)importedBlocks[defName(def.name)]={name:defName(def.name),entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'};
+ }
  blockCount=0;
  if(opts&&opts.parseOnly)return {entities,layers:[...layers.values()],blocks:importedBlocks,unitCode};
- if(!entities.length)throw Error('No supported 2D entities found. DXF blocks, spline curves and layout entities may require a more complete CAD import engine.');
+ if(!entities.length&&!Object.keys(importedBlocks).length)throw Error('No supported 2D entities found. DXF blocks, spline curves and layout entities may require a more complete CAD import engine.');
  const unitMap={1:'in',2:'ft',4:'mm',5:'cm',6:'m'};
  let from=unitMap[unitCode];if(!from){
   const input=window.prompt('This DXF has no supported drawing units ($INSUNITS='+unitCode+'). Choose the ORIGINAL drawing units without rescaling coordinates: mm, cm, m, in or ft','mm');
@@ -8737,6 +8743,7 @@ function renderBlockLibrary(){
  const start=document.createElement('option');start.value='';start.textContent='Choose block...';sel.append(start);
  Object.keys(state.blocks||{}).sort().forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;sel.append(option)});
  if(state.blocks?.[previous])sel.value=previous;
+ if(document.getElementById('cadDocumentBlocks'))cadDocumentBlocksRefresh();
 }
 function blockDefinition(name){return state.blocks?.[name]||null}
 function selectedBlock(){return blockDefinition($('blockLibrary').value)}
@@ -9205,6 +9212,100 @@ async function importCADBlock(file){
 
 /* Blackline CAD: built-in architectural block gallery.
    Original parametric geometry; third-party collection pending source verification. */
+/* Project block definitions and the independent personal symbol library. */
+function cadPersonalBlocksDB(){
+ return new Promise((resolve,reject)=>{
+  if(!window.indexedDB)return reject(Error('El navegador no permite guardar bibliotecas locales'));
+  const req=indexedDB.open('blackline-personal-blocks-v1',1);
+  req.onupgradeneeded=()=>req.result.createObjectStore('blocks',{keyPath:'id',autoIncrement:true});
+  req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);
+ });
+}
+async function cadPersonalBlocksRead(){
+ const db=await cadPersonalBlocksDB();
+ try{return await new Promise((resolve,reject)=>{const q=db.transaction('blocks','readonly').objectStore('blocks').getAll();q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}finally{db.close()}
+}
+async function cadPersonalBlockSave(name){
+ const def=state.blocks?.[name];if(!def||!def.entities?.length)return toast('Elegí un bloque del documento');
+ if(cadBlockEdit)return toast('Cerrá el editor de bloques antes de guardar en la galería');
+ if(def.xref||state.entities.some(e=>e.blockName===name&&e.xref))return toast('Una referencia externa debe convertirse en bloque local primero');
+ const item={name,unit:state.unit,definition:clone(def)};
+ const fingerprint=JSON.stringify([item.unit,item.definition.entities,item.definition.parametric||null,item.definition.dynamic2d||false]);
+ const db=await cadPersonalBlocksDB();
+ try{
+  const saved=await new Promise((resolve,reject)=>{
+   const tx=db.transaction('blocks','readwrite'),store=tx.objectStore('blocks'),q=store.getAll();let duplicate=false;
+   q.onsuccess=()=>{duplicate=q.result.some(x=>x.name===name&&JSON.stringify([x.unit,x.definition.entities,x.definition.parametric||null,x.definition.dynamic2d||false])===fingerprint);if(!duplicate)store.add(item)};
+   tx.oncomplete=()=>resolve(!duplicate);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+  });
+  toast(saved?'Bloque guardado en Mis bloques: '+name:'Este bloque ya está en Mis bloques');
+ }finally{db.close()}
+}
+function cadPersonalBlockInsert(item){
+ if(!item?.definition?.entities?.length||!U[item.unit]||!U[state.unit])return toast('Bloque de galería inválido');
+ const def=clone(item.definition),ratio=U[item.unit]/U[state.unit];
+ if(ratio!==1){
+  def.entities=def.entities.map(e=>{const scaled=scaleDrawingEntity(e,ratio);for(const k of ['pwidth','hatchSpacing','hatchScale'])if(Number.isFinite(e[k]))scaled[k]=e[k]*ratio;return scaled});
+  if(def.parametric?.defaults)for(const k of ['width','depth','frameWidth','frameDepth'])if(Number.isFinite(def.parametric.defaults[k]))def.parametric.defaults[k]*=ratio;
+ }
+ const base=item.name||'Bloque personal';let name=base,n=2;
+ while(Object.prototype.hasOwnProperty.call(state.blocks,name)){
+  const old=state.blocks[name];
+  if(JSON.stringify(old.entities)===JSON.stringify(def.entities)&&JSON.stringify(old.parametric||null)===JSON.stringify(def.parametric||null)&&!!old.pro===!!def.pro&&!!old.paidOnly===!!def.paidOnly&&!!old.dynamic2d===!!def.dynamic2d)break;
+  name=base+' ('+n+++')';
+ }
+ if(!Object.prototype.hasOwnProperty.call(state.blocks,name)){saveHistory();def.name=name;Object.defineProperty(state.blocks,name,{value:def,writable:true,enumerable:true,configurable:true});renderBlockLibrary();queueLocalBackup()}
+ $('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';state.galleryRepeatedInsert=true;setTool('insertBlock');toast('Clic en el plano para insertar '+name);
+}
+function cadDocumentBlockPreview(def){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('aria-label','Vista previa del bloque');svg.setAttribute('role','img');svg.style.cssText='width:100%;height:100px;background:#f3ead6;border-radius:4px;display:block';
+ const ns=svg.namespaceURI,group=document.createElementNS(ns,'g');group.setAttribute('transform','scale(1 -1)');group.setAttribute('fill','none');group.setAttribute('stroke','#28353d');group.setAttribute('stroke-width','1');svg.append(group);
+ let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+ const track=(x,y)=>{if(Number.isFinite(x)&&Number.isFinite(y)){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}};
+ function shape(tag,attrs){if(Object.values(attrs).some(v=>typeof v==='number'&&!Number.isFinite(v)))return;const el=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));el.setAttribute('vector-effect','non-scaling-stroke');group.append(el)}
+ const line=(a,b)=>{if(!a||!b)return;track(a.x,a.y);track(b.x,b.y);shape('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y})};
+ const circle=(e,rx,ry)=>{if(!e.c)return;track(e.c.x-rx,e.c.y-ry);track(e.c.x+rx,e.c.y+ry);shape('ellipse',{cx:e.c.x,cy:e.c.y,rx,ry})};
+ for(const e of (def?.entities||[]).slice(0,2500)){
+  if(e.type==='line')line(e.a,e.b);
+  else if(e.type==='rect'&&e.a&&e.b){track(e.a.x,e.a.y);track(e.b.x,e.b.y);shape('rect',{x:Math.min(e.a.x,e.b.x),y:Math.min(e.a.y,e.b.y),width:Math.abs(e.b.x-e.a.x),height:Math.abs(e.b.y-e.a.y)})}
+  else if(e.type==='polyline'||e.type==='hatch'){const pts=(e.pts||[]).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));pts.forEach(p=>track(p.x,p.y));if(pts.length)shape(e.closed||e.type==='hatch'?'polygon':'polyline',{points:pts.map(p=>p.x+','+p.y).join(' ')})}
+  else if(e.type==='circle')circle(e,e.r,e.r);
+  else if(e.type==='ellipse')circle(e,e.rx,e.ry);
+  else if(e.type==='arc'&&e.c&&Number.isFinite(e.r)&&Number.isFinite(e.a0)&&Number.isFinite(e.a1)){let sweep=arcSweep(e.a0,e.a1),prev=null;for(let i=0;i<=24;i++){const a=e.a0+sweep*i/24,pt={x:e.c.x+e.r*Math.cos(a),y:e.c.y+e.r*Math.sin(a)};if(prev)line(prev,pt);prev=pt;}}
+  else if(e.type==='text'&&e.p){track(e.p.x,e.p.y);const h=Math.max(.001,Number(e.h)||.1);line(e.p,{x:e.p.x+h*Math.max(1,String(e.text||'').length)*.5,y:e.p.y+h})}
+ }
+ if(!Number.isFinite(x0)){x0=y0=0;x1=y1=1}
+ const w=Math.max(.001,x1-x0),h=Math.max(.001,y1-y0),pad=Math.max(w,h)*.08;
+ svg.setAttribute('viewBox',[x0-pad,-y1-pad,w+2*pad,h+2*pad].join(' '));return svg;
+}
+function cadDocumentBlocksRefresh(){
+ const panel=$('cadDocumentBlocks');if(!panel)return;
+ const list=$('cadDocBlockSelect'),prior=list.value;
+ const names=Object.keys(state.blocks||{}).sort((a,b)=>a.localeCompare(b));
+ const signature=JSON.stringify(names);
+ if(list.dataset.signature!==signature){list.dataset.signature=signature;list.replaceChildren();const empty=new Option('Elegir bloque…','');list.add(empty);for(const n of names)list.add(new Option(n,n));if(names.includes(prior))list.value=prior;}
+ $('cadDocBlockCount').textContent=names.length+' definiciones en el documento';
+ if(!$('cadDocBlockBody').hidden)cadDocumentBlockSelection();
+}
+function cadDocumentBlockSelection(){
+ const name=$('cadDocBlockSelect').value,def=state.blocks?.[name],preview=$('cadDocBlockPreview');
+ if(preview._definition!==def||preview._epoch!==cadDrawEpoch){preview._definition=def;preview._epoch=cadDrawEpoch;preview.replaceChildren();if(def)preview.append(cadDocumentBlockPreview(def))}
+ $('cadDocBlockInfo').textContent=def?def.entities.length+' elementos · '+state.entities.filter(e=>e.type==='blockRef'&&e.blockName===name).length+' inserciones':'Seleccioná una definición del archivo';
+ for(const b of $('cadDocumentBlocks').querySelectorAll('[data-doc-block-action]'))b.disabled=!def;
+}
+function cadInitDocumentBlocks(dock){
+ const panel=document.createElement('section');panel.className='panel';panel.id='cadDocumentBlocks';
+ panel.innerHTML='<div class="panel-title"><span>BLOQUES DEL ARCHIVO</span><button type="button" class="btn slim" id="cadDocBlockToggle" aria-expanded="false">+</button></div><div class="panel-content" id="cadDocBlockBody" hidden><small id="cadDocBlockCount"></small><select id="cadDocBlockSelect" aria-label="Bloques del archivo" style="width:100%;margin:6px 0"></select><div id="cadDocBlockPreview"></div><small id="cadDocBlockInfo"></small><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn slim" data-doc-block-action="insert">Insertar</button><button class="btn slim" data-doc-block-action="edit">Editar</button><button class="btn slim" data-doc-block-action="select">Seleccionar instancias</button><button class="btn slim" data-doc-block-action="save">＋ Guardar en galería</button></div></div>';
+ dock.append(panel);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockToggle').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh()};
+ $('cadDocBlockSelect').onchange=cadDocumentBlockSelection;
+ panel.addEventListener('click',async e=>{const b=e.target.closest('[data-doc-block-action]');if(!b)return;const name=$('cadDocBlockSelect').value;if(!state.blocks?.[name])return;
+  if(b.dataset.docBlockAction==='insert'){$('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';$('insertBlockBtn').click()}
+  if(b.dataset.docBlockAction==='edit')cadEditBlockDefinition(name);
+  if(b.dataset.docBlockAction==='select'){state.selected=state.entities.filter(e=>e.type==='blockRef'&&e.blockName===name&&layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);updateProps();schedule();toast(state.selected.length+' instancias seleccionadas')}
+  if(b.dataset.docBlockAction==='save'){b.disabled=true;try{await cadPersonalBlockSave(name)}catch(err){toast('No se pudo guardar: '+err.message)}finally{b.disabled=false}}
+ });cadDocumentBlocksRefresh();
+}
 function openBlacklineBlockPalette(){
  const panel=$('blacklineBlockGallery');if(!panel)return toast('Block library is unavailable');
  const body=$('blBody');if(body)body.hidden=false;
@@ -9225,7 +9326,7 @@ function initPermanentBlockGallery(){
  if(!dock)return;
  const panel=document.createElement('section');panel.className='panel';panel.id='blacklineBlockGallery';
  panel.innerHTML='<div class="panel-title"><span>BLOCKS · SYMBOL PALETTE</span><button type="button" id="blCollapse" class="btn slim" title="Collapse / expand" aria-label="Collapse block palette">−</button></div><div id="blBody" class="panel-content" style="padding:8px"><div id="blCategories" role="group" aria-label="Block categories" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"></div><div id="blCards" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;max-height:290px;overflow-y:auto"></div><p id="blHelp" style="font-size:10px;color:#9cb1bc;margin:7px 0 0">Choose a symbol, then click the drawing to place it at 1:1.</p></div>';
- dock.prepend(panel);
+ dock.prepend(panel);cadInitDocumentBlocks(dock);
  $('blCollapse').onclick=()=>{const body=$('blBody'),collapsed=body.hidden;body.hidden=!collapsed;$('blCollapse').textContent=collapsed?'−':'+';$('blCollapse').setAttribute('aria-expanded',String(collapsed))};
  const entries=[
  {id:'Puerta simple 090 · marco',cat:'Openings',w:.9,h:.9,kind:'swing-door',draw:[['rect',0,-.06,.05,.12],['rect',.85,-.06,.05,.12],['line',.05,0,.05,.8],['arc',.05,0,.8,0,90]]},
@@ -9470,7 +9571,7 @@ function initPermanentBlockGallery(){
  for(const w of [.70,.80,.90,1.00,1.20,1.50,1.80,2.40,3.00])
   addFreeOpening('Vano libre '+openingCm(w),'framed-window',w,{vano:true});
  const canUseLibraryPro=()=>!window.CAD2D_PLAN||window.CAD2D_PLAN.can('arq-pro');
- const cats=[...new Set(entries.map(x=>x.cat))];
+ const cats=[...new Set(entries.map(x=>x.cat)),'Mis bloques'];
  let activeCategory=cats[0];
  const catIcons={Openings:'▯',Furniture:'▤',Sanitary:'◉',Vehicles:'▰',Landscape:'♧'};
  const chooser=$('blCategories');
@@ -9564,6 +9665,9 @@ function initPermanentBlockGallery(){
  function showCards(){
   for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
   const cards=$('blCards');cards.replaceChildren();
+  if(activeCategory==='Mis bloques'){
+   cards.textContent='Cargando biblioteca local…';cadPersonalBlocksRead().then(items=>{if(activeCategory!=='Mis bloques')return;cards.replaceChildren();if(!items.length){cards.textContent='Guardá bloques desde Bloques del archivo.';return}for(const item of items){const button=document.createElement('button');button.type='button';button.className='btn';button.style.cssText='padding:4px;min-width:0;white-space:normal';button.append(cadDocumentBlockPreview(item.definition));const label=document.createElement('span');label.textContent=item.name;button.append(label);button.onclick=()=>cadPersonalBlockInsert(item);cards.append(button)}}).catch(err=>{if(activeCategory==='Mis bloques')cards.textContent=err.message});return;
+  }
   for(const x of entries.filter(x=>x.cat===activeCategory)){
    const button=document.createElement('button');button.type='button';button.className='btn';
    button.style.cssText='padding:4px;min-width:0;aspect-ratio:1;white-space:normal;';
