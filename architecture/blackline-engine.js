@@ -571,6 +571,25 @@ function suiteCorridor(plan,passage){
  plan.assumptions.push(note);plan.warning=(plan.warning||'Anteproyecto editable; verificar normativa y evacuación.')+' '+note;
  return plan;
 }
+// Two equally sized hotel wings around a shared corridor. A 180-degree
+// rotation preserves the opening and block orientation without mirroring CAD definitions.
+function doubleSuiteCorridor(plan,passage){
+ const p=suiteCorridor(plan,passage),hall=p.rooms.find(r=>r.id==='v0-hall'),[hx,hy,hw,hd]=hall.clearBounds,t=p.brief.wall;
+ const cx=2*hx+hw,cy=2*hy+hd,pt=a=>[cx-a[0],cy-a[1]],id=x=>'south-'+x;
+ const northWalls=p.walls.filter(w=>!w.id.startsWith('v0-hall-')),northIds=new Set(northWalls.map(w=>w.id));
+ const southWalls=northWalls.map(w=>({...w,id:id(w.id),a:pt(w.a),b:pt(w.b)}));
+ const southOpenings=p.openings.filter(o=>northIds.has(o.host)).map(o=>({...o,host:id(o.host)}));
+ const southRooms=p.rooms.filter(r=>r.id!==hall.id).map(r=>{const [x,y,w,d]=r.clearBounds;return {...r,id:id(r.id),clearBounds:[cx-x-w,cy-y-d,w,d]}});
+ const southBlocks=p.blocks.map(b=>{const [x,y,w,d]=b.envelope;return {...b,point:pt(b.point),rotation:(b.rotation+180)%360,envelope:[cx-x-w,cy-y-d,w,d]}});
+ const southConnections=p.connections.map(c=>({...c,from:c.from===hall.id?hall.id:id(c.from),to:id(c.to),via:id(c.via)}));
+ p.walls=p.walls.filter(w=>w.id!=='v0-hall-front').concat(southWalls);
+ p.openings.push(...southOpenings);p.rooms.push(...southRooms);p.blocks.push(...southBlocks);p.connections.push(...southConnections);
+ p.virtualDimensions.push(...p.virtualDimensions.map(v=>({...v,room:id(v.room),between:v.between?.map(id),editable:false})));
+ p.brief.count*=2;p.brief.doubleLoaded=true;
+ p.assumptions.push('Habitaciones a ambos lados del pasillo; cantidad total '+p.brief.count+'.');
+ p.warning+=' Doble crujía: verificar salidas de emergencia, accesibilidad y ventilación.';
+ return p;
+}
 function run(raw){
  const {text,corrections}=correctText(internationalText(raw));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
@@ -579,6 +598,14 @@ function run(raw){
   const passage=num(suiteHall[1])*unitScale(suiteHall[2]);
   if(passage<1.2||passage>4)throw Error('Pasillo de suites: ancho libre entre 1,20 y 4 m.');
   const clean=(text.slice(0,suiteHall.index)+' '+text.slice(suiteHall.index+suiteHall[0].length)).replace(/\b(?:de\s+)?hotel\b/g,'').replace(/\s+(?:y|con)\s*$/,'').trim();
+  const both=/\b(?:a ambos lados|de ambos lados|a los dos lados|doble crujia)\b/.test(clean);
+  if(both){
+   const q=clean.match(/\b(\d+|dos|cuatro|seis|ocho|diez)\s+(?:habitaciones|dormitorios)\b/);
+   const total=q?Number(numberWords[q[1]]||q[1]):0;
+   if(!Number.isInteger(total)||total<2||total>30||total%2)throw Error('Doble crujía: indicá una cantidad total par de 2 a 30 habitaciones.');
+   const half=clean.replace(q[0],(total/2)+' habitaciones').replace(/\b(?:a ambos lados|de ambos lados|a los dos lados|doble crujia)\b/g,'').trim();
+   return doubleSuiteCorridor(run(half),passage);
+  }
   return suiteCorridor(run(clean),passage);
  }
  const compound=compoundInstruction(text);if(compound){const p=compoundPlan(compound);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
