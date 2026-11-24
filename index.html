@@ -7771,23 +7771,26 @@ async function inspectDWGHeader(file){
 }
 
 async function convertDWGAutomatically(file,options={}){
- const info=await inspectDWGHeader(file);
+ const signal=options.signal,epoch=cadDrawEpoch,original=state.entities;
+ const check=()=>{if(signal?.aborted)throw Error('Apertura cancelada; dibujo anterior conservado')};check();
+ const info=await inspectDWGHeader(file);check();
  if(!info.valid)throw Error(info.message);
  const local=window.CAD2D_DWG_BATCH?.convertLocal;
  if(typeof local!=='function')throw Error('El conversor local todavía no se cargó. Recargá CAD2D3D y volvé a intentar.');
  const started=performance.now();
  log('DWG [1/3] Conversión local · '+info.version+' · '+Math.round(file.size/1024)+' KiB');
  toast('DWG 1/3 · convirtiendo '+file.name+'…');
- const bytes=await local(file,'dwg-dxf');
+ const bytes=await local(file,'dwg-dxf',{signal});check();
  if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('El conversor no devolvió un archivo válido.');
  log('DWG [2/3] DXF generado · '+Math.round(bytes.byteLength/1024)+' KiB · '+((performance.now()-started)/1000).toFixed(1)+' s');
- const dxf=await cadDxfDecode(bytes);
+ if(bytes.byteLength>64*1024*1024)throw Error('El DXF convertido supera 64 MiB; dibujo anterior conservado');
+ const dxf=await cadDxfDecode(bytes);check();
  if(!/\bSECTION\b/.test(dxf.slice(0,20000)))throw Error('El resultado no es un DXF reconocido. El original no se modificó.');
  if(options.textOnly)return dxf;
  toast('DWG 3/3 · importando geometría y bloques…');
  log('DWG [3/3] Importación del modelo');
  await new Promise(resolve=>setTimeout(resolve,40));
- await cadOpenDXFAsync(dxf,file.name.replace(/\.(dwg|dwt)$/i,'.dxf'));
+ check();await cadOpenDXFAsync(dxf,file.name.replace(/\.(dwg|dwt)$/i,'.dxf'),{signal,epoch,original});
  cadSetDrawingName(file.name.replace(/\.dwt$/i,'.dwg'));
  log('DWG convertido localmente · comprobar capas, bloques y escala 1:1.');
 }
@@ -7956,7 +7959,20 @@ async function cadDxfDecode(buf){
  const cp=m?'windows-'+m[1]:'windows-1252';
  try{return new TextDecoder(cp).decode(bytes)}catch(e){return new TextDecoder('windows-1252').decode(bytes)}
 }
+var cadDwgOpenController=null;
+async function cadOpenDwgCancelable(f){
+ const controller=new AbortController();cadDwgOpenController=controller;
+ const cancel=ev=>{if(ev.key==='Escape'&&cadDwgOpenController===controller){ev.preventDefault();ev.stopImmediatePropagation();controller.abort();toast('Apertura DWG cancelada')}};
+ window.addEventListener('keydown',cancel,true);
+ try{
+  toast('Abriendo DWG · Esc para cancelar');await convertDWGAutomatically(f,{signal:controller.signal});
+  cadProjectSaveHandle=null;cadDwgLastSaved=null;return true;
+ }catch(err){if(!controller.signal.aborted)alert('Unable to open file: '+err.message);return false}
+ finally{window.removeEventListener('keydown',cancel,true);if(cadDwgOpenController===controller)cadDwgOpenController=null}
+}
 async function loadDrawingFile(f){if(!f)return;
+ if(cadDwgOpenController)cadDwgOpenController.abort();
+ if(/\.dwg$/i.test(f.name))return cadOpenDwgCancelable(f);
  // Do not reuse a previous drawing's save destination after opening a different file.
  if(!/\.(pdf|png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name)){cadProjectSaveHandle=null;cadDwgLastSaved=null;}
  // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
@@ -8157,16 +8173,18 @@ function cadApplyParsedDXF(parsed,name){
 
 
 var cadDxfOpenSequence=0,cadDxfActiveJob=null;
-function cadParseDXFWorker(text,style){
- if(typeof Worker==='undefined')return Promise.resolve().then(()=>window.CAD2DDxfParser.parse(text,{},style));
+function cadParseDXFWorker(text,style,signal){
+ if(signal?.aborted)return Promise.reject(Error('Importación cancelada; dibujo anterior conservado'));
+ if(typeof Worker==='undefined')return Promise.resolve().then(()=>{if(signal?.aborted)throw Error('Importación cancelada');return window.CAD2DDxfParser.parse(text,{},style)});
  return new Promise((resolve,reject)=>{
   let worker,timer,finished=false;
-  const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
+  const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
   const cancel=()=>finish(Error('Importación cancelada; dibujo anterior conservado'));
   if(cadDxfActiveJob)cadDxfActiveJob();
   try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-worker-v2',document.baseURI));}
   catch(e){return finish(Error('No se pudo iniciar el lector DXF local: '+e.message))}
   cadDxfActiveJob=cancel;
+  if(signal?.aborted)return cancel();signal?.addEventListener('abort',cancel,{once:true});
   timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),45000);
   worker.onmessage=e=>{const {error,result}=e.data||{};finish(error?Error(error):!result?Error('Respuesta inválida del lector DXF'):null,result)};
   worker.onerror=e=>finish(Error('Error del lector DXF local: '+(e.message||'recargá CAD2D3D')));
@@ -8174,9 +8192,10 @@ function cadParseDXFWorker(text,style){
   try{worker.postMessage({text,options:{},style});}catch(e){finish(e)}
  });
 }
-async function cadOpenDXFAsync(text,name){
- const job=++cadDxfOpenSequence,epoch=cadDrawEpoch,original=state.entities;
- const parsed=await cadParseDXFWorker(text,readDimensionStyle());
+async function cadOpenDXFAsync(text,name,options={}){
+ const job=++cadDxfOpenSequence,epoch=options.epoch??cadDrawEpoch,original=options.original??state.entities;
+ const parsed=await cadParseDXFWorker(text,readDimensionStyle(),options.signal);
+ if(options.signal?.aborted)throw Error('Importación cancelada; dibujo anterior conservado');
  if(job!==cadDxfOpenSequence)throw Error('Se inició otra importación');
  if((epoch!==cadDrawEpoch||original!==state.entities)&&!window.confirm('El dibujo cambió durante la lectura. ¿Reemplazarlo por el archivo importado?'))throw Error('Importación cancelada; dibujo actual conservado');
  cadApplyParsedDXF(parsed,name);
@@ -11798,7 +11817,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-affine-v2"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
-<script src="cad-dwg-batch.js?v=20261123-local-bidirectional-v4"></script>
+<script src="cad-dwg-batch.js?v=20261124-cancel-v5"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261124-demand-v14"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
