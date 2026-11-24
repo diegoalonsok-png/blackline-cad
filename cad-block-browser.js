@@ -183,9 +183,9 @@
   return !v.cats||v.cats(it.cat)};
  const groupOf=it=>VIEWS[st.view]?.family?modeOf(it):familyOf(it);
  const cm=v=>Math.round(v*100);
- function filtered(){
+ function filtered(pool=items().filter(inView)){
   const q=st.q.trim().toLowerCase();
-  return items().filter(it=>inView(it)&&(!st.cat||groupOf(it)===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)+' '+it.id).toLowerCase().includes(q)));
+  return pool.filter(it=>(!st.cat||groupOf(it)===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)+' '+it.id).toLowerCase().includes(q)));
  }
  // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
  function simpleBlockNames(){
@@ -197,9 +197,11 @@
   }
   return out;
  }
- const simpleName=it=>{const n=simpleBlockNames().get(it.id)||tr(it.name);return /^userdx4-/.test(it.id)?n.replace(/ · escala estimada| · parcial/g,'')+(it.importFlags&1?' · '+T('check scale','revisar escala'):'')+(it.importFlags&6?' · '+T('partial','parcial'):''):n};
+ const simpleName=(it,names)=>{const n=names.get(it.id)||tr(it.name);return /^userdx4-/.test(it.id)?n.replace(/ · escala estimada| · parcial/g,'')+(it.importFlags&1?' · '+T('check scale','revisar escala'):'')+(it.importFlags&6?' · '+T('partial','parcial'):''):n};
  function paint(){
-  if(!el)return;
+  if(!el||el.style.display==='none'||el.classList.contains('min'))return;
+  const allItems=items(),pool=allItems.filter(inView),names=simpleBlockNames(),counts=new Map();
+  for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
   const visual=st.view==='visual'||st.view==='olymp3'||st.view==='imported';
   const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
@@ -208,24 +210,24 @@
   el.classList.toggle('visual',visual);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
-  el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+items().filter(it=>/^userdx4-/.test(it.id)).length;});
-  const cats=[...new Set(items().filter(inView).map(groupOf))].sort((a,b)=>a.localeCompare(b,es()?'es':'en'));
+  el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+allItems.filter(it=>/^userdx4-/.test(it.id)).length;});
+  const cats=[...counts.keys()].sort((a,b)=>a.localeCompare(b,es()?'es':'en'));
   if(st.cat&&!cats.includes(st.cat))st.cat='';
-  const count=c=>items().filter(i=>inView(i)&&(!c||groupOf(i)===c)).length;
+  const count=c=>c?(counts.get(c)||0):pool.length;
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
-  const list=filtered(),grid=el.querySelector('.grid');
+  const list=filtered(pool),grid=el.querySelector('.grid');
   if(visual)list.sort((a,b)=>{
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
    return rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
   });
   const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it,names)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
-   :T(`${list.length} of ${items().length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${items().length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
+   :T(`${list.length} of ${allItems.length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${allItems.length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
   const pkg=window.CAD2D_OLYMPIADAS3;
   if(pkg&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
@@ -245,13 +247,14 @@
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
-  q.addEventListener('input',()=>{st.q=q.value;visibleCount=72;paint()});
-  el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();paint()});
+  let repaintFrame=0;const schedulePaint=()=>{if(!repaintFrame)repaintFrame=requestAnimationFrame(()=>{repaintFrame=0;paint()})};
+  q.addEventListener('input',()=>{st.q=q.value;visibleCount=pageSize();schedulePaint()});
+  el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();schedulePaint()});
   el.addEventListener('click',e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
-   if(a==='min'){el.classList.toggle('min');return}
+   if(a==='min'){el.classList.toggle('min');if(!el.classList.contains('min'))paint();return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
