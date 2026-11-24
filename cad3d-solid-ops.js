@@ -36,11 +36,12 @@ function boolean(a,b,op){
 }
 function revolve(profile,angle,faces){
  if(profile.length<3||profile.length>128||!Number.isFinite(angle)||angle<=0||angle>360||profile.some(p=>p[0]<-EPS||!p.every(Number.isFinite)))throw Error('Perfil o ángulo inválido');
+ const area=profile.reduce((v,p,i)=>{const q=profile[(i+1)%profile.length];return v+p[0]*q[1]-p[1]*q[0]},0);if(area<=EPS)throw Error('El perfil debe tener orientación antihoraria y área positiva');
  const full=Math.abs(angle-360)<EPS,n=Math.max(8,Math.ceil(angle/5)),a=angle*Math.PI/180,out=[];
  const pt=(p,j)=>[p[0]*Math.cos(a*j/n),p[0]*Math.sin(a*j/n),p[1]];
  function tri(a,b,c){if(poly([a,b,c]))out.push(...a,...b,...c)}
- for(let j=0;j<n;j++)for(let i=0;i<profile.length;i++){const p=profile[i],q=profile[(i+1)%profile.length],u=pt(p,j),v=pt(q,j),w=pt(q,j+1),x=pt(p,j+1);tri(u,v,w);tri(u,w,x)}
- if(!full){for(const f of faces){tri(pt(profile[f[0]],0),pt(profile[f[1]],0),pt(profile[f[2]],0));tri(pt(profile[f[2]],n),pt(profile[f[1]],n),pt(profile[f[0]],n))}}
+ for(let j=0;j<n;j++)for(let i=0;i<profile.length;i++){const p=profile[i],q=profile[(i+1)%profile.length],u=pt(p,j),v=pt(q,j),w=pt(q,j+1),x=pt(p,j+1);tri(u,w,v);tri(u,x,w)}
+ if(!full){for(const f of faces){let [i,j,k]=f;const p=profile[i],q=profile[j],r=profile[k];if((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0])<0)[j,k]=[k,j];tri(pt(profile[i],0),pt(profile[j],0),pt(profile[k],0));tri(pt(profile[k],n),pt(profile[j],n),pt(profile[i],n))}}
  if(out.length>MAX||Math.abs(volume(out))<EPS*EPS)throw Error('Revolución sin volumen válido');
  if(volume(out)<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
  return out;
