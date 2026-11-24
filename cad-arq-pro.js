@@ -492,7 +492,7 @@ function onPointerUp(ev){
 /* ---------- Selector de puntos para comandos interactivos ---------- */
 const pick={active:false,points:[],need:0,label:'',done:null,mouse:null,mode:'line'};
 function startPick(need,label,done,mode='line'){
- Object.assign(pick,{active:true,points:[],need,label,done,mouse:null,mode});
+ Object.assign(pick,{active:true,points:[],need,label,done,mouse:null,mode,planPreview:null});
  CORE.setTool('select');CORE.toast(label+' · Esc cancela');statusHint(label+' · punto 1');
 }
 function statusHint(text){const h=$('statusHint');if(h)h.textContent=text}
@@ -503,6 +503,13 @@ function pickClick(raw){
  CORE.schedule();
 }
 function drawPickPreview(ctx){
+ if(pick.planPreview&&pick.mouse){
+  const p=pick.planPreview,k=f(),to=(x,y)=>CORE.screen(P(pick.mouse.x+x*k,pick.mouse.y+y*k));
+  ctx.save();ctx.strokeStyle='#91d8e8';ctx.globalAlpha=.75;ctx.setLineDash([]);ctx.lineCap='butt';
+  for(const w of p.walls){const L=Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1]),ux=(w.b[0]-w.a[0])/L,uy=(w.b[1]-w.a[1])/L,at=v=>to(w.a[0]+ux*v,w.a[1]+uy*v);const A=to(0,0),B=to(w.thickness,0);ctx.lineWidth=Math.max(1,Math.hypot(A.x-B.x,A.y-B.y));let t=0;const segment=(a,b)=>{if(b<=a)return;const x=at(a),y=at(b);ctx.beginPath();ctx.moveTo(x.x,x.y);ctx.lineTo(y.x,y.y);ctx.stroke()};for(const o of p.openings.filter(o=>o.host===w.id).sort((a,b)=>a.offset-b.offset)){segment(t,o.offset-o.width/2);t=o.offset+o.width/2;}segment(t,L);}
+  ctx.lineWidth=1;ctx.setLineDash([3,3]);for(const b of p.blocks){if(!b.envelope)continue;const [x,y,w,d]=b.envelope,A=to(x,y),B=to(x+w,y+d);ctx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(A.x-B.x),Math.abs(A.y-B.y));}
+  ctx.restore();return;
+ }
  if(!pick.points.length||!pick.mouse)return;
  const a=CORE.screen(pick.points[0]),b=CORE.screen(pick.mouse);
  ctx.setLineDash([5,4]);ctx.strokeStyle='#ffce78';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
@@ -924,16 +931,20 @@ EXT.drawArchitectureCommand=async raw=>{
 
 /* Visual catalogue: generated, checked plans from the native architectural engine.
    Thumbnails and insertion use the same plan, not a raster reference. */
-const arqCatalogueCounts={"bathroom":37,"kitchen":3,"bedroom":3};
+const arqCatalogueCounts={"bathroom":37,"kitchen":12,"bedroom":11,"laundry":1,"office":1,"dining":1,"closet":1};
 const arqCatalogueBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
 let arqCataloguePromise=null;
-function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
+function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-expanded-v2',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
 function arqCatalogueCategory(raw){
  const s=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/^(?:bnao|bno|banio|banios|bnaos|banoo|banoss)$/.test(s))return 'bathroom';
  if(/^(?:bano|banos|toilette|mostrar banos|listado de banos|bathroom|bathrooms|salle de bains|bagno|bagni|banheiro|banheiros|badezimmer|浴室|卫生间|衛生間|ванная|حمام|욕실)$/.test(s))return 'bathroom';
  if(/^(?:cocina|cocinas|kitchen|kitchens|cuisine|cucina|cozinha|kuche|厨房|キッチン|кухня|مطبخ)$/.test(s))return 'kitchen';
  if(/^(?:habitacion|habitaciones|dormitorio|dormitorios|bedroom|bedrooms|chambre|camera|quarto|schlafzimmer|寝室|卧室|спальня|غرفة نوم)$/.test(s))return 'bedroom';
+ if(/^(?:lavadero|lavaderos|laundry|buanderie|lavanderia)$/.test(s))return 'laundry';
+ if(/^(?:oficina|oficinas|office|bureau|ufficio)$/.test(s))return 'office';
+ if(/^(?:comedor|comedores|dining room|sala da pranzo)$/.test(s))return 'dining';
+ if(/^(?:vestidor|vestidores|dressing|walk-in closet)$/.test(s))return 'closet';
  return null;
 }
 function arqPlanThumbnail(plan){
@@ -960,7 +971,7 @@ async function openArqPlanCatalogue(category){
  const dlg=document.createElement('dialog');dlg.id='arqPlanCatalogue';
  dlg.style.cssText='width:min(760px,94vw);max-height:80vh;overflow:auto;background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:14px;box-sizing:border-box';
  const header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px';
- const title=document.createElement('strong');title.textContent='ARQASSIST · '+({bathroom:'Baños / Bathrooms',kitchen:'Cocinas / Kitchens',bedroom:'Habitaciones / Bedrooms'}[category]||'Plantas');
+ const title=document.createElement('strong');title.textContent='ARQASSIST · '+({bathroom:'Baños / Bathrooms',kitchen:'Cocinas / Kitchens',bedroom:'Habitaciones / Bedrooms',laundry:'Lavaderos / Laundry',office:'Oficinas / Offices',dining:'Comedores / Dining',closet:'Vestidores / Dressing'}[category]||'Plantas');
  const close=document.createElement('button');close.className='btn slim';close.textContent='×';close.setAttribute('aria-label','Cerrar / Close');close.onclick=()=>dlg.close();header.append(title,close);dlg.append(header);
  const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px';dlg.append(grid);
  const fmt=n=>n.toFixed(2);
@@ -969,10 +980,10 @@ async function openArqPlanCatalogue(category){
  let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;status.remove();
  for(const item of items.filter(x=>x.category===category).sort((a,b)=>a.area-b.area)){
   const button=document.createElement('button');button.className='btn arq-card';button.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
-  const img=document.createElement('img');img.src=new URL(item.id+'.svg',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
+  const img=document.createElement('img');img.src=new URL(item.id+'.svg',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard',counter:'Mesada',kingbed:'Cama king',bunk:'Cucheta',crib:'Cuna',desk:'Escritorio',washer:'Lavarropas',dryer:'Secarropas',laundrySink:'Pileta',bookshelf:'Biblioteca',table8:'Mesa para ocho'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
   if(item.preliminary){const note=document.createElement('small');note.textContent='Preliminar / Preliminary';note.style.color='#dfc28b';button.append(note);}
   button.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');const epoch=++arqCommandEpoch;button.disabled=true;
-   try{const response=await fetch(new URL(item.id+'.json',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');const plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');}
+   try{const response=await fetch(new URL(item.id+'.json',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');const plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
    catch(e){CORE.toast(e.message)}finally{button.disabled=false}};
   grid.append(button);
  }
