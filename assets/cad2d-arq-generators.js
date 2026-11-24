@@ -792,6 +792,8 @@ one('pv-parada-falda-fre','Persona con falda · vista frontal',PV,.60,1.70,(b,W,
 one('pv-brazos-cruzados-fre','Persona con manos adelante · vista frontal',PV,.60,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:W/2,armsIn:true})},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.9,dMax:2.1});
 one('pv-sentado-fre','Persona sentada · vista frontal',PV,.60,1.30,(b,W,D)=>{const s=D/1.30;frontal(b,s,{x:W/2,sit:true});b.rect(W/2-.24*s,.43*s,.48*s,.04*s)},{family:'pers-vista',wMin:.4,wMax:.9,dMin:.8,dMax:1.6});
 one('pv-grupo-fre','Grupo de tres personas · vista frontal',PV,1.70,1.75,(b,W,D)=>{const s=D/1.75;frontal(b,s,{x:.32*s});frontal(b,s*.96,{x:.85*s,skirt:true});frontal(b,s*.62,{x:1.35*s})},{family:'pers-vista',wMin:1.2,wMax:2.4,dMin:1.2,dMax:2.1});
+one('mob-locker','Locker individual de vestuario',MOB,.40,.50,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.025,.025,W-.05,D-.05);b.line(.04,D-.06,W-.04,D-.06);b.circle(W-.065,.07,.015);for(let i=0;i<3;i++)b.line(W*.25,D*.45+i*.035,W*.75,D*.45+i*.035)},{wMin:.30,wMax:.60,dMin:.40,dMax:.65});
+one('mob-banco-vest','Banco de vestuario',MOB,1.50,.40,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<4;i++)b.line(0,i*D/4,W,i*D/4);b.rect(.08,.04,.08,D-.08);b.rect(W-.16,.04,.08,D-.08)},{wMin:1,wMax:2.5,dMin:.35,dMax:.55});
 const api={library:LIB,build,bounds,categories:[...new Set(LIB.map(x=>x.cat))],Builder,F};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 root.CAD2D_ARQ_LIBRARY=api;
