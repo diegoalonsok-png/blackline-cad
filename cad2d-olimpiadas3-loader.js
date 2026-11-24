@@ -34,7 +34,7 @@
   const job=(async()=>{
    await loadCatalog();
    const meta=catalogRows.get(id);if(!meta)throw Error('Bloque no encontrado');
-   const response=await fetch('/assets/block-library/v1/'+encodeURIComponent(id)+'.json');
+   const response=await fetch('/assets/block-library/v1/'+encodeURIComponent(id)+'.json',{cache:'no-store'});
    if(!response.ok)throw Error('No se pudo descargar el bloque');
    const x=await response.json();
    if(x.id!==id||x.source!==meta.source||x.sourceHash!==meta.sourceHash||typeof x.data!=='string'||x.data.length>1100000)throw Error('Geometría incompatible');
