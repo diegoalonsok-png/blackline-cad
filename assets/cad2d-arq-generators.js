@@ -551,6 +551,85 @@ for(let n=1;n<=12;n++)for(const privateBath of [true,false])for(const side of ['
  gen(b,W,D){tandemRooms(b,W,D,n,side,privateBath)}});
 }
 
+
+/* Wardrobes and independent suites. Original layouts, metres, exterior dimensions.
+   Cabinet depth .60 m; design clearance targets are advisory, not code certification. */
+const CLOSETS='Vestidores completos';
+function wardrobe(b,x,y,w,d,drawers){
+ b.rect(x,y,w,d);
+ const along=w>=d,n=Math.max(1,Math.ceil((along?w:d)/.75));
+ for(let i=1;i<n;i++){if(along)b.line(x+w*i/n,y,x+w*i/n,y+d);else b.line(x,y+d*i/n,x+w,y+d*i/n)}
+ if(drawers){for(let i=1;i<4;i++){if(along)b.line(x+.04,y+d*i/4,x+w-.04,y+d*i/4);else b.line(x+w*i/4,y+.04,x+w*i/4,y+d-.04)}}
+ else if(along)b.line(x+.04,y+d/2,x+w-.04,y+d/2,{dashed:true});
+ else b.line(x+w/2,y+.04,x+w/2,y+d-.04,{dashed:true});
+}
+function roomShell(b,W,D,doorX,doorW,t=.12){
+ const a=doorX,z=a+doorW;
+ for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22});
+ // Open outward: clearance outside the local envelope must be reviewed at placement.
+ b.line(a,0,a,-doorW);b.arc(a,0,doorW,270,360);
+}
+function closetSpec(W,D,kind,side,drawers){
+ const t=.12,dep=.60,back=kind==='u'||kind==='l'?dep:0;
+ const rects=[],left=side==='left'||kind==='double'||kind==='u',right=side==='right'||kind==='double'||kind==='u';
+ if(left)rects.push({x:t,y:t,w:dep,h:D-2*t-back,drawers});
+ if(right)rects.push({x:W-t-dep,y:t,w:dep,h:D-2*t-back,drawers:!drawers});
+ if(back)rects.push({x:t,y:D-t-dep,w:W-2*t,h:dep,drawers:!drawers});
+ const clear=W-2*t-dep*(Number(left)+Number(right)),door=.80;
+ if(clear<.90-1e-8||D-2*t-back<1.20-1e-8)throw Error('Vestidor sin circulación suficiente');
+ return {t,rects,clear,doorX:t+(left?dep:0)+(clear-door)/2,door};
+}
+for(const [kind,label] of [['single','Lineal'],['double','Paralelo'],['l','En L'],['u','En U']]){
+ for(const side of (kind==='double'||kind==='u'?['left']:['left','right']))for(const drawers of [true,false]){
+  const id='arq-closet-'+kind+'-'+side+'-'+(drawers?'drawers':'rails');
+  const mw=kind==='double'||kind==='u'?2.40:1.80,md=kind==='l'||kind==='u'?2.20:1.60;
+  def({id,name:'Vestidor '+label+' · '+side+' · '+(drawers?'cajones':'barral'),cat:CLOSETS,family:'arq-closet-'+kind,w:mw+.40,d:md+.60,wMin:mw,wMax:5,dMin:md,dMax:5,arqCloset:true,
+   layoutSpec:(W,D)=>closetSpec(W,D,kind,side,drawers),gen(b,W,D){const s=closetSpec(W,D,kind,side,drawers);roomShell(b,W,D,s.doorX,s.door,s.t);for(const r of s.rects)wardrobe(b,r.x,r.y,r.w,r.h,r.drawers)}});
+ }
+}
+function suiteSpec(W,D,bedType,side,closetKind){
+ const t=.12,part=.12,bw=2.30,cd=2.60,base=t,top=D-t;
+ const leftX=t,rightX=W-t-bw,bathX=side==='left'?leftX:rightX,closetX=side==='left'?rightX:leftX;
+ const passage=W-2*t-2*bw-2*part,front=base+cd+part;
+ const bed=bedType==='king'?2:bedType==='queen'?1.60:1.40,bedW=bed+1,bedD=2;
+ const rects=[
+  {key:'shower',x:bathX+.10,y:base+.10,w:.90,h:.90},
+  {key:'wc',x:bathX+1.60,y:base+.10,w:.40,h:.75},
+  {key:'sink',x:bathX+.10,y:base+1.38,w:.60,h:.55},
+  {key:'cabinet',x:closetX,y:base,w:.60,h:cd,drawers:true},
+  {key:'bed',x:(W-bedW)/2,y:top-bedD-.10,w:bedW,h:bedD}
+ ];
+ if(closetKind==='double')rects.push({key:'cabinet',x:closetX+bw-.60,y:base,w:.60,h:cd,drawers:false});
+ else rects.push({key:'cabinet',x:closetX+.60,y:base,w:bw-.60,h:.60,drawers:false});
+ const closetClear=bw-1.20;
+ if(passage<1.10-1e-8||closetClear<.90||rects[4].y-front<.90-1e-8)throw Error('Suite sin circulación suficiente');
+ return {t,part,bw,cd,base,top,bathX,closetX,passage,front,rects,doorX:(W-.90)/2,bedW,bedD};
+}
+function suiteDraw(b,W,D,bedType,side,closetKind){
+ const s=suiteSpec(W,D,bedType,side,closetKind);
+ roomShell(b,W,D,s.doorX,.90,s.t);
+ for(const [x,isBath] of [[s.bathX,true],[s.closetX,false]]){
+  const isLeft=x<W/2,inner=isLeft?x+s.bw:x,other=inner+(isLeft?s.part:-s.part),y=s.base+s.cd;
+  for(const xx of [inner,other])b.line(xx,s.base,xx,y+s.part,{width:.22});
+  // Access from sleeping area; pocket door leaves the passage unobstructed.
+  const a=x+(s.bw-.80)/2,z=a+.80;
+  for(const yy of [y,y+s.part]){b.line(x,yy,a,yy,{width:.22});b.line(z,yy,x+s.bw,yy,{width:.22})}
+  b.line(a,y,a,y+s.part,{width:.22});b.line(z,y,z,y+s.part,{width:.22});
+  b.line(z,y+.06,z+.65,y+.06);
+  b.text(x+.72,y-.30,isBath?'BAÑO':'VESTIDOR',.10);
+ }
+ for(const r of s.rects){
+  if(r.key==='cabinet')wardrobe(b,r.x,r.y,r.w,r.h,r.drawers);
+  else b.at(r.x,r.y,0,q=>{if(r.key==='shower')F.ducha(q,r.w,r.h,false);else if(r.key==='wc')F.wc(q);else if(r.key==='sink')F.lavatorio(q,r.w,r.h);else cama(q,r.w,r.h)});
+ }
+ b.text(.30,D-.45,'SUITE',.14);
+}
+const SUITES='Dormitorios en suite';
+for(const bedType of ['double','queen','king'])for(const side of ['left','right'])for(const closetKind of ['l','double']){
+ def({id:'arq-suite-'+bedType+'-'+side+'-'+closetKind,name:'Suite '+bedType+' · baño '+(side==='left'?'izquierdo':'derecho')+' · vestidor '+(closetKind==='l'?'en L':'paralelo'),cat:SUITES,family:'arq-suite-'+bedType,w:6.50,d:7.00,wMin:6.20,wMax:9,dMin:6.10,dMax:10,arqSuite:true,
+ layoutSpec:(W,D)=>suiteSpec(W,D,bedType,side,closetKind),gen(b,W,D){suiteDraw(b,W,D,bedType,side,closetKind)}});
+}
+
 /* ===== EXTERIOR Y VEGETACIÓN ===== */
 const EXT='Exterior';
 one('ext-arbol','Árbol caducifolio',EXT,3.00,3.00,(b,W)=>{const r=W/2,n=14,pts=[];for(let i=0;i<=n*2;i++){const a=i*180/n*DEG,rr=i%2?r*.86:r;pts.push([r+rr*Math.cos(a),r+rr*Math.sin(a)])}b.poly(pts,true);b.circle(r,r,r*.12);for(let i=0;i<6;i++){const a=i*60*DEG;b.line(r,r,r+r*.6*Math.cos(a),r+r*.6*Math.sin(a))}},{wMin:1.0,wMax:8.0,lockAspect:true,family:'arbol'});
