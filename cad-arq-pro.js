@@ -127,10 +127,13 @@ function svgFor(item,W,D,{height=96,pad=.08}={}){
  }
  return `<svg xmlns="${NS}" viewBox="${(b.minX-p).toFixed(4)} ${(-b.maxY-p).toFixed(4)} ${(w+2*p).toFixed(4)} ${(h+2*p).toFixed(4)}" style="display:block;width:100%;height:${height}px" role="img" aria-label="Planta de ${esc(item.name)}"><g fill="none" stroke="currentColor" stroke-width="${sw.toFixed(4)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke">${body}</g></svg>`;
 }
-const thumbCache=new Map();
+const thumbCache=new Map();let thumbCacheChars=0;
 function thumb(item,height){
- const key=item.id+'|'+height;if(!thumbCache.has(key))thumbCache.set(key,svgFor(item,null,null,{height}));
- return thumbCache.get(key);
+ const key=item.id+'|'+height;
+ if(thumbCache.has(key)){const hit=thumbCache.get(key);thumbCache.delete(key);thumbCache.set(key,hit);return hit}
+ const svg=svgFor(item,null,null,{height});
+ if(svg.length<=2000000){thumbCache.set(key,svg);thumbCacheChars+=svg.length;while(thumbCache.size>240||thumbCacheChars>8000000){const first=thumbCache.keys().next().value;thumbCacheChars-=thumbCache.get(first).length;thumbCache.delete(first)}}
+ return svg;
 }
 const sizeLabel=item=>cm(item.w)+'×'+cm(item.d)+' cm';
 const isDynamic=item=>item.wMax>item.wMin||item.dMax>item.dMin;
@@ -189,12 +192,13 @@ function cardsFor(cat,q){
  return LIB.library.filter(x=>!x.hideFromGallery&&(s?(x.name+' '+x.cat).toLowerCase().includes(s):(cat==='Todos'||x.cat===cat)));
 }
 // Etiquetas genéricas en la paleta, sin cambiar el nombre CAD ni su geometría.
+let arqNames=new Map(),arqNamesLength=-1;
 function arqSimpleName(item){
+ if(arqNamesLength===LIB.library.length)return arqNames.get(item.id)||item.name;
  const patterns=[['Puerta',/\b(?:puerta|door|porton|portón)\b/i],['Ventana',/\b(?:ventana|ventanal|window)\b/i],['Escalera',/\b(?:escalera|stair)\b/i],['Inodoro',/\b(?:inodoro|toilet|wc)\b/i],['Bañadera',/\b(?:bañadera|bañera|bathtub)\b/i],['Auto',/\b(?:auto|automóvil|coche|car)\b/i],['Camión',/\b(?:camión|camion|truck)\b/i],['Árbol',/\b(?:árbol|arbol|tree)\b/i],['Heladera',/\b(?:heladera|refrigerador|fridge)\b/i],['Cocina',/\b(?:cocina|kitchen)\b/i]];
- const type=patterns.find(p=>p[1].test(String(item.name||'')))?.[0];
- if(!type)return item.name;
- const matching=LIB.library.filter(x=>patterns.find(p=>p[1].test(String(x.name||'')))?.[0]===type).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
- return type+' '+(matching.findIndex(x=>x.id===item.id)+1);
+ const counters=new Map();arqNames=new Map();
+ for(const x of LIB.library.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))){const type=patterns.find(p=>p[1].test(String(x.name||'')))?.[0];if(!type)continue;const n=(counters.get(type)||0)+1;counters.set(type,n);arqNames.set(x.id,type+' '+n)}
+ arqNamesLength=LIB.library.length;return arqNames.get(item.id)||item.name;
 }
 function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
@@ -214,7 +218,7 @@ function chips(container,onPick){
   b.onclick=()=>{activeCat=cat;onPick()};container.append(b);
  }
 }
-window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
+window.CAD2D_ARQ_REFRESH=()=>{arqNamesLength=-1;const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
 function fillPanelGrid(items){
  const grid=$('arqPanelGrid');if(!grid)return;
  const cap=48;
@@ -227,7 +231,7 @@ function fillPanelGrid(items){
  }
 }
 function renderPanel(){
- const grid=$('arqPanelGrid');if(!grid)return;
+ const grid=$('arqPanelGrid');if(!grid||$('arqPanelBody')?.hidden)return;
  const sel=$('arqPanelCat');
  if(!sel.options.length){for(const cat of ['Todos',...LIB.categories.filter(c=>LIB.library.some(x=>x.cat===c&&!x.hideFromGallery))]){const o=document.createElement('option');o.value=cat;o.textContent=cat+' ('+(cat==='Todos'?LIB.library.filter(x=>!x.hideFromGallery).length:LIB.library.filter(x=>x.cat===cat&&!x.hideFromGallery).length)+')';sel.append(o)}sel.onchange=()=>{activeCat=sel.value;query='';$('arqPanelSearch').value='';renderPanel()}}
  sel.value=activeCat;
@@ -260,7 +264,7 @@ function buildPanel(){
  }
  mountDrawingBlocks();
  $('arqDrawingBlocksFallback')?.addEventListener('click',()=>{mountDrawingBlocks();const toggle=$('cadDocBlockToggle');if(toggle)toggle.click();else CORE.toast('Recargá CAD2D3D para activar los bloques del plano')});
- $('arqCollapse').onclick=()=>{const body=$('arqPanelBody');body.hidden=!body.hidden;$('arqCollapse').textContent=body.hidden?'+':'−'};
+ $('arqCollapse').onclick=()=>{const body=$('arqPanelBody');body.hidden=!body.hidden;$('arqCollapse').textContent=body.hidden?'+':'−';if(!body.hidden)renderPanel()};
  $('arqPanelSearch').oninput=e=>{query=e.target.value;fillPanelGrid(cardsFor(activeCat,query))};
  $('arqOpenBig').onclick=()=>openModal();
  $('arqOpenVisual').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
