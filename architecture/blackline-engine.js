@@ -11,14 +11,24 @@ const C=Object.freeze({
  sink:['kq-bacha',.80,.60],range:['kq-cocina',.60,.62],fridge:['kq-heladera',.70,.70],
  island:['kq-isla',2,.95],sofa:['mob-sofa3',2.30,.92],table6:['mob-mesa6',1.80,1.90],
  table4:['mob-mesa4',1.20,1.80],table8:['mob-mesa8',2.40,2],desk:['mob-escritorio',1.40,1.20],
- coffee:['mob-ratona',1.10,.60],tv:['mob-tv',1.80,.45]
+ coffee:['mob-ratona',1.10,.60],tv:['mob-tv',1.80,.45],
+ washer:['kq-lavarropas',.60,.60],dryer:['kq-secarropas',.60,.60],laundrySink:['kq-pileta',.60,.55],bookshelf:['mob-biblioteca',1.60,.35],shelving:['mob-estanteria',1.20,.35],meetingTable:['ofi-reuniones',3.20,2.20],workstations:['ofi-puestos-4',2.80,2.60],receptionDesk:['ofi-recepcion',2.40,1.60],entryBench:['mob-recibidor',1,.40],bunk:['dor-cucheta',.90,2],crib:['dor-cuna',.70,1.30],dishwasher:['kq-lv',.60,.60],oven:['kq-horno',.60,.60]
 });
-const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']]};
+const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']],laundry:[2.2,2.5,['washer','laundrySink']],office:[3.5,4,['desk','bookshelf']],dining:[4,4,['table6']],storage:[2.4,3,['shelving']],meeting:[5,4.5,['meetingTable']],reception:[4,4,['receptionDesk','sofa']],closet:[2.4,2.4,['wardrobe']],nursery:[3,3.5,['crib','wardrobe']]};
 const aliases={
  bedroom:'habitacion habitaciones dormitorio dormitorios cuarto cuartos pieza piezas recamara recamaras alcoba alcobas bedroom bedrooms chambre chambres schlafzimmer quarto quartos camera camere',
  bathroom:'bano banos toilette toilettes sanitario sanitarios bathroom bathrooms restroom restrooms badezimmer banheiro banheiros bagno bagni',
  kitchen:'cocina cocinas kitchen kitchens cuisine cuisines kuche kuchen cozinha cozinhas cucina cucine',
  living:'living livings salon salones lounge lounges wohnzimmer soggiorno soggiorni',
+ laundry:'lavadero lavaderos lavanderia lavanderias laundry buanderie',
+ office:'oficina oficinas despacho despachos office offices',
+ dining:'comedor comedores dining',
+ storage:'deposito depositos despensa despensas trastero trasteros storage',
+ meeting:'reunion reuniones meeting',
+ reception:'recepcion recepciones reception',
+ closet:'vestidor vestidores dressing',
+ nursery:'guarderia guarderias nursery',
+ washer:'lavarropas lavadora lavadoras washer',dryer:'secarropas secadora dryer',laundrySink:'lavadero_pileta',bookshelf:'biblioteca bibliotecas librero libreros bookshelf',shelving:'estanteria estanterias estante estantes shelving',bunk:'cucheta cuchetas litera literas bunk',crib:'cuna cunas crib',dishwasher:'lavavajillas dishwasher',oven:'horno hornos oven',
  wall:'muro muros pared paredes tabique tabiques wall walls mur murs wand wande parede paredes muro muri',
  door:'puerta puertas door doors porte portes tur turen porta portas',
  window:'ventana ventanas ventanal ventanales window windows fenetre fenetres fenster janela janelas finestra finestre',
@@ -52,15 +62,15 @@ function measure(s){const m=s.match(new RegExp('^\\s*'+N+'\\s*'+U+'\\b','i'));re
 function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by|par|mal|per)\\s*'+N+'\\s*'+U,'i'));return m?[num(m[1])*unitScale(m[2]||m[4]),num(m[3])*unitScale(m[4]||m[2])]:null}
 function interpret(raw){
  if(typeof raw!=='string'||!raw.trim()||raw.length>4000)throw Error('Escribí una instrucción arquitectónica.');
- let s=normalize(raw).replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
+ let s=normalize(raw).replace(/\bsala de reuniones\b/g,'reunion').replace(/\b(?:living comedor|living-comedor)\b/g,'living').replace(/\b(?:pileta de lavar|pileta de lavadero)\b/g,'laundry_sink').replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
  if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre(?:r|lo|la|los|las)?|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
  if(/\b(?:en corte|en seccion|section view)\b/.test(s))throw Error('El corte arquitectónico requiere un generador de sección; no se dibujará una planta.');
  const tokens=[...s.matchAll(/[a-z]+|\d+(?:[.,]\d+)?/g)].map(m=>({t:m[0],i:m.index,end:m.index+m[0].length,k:concept(m[0])}));
  const rooms=tokens.filter(x=>Object.hasOwn(DEFAULT,x.k));
  if(!rooms.length)throw Error('No reconozco un ambiente de arquitectura. Indicá qué querés dibujar.');
- const first=rooms[0],base=first.k,bath=rooms.find((r,i)=>i>0&&r.k==='bathroom'),suite=base==='bedroom'&&!!bath;
- if(rooms.some(r=>r.k!==base&&!(suite&&r.k==='bathroom')))throw Error('Todavía no puedo resolver conjuntos de ambientes diferentes.');
- if(/\b(?:pasillo|corredor|corridor|balcon|balcony|vestidor|walk-in closet|escalera|stairs|planta alta|second floor)\b/.test(s))throw Error('La geometría solicitada incluye elementos aún no soportados.');
+ const first=rooms[0],base=first.k,bath=rooms.find((r,i)=>i>0&&r.k==='bathroom'),suite=base==='bedroom'&&!!bath,closet=base==='bedroom'?rooms.find((r,i)=>i>0&&r.k==='closet'):null;
+ if(rooms.some(r=>r.k!==base&&!(suite&&r.k==='bathroom')&&!(closet&&r.k==='closet')))throw Error('Todavía no puedo resolver conjuntos de ambientes diferentes.');
+ if(/\b(?:pasillo|corredor|corridor|balcon|balcony|walk-in closet|escalera|stairs|planta alta|second floor)\b/.test(s))throw Error('La geometría solicitada incluye elementos aún no soportados.');
  const qty=t=>t?(/^\d+$/.test(t.t)?+t.t:numberWords[t.t]):undefined;
  const at=tokens.indexOf(first),alt=tokens.find(x=>x.k==='alternative'),alternatives=alt?(qty(tokens[tokens.indexOf(alt)-1])||1):1;
  const row=tokens.some(t=>t.k==='row');
@@ -75,7 +85,7 @@ function interpret(raw){
  if(/\b(?:frente a|enfrente de|a la izquierda|a la derecha|junto a|al fondo|centrad[oa]|esquina|opposite|next to)\b/.test(s))throw Error('La posición relativa solicitada todavía no está soportada; no se omitirá silenciosamente.');
  if(/\b(?:accesibles?|adaptad[oa]s?|sillas? de ruedas|wheelchair|discapacitados?)\b/.test(s))throw Error('Accesibilidad: falta implementar y verificar las áreas de maniobra y transferencia.');
  if(/\b(?:cocina en [ul]|kitchen in [ul]|integrada? (?:al|a la)|doble lavabo|doble bacha|doble lavatorio)\b/.test(s))throw Error('Esta configuración específica todavía no está soportada.');
- const assumptions=[],main=suite?s.slice(0,bath.i):s;
+ const assumptions=[],main=s.slice(0,Math.min(bath&&suite?bath.i:s.length,closet?closet.i:s.length));
  if(assumedCount)assumptions.push('Cantidad no indicada: 3 ambientes en tándem como propuesta inicial.');
  let size=dimensions(main);
  if(!size){
@@ -109,13 +119,14 @@ function interpret(raw){
    const q=qty(tokens[tokens.indexOf(t)-1]);if(q>1)throw Error('Equipamiento repetido: aún no se puede garantizar la cantidad solicitada.');
 if(neg(t))out.delete(t.k);else out.add(t.k)}
   if(kind==='bathroom'&&out.has('bathtub')&&!ts.some(t=>t.k==='shower'&&!neg(t)))out.delete('shower');
-  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed|dormitorio individual|habitacion individual|dormitorio infantil|habitacion infantil)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
-  if(kind==='living'){const m=words.match(/\b(?:mesa|table)\s+(?:para|for)\s+(4|6|8|cuatro|seis|ocho|four|six|eight)\b/);if(m){out.delete('table6');out.add('table'+(numberWords[m[1]]||m[1]))}if(/\b(?:mesa ratona|coffee table)\b/.test(words))out.add('coffee')}
+  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed|dormitorio individual|habitacion individual|dormitorio infantil|habitacion infantil)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}if(out.has('bunk')||out.has('crib')){out.delete('bed');out.delete('singlebed');out.delete('doublebed');out.delete('kingbed')}}
+  if(kind==='living'||kind==='dining'){const m=words.match(/\b(?:mesa|table)\s+(?:para|for)\s+(4|6|8|cuatro|seis|ocho|four|six|eight)\b/);if(m){out.delete('table6');out.add('table'+(numberWords[m[1]]||m[1]))}if(/\b(?:mesa ratona|coffee table)\b/.test(words))out.add('coffee')}
   if(/\b(?:sin muebles|sin mobiliario|without furniture|vaci[oa])\b/.test(words))out.clear();
   return [...out];
  };
- spec.fixtures=selected(base,[0,suite?bath.i:s.length]);
- if(suite){const bs=dimensions(s.slice(bath.i))||[spec.width,2.4];spec.bathWidth=bs[0];spec.bathDepth=bs[1];spec.bathFixtures=selected('bathroom',[bath.i,s.length]);if(!dimensions(s.slice(bath.i)))assumptions.push('Baño: '+bs.join(' × ')+' m (inicial)')}
+ spec.fixtures=selected(base,[0,main.length]);
+ if(closet){const next=rooms.find(r=>r.i>closet.i),cs=dimensions(s.slice(closet.end,next?.i??s.length));if(cs&&Math.abs(cs[0]-spec.width)>1e-6)throw Error('Vestidor de paso: el ancho debe coincidir con el dormitorio en esta variante.');spec.closetDepth=cs?.[1]??2.4;spec.fixtures=spec.fixtures.filter(k=>k!=='wardrobe');assumptions.push('Vestidor posterior de paso: '+spec.width+' × '+spec.closetDepth+' m.');}
+ if(suite){const bathEnd=rooms.find(r=>r.i>bath.i)?.i??s.length;const bs=dimensions(s.slice(bath.i,bathEnd))||[spec.width,2.4];spec.bathWidth=bs[0];spec.bathDepth=bs[1];spec.bathFixtures=selected('bathroom',[bath.i,bathEnd]);if(!dimensions(s.slice(bath.i,bathEnd)))assumptions.push('Baño: '+bs.join(' × ')+' m (inicial)')}
  return spec;
 }
 const R=(x,y,w,d)=>({x,y,w,d});
@@ -155,13 +166,15 @@ function solve(spec){
  const amount=spec.alternatives||1;if(!Number.isInteger(amount)||amount<1||amount>20||amount>1&&n>1)throw Error('Hasta 20 alternativas individuales o 30 ambientes contiguos.');
  const items=spec.fixtures||DEFAULT[base][2],bathItems=spec.bathFixtures||DEFAULT.bathroom[2];if(!Array.isArray(items)||!Array.isArray(bathItems)||[...items,...bathItems].some(k=>!C[k])||items.length>12||bathItems.length>12)throw Error('Equipamiento no reconocido.');
  const out={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks:[],rooms:[],virtualDimensions:[],connections:[],variants:[],brief:spec,assumptions:[...(spec.assumptions||[])]};
- const step=w+t,fullD=d+(suite?bd+t:0),cols=Math.ceil(Math.sqrt(amount)),seen=new Set();
+ const cd=spec.closetDepth||0;if(cd&&(!Number.isFinite(cd)||cd<1.5||cd>8))throw Error('Vestidor fuera de rango.');const shift=cd?cd+t:0;
+ const step=w+t,fullD=d+shift+(suite?bd+t:0),cols=Math.ceil(Math.sqrt(amount)),seen=new Set();
  const doorX=spec.doorX??(w-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>w-.03)throw Error('Posición de puerta inválida.');
  const doorZones=door?[R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay;try{lay=(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...(suite?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+  let lay,blay,clay;try{lay=(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...((suite||cd)?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+   if(cd)clay=arrange(w,cd,['wardrobe'],[R((w-bathDoor)/2,0,bathDoor,bathDoor),...(suite?[R((w-bathDoor)/2,cd-bathDoor,bathDoor,bathDoor)]:[])],seed);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
-  const signature=JSON.stringify([lay,blay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
+  const signature=JSON.stringify([lay,blay,clay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
   const pt=(x,y)=>[x+dx,y+dy];
   const wall=(id,a,b)=>{out.walls.push({id:p+id,a:pt(...a),b:pt(...b),thickness:t,layer:'WALLS',join:'native'})};
@@ -177,13 +190,13 @@ function solve(spec){
    const x=t+i*step,a=x-t/2,b=a+step,front='front'+i,back='back'+i,rear='rear'+i;
    wall(front,[a,t/2],[b,t/2]);wall(back,[a,d+1.5*t],[b,d+1.5*t]);opening(front,'swing-door',t/2+doorX+door/2,door);
    room('room'+i,base,x,t,d,front,back,i);blocks(lay,x,t,base);
-   if(suite){
+   if(suite||cd){
     const offset=step/2-door/2-win/2-.2;
     if(win&&offset-win/2<=t/2)throw Error('No hay espacio en fachada para la puerta y ventana solicitadas.');
     opening(front,'framed-window',offset,win);opening(back,'swing-door',step/2,bathDoor);
-    wall(rear,[a,fullD+1.5*t],[b,fullD+1.5*t]);opening(rear,'framed-window',step/2,Math.min(.8,w-.3));
-    room('bath'+i,'bathroom',x,d+2*t,bd,back,rear,i);blocks(blay,x,d+2*t,'bathroom');
-    out.connections.push({from:p+'room'+i,to:p+'bath'+i,via:p+back,private:true});
+    let prev=back,from='room'+i;
+    if(cd){const closetBack='closetback'+i;wall(closetBack,[a,d+shift+1.5*t],[b,d+shift+1.5*t]);room('closet'+i,'closet',x,d+2*t,cd,back,closetBack,i);blocks(clay,x,d+2*t,'closet');out.connections.push({from:p+from,to:p+'closet'+i,via:p+back,private:true});prev=closetBack;from='closet'+i;if(suite)opening(prev,'swing-door',step/2,bathDoor);}
+    if(suite){wall(rear,[a,fullD+1.5*t],[b,fullD+1.5*t]);opening(rear,'framed-window',step/2,Math.min(.8,w-.3));room('bath'+i,'bathroom',x,d+shift+2*t,bd,prev,rear,i);blocks(blay,x,d+shift+2*t,'bathroom');out.connections.push({from:p+from,to:p+'bath'+i,via:p+prev,private:true});}
    }else opening(back,'framed-window',step/2,win);
   }
   out.variants.push({id:p.slice(0,-1),number:v+1});if(out.variants.length===amount)break;
