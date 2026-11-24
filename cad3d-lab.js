@@ -6392,9 +6392,9 @@ function grip3DValue(r,kind,openingId){
   ({'opening-offset':'offset','opening-start':'w','opening-end':'w','opening-height':'h','opening-sill':'sill',
    'opening-depth-start':'d','opening-depth-end':'d','opening-offset-y':'offsetY'})[kind]:
   ({'length-start':'w','length-end':'w','depth-start':'d','depth-end':'d','thickness':'d',
-   'height':'h','radius':'radius','rotate':'rot'})[kind];
+   'height':'h','radius':'radius','rotate':'rot','stair-width':'d','radial-width':'d','stair-radius':'innerRadius','rail-rise':'railRise'})[kind];
  if(kind==='move')return 'X '+r.x.toFixed(3)+' · Y '+r.y.toFixed(3);
- return field?Number(obj[field]).toFixed(3)+(field==='rot'?'°':' m'):'';
+ return field?Number(field==='innerRadius'?cad3dRadialStairPlan(r).inner:field==='railRise'?finite(obj[field],0):obj[field]).toFixed(3)+(field==='rot'?'°':' m'):'';
 }
 function render3DGrips(){
  if(!root)return;
@@ -6422,11 +6422,12 @@ function numeric3DGripAdjustment(r,kind,openingId){
  'opening-depth-start':'d','opening-depth-end':'d','opening-offset-y':'offsetY'})[kind]:
  ({'length-start':'w','length-end':'w','depth-start':'d','depth-end':'d','thickness':'d','height':'h','radius':'radius','rotate':'rot','stair-width':'d','radial-width':'d','stair-radius':'innerRadius','rail-rise':'railRise'})[kind];
  if(!field)return null;
- var response=window.prompt('Nuevo valor '+field+(field==='rot'?' (grados)':' (metros)'),String(current[field]));
+ var old=field==='innerRadius'?cad3dRadialStairPlan(r).inner:field==='railRise'?finite(current[field],0):current[field];
+ var response=window.prompt('Nuevo valor '+field+(field==='rot'?' (grados)':' (metros)'),String(old));
  if(response===null||response.trim()==='')return null;
  var value=Number(response);
  if(!Number.isFinite(value))return null;
- var d=value-current[field];
+ var d=value-old;
  if(kind==='length-start'||kind==='depth-start'||kind==='opening-start'||kind==='opening-depth-start')d=-d;
  if(kind==='thickness'||kind==='stair-width')d/=2;
  return d;
@@ -7903,7 +7904,8 @@ function change(e){
   else if(key==='postSpacing')r.postSpacing=clamp(finite(Number(input.value),1),.35,3);
   else if(key==='railRise'&&r.type==='railing')r.railRise=clamp(finite(Number(input.value),0),-10,10);
   else return;
-  r.styleId='';redraw();renderProps();text('Geometría paramétrica actualizada');return;
+  // Retain the originating stair preset so changing dimensions does not change its finish.
+ if(r.type!=='stair')r.styleId='';redraw();renderProps();text('Geometría paramétrica actualizada');return;
  }
  if(input.matches('[data-object-color]')){
   if(r.type!=='imported3d'||!/^#[0-9a-f]{6}$/i.test(input.value))return;
