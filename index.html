@@ -5053,23 +5053,105 @@ function cadListEntities(){
  box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
  document.body.append(box);close.focus({preventScroll:true});
 }
-function cadQuickSelect(){
- const all=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked);
- const types=[...new Set(all.map(e=>e.type))].sort();
- const type=window.prompt('QSELECT · tipo de objeto (ALL / '+types.join(' / ')+')','ALL');
- if(type===null)return;
- const wanted=type.trim().toLowerCase();
- if(wanted!=='all'&&!types.includes(wanted))return toast('QSELECT: tipo desconocido');
- const layers=[...new Set(all.map(e=>layerFor(e).name))];
- const name=window.prompt('QSELECT · capa (ALL / '+layers.join(' / ')+')','ALL');
- if(name===null)return;
- const layerName=name.trim();
- if(layerName.toUpperCase()!=='ALL'&&!layers.some(x=>x.toLowerCase()===layerName.toLowerCase()))
-  return toast('QSELECT: capa inexistente');
- state.selected=all.filter(e=>(wanted==='all'||e.type===wanted)&&
-  (layerName.toUpperCase()==='ALL'||layerFor(e).name.toLowerCase()===layerName.toLowerCase())).map(e=>e.id);
- updateProps();schedule();toast('QSELECT · '+state.selected.length+' objetos encontrados');
+
+/* QSELECT / FILTER: one selection tool, combined criteria, no document mutations. */
+function cadFilterValue(e,l,key){
+ if(key==='type')return e.type;
+ if(key==='layer')return l.id;
+ if(key==='color')return e.color||l.color||'';
+ if(key==='linetype')return e.linetype||l.linetype||'CONTINUOUS';
+ if(key==='width')return e.width??l.width??.25;
+ if(key==='block')return e.type==='blockRef'?e.blockName:null;
+ if(key==='text')return e.type==='text'?e.text:null;
+ if(key==='radius')return ['circle','arc'].includes(e.type)?e.r:null;
+ if(key==='area')return e.type==='hatch'?cadQuickHatchArea(e):cadEntityArea(e);
+ if(key==='length'){
+  if(e.type==='line')return dist(e.a,e.b);
+  if(e.type==='circle')return TAU*e.r;
+  if(e.type==='arc')return arcSweep(e.a0,e.a1)*e.r;
+  if(e.type==='ellipse')return cadQuickEllipsePerimeter(e.rx,e.ry);
+  if(e.type==='rect')return 2*(Math.abs(e.a.x-e.b.x)+Math.abs(e.a.y-e.b.y));
+  if(e.type==='polyline')return cadQuickPathInfo(e).length;
+  if(e.type==='hatch')return cadQuickPathInfo({pts:e.pts,closed:true}).length;
+ }
+ return null;
 }
+function cadFilterMatches(value,rule){
+ if(value==null)return false;
+ if(['width','radius','area','length'].includes(rule.key)){
+  const n=rule.value;
+  if(!Number.isFinite(value)||!Number.isFinite(n))return false;
+  const eq=Math.abs(value-n)<=1e-9*Math.max(1,Math.abs(value),Math.abs(n));
+  switch(rule.op){case 'eq':return eq;case 'ne':return !eq;case 'gt':return value>n&&!eq;case 'ge':return value>n||eq;case 'lt':return value<n&&!eq;case 'le':return value<n||eq;default:return false}
+ }
+ const a=String(value),b=String(rule.value);
+ if(rule.key==='layer')return rule.op==='eq'?a===b:rule.op==='ne'?a!==b:false;
+ const x=a.toLowerCase(),y=b.toLowerCase();
+ return rule.op==='eq'?x===y:rule.op==='ne'?x!==y:rule.op==='contains'?x.includes(y):false;
+}
+function cadFilterIds(entities,layers,prior,rules,scope,logic,mode){
+ const byLayer=new Map(layers.map(l=>[l.id,l])),before=new Set(prior);
+ const matched=[],eligible=[];
+ for(const e of entities){
+  const l=byLayer.get(e.layer)||layers[0];
+  if(!l||l.visible===false||l.locked||l.frozen||e.cadHidden||e.autoOpeningRef!=null)continue;
+  eligible.push(e.id);
+  if(scope==='selection'&&!before.has(e.id))continue;
+  const pass=r=>cadFilterMatches(cadFilterValue(e,l,r.key),r);
+  if(!rules.length||(logic==='any'?rules.some(pass):rules.every(pass)))matched.push(e.id);
+ }
+ const found=new Set(matched);
+ return {matched,selected:eligible.filter(id=>mode==='add'?before.has(id)||found.has(id):mode==='subtract'?before.has(id)&&!found.has(id):found.has(id))};
+}
+function cadQuickSelect(){
+ if($('cadFilterDialog'))return;
+ const d=document.createElement('dialog');d.id='cadFilterDialog';
+ d.style.cssText='max-width:min(720px,92vw);max-height:85vh;overflow:auto;background:var(--cad-ui-panel,#17232c);color:var(--cad-ui-text,#e5eef5);border:1px solid #536876;border-radius:6px;padding:16px';
+ d.innerHTML='<div style="display:flex;gap:8px;align-items:center"><strong style="flex:1">QSELECT / FILTER · Selección avanzada</strong><button type="button" class="btn" data-close>×</button></div><p>Combiná propiedades. Solo se seleccionan objetos visibles y editables.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><label>Buscar en <select data-scope><option value="all">Dibujo completo</option><option value="selection">Selección actual</option></select></label><label>Coincidencia <select data-logic><option value="all">Todas (Y)</option><option value="any">Cualquiera (O)</option></select></label><label>Resultado <select data-mode><option value="replace">Reemplazar</option><option value="add">Agregar</option><option value="subtract">Quitar</option></select></label></div><div data-rules style="display:grid;gap:6px;margin:12px 0"></div><button type="button" class="btn" data-add>+ Agregar criterio</button><p data-count aria-live="polite"></p><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-preview>Contar coincidencias</button><button type="button" class="btn primary" data-apply>Seleccionar</button><button type="button" class="btn" data-close>Cancelar</button></div>';
+ const host=d.querySelector('[data-rules]'),status=d.querySelector('[data-count]');
+ const properties=[['type','Tipo de objeto'],['layer','Capa'],['color','Color efectivo'],['linetype','Tipo de línea efectivo'],['width','Espesor de impresión (mm)'],['block','Nombre de bloque'],['text','Texto'],['radius','Radio ('+state.unit+')'],['length','Longitud / perímetro ('+state.unit+')'],['area','Área ('+state.unit+'²)']];
+ const numeric=new Set(['width','radius','length','area']);
+ const option=(el,value,label)=>el.add(new Option(label,value));
+ function addRule(key){
+  if(host.children.length>=12)return toast('FILTER: máximo 12 criterios');
+  const row=document.createElement('div');row.style.cssText='display:flex;gap:5px;flex-wrap:wrap;align-items:center';
+  const prop=document.createElement('select'),op=document.createElement('select'),val=document.createElement('span'),remove=document.createElement('button');
+  prop.setAttribute('aria-label','Propiedad');op.setAttribute('aria-label','Operador');remove.type='button';remove.className='btn slim';remove.textContent='×';remove.setAttribute('aria-label','Quitar criterio');
+  properties.forEach(([k,n])=>option(prop,k,n));prop.value=key;
+  function configure(){
+   const k=prop.value;op.replaceChildren();val.replaceChildren();
+   for(const [v,n] of numeric.has(k)?[['eq','='],['ne','≠'],['gt','>'],['ge','≥'],['lt','<'],['le','≤']]:[['eq','Igual'],['ne','Distinto'],...(!['type','layer'].includes(k)?[['contains','Contiene']]:[])])option(op,v,n);
+   let input;
+   if(k==='layer'||k==='type'){
+    input=document.createElement('select');option(input,'','Elegir…');
+    if(k==='layer')state.layers.forEach(l=>option(input,l.id,l.name));
+    else [...new Set(state.entities.map(e=>e.type))].sort().forEach(t=>option(input,t,t));
+   }else{
+    input=document.createElement('input');input.type=numeric.has(k)?'number':'text';if(numeric.has(k))input.step='any';input.placeholder=k==='color'?'#ffffff':k==='linetype'?'CONTINUOUS':'Valor';
+    input.style.maxWidth='150px';
+   }
+   input.setAttribute('aria-label','Valor del criterio');val.append(input);status.textContent='';
+  }
+  prop.onchange=configure;remove.onclick=()=>{row.remove();status.textContent=''};row.append(prop,op,val,remove);host.append(row);configure();
+  row.read=()=>{const key=prop.value,raw=val.firstElementChild.value.trim();if(!raw)throw Error('Completá todos los criterios o quitalos');const value=numeric.has(key)?Number(raw):raw;if(numeric.has(key)&&!Number.isFinite(value))throw Error('Valor numérico inválido');return {key,op:op.value,value}};
+ }
+ function evaluate(apply){
+  try{
+   const rules=[...host.children].map(row=>row.read());
+   if(!rules.length)throw Error('Agregá al menos un criterio');
+   const p=cadFilterIds(state.entities,state.layers,state.selected,rules,d.querySelector('[data-scope]').value,d.querySelector('[data-logic]').value,d.querySelector('[data-mode]').value);
+   status.textContent=p.matched.length+' coincidencias · '+p.selected.length+' objetos en la selección resultante';
+   if(apply){state.selected=p.selected;updateProps();schedule();d.close();toast('FILTER · '+p.selected.length+' objetos seleccionados')}
+  }catch(e){status.textContent=e.message}
+ }
+ d.querySelector('[data-add]').onclick=()=>addRule('layer');
+ d.querySelector('[data-preview]').onclick=()=>evaluate(false);
+ d.querySelector('[data-apply]').onclick=()=>evaluate(true);
+ d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
+ d.addEventListener('close',()=>d.remove());d.addEventListener('input',()=>{status.textContent=''});
+ addRule('type');document.body.append(d);d.showModal();
+}
+
 function cadAlignTwoPoints(p){
  const chosen=validEditSelection();
  if(!chosen.length)return toast('ALIGN: seleccioná objetos antes de iniciar');
@@ -6343,7 +6425,7 @@ const CAD_COMMANDS=[
  ['PERFORMANCE','RENDIMIENTO','Diagnóstico local de tiempos de dibujo, objetos e historial'],
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['SAVE','QSAVE','Guardar dibujo (DXF)'],['SAVEAS','','Guardar una copia con otro nombre (DXF, DWG o proyecto)'],['SAVEDWG','GUARDARDWG','Guardar dibujo como DWG binario editable'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
- ['BREAKATPOINT','BAP','Partir línea en un punto, sin eliminar tramo'],['ALIGN','ALN','Alinear objetos por dos pares de puntos sin escalar'],['LIST','LI','Mostrar geometría y propiedades de la selección'],['QSELECT','QS','Selección rápida por tipo y capa'],['REGEN','RE','Redibujar la vista'],
+ ['BREAKATPOINT','BAP','Partir línea en un punto, sin eliminar tramo'],['ALIGN','ALN','Alinear objetos por dos pares de puntos sin escalar'],['LIST','LI','Mostrar geometría y propiedades de la selección'],['QSELECT','QS / FILTER','Selección avanzada por propiedades y medidas'],['REGEN','RE','Redibujar la vista'],
  ['ZOOM','Z','Z Enter · - aleja · + acerca · E extensión · P anterior · 2x factor · W ventana'],['ZOOMEXTENTS','ZE','Encuadrar todo el dibujo'],['ZOOMPREVIOUS','ZP','Volver a la vista anterior'],['POLAR','F10','Toggle polar angular tracking'],['TIJERA','TS','Remove line portion between two clicks'],['LINE','L','Draw sequential line segments'],['PLINE','PL / POL','Connected editable polyline'],
  ['POLYGON','PG','Regular polygon'],['RECTANGLE','REC','Rectangle'],['CIRCLE','C','Center and radius'],
  ['ARC','A','Center and arc endpoints'],['ELLIPSE','EL','Ellipse'],['HATCH','H / SB / SOM','Relleno: H siempre activa HATCH; idioma ES o EN'],
@@ -6625,7 +6707,7 @@ function cadDispatchImmediate(upper){
  if(['BREAKATPOINT','PARTIRENPUNTO','BAP'].includes(upper))return setTool('breakAtPoint');
  if(['ALIGN','ALINEAR','ALN'].includes(upper))return setTool('align2p');
  if(['LIST','LISTAR','LI'].includes(upper))return cadListEntities();
- if(['QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
+ if(['FILTER','FILTRO','QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
  if(['REGEN','REGENALL','REGENERAR','RE'].includes(upper)){schedule();return toast('REGEN: vista regenerada')}
  if(['DWGCOMPARE','COMPARE','COMPARARPLANOS'].includes(upper))return cadComparePicker();
  if(['LAYERSTATE','LAYERSTATES','LAYSTATE','ESTADOSCAPAS'].includes(upper))return cadLayerStatesDialog();
