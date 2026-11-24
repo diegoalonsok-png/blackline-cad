@@ -7870,7 +7870,7 @@ function cadParseDXFWorker(text,style){
   const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
   const cancel=()=>finish(Error('Importación cancelada; dibujo anterior conservado'));
   if(cadDxfActiveJob)cadDxfActiveJob();
-  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-worker-v1',document.baseURI));}
+  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-memory-v1',document.baseURI));}
   catch(e){return finish(Error('No se pudo iniciar el lector DXF local: '+e.message))}
   cadDxfActiveJob=cancel;
   timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),45000);
@@ -11475,7 +11475,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
 <script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261124-worker-v1"></script>
+<script src="cad-dxf-parser.js?v=20261124-memory-v1"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261123-local-bidirectional-v4"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
