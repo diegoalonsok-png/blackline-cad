@@ -6338,6 +6338,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
  SELECCIONARSIMILARES:'SELECTSIMILAR',SELECCIONINVERSA:'SELECTINVERT'
 });
 const CAD_COMMANDS=[
+ ['AUDIT','AUDITAR','Comprobar integridad del dibujo e informar incidencias'],
  ['LAYERSTATE','ESTADOSCAPAS','Guardar y restaurar estados de capas del dibujo'],
  ['DWGCOMPARE','COMPARE / COMPARARPLANOS','Comparar versiones DWG, DXF o CADJSON sin alterar el dibujo'],
  ['PERFORMANCE','RENDIMIENTO','Diagnóstico local de tiempos de dibujo, objetos e historial'],
@@ -6513,6 +6514,91 @@ function openCadPaletteByTitle(text){
  matching.classList.remove('collapsed');matching.scrollIntoView({block:'nearest',behavior:'smooth'});
  toast('Opened '+text+' palette');
 }
+
+/* AUDIT: inspect drawing structure without expanding blocks, deleting geometry,
+   or invoking a DWG converter. Repair only an unambiguous nextId counter. */
+function cadAuditScan(doc){
+ const issues=[],counts=Object.create(null),limit=300;let total=0;
+ function report(kind,where){total++;counts[kind]=(counts[kind]||0)+1;if(issues.length<limit)issues.push(kind+' · '+where)}
+ const layers=Array.isArray(doc.layers)?doc.layers:[],entities=Array.isArray(doc.entities)?doc.entities:[],blocks=doc.blocks&&typeof doc.blocks==='object'?doc.blocks:{};
+ const layerIds=new Set(),ids=new Set(),graph=new Map(),own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+ let maxId=0,validIds=true;
+ for(const l of layers){
+  if(!l||typeof l.id!=='string'||!l.id){report('ID de capa inválido','capas');continue}
+  if(layerIds.has(l.id))report('ID de capa duplicado',l.id);
+  layerIds.add(l.id);
+ }
+ if(!layerIds.has('0'))report('Capa 0 ausente','capas');
+ if(!layerIds.has(doc.layerId))report('Capa activa inexistente',String(doc.layerId));
+ const point=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
+ const fields={line:['a','b'],rect:['a','b'],image:['a','b'],circle:['c'],arc:['c'],ellipse:['c'],text:['p'],blockRef:['p'],dimension:['a','b','p']};
+ function inspect(e,where,top,edges){
+  if(!e||typeof e!=='object'||typeof e.type!=='string'){report('Entidad inválida',where);if(top)validIds=false;return}
+  if(top){
+   if(!Number.isSafeInteger(e.id)||e.id<1){report('ID de entidad inválido',where);validIds=false}
+   else {if(ids.has(e.id)){report('ID de entidad duplicado',where);validIds=false}ids.add(e.id);maxId=Math.max(maxId,e.id)}
+  }
+  if(e.layer!=null&&!layerIds.has(e.layer))report('Referencia a capa inexistente',where);
+  for(const k of (own(fields,e.type)?fields[e.type]:[]))if(!point(e[k]))report('Coordenada inválida '+k,where);
+  if(['polyline','hatch'].includes(e.type)&&(!Array.isArray(e.pts)||e.pts.length<(e.type==='hatch'||e.closed?3:2)||e.pts.some(p=>!point(p))))report('Vértices inválidos o insuficientes',where);
+  if(['circle','arc'].includes(e.type)&&(!Number.isFinite(e.r)||e.r<=0))report('Radio inválido',where);
+  if(e.type==='ellipse'&&(!Number.isFinite(e.rx)||!Number.isFinite(e.ry)||e.rx<=0||e.ry<=0))report('Semiejes inválidos',where);
+  if(e.type==='line'&&point(e.a)&&point(e.b)&&e.a.x===e.b.x&&e.a.y===e.b.y)report('Línea de longitud cero',where);
+  if(e.type==='arc'&&(!Number.isFinite(e.a0)||!Number.isFinite(e.a1)))report('Ángulos de arco inválidos',where);
+  if(e.type==='text'&&(!Number.isFinite(e.h)||e.h<=0))report('Altura de texto inválida',where);
+  if(e.type==='blockRef'){
+   if(typeof e.blockName!=='string'||!own(blocks,e.blockName))report('Definición de bloque ausente',where);
+   else if(edges)edges.add(e.blockName);
+  }
+ }
+ entities.forEach((e,i)=>inspect(e,'Modelo #'+(e?.id??i),true,null));
+ for(const [name,b] of Object.entries(blocks)){
+  const edges=new Set();graph.set(name,edges);
+  if(!b||!Array.isArray(b.entities)){report('Definición de bloque inválida',name);continue}
+  b.entities.forEach((e,i)=>inspect(e,'Bloque '+name+' / '+i,false,edges));
+ }
+ // Iterative DFS avoids recursion overflow on deeply nested or cyclic blocks.
+ const color=new Map();
+ for(const name of graph.keys()){
+  if(color.has(name))continue;
+  color.set(name,1);const stack=[{name,it:graph.get(name).values()}];
+  while(stack.length){
+   const frame=stack[stack.length-1],next=frame.it.next();
+   if(next.done){color.set(frame.name,2);stack.pop();continue}
+   const child=next.value;
+   if(color.get(child)===1){report('Referencia circular de bloque',frame.name+' → '+child);continue}
+   if(!color.has(child)&&graph.has(child)){color.set(child,1);stack.push({name:child,it:graph.get(child).values()})}
+  }
+ }
+ const counterBad=!Number.isSafeInteger(doc.nextId)||doc.nextId<=maxId||doc.nextId<1;
+ if(counterBad)report('Contador nextId inválido','próximo ID '+String(doc.nextId)+' · máximo '+maxId);
+ const nextId=counterBad&&validIds&&Number.isSafeInteger(maxId+1)?maxId+1:null;
+ return {total,counts,issues,nextId,entities:entities.length,layers:layers.length,blocks:graph.size};
+}
+function cadAuditDrawing(){
+ const initial=cadAuditScan(state);
+ $('cadAuditResult')?.remove();
+ const box=document.createElement('section');box.id='cadAuditResult';box.className='modal-backdrop show';
+ box.innerHTML='<div class="modal" style="max-width:680px"><div class="modal-head"><h2>AUDIT · Integridad del dibujo</h2><button type="button" class="btn" data-close>×</button></div><p data-summary></p><pre style="white-space:pre-wrap;max-height:45vh;overflow:auto;font-size:12px"></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-report>Descargar informe</button><button type="button" class="btn" data-repair>Corregir contador de IDs</button><button type="button" class="btn" data-close>Cerrar</button></div><p>Las geometrías, capas y bloques no se eliminan automáticamente.</p></div>';
+ let reportText='';
+ function render(result){
+  const summary=result.entities+' objetos · '+result.layers+' capas · '+result.blocks+' bloques · '+result.total+' incidencias';
+  reportText='AUDIT · '+state.file+'\n'+summary+'\n\n'+Object.entries(result.counts).map(([k,n])=>k+': '+n).join('\n')+'\n\n'+result.issues.join('\n')+(result.total>result.issues.length?'\nDetalle limitado a las primeras '+result.issues.length+' incidencias.':'');
+  box.querySelector('[data-summary]').textContent=summary;
+  box.querySelector('pre').textContent=result.total?reportText:'No se detectaron incidencias en las comprobaciones realizadas.';
+  box.querySelector('[data-repair]').disabled=result.nextId===null;
+ }
+ box.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>box.remove());
+ box.onclick=e=>{if(e.target===box)box.remove()};
+ box.querySelector('[data-report]').onclick=()=>download('AUDIT-informe.txt',reportText,'text/plain;charset=utf-8');
+ box.querySelector('[data-repair]').onclick=()=>{
+  const now=cadAuditScan(state);if(now.nextId===null){render(now);return}
+  if(!window.confirm('Corregir únicamente el contador de IDs a '+now.nextId+'?'))return;
+  saveHistory();state.nextId=now.nextId;queueLocalBackup();render(cadAuditScan(state));log('AUDIT · contador corregido');
+ };
+ render(initial);document.body.append(box);log('AUDIT · '+initial.total+' incidencias');
+}
+
 function purgeUnusedCadLayers(){
  const references=new Set(state.entities.map(e=>e.layer));
  for(const block of Object.values(state.blocks))for(const e of block.entities)references.add(e.layer);
@@ -6624,6 +6710,7 @@ function cadDispatchImmediate(upper){
  if(upper==='ARRAYPOLAR'||upper==='MATRIZPOLAR')return cadPolarArray();
  if(['BREAKATPOINT','PARTIRENPUNTO','BAP'].includes(upper))return setTool('breakAtPoint');
  if(['ALIGN','ALINEAR','ALN'].includes(upper))return setTool('align2p');
+ if(['AUDIT','AUDITAR','AUDITORIA'].includes(upper))return cadAuditDrawing();
  if(['LIST','LISTAR','LI'].includes(upper))return cadListEntities();
  if(['QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
  if(['REGEN','REGENALL','REGENERAR','RE'].includes(upper)){schedule();return toast('REGEN: vista regenerada')}
