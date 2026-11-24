@@ -9074,6 +9074,22 @@ function updateDynamicReadout(e){
 /* MASSPROP / LIST 3D — read-only geometric quantities, in model metres.
    Analytic primitives and validated simple prisms; architectural gross/net
    quantities are separated from solid totals because mitres may change them. */
+function cad3dMeshMass(t){
+ const q=cad3dMeshTopology(t);
+ if(q.invalid||q.degenerate||q.nonManifold||q.orientation||q.open)return null;
+ const o=t.slice(0,3),moment=[0,0,0];let signed=0,surface=0;
+ for(let i=0;i<t.length;i+=9){
+  const a=t.slice(i,i+3).map((v,j)=>v-o[j]),b=t.slice(i+3,i+6).map((v,j)=>v-o[j]),c=t.slice(i+6,i+9).map((v,j)=>v-o[j]);
+  const u=b.map((v,j)=>v-a[j]),v=c.map((v,j)=>v-a[j]);
+  const cross=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+  surface+=Math.hypot(...cross)/2;
+  const dv=(a[0]*cross[0]+a[1]*cross[1]+a[2]*cross[2])/6;
+  signed+=dv;for(let j=0;j<3;j++)moment[j]+=dv*(a[j]+b[j]+c[j])/4;
+ }
+ if(!Number.isFinite(signed)||Math.abs(signed)<1e-9||!Number.isFinite(surface)||surface<=0)return null;
+ const center=moment.map((v,j)=>v/signed+o[j]);
+ return center.every(Number.isFinite)?{volume:Math.abs(signed),surface,center}:null;
+}
 function cad3dMassProperties(r){
  const positive=(...v)=>v.every(x=>Number.isFinite(x)&&x>0);
  const validPosition=[r.x??0,r.y??0,r.z??0,r.rot??0].every(Number.isFinite);
@@ -9089,6 +9105,10 @@ function cad3dMassProperties(r){
   volume=Math.PI*R**2*h;surface=2*Math.PI*R*(R+h);center[2]=h/2;
  }else if(r.type==='cone'&&positive(R,h)){
   volume=Math.PI*R**2*h/3;surface=Math.PI*R*(R+Math.hypot(R,h));center[2]=h/4;
+ }else if(r.type==='boolean'){
+  const mesh=cad3dMeshMass(r.triangles);
+  if(!mesh)return unsupported('Malla sin cierre verificable por aristas; consultá CHECK3D (posibles uniones en T)');
+  volume=mesh.volume;surface=mesh.surface;center=mesh.center;reason='Magnitudes de malla triangulada; no certifica ausencia de autointersecciones.';
  }else if(r.type==='profile2d'&&r.profileClosed&&positive(r.extrudedHeight)&&cad3dProfileSimple(r.profilePoints)){
   const p=r.profilePoints;let cross=0,cx=0,cy=0,perimeter=0;
   for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],v=a[0]*b[1]-b[0]*a[1];cross+=v;cx+=(a[0]+b[0])*v;cy+=(a[1]+b[1])*v;perimeter+=Math.hypot(b[0]-a[0],b[1]-a[1])}
