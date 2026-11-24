@@ -2523,7 +2523,16 @@ function buildCAD3DBlock(record,group){
 
 /* CAD3D_PROFILE_DRAW_V1: native 2D profiles drawn on the XY workplane. */
 var cad3dDraftProfile=[];
-function cad3dIsRectangle(kind){return kind==='rectangle'||kind==='slab'||kind==='floor';}
+var cad3dRoundRectRadius=.20;
+function cad3dCurvedRectangle(kind,a,b,radius){
+ var x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y),w=x1-x0,d=y1-y0;
+ if(w<.01||d<.01)return null;
+ if(kind==='ellipse'){var cx=(x0+x1)/2,cy=(y0+y1)/2;return Array.from({length:96},(_,i)=>{var t=i*Math.PI/48;return [cx+w/2*Math.cos(t),cy+d/2*Math.sin(t)];});}
+ var rad=clamp(finite(radius,.2),.001,Math.min(w,d)/2),pts=[];
+ [[x1-rad,y1-rad,0],[x0+rad,y1-rad,90],[x0+rad,y0+rad,180],[x1-rad,y0+rad,270]].forEach(function(c){for(var j=0;j<=16;j++){var t=(c[2]+90*j/16)*Math.PI/180,p=[c[0]+rad*Math.cos(t),c[1]+rad*Math.sin(t)];if(!pts.length||Math.hypot(p[0]-pts[pts.length-1][0],p[1]-pts[pts.length-1][1])>1e-7)pts.push(p);}});
+ if(pts.length>3&&Math.hypot(pts[0][0]-pts[pts.length-1][0],pts[0][1]-pts[pts.length-1][1])<1e-7)pts.pop();return pts;
+}
+function cad3dIsRectangle(kind){return ['rectangle','ellipse','roundrect','slab','floor'].includes(kind);}
 function cad3dRectangleCorners(a,b){
  return [[a.x,a.y],[b.x,a.y],[b.x,b.y],[a.x,b.y]];
 }
@@ -2576,7 +2585,7 @@ function cad3dUpdateDraftPreview(point){
  }
  var kind=placing,rectangular=cad3dIsRectangle(kind);
  var points=rectangular&&firstPoint?[[firstPoint.x,firstPoint.y]]:cad3dDraftProfile;
- if(!['line','polyline','rectangle','circle','arc','slab','floor'].includes(kind)||!points.length){
+ if(!['line','polyline','rectangle','ellipse','roundrect','circle','arc','slab','floor'].includes(kind)||!points.length){
   overlay.replaceChildren();overlay.style.display='none';return;
  }
  var w=view.clientWidth,h=view.clientHeight;
@@ -2592,7 +2601,8 @@ function cad3dUpdateDraftPreview(point){
  }
  var shape=pts;
  if(rectangular){
-  shape=cad3dRectangleCorners(firstPoint,point);
+  shape=(kind==='ellipse'||kind==='roundrect')?cad3dCurvedRectangle(kind,firstPoint,point,cad3dRoundRectRadius):cad3dRectangleCorners(firstPoint,point);
+  if(!shape)shape=cad3dRectangleCorners(firstPoint,point);
  }else if(kind==='circle'){
   var a=pts[0],b=pts[pts.length-1],r=Math.hypot(a[0]-b[0],a[1]-b[1]);
   shape=Array.from({length:65},(_,i)=>[a[0]+r*Math.cos(i*Math.PI/32),a[1]+r*Math.sin(i*Math.PI/32)]);
@@ -2603,7 +2613,7 @@ function cad3dUpdateDraftPreview(point){
  var dimensionLabels='';
  if(rectangular){
   path+=' Z';
-  var p0=projected(shape[0]),p1=projected(shape[1]),p2=projected(shape[2]);
+  var corners=cad3dRectangleCorners(firstPoint,point),p0=projected(corners[0]),p1=projected(corners[1]),p2=projected(corners[2]);
   var width=Math.abs(point.x-firstPoint.x),depth=Math.abs(point.y-firstPoint.y);
   dimensionLabels='<text class="cad3dPlateDimension" x="'+((p0.x+p1.x)/2).toFixed(1)+'" y="'+((p0.y+p1.y)/2-10).toFixed(1)+'" text-anchor="middle">'+width.toFixed(2)+' m</text>'+
    '<text class="cad3dPlateDimension" x="'+((p1.x+p2.x)/2+10).toFixed(1)+'" y="'+((p1.y+p2.y)/2).toFixed(1)+'">'+depth.toFixed(2)+' m</text>';
@@ -2632,7 +2642,7 @@ function cad3dDrawProfilePoint(pt){
  var start=cad3dDraftProfile[0],points,closed=true;
  if(kind==='circle'){
   var radius=Math.hypot(p[0]-start[0],p[1]-start[1]);if(radius<.01)return;
-  points=Array.from({length:64},(_,i)=>[start[0]+radius*Math.cos(i*Math.PI/32),start[1]+radius*Math.sin(i*Math.PI/32)]);
+  points=Array.from({length:96},(_,i)=>[start[0]+radius*Math.cos(i*Math.PI/48),start[1]+radius*Math.sin(i*Math.PI/48)]);
  }else if(kind==='arc'){
   points=cad3dThreePointArc(start,cad3dDraftProfile[1],p);closed=false;
   if(!points){text('Los tres puntos del arco no pueden ser colineales');return;}
@@ -4876,7 +4886,7 @@ function setPlacement(which){
  }
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
- if(which&&['line','polyline','rectangle','circle','arc','wall','slab','floor','dist','stair','railing'].includes(which)){
+ if(which&&['line','polyline','rectangle','ellipse','roundrect','circle','arc','wall','slab','floor','dist','stair','railing'].includes(which)){
   cad3dNavigationTool='select';cad3dSyncCompactBars();
  }
  cad3dUpdateDraftPreview();
@@ -4897,6 +4907,8 @@ function setPlacement(which){
   stair:'Escalera: elegí inicio y dirección / desarrollo de tramos · editá forma, escalones y barandas en Propiedades',
   railing:'Baranda recta: elegí inicio y final del recorrido · editá altura y estilo en Propiedades',
   rectangle:'Rectángulo · marcá dos esquinas opuestas o arrastrá de una a otra',
+  ellipse:'Elipse · indicá las esquinas opuestas de su rectángulo envolvente',
+  roundrect:'Rectángulo redondeado · dos esquinas · radio '+cad3dRoundRectRadius+' m · comando RADIO valor para ajustarlo',
   slab:'Losa rectangular · marcá dos esquinas opuestas o arrastrá de una a otra',
   floor:'Piso rectangular · marcá dos esquinas opuestas o arrastrá de una a otra',
   door:'Puertas continuas: clic sobre cada muro · Enter o Esc termina',
@@ -6019,6 +6031,10 @@ function placePoint(pt){
    w:Math.hypot(dx,dy),rot:Math.atan2(dy,dx)*180/Math.PI,z:0});
  }else if(cad3dIsRectangle(kind)){
   var corners=cad3dRectangleCorners(firstPoint,pt),w=Math.abs(pt.x-firstPoint.x),d=Math.abs(pt.y-firstPoint.y);
+  if(kind==='ellipse'||kind==='roundrect'){
+   var profile=cad3dCurvedRectangle(kind,firstPoint,pt,cad3dRoundRectRadius);if(!profile)return text('Indicá largo y ancho de al menos 1 cm');
+   cad3dProfileRecord(profile,true,kind==='ellipse'?'Ellipse':'Rounded rectangle');setPlacement(null);text('Perfil cerrado creado · listo para EXTRUDE o LOSACORTE');return;
+  }
   if(kind==='rectangle'){
    if(w<1e-6||d<1e-6)return text('Rectángulo · elegí una esquina con largo y ancho');
    cad3dProfileRecord(corners,true,kind);setPlacement(null);text('Rectángulo creado');return;
@@ -8563,6 +8579,8 @@ function updateDynamicReadout(e){
 }
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
+ var radiusCommand=raw.match(/^(?:RADIO|RADIUS|RRECT|RECTREDONDEADO)\s+(\d+(?:[.,]\d+)?|[.,]\d+)$/i);
+ if(radiusCommand){var radius=Number(radiusCommand[1].replace(',','.'));if(!Number.isFinite(radius)||radius<=0||radius>500)return text('Radio inválido');cad3dRoundRectRadius=radius;if(/^(RRECT|RECTREDONDEADO)/i.test(raw))action('roundrect');else text('Radio de esquinas: '+radius+' m');return;}
  if(cad3dViewAlias(raw))return;
  if(!raw){
   if(['line','polyline'].includes(placing)){cad3dFinishPolyline();return;}
@@ -8604,7 +8622,7 @@ function run3DCommand(){
   if(!Number.isFinite(distance)||distance<=0)return text('Ingresá una distancia positiva');
   placePoint({x:firstPoint.x+(len?dx/len:1)*distance,y:firstPoint.y+(len?dy/len:0)*distance,z:0});return;
  }
- var aliases={L:'line',PL:'polyline',POLI:'polyline',POLILINEA:'polyline',RECT:'rectangle',REC:'rectangle',C:'circle',CIRCULO:'circle',ARC:'arc',ARCO:'arc',MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',ESCALERA:'stair',BARANDA:'railing',PASAMANOS:'railing',SUSTRACCION:'subtract',RESTAR:'subtract',M:'materials',MV:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
+ var aliases={L:'line',PL:'polyline',POLI:'polyline',POLILINEA:'polyline',RECT:'rectangle',REC:'rectangle',EL:'ellipse',ELIPSE:'ellipse',OVALO:'ellipse',RRECT:'roundrect',RECTREDONDEADO:'roundrect',C:'circle',CIRCULO:'circle',ARC:'arc',ARCO:'arc',MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',ESCALERA:'stair',BARANDA:'railing',PASAMANOS:'railing',SUSTRACCION:'subtract',RESTAR:'subtract',M:'materials',MV:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
@@ -8620,7 +8638,7 @@ function action(a,presetId){
  if(a==='select'){cad3dMaterialPaint=false;cad3dMaterialRender();cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
- if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
+ if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','ellipse','roundrect','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
   else{
    if(['stair','railing'].includes(a)&&!cad3dStairsBetaEnabled){text('Escaleras/Barandas BETA desactivadas en la galería');return true;}
