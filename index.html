@@ -11489,8 +11489,8 @@ window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
     const l=item.id.startsWith('san-')?sanitary:item.id.startsWith('kq-')?layer(/^(kq-(heladera2?|cocina|anafe\d*|horno|lv|micro))$/.test(item.id)?'ELECTRODOMESTICOS':'COCINAS','#e6ab78'):furniture;
     const built=lib.build(item.id),bb=lib.bounds(built.entities);
     if(![bb.minX,bb.minY,bb.maxX,bb.maxY].every(Number.isFinite))throw Error('Bloque inválido');
-    const name='ARCHGEN · '+item.id+' · m';
-    if(!state.blocks[name])state.blocks[name]={name,entities:normalizeBlockEntities(built.entities.map(e=>({...e,layer:l}))),dynamicActions:true};
+    const name='ARCHGEN · '+item.id+' · m · fijo';
+    if(!state.blocks[name])state.blocks[name]={name,entities:normalizeBlockEntities(built.entities.map(e=>({...e,layer:l}))),dynamic2d:false,dynamicActions:false};
     const ang=item.rotation||0,rad=ang*Math.PI/180,c=Math.cos(rad),sn=Math.sin(rad);
     const corners=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([a,b])=>[a*c-b*sn,a*sn+b*c]);
     const minX=Math.min(...corners.map(v=>v[0])),minY=Math.min(...corners.map(v=>v[1])),bw=Math.max(...corners.map(v=>v[0]))-minX,bd=Math.max(...corners.map(v=>v[1]))-minY;
