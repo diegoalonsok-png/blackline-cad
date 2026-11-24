@@ -63,7 +63,12 @@ function interpret(raw){
  if(/\b(?:pasillo|corredor|corridor|balcon|balcony|vestidor|walk-in closet|escalera|stairs|planta alta|second floor)\b/.test(s))throw Error('La geometría solicitada incluye elementos aún no soportados.');
  const qty=t=>t?(/^\d+$/.test(t.t)?+t.t:numberWords[t.t]):undefined;
  const at=tokens.indexOf(first),alt=tokens.find(x=>x.k==='alternative'),alternatives=alt?(qty(tokens[tokens.indexOf(alt)-1])||1):1;
- let count=qty(tokens[at-1])||1;if(alt)count=1;
+ const row=tokens.some(t=>t.k==='row');
+ const after=first&&s.slice(first.end).match(/^\s*:\s*(\d+)\b/);
+ const beforeRow=tokens.findIndex(t=>t.k==='row');
+ const explicit=qty(tokens[at-1])??(after?+after[1]:undefined)??(beforeRow>=0?qty(tokens[beforeRow-1]):undefined);
+ const assumedCount=explicit===undefined&&row&&!alt;
+ let count=explicit??(assumedCount?3:1);if(alt)count=1;
  if(count>1&&!tokens.some(t=>t.k==='row'))throw Error('Indicá cómo se relacionan los ambientes: contiguos o alternativas.');
  if(suite&&count>1&&!tokens.some(t=>t.k==='private'))throw Error('Indicá si cada habitación tiene su propio baño.');
  if(suite&&/\b(?:compartid[oa]s?|shared|comun)\b/.test(s))throw Error('Baño compartido: requiere una distribución conectada todavía no implementada.');
@@ -71,6 +76,7 @@ function interpret(raw){
  if(/\b(?:accesibles?|adaptad[oa]s?|sillas? de ruedas|wheelchair|discapacitados?)\b/.test(s))throw Error('Accesibilidad: falta implementar y verificar las áreas de maniobra y transferencia.');
  if(/\b(?:cocina en [ul]|kitchen in [ul]|integrada? (?:al|a la)|doble lavabo|doble bacha|doble lavatorio)\b/.test(s))throw Error('Esta configuración específica todavía no está soportada.');
  const assumptions=[],main=suite?s.slice(0,bath.i):s;
+ if(assumedCount)assumptions.push('Cantidad no indicada: 3 ambientes en tándem como propuesta inicial.');
  let size=dimensions(main);
  if(!size){
   const named=(labels)=>{const m=main.match(new RegExp('(?:'+labels+')\\s*(?:de|:|=)?\\s*'+N+'\\s*'+U,'i'))||main.match(new RegExp(N+'\\s*'+U+'\\s*(?:de\\s+)?(?:'+labels+')\\b','i'));return m?num(m[1])*unitScale(m[2]):null};
