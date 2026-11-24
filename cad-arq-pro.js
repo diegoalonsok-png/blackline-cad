@@ -238,24 +238,44 @@ function parseArqRequest(raw){
  const s=String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim().replace(/^cad2d3d[,:\s]+/,'');
  if(!/^(?:mostra(?:me|r)?|muestra(?:me)?|mostrar|ver|lista(?:me|r|do)?|show(?: me)?|list|construi(?:me|r)?|construye(?:me)?|crea(?:me|r)?|genera(?:me|r)?|disena(?:me|r)?|build|create|generate|design)\b/.test(s))return null;
  const generate=/^(?:construi|construye|crea|genera|disena|build|create|generate|design)/.test(s);
- const room=/\b(?:habitacion(?:es)?|dormitorio(?:s)?|hotel(?:es)?|bedroom(?:s)?|room(?:s)?|tandem|vestidor(?:es)?)\b/.test(s);
+ const wardrobe=/\b(?:vestidor(?:es)?|walk-in(?: closet)?|closet(?:s)?)\b/.test(s);
+ const suite=/\b(?:suite|ensuite|en-suite)\b/.test(s);
+ const room=/\b(?:habitacion(?:es)?|dormitorio(?:s)?|hotel(?:es)?|bedroom(?:s)?|room(?:s)?|tandem)\b/.test(s)||suite;
  
  const bath=/\b(?:bano(?:s)?|bathroom(?:s)?|toilette(?:s)?)\b/.test(s);
  const kitchen=/\b(?:cocina(?:s)?|kitchen(?:s)?)\b/.test(s);
- if(!room&&bath===kitchen)return {kind:'unsupported'};
- const category=room?'Habitaciones completas':bath?'Baños completos':'Cocinas completas';
+ if(!room&&!wardrobe&&bath===kitchen)return {kind:'unsupported'};
+ const category=room?'Habitaciones completas':wardrobe?'Vestidores completos':bath?'Baños completos':'Cocinas completas';
  const match=s.match(/(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\b/);
  const unit=(n,u)=>Number(n.replace(',','.'))/({cm:100,mm:1000,m:1}[u]||1);
  const dims=match?[unit(match[1],match[2]||match[4]),unit(match[3],match[4]||match[2])]:null;
  if(dims&&dims.some(n=>!Number.isFinite(n)||n<=0||n>30))return {kind:'invalid'};
+ if(wardrobe&&!room&&!bath&&!kitchen){
+  const filters=[];
+  if(/\b(?:en l|l-shaped)\b/.test(s))filters.push(/en l\b/);
+  if(/\b(?:en u|u-shaped)\b/.test(s))filters.push(/en u\b/);
+  if(/\b(?:paralelo|parallel)\b/.test(s))filters.push(/paralelo/);
+  if(/\b(?:lineal|linear)\b/.test(s))filters.push(/lineal/);
+  return {kind:'catalog',category:'Vestidores completos',dims,count:null,filters};
+ }
  if(room){
-  if(/\b(?:vestidor(?:es)?|walk-in|closet|accesible|accessible|sin pasillo|without corridor|cocina|kitchen|bano compartido|shared bathroom)\b/.test(s))return {kind:'unsupported'};
+  if(/\b(?:accesible|accessible|sin pasillo|without corridor|cocina|kitchen|bano compartido|shared bathroom)\b/.test(s))return {kind:'unsupported'};
   const words={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
   const q=s.match(/\b(\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(?:hotel\s+)?(?:habitacion(?:es)?|dormitorio(?:s)?|bedroom(?:s)?|room(?:s)?)\b/);
   const n=q?(words[q[1]]??Number(q[1])):1;
   if(!Number.isInteger(n)||n<1||n>12)return {kind:'invalid'};
   const noBath=/\b(?:sin bano|without (?:a )?bathroom|no bathroom)\b/.test(s);
   const privateBath=noBath?false:bath||/\b(?:suite|ensuite|en-suite|hotel|private bath)\b/.test(s)?true:null;
+  if(wardrobe){
+   if(n!==1||/\b(?:tandem|hotel|sin bano|without (?:a )?bathroom)\b/.test(s))return {kind:'unsupported'};
+   const filters=[];
+   if(/\bking\b/.test(s))filters.push(/king/);
+   if(/\bqueen\b/.test(s))filters.push(/queen/);
+   if(/\b(?:matrimonial|double)\b/.test(s))filters.push(/double/);
+   if(/\b(?:en l|l-shaped)\b/.test(s))filters.push(/en l\b/);
+   if(/\b(?:paralelo|parallel)\b/.test(s))filters.push(/paralelo/);
+   return {kind:'catalog',category:'Dormitorios en suite',dims,count:null,filters};
+  }
   const moduleDims=dims||[4,6];
   return {kind:'rooms',category,n,privateBath,dims:[moduleDims[0]*n,moduleDims[1]+1.5],moduleDims};
  }
