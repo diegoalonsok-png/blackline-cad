@@ -381,7 +381,7 @@ one('dor-cuna','Cuna',DOR,.70,1.30,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<8;i++
 function tandemRooms(b,W,D,n,side,privateBath){
  const t=.15,c=1.50,p=W/n,top=D-t,base=c+t,door=.90;
  const seg=(x,y,X,Y)=>{if(Math.hypot(X-x,Y-y)>1e-8)b.line(x,y,X,Y,{width:.22})};
- const pair=(x,y,X,Y)=>{seg(x,y,X,Y)};
+ 
  // Open common corridor at both ends; wall along outer corridor edge.
  seg(0,0,W,0);seg(0,.15,W,.15);
  seg(0,D,W,D);seg(t,top,W-t,top);
@@ -410,7 +410,7 @@ function tandemRooms(b,W,D,n,side,privateBath){
    const x0=side==='left'?bx+.15:bx+.80,x1=x0+.75,y=by+bd;
    for(const yy of [y,y+t]){seg(bx,yy,x0,yy);seg(x1,yy,bx+bw,yy)}
    seg(x0,y,x0,y+t);seg(x1,y,x1,y+t);
-   b.line(x1,y+.06,x1+.60<=bx+bw?x1+.60:x0-.60,y+.06);
+   if(x1+.60<=bx+bw)b.line(x1,y+.06,x1+.60,y+.06);else b.line(x0,y+.06,x0-.60,y+.06);
    b.at(bx+.12,by+.10,0,q=>F.ducha(q,.85,.85,false));
    b.at(bx+1.28,by+.10,0,q=>F.wc(q));
    b.at(bx+.08,by+1.38,0,q=>F.lavatorio(q,.55,.43));
@@ -427,7 +427,7 @@ const ROOMS='Habitaciones completas';
 for(let n=1;n<=12;n++)for(const privateBath of [true,false])for(const side of ['left','right']){
  const kind=privateBath?'suite':'simple';
  const id='arq-room-'+kind+'-'+n+'-'+side;
- def({id,name:(n===1?'Habitación':n+' habitaciones en tándem')+(privateBath?' · baño individual':' · sin baño')+' · '+(side==='left'?'izquierda':'derecha'),cat:ROOMS,family:'arq-room-'+kind+'-'+n,w:n*4,d:7.50,wMin:n*3.8,wMax:n*6,dMin:7.0,dMax:11.5,roomCount:n,privateBath,roomSide:side,
+ def({id,name:(n===1?'Habitación':n+' habitaciones en tándem')+(privateBath?' · baño individual':' · sin baño')+' · '+(side==='left'?'izquierda':'derecha'),cat:ROOMS,family:'arq-room-'+kind+'-'+n,w:n*4,d:7.50,wMin:n*3.8,wMax:n*6,dMin:6.5,dMax:11.5,roomCount:n,privateBath,roomSide:side,
  gen(b,W,D){tandemRooms(b,W,D,n,side,privateBath)}});
 }
 
