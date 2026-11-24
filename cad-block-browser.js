@@ -204,9 +204,28 @@
   return !v.cats||v.cats(it.cat)};
  const groupOf=it=>VIEWS[st.view]?.family?modeOf(it):familyOf(it);
  const cm=v=>Math.round(v*100);
+ const blockTerms=[
+ ['inodoro toilet toilets inodoros wc retrete retretes',/\b(?:inodoros?|toilets?|wc|retretes?|water closet)\b/],
+ ['bidet bidets bidé bidés',/\b(?:bidet|bide)s?\b/],
+ ['lavabo lavatorio bacha sink washbasin',/\b(?:lavabos?|lavatorios?|bachas?|sinks?|washbasins?|vanitory)\b/],
+ ['ducha shower showers duchas',/\b(?:duchas?|showers?)\b/],
+ ['bañadera bañera bathtub bathtubs banadera banera',/\b(?:banaderas?|baneras?|bathtubs?)\b/],
+ ['puerta puertas door doors',/\b(?:puertas?|doors?)\b/],
+ ['ventana ventanas window windows',/\b(?:ventanas?|ventanales?|windows?)\b/],
+ ['escalera escaleras stair stairs staircase',/\b(?:escaleras?|stairs?|staircases?)\b/],
+ ['heladera refrigerador fridge refrigerator',/\b(?:heladeras?|refrigeradores?|fridges?|refrigerators?)\b/],
+ ['silla sillas chair chairs',/\b(?:sillas?|chairs?)\b/],
+ ['mesa mesas table tables',/\b(?:mesas?|tables?)\b/],
+ ['cama camas bed beds',/\b(?:camas?|beds?)\b/],
+ ['sofa sofá sillon sillón couch',/\b(?:sofas?|sillones?|sillon|couches?|couch)\b/],
+ ['auto autos car cars coche coches',/\b(?:autos?|automoviles?|automovil|cars?|coches?)\b/],
+ ['arbol árbol tree trees arboles árboles',/\b(?:arbol(?:es)?|trees?)\b/]
+ ];
+ const normalizeTerm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+ const termIndex=new Map(blockTerms.flatMap(([keys,re])=>keys.split(' ').map(k=>[normalizeTerm(k),re])));
  function filtered(pool=items().filter(inView)){
-  const q=st.q.trim().toLowerCase();
-  return pool.filter(it=>(!st.cat||groupOf(it)===st.cat)&&(!q||(it.name+' '+tr(it.name)+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)+' '+it.id).toLowerCase().includes(q)));
+  const q=normalizeTerm(st.q),syn=termIndex.get(q);
+  return pool.filter(it=>{if(st.cat&&groupOf(it)!==st.cat)return false;if(!q)return true;const name=normalizeTerm(it.name+' '+tr(it.name)+' '+it.id);return syn?syn.test(name):normalizeTerm(name+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)).includes(q)});
  }
  // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
  function simpleBlockNames(){
@@ -360,9 +379,11 @@
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
+ function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;paint()}
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
+  for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
   for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
   for(const k of ['VISTASRECUPERADAS','VISTASBLOQUES'])EXT.commands[k]=openRecovered;
