@@ -11487,9 +11487,9 @@ window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
    for(const item of m.items){
     const sourceId=item.sourceId||item.id,meta=lib.library.find(v=>v.id===sourceId);if(!meta||meta.pro||meta.paidOnly)throw Error('Componente libre no disponible: '+sourceId);
     const l=item.id.startsWith('san-')?sanitary:item.id.startsWith('kq-')?layer(/^(kq-(heladera2?|cocina|anafe\d*|horno|lv|micro))$/.test(item.id)?'ELECTRODOMESTICOS':'COCINAS','#e6ab78'):furniture;
-    const built=lib.build(sourceId),bb=lib.bounds(built.entities);
+    const built=window.CAD2D_ARCHGEN.fixtureGeometry(sourceId,lib),bb=lib.bounds(built.entities);
     if(![bb.minX,bb.minY,bb.maxX,bb.maxY].every(Number.isFinite))throw Error('Bloque inválido');
-    const name='ARCHGEN · '+sourceId+' · m · fijo';
+    const name='ARCHGEN · '+sourceId+' · m · fijo limpio';
     if(!state.blocks[name])state.blocks[name]={name,entities:normalizeBlockEntities(built.entities.map(e=>({...e,layer:l}))),dynamic2d:false,dynamicActions:false};
     const ang=item.rotation||0,rad=ang*Math.PI/180,c=Math.cos(rad),sn=Math.sin(rad);
     const corners=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([a,b])=>[a*c-b*sn,a*sn+b*c]);
@@ -11764,7 +11764,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-local-vector-packs.js?v=20261123-selection-v1"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script src="cad-archgen.js?v=20261124-quality-v4"></script>
+<script src="cad-archgen.js?v=20261124-quality-v5"></script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
 <script defer src="cad3d-lab.js?v=20261124-massprop-interfere-v1"></script>
 </body></html>
