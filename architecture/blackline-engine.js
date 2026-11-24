@@ -5,7 +5,7 @@
 'use strict';
 const C=Object.freeze({
  toilet:['san-wc',.40,.70],bidet:['san-bidet',.38,.58],basin:['san-lav',.60,.48],
- shower:['san-ducha',.90,.90],bathtub:['san-banera',1.70,.75],
+ shower:['san-ducha',.90,.90],bathtub:['san-banera',1.70,.75],bathtub150:['san-banera',1.50,.75],
  bed:['dor-queen',2.60,2],wardrobe:['mob-placard',1.80,.62],
  singlebed:['dor-cama1',1.40,2],doublebed:['dor-cama2',2.40,1.90],kingbed:['dor-king',3,2],
  sink:['kq-bacha',.80,.60],range:['kq-cocina',.60,.62],fridge:['kq-heladera',.70,.70],
@@ -125,6 +125,12 @@ if(neg(t))out.delete(t.k);else out.add(t.k)}
   return [...out];
  };
  spec.fixtures=selected(base,[0,main.length]);
+ if(base==='bathroom'&&spec.fixtures.includes('bathtub')){
+  const requested=main.match(/\b(?:banadera|banera)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:m\b|metros?\b)?/);
+  if(requested){const length=num(requested[1]);if(Math.abs(length-1.5)<1e-6){spec.fixtures=spec.fixtures.map(k=>k==='bathtub'?'bathtub150':k);assumptions.push('Bañadera de catálogo regenerada a 1,50 × 0,75 m.');}else if(Math.abs(length-1.7)>1e-6)throw Error('Medida de bañadera aún no disponible en este generador: '+length);}
+ }
+ if(base==='bathroom'&&!tokens.some(t=>t.k==='window')&&spec.width<1.5){spec.window=Math.min(.6,spec.width-.3);assumptions.push('Ventana inicial ajustada al ancho del baño: '+spec.window+' m.');}
+ if(base==='bathroom'&&!tokens.some(t=>t.k==='door')&&spec.width<1.2){spec.door=.65;assumptions.push('Puerta preliminar de 0,65 m: verificar ancho libre y normativa.');}
  if(closet){const next=rooms.find(r=>r.i>closet.i),cs=dimensions(s.slice(closet.end,next?.i??s.length));if(cs&&Math.abs(cs[0]-spec.width)>1e-6)throw Error('Vestidor de paso: el ancho debe coincidir con el dormitorio en esta variante.');spec.closetDepth=cs?.[1]??2.4;spec.fixtures=spec.fixtures.filter(k=>k!=='wardrobe');assumptions.push('Vestidor posterior de paso: '+spec.width+' × '+spec.closetDepth+' m.');}
  if(suite){const bathEnd=rooms.find(r=>r.i>bath.i)?.i??s.length;const bs=dimensions(s.slice(bath.i,bathEnd))||[spec.width,2.4];spec.bathWidth=bs[0];spec.bathDepth=bs[1];spec.bathFixtures=selected('bathroom',[bath.i,bathEnd]);if(!dimensions(s.slice(bath.i,bathEnd)))assumptions.push('Baño: '+bs.join(' × ')+' m (inicial)')}
  return spec;
@@ -137,12 +143,12 @@ const overlap=(a,b,g=0)=>a.x<b.x+b.w+g-1e-7&&b.x<a.x+a.w+g-1e-7&&a.y<b.y+b.d+g-1
    the same collision solver. No scaling of sanitary fixtures. */
 function bathroomPattern(w,d,fixtures,seed){
  const has=k=>fixtures.includes(k);
- if(!fixtures.length||fixtures.some(k=>!['toilet','bidet','basin','shower','bathtub'].includes(k)))return null;
+ if(!fixtures.length||fixtures.some(k=>!['toilet','bidet','basin','shower','bathtub','bathtub150'].includes(k)))return null;
  const targets={};
  let id;
- if(has('bathtub')||has('shower')){
-  const wet=has('bathtub')?'bathtub':'shower',wetD=C[wet][2],wetW=C[wet][1];
-  id=wet==='bathtub'?(has('bidet')?'bano-completo':'bano-banera'):(has('bidet')?'bano-ducha-bidet':'bano-minimo');
+ if(has('bathtub')||has('bathtub150')||has('shower')){
+  const wet=has('bathtub150')?'bathtub150':has('bathtub')?'bathtub':'shower',wetD=C[wet][2],wetW=C[wet][1];
+  id=wet.startsWith('bathtub')?(has('bidet')?'bano-completo':'bano-banera'):(has('bidet')?'bano-ducha-bidet':'bano-minimo');
   targets[wet]={rot:180,x:0,y:d-wetD};
   if(has('toilet'))targets.toilet={rot:270,x:0,y:d-wetD-.12-C.toilet[1]};
   if(has('bidet'))targets.bidet={rot:270,x:0,y:d-wetD-.24-(has('toilet')?C.toilet[1]:0)-C.bidet[1]};
@@ -169,7 +175,7 @@ function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
    for(let j=0;j<=Math.ceil(edge/step);j++){
     const accessRot=['bed','singlebed','doublebed','kingbed'].includes(key)?(rot+180)%360:rot;
     const z=Math.min(edge,j*step),r=horizontal?R(z,accessRot===0?0:d-fd,fw,fd):R(accessRot===90?w-fw:0,z,fw,fd);
-    const gap=['toilet','bidet','basin','shower','bathtub'].includes(key)?(compact?.25:.60):.75;
+    const gap=['toilet','bidet','basin','shower','bathtub','bathtub150'].includes(key)?(compact?.25:.60):.75;
     // Bed catalogue headboard is local +Y; place headboard at wall (rotation 180/90).
     // Beds have their headboard at local +Y; their access direction is reversed.
     const a=accessRot===0?R(r.x,r.y,r.w,r.d+gap):accessRot===90?R(r.x-gap,r.y,r.w+gap,r.d):accessRot===180?R(r.x,r.y-gap,r.w,r.d+gap):R(r.x,r.y,r.w+gap,r.d);
@@ -196,7 +202,7 @@ function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
 function solve(spec){
  const {width:w,depth:d,wall:t,door,window:win,count:n}=spec;
  const kind=spec.kind,suite=kind==='suite_row',base=suite?'bedroom':kind;
- if(!DEFAULT[base]||![w,d,t,door,win].every(Number.isFinite)||w<1.2||d<1.2||w>20||d>20||t<.08||t>.5||(door!==0&&door<.6)||door>Math.min(1.2,w-.3)||win<0||win>w-.3||!Number.isInteger(n)||n<1||n>30)throw Error('Dimensiones o cantidad fuera del rango del motor.');
+ if(!DEFAULT[base]||![w,d,t,door,win].every(Number.isFinite)||w<(base==='bathroom'?.9:1.2)||d<1.2||w>20||d>20||t<.08||t>.5||(door!==0&&door<.6)||door>Math.min(1.2,w-.3)||win<0||win>w-.3||!Number.isInteger(n)||n<1||n>30)throw Error('Dimensiones o cantidad fuera del rango del motor.');
  const bd=suite?spec.bathDepth:0;
  if(suite&&(Math.abs(spec.bathWidth-w)>1e-6||!Number.isFinite(bd)||bd<1.5||bd>20))throw Error('Por ahora el baño privado debe tener el mismo ancho que el dormitorio.');
  const amount=spec.alternatives||1;if(!Number.isInteger(amount)||amount<1||amount>20||amount>1&&n>1)throw Error('Hasta 20 alternativas individuales o 30 ambientes contiguos.');
@@ -207,7 +213,7 @@ function solve(spec){
  const doorX=spec.doorX??(w-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>w-.03)throw Error('Posición de puerta inválida.');
  const doorZones=door?[R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay,clay;try{lay=(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...((suite||cd)?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+  let lay,blay,clay;try{lay=(spec.compactTransverse?[{key:'bathtub150',rot:180,r:R(0,d-.75,1.5,.75)},{key:'toilet',rot:90,r:R(w-.70,d-.75-.10-.40,.70,.40)},{key:'bidet',rot:90,r:R(w-.58,d-.75-.10-.40-.10-.38,.58,.38)}]:null)||(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...((suite||cd)?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
    if(cd)clay=arrange(w,cd,['wardrobe'],[R((w-bathDoor)/2,0,bathDoor,bathDoor),...(suite?[R((w-bathDoor)/2,cd-bathDoor,bathDoor,bathDoor)]:[])],seed);
    if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay,clay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
@@ -522,9 +528,18 @@ function run(raw){
  if(!error.message.includes('sin interferencias'))throw error;
  const s=normalize(text),explicit=new Set();
  for(const m of s.matchAll(/[a-z]+/g)){const k=concept(m[0]);if(C[k])explicit.add(k)}
- const requested=spec.fixtures.filter(k=>explicit.has(k));
+ const requested=spec.fixtures.filter(k=>explicit.has(k)||(k==='bathtub150'&&explicit.has('bathtub')));
  const essential=requested.length?requested:spec.fixtures;
  const attempts=[spec.fixtures,essential];
+ if(spec.kind==='bathroom'&&spec.fixtures.includes('bathtub150')&&spec.width>=1.5&&spec.depth>=2.1&&spec.door<=.8&&spec.fixtures.includes('toilet')&&spec.fixtures.includes('bidet')&&!explicit.has('basin')&&!spec.fixtures.includes('shower')){
+  // Compact transverse bathtub and two fixtures along the same wall.
+  const w=spec.width,d=spec.depth,doorX=.04;
+  const layout=[{key:'bathtub150',rot:180,r:R(0,d-.75,1.5,.75)},{key:'toilet',rot:90,r:R(w-.70,d-.75-.10-.40,.70,.40)},{key:'bidet',rot:90,r:R(w-.58,d-.75-.10-.40-.10-.38,.58,.38)}];
+  const swing=R(doorX,0,spec.door,spec.door);
+  if(layout.every(o=>inside(o.r,w,d)&&!overlap(o.r,swing,.005))&&layout.every((o,i)=>layout.slice(i+1).every(q=>!overlap(o.r,q.r,.005)))){
+   try{const p=solve({...spec,fixtures:['bathtub150','toilet','bidet'],doorX,compactTransverse:true});notes.push('Configuración compacta: bañadera transversal y sanitarios alineados; lavatorio automático omitido. Revisar holguras y acceso.');return mark(p)}catch(e){}
+  }
+ }
  const tpl=compactBathTemplate(spec);
  if(tpl){try{const p=solve({...spec,fixtures:['bathtub','toilet','bidet'],doorX:tpl.doorX,templateLayout:tpl.layout});notes.push('Modelo compacto basado en baño completo de biblioteca; lavatorio no colocado. Holguras y circulación no verificadas.');return mark(p)}catch(e){}}
  // Try the original dimensions, all requested fixtures and alternate door positions first.
@@ -534,7 +549,7 @@ function run(raw){
   for(const doorX of [(spec.width-spec.door)/2,.08,spec.width-spec.door-.08]){
    try{const omitted=spec.fixtures.filter(k=>!fixtures.includes(k));
     const missing=essential.filter(k=>!fixtures.includes(k));
-    const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',shower:'ducha'};
+    const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',bathtub150:'bañadera de 1,50 m',shower:'ducha'};
     const warning='APROXIMACIÓN: distribución preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
     const p=solve({...spec,fixtures,doorX,compact:true,assumptions:[...spec.assumptions,warning]});p.status='approximate';p.warning=[...notes,warning].join(' ');return p;
    }catch(e){}
