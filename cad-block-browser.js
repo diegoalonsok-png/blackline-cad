@@ -200,7 +200,7 @@
  const simpleName=it=>{const n=simpleBlockNames().get(it.id)||tr(it.name);return /^userdx4-/.test(it.id)?n.replace(/ · escala estimada| · parcial/g,'')+(it.importFlags&1?' · '+T('check scale','revisar escala'):'')+(it.importFlags&6?' · '+T('partial','parcial'):''):n};
  function paint(){
   if(!el)return;
-  const visual=st.view==='visual'||st.view==='olymp3';
+  const visual=st.view==='visual'||st.view==='olymp3'||st.view==='imported';
   const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
@@ -208,7 +208,7 @@
   el.classList.toggle('visual',visual);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
-  el.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===st.view));
+  el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+items().filter(it=>/^userdx4-/.test(it.id)).length;});
   const cats=[...new Set(items().filter(inView).map(groupOf))].sort((a,b)=>a.localeCompare(b,es()?'es':'en'));
   if(st.cat&&!cats.includes(st.cat))st.cat='';
   const count=c=>items().filter(i=>inView(i)&&(!c||groupOf(i)===c)).length;
@@ -290,13 +290,15 @@
  function openVisual(){st.view='visual';st.cat='';st.q='';visibleCount=12;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,openOlimpiadas,close,refresh:paint});
+ function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
   for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
   for(const k of ['VISTASRECUPERADAS','VISTASBLOQUES'])EXT.commands[k]=openRecovered;
   for(const k of ['OLIMPIADAS','OLIMPIADAS3','BLOQUESOLIMPIADAS'])EXT.commands[k]=openOlimpiadas;
+  for(const k of ['IMPORTEDBLOCKS','BLOQUESIMPORTADOS'])EXT.commands[k]=openImported;
  }
  // Botón grande en la cinta (Inicio y Arquitectura) y en la barra rápida.
  const ico='<rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="16" y="11" width="6" height="6" rx="1"/><path d="M4 21h16"/>';
