@@ -2111,6 +2111,19 @@ function cadArqWallPochePolygons(entities,visible=()=>true){
   const t=p=>(p.x-a.a.x)*ux+(p.y-a.a.y)*uy;
   if(Math.min(L,t(bb))-Math.max(0,t(ba))<=1e-8)continue;
   result.push([a.a,a.b,bb,ba]);
+  // At a segmented T, the outside face reaches the guide node but the
+  // inside face is trimmed. Fill the triangular remainder of the wall
+  // body without drawing an extra edge or modifying the opening.
+  const m=a.wall2d,eps=Math.max(1e-8,m.thickness*1e-5);
+  for(const [pa,pb,g,sign] of [[a.a,ba,m.guideA,1],[a.b,bb,m.guideB,-1]]){
+   if(!g)continue;
+   const ta=(pa.x-g.x)*ux+(pa.y-g.y)*uy,tb=(pb.x-g.x)*ux+(pb.y-g.y)*uy;
+   if(Math.abs(ta)<=eps&&tb*sign>eps&&tb*sign<=m.thickness*2){
+    result.push([pa,pb,{x:pb.x-tb*ux,y:pb.y-tb*uy}]);
+   }else if(Math.abs(tb)<=eps&&ta*sign>eps&&ta*sign<=m.thickness*2){
+    result.push([pb,pa,{x:pa.x-ta*ux,y:pa.y-ta*uy}]);
+   }
+  }
  }
  return result;
 }
