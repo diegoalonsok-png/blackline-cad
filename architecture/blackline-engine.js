@@ -448,8 +448,59 @@ function compoundPlan(spec){
  out.assumptions=[...notes];return out;
 }
 
+/* Offline multilingual architectural vocabulary, not unrestricted translation. */
+function internationalText(raw){
+ if(typeof raw!=='string'||raw.length>4000)return raw;
+ let s=normalize(raw.normalize('NFKC')).replace(/[٠-٩۰-۹]/g,x=>String('٠١٢٣٤٥٦٧٨٩'.includes(x)?'٠١٢٣٤٥٦٧٨٩'.indexOf(x):'۰۱۲۳۴۵۶۷۸۹'.indexOf(x))).replace(/٫/g,'.');
+ const groups=[
+ ['una mas de','one more of|one more|one additional|une autre de|une de|un altra di|una di|mais um de|mais uma de|ein weiteres mit|ein weiteres|eine weitere'],
+ ['bano de servicio','service bathroom|bagno di servizio|banheiro de servico|gaste wc'],
+ ['bano compartido','shared bathroom|salle de bains commune|bagno condiviso|banheiro compartilhado|gemeinschaftsbad'],
+ ['habitaciones','bedrooms|chambres|camere|quartos|schlafzimmer'],
+ ['habitacion','bedroom|chambre|camera|quarto'],
+ ['bano','bathrooms?|salles? de bains|bagno|bagni|banheiros?|badezimmer'],
+ ['cocina','kitchens?|cuisines?|cucina|cucine|cozinhas?|kuchen?'],
+ ['living','living rooms?|sala de estar|soggiorno|wohnzimmer'],
+ ['vestidor','walk-in closet|walk in closet|dressing room|cabina armadio|ankleidezimmer'],
+ ['casa','house|maison|haus'],['entrada','entrance|entry|entree|ingresso|eingang'],
+ ['lavadero','laundry room|buanderie|lavanderia|waschkuche'],['oficina','office|ufficio|buro'],
+ ['ducha','shower|douche|doccia|chuveiro|dusche'],['banadera','bathtub|baignoire|vasca da bagno|banheira|badewanne'],
+ ['inodoro','toilets?|wc|vaso sanitario'],['lavatorio','washbasin|wash basin|lavabo|waschbecken'],
+ ['bidet','bide'],['puerta','doors?|portes?|portas?|tur|turen'],['ventana','windows?|fenetres?|finestr[ae]|janelas?|fenster'],
+ ['cama doble','double bed|lit double|letto matrimoniale|cama de casal|doppelbett'],
+ ['placard','wardrobe|armoire|guarda roupa|kleiderschrank'],
+ ['tandem','in a row|side by side|cote a cote|affiancate|lado a lado|nebeneinander'],
+ ['variantes','variants|versions|alternatives|varianti|alternativen'],
+ ['sin','without|sans|senza|sem|ohne'],['con','with|avec|com|mit'],
+ ['tres','three|trois|tre|drei'],['dos','two|deux|due|dois|duas|zwei'],
+ ['cuatro','four|quatre|quattro|quatro|vier'],['cinco','five|cinq|cinque|funf'],['seis','six|sechs'],
+ ['una','one|une|eine'],['y','and|et|und'],['de','of|di'],
+ ['accesible','accessible|barrierefrei|accessibile|acessivel'],
+ ['ultima','last|derniere|letzte'],['primera','first|premiere|erste']
+ ];
+ for(const [to,from] of groups)s=s.replace(new RegExp('\\b(?:'+from+')\\b','g'),to);
+ s=s.replace(/\be\b(?=\s+(?:una|un|um|dos|tres|\d|bano|cocina|vestidor|ducha|bidet|lavatorio))/g,'y').replace(/\b(habitacion(?:es)?|bano|cocina)\s+con\s+(?=\d)/g,'$1 de ');
+ const scripts=[
+ ['habitacion','寝室|卧室|臥室|спальня|غرفة نوم|침실|शयनकक्ष'],
+ ['bano','浴室|卫生间|衛生間|ванная комната|ванная|حمام|욕실|स्नानघर'],
+ ['cocina','キッチン|台所|厨房|廚房|кухня|مطبخ|주방|रसोई'],
+ ['living','リビング|客厅|客廳|гостиная|غرفة معيشة|거실|बैठक'],
+ ['vestidor','ウォークインクローゼット|衣帽间|衣帽間|гардеробная|غرفة ملابس|드레스룸'],
+ ['banadera','浴槽|浴缸|ванна|حوض استحمام|욕조'],['ducha','シャワー|淋浴|душ|دش|샤워'],
+ ['inodoro','便器|马桶|馬桶|унитаз|مرحاض|변기'],['bidet','ビデ|坐浴盆|биде|بيديه|비데'],
+ ['lavatorio','洗面台|洗手盆|раковина|مغسلة|세면대'],['puerta','ドア|门|門|дверь|باب|문'],
+ ['ventana','窓|窗户|窗戶|окно|نافذة|창문'],
+ ['sin','なし|没有|沒有|без|بدون|없이'],['con','付き|带有|帶有|مع|포함'],
+ ['y','および|以及|和| и | و |및'],
+ ['cm','センチ|厘米|см|سم'],['m','メートル|米|метров|метра|متر|미터']
+ ];
+ for(const [to,from] of scripts)s=s.replace(new RegExp(normalize(from),'gu'),' '+to+' ');
+ return s.replace(/\s+/g,' ').trim();
+}
+
 function run(raw){
- const {text,corrections}=correctText(raw);
+ const {text,corrections}=correctText(internationalText(raw));
+ if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const compound=compoundInstruction(text);if(compound){const p=compoundPlan(compound);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
  const d=detailInstruction(text);if(d){const p=solveDetail(d);if(corrections.length)p.assumptions.push('Correcciones: '+corrections.join(', '));return p;}
  let spec,notes=[];
@@ -492,6 +543,6 @@ function run(raw){
  throw error;
  }
 }
-const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,correctText,bathroomPattern,catalog:C});
+const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,correctText,internationalText,bathroomPattern,catalog:C});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BlacklineArchitectureAI=api;
 })(typeof self!=='undefined'?self:globalThis);
