@@ -7185,6 +7185,12 @@ function cad3dRailParts(r){
   railToe:r.railToe===true,railToeHeight:n('railToeHeight',.10,.02,.30),
   railToeThickness:n('railToeThickness',.015,.003,.08)};
 }
+function cad3dRailLevel(parts,kind,index){
+ var t=parts.railTubeCount,c=parts.railCableCount;
+ if(t&&c)return (kind==='tube'?index:index+t)/(t+c+1);
+ if(kind==='tube')return t===1?.56:index/(t+1);
+ return index/(c+1);
+}
 function cad3dRailCopyParts(to,from){
  var parts=cad3dRailParts(from);
  Object.keys(parts).forEach(function(k){delete to[k];if(Object.prototype.hasOwnProperty.call(from,k))to[k]=parts[k];});
@@ -7220,8 +7226,8 @@ function cad3dRailGeometry(id,parent,spec){
  for(var i=0;i<count;i++){
   var a=topPt(i/count,h),b=topPt((i+1)/count,h);
   cad3dRailTop(parent,id,a,b,parts,color);
-  for(var j=1;j<=parts.railTubeCount;j++){var z=h*(parts.railTubeCount===1?.56:j/(parts.railTubeCount+1));cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railTubeDiameter/2,color);}
-  for(var j=1;j<=parts.railCableCount;j++){var z=h*j/(parts.railCableCount+1);cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railCableDiameter/2,color);}
+  for(var j=1;j<=parts.railTubeCount;j++){var z=h*cad3dRailLevel(parts,'tube',j);cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railTubeDiameter/2,color);}
+  for(var j=1;j<=parts.railCableCount;j++){var z=h*cad3dRailLevel(parts,'cable',j);cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railCableDiameter/2,color);}
   if(parts.railToe)cad3dRailStrip(parent,id,topPt(i/count,parts.railToeHeight/2),topPt((i+1)/count,parts.railToeHeight/2),parts.railToeThickness,parts.railToeHeight,color);
   if(style==='picket'){
    var bars=Math.max(1,Math.ceil(length/count/.105));for(var j=1;j<bars;j++){var t=(i+j/bars)/count;cad3dRailLine(parent,id,pt(t,.04),topPt(t,h),.009,color);}
@@ -7277,8 +7283,8 @@ function cad3dBuildRadialStair(r,group){
  function shifted(v,offset){var a=v.slice();a[2]-=offset;return a;}
  for(var j=1;j<rail.length;j++){
   cad3dRailTop(group,r.id,rail[j-1],rail[j],parts,col);
-  for(var k=1;k<=parts.railTubeCount;k++){var offset=rh*(1-(parts.railTubeCount===1?.56:k/(parts.railTubeCount+1)));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railTubeDiameter/2,col);}
-  for(var k=1;k<=parts.railCableCount;k++){var offset=rh*(1-k/(parts.railCableCount+1));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railCableDiameter/2,col);}
+  for(var k=1;k<=parts.railTubeCount;k++){var offset=rh*(1-cad3dRailLevel(parts,'tube',k));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railTubeDiameter/2,col);}
+  for(var k=1;k<=parts.railCableCount;k++){var offset=rh*(1-cad3dRailLevel(parts,'cable',k));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railCableDiameter/2,col);}
   if(parts.railToe){var offset=rh-parts.railToeHeight/2;cad3dRailStrip(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railToeThickness,parts.railToeHeight,col);}
   if(style==='picket'){var a=rail[j].slice(),b=a.slice();b[2]=Math.min(p.n,Math.max(1,Math.floor(j/(rail.length-1)*p.n)+1))*p.rise+.04;cad3dRailLine(group,r.id,a,b,.009,col);}
  }
