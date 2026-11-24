@@ -195,12 +195,22 @@ def interpret(text):
     assumptions=[]
     if not m: assumptions.append(f"{kind}: {width} x {depth} m")
     if not t: assumptions.append("wall: 0.15 m")
-    assumptions.append("standard doors 0.80 m and windows 1.20 m")
+    def opening(pattern,default):
+        match=re.search(pattern+r"\s*(?:de\s+|of\s+)?"+number+r"\s*(cm\b|mm\b|mts?\b|metros?\b|m\b|ft\b)?",s)
+        if not match: return default,False
+        value=float(match[1].replace(",","."))
+        unit=match[2]
+        return value*({"cm":.01,"mm":.001,"ft":.3048}.get(unit,1)),True
+    door,door_given=opening(r"\b(?:puertas?|doors?)",.80)
+    window,window_given=opening(r"\b(?:ventanas?|windows?)",1.20)
+    if not door_given: assumptions.append("door: 0.80 m")
+    if not window_given: assumptions.append("window: 1.20 m")
     bathtub=bool(re.search(r"\b(?:banadera|banera|bathtub|bath tub|tub|baignoire|badewanne|banheira|vasca)\b",s))
     shower=bool(re.search(r"\b(?:ducha|shower|douche|dusche|chuveiro|doccia)\b",s))
     bath_fixtures=["toilet","bidet","basin"]+(["bathtub"] if bathtub else [])+(["shower"] if shower or not bathtub else [])
-    spec={"kind":kind,"count":n,"width":width,"depth":depth,"wall":wall,"assumptions":assumptions}
+    spec={"kind":kind,"count":n,"width":width,"depth":depth,"wall":wall,"door":door,"window":window,"assumptions":assumptions}
     if suite:
+        if door!=.8 or window!=1.2: raise ValueError("Custom suite openings are not supported yet.")
         bm=re.search(dim,s[bath[0]:]) if bath else None
         bw,bd=size(bm) or (width,2.4)
         if not bm: assumptions.append(f"bathroom: {bw} x {bd} m")
@@ -356,6 +366,10 @@ def selftest():
     assert len({a["id"] for a in variants["walls"]})==len(variants["walls"])
     assert all(a["scale"]==1 for a in variants["blocks"])
     assert all(a["clearBounds"][2:]==[5.,4.] for a in variants["rooms"])
+    p=solve_instruction("habitacion de 4x 5 mts con cama + ventana de 2 mts y una puerta de 90 cm l acama doble y placad")
+    assert p["rooms"][0]["clearBounds"][2:]==[4.,5.]
+    assert {a["kind"]:a["width"] for a in p["openings"]}=={"swing-door":.9,"framed-window":2.}
+    assert {b["role"] for b in p["blocks"]}=={"bed","wardrobe"}
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
