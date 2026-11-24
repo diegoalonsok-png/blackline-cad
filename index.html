@@ -7695,17 +7695,31 @@ function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.e
 // Si el dibujo ya se guardó en un archivo (Save), se reescribe ese mismo .dxf; si no, copia en el navegador.
 let cad2dSaveMinutes=5,cad2dLastAutoSig='',cad2dLastAutoTime=Date.now();
 try{const m=Number(localStorage.getItem('cad2d-savetime'));if(m>=0&&m<=120)cad2dSaveMinutes=m}catch(e){}
-function cad2dDrawingSignature(){return state.entities.length+':'+state.history.length+':'+state.future.length+':'+(state.entities.at(-1)?.id||0)}
+var cadAutoSaveBusy=false;
+function cad2dDrawingSignature(){return JSON.stringify([cadDrawEpoch,state.file,state.unit,state.entities.length,state.history.length,state.future.length,state.entities.at(-1)?.id||0])}
 async function cad2dAutoSave(force=false){
- const sig=cad2dDrawingSignature();if(!force&&sig===cad2dLastAutoSig)return;
- const hh=new Date().toTimeString().slice(0,5);
- try{await cadWriteBak()}catch(err){console.warn('[CAD2D BAK]',err)}
+ const sig=cad2dDrawingSignature();if(cadAutoSaveBusy||(!force&&sig===cad2dLastAutoSig))return;
+ cadAutoSaveBusy=true;
+ const hh=new Date().toTimeString().slice(0,5),h=cadProjectSaveHandle,entities=state.entities,name=state.file;
+ const current=()=>state.entities===entities&&state.file===name&&cadProjectSaveHandle===h&&cad2dDrawingSignature()===sig;
  try{
-  const h=cadProjectSaveHandle,ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
-  if(ok){const w=await h.createWritable();await w.write(cadDxfWithProject(state.file));await w.close();toast('Autosave · '+h.name+' · '+hh)}
-  else{if(typeof persistLocalBackup==='function')await persistLocalBackup();toast('Autosave (browser copy) · '+hh)}
+  // Generate the DXF only once, before asynchronous storage operations.
+  const snapshot={name:cadBakName(),text:cadDxfWithProject(name),objects:entities.length,ts:Date.now()};
+  try{await cadWriteBak(snapshot)}catch(err){console.warn('[CAD2D BAK]',err)}
+  if(!current())return;
+  const ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
+  if(!current())return;
+  if(ok){
+   const w=await h.createWritable();
+   if(!current()){await w.abort();return}
+   await w.write(snapshot.text);await w.close();toast('Autosave · '+h.name+' · '+hh);
+  }else{
+   if(!await persistLocalBackup())return;
+   toast('Autosave (browser copy) · '+hh);
+  }
   cad2dLastAutoSig=sig;cad2dLastAutoTime=Date.now();log('AUTOSAVE '+hh);
  }catch(err){console.warn('[CAD2D AUTOSAVE]',err)}
+ finally{cadAutoSaveBusy=false}
 }
 setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
 /* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
@@ -7715,11 +7729,11 @@ setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveM
 const CAD2D_BAK_KEEP=10;let cadBakDir=null;
 const cadBakName=()=>String(state.file||'Sin titulo').replace(/[\\/:*?"<>|]+/g,'_').slice(0,80)||'Sin titulo';
 async function cadBakKeys(){if(!backupDb)return [];return (await backupTransaction('readonly',st=>st.getAllKeys())).filter(k=>typeof k==='string'&&k.startsWith('bak:'))}
-async function cadWriteBak(){
- if(!state.entities.length)return;
- const name=cadBakName(),text=cadDxfWithProject(name),ts=Date.now();
+async function cadWriteBak(snapshot){
+ const objects=snapshot?.objects??state.entities.length;if(!objects)return;
+ const name=snapshot?.name??cadBakName(),text=snapshot?.text??cadDxfWithProject(name),ts=snapshot?.ts??Date.now();
  if(backupDb){
-  await backupTransaction('readwrite',st=>st.put({name,savedAt:new Date(ts).toISOString(),objects:state.entities.length,text},'bak:'+name+':'+ts));
+  await backupTransaction('readwrite',st=>st.put({name,savedAt:new Date(ts).toISOString(),objects,text},'bak:'+name+':'+ts));
   const mine=(await cadBakKeys()).filter(k=>k.startsWith('bak:'+name+':')).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
   for(const k of mine.slice(CAD2D_BAK_KEEP))await backupTransaction('readwrite',st=>st.delete(k));
  }
@@ -9101,8 +9115,8 @@ async function persistLocalBackup(){
   const snap=backupPayload();
   await backupTransaction('readwrite',store=>store.put(snap,'current'));
   backupAvailable=true;
-  backupStatus('Saved locally: '+new Date(snap.savedAt).toLocaleString()+' · '+snap.entities.length+' objects');
- }catch(ex){backupStatus('Backup not saved ('+(ex.name||'storage unavailable')+'). Download a project copy.')}
+  backupStatus('Saved locally: '+new Date(snap.savedAt).toLocaleString()+' · '+snap.entities.length+' objects');return true;
+ }catch(ex){backupStatus('Backup not saved ('+(ex.name||'storage unavailable')+'). Download a project copy.');return false}
 }
 function queueLocalBackup(){
  if(!backupDb||!backupEnabled)return;
