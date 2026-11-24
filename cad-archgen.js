@@ -153,7 +153,37 @@ function generate({kind='bath',width=3,depth=3,wall=.2,count=50}={}){
  }
  return out;
 }
-root.CAD2D_ARCHGEN=Object.freeze({generate});
+// Resize a standard room without scaling any component or changing its wall assignment.
+// A rejected contraction leaves the original model untouched.
+function resizeModel(model,width,depth){
+ if(!model||!['bath','bedroom'].includes(model.kind))throw Error('Redimensionamiento inicial disponible para baños y dormitorios comunes');
+ if(![width,depth,model.width,model.depth,model.wall].every(Number.isFinite)||width<1.5||depth<1.5||width>20||depth>20||!Array.isArray(model.items))throw Error('Dimensiones inválidas');
+ const w0=model.width,d0=model.depth,eps=1e-8;
+ const within=a=>a.x>=-eps&&a.y>=-eps&&a.x+a.w<=width+eps&&a.y+a.d<=depth+eps;
+ const slide=(p,span,oldSize,newSize)=>{
+  const free=oldSize-span;if(free<eps)return (newSize-span)/2;
+  return p/free*(newSize-span);
+ };
+ const items=model.items.map(a=>{
+  let x=slide(a.x,a.w,w0,width),y=slide(a.y,a.d,d0,depth);
+  if(a.side==='N')y=depth-(d0-a.y);
+  if(a.side==='S')y=a.y;
+  if(a.side==='E')x=width-(w0-a.x);
+  if(a.side==='W')x=a.x;
+  return {...a,x,y};
+ });
+ const door={...model.door,x:slide(model.door.x,model.door.width,w0,width)};
+ const window={...model.window,x:slide(model.window.x,model.window.width,w0,width)};
+ for(const o of [door,window])if(!Number.isFinite(o.x)||o.x<.08-eps||o.x+o.width>width-.08+eps)throw Error('No hay espacio para conservar el vano');
+ const swing={x:door.x,y:0,w:door.width,d:door.outward?.35:door.width};
+ const gap=model.kind==='bedroom'?.55:.42;
+ const front=a=>a.side==='N'?{x:a.x,y:a.y-gap,w:a.w,d:gap}:a.side==='S'?{x:a.x,y:a.y+a.d,w:a.w,d:gap}:a.side==='W'?{x:a.x+a.w,y:a.y,w:gap,d:a.d}:{x:a.x-gap,y:a.y,w:gap,d:a.d};
+ for(const [i,a] of items.entries()){
+  if(!within(a)||!within(front(a))||overlap(a,swing)||items.some((b,j)=>i!==j&&(overlap(a,b)||overlap(front(a),b))))throw Error('El tamaño solicitado genera interferencias o falta de espacio');
+ }
+ return {...model,width,depth,area:width*depth,items,door,window};
+}
+root.CAD2D_ARCHGEN=Object.freeze({generate,resizeModel});
 if(typeof document==='undefined'||!root.CAD2D_CORE)return;
 function openPalette(){
  const core=root.CAD2D_CORE,lib=root.CAD2D_ARQ_LIBRARY;
@@ -174,7 +204,11 @@ function openPalette(){
   const line=(a,b)=>el('line',{x1:a.x,y1:a.y,x2:b.x,y2:b.y,stroke:'#38332c','stroke-width':.012});
   const rect=(x,y,w,h)=>el('rect',{x,y,width:w,height:h,fill:'none',stroke:'#38332c','stroke-width':.022});
   const t=m.wall,w=m.width,d=m.depth;
-  rect(-t,0,t,d);rect(w,0,t,d);rect(-t,-t,m.door.x+t,t);rect(m.door.x+m.door.width,-t,w+t-m.door.x-m.door.width,t);rect(-t,d,m.window.x+t,t);rect(m.window.x+m.window.width,d,w+t-m.window.x-m.window.width,t);
+  // Continuous wall contours: no internal corner seams; openings remain clear.
+  const dx0=m.door.x,dx1=dx0+m.door.width,wx0=m.window.x,wx1=wx0+m.window.width;
+  const wallOutline=ps=>el('polygon',{points:ps.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#38332c','stroke-width':.022,'stroke-linejoin':'miter'});
+  wallOutline([[dx0,-t],[-t,-t],[-t,d+t],[wx0,d+t],[wx0,d],[0,d],[0,0],[dx0,0]]);
+  wallOutline([[dx1,-t],[w+t,-t],[w+t,d+t],[wx1,d+t],[wx1,d],[w,d],[w,0],[dx1,0]]);
   for(const item of m.items){
    const b=lib.build(item.id),bb=lib.bounds(b.entities),r=(item.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
    const cs=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([x,y])=>[x*c-y*s,x*s+y*c]),ox=item.x-Math.min(...cs.map(v=>v[0])),oy=item.y-Math.min(...cs.map(v=>v[1]));
