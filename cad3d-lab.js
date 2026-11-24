@@ -1674,7 +1674,7 @@ function cad3dRestoreSavedStairs(){
     rails:['none','left','right','both'].includes(p.rails)?p.rails:'both',
     railHeight:clamp(finite(p.railHeight,.95),.60,1.35),stairBuild:cad3dStairConstruction(p),stairLayout:cad3dStairLayout(p),innerRadius:clamp(finite(p.innerRadius,cad3dStairLayout(p)==='spiral'?.10:1),.06,20),turnAngle:clamp(finite(p.turnAngle,cad3dStairLayout(p)==='spiral'?360:90),30,720),clockwise:!!p.clockwise,landingDepth:clamp(finite(p.landingDepth,p.d),p.d,Math.max(p.d,5)),stairGap:clamp(finite(p.stairGap,.12),0,2),treadThickness:clamp(finite(p.treadThickness,.05),.015,.30),waistThickness:clamp(finite(p.waistThickness,.18),.08,.40)});
    else spec.railRise=clamp(finite(p.railRise,0),-10,10);
-   ARCH_STYLES[item.kind].push(spec);
+   cad3dRailCopyParts(spec,p);ARCH_STYLES[item.kind].push(spec);
   });
  }catch(_e){}
 }
@@ -1690,7 +1690,7 @@ function cad3dSaveStairPreset(r){
   var spec={id:id,name:name,w:r.w,d:r.d,h:r.h,railStyle:r.railStyle,postSpacing:r.postSpacing};
   if(r.type==='stair')Object.assign(spec,{stepCount:r.stepCount,rails:r.rails,railHeight:r.railHeight,stairBuild:cad3dStairConstruction(r),stairLayout:cad3dStairLayout(r),innerRadius:r.innerRadius,turnAngle:r.turnAngle,clockwise:r.clockwise,landingDepth:r.landingDepth,stairGap:r.stairGap,treadThickness:r.treadThickness,waistThickness:r.waistThickness});
   else spec.railRise=r.railRise;
-  previous.push({kind:r.type,spec:spec});
+  cad3dRailCopyParts(spec,r);previous.push({kind:r.type,spec:spec});
   localStorage.setItem('blackline-cad3d-stair-components-v1',JSON.stringify(previous));
   ARCH_STYLES[r.type].push(spec);
   if(root)renderArchPalette();
@@ -6101,6 +6101,7 @@ function placePoint(pt){
   if(kind==='stair')Object.assign(rec,{stepCount:style.stepCount,rails:style.rails,
    railStyle:style.railStyle,railHeight:style.railHeight,postSpacing:style.postSpacing||1,stairBuild:cad3dStairConstruction(style),stairLayout:cad3dStairLayout(style),innerRadius:style.innerRadius,turnAngle:style.turnAngle,clockwise:!!style.clockwise,landingDepth:style.landingDepth??style.d,stairGap:style.stairGap??.12,treadThickness:style.treadThickness??.05,waistThickness:style.waistThickness??.18});
   else Object.assign(rec,{railStyle:style.railStyle,postSpacing:style.postSpacing,railRise:style.railRise});
+  cad3dRailCopyParts(rec,style);
   if(kind==='stair'&&cad3dStairRadial(rec)){rec.x=firstPoint.x;rec.y=firstPoint.y;rec.innerRadius=clamp(len-rec.d,.06,20);}
  }else if(kind==='block3d'){
   var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
@@ -7169,6 +7170,36 @@ function cad3dStairSpec(r){
  return {n:n,run:Math.max(.2,finite(r.w,4)),width:Math.max(.30,finite(r.d,1)),
   rise:Math.max(.015,finite(r.h,2.8))/n,going:Math.max(.2,finite(r.w,4))/n};
 }
+/* Independently configurable railing components; old records retain their original defaults. */
+function cad3dRailParts(r){
+ var style=r.railStyle||r.style||'metal';
+ function n(k,d,min,max){return clamp(finite(r[k],d),min,max);}
+ return {railTop:r.railTop!==false,railPosts:r.railPosts!==false,
+  railTopShape:r.railTopShape==='square'?'square':'round',
+  railTopDiameter:n('railTopDiameter',r.type==='railing'?finite(r.d,.064):style==='wood'?.084:.064,.015,.20),
+  railPostDiameter:n('railPostDiameter',style==='wood'?.052:.04,.012,.15),
+  railTubeCount:Math.round(n('railTubeCount',style==='metal'?1:0,0,12)),
+  railTubeDiameter:n('railTubeDiameter',.03,.008,.12),
+  railCableCount:Math.round(n('railCableCount',style==='cable'?5:0,0,16)),
+  railCableDiameter:n('railCableDiameter',.012,.003,.04),
+  railToe:r.railToe===true,railToeHeight:n('railToeHeight',.10,.02,.30),
+  railToeThickness:n('railToeThickness',.015,.003,.08)};
+}
+function cad3dRailCopyParts(to,from){
+ var parts=cad3dRailParts(from);
+ Object.keys(parts).forEach(function(k){delete to[k];if(Object.prototype.hasOwnProperty.call(from,k))to[k]=parts[k];});
+}
+function cad3dRailStrip(group,id,a,b,thick,height,color){
+ var dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],run=Math.hypot(dx,dy),len=Math.hypot(run,dz);
+ if(len<.002)return;
+ var mesh=addMesh(new T.BoxGeometry(len,thick,height),color,id,group,(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);
+ mesh.rotation.order='ZYX';mesh.rotation.z=Math.atan2(dy,dx);mesh.rotation.y=-Math.atan2(dz,run);
+}
+function cad3dRailTop(group,id,a,b,parts,color){
+ if(!parts.railTop)return;
+ if(parts.railTopShape==='square')cad3dRailStrip(group,id,a,b,parts.railTopDiameter,parts.railTopDiameter,color);
+ else cad3dRailLine(group,id,a,b,parts.railTopDiameter/2,color);
+}
 function cad3dRailLine(group,id,a,b,radius,color){
  var start=new T.Vector3(a[0],a[1],a[2]),end=new T.Vector3(b[0],b[1],b[2]);
  var dir=end.clone().sub(start),length=dir.length();if(length<.002)return;
@@ -7179,21 +7210,20 @@ function cad3dRailLine(group,id,a,b,radius,color){
 function cad3dRailGeometry(id,parent,spec){
  var length=Math.max(.20,finite(spec.length,3)),side=finite(spec.y,0),h=Math.max(.55,finite(spec.height,.95));
  var rise=finite(spec.rise,0),count=clamp(Math.ceil(length/clamp(finite(spec.spacing,1),.35,3)),1,48);
- var style=['metal','wood','glass','cable','picket'].includes(spec.style)?spec.style:'metal';
+ var style=['metal','wood','glass','cable','picket'].includes(spec.style)?spec.style:'metal',parts=cad3dRailParts(spec.parts||spec);
  var color=style==='wood'?0x947252:style==='glass'?0xbfc7ce:0x9da9b2;
  var baseZ=typeof spec.baseZ==='function'?spec.baseZ:function(t){return t*rise;};
  var topBaseZ=typeof spec.topBaseZ==='function'?spec.topBaseZ:baseZ;
  function pt(t,z){return [-length/2+length*t,side,baseZ(t)+z];}
  function topPt(t,z){return [-length/2+length*t,side,topBaseZ(t)+z];}
- for(var i=0;i<=count;i++)cad3dRailLine(parent,id,pt(i/count,0),topPt(i/count,h),style==='wood'?.026:.020,color);
+ if(parts.railPosts)for(var i=0;i<=count;i++)cad3dRailLine(parent,id,pt(i/count,0),topPt(i/count,h),parts.railPostDiameter/2,color);
  for(var i=0;i<count;i++){
   var a=topPt(i/count,h),b=topPt((i+1)/count,h);
-  cad3dRailLine(parent,id,a,b,clamp(finite(spec.diameter,style==='wood'?.084:.064),.03,.20)/2,color);
-  if(style==='metal'){
-   cad3dRailLine(parent,id,topPt(i/count,h*.56),topPt((i+1)/count,h*.56),.015,0x7e8c97);
-  }else if(style==='cable'){
-   for(var j=1;j<=5;j++)cad3dRailLine(parent,id,topPt(i/count,h*j/6),topPt((i+1)/count,h*j/6),.006,color);
-  }else if(style==='picket'){
+  cad3dRailTop(parent,id,a,b,parts,color);
+  for(var j=1;j<=parts.railTubeCount;j++){var z=h*(parts.railTubeCount===1?.56:j/(parts.railTubeCount+1));cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railTubeDiameter/2,color);}
+  for(var j=1;j<=parts.railCableCount;j++){var z=h*j/(parts.railCableCount+1);cad3dRailLine(parent,id,topPt(i/count,z),topPt((i+1)/count,z),parts.railCableDiameter/2,color);}
+  if(parts.railToe)cad3dRailStrip(parent,id,topPt(i/count,parts.railToeHeight/2),topPt((i+1)/count,parts.railToeHeight/2),parts.railToeThickness,parts.railToeHeight,color);
+  if(style==='picket'){
    var bars=Math.max(1,Math.ceil(length/count/.105));for(var j=1;j<bars;j++){var t=(i+j/bars)/count;cad3dRailLine(parent,id,pt(t,.04),topPt(t,h),.009,color);}
   }else if(style==='glass'){
    var p0=pt(i/count,0),p1=pt((i+1)/count,0);
@@ -7243,19 +7273,19 @@ function cad3dBuildRadialStair(r,group){
  }
  ['left','right'].forEach(function(side){
  if(r.rails!=='both'&&r.rails!==side)return;
- var rail=cad3dRadialRailPoints(r,p,side),style=r.railStyle||'metal',col=style==='wood'?0x947252:0x9da9b2,rad=style==='wood'?.042:.032;
+ var rail=cad3dRadialRailPoints(r,p,side),style=r.railStyle||'metal',col=style==='wood'?0x947252:0x9da9b2,parts=cad3dRailParts(r),rh=clamp(finite(r.railHeight,.95),.60,1.35);
+ function shifted(v,offset){var a=v.slice();a[2]-=offset;return a;}
  for(var j=1;j<rail.length;j++){
-  cad3dRailLine(group,r.id,rail[j-1],rail[j],rad,col);
-  if(style==='cable'||style==='metal'){
-   var rh=clamp(finite(r.railHeight,.95),.60,1.35),levels=style==='cable'?5:1;
-   for(var k=1;k<=levels;k++){var offset=rh*(1-k/(levels+1));var a=rail[j-1].slice(),b=rail[j].slice();a[2]-=offset;b[2]-=offset;cad3dRailLine(group,r.id,a,b,style==='cable'?.006:.015,col);}
-  }
+  cad3dRailTop(group,r.id,rail[j-1],rail[j],parts,col);
+  for(var k=1;k<=parts.railTubeCount;k++){var offset=rh*(1-(parts.railTubeCount===1?.56:k/(parts.railTubeCount+1)));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railTubeDiameter/2,col);}
+  for(var k=1;k<=parts.railCableCount;k++){var offset=rh*(1-k/(parts.railCableCount+1));cad3dRailLine(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railCableDiameter/2,col);}
+  if(parts.railToe){var offset=rh-parts.railToeHeight/2;cad3dRailStrip(group,r.id,shifted(rail[j-1],offset),shifted(rail[j],offset),parts.railToeThickness,parts.railToeHeight,col);}
   if(style==='picket'){var a=rail[j].slice(),b=a.slice();b[2]=Math.min(p.n,Math.max(1,Math.floor(j/(rail.length-1)*p.n)+1))*p.rise+.04;cad3dRailLine(group,r.id,a,b,.009,col);}
  }
  var radius=Math.hypot(rail[0][0],rail[0][1]),posts=Math.max(1,Math.min(96,Math.ceil(Math.abs(p.sweep)*radius/clamp(finite(r.postSpacing,1),.35,3))));
- for(var j=0;j<=posts;j++){
+ if(parts.railPosts)for(var j=0;j<=posts;j++){
  var t=j/posts,a=p.sweep*t,x=radius*Math.cos(a),y=radius*Math.sin(a),base=Math.min(p.n,Math.max(1,Math.floor(t*p.n)+1))*p.rise,top=p.rise+(p.n-1)*p.rise*t+clamp(finite(r.railHeight,.95),.60,1.35);
- cad3dRailLine(group,r.id,[x,y,base],[x,y,top],.02,col);
+ cad3dRailLine(group,r.id,[x,y,base],[x,y,top],parts.railPostDiameter/2,col);
  }
  });
 }
@@ -7316,7 +7346,7 @@ function cad3dBuildTurnedStair(r,group,plan){
  plan.rails.forEach(function(e){if(r.rails!=='both'&&r.rails!==e.side)return;
  var dx=e.b[0]-e.a[0],dy=e.b[1]-e.a[1],len=Math.hypot(dx,dy);if(len<.20)return;
  var rail=new T.Group();rail.position.set((e.a[0]+e.b[0])/2,(e.a[1]+e.b[1])/2,p.z);rail.rotation.z=Math.atan2(dy,dx);group.add(rail);
- cad3dRailGeometry(r.id,rail,{length:len,height:clamp(finite(r.railHeight,.95),.60,1.35),spacing:r.postSpacing,style:r.railStyle});
+ cad3dRailGeometry(r.id,rail,{length:len,height:clamp(finite(r.railHeight,.95),.60,1.35),spacing:r.postSpacing,style:r.railStyle,parts:r});
  });
 }
 function cad3dBuildStair(r,group){
@@ -7351,14 +7381,14 @@ function cad3dBuildStair(r,group){
  sides.forEach(function(sign){
   var n=st.n;
   cad3dRailGeometry(r.id,group,{length:st.run,y:sign*(st.width/2-.055),height:clamp(finite(r.railHeight,.95),.60,1.35),
-   spacing:clamp(finite(r.postSpacing,1),.35,3),style:r.railStyle||'metal',
+   spacing:clamp(finite(r.postSpacing,1),.35,3),style:r.railStyle||'metal',parts:r,
    baseZ:function(t){return Math.min(st.n,Math.max(1,Math.ceil(t*n)))*st.rise;},
    topBaseZ:function(t){return st.rise+(st.n-1)*st.rise*t;}});
  });
 }
 function cad3dBuildRailing(r,group){
  cad3dRailGeometry(r.id,group,{length:r.w,y:0,height:r.h,spacing:r.postSpacing,
-  rise:r.railRise,style:r.railStyle,diameter:r.d});
+  rise:r.railRise,style:r.railStyle,diameter:r.d,parts:r});
 }
 function buildObject(r){
  var group=new T.Group();group.userData.owner=r.id;group.position.set(r.x||0,r.y||0,r.z||0);group.rotation.z=(r.rot||0)*Math.PI/180;
@@ -7827,6 +7857,7 @@ function renderProps(){
   }
   html+='<label>Material de baranda <select data-arch-param="railStyle">'+options(r.railStyle,[['metal','Metal'],['wood','Madera'],['glass','Vidrio'],['cable','Cables horizontales'],['picket','Barrotes verticales']])+'</select></label>'+
    '<label>Separación entre postes (m) <input data-arch-param="postSpacing" type="number" min=".35" max="3" step=".05" value="'+escapeHtml(r.postSpacing??1)+'"></label>'+
+   cad3dRailPartsHTML(r)+
    '<button type="button" class="btn" data-save-arch-preset>Guardar como componente reutilizable</button>'+
    '<small>Prototipo visual. Comprobar la normativa local antes de construir.</small></div>';
  }
@@ -7879,6 +7910,17 @@ function renderProps(){
  '<button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
  p.innerHTML=html;
 }
+function cad3dRailPartsHTML(r){
+ var p=cad3dRailParts(r);
+ function toggle(k,label){return '<label>'+label+' <select data-arch-param="'+k+'"><option value="yes"'+(p[k]?' selected':'')+'>Sí</option><option value="no"'+(!p[k]?' selected':'')+'>No</option></select></label>';}
+ function num(k,label,min,max,step){return '<label>'+label+' <input type="number" data-arch-param="'+k+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+p[k]+'"></label>';}
+ return '<strong>COMPONENTES DE BARANDA</strong>'+toggle('railTop','Pasamanos superior')+
+ '<label>Sección del pasamanos <select data-arch-param="railTopShape"><option value="round"'+(p.railTopShape==='round'?' selected':'')+'>Redonda</option><option value="square"'+(p.railTopShape==='square'?' selected':'')+'>Cuadrada</option></select></label>'+
+ num('railTopDiameter','Sección / diámetro superior (m)',.015,.20,.005)+toggle('railPosts','Postes')+num('railPostDiameter','Diámetro postes (m)',.012,.15,.005)+
+ num('railTubeCount','Cantidad de caños horizontales',0,12,1)+num('railTubeDiameter','Diámetro caños (m)',.008,.12,.002)+
+ num('railCableCount','Cantidad de tensores / cables',0,16,1)+num('railCableDiameter','Diámetro tensores (m)',.003,.04,.001)+
+ toggle('railToe','Cubrepié / rodapié')+num('railToeHeight','Altura cubrepié (m)',.02,.30,.005)+num('railToeThickness','Espesor cubrepié (m)',.003,.08,.002);
+}
 function change(e){
  var input=e.target;
  if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param],[data-arch-param],input[data-object-color]'))return;
@@ -7886,7 +7928,11 @@ function change(e){
  if(input.matches('[data-arch-param]')){
   if(!['stair','railing'].includes(r.type))return;
   var key=input.dataset.archParam;
-  if(key==='railStyle'&&['metal','wood','glass','cable','picket'].includes(input.value))r.railStyle=input.value;
+  if(Object.prototype.hasOwnProperty.call(cad3dRailParts(r),key)){
+   if(['railTop','railPosts','railToe'].includes(key))r[key]=input.value==='yes';
+   else if(key==='railTopShape')r[key]=input.value==='square'?'square':'round';
+   else{if(input.value.trim()===''||!Number.isFinite(Number(input.value)))return;r[key]=Number(input.value);r[key]=cad3dRailParts(r)[key];}
+  }else if(key==='railStyle'&&['metal','wood','glass','cable','picket'].includes(input.value))r.railStyle=input.value;
   else if(key==='rails'&&r.type==='stair'&&['none','left','right','both'].includes(input.value))r.rails=input.value;
   else if(key==='stairLayout'&&r.type==='stair'&&['straight','l','u','t','landing','spiral','curved'].includes(input.value)){r.stairLayout=input.value;if(input.value!=='straight')r.stepCount=Math.max(6,finite(r.stepCount,16));}
   else if(key==='innerRadius'&&r.type==='stair')r.innerRadius=clamp(finite(Number(input.value),.1),.06,20);
@@ -7956,6 +8002,7 @@ function change(e){
     r.w=st.w;r.d=st.d;
     if(r.type==='stair')Object.assign(r,{stepCount:st.stepCount,rails:st.rails,railStyle:st.railStyle,railHeight:st.railHeight,postSpacing:st.postSpacing||1,stairBuild:cad3dStairConstruction(st),stairLayout:cad3dStairLayout(st),innerRadius:st.innerRadius,turnAngle:st.turnAngle,clockwise:!!st.clockwise,landingDepth:st.landingDepth??st.d,stairGap:st.stairGap??.12,treadThickness:st.treadThickness??.05,waistThickness:st.waistThickness??.18});
     else Object.assign(r,{railStyle:st.railStyle,postSpacing:st.postSpacing,railRise:st.railRise});
+    cad3dRailCopyParts(r,st);
    }else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
   }
   redraw();renderProps();text('Estilo actualizado · geometría regenerada');return;
@@ -9108,6 +9155,7 @@ async function readJSON(e){
     o.postSpacing=clamp(finite(r.postSpacing,1),.35,3);
     o.railRise=clamp(finite(r.railRise,0),-10,10);
    }
+   if(r.type==='stair'||r.type==='railing')cad3dRailCopyParts(o,r);
    if((r.type==='wall'||r.type==='slab')&&Array.isArray(r.openings)){
     var kinds=r.type==='wall'?['door','window','opening']:['opening'];
     o.openings=r.openings.slice(0,150).filter(function(v){return v&&kinds.includes(v.kind);}).map(function(v){
