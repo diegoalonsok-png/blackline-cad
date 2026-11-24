@@ -22,12 +22,17 @@ function decode(record){
   if(p+8>end||commands.length>=100000)return [];
   const len=v.getUint32(p,true),type=v.getUint32(p+4,true);
   if(len<8||p+len>end)return [];
-  if([25,26,27,28,29,30,31,32,33,34,35].includes(type))return [];
+  if([29,30,31].includes(type))return [];
   commands.push({type,at:p+8,end:p+len});p+=len;
  }
  if(p!==end)return [];
  for(const cmd of commands){
-  if(cmd.type!==6&&cmd.type!==7)continue;
+  if(cmd.type===2&&cmd.at+56<=cmd.end){
+   const a=cmd.at,x=v.getFloat64(a,true),y=v.getFloat64(a+8,true),z=v.getFloat64(a+16,true),r=v.getFloat64(a+24,true),nx=v.getFloat64(a+32,true),ny=v.getFloat64(a+40,true),nz=v.getFloat64(a+48,true);
+   if([x,y,z,r,nx,ny,nz].every(Number.isFinite)&&r>0&&Math.abs(nx)<1e-9&&Math.abs(ny)<1e-9&&Math.abs(Math.abs(nz)-1)<1e-9)out.push({type:'circle',c:{x,y},r});
+   continue;
+  }
+  if(cmd.type!==6&&cmd.type!==7&&cmd.type!==32)continue;
   if(cmd.at+4>cmd.end)continue;
   const n=v.getUint32(cmd.at,true);
   if(n<2||n>100000||cmd.at+4+n*24>cmd.end)continue;
