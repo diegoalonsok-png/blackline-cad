@@ -37,8 +37,9 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const getLayer=(name)=>{if(!layers.has(name))layers.set(name,{id:name,name,color:'#c6cbd1',visible:true,locked:false,width:.25,linetype:'CONTINUOUS'});return layers.get(name)};
  // --- Parse sections: tables, block definitions and model-space records ---
  const blocksDef=new Map(),modelRecs=[];let curBlock=null;
+ let scanCheckpoint=0;
  for(let i=0;i<pairs.length;){
-  if((i&8191)===0)checkTime();const [code,val]=pairs[i];
+  if(i>=scanCheckpoint){checkTime();scanCheckpoint=i+8192;}const [code,val]=pairs[i];
   if(code===0&&val==='SECTION'){section=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';table='';i+=2;continue}
   if(code===0&&val==='ENDSEC'){section='';table='';i++;continue}
   if(section==='HEADER'&&code===9&&val==='$INSUNITS'){unitCode=Number(pairs[i+1]?.[1]||0);i+=2;continue}
@@ -46,7 +47,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   if(section==='TABLES'&&code===0&&val==='ENDTAB'){table='';i++;continue}
   if(code!==0){i++;continue}
   let record=[],type=val;i++;
-  while(i<pairs.length&&pairs[i][0]!==0)record.push(pairs[i++]);
+  while(i<pairs.length&&pairs[i][0]!==0){if(i>=scanCheckpoint){checkTime();scanCheckpoint=i+8192;}record.push(pairs[i++]);}
   const {get,str}=fields(record);
   if(section==='TABLES'&&table==='LAYER'&&type==='LAYER'){
    let name=str(2,'0'),flags=get(70),colorIndex=get(62,7),trueColor=get(420,NaN),weight=get(370,-1);
@@ -70,7 +71,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const isId=m=>m.every((v,k)=>Math.abs(v-ID[k])<1e-12);
  const arcPts=(c,r,a0,sweep)=>{if(![c.x,c.y,r,a0,sweep].every(Number.isFinite)||Math.abs(sweep)>Math.PI*2+1e-6)throw Error('Arco DXF inválido');const n=Math.max(6,Math.ceil(Math.abs(sweep)/(Math.PI/24)));return Array.from({length:n+1},(_,k)=>P(c.x+r*Math.cos(a0+sweep*k/n),c.y+r*Math.sin(a0+sweep*k/n)))};
  const bulgePts=(p1,p2,b)=>{const d=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(d<1e-12||Math.abs(b)<1e-10)return[p2];const th=4*Math.atan(b),r=d*(1+b*b)/(4*Math.abs(b)),ux=(p2.x-p1.x)/d,uy=(p2.y-p1.y)/d,h=d/2*(1-b*b)/(2*b),c=P((p1.x+p2.x)/2-uy*h,(p1.y+p2.y)/2+ux*h);return arcPts(c,r,Math.atan2(p1.y-c.y,p1.x-c.x),th).slice(1)};
- const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];out.push(...bulgePts(a.p,b.p,a.b||0))}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
+ const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];if((k&1023)===0)checkTime();const segment=bulgePts(a.p,b.p,a.b||0);if(out.length+segment.length>MAX_VERTICES-vertexCount)abortImport('expansión de polilínea demasiado grande');out.push(...segment)}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
  const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
  const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
@@ -253,6 +254,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:'0',color:undefined,linetype:'BYLAYER',width:.25},1,list);
   if(list.length)importedBlocks[defName(def.name)]={name:defName(def.name),entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'};
  }
+ checkTime();
  blockCount=0;
  return {entities,layers:[...layers.values()],blocks:importedBlocks,unitCode,dimStyles:importedDimStyles,warnings:[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')')};
 }
