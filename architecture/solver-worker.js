@@ -5,7 +5,7 @@ async function init(){
   const base='https://cdn.jsdelivr.net/pyodide/v0.27.7/full/';
   importScripts(base+'pyodide.js');
   const py=await loadPyodide({indexURL:base});
-  const r=await fetch(new URL('solver.py?v=20261124-v4',self.location.href),{cache:'no-cache'});
+  const r=await fetch(new URL('solver.py?v=20261124-semantic-v5',self.location.href),{cache:'no-cache'});
   if(!r.ok)throw Error('Architecture solver unavailable');
   py.FS.writeFile('/architecture_solver.py',await r.text());
   await py.runPythonAsync('import sys\nsys.path.insert(0,"/")\nimport architecture_solver, json');
@@ -19,7 +19,7 @@ self.onmessage=async({data})=>{
   const py=await init();let output;
   if(data.brief){
    py.globals.set('_arq_spec_json',JSON.stringify(data.brief));
-   output=await py.runPythonAsync('s=json.loads(_arq_spec_json)\np=architecture_solver.solve(s)\np["brief"]=s\np["assumptions"]=s.get("assumptions",[])\njson.dumps(p, ensure_ascii=False)');
+   output=await py.runPythonAsync('s=json.loads(_arq_spec_json)\np=architecture_solver.compile_semantic_brief(s)\njson.dumps(p, ensure_ascii=False)');
   }else{
    if(typeof data.text!=='string'||!data.text.trim()||data.text.length>4000)throw Error('Invalid instruction');
    py.globals.set('_arq_text',data.text);
