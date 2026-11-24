@@ -4134,7 +4134,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="extrude" title="Extrude · E + Enter" aria-label="Extrude">'+ico('extrude')+'<span>Extrude</span></button>'+
  '<button type="button" class="btn" data-solid-command="extrudeface" title="Extrude Face · empujar o tirar una cara" aria-label="Extrude Face">'+ico('extrudeface')+'<span>Extrude Face</span></button>'+
  '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">'+ico('union')+'<span>Union</span></button>'+
- '<button type="button" class="btn" data-solid-command="subtract" title="Subtract the second selected unrotated box from the first">'+ico('subtract')+'<span>Subtract</span></button>'+
+ '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
  '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
@@ -7506,7 +7506,7 @@ function renderProps(){
  if(!root)return;var p=root.querySelector('.props');
  if(typeof render3DGrips==='function')render3DGrips();
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
- if(selected.length!==1){var pair=records.filter(r=>selected.includes(r.id));p.innerHTML='<p>'+selected.length+' objetos seleccionados.</p>'+(pair.length===2&&pair.some(r=>r.type==='slab')&&pair.some(r=>r.type==='profile2d')?'<button class="btn" data-slab-poly-cut>Perforar losa con polilínea</button>':'<p>Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>');return;}
+ if(selected.length!==1){var pair=records.filter(r=>selected.includes(r.id));p.innerHTML='<p>'+selected.length+' objetos seleccionados.</p>'+(pair.length===2&&pair.some(r=>r.type==='slab')&&pair.some(r=>r.type==='profile2d')?'<button class="btn" data-slab-poly-cut>Perforar losa con polilínea</button>':'<p>SUBTRACT: losa primero, sólido cortante después. UNION / INTERSECT: dos BOX sin rotación.</p>');return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
  var focus=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
  var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
@@ -7822,17 +7822,49 @@ function cad3dExtrudeSelection(){
   rec.extrudedHeight=height;rec.h=height;redraw();renderProps();text('Perfil extrudado · '+height.toFixed(2)+' m');return true;
  }
  if(rec.type==='slab'){
-  if((rec.openings||[]).length){text('La losa tiene aberturas: extrusión directa no disponible');return false;}
+  if((rec.openings||[]).length||rec.slabPolyHoles?.length){text('La losa tiene aberturas: ajustá el espesor desde Propiedades');return false;}
   rec.type='box';rec.pitch=0;rec.styleId='';
  }
  rec.h=height;
  redraw();renderProps();text('Extrude aplicado · altura '+height.toFixed(2)+' m');
  return true;
 }
+/* Native slab subtraction: preserve architectural record instead of flattening to mesh.
+   Through-cuts only; reject partial depth, edge cuts and unsupported cutters. */
+function cad3dSlabSubtractPlan(slab,cutter){
+ var p,h;
+ if(cutter.type==='box'||cutter.type==='slab'){
+  if(cutter.type==='slab'&&(cutter.pitch||cutter.openings?.length||cutter.slabPolyHoles?.length))return {error:'El sólido cortante debe ser un prisma sin huecos ni pendiente.'};
+  p=cad3dSlabOuter(cutter);h=cutter.h;
+ }else if(cutter.type==='cylinder'){
+  p=Array.from({length:32},function(_,i){var a=2*Math.PI*i/32;return [cutter.radius*Math.cos(a),cutter.radius*Math.sin(a)];});h=cutter.h;
+ }else if(cutter.type==='profile2d'&&cutter.profileClosed&&cutter.extrudedHeight>0){
+  p=(cutter.profilePoints||[]).map(v=>v.slice());h=cutter.extrudedHeight;
+ }else return {error:'SUBTRACT de losa admite BOX, CYLINDER y perfil cerrado extrudado.'};
+ if(!Number.isFinite(h)||h<=0||!Number.isFinite(cutter.z)||!p.length)return {error:'Sólido cortante inválido.'};
+ var a=(cutter.rot||0)*Math.PI/180,b=(slab.rot||0)*Math.PI/180,c=Math.cos(a),d=Math.sin(a),u=Math.cos(b),v=Math.sin(b);
+ p=p.map(function(pt){var x=cutter.x+pt[0]*c-pt[1]*d-slab.x,y=cutter.y+pt[0]*d+pt[1]*c-slab.y;return [x*u+y*v,-x*v+y*u];});
+ if(p.length>3&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7)p.pop();
+ if((slab.slabPolyHoles||[]).length>=32)return {error:'Límite de 32 cortes poligonales por losa.'};
+ var proposal=Object.assign({},slab,{slabPolyHoles:(slab.slabPolyHoles||[]).concat([p])});
+ if(!cad3dSlabHolesValid(proposal))return {error:'El sólido debe quedar dentro de la losa, sin tocar su borde ni otros huecos.'};
+ var slope=Math.tan((slab.pitch||0)*Math.PI/180),z=p.map(v=>slab.z+v[0]*slope);
+ if(cutter.z>Math.min(...z)+1e-7||cutter.z+h<Math.max(...z)+slab.h-1e-7)return {error:'El sólido cortante debe atravesar todo el espesor de la losa. Ajustá Z y altura.'};
+ return {holes:proposal.slabPolyHoles};
+}
+function cad3dSubtractSlab(slab,cutter){
+ var result=cad3dSlabSubtractPlan(slab,cutter);
+ if(result.error){text(result.error);return;}
+ cad3dHistoryStart();slab.slabPolyHoles=result.holes;records=records.filter(r=>r.id!==cutter.id);
+ selected=[slab.id];selectedOpeningId=null;redraw();renderProps();text('SUBTRACT · losa perforada, propiedades conservadas · Ctrl+Z deshace');
+}
 function booleanBox(kind){
- if(selected.length!==2){text('Booleanas: seleccioná dos BOX con Shift + clic');return;}
+ if(selected.length!==2){text('Booleanas: seleccioná el objeto base y después el sólido cortante con Shift + clic');return;}
  var a=records.find(function(r){return r.id===selected[0];}),b=records.find(function(r){return r.id===selected[1];});
- if(!a||!b||a.type!=='box'||b.type!=='box'||a.rot||b.rot){text('Booleanas experimentales: solo dos BOX sin rotación');return;}
+ if(!a||!b||!editableRecord(a)||!editableRecord(b)){text('Seleccioná dos objetos editables.');return;}
+ if(kind==='subtract'&&a.type==='slab'){cad3dSubtractSlab(a,b);return;}
+ if(kind==='subtract'&&b.type==='slab'&&a.type!=='box'){text('Seleccioná primero la losa y después el sólido cortante.');return;}
+ if(a.type!=='box'||b.type!=='box'||a.rot||b.rot){text('SUBTRACT: losa primero y sólido cortante después; otras booleanas: dos BOX sin rotación.');return;}
  var bounds=function(r){return [r.x-r.w/2,r.x+r.w/2,r.y-r.d/2,r.y+r.d/2,r.z,r.z+r.h];};
  var A=bounds(a),B=bounds(b),sortUnique=function(v){return v.sort(function(a,b){return a-b;}).filter(function(x,i,s){return !i||Math.abs(x-s[i-1])>1e-9;});};
  var X=sortUnique([A[0],A[1],B[0],B[1]]),Y=sortUnique([A[2],A[3],B[2],B[3]]),Z=sortUnique([A[4],A[5],B[4],B[5]]),occupied={};
