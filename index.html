@@ -7603,7 +7603,7 @@ function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.e
 // Si el dibujo ya se guardó en un archivo (Save), se reescribe ese mismo .dxf; si no, copia en el navegador.
 let cad2dSaveMinutes=5,cad2dLastAutoSig='',cad2dLastAutoTime=Date.now();
 try{const m=Number(localStorage.getItem('cad2d-savetime'));if(m>=0&&m<=120)cad2dSaveMinutes=m}catch(e){}
-function cad2dDrawingSignature(){return state.entities.length+':'+state.history.length+':'+state.future.length+':'+(state.entities.at(-1)?.id||0)}
+function cad2dDrawingSignature(){return JSON.stringify([state.entities,state.layers,state.blocks,state.dimStyles,state.activeDimStyle,state.unit,state.grid,state.precision,state.nextId,state.layerId,state.layerStates,collectLayoutState(),cadLayoutsSnapshot()])}
 async function cad2dAutoSave(force=false){
  const sig=cad2dDrawingSignature();if(!force&&sig===cad2dLastAutoSig)return;
  const hh=new Date().toTimeString().slice(0,5);
@@ -8293,7 +8293,7 @@ async function cadXrefReload(only,quiet){
     else file=await new Promise(ok=>{const i=document.createElement('input');i.type='file';i.accept='.dxf,.dwg';i.onchange=()=>ok(i.files[0]);i.click()})}
    if(!file)continue;
    if(quiet&&file.lastModified&&file.lastModified<=def.xref.lastModified)continue;
-   const parsed=await cadXrefRead(file);saveHistory();cadXrefApply(key.slice(5),parsed,file);n++;
+   const parsed=await cadXrefRead(file);if(state.blocks[key]!==def)continue;saveHistory();cadXrefApply(key.slice(5),parsed,file);n++;
   }catch(e){if(!quiet)toast('No se pudo recargar '+key.slice(5)+': '+e.message)}
  }
  if(n){renderLayers?.();updateAll();toast(n+' referencia(s) externa(s) actualizada(s)')}else if(!quiet)toast('Las referencias ya estaban al día');
@@ -8321,7 +8321,10 @@ const cadApiBase=()=>{try{return new URL((window.CAD2D_AUTH_CONFIG||{}).statusUr
 async function cadApi(path){const b=cadApiBase();if(!b)throw Error('la nube no está configurada');const r=await fetch(b+path,{credentials:'include',headers:{accept:'application/json'}});const j=await r.json().catch(()=>({}));if(r.status===401)throw Error('iniciá sesión (Account) para usar la nube');if(!r.ok)throw Error(j.error||('HTTP '+r.status));return j}
 function cadFlattenProject(proj){const saved=state.blocks;state.blocks=proj.blocks||{};try{const out=[];const walk=(list,d)=>{for(const e of list||[]){if(e.type==='blockRef'){if(d<8)walk(blockChildren(e),d+1)}else out.push(e)}};walk(proj.entities,0);return out}finally{state.blocks=saved}}
 async function cadXrefLoadCloud(id,name,isReload){
- const j=await cadApi('/api/xref/projects/'+encodeURIComponent(id));let proj;try{proj=JSON.parse(j.data)}catch(e){throw Error('proyecto ilegible')}
+ const original=isReload?state.blocks['REFX:'+cadXrefSafe(name)]:null;
+ const j=await cadApi('/api/xref/projects/'+encodeURIComponent(id));
+ if(isReload&&(!original||state.blocks['REFX:'+cadXrefSafe(name)]!==original))return false;
+ let proj;try{proj=JSON.parse(j.data)}catch(e){throw Error('proyecto ilegible')}
  const parsed={entities:cadFlattenProject(proj),layers:proj.layers||[],unitCode:{in:1,ft:2,mm:4,cm:5,m:6}[proj.unit]||0};
  if(!parsed.entities.length)throw Error('el proyecto no tiene objetos');
  const nm=cadXrefSafe(name||j.name);saveHistory();
@@ -8958,8 +8961,10 @@ function backupTransaction(mode,action){
   let tx;
   try{tx=backupDb.transaction('drawings',mode)}catch(ex){reject(ex);return}
   const request=action(tx.objectStore('drawings'));
-  request.onsuccess=()=>resolve(request.result);
+  let result;
+  request.onsuccess=()=>{result=request.result};
   request.onerror=()=>reject(request.error||Error('Local backup error'));
+  tx.oncomplete=()=>resolve(result);
   tx.onabort=()=>reject(tx.error||Error('Backup transaction aborted'));
  });
 }
