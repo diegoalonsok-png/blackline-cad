@@ -593,6 +593,26 @@ function doubleSuiteCorridor(plan,passage){
 function run(raw){
  const {text,corrections}=correctText(internationalText(raw));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
+ // Quantified collective sanitary fixtures, preserving requested counts.
+ const collective=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?(?:(\d+)\s+)?(?:banos?|vestuarios?)\s+(?:colectivos?\s+)?(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)\s*(?:m|mts|metros)?\s+con\s+(.+)$/);
+ if(collective){
+  const names={ducha:'shower',duchas:'shower',inodoro:'toilet',inodoros:'toilet',lavatorio:'basin',lavatorios:'basin',bidet:'bidet',bidets:'bidet'};
+  const tail=collective[4].replace(/\s+cada uno\s*$/,'').trim();
+  const pieces=tail.split(/\s*(?:,|\+|\by\b)\s*/);
+  const fixtures=[];
+  let quantified=true;
+  for(const piece of pieces){
+   const m=piece.match(/^(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(duchas?|inodoros?|lavatorios?|bidets?)$/);
+   if(!m){quantified=false;break;}
+   const n=Number(numberWords[m[1]]||m[1]);if(n<1||n>12)throw Error('Cantidad de artefactos fuera de rango (1 a 12).');
+   for(let i=0;i<n;i++)fixtures.push(names[m[2]]);
+  }
+  if(quantified&&fixtures.length){
+   if(fixtures.length>12)throw Error('Hasta doce artefactos por baño colectivo.');
+   const spec={kind:'bathroom',count:Number(collective[1]||1),width:num(collective[2]),depth:num(collective[3]),wall:.15,door:.9,window:1.2,fixtures,assumptions:['Baño colectivo preliminar: cantidades explícitas de artefactos respetadas.','Sin cabinas, bancos ni lockers; comprobar privacidad, circulación y normativa.']};
+   const p=solve(spec);p.status='approximate';p.warning=spec.assumptions.join(' ');return p;
+  }
+ }
  const suiteHall=text.match(/\b(?:con\s+)?(?:pasillo|corredor)\s*(?:comun\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|metros?|m)?\b/);
  if(suiteHall&&/\b(?:habitaciones?|dormitorios?)\b/.test(text)&&/\bbanos?\b/.test(text)&&!/\b(?:casa|vivienda|mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia)\b/.test(text)){
   const passage=num(suiteHall[1])*unitScale(suiteHall[2]);
