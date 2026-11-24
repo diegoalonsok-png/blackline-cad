@@ -7863,8 +7863,8 @@ function cadApplyParsedDXF(parsed,name){
 
 
 var cadDxfOpenSequence=0,cadDxfActiveJob=null;
-function cadParseDXFWorker(text,style){
- if(typeof Worker==='undefined')return Promise.resolve().then(()=>window.CAD2DDxfParser.parse(text,{},style));
+function cadParseDXFWorker(text,style,options={}){
+ if(typeof Worker==='undefined')return Promise.resolve().then(()=>window.CAD2DDxfParser.parse(text,options,style));
  return new Promise((resolve,reject)=>{
   let worker,timer,finished=false;
   const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
@@ -7873,11 +7873,13 @@ function cadParseDXFWorker(text,style){
   try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-worker-v1',document.baseURI));}
   catch(e){return finish(Error('No se pudo iniciar el lector DXF local: '+e.message))}
   cadDxfActiveJob=cancel;
-  timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),45000);
+  // Allow larger local drawings more time, with a bounded watchdog.
+  const timeout=Math.min(180000,45000+Math.floor(text.length/1000000)*3000);
+  timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),timeout);
   worker.onmessage=e=>{const {error,result}=e.data||{};finish(error?Error(error):!result?Error('Respuesta inválida del lector DXF'):null,result)};
   worker.onerror=e=>finish(Error('Error del lector DXF local: '+(e.message||'recargá CAD2D3D')));
   worker.onmessageerror=()=>finish(Error('No se pudo recuperar el modelo del lector local'));
-  try{worker.postMessage({text,options:{},style});}catch(e){finish(e)}
+  try{worker.postMessage({text,options,style});}catch(e){finish(e)}
  });
 }
 async function cadOpenDXFAsync(text,name){
@@ -7892,7 +7894,7 @@ async function cadOpenDXFAsync(text,name){
    Se ubica con un clic (esquina inferior izquierda del plano) y respeta las unidades del dibujo. */
 async function cadInsertDxfPlan(url,label,opts={}){
  let parsed;
- try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=importDXF(await cadDxfDecode(await r.arrayBuffer()),label||'plano',{parseOnly:true})}
+ try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=await cadParseDXFWorker(await cadDxfDecode(await r.arrayBuffer()),readDimensionStyle(),{parseOnly:true})}
  catch(e){return toast('No se pudo cargar el plano: '+e.message)}
  const fromUnit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
  let minX=Infinity,minY=Infinity;
