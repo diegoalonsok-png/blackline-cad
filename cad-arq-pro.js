@@ -823,6 +823,7 @@ function applyArchitectureDetail(plan,origin){
  st.selected=[];CORE.updateAll();return plan.entities.length+fills.length+blocks.length;
 }
 
+window.CAD2D_APPLY_TRACE_PLAN=(plan,origin)=>applyArchitecture(plan,origin);
 function applyArchitecture(plan,origin,replaceBatch=null){
  if(plan?.schema==='blackline.architecture.detail.v1'){if(replaceBatch)throw Error('No se puede reemplazar un ambiente por un detalle.');return applyArchitectureDetail(plan,origin);}
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');

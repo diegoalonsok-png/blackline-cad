@@ -208,24 +208,40 @@ async function traceFile(file,source=null){
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
   for(const wall of walls){pc.beginPath();pc.lineWidth=wall.t;pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
+  const placements=[];
   const accepted=await new Promise(resolve=>{
    const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
    const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos. Revisá la vista previa. Aberturas y mobiliario aún no reconocidos.';
    preview.style.cssText='width:100%;max-height:55vh;object-fit:contain;display:block';
-   const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent='Insertar muros';cancel.textContent='Cancelar';ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
-   d.append(title,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+   const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent='Insertar muros y bloques marcados';cancel.textContent='Cancelar';ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
+   const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
+   const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button');
+   const catalog=window.CAD2D_ARQ_LIBRARY?.library||[];
+   const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-cama|dor-queen|dor-king|mob-placard|mob-escritorio|mob-sillon)/.test(i.id));
+   picker.add(new Option('Marcar objeto sobre la imagen…',''));for(const i of candidates)picker.add(new Option(i.name,i.id));
+   for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
+   undo.textContent='Deshacer marca';undo.className='btn';
+   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);pc.strokeStyle='#008b99';for(const wall of walls){pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
+    pc.fillStyle='#b64912';pc.font=Math.max(12,w/70)+'px sans-serif';for(const [i,b] of placements.entries()){pc.beginPath();pc.arc(b.x,b.y,Math.max(4,w/180),0,2*Math.PI);pc.fill();pc.fillText((i+1)+' '+b.name,b.x+6,b.y-6);}};
+   // Position click is the insertion origin, not the centre; source image is kept.
+   preview.onclick=e=>{const it=candidates.find(i=>i.id===picker.value);if(!it)return;const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h),x=(e.clientX-rect.left-(rect.width-w*scale)/2)/scale,y=(e.clientY-rect.top-(rect.height-h*scale)/2)/scale;if(x<0||x>w||y<0||y>h)return;placements.push({x,y,id:it.id,name:it.name,w:it.w,d:it.d,rotation:Number(rot.value)});redraw();};
+   undo.onclick=()=>{placements.pop();redraw();};
+   controls.append(picker,rot,undo);const hint=document.createElement('p');hint.textContent='Opcional: elegí un bloque y marcá su punto de inserción sobre la imagen. Los objetos aún requieren identificación manual.';
+   redraw();d.append(title,hint,controls,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
   if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
   const k=real/w*1000/C.U[S.unit];if(!Number.isFinite(k)||k<=0)return C.toast('Unidad inválida.');
   const center=C.world?C.world({x:C.canvas.clientWidth/2,y:C.canvas.clientHeight/2}):C.P(0,0);
   const Q=source?p=>C.P(Math.min(source.a.x,source.b.x)+p[0]/w*Math.abs(source.b.x-source.a.x),Math.max(source.a.y,source.b.y)-p[1]/h*Math.abs(source.b.y-source.a.y)):p=>C.P(center.x+(p[0]-w/2)*k,center.y+(h/2-p[1])*k);
-  const layerName='CALCO-MUROS';let layer=S.layers.find(l=>l.name===layerName);
-  if(layer&&(layer.locked||layer.visible===false))return C.toast('La capa CALCO-MUROS está bloqueada u oculta.');
-  C.saveHistory();if(!layer){layer={id:'calco_'+Date.now().toString(36),name:layerName,color:'#e5e5e5',visible:true,locked:false};S.layers.push(layer);}
-  const stamp=Date.now().toString(36);let count=0;
-  for(const wall of walls){const a=Q(wall.a),b=Q(wall.b),vertical=wall.a[0]===wall.b[0],edge=vertical?Q([wall.a[0]+wall.t,wall.a[1]]):Q([wall.a[0],wall.a[1]+wall.t]),thickness=Math.hypot(edge.x-a.x,edge.y-a.y),faces=C.wall.faces(a,b,thickness,'center');if(!faces)continue;const group='trace_'+stamp+'_'+count++;for(let i=0;i<2;i++)S.entities.push({id:S.nextId++,type:'line',...faces[i],layer:layer.id,width:.25,wall2d:{group,face:i,thickness,justify:'center',guideA:{...a},guideB:{...b}}});}
-  S.selected=[];C.updateAll();C.zoomExtents?.();C.toast('CALCO: '+count+' tramos de muro editables. Revisá las uniones y los huecos.');
+  // Use the isolated architecture transaction and its native L/T/+ junction solver.
+  if(typeof window.CAD2D_APPLY_TRACE_PLAN!=='function')throw Error('Motor ARQ no disponible; actualizá la página.');
+  const origin=Q([0,h]),toM=1000/C.U[S.unit],local=p=>{const q=Q(p);return [(q.x-origin.x)/toM,(q.y-origin.y)/toM]};
+  const native=walls.map((wall,i)=>{const a=local(wall.a),b=local(wall.b),vertical=wall.a[0]===wall.b[0],edge=local(vertical?[wall.a[0]+wall.t,wall.a[1]]:[wall.a[0],wall.a[1]+wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w.thickness>=.08&&w.thickness<=.5&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
+  if(!native.length)throw Error('Ningún muro tiene espesor válido de 0,08 a 0,50 m. Calibrá la imagen.');
+  const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':'FURNITURE'}));
+  window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:[],blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace'}},origin);
+  C.renderBlockLibrary?.();C.queueLocalBackup?.();C.toast('CALCO: '+native.length+' muros y '+blocks.length+' bloques marcados. Revisá uniones y aberturas.');
  }catch(e){C.toast('Calco: '+(e?.message||e));}finally{bitmap?.close?.();doc?.destroy?.();}
 }
 function pickTrace(){const S=C.state;const imgs=S.entities.filter(e=>e.type==='image'&&S.layers.find(l=>l.id===e.layer)?.visible!==false);const selected=imgs.filter(e=>S.selected.includes(e.id));const source=selected.length===1?selected[0]:selected.length===0&&imgs.length===1?imgs[0]:null;if(source){return traceFile(null,{...source,a:{...source.a},b:{...source.b}});}if(selected.length>1||imgs.length>1){C.toast('Seleccioná una sola imagen para CALCO.');return;}const i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';i.onchange=()=>{if(i.files[0])traceFile(i.files[0])};i.click();}
