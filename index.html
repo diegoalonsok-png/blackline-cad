@@ -1463,7 +1463,7 @@ function cadTrimHistory(){
   bytes-=cadHistorySizes.get(stack.shift())||0;
  }
 }function syncCadHeaderHistoryButtons(){const u=$('cadHeaderUndo'),r=$('cadHeaderRedo');if(u)u.disabled=!state.history.length;if(r)r.disabled=!state.future.length}
-function saveHistory(){state.history.push(historySnapshot());state.future=[];cadTrimHistory();syncCadHeaderHistoryButtons()}
+function saveHistory(snapshot=historySnapshot()){state.history.push(snapshot);state.future=[];cadTrimHistory();syncCadHeaderHistoryButtons()}
 function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
 function redo(){clearOtrackAnchors(false);if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());Object.assign(state,state.future.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('REDO')}
 $('cadHeaderUndo')?.addEventListener('click',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();syncCadHeaderHistoryButtons()});
@@ -2532,7 +2532,7 @@ function cadResizeOpening(ref,meters){
  const target=Number(meters),next=target*1000/U[state.unit]/scale,ratio=next/current;
  if(!(target>=.20&&target<=20&&Number.isFinite(next)&&next>0&&current>0))return {ok:false,reason:'Ancho inválido: usá entre 0.20 y 20 metros'};
  if(Math.abs(ratio-1)<1e-9)return {ok:true,width:target,unchanged:true};
- const snapshot=historySnapshot(),hadWall=state.entities.some(e=>e.autoOpeningRef===ref.id);
+ const snapshot=historySnapshot(),historyBefore=state.history.slice(),futureBefore=state.future,hadWall=state.entities.some(e=>e.autoOpeningRef===ref.id);
  const params={...def.parametric.defaults,...ref.params,width:next};
  if(kind==='framed-window'){
   params.frameDepth=cadWindowDepthModel(ref,def);
@@ -2541,10 +2541,10 @@ function cadResizeOpening(ref,meters){
   params.frameWidth=Number(params.frameWidth)*ratio;
   params.frameDepth=Number(params.frameDepth)*ratio;
  }
- saveHistory();ref.params=params;
+ saveHistory(snapshot);ref.params=params;
  const result=relocateOpeningWithBlock(ref,clone(ref.p));
  if(!result.ok||(hadWall&&!result.cut)){
-  Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();updateAll();
+  Object.assign(state,snapshot);state.history=historyBefore;state.future=futureBefore;syncCadHeaderHistoryButtons();updateAll();
   return {ok:false,reason:'No se puede actualizar el vano: operación cancelada'};
  }
  updateAll();return {ok:true,width:target,cut:result.cut};
@@ -2950,12 +2950,12 @@ function cadEditOpeningClearance(hit){
   const total=Math.hypot(wall.b.x-wall.a.x,wall.b.y-wall.a.y);
   if(!Number.isFinite(wanted)||wanted<0||wanted+span>total+1e-8){toast('La posición excede los límites del muro');field.focus();return}
   if(Math.abs(delta)<1e-9){close();return}
-  const snapshot=historySnapshot();
-  saveHistory();
+  const snapshot=historySnapshot(),historyBefore=state.history.slice(),futureBefore=state.future;
+  saveHistory(snapshot);
   ref.p=add(ref.p,mul(wall.tangent,delta));
   const result=relocateOpeningWithBlock(ref,before);
   if(!result.ok||(state.entities.some(e=>e.autoOpeningRef===ref.id)&&!result.cut)){
-   Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();
+   Object.assign(state,snapshot);state.history=historyBefore;state.future=futureBefore;syncCadHeaderHistoryButtons();
    updateAll();toast(result.reason||'No se pudo reconstruir el vano; movimiento cancelado');close();return;
   }
   updateAll();close();toast('Distancia ajustada: '+wanted.toFixed(state.precision)+' '+state.unit+' · Ctrl+Z para deshacer');
@@ -3003,13 +3003,13 @@ function cadOpeningNumericDrag(firstKey){
    close();cadCommitVertexMove(target);return;
   }
   const original=P(d.original.x,d.original.y);
-  const snapshot=historySnapshot();
-  if(!d.moved)saveHistory();
+  const snapshot=historySnapshot(),historyBefore=state.history.slice(),futureBefore=state.future;
+  if(!d.moved)saveHistory(snapshot);
   ref.p=target;
   const result=relocateOpeningWithBlock(ref,original);
   if(!result.ok){
    Object.assign(state,snapshot);
-   if(!d.moved&&state.history.length)state.history.pop();
+   if(!d.moved){state.history=historyBefore;state.future=futureBefore;}
    syncCadHeaderHistoryButtons();state.drag=null;close();updateAll();
    toast(result.reason||'No se pudo desplazar el vano');return;
   }
