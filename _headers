@@ -28,3 +28,13 @@
 
 /manifest.webmanifest
   Content-Type: application/manifest+json
+
+/
+  Cache-Control: no-cache, must-revalidate
+
+/dwg-wasm/pkg/blackline_dwg_bg.wasm
+  Content-Type: application/wasm
+  Cache-Control: no-cache, must-revalidate
+
+/dwg-wasm/pkg/blackline_dwg.js
+  Cache-Control: no-cache, must-revalidate
