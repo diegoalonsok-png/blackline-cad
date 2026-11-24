@@ -42,8 +42,11 @@ async function convertLocal(file,direction,options={}){
  }
 }
 async function convertOnce(file,direction,allowPartial,options={}){
+ const signal=options.signal;
+ if(signal?.aborted)throw Error('Conversión cancelada');
  if(!file.size||file.size>64*1024*1024)throw Error('Archivo vacío o mayor a 64 MiB');
  let bytes=await file.arrayBuffer();
+ if(signal?.aborted)throw Error('Conversión cancelada');
  if(direction==='dxf-dwg'){
   const raw=new Uint8Array(bytes),marker=new TextEncoder().encode('CAD2D-PROJECT-JSON');
   // Strip the app's optional embedded project only when directly after DXF EOF.
@@ -58,9 +61,12 @@ async function convertOnce(file,direction,allowPartial,options={}){
  return new Promise((resolve,reject)=>{
   const worker=new Worker(new URL('cad-dwg-local-worker.js?v=20261123-wasm-v4',document.baseURI),{type:'module'}),timer=setTimeout(()=>finish('Tiempo límite de conversión'),180000);
   let done=false;
-  function finish(error,output){if(done)return;done=true;clearTimeout(timer);worker.terminate();if(error)reject(Error(error));else resolve(output)}
-  worker.onmessage=e=>{if(!e.data.error&&options.preview instanceof ArrayBuffer)options.onPreview?.(e.data.previewEmbedded===true);finish(e.data.error,e.data.output)};
+  const abort=()=>finish('Conversión cancelada');
+  function finish(error,output){if(done)return;done=true;clearTimeout(timer);signal?.removeEventListener('abort',abort);worker.terminate();if(error)reject(Error(error));else resolve(output)}
+  worker.onmessage=e=>{const d=e.data||{};if(d.error)return finish(d.error);if(!(d.output instanceof ArrayBuffer)||!d.output.byteLength)return finish('Salida inválida del conversor');try{if(options.preview instanceof ArrayBuffer)options.onPreview?.(d.previewEmbedded===true)}catch(err){return finish(err.message||String(err))}finish(null,d.output)};
   worker.onerror=e=>finish(e.message||'No pudo iniciarse el motor');
+  worker.onmessageerror=()=>finish('No se pudo recuperar la respuesta del conversor');
+  if(signal?.aborted)return abort();signal?.addEventListener('abort',abort,{once:true});
   try{worker.postMessage({bytes,direction,allowPartial,preview:options.preview},[bytes])}catch(err){finish(err.message)}
  });
 }
