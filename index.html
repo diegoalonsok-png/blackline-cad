@@ -3639,9 +3639,10 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
   const osnapProbe=orthoLocksPointer&&trackingEligible()?rawPointer:q;
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
+  const lookup=cadSelectionLayerLookup(),tol=11/state.view.scale;
   for(const e of state.entities){
-   const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
-   const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
+   const lay=lookup(e);if(!lay.visible||lay.locked)continue;
+   const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e);if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
    // not just their insertion point. Read-only: never alter block entities.
@@ -3745,7 +3746,14 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
-function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
+// Local to each synchronous selection query: never cache geometry or layers across edits.
+function cadSelectionLayerLookup(){
+ const layers=new Map();
+ for(const l of state.layers)if(!layers.has(l.id))layers.set(l.id,l);
+ const fallback=state.layers[0];
+ return e=>{const l=layers.get(e.layer)||fallback;return l?.frozen?{...l,visible:false}:l};
+}
+function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;const lookup=cadSelectionLayerLookup();for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=lookup(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
   if(!s.length){s.push(P(p.x,p.y));prompt();schedule();return}
@@ -5440,8 +5448,9 @@ function cadApplyWindowSelection(start,end,shift,path){
  const useLasso=Array.isArray(path)&&path.length>=2;
  const poly=useLasso?[start,...path]:null;
  const l=Math.min(start.x,end.x),r=Math.max(start.x,end.x),t=Math.min(start.y,end.y),b=Math.max(start.y,end.y);
+ const lookup=cadSelectionLayerLookup();
  const ids=state.entities.filter(e=>{
-  const layer=layerFor(e);if(!layer.visible||layer.locked)return false;
+  const layer=lookup(e);if(!layer.visible||layer.locked)return false;
   const bb=cadSelectionBox(e);if(!bb)return false;
   if(poly)return cadLassoHitsBox(poly,bb,crossing);
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
