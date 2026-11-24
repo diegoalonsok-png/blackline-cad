@@ -9299,6 +9299,7 @@ function cadDocumentBlockSelection(){
  for(const b of $('cadDocumentBlocks').querySelectorAll('[data-doc-block-action]'))b.disabled=!def;
 }
 function cadInitDocumentBlocks(dock){
+ if(!dock||$('cadDocumentBlocks'))return;
  const panel=document.createElement('section');panel.className='cad-document-blocks';panel.id='cadDocumentBlocks';
  panel.innerHTML='<button type="button" class="btn slim" id="cadDocBlockToggle" aria-controls="cadDocBlockBody" aria-expanded="false" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO <span id="cadDocBlockBadge">(0)</span> <span id="cadDocBlockArrow">+</span></button><div class="panel-content" id="cadDocBlockBody" style="padding:6px 0" hidden><small id="cadDocBlockCount"></small><select id="cadDocBlockSelect" aria-label="Bloques del archivo" style="width:100%;margin:6px 0"></select><div id="cadDocBlockPreview"></div><small id="cadDocBlockInfo"></small><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn slim" data-doc-block-action="insert">Insertar</button><button class="btn slim" data-doc-block-action="edit">Editar</button><button class="btn slim" data-doc-block-action="select">Seleccionar instancias</button><button class="btn slim" data-doc-block-action="save">＋ Guardar en galería</button></div><div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><small>Mis bloques guardados</small><select id="cadDocSavedSelect" aria-label="Mis bloques guardados" style="width:100%;margin:4px 0"></select><button type="button" class="btn slim" id="cadDocSavedInsert" style="width:100%" disabled>Insertar bloque guardado</button></div></div>';
  const gallery=$('blacklineBlockGallery');dock.insertBefore(panel,gallery?.parentElement===dock?gallery.nextSibling:null);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockArrow').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh();if(!body.hidden)refreshSaved()};
@@ -9318,6 +9319,14 @@ function cadInitDocumentBlocks(dock){
   if(b.dataset.docBlockAction==='save'){b.disabled=true;try{await cadPersonalBlockSave(name)}catch(err){toast('No se pudo guardar: '+err.message)}finally{b.disabled=false}}
  });cadDocumentBlocksRefresh();
 }
+window.CAD2D_MOUNT_DOCUMENT_BLOCKS=function(slot){
+ if(!slot)return false;
+ if(!$('cadDocumentBlocks'))cadInitDocumentBlocks(slot);
+ const panel=$('cadDocumentBlocks');if(!panel)return false;
+ if(panel.parentElement!==slot)slot.replaceChildren(panel);
+ else slot.querySelector('#arqDrawingBlocksFallback')?.remove();
+ cadDocumentBlocksRefresh();return true;
+};
 function openBlacklineBlockPalette(){
  const panel=$('blacklineBlockGallery');if(!panel)return toast('Block library is unavailable');
  const body=$('blBody');if(body)body.hidden=false;
@@ -11062,10 +11071,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261123-olimpiadas1251-v2"></script>
-<script>
-(function(){const panel=document.getElementById("cadDocumentBlocks"),anchor=document.getElementById("arqOpenOlimpiadas");if(panel&&anchor){anchor.after(panel);const toggle=panel.querySelector("#cadDocBlockToggle");if(toggle)toggle.className=anchor.className;}})();
-</script>
+<script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
 <script src="cad-dwg-batch.js?v=20261123-1"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
