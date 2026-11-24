@@ -77,6 +77,8 @@ var icons={
  window:'<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/>',
  slab:'<path d="M2 9 17 4l5 5-15 6-5-6ZM2 9v5l5 6v-5M7 15l15-6v5l-15 6"/>',
  floor:'<path d="M2 9 17 4l5 5-15 6-5-6M2 9v5l5 6v-5M7 15v5l15-6V9M7 20l15-6"/>',
+ stair:'<path d="M2 21h20V3h-5v5h-5v5H7v4H2zM7 17l4 3M12 13l4 3M17 8l4 3"/>',
+ railing:'<path d="M3 21V9l18-6M3 15l18-6M9 19V7m6 10V5m6 10V3"/>',
  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.5 1.5m11.2 11.2 1.5 1.5M19.1 4.9l-1.5 1.5M6.4 17.6l-1.5 1.5"/>',
  union:'<rect x="2" y="8" width="12" height="12"/><rect x="10" y="3" width="12" height="12"/>',
  subtract:'<rect x="2" y="7" width="16" height="14"/><path d="M10 3h12v11h-7" stroke-dasharray="3 2"/>',
@@ -3187,6 +3189,7 @@ function cad3dBasicBars(){
    tool('rectangle','Rectangle','rectangle')+tool('circle','Circle','circle')+tool('arc','Arc','arc')+
    tool('wall','Wall','wall')+tool('slab','Slab','slab')+tool('floor','Floor','floor')+
    tool('door','Door','door')+tool('window','Window','window')+tool('opening','Opening','opening')+
+   tool('stair-gallery','Escaleras','stair','Escaleras 3D · elegir tipología')+tool('railing-gallery','Pasamanos','railing','Pasamanos y barandas 3D · elegir estilo')+
    tool('box','Box','cube')+tool('sphere','Sphere','sphere')+
    tool('cylinder','Cylinder','cylinder')+tool('cone','Cone','cone')+'</div>'+
   '<div class="cad3dBar" role="toolbar" aria-label="Modify"><strong>MODIFY</strong>'+
@@ -4364,6 +4367,9 @@ function build(){
   if(button){if(menu)menu.querySelector('summary').focus();if(button.dataset.action==='sketch'){
    var panel=root.querySelector('.stylePanel');panel.hidden=!panel.hidden;
    root.querySelector('.styleLaunch').setAttribute('aria-expanded',String(!panel.hidden));
+  }else if(['stair-gallery','railing-gallery'].includes(button.dataset.action)){
+   cad3dStairsBetaEnabled=true;try{localStorage.setItem('blackline-cad3d-stairs-beta-v1','on');}catch(_e){}
+   setPlacement(null);activeCategory=button.dataset.action==='stair-gallery'?'stair':'railing';showArchPalette(true);
   }else action(button.dataset.action);}
  });
  root.querySelector('.cad3dModelTools').addEventListener('click',function(e){
