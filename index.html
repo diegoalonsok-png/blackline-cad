@@ -4620,20 +4620,39 @@ function regularPolygon(center,vertex,sides){
  return Array.from({length:sides},(_,i)=>P(center.x+r*Math.cos(theta+TAU*i/sides),center.y+r*Math.sin(theta+TAU*i/sides)));
 }
 function hatchPolygonSegments(vertices,spacing,angleDegrees,limit=12000){
+ if(!Array.isArray(vertices)||vertices.length<3||!Number.isFinite(spacing)||spacing<=0||!Number.isFinite(angleDegrees)||!Number.isSafeInteger(limit)||limit<0)return null;
  const theta=angleDegrees*Math.PI/180,direction=P(Math.cos(theta),Math.sin(theta)),normal=P(-direction.y,direction.x);
- const project=p=>P(p.x*direction.x+p.y*direction.y,p.x*normal.x+p.y*normal.y);
- const raw=vertices.map(project);
- const minV=Math.min(...raw.map(p=>p.y)),maxV=Math.max(...raw.map(p=>p.y));
+ const raw=[];let minV=Infinity,maxV=-Infinity;
+ for(const p of vertices){
+  if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))return null;
+  const q=P(p.x*direction.x+p.y*direction.y,p.x*normal.x+p.y*normal.y);
+  if(!Number.isFinite(q.x)||!Number.isFinite(q.y))return null;
+  raw.push(q);minV=Math.min(minV,q.y);maxV=Math.max(maxV,q.y);
+ }
  const start=Math.ceil((minV+1e-9)/spacing),end=Math.floor((maxV-1e-9)/spacing);
- if(end-start>limit)return null;
- const output=[];
+ if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||end-start>limit)return null;
+ if(end<start)return [];
+ // Sweep only edges that intersect the current hatch scanline.
+ const edges=[];
+ for(let i=0;i<raw.length;i++){
+  let a=raw[i],b=raw[(i+1)%raw.length];if(a.y===b.y)continue;
+  if(a.y>b.y)[a,b]=[b,a];
+  edges.push({a,b});
+ }
+ edges.sort((u,v)=>u.a.y-v.a.y);
+ const output=[],active=[];let next=0,work=0;
  for(let index=start;index<=end;index++){
   const y=index*spacing,intersections=[];
-  for(let j=0;j<raw.length;j++){
-   const a=raw[j],b=raw[(j+1)%raw.length];
-   if((a.y<=y&&b.y>y)||(b.y<=y&&a.y>y))
-    intersections.push(a.x+(b.x-a.x)*(y-a.y)/(b.y-a.y));
+  while(next<edges.length&&edges[next].a.y<=y){if(edges[next].b.y>y)active.push(edges[next]);next++}
+  let count=0;
+  for(const edge of active){
+   if(edge.b.y<=y)continue;
+   active[count++]=edge;
+   if(++work>8000000)return null;
+   const {a,b}=edge;
+   intersections.push(a.x+(b.x-a.x)*(y-a.y)/(b.y-a.y));
   }
+  active.length=count;
   intersections.sort((a,b)=>a-b);
   for(let k=0;k+1<intersections.length;k+=2){
    const x1=intersections[k],x2=intersections[k+1];
