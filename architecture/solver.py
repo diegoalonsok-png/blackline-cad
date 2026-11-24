@@ -5,6 +5,8 @@ The CAD adapter is responsible for native walls, hosted openings and block refer
 """
 import json
 import math
+import re
+import unicodedata
 import sys
 from dataclasses import dataclass
 
@@ -79,7 +81,7 @@ def clearance(kind,rot,r):
             Rect(r.x,r.y-a,r.w,r.d+a) if rot==180 else
             Rect(r.x,r.y,r.w+a,r.d))
 
-def arrange(w,d,fixtures,door):
+def arrange(w,d,fixtures,door,extra_protected=()):
     protected = Rect((w-door)/2,0,door,door)  # full conservative door swing envelope
     order = sorted(fixtures,key=lambda key: CATALOG[key][1]*CATALOG[key][2],reverse=True)
     result=[]
@@ -92,7 +94,7 @@ def arrange(w,d,fixtures,door):
             nodes+=1
             if nodes>50000: return False
             access=clearance(kind,rot,r)
-            if not access.inside(w,d) or r.overlaps(protected,.02): continue
+            if not access.inside(w,d) or r.overlaps(protected,.02) or any(r.overlaps(zone,.02) for zone in extra_protected): continue
             if any(r.overlaps(old,.02) or r.overlaps(a,.02) or access.overlaps(old,.02)
                    for _,_,old,a in result): continue
             result.append((kind,rot,r,access))
@@ -143,6 +145,98 @@ def solve(spec):
               {"room":"room"+str(i),"axis":"depth","value":d,"between":[front,back],"editable":True}])
     return plan
 
+def interpret(text):
+    """Limited bilingual semantic interpreter. No LLM or external API required."""
+    s = "".join(ch for ch in unicodedata.normalize("NFD", text.lower())
+                if unicodedata.category(ch) != "Mn")
+    words = dict(zip(("un","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez"),range(1,11)))
+    words.update(zip(("one","two","three","four","five","six","seven","eight","nine","ten"),range(1,11)))
+    count = re.search(r"\b(\d+|"+ "|".join(words)+r")\s+(?:habitacion(?:es)?|dormitorios?|bedrooms?|rooms?)\b",s)
+    private = re.search(r"\b(?:cada\s+un[oa]|cada\s+(?:habitacion|dormitorio)|en suite|privad[oa]s?|each|ensuite|en-suite|private)\b",s)
+    bath = re.search(r"\b(?:banos?|bathrooms?|baths?)\b",s)
+    if not (count and private and bath):
+        raise ValueError("This interpreter currently supports rows of bedrooms with individual bathrooms.")
+    row = re.search(r"\b(?:pegad[oa]s?|contigu[oa]s?|tandem|fila|al lado|side by side|adjoining|in a row|adjacent)\b",s)
+    if not row:
+        raise ValueError("Specify the arrangement of the bedrooms (row or side by side).")
+    if re.search(r"\b(?:vestidor|closet|balcon|balcony|pasillo|corridor|dos plantas|two floors)\b",s):
+        raise ValueError("Additional requested elements are not yet supported by this interpreter.")
+    n = words[count[1]] if count[1] in words else int(count[1])
+    number = r"(\d+(?:[.,]\d+)?)"
+    dim = number+r"\s*(?:x|×|por|by)\s*"+number
+    bedroom_text = s[:bath.start()]
+    bath_text = s[bath.start():]
+    m = re.search(dim,bedroom_text)
+    bm = re.search(dim,bath_text)
+    t = re.search(r"(?:muros?|walls?)\s+(?:de\s+|of\s+)?"+number+r"\s*(cm|mm|m\b)?",s)
+    num=lambda v:float(v.replace(",","."))
+    if bm and m is None and re.search(dim,s) and not re.search(r"(?:banos?|bathrooms?)\s+(?:de\s+|of\s+)?"+dim,bath_text):
+        raise ValueError("Specify which room the dimensions refer to.")
+    width,depth = (num(m[1]),num(m[2])) if m else (4.,5.)
+    bw,bd = (num(bm[1]),num(bm[2])) if bm else (width,2.4)
+    wall = num(t[1]) / (100 if t[2]=="cm" else 1000 if t[2]=="mm" else 1) if t else .15
+    bathtub=bool(re.search(r"\b(?:banadera|banera|bathtub|bath tub|tub)\b",s))
+    shower=bool(re.search(r"\b(?:ducha|shower)\b",s))
+    fixtures=["toilet","bidet","basin"]+ (["bathtub"] if bathtub else []) + (["shower"] if shower or not bathtub else [])
+    return {"kind":"suite_row","count":n,"width":width,"depth":depth,"bathWidth":bw,"bathDepth":bd,
+            "wall":wall,"bathFixtures":fixtures,
+            "assumptions":[k for k,v in (("bedroom dimensions: 4 x 5 m",not m),
+                ("bathroom: full bedroom width x 2.4 m",not bm),("wall: 0.15 m",not t),
+                ("standard doors 0.80 m and windows 1.20 m",True)) if v]}
+
+def solve_suite_row(spec):
+    """Attach one private bathroom behind each bedroom, sharing the partition."""
+    w,d,bw,bd,t=map(float,(spec["width"],spec["depth"],spec.get("bathWidth",spec["width"]),
+                        spec.get("bathDepth",2.4),spec.get("wall",.15)))
+    n=spec["count"]
+    if not math.isclose(w,bw,abs_tol=1e-8):
+        raise ValueError("This version requires bathroom width equal to bedroom width; no silent resizing.")
+    if w<3.0:
+        raise ValueError("Bedroom width must accommodate both entrance and external window.")
+    # Reuse the dimensional validation, not a pre-drawn room.
+    front=solve(dict(kind="bedroom",width=w,depth=d,wall=t,count=n,fixtures=[]))
+    rear=solve(dict(kind="bathroom",width=bw,depth=bd,wall=t,count=n,fixtures=spec.get("bathFixtures",DEFAULTS["bathroom"])))
+    bedrooms=arrange(w,d,DEFAULTS["bedroom"],.8,extra_protected=(Rect((w-.8)/2,d-.8,.8,.8),))
+    plan=front
+    plan["assumptions"]=spec.get("assumptions",[])
+    plan["connections"]=[]
+    dy=d+t
+    # Side wall centreline continues through the bathroom: one shared wall per pair of suites.
+    for a in plan["walls"]:
+        if a["id"].startswith("side"): a["b"][1]+=bd+t
+    for a in rear["walls"]:
+        if a["id"].startswith("back"):
+            plan["walls"].append({**a,"id":"bath-"+a["id"],
+                                  "a":[a["a"][0],a["a"][1]+dy],"b":[a["b"][0],a["b"][1]+dy]})
+    # Replace rear bedroom window with the private connecting door.
+    for a in plan["openings"]:
+        if a["host"].startswith("back"):
+            a.update(kind="swing-door",width=.8,connects=["room"+a["host"][4:],"bath-room"+a["host"][4:]])
+    for i in range(n):
+        plan["openings"].append({"host":"front"+str(i),"kind":"framed-window","offset":(w+t)/2-.8/2-1.2/2-.2,"width":1.2,"layer":"OPENINGS"})
+        plan["connections"].append({"from":"room"+str(i),"to":"bath-room"+str(i),"via":"back"+str(i),"private":True})
+        x=t+i*(w+t)
+        for key,rot,r,_ in bedrooms:
+            block_id,b1,b2=CATALOG[key]
+            ox,oy={0:(0,0),90:(r.w,0),180:(r.w,r.d),270:(0,r.d)}[rot]
+            plan["blocks"].append({"catalogId":block_id,"role":key,"point":[x+r.x+ox,t+r.y+oy],
+                "rotation":rot,"scale":1,"layer":"FURNITURE","envelope":[x+r.x,t+r.y,r.w,r.d],"nominalSize":[b1,b2]})
+    for a in rear["openings"]:
+        if a["host"].startswith("back"): plan["openings"].append({**a,"host":"bath-"+a["host"]})
+    for a in rear["rooms"]:
+        x,y,w0,d0=a["clearBounds"]
+        plan["rooms"].append({**a,"id":"bath-"+a["id"],"clearBounds":[x,y+dy,w0,d0],"privateTo":a["id"]})
+    for a in rear["blocks"]:
+        x,y=a["point"];ex,ey,ew,ed=a["envelope"]
+        plan["blocks"].append({**a,"point":[x,y+dy],"envelope":[ex,ey+dy,ew,ed]})
+    for a in rear["virtualDimensions"]:
+        plan["virtualDimensions"].append({**a,"room":"bath-"+a["room"],
+            "between":[("bath-"+b if b.startswith("back") else b.replace("front","back",1) if b.startswith("front") else b) for b in a["between"]]})
+    return plan
+
+def solve_instruction(text):
+    return solve_suite_row(interpret(text))
+
 def selftest():
     for kind,w,d,n in [("bedroom",4,5,3),("bathroom",2,2.4,1),("kitchen",4,5,1),("living",5,8,1)]:
         p=solve(dict(kind=kind,width=w,depth=d,count=n))
@@ -156,8 +250,21 @@ def selftest():
     try: solve(dict(kind="bathroom",width=1.2,depth=1.2))
     except ValueError: pass
     else: raise AssertionError("Impossible bathroom should fail")
+    for instruction in ("Necesito 3 habitaciones pegadas una al lado de la otra cada una con su baño con bañadera",
+                        "Three bedrooms side by side each with a private bathroom with bathtub"):
+        p=solve_instruction(instruction)
+        assert len(p["rooms"])==6 and len(p["connections"])==3
+        assert sum(a["role"]=="bathtub" for a in p["blocks"])==3
+        assert sum(a["kind"]=="swing-door" for a in p["openings"])==6
+        assert sum(a["kind"]=="framed-window" for a in p["openings"])==6
+        assert len(p["walls"])==13 and len(p["virtualDimensions"])==12
+        assert all(a["scale"]==1 for a in p["blocks"])
+        assert all(a["host"] in {w["id"] for w in p["walls"]} for a in p["openings"])
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
     if "--selftest" in sys.argv: selftest()
-    else: print(json.dumps(solve(json.load(sys.stdin)),ensure_ascii=False))
+    elif "--text" in sys.argv: print(json.dumps(solve_instruction(sys.stdin.read()),ensure_ascii=False))
+    else:
+        spec=json.load(sys.stdin)
+        print(json.dumps(solve_suite_row(spec) if spec.get("kind")=="suite_row" else solve(spec),ensure_ascii=False))
