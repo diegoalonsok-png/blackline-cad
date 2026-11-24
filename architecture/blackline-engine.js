@@ -354,6 +354,13 @@ function compactBathTemplate(spec){
 function compoundInstruction(text){
  const s=normalize(text).replace(/\bentreda\b/g,'entrada');
  const isHouse=/\b(?:casa|vivienda|house)\b/.test(s);
+ const hallMatch=s.match(/\b(?:pasillo|corredor)\s*(?:comun\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|metros?)?\b/);
+ const hallRooms=s.match(/\b(\d+|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:habitaciones|dormitorios)\b/);
+ if(!isHouse&&hallMatch&&hallRooms&&!/\b(?:banos?|vestidores?|cocinas?|sin|variantes|alternativas|escaleras?|balcon|mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia)\b/.test(s)){
+  const count=Number(numberWords[hallRooms[1]]||hallRooms[1]),size=dimensions(s.slice(0,hallMatch.index))||[4,5],passage=num(hallMatch[1])*unitScale(hallMatch[2]);
+  if(count<1||count>20||!size.every(x=>x>=1.5&&x<=15)||passage<1||passage>4)throw Error('Pasillo: ancho entre 1 y 4 m; hasta 20 habitaciones.');
+  return {kind:'compound_hall',variants:1,groups:[{count,size}],passage};
+ }
  // Explicit size groups, including elliptical references ("una más").
  if(!isHouse&&/\b(?:habitacion(?:es)?|dormitorios?)\b/.test(s)&&!/\b(?:banos?|cocinas?|vestidores?|living|comedor|oficina|corte|seccion|escalera|pasamanos|sin|con|mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia|versiones|variantes|alternativas)\b/.test(s)){
   const clauses=s.split(/\s+(?:y\s+)+|\s*\+\s*|;\s*/).filter(x=>x.trim());
@@ -396,13 +403,13 @@ function compoundInstruction(text){
  return {kind:'compound_house',variants,bedrooms,bedroomSize,bathSize,kitchenSize,livingSize,service,serviceSize,assumedBedrooms:!q};
 }
 function compoundPlan(spec){
- const t=.15,door=.8,passage=1.2;
+ const t=.15,door=.8,passage=spec.passage??1.2;
  const out={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks:[],rooms:[],virtualDimensions:[],connections:[],variants:[],brief:spec,assumptions:[],status:'approximate'};
  const notes=new Set(['Anteproyecto editable; no verifica estructura, terreno, ventilación ni normativa.']);
  if(spec.kind==='compound_house'){
   if(spec.assumedBedrooms)notes.add('Cantidad no indicada: se proponen dos dormitorios.');
   notes.add('Circulación común de 1,20 m; medidas de ambientes no indicadas adoptadas como propuesta.');
- }else if(spec.kind==='compound_bedrooms')notes.add('Habitaciones contiguas en fila, acceso independiente desde el exterior; muro de 0,15 m y aberturas iniciales.');else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
+ }else if(spec.kind==='compound_hall')notes.add('Pasillo común de '+passage+' m de ancho libre.');else if(spec.kind==='compound_bedrooms')notes.add('Habitaciones contiguas en fila, acceso independiente desde el exterior; muro de 0,15 m y aberturas iniciales.');else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
  let dx=0;
  for(let v=0;v<spec.variants;v++){
   const prefix='v'+v+'-',rects=[],requests=[],raw=[],roomSpecs=[];
@@ -418,6 +425,12 @@ function compoundPlan(spec){
   let total=0;
   if(spec.kind==='compound_bedrooms'){
    let index=0;for(const group of spec.groups)for(let n=0;n<group.count;n++){makeRoom('bed'+index++,'bedroom',total,0,...group.size,'S',DEFAULT.bedroom[2]);total+=group.size[0]+t;}
+  }else if(spec.kind==='compound_hall'){
+   const cy=passage+t;
+   let index=0;for(const group of spec.groups)for(let n=0;n<group.count;n++){const room=makeRoom('bed'+index++,'bedroom',total,cy,...group.size,'S',DEFAULT.bedroom[2]);out.connections.push({from:prefix+'hall',to:room.id,private:false});total+=group.size[0]+t;}
+   rects.push({x:0,y:0,X:total,Y:cy});
+   out.rooms.push({id:prefix+'hall',kind:'circulation',clearBounds:[dx+t/2,t/2,total-t,passage]});
+   requests.push({kind:'swing-door',a:[0,cy],b:[0,0],center:[0,cy/2],width:.9,entry:true});
   }else if(spec.kind==='compound_pair'){
    const items=[fixture('bath','bathroom',spec.bathSize),fixture('kitchen','kitchen',spec.kitchenSize)];if(v%2)items.reverse();
    for(const item of items){makeRoom(item.id,item.kind,total,0,...item.size,'S',item.items);total+=item.size[0]+t+1.5;}
