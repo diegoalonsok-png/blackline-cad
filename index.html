@@ -7413,11 +7413,16 @@ function importDXF(text,name,opts){
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
  const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
  const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
- const silent=new Set(['POINT','VIEWPORT','SEQEND','VERTEX','ACAD_PROXY_ENTITY','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
+ const silent=new Set(['POINT','VIEWPORT','SEQEND','VERTEX','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
  const note=t=>unsupported.set(t,(unsupported.get(t)||0)+1);
  // --- Read one record in block-local coordinates ---
  function readRecord(type,record,recs,idx){
   const {get,str}=fields(record);
+  if(type==='ACAD_PROXY_ENTITY'){
+   const recovered=window.CAD2DProxy2D?.decode(record)||[];
+   note(recovered.length?'ACAD_PROXY_ENTITY (representación gráfica parcial, sin propiedades AEC)':'ACAD_PROXY_ENTITY (sin geometría recuperable)');
+   return recovered.length?recovered:null;
+  }
   if(type==='LINE')return{type:'line',a:P(get(10),get(20)),b:P(get(11),get(21))};
   if(type==='CIRCLE'&&get(40)>0)return{type:'circle',c:P(get(10),get(20)),r:get(40)};
   if(type==='ARC'&&get(40)>0)return{type:'arc',c:P(get(10),get(20)),r:get(40),a0:get(50)*Math.PI/180,a1:get(51)*Math.PI/180};
@@ -7602,7 +7607,7 @@ function importDXF(text,name,opts){
  let warning=[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')');
  log('DXF imported: '+entities.length+' entities · '+state.layers.length+' layers');
  toast('DXF imported: '+entities.length+' supported entities');
- if(warning.length)alert('Importación con advertencias: CAD2D no puede representar todavía estos elementos y no los muestra:\n\n· '+warning.join('\n· ')+'\n\nEl archivo original no se modifica: si lo guardás desde CAD2D con otro nombre, conservá el original para no perderlos.');
+ if(warning.length)alert('Importación con advertencias: CAD2D no puede representar íntegramente estos elementos:\n\n· '+warning.join('\n· ')+'\n\nEl archivo original no se modifica: si lo guardás desde CAD2D con otro nombre, conservá el original para no perderlos.');
 }
 
 /* Plano típico (DXF) insertado dentro del dibujo actual: muros y líneas sueltos, pero el mobiliario,
@@ -11140,6 +11145,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
 <script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
+<script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dwg-batch.js?v=20261123-local-bidirectional-v3"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
