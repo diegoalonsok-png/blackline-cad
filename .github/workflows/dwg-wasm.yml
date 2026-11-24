@@ -1,0 +1,42 @@
+name: DWG WASM build and roundtrip
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['dwg-wasm/**', '.github/workflows/dwg-wasm.yml']
+permissions:
+  contents: read
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Test native roundtrip
+        run: cargo test --manifest-path dwg-wasm/Cargo.toml
+      - name: Install wasm-pack
+        run: cargo install wasm-pack --version 0.13.1 --locked
+      - name: Build browser module
+        run: wasm-pack build dwg-wasm --target web --release --out-dir pkg --out-name blackline_dwg
+      - name: Test browser WASM in Node
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';
+          import init,{dwg_to_dxf,dxf_to_dwg} from './dwg-wasm/pkg/blackline_dwg.js';
+          await init({module_or_path:await readFile('./dwg-wasm/pkg/blackline_dwg_bg.wasm')});
+          const dxf=await readFile('examples/scale-1to1-test.dxf');
+          const dwg=dxf_to_dwg(dxf);
+          if(!new TextDecoder().decode(dwg.slice(0,6)).match(/^AC10\d\d$/))throw Error('DWG header invalid');
+          const output=new TextDecoder().decode(dwg_to_dxf(dwg));
+          if(!output.includes('SECTION')||!output.includes('LINE'))throw Error('DXF geometry missing');
+          JS
+      - name: Package source and licence notice
+        run: |
+          cp dwg-wasm/README.md dwg-wasm/pkg/SOURCE-NOTICE.md
+          cp dwg-wasm/Cargo.lock dwg-wasm/pkg/Cargo.lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blackline-dwg-wasm-tested
+          path: dwg-wasm/pkg/
