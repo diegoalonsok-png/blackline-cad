@@ -121,5 +121,81 @@ const EXT=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:
 for(const k of ['PDFIMPORT','IMPORTARPDF','PDFIMPORTAR','PDF'])EXT.commands[k]=()=>pick();
 const ICON='<path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><text x="7.5" y="17" font-size="6" font-family="Arial" stroke="none" fill="currentColor">PDF</text>';
 try{C.ribbon?.add('output','PDF',[{id:'outPdfImport',label:'Importar PDF · PDFIMPORT',icon:ICON,run:()=>pick()}]);C.ribbon?.rebuild()}catch(e){}
+
+/* CALCO: local raster line extraction. First version, orthogonal plans only. */
+function traceRuns(mask,w,h,min){
+ const result=[];
+ function scan(vertical){
+  const rows=vertical?w:h,cols=vertical?h:w,groups=[];
+  for(let y=0;y<rows;y++){
+   let x=0;
+   while(x<cols){
+    const dark=i=>mask[vertical?i*w+y:y*w+i];
+    while(x<cols&&!dark(x))x++;
+    const a=x;while(x<cols&&dark(x))x++;
+    if(x-a<min)continue;
+    const b=x-1;
+    const g=groups.findLast(g=>g.last===y-1&&Math.abs(g.a-a)<=3&&Math.abs(g.b-b)<=3);
+    if(g){g.last=y;g.a=(g.a*g.n+a)/(g.n+1);g.b=(g.b*g.n+b)/(g.n+1);g.n++;}
+    else groups.push({a,b,first:y,last:y,n:1});
+   }
+  }
+  for(const g of groups){
+   const cy=(g.first+g.last)/2;
+   // Discard broad filled areas; retain the centre of thin strokes.
+   if(g.last-g.first+1>Math.max(12,(g.b-g.a)*.25))continue;
+   result.push(vertical?[[cy,g.a],[cy,g.b]]:[[g.a,cy],[g.b,cy]]);
+  }
+ }
+ scan(false);scan(true);return result;
+}
+async function traceFile(file){
+ const S=C.state;if(S.tool!=='select'||S.stage?.length)return C.toast('Terminá el comando actual antes de calcar.');
+ let bitmap,doc;
+ try{
+  if(/\.pdf$/i.test(file.name)){
+   const L=await pdfjs();doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+   const no=doc.numPages===1?1:Number(prompt('Página del PDF (1–'+doc.numPages+')','1'));
+   if(!Number.isInteger(no)||no<1||no>doc.numPages)return;
+   const page=await doc.getPage(no),g=await extract(page);
+   if(g.paths.reduce((n,p)=>n+p.pts.length,0)>=20){await importPdf(file);return;}
+   const v=page.getViewport({scale:1}),vp=page.getViewport({scale:Math.min(2,1800/Math.max(v.width,v.height))}),cv=document.createElement('canvas');
+   cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;bitmap=cv;
+  }else bitmap=await createImageBitmap(file);
+  const ratio=Math.min(1,1800/Math.max(bitmap.width,bitmap.height)),w=Math.max(1,Math.round(bitmap.width*ratio)),h=Math.max(1,Math.round(bitmap.height*ratio));
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
+  const pix=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
+  for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<145?1:0;
+  const lines=traceRuns(mask,w,h,Math.max(18,Math.round(Math.max(w,h)*.025)));
+  if(!lines.length||lines.length>4000)return C.toast('Calco: no se detectaron trazos útiles o hay demasiado ruido.');
+  const real=Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
+  if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
+  // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
+  const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
+  for(const [a,b] of lines){pc.moveTo(...a);pc.lineTo(...b);}pc.stroke();
+  const accepted=await new Promise(resolve=>{
+   const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
+   const title=document.createElement('p');title.textContent='CALCO · '+lines.length+' líneas detectadas (preliminar). No reconoce todavía puertas, ventanas ni artefactos.';
+   preview.style.cssText='width:100%;max-height:55vh;object-fit:contain;display:block';
+   const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent='Insertar líneas';cancel.textContent='Cancelar';ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
+   d.append(title,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+  });
+  if(!accepted||S.tool!=='select'||S.stage?.length)return;
+  const k=real/w*1000/C.U[S.unit];if(!Number.isFinite(k)||k<=0)return C.toast('Unidad inválida.');
+  const center=C.world?C.world({x:C.canvas.clientWidth/2,y:C.canvas.clientHeight/2}):C.P(0,0);
+  const Q=p=>C.P(center.x+(p[0]-w/2)*k,center.y+(h/2-p[1])*k);
+  const layerName='CALCO-REFERENCIA';let layer=S.layers.find(l=>l.name===layerName);
+  if(layer&&(layer.locked||layer.visible===false))return C.toast('La capa CALCO-REFERENCIA está bloqueada u oculta.');
+  C.saveHistory();if(!layer){layer={id:'calco_'+Date.now().toString(36),name:layerName,color:'#e5e5e5',visible:true,locked:false};S.layers.push(layer);}
+  const ids=[];for(const [a,b] of lines){const id=S.nextId++;S.entities.push({id,type:'line',a:Q(a),b:Q(b),layer:layer.id});ids.push(id);}
+  S.selected=ids;C.updateAll();C.zoomExtents?.();C.toast('CALCO: '+ids.length+' líneas editables. Verificá escala y corregí discontinuidades.');
+ }catch(e){C.toast('Calco: '+(e?.message||e));}finally{bitmap?.close?.();doc?.destroy?.();}
+}
+function pickTrace(){const i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';i.onchange=()=>{if(i.files[0])traceFile(i.files[0])};i.click();}
+for(const k of ['CALCO','CALCAR','TRACEPLAN'])EXT.commands[k]=()=>pickTrace();
+const TRACE_ICON='<path d="M3 4h18v16H3z M6 16V8h7v4h5v4z"/><path d="M6 19h12" stroke-dasharray="2 2"/>';
+try{C.ribbon?.add('output','Calco',[{id:'outTracePlan',label:'Calco de planta · CALCO',icon:TRACE_ICON,run:()=>pickTrace()}]);C.ribbon?.rebuild()}catch(e){}
+window.CAD2D_TRACE_PLAN=traceFile;
+
 window.CAD2D_PDF_IMPORT=importPdf;
 })();
