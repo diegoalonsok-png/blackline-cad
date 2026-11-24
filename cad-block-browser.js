@@ -146,8 +146,19 @@
 
  let el=null,armedId=null,visibleCount=st.view==='olymp3'?18:72;
  const pageSize=()=>st.view==='visual'?12:st.view==='olymp3'?18:72;
+ let catalogOpening=null,selectionEpoch=0;
  function loadOlimpiadas(){const pkg=window.CAD2D_OLYMPIADAS3;
-  if(pkg&&!pkg.loading&&pkg.loaded<pkg.total)pkg.load().catch(err=>CORE.toast('Bloques 2D: '+err.message));
+  if(!pkg||pkg.catalogReady||catalogOpening||pkg.loaded===pkg.total)return;
+  catalogOpening=(async()=>{
+   try{await pkg.loadCatalog();paint()}
+   catch(err){if(!pkg.loading&&pkg.loaded<pkg.total)await pkg.load()}
+  })().catch(err=>CORE.toast('Bloques 2D: '+err.message)).finally(()=>{catalogOpening=null});
+ }
+ function galleryItems(){
+  const base=LIB.library,remote=window.CAD2D_OLYMPIADAS3?.catalog||[];
+  if(!remote.length)return base;
+  const ids=new Set(base.map(it=>it.id)),sources=new Set(base.map(it=>String(it.source||'').toLowerCase()).filter(Boolean));
+  return base.concat(remote.filter(it=>!ids.has(it.id)&&!sources.has(String(it.source||'').toLowerCase())));
  }
  // Quality gate: the temporary schematic views26 set remains in source for
  // backward compatibility, but is not advertised as production CAD drafting.
@@ -155,7 +166,7 @@
  // Recover access only in view-specific tabs, retaining curated main gallery.
  const archivedView=it=>Boolean(it.hideFromGallery&&/^(?:cv-|vm-|alz-)/.test(it.id));
  const archiveTabs=new Set(['section','archive','doorElev','windowElev','fridgeElev']);
- const items=()=>LIB.library.filter(it=>!/^views26-/.test(it.id)&&
+ const items=()=>galleryItems().filter(it=>!/^views26-/.test(it.id)&&
    (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view))));
  const familyOf=it=>{
   const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
@@ -198,7 +209,7 @@
  function simpleBlockNames(){
   const counters=Object.create(null),out=new Map();
   const patterns=[['Puerta',/\b(?:puerta|door|porton|portón)\b/i],['Ventana',/\b(?:ventana|ventanal|window)\b/i],['Escalera',/\b(?:escalera|stair)\b/i],['Inodoro',/\b(?:inodoro|toilet|wc)\b/i],['Bañadera',/\b(?:bañadera|bañera|bathtub)\b/i],['Auto',/\b(?:auto|automóvil|coche|car)\b/i],['Camión',/\b(?:camión|camion|truck)\b/i],['Árbol',/\b(?:árbol|arbol|tree)\b/i],['Heladera',/\b(?:heladera|refrigerador|fridge)\b/i],['Cocina',/\b(?:cocina|kitchen)\b/i]];
-  for(const it of LIB.library.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))){
+  for(const it of galleryItems().slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))){
    const candidate=patterns.find(p=>p[1].test(String(it.name||'')))?.[0];
    if(candidate){counters[candidate]=(counters[candidate]||0)+1;out.set(it.id,candidate+' '+counters[candidate]);}
   }
@@ -225,11 +236,11 @@
   function render(node){
    if(epoch!==previewEpoch||!node.isConnected)return;
    const id=node.dataset.previewId,h=Number(node.dataset.previewHeight);
-   if(staticIds.has(id)){
+   if(staticIds.has(id)||(/^olymp3-/.test(id)&&window.CAD2D_OLYMPIADAS3?.catalogReady)){
     const img=document.createElement('img');img.alt='';img.decoding='async';img.loading='lazy';
     img.style.cssText='display:block;width:100%;height:100%;object-fit:contain';
     img.className='static-block-preview';
-    img.onerror=()=>{if(epoch===previewEpoch&&node.isConnected)node.innerHTML=ARQ.thumb(id,h)};
+    img.onerror=()=>{if(epoch===previewEpoch&&node.isConnected){try{node.innerHTML=ARQ.thumb(id,h)||'—'}catch(e){node.textContent='—'}}};
     img.src='/assets/block-previews/v1/'+encodeURIComponent(id)+'.svg';node.replaceChildren(img);
    }else{try{node.innerHTML=ARQ.thumb(id,h)}catch(e){node.textContent='—'}}
   }
@@ -280,7 +291,7 @@
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
    :T(`${list.length} of ${allItems.length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${allItems.length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
   const pkg=window.CAD2D_OLYMPIADAS3;
-  if(pkg&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
+  if(pkg&&!pkg.catalogReady&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
  function place(){
   const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
@@ -302,17 +313,17 @@
   let repaintFrame=0;const schedulePaint=()=>{if(!repaintFrame)repaintFrame=requestAnimationFrame(()=>{repaintFrame=0;paint()})};
   q.addEventListener('input',()=>{st.q=q.value;visibleCount=pageSize();schedulePaint()});
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();schedulePaint()});
-  el.addEventListener('click',e=>{
+  el.addEventListener('click',async e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
-   if(a==='min'){el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
+   if(a==='min'){selectionEpoch++;el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=pageSize();paint();el.querySelector('.grid').scrollTop=pos;return}
-   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id;try{if(ARQ.insert(targetId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
+   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id,epoch=++selectionEpoch;try{let insertId=targetId;if(!LIB.library.some(x=>x.id===targetId)&&/^olymp3-/.test(targetId)){card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));try{insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId)}finally{card.removeAttribute('aria-busy')}}if(epoch!==selectionEpoch||!el||el.style.display==='none'||el.classList.contains('min'))return;if(ARQ.insert(insertId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
   const hd=el.querySelector('.hd');let drag=null;
@@ -333,7 +344,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
