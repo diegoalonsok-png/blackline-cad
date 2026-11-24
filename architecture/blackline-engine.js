@@ -15,7 +15,7 @@ const C=Object.freeze({
 });
 const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']]};
 const aliases={
- bedroom:'habitacion habitaciones dormitorio dormitorios cuarto cuartos bedroom bedrooms chambre chambres schlafzimmer quarto quartos camera camere',
+ bedroom:'habitacion habitaciones dormitorio dormitorios cuarto cuartos pieza piezas recamara recamaras alcoba alcobas bedroom bedrooms chambre chambres schlafzimmer quarto quartos camera camere',
  bathroom:'bano banos sanitario sanitarios bathroom bathrooms restroom restrooms badezimmer banheiro banheiros bagno bagni',
  kitchen:'cocina cocinas kitchen kitchens cuisine cuisines kuche kuchen cozinha cozinhas cucina cucine',
  living:'living livings salon salones lounge lounges wohnzimmer soggiorno soggiorni',
@@ -52,7 +52,8 @@ function measure(s){const m=s.match(new RegExp('^\\s*'+N+'\\s*'+U+'\\b','i'));re
 function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by|par|mal|per)\\s*'+N+'\\s*'+U,'i'));return m?[num(m[1])*unitScale(m[2]||m[4]),num(m[3])*unitScale(m[4]||m[2])]:null}
 function interpret(raw){
  if(typeof raw!=='string'||!raw.trim()||raw.length>4000)throw Error('Escribí una instrucción arquitectónica.');
- let s=normalize(raw).replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
+ let s=normalize(raw).replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
+ if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre\w*|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
  const tokens=[...s.matchAll(/[a-z]+|\d+(?:[.,]\d+)?/g)].map(m=>({t:m[0],i:m.index,end:m.index+m[0].length,k:concept(m[0])}));
  const rooms=tokens.filter(x=>Object.hasOwn(DEFAULT,x.k));
  if(!rooms.length)throw Error('No reconozco un ambiente de arquitectura. Indicá qué querés dibujar.');
@@ -71,8 +72,8 @@ function interpret(raw){
   const t=tokens.find(x=>x.k===key);if(!t){assumptions.push(key+': '+def+' m');continue}
   const tail=s.slice(t.end).replace(/^\s*(?:de|of|von|da|di|com|con|ancho|width|espesor|thickness|de ancho|de espesor)\s+/,'');
   const v=measure(tail);
-  if(v!==null)spec[key]=v;
-  else if(/^\s*(?:sin|without)\b/.test(s.slice(Math.max(0,t.i-9),t.i)))spec[key]=0;
+  if(/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+)?$/.test(s.slice(Math.max(0,t.i-24),t.i)))spec[key]=0;
+  else if(v!==null)spec[key]=v;
   else assumptions.push(key+': '+def+' m');
  }
  const selected=(kind,part)=>{
@@ -81,7 +82,7 @@ function interpret(raw){
   const neg=t=>/\b(?:sin|without|sans|sem|ohne|senza)\s+(?:un[ao]?\s+|a\s+)?$/.test(s.slice(Math.max(part[0],t.i-24),t.i));
   for(const t of ts){if(!C[t.k])continue;if(neg(t))out.delete(t.k);else out.add(t.k)}
   if(kind==='bathroom'&&out.has('bathtub')&&!ts.some(t=>t.k==='shower'&&!neg(t)))out.delete('shower');
-  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
+  if(kind==='bedroom'){let k=/\b(?:cama\s+(?:individual|simple|de una plaza)|single bed)\b/.test(words)?'singlebed':/\b(?:cama\s+(?:doble|de dos plazas|matrimonial)|double bed|dormitorio matrimonial|habitacion matrimonial|cuarto matrimonial)\b/.test(words)?'doublebed':/\bking\b/.test(words)?'kingbed':null;if(k&&out.has('bed')){out.delete('bed');out.add(k)}}
   if(kind==='living'){const m=words.match(/\b(?:mesa|table)\s+(?:para|for)\s+(4|6|8|cuatro|seis|ocho|four|six|eight)\b/);if(m){out.delete('table6');out.add('table'+(numberWords[m[1]]||m[1]))}if(/\b(?:mesa ratona|coffee table)\b/.test(words))out.add('coffee')}
   return [...out];
  };
