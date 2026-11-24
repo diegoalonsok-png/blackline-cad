@@ -35,7 +35,8 @@ function validate(r){
  return [id,safe(source).toLowerCase(),safe(name)||'Bloque DXF',safe(cat)||'Otros',w,d,data,hash,omitted];
 }
 function known(){
- return {ids:new Set(L.library.map(x=>x.id)),sources:new Set(L.library.map(x=>String(x.source||'').trim().toLowerCase()).filter(Boolean)),hashes:new Set(L.library.map(x=>String(x.sourceHash||'')).filter(Boolean))};
+ const records=L.library.concat(window.CAD2D_OLYMPIADAS3?.catalog||[]);
+ return {ids:new Set(records.map(x=>x.id)),sources:new Set(records.map(x=>String(x.source||'').trim().toLowerCase()).filter(Boolean)),hashes:new Set(records.map(x=>String(x.sourceHash||'')).filter(Boolean))};
 }
 function filterNew(rows){const k=known(),result=[];
  for(const row of rows){const [id,source,,,,,,hash]=row;
@@ -69,7 +70,9 @@ function refresh(){
 }
 async function loadExisting(){
  const p=window.CAD2D_OLYMPIADAS3;
- if(p&&p.loaded<p.total){const out=await p.load();if(out.loaded!==p.total)throw Error('No se completó la carga de la biblioteca existente. Reintentá antes de importar para evitar duplicados.');}
+ if(!p||p.catalogReady||p.loaded===p.total)return;
+ try{await p.loadCatalog();return}catch(e){}
+ const out=await p.load();if(out.loaded!==p.total)throw Error('No se completó la carga de la biblioteca existente. Reintentá antes de importar para evitar duplicados.');
 }
 async function verifyStored(){
  const saved=await readAll(),registered=new Map(L.library.filter(x=>/^userdx4-/.test(x.id)).map(x=>[x.id,x]));
