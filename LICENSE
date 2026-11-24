@@ -24,3 +24,5 @@ Autodesk, AutoCAD y DWG son marcas de Autodesk, Inc. Blackline CAD no está
 afiliado, patrocinado ni respaldado por Autodesk, Inc.
 
 Contacto: contacto@blackline-cad.org
+
+- El motor experimental dwg-wasm/ se distribuye por separado bajo MPL-2.0; acadrust 0.6.8: https://crates.io/crates/acadrust/0.6.8. El resto del programa mantiene su licencia original.
