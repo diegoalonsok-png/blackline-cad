@@ -60,6 +60,9 @@ var viewPresets=[
  ['walk','Peatonal 1,65 m','walk',-Math.PI/2,.02]
 ];
 var icons={
+ revolve:'<path d="M8 4v16M13 6c8 1 8 11 0 12M17 4l-4 2 4 3M8 8h4v8H8"/>',
+ voidextrude:'<path d="M3 8l9-4 9 4v12H3zM9 8v12m6-12v12M9 8l3-2 3 2" stroke-dasharray="3 1"/>',
+ slice:'<path d="M3 7l9-4 9 4v13H3zM2 14h20M5 12l14 4"/>',
  extrude:'<path d="M4 19 4 9 12 5 20 9 20 19 12 23zM4 9l8 5 8-5M12 14v9M12 1v5m-3-3 3-3 3 3"/>',
  extrudeface:'<path d="M4 15 12 19 20 15M4 15 12 11 20 15M12 11V3m-4 4 4-4 4 4M4 15v5l8 4 8-4v-5"/>',
  line:'<path d="M4 19 20 5"/><circle cx="4" cy="19" r="2" fill="currentColor" stroke="none"/><circle cx="20" cy="5" r="2" fill="currentColor" stroke="none"/>',
@@ -4249,6 +4252,9 @@ function build(){
  '<label style="font-size:11px;color:#b9c9d3">Height (m) <input class="cad3dExtrudeHeight" type="number" min="-1000" max="1000" step="0.1" value="2.8" aria-label="Extrude height or signed face distance in meters" style="width:68px;padding:5px;background:#263641;color:white;border:1px solid #536876;border-radius:5px"></label>'+
  '<button type="button" class="btn" data-solid-command="extrude" title="Extrude · E + Enter" aria-label="Extrude">'+ico('extrude')+'<span>Extrude</span></button>'+
  '<button type="button" class="btn" data-solid-command="extrudeface" title="Extrude Face · empujar o tirar una cara" aria-label="Extrude Face">'+ico('extrudeface')+'<span>Extrude Face</span></button>'+
+ '<button type="button" class="btn" data-solid-command="revolve" title="Revolve · perfil cerrado alrededor de un eje" aria-label="Revolve">'+ico('revolve')+'<span>Revolve</span></button>'+
+ '<button type="button" class="btn" data-solid-command="voidextrude" title="Void Extrude · vaciado a partir de un perfil" aria-label="Void Extrude">'+ico('voidextrude')+'<span>Void Extrude</span></button>'+
+ '<button type="button" class="btn" data-solid-command="slice" title="Slice · corte real en dos sólidos" aria-label="Slice">'+ico('slice')+'<span>Slice</span></button>'+
  '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">'+ico('union')+'<span>Union</span></button>'+
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
@@ -4455,7 +4461,7 @@ function build(){
   var command=button.dataset.solidCommand;
   if(command==='extrude')cad3dExtrudeSelection();
   else if(command==='extrudeface')action('extrudeface');
-  else if(['union','subtract','intersect'].includes(command))action(command);
+  else if(['union','subtract','intersect','revolve','voidextrude','slice'].includes(command))action(command);
  });
  root.querySelector('.cad3dOBJInput').addEventListener('change',async function(e){
   var file=e.target.files&&e.target.files[0];if(!file)return;
@@ -8290,13 +8296,107 @@ function cad3dSubtractSlab(slab,cutter){
  cad3dHistoryStart();slab.slabPolyHoles=result.holes;records=records.filter(r=>r.id!==cutter.id);
  selected=[slab.id];selectedOpeningId=null;redraw();renderProps();text('SUBTRACT · losa perforada, propiedades conservadas · Ctrl+Z deshace');
 }
+
+/* Local tessellated solid operations; native architectural records stay intact. */
+function cad3dSolidKernel(){
+ if(!T||!window.CAD3DSolidOps)throw Error('Motor de sólidos 3D no disponible');
+ return window.CAD3DSolidOps;
+}
+function cad3dProfileSimple(p){
+ if(!Array.isArray(p)||p.length<3||p.length>128||!p.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite))||Math.abs(cad3dPolyArea(p))<1e-8)return false;
+ for(var i=0;i<p.length;i++){
+  if(Math.hypot(p[i][0]-p[(i+1)%p.length][0],p[i][1]-p[(i+1)%p.length][1])<1e-7)return false;
+  for(var j=i+1;j<p.length;j++){if(j===i+1||i===0&&j===p.length-1)continue;if(cad3dPolyIntersect(p[i],p[(i+1)%p.length],p[j],p[(j+1)%p.length]))return false;}
+ }return true;
+}
+function cad3dSolidTriangles(r){
+ var g=null;
+ if(r.type==='box')g=boxGeom(r.w,r.d,r.h);
+ else if(r.type==='sphere'){g=new T.SphereGeometry(r.radius,20,12);g.translate(0,0,r.radius);}
+ else if(['cylinder','cone'].includes(r.type)){g=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);g.rotateX(Math.PI/2);g.translate(0,0,r.h/2);}
+ else if(r.type==='profile2d'&&r.profileClosed&&r.extrudedHeight>0&&cad3dProfileSimple(r.profilePoints)){
+  var p=r.profilePoints,shape=new T.Shape();shape.moveTo(p[0][0],p[0][1]);p.slice(1).forEach(v=>shape.lineTo(v[0],v[1]));shape.closePath();g=new T.ExtrudeGeometry(shape,{depth:r.extrudedHeight,steps:1,bevelEnabled:false});
+ }else if(r.type==='boolean'&&Array.isArray(r.triangles)&&r.triangles.length){g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(r.triangles,3));}
+ else throw Error('Sólidos compatibles: BOX, SPHERE, CYLINDER, CONE, perfil extrudado y malla resultante. Muros y losas conservan sus propias herramientas.');
+ try{
+  var m=new T.Matrix4().makeRotationZ((r.rot||0)*Math.PI/180);m.setPosition(r.x||0,r.y||0,r.z||0);
+  var out=[],p=g.getAttribute('position'),idx=g.index,v=new T.Vector3(),n=idx?idx.count:p.count;
+  if(n*3>120000||n%3)throw Error('Malla demasiado grande o inválida');
+  for(var i=0;i<n;i++){v.fromBufferAttribute(p,idx?idx.getX(i):i).applyMatrix4(m);out.push(v.x,v.y,v.z);}
+  return out;
+ }finally{g.dispose()}
+}
+function cad3dSolidBounds(t){
+ var min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+ for(var i=0;i<t.length;i++){var k=i%3;min[k]=Math.min(min[k],t[i]);max[k]=Math.max(max[k],t[i]);}
+ return {min,max};
+}
+function cad3dMakeSolid(t,source,name){
+ var v=Math.abs(cad3dSolidKernel().volume(t));
+ if(!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite)||v<1e-9)throw Error('El resultado no contiene volumen válido');
+ var b=cad3dSolidBounds(t),x=(b.min[0]+b.max[0])/2,y=(b.min[1]+b.max[1])/2,z=b.min[2];
+ return {type:'boolean',name,layerId:source.layerId||'0',x,y,z,rot:0,w:Math.max(.01,b.max[0]-b.min[0]),d:Math.max(.01,b.max[1]-b.min[1]),h:Math.max(.01,b.max[2]-z),triangles:t.map((v,i)=>v-[x,y,z][i%3])};
+}
+function cad3dCommitSolids(remove,results,message){
+ cad3dHistoryStart();records=records.filter(r=>!remove.includes(r.id));
+ results.forEach(r=>{r.id=serial++;records.push(r)});selected=results.map(r=>r.id);selectedOpeningId=null;setPlacement(null);redraw();renderProps();text(message+' · Ctrl+Z deshace');return true;
+}
+function cad3dRevolveSelection(){
+ try{
+  var kernel=cad3dSolidKernel(),r=records.find(v=>selected.length===1&&v.id===selected[0]&&editableRecord(v));
+  if(!r||r.type!=='profile2d'||!r.profileClosed||r.extrudedHeight||!cad3dProfileSimple(r.profilePoints))throw Error('REVOLVE: seleccioná un perfil cerrado simple sin extruir (hasta 128 vértices). X local = radio, Y local = altura.');
+  var p=r.profilePoints.map(v=>v.slice()),minX=Math.min(...p.map(v=>v[0])),minY=Math.min(...p.map(v=>v[1]));
+  var axis=window.prompt('Eje de revolución: X local del perfil (m). Por defecto el borde izquierdo.',String(minX));if(axis===null)return false;if(!axis.trim()||!Number.isFinite(Number(axis))||Number(axis)>minX+1e-7||Math.abs(Number(axis))>1000)throw Error('El eje no debe atravesar el perfil');
+  var raw=window.prompt('Ángulo de revolución (grados):','360');if(raw===null)return false;var ang=Number(raw);if(!(ang>0&&ang<=360))throw Error('Ángulo entre 0 y 360 grados');
+  p=p.map(v=>[Math.max(0,v[0]-Number(axis)),v[1]-minY]);if(cad3dPolyArea(p)<0)p.reverse();
+  var faces=T.ShapeUtils.triangulateShape(p.map(v=>new T.Vector2(v[0],v[1])),[]);
+  var t=kernel.revolve(p,ang,faces),a=(r.rot||0)*Math.PI/180,co=Math.cos(a),si=Math.sin(a),x=r.x+Number(axis)*co-minY*si,y=r.y+Number(axis)*si+minY*co;
+  for(var i=0;i<t.length;i+=3){var u=t[i],v=t[i+1];t[i]=x+u*co-v*si;t[i+1]=y+u*si+v*co;t[i+2]+=r.z||0;}
+  return cad3dCommitSolids([r.id],[cad3dMakeSolid(t,r,'Revolve '+ang+'°')],'REVOLVE · sólido generado');
+ }catch(e){text(e.message);return false}
+}
+function cad3dMeshBoolean(kind,a,b,remove){
+ try{
+  var k=cad3dSolidKernel(),A=cad3dSolidTriangles(a),B=cad3dSolidTriangles(b),t=k.boolean(A,B,kind);
+  var av=Math.abs(k.volume(A)),bv=Math.abs(k.volume(B)),v=Math.abs(k.volume(t)),tol=Math.max(1e-8,av*1e-5,bv*1e-5);
+  if(kind==='subtract'&&(v>=av-tol||v<=tol))throw Error('La sustracción no deja un volumen nuevo válido; no se modificaron los objetos');
+  if(kind==='intersect'&&v>Math.min(av,bv)+tol||kind==='union'&&(v<Math.max(av,bv)-tol||v>av+bv+tol))throw Error('Validación de volumen fallida; objetos conservados');
+  return cad3dCommitSolids(remove,[cad3dMakeSolid(t,a,kind.toUpperCase())],kind.toUpperCase()+' · resultado de malla');
+ }catch(e){text(e.message);return false}
+}
+function cad3dVoidSelection(){
+ if(selected.length!==2)return text('VOIDEXTRUDE: seleccioná el sólido base y luego el perfil cerrado (Shift + clic)');
+ var a=records.find(r=>r.id===selected[0]),p=records.find(r=>r.id===selected[1]);
+ if(!a||!p||!editableRecord(a)||!editableRecord(p)||p.type!=='profile2d'||!p.profileClosed||!cad3dProfileSimple(p.profilePoints))return text('Seleccioná un sólido y un perfil cerrado editable');
+ var h=Number(root.querySelector('.cad3dExtrudeHeight')?.value);
+ if(!Number.isFinite(h)||Math.abs(h)<.01||Math.abs(h)>1000)return text('Ingresá una profundidad entre 0,01 y 1000 m (positiva o negativa)');
+ var cutter=Object.assign({},p,{z:(p.z||0)+Math.min(0,h),h:Math.abs(h),extrudedHeight:Math.abs(h)});
+ if(a.type==='slab'){cad3dSubtractSlab(a,cutter);return;}
+ return cad3dMeshBoolean('subtract',a,cutter,[a.id,p.id]);
+}
+function cad3dSliceSelection(){
+ try{
+  var k=cad3dSolidKernel(),r=records.find(v=>selected.length===1&&v.id===selected[0]&&editableRecord(v));
+  if(!r)throw Error('SLICE: seleccioná un sólido editable');
+  var t=cad3dSolidTriangles(r),b=cad3dSolidBounds(t),raw=window.prompt('Eje normal al plano de corte (X, Y o Z):','Z');if(raw===null)return false;
+  var axis=['X','Y','Z'].indexOf(raw.trim().toUpperCase());if(axis<0)throw Error('Eje inválido');
+  var q=window.prompt('Coordenada mundial del plano de corte (m):',String((b.min[axis]+b.max[axis])/2));if(q===null)return false;
+  var cut=Number(q);if(!q.trim()||!Number.isFinite(cut)||cut<=b.min[axis]+1e-6||cut>=b.max[axis]-1e-6)throw Error('El plano debe atravesar el sólido');
+  var pad=Math.max(1,...b.max.map((v,i)=>v-b.min[i])),lo=b.min.map(v=>v-pad),hi=b.max.map(v=>v+pad),lowEnd=hi.slice(),highStart=lo.slice();lowEnd[axis]=cut;highStart[axis]=cut;
+  function cutter(l,h){return cad3dSolidTriangles({type:'box',x:(l[0]+h[0])/2,y:(l[1]+h[1])/2,z:l[2],w:h[0]-l[0],d:h[1]-l[1],h:h[2]-l[2],rot:0})}
+  var one=k.boolean(t,cutter(lo,lowEnd),'intersect'),two=k.boolean(t,cutter(highStart,hi),'intersect'),vol=Math.abs(k.volume(t)),sum=Math.abs(k.volume(one))+Math.abs(k.volume(two));
+  if(Math.abs(vol-sum)>Math.max(1e-7,vol*1e-4))throw Error('No se conserva el volumen; corte cancelado');
+  return cad3dCommitSolids([r.id],[cad3dMakeSolid(one,r,'Slice A'),cad3dMakeSolid(two,r,'Slice B')],'SLICE · dos sólidos independientes');
+ }catch(e){text(e.message);return false}
+}
+
 function booleanBox(kind){
  if(selected.length!==2){text('Booleanas: seleccioná el objeto base y después el sólido cortante con Shift + clic');return;}
  var a=records.find(function(r){return r.id===selected[0];}),b=records.find(function(r){return r.id===selected[1];});
  if(!a||!b||!editableRecord(a)||!editableRecord(b)){text('Seleccioná dos objetos editables.');return;}
  if(kind==='subtract'&&a.type==='slab'){cad3dSubtractSlab(a,b);return;}
  if(kind==='subtract'&&b.type==='slab'&&a.type!=='box'){text('Seleccioná primero la losa y después el sólido cortante.');return;}
- if(a.type!=='box'||b.type!=='box'||a.rot||b.rot){text('SUBTRACT: losa primero y sólido cortante después; otras booleanas: dos BOX sin rotación.');return;}
+ if(a.type!=='box'||b.type!=='box'||a.rot||b.rot){cad3dMeshBoolean(kind,a,b,[a.id,b.id]);return;}
  var bounds=function(r){return [r.x-r.w/2,r.x+r.w/2,r.y-r.d/2,r.y+r.d/2,r.z,r.z+r.h];};
  var A=bounds(a),B=bounds(b),sortUnique=function(v){return v.sort(function(a,b){return a-b;}).filter(function(x,i,s){return !i||Math.abs(x-s[i-1])>1e-9;});};
  var X=sortUnique([A[0],A[1],B[0],B[1]]),Y=sortUnique([A[2],A[3],B[2],B[3]]),Z=sortUnique([A[4],A[5],B[4],B[5]]),occupied={};
@@ -9004,6 +9104,9 @@ function action(a,presetId){
  if(a==='materials'){cad3dShowMaterials();return true;}
  if(a==='select'){cad3dMaterialPaint=false;cad3dMaterialRender();cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
+ if(['revolve','revolucion'].includes(a)){cad3dRevolveSelection();return true;}
+ if(['voidextrude','extrusionvacia','vacio'].includes(a)){cad3dVoidSelection();return true;}
+ if(['slice','cortesolido'].includes(a)){cad3dSliceSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','ellipse','roundrect','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
@@ -9309,7 +9412,7 @@ async function readJSON(e){
     });
     o.faceMaterials=paint;
    }
-   if(r.type==='boolean')o.triangles=Array.isArray(r.triangles)?r.triangles.slice(0,120000).filter(function(v){return Number.isFinite(v);}):[];
+   if(r.type==='boolean'){if(!Array.isArray(r.triangles)||!r.triangles.length||r.triangles.length>120000||r.triangles.length%9||!r.triangles.every(Number.isFinite))throw Error('Sólido de malla guardado inválido');o.triangles=r.triangles.slice();o.name=String(r.name||'Solid').slice(0,80);}
    return o;
   });
   records=sanitized;layers=importedLayers;
