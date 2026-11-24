@@ -1626,6 +1626,52 @@ function cadMakeWallSegment(a,b){
  updateAll();if(joined.length)toast('MUROS: '+joined.join(' / ')+' conectados automáticamente');
  log('MURO 2D '+(width*U[state.unit]/1000).toFixed(2)+' m · '+justify);
 }
+
+/* Atomic architectural row generation: native wall faces and hosted openings. */
+function cadGenerateRoomRow(spec,origin){
+ const {count,W,D,T}=spec,k=1000/U[state.unit],total=count*W+(count+1)*T;
+ if(!Number.isInteger(count)||count<1||count>30||![W,D,T,origin.x,origin.y].every(Number.isFinite)||W<1.5||D<1.5||T<.08||T>.5)throw Error('Medidas de ambiente inválidas');
+ if(!autoOpeningEnabled||!window.BlacklineAutoOpening)throw Error('Activá la apertura automática de vanos.');
+ const before=historySnapshot(),history=state.history.slice(),future=state.future.slice();
+ const point=(x,y)=>P(origin.x+x*k,origin.y+y*k);
+ const wall=(a,b,ends)=>{
+  const A=point(...a),B=point(...b),faces=cadWallFaces(A,B,T*k,'center'),group='wall-'+state.nextId;
+  return faces.map((face,i)=>{
+   const e={id:state.nextId++,type:'line',a:ends?point(...ends[i][0]):face.a,b:ends?point(...ends[i][1]):face.b,layer:wallLayer,width:.25,wall2d:{group,face:i,thickness:T*k,justify:'center',guideA:clone(A),guideB:clone(B)}};
+   state.entities.push(e);return e;
+  });
+ };
+ let wallLayer,openingLayer;
+ try{
+  saveHistory();wallLayer=ensureArchitecturalLayer('walls');openingLayer=ensureArchitecturalLayer('openings');
+  if([wallLayer,openingLayer].some(id=>{const l=state.layers.find(x=>x.id===id);return !l||l.locked||!l.visible}))throw Error('Desbloqueá y mostrá las capas WALLS y OPENINGS.');
+  const makeOpening=(kind,center,width,host)=>{
+   const name='ARQ nativo · '+kind+' · '+Math.round(width*100)+' · '+Math.round(T*100)+' · '+state.unit;
+   const defaults={width:width*k,frameWidth:.045*k,frameDepth:T*k,mirror:false};
+   if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(width*k,0),layer:openingLayer}],parametric:{kind,defaults}};
+   const block=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:point(center[0]-width/2,center[1]),scale:1,rotation:0,layer:openingLayer,params:{...defaults},wallThickness:T*k,autoOpeningPairIds:host.map(e=>e.id)};
+   state.entities.push(ref);if(autoCutWallForOpening(ref,block)!==2)throw Error('No se pudo abrir el vano en ambas caras del muro.');
+  };
+  const front=[],back=[],step=W+T;
+  for(let i=0;i<=count;i++){
+   const x=T/2+i*step,left=i===0,right=i===count;
+   wall([x,T/2],[x,D+1.5*T],[
+    [[x-T/2,left?0:T],[x-T/2,left?D+2*T:D+T]],
+    [[x+T/2,right?0:T],[x+T/2,right?D+2*T:D+T]]
+   ]);
+  }
+  for(let i=0;i<count;i++){
+   const a=T/2+i*step,b=a+step,lo=a+T/2,hi=b-T/2;
+   front.push(wall([a,T/2],[b,T/2],[[[lo,T],[hi,T]],[[i===0?0:a,0],[i===count-1?total:b,0]]]));
+   back.push(wall([a,D+1.5*T],[b,D+1.5*T],[[[i===0?0:a,D+2*T],[i===count-1?total:b,D+2*T]],[[lo,D+T],[hi,D+T]]]));
+  }
+  for(let i=0;i<count;i++){
+   const cx=T+i*step+W/2;makeOpening('swing-door',[cx,T/2],.8,front[i]);
+   makeOpening('framed-window',[cx,D+1.5*T],Math.min(1.2,W-.3),back[i]);
+  }
+  renderBlockLibrary();updateAll();queueLocalBackup();return count;
+ }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
+}
 function cadWallCenterline(meta){
  if(!meta?.guideA||!meta?.guideB)return null;
  const a=meta.guideA,b=meta.guideB,v=sub(b,a),len=Math.hypot(v.x,v.y);
@@ -11239,7 +11285,7 @@ window.CAD2D_CORE=Object.freeze({
  explicitWallLayerName,eraseSelected,copySelectedCadObjects,pasteCadObjects,
  command:text=>{$('command').value=String(text);runCommand()},
  lastCommand:()=>cad2dLastCommand,
- wall:Object.freeze({faces:(a,b,w,j)=>cadWallFaces(a,b,w,j),join:faces=>cadWallJoinNewFaces(faces),centerline:meta=>cadWallCenterline(meta)}),
+ wall:Object.freeze({roomRow:cadGenerateRoomRow,faces:(a,b,w,j)=>cadWallFaces(a,b,w,j),join:faces=>cadWallJoinNewFaces(faces),centerline:meta=>cadWallCenterline(meta)}),
  layout:Object.freeze({get viewports(){return cadLayoutViewports},set viewports(v){cadLayoutViewports=Array.isArray(v)?v:[]},render:()=>renderLayoutWorkspace(),switchTo:space=>switchCadSpace(space),get active(){return cadActiveSpace},options:()=>layoutPlotOptions(),svg:o=>makeSVG(o),pdf:o=>makePDF(o)}),
  ribbon:Object.freeze({add:(tab,group,items)=>cad2dAddRibbonGroup(tab,group,items),rebuild:()=>buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home')}),
  openContextMenu:(x,y,worldPoint)=>openCadContextMenu(x,y,worldPoint),
@@ -11479,7 +11525,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261124-direct-rooms-v4"></script>
+<script src="cad-arq-pro.js?v=20261124-native-rooms-v5"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-zip-organize-v4"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
