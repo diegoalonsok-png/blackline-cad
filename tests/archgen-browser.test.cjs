@@ -84,6 +84,13 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
   }
   assert.equal(await evaluate("typeof window.CAD2D_ARCHGEN_INSERT"),'function');
   assert.equal(await evaluate("window.CAD2D_CORE.state.unit"),'m','test drawing uses metres');
+  const capture=async name=>{
+   const dir=process.env.ARCHGEN_SCREENSHOTS;
+   if(!dir)return;
+   fs.mkdirSync(dir,{recursive:true});
+   const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+   fs.writeFileSync(path.join(dir,name+'.png'),Buffer.from(image.data,'base64'));
+  };
   for(const spec of [{kind:'bath',w:3,d:3},{kind:'accessible',w:4,d:4},{kind:'bedroom',w:4,d:5},{kind:'kitchen',w:6,d:5}]){
    const before=await evaluate("JSON.stringify(window.CAD2D_CORE.state.entities)");
    const result=await evaluate(`(()=>{
@@ -114,13 +121,43 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
    assert.ok(result.entities>6);
    assert.equal(result.openings.length,2);
    assert.deepEqual(result.openings.map(e=>e.kind).sort(),['framed-window','swing-door']);
-   assert.ok(result.openings.every(e=>e.width>0),'parametric width');
+   assert.ok(result.openings.every(e=>e.width>0&&e.cut),'parametric openings cut their own walls');
    assert.ok(result.furniture>=2);
    assert.equal(result.dimensions,2);
    assert.equal(result.hatches,1);
    await evaluate("window.CAD2D_CORE.undo()");
    assert.equal(await evaluate("JSON.stringify(window.CAD2D_CORE.state.entities)"),before,'undo restores drawing');
   }
+  // Batch insertion through the actual gallery, with optional annotations switched off.
+  const before=await evaluate("JSON.stringify(window.CAD2D_CORE.state.entities)");
+  const readyBatch=await evaluate(`(()=>{
+   const core=window.CAD2D_CORE;
+   core.command('ARCHGEN');
+   const dlg=document.querySelector('[data-archgen-palette][open]');
+   if(!dlg)return false;
+   const q=s=>dlg.querySelector(s);
+   q('[data-kind]').value='bath';q('[data-w]').value=3;q('[data-d]').value=3;
+   q('[data-count]').value=6;q('[data-dim]').checked=false;q('[data-hatch]').checked=false;
+   q('[data-generate]').click();q('[data-all]').click();
+   return q('[data-gallery]').children.length===6&&!q('[data-insert]').disabled;
+  })()`);
+  assert.equal(readyBatch,true,'six options selected from gallery');
+  await capture('01-gallery-bath');
+  const batch=await evaluate(`(()=>{
+   const core=window.CAD2D_CORE,ids=new Set(core.state.entities.map(e=>e.id));
+   const dlg=document.querySelector('[data-archgen-palette][open]');
+   dlg.querySelector('[data-insert]').click();
+   if(dlg.open)return {error:dlg.querySelector('[data-status]').textContent};
+   const es=core.state.entities.filter(e=>!ids.has(e.id));
+   const doors=es.filter(e=>e.type==='blockRef'&&core.state.blocks[e.blockName]?.parametric?.kind==='swing-door');
+   const windows=es.filter(e=>e.type==='blockRef'&&core.state.blocks[e.blockName]?.parametric?.kind==='framed-window');
+   return {doors:doors.length,windows:windows.length,positions:new Set(doors.map(e=>e.p.x+','+e.p.y)).size,cut:[...doors,...windows].every(e=>es.some(f=>f.autoOpeningRef===e.id)),dimensions:es.filter(e=>e.type==='dimension').length,hatches:es.filter(e=>e.type==='hatch').length};
+  })()`);
+  console.log('Batch CAD insertion: '+JSON.stringify(batch));
+  assert.deepEqual(batch,{doors:6,windows:6,positions:6,cut:true,dimensions:0,hatches:0});
+  await sleep(300);await capture('02-six-baths-in-cad');
+  await evaluate("window.CAD2D_CORE.undo()");
+  assert.equal(await evaluate("JSON.stringify(window.CAD2D_CORE.state.entities)"),before,'batch undo is atomic');
  }finally{
   ws?.close();browser.kill('SIGKILL');await new Promise(resolve=>server.close(resolve));
   try{fs.rmSync(temp,{recursive:true,force:true,maxRetries:10,retryDelay:100})}catch(error){console.warn('Chrome test cleanup: '+error.message)}
