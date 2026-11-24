@@ -186,6 +186,58 @@ function solve(spec){
  else delete out.brief.alternatives;
  return out;
 }
-const api=Object.freeze({interpret,solve,run:text=>solve(interpret(text)),catalog:C});
+
+function detailInstruction(raw){
+ const s=normalize(raw);
+ const stair=/\b(?:escaleras?|stairs?|staircase)\b/.test(s),rail=/\b(?:pasamanos|barandillas?|barandas?|handrail)\b/.test(s),section=/\b(?:en corte|en seccion|section view)\b/.test(s);
+ if(!stair&&!rail&&!section)return null;
+ if(/\b(?:agranda|achica|modifica|mueve|desplaza|cambia)\b/.test(s))throw Error('Edición de detalles existentes aún no soportada.');
+ const read=(labels,def)=>{const m=s.match(new RegExp('(?:'+labels+')\\s*(?:de|:|=)?\\s*'+N+'\\s*'+U,'i'))||s.match(new RegExp(N+'\\s*'+U+'\\s*(?:de\\s+)?(?:'+labels+')\\b','i'));return m?num(m[1])*unitScale(m[2]):def};
+ const generic=s.match(new RegExp('\\bde\\s+'+N+'\\s*'+U,'i'));
+ const fallback=generic?num(generic[1])*unitScale(generic[2]):null;
+ if(stair){
+  if(/\b(?:en [lut]|caracol|curva|compensada|helicoidal|descanso)\b/.test(s))throw Error('Solo escalera recta de un tramo en este prototipo.');
+  return {kind:'stair_detail',height:read('altura|desnivel|salvar',fallback??3),width:read('ancho|anchura',1.1),tread:read('huella',.28),rail,section};
+ }
+ if(rail){
+  if(/\b(?:curvo|curva|inclinado|inclinada|vidrio|escalonado)\b/.test(s))throw Error('Solo pasamanos recto horizontal en este prototipo.');
+  return {kind:'rail_detail',length:read('largo|longitud',fallback??3),height:read('altura|alto',.95)};
+ }
+ if(!/\b(?:habitacion|dormitorio|cuarto|pieza)\b/.test(s)||/\b(?:ventanas?|puertas?|muebles|camas?|vestidor|baño|bano)\b/.test(s))throw Error('Corte básico disponible solo para habitación sin aberturas ni mobiliario especificados.');
+ return {kind:'room_section',width:dimensions(s)?.[0]??read('ancho|luz',fallback??4),height:read('altura|alto|altura libre',2.7),wall:read('espesor|muro',.15),slab:read('losa',.2)};
+}
+function solveDetail(spec){
+ const entities=[],assumptions=['Detalle esquemático 2D; verificar normativa y estructura.'];
+ const line=(a,b,layer)=>entities.push({type:'line',a,b,layer});
+ const rect=(x,y,w,h,layer)=>{const p=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];for(let i=0;i<4;i++)line(p[i],p[(i+1)%4],layer)};
+ const finite=(v,a,b)=>Number.isFinite(v)&&v>=a&&v<=b;
+ const {kind,height:h,width:w}=spec;
+ if(kind==='stair_detail'){
+  if(!finite(h,.5,6)||!finite(w,.7,3)||!finite(spec.tread,.22,.4))throw Error('Dimensiones de escalera fuera de rango.');
+  const n=Math.ceil(h/.18),rise=h/n,tread=spec.tread,run=(n-1)*tread;
+  if(n>18||2*rise+tread<.58||2*rise+tread>.66)throw Error('Escalera de un tramo no viable con los criterios preliminares; requiere descanso o ajuste.');
+  if(spec.section){
+   for(let i=0;i<n;i++){line([i*tread,i*rise],[i*tread,(i+1)*rise],'STAIRS');if(i<n-1)line([i*tread,(i+1)*rise],[(i+1)*tread,(i+1)*rise],'STAIRS')}
+   if(spec.rail)line([0,rise+.95],[run,h+.95],'RAILS');
+  }else{
+   rect(0,0,w,run,'STAIRS');for(let i=1;i<n-1;i++)line([0,i*tread],[w,i*tread],'STAIRS');
+   line([w/2,.1],[w/2,run-.1],'STAIRS');line([w/2,run-.1],[w/2-.12,run-.3],'STAIRS');line([w/2,run-.1],[w/2+.12,run-.3],'STAIRS');
+   if(spec.rail){line([.05,0],[.05,run],'RAILS');line([w-.05,0],[w-.05,run],'RAILS')}
+  }
+  assumptions.push(n+' contrahuellas de '+(rise*100).toFixed(2)+' cm; huella '+(tread*100).toFixed(1)+' cm; desarrollo '+run.toFixed(2)+' m');
+ }else if(kind==='rail_detail'){
+  const l=spec.length;if(!finite(l,.3,30)||!finite(h,.7,1.3))throw Error('Dimensiones de pasamanos fuera de rango.');
+  line([0,h],[l,h],'RAILS');line([0,h-.04],[l,h-.04],'RAILS');const n=Math.ceil(l/1.2);
+  for(let i=0;i<=n;i++)rect(i*l/n-.02,0,.04,h-.04,'RAILS');
+  assumptions.push('Separación preliminar entre postes ≤ 1,20 m; no implica resistencia ni cumplimiento.');
+ }else if(kind==='room_section'){
+  const t=spec.wall,b=spec.slab;if(!finite(w,1.2,20)||!finite(h,2,6)||!finite(t,.08,.5)||!finite(b,.1,.5))throw Error('Dimensiones de corte fuera de rango.');
+  rect(-t,0,t,h,'SECTIONS');rect(w,0,t,h,'SECTIONS');rect(-t,-b,w+2*t,b,'SECTIONS');rect(-t,h,w+2*t,b,'SECTIONS');
+  assumptions.push('Corte transversal esquemático; sin mobiliario, aberturas ni estructura calculada.');
+ }else throw Error('Detalle no reconocido.');
+ return {schema:'blackline.architecture.detail.v1',units:'m',entities,brief:spec,assumptions};
+}
+
+const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run:text=>{const d=detailInstruction(text);return d?solveDetail(d):solve(interpret(text))},catalog:C});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BlacklineArchitectureAI=api;
 })(typeof self!=='undefined'?self:globalThis);
