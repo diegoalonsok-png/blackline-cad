@@ -11486,7 +11486,7 @@ window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
    opening(north,x+m.window.x,y+d+t/2,m.window.width,'framed-window',windows,false,t);
    for(const item of m.items){
     const meta=lib.library.find(v=>v.id===item.id);if(!meta||meta.pro||meta.paidOnly)throw Error('Componente libre no disponible: '+item.id);
-    const l=item.id.startsWith('san-')?sanitary:furniture;
+    const l=item.id.startsWith('san-')?sanitary:item.id.startsWith('kq-')?layer(/^(kq-(heladera2?|cocina|anafe\d*|horno|lv|micro))$/.test(item.id)?'ELECTRODOMESTICOS':'COCINAS','#e6ab78'):furniture;
     const built=lib.build(item.id),bb=lib.bounds(built.entities);
     if(![bb.minX,bb.minY,bb.maxX,bb.maxY].every(Number.isFinite))throw Error('Bloque inválido');
     const name='ARCHGEN · '+item.id+' · m';
@@ -11498,7 +11498,7 @@ window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
     put({type:'blockRef',blockName:name,p:p(item.x-minX,item.y-minY),rotation:ang,scale:1,layer:l});
    }
    if(m.turn)put({type:'circle',c:p(m.turn.x,m.turn.y),r:m.turn.r,layer:clearance,linetype:'DASHED',width:.05});
-   put({type:'text',p:p(0,-.85),text:(m.kind==='accessible'?'BAÑO ACCESIBLE':m.kind==='bedroom'?'DORMITORIO':'BAÑO')+' '+String(i+1).padStart(2,'0'),h:.16,rotation:0,fontFamily:'Arial',layer:labels});
+   put({type:'text',p:p(0,-.85),text:(m.kind==='accessible'?'BAÑO ACCESIBLE':m.kind==='bedroom'?'DORMITORIO':m.kind==='kitchen'?'COCINA':'BAÑO')+' '+String(i+1).padStart(2,'0'),h:.16,rotation:0,fontFamily:'Arial',layer:labels});
    put({type:'text',p:p(0,-1.1),text:(w*d).toFixed(2)+' m²',h:.13,rotation:0,fontFamily:'Arial',layer:areas});
    if(dims){dimension(p(0,d),p(w,d),p(0,d+t+.35),'horizontal',dims);dimension(p(0,0),p(0,d),p(-t-.35,0),'vertical',dims)}
   });
@@ -11764,7 +11764,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-local-vector-packs.js?v=20261123-selection-v1"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script src="cad-archgen.js?v=20261124-diverse-v2"></script>
+<script src="cad-archgen.js?v=20261124-kitchens-v3"></script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
 <script defer src="cad3d-lab.js?v=20261124-massprop-interfere-v1"></script>
 </body></html>
