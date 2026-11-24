@@ -932,10 +932,10 @@ EXT.drawArchitectureCommand=async raw=>{
 
 /* Visual catalogue: generated, checked plans from the native architectural engine.
    Thumbnails and insertion use the same plan, not a raster reference. */
-const arqCatalogueCounts={"bathroom":37,"kitchen":12,"bedroom":11,"laundry":1,"office":1,"dining":1,"closet":1,"house":21};
+const arqCatalogueCounts={"bathroom":37,"kitchen":12,"bedroom":11,"laundry":1,"office":1,"dining":1,"closet":1,"house":22};
 const arqCatalogueBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
 let arqCataloguePromise=null;
-function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-house-v4',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
+function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-house-v5',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
 function arqCatalogueCategory(raw){
  const s=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m\s*(?:2|²|\^2)|mts?\s*(?:2|²)?|sqm|metros?(?:\s+cuadrados?)?)?)?[\s.]*$/.test(s))return 'house';
