@@ -146,43 +146,64 @@ def solve(spec):
     return plan
 
 def interpret(text):
-    """Limited bilingual semantic interpreter. No LLM or external API required."""
+    """Local multilingual fallback. A future LLM may supply the same structured brief."""
     s = "".join(ch for ch in unicodedata.normalize("NFD", text.lower())
                 if unicodedata.category(ch) != "Mn")
+    kinds = {
+        "bedroom": r"\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|chambres?|schlafzimmer|quartos?|camere?)\b",
+        "bathroom": r"\b(?:banos?|bathrooms?|baths?|salle[s]? de bain[s]?|badezimmer|banheiros?|bagni|bagno)\b",
+        "kitchen": r"\b(?:cocinas?|kitchens?|cuisines?|kuchen|cozinhas?|cucine?|cucina)\b",
+        "living": r"\b(?:livings?|salones?|salas? de estar|living rooms?|salons?|wohnzimmer|salas? de estar|soggiorni?|soggiorno)\b",
+    }
     words = dict(zip(("un","dos","tres","cuatro","cinco","seis","siete","ocho","nueve","diez"),range(1,11)))
     words.update(zip(("one","two","three","four","five","six","seven","eight","nine","ten"),range(1,11)))
-    count = re.search(r"\b(\d+|"+ "|".join(words)+r")\s+(?:habitacion(?:es)?|dormitorios?|bedrooms?|rooms?)\b",s)
-    private = re.search(r"\b(?:cada\s+un[oa]|cada\s+(?:habitacion|dormitorio)|en suite|privad[oa]s?|each|ensuite|en-suite|private)\b",s)
-    bath = re.search(r"\b(?:banos?|bathrooms?|baths?)\b",s)
-    if not (count and private and bath):
-        raise ValueError("This interpreter currently supports rows of bedrooms with individual bathrooms.")
-    row = re.search(r"\b(?:pegad[oa]s?|contigu[oa]s?|tandem|fila|al lado|side by side|adjoining|in a row|adjacent)\b",s)
-    if not row:
-        raise ValueError("Specify the arrangement of the bedrooms (row or side by side).")
-    if re.search(r"\b(?:vestidor|closet|balcon|balcony|pasillo|corridor|dos plantas|two floors)\b",s):
-        raise ValueError("Additional requested elements are not yet supported by this interpreter.")
-    n = words[count[1]] if count[1] in words else int(count[1])
-    number = r"(\d+(?:[.,]\d+)?)"
-    dim = number+r"\s*(?:x|×|por|by)\s*"+number
-    bedroom_text = s[:bath.start()]
-    bath_text = s[bath.start():]
-    m = re.search(dim,bedroom_text)
-    bm = re.search(dim,bath_text)
-    t = re.search(r"(?:muros?|walls?)\s+(?:de\s+|of\s+)?"+number+r"\s*(cm|mm|m\b)?",s)
-    num=lambda v:float(v.replace(",","."))
-    if bm and m is None and re.search(dim,s) and not re.search(r"(?:banos?|bathrooms?)\s+(?:de\s+|of\s+)?"+dim,bath_text):
-        raise ValueError("Specify which room the dimensions refer to.")
-    width,depth = (num(m[1]),num(m[2])) if m else (4.,5.)
-    bw,bd = (num(bm[1]),num(bm[2])) if bm else (width,2.4)
-    wall = num(t[1]) / (100 if t[2]=="cm" else 1000 if t[2]=="mm" else 1) if t else .15
-    bathtub=bool(re.search(r"\b(?:banadera|banera|bathtub|bath tub|tub)\b",s))
-    shower=bool(re.search(r"\b(?:ducha|shower)\b",s))
-    fixtures=["toilet","bidet","basin"]+ (["bathtub"] if bathtub else []) + (["shower"] if shower or not bathtub else [])
-    return {"kind":"suite_row","count":n,"width":width,"depth":depth,"bathWidth":bw,"bathDepth":bd,
-            "wall":wall,"bathFixtures":fixtures,
-            "assumptions":[k for k,v in (("bedroom dimensions: 4 x 5 m",not m),
-                ("bathroom: full bedroom width x 2.4 m",not bm),("wall: 0.15 m",not t),
-                ("standard doors 0.80 m and windows 1.20 m",True)) if v]}
+    words.update({"una":1,"uno":1,"a":1,"an":1,"une":1,"deux":2,"trois":3,"ein":1,"eine":1,"zwei":2,"drei":3,"um":1,"uma":1,"dois":2,"duas":2,"tres":3,"due":2,"tre":3})
+    hits=sorted((m.start(),m.end(),kind) for kind,pattern in kinds.items() for m in re.finditer(pattern,s))
+    if not hits: raise ValueError("No supported room type found; specify bedroom, bathroom, kitchen or living room.")
+    _,end,kind=hits[0]
+    numword=r"(?:\d+|"+"|".join(words)+r")"
+    count=re.search(r"\b("+numword+r")\s+"+kinds[kind],s)
+    n=words.get(count[1],int(count[1]) if count[1].isdigit() else 1) if count else 1
+    bath=next((h for h in hits[1:] if h[2]=="bathroom"),None)
+    suite=kind=="bedroom" and (bath is not None or bool(re.search(r"\b(?:ensuite|en suite|en-suite)\b",s)))
+    if any(h[2]!=kind and not(suite and h[2]=="bathroom") for h in hits[1:]):
+        raise ValueError("Mixed-room floor plans are not supported by the local fallback yet.")
+    if suite and n>1 and not re.search(r"\b(?:cada|each|privad[oa]s?|ensuite|en suite|en-suite|chacune?|jeweils|cada um|ciascun[ao])\b",s):
+        raise ValueError("Specify whether the bathroom belongs to each bedroom or is shared.")
+    if n>1 and not re.search(r"\b(?:pegad[oa]s?|contigu[oa]s?|tandem|fila|al lado|side by side|adjoining|in a row|adjacent|cote a cote|nebeneinander|lado a lado|affiancate)\b",s):
+        raise ValueError("Specify the arrangement of the rooms (row or side by side).")
+    if re.search(r"\b(?:vestidor|balcon|balcony|pasillo|corridor|dos plantas|two floors)\b",s):
+        raise ValueError("Additional requested elements are not supported by the local fallback.")
+    number=r"(\d+(?:[.,]\d+)?)"
+    dim=number+r"\s*(?:m\b|ft\b|cm\b)?\s*(?:x|×|por|by|par|mal|per)\s*"+number+r"\s*(m\b|ft\b|cm\b)?"
+    def size(m):
+        if not m:return None
+        unit=m[3] or ("ft" if re.search(r"\bft\b",m[0]) else "cm" if re.search(r"\bcm\b",m[0]) else "m")
+        scale={"ft":.3048,"cm":.01,"m":1}[unit]
+        return float(m[1].replace(",","."))*scale,float(m[2].replace(",","."))*scale
+    t=re.search(r"(?:muros?|walls?|murs?|wande|paredes?|muri)\s+(?:de\s+|of\s+)?"+number+r"\s*(cm|mm|m\b)?",s)
+    wall=float(t[1].replace(",","."))/(100 if t[2]=="cm" else 1000 if t[2]=="mm" else 1) if t else .15
+    default_size={"bedroom":(4.,5.),"bathroom":(2.2,2.6),"kitchen":(4.,5.),"living":(5.,6.)}
+    maintext=s[:bath[0]] if suite and bath else s
+    m=re.search(dim,maintext)
+    width,depth=size(m) or default_size[kind]
+    assumptions=[]
+    if not m: assumptions.append(f"{kind}: {width} x {depth} m")
+    if not t: assumptions.append("wall: 0.15 m")
+    assumptions.append("standard doors 0.80 m and windows 1.20 m")
+    bathtub=bool(re.search(r"\b(?:banadera|banera|bathtub|bath tub|tub|baignoire|badewanne|banheira|vasca)\b",s))
+    shower=bool(re.search(r"\b(?:ducha|shower|douche|dusche|chuveiro|doccia)\b",s))
+    bath_fixtures=["toilet","bidet","basin"]+(["bathtub"] if bathtub else [])+(["shower"] if shower or not bathtub else [])
+    spec={"kind":kind,"count":n,"width":width,"depth":depth,"wall":wall,"assumptions":assumptions}
+    if suite:
+        bm=re.search(dim,s[bath[0]:]) if bath else None
+        bw,bd=size(bm) or (width,2.4)
+        if not bm: assumptions.append(f"bathroom: {bw} x {bd} m")
+        spec.update(kind="suite_row",bathWidth=bw,bathDepth=bd,bathFixtures=bath_fixtures)
+    elif kind=="bathroom": spec["fixtures"]=bath_fixtures
+    elif kind=="kitchen" and re.search(r"\b(?:isla|island|ilot|insel|ilha|isola)\b",s):
+        spec["fixtures"]=DEFAULTS["kitchen"]+["island"]
+    return spec
 
 def solve_suite_row(spec):
     """Attach one private bathroom behind each bedroom, sharing the partition."""
@@ -235,7 +256,11 @@ def solve_suite_row(spec):
     return plan
 
 def solve_instruction(text):
-    return solve_suite_row(interpret(text))
+    spec=interpret(text)
+    plan=solve_suite_row(spec) if spec['kind']=='suite_row' else solve(spec)
+    plan['assumptions']=spec['assumptions']
+    plan['brief']=spec
+    return plan
 
 def selftest():
     for kind,w,d,n in [("bedroom",4,5,3),("bathroom",2,2.4,1),("kitchen",4,5,1),("living",5,8,1)]:
@@ -267,6 +292,14 @@ def selftest():
             assert all(a[1]<=b[0] for a,b in zip(intervals,intervals[1:]))
         rects=[Rect(*a["envelope"]) for a in p["blocks"]]
         assert not any(a.overlaps(b) for i,a in enumerate(rects) for b in rects[i+1:])
+    for instruction in ("Una habitación 4x5 con baño", "A bedroom 4 x 5 with bathroom",
+                        "Une chambre 4 x 5 avec salle de bain", "Ein Schlafzimmer 4 x 5 mit Badezimmer",
+                        "Um quarto 4 x 5 com banheiro", "Una camera 4 x 5 con bagno"):
+        spec=interpret(instruction)
+        assert spec["kind"]=="suite_row" and spec["count"]==1 and spec["width"]==4 and spec["depth"]==5
+    assert interpret("Cocina 5 x 5 con isla")["fixtures"][-1]=="island"
+    assert interpret("Bathroom 2.5 x 3 with bathtub")["fixtures"][-1]=="bathtub"
+    assert interpret("Bedroom 13 x 16 ft")["width"]==13*.3048
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
