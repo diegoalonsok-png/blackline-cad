@@ -62,6 +62,19 @@ function isCleanOpening(item){
 function cleanPlanEntities(item,entities){
  return isCleanOpening(item)?entities.filter(e=>!['text','dimension','mtext','attdef','attrib'].includes(e.type)&&!e.attdef):entities;
 }
+const PLAN_LAYERS={
+ wall:['A-ARQ-MUROS','#707070',.25],
+ opening:['A-ARQ-ABERTURAS','#999999',.15],
+ furniture:['A-ARQ-MOBILIARIO','#b0b0b0',.13],
+ sanitary:['A-ARQ-SANITARIOS','#a8a8a8',.13],
+ equipment:['A-ARQ-EQUIPAMIENTO','#a0a0a0',.13],
+ text:['A-ARQ-TEXTOS','#909090',.09],
+ other:['A-ARQ-GEOMETRIA','#b0b0b0',.13]
+};
+function planLayer(item,e){
+ const role=isCleanOpening(item)?'opening':e.type==='text'?'text':e.arqRole||'other';
+ return PLAN_LAYERS[role]||PLAN_LAYERS.other;
+}
 function grayPlanColor(e){
  if(e.type==='hatch')return '#a2a2a2';
  if(e.type==='text')return '#8c8c8c';
@@ -74,7 +87,7 @@ function docGeometry(entities,W,D,opts){
  const out=[],eps=1e-6;
  if(opts.hatch){
   // Match the actual parallel outer and inner faces; never bridge an entry gap.
-  const ls=entities.filter(e=>e.type==='line'&&e.a&&e.b);
+  const ls=entities.filter(e=>e.type==='line'&&e.a&&e.b&&e.arqRole==='wall');
   for(const axis of ['x','y']){
    const along=axis==='x'?'y':'x',limit=axis==='x'?W:D;
    const axisLines=ls.filter(e=>Math.abs(e.a[axis]-e.b[axis])<eps);
@@ -110,7 +123,7 @@ function ensureDefinition(item,W,D,opts=docChoices(item),openingOptions){
  const gray=docEligible(item)||isCleanOpening(item);
  built.entities=cleanPlanEntities(item,built.entities);
  const docs=docEligible(item)?docGeometry(built.entities,built.w,built.d,opts):[];
- const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix+(gray?' · Gris v1':'')+(opening?' · P'+cm(opening.doorWidth)+'x'+cm(opening.doorHeight)+' V'+cm(opening.windowWidth)+'x'+cm(opening.windowHeight):'');
+ const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix+(gray?' · Gris capas v2':'')+(opening?' · P'+cm(opening.doorWidth)+'x'+cm(opening.doorHeight)+' V'+cm(opening.windowWidth)+'x'+cm(opening.windowHeight):'');
  if(docs.some(e=>e.layer===DOC_DIMS))ensureDocLayer(DOC_DIMS,'#909090');
  if(docs.some(e=>e.layer===DOC_HATCH))ensureDocLayer(DOC_HATCH,'#a2a2a2');
  // Preserve old colored definitions used by existing drawings. New insertions
@@ -118,10 +131,10 @@ function ensureDefinition(item,W,D,opts=docChoices(item),openingOptions){
  const name=st.blocks[oldName]&&!st.blocks[oldName].libraryLayer0?oldName+' · Layer 0':oldName;
  if(!st.blocks[name]){
   const ents=built.entities.map(e=>scaleEntity(e,k));
-  for(const e of ents){e.layer='0';e.color=gray?grayPlanColor(e):'#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
+  for(const e of ents){if(gray){const [id,color,width]=planLayer(item,e);const lay=ensureDocLayer(id,color);e.layer=lay.id;e.arqDocLayer=true;e.color=lay.color;if(e.width===undefined||e.arqRole==='wall')e.width=width;}else{e.layer='0';e.color='#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}}
   const docEnts=docs.map(e=>scaleEntity(e,k));
   const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities([...docEnts.filter(e=>e.type==='hatch'),...ents,...docEnts.filter(e=>e.type==='dimension')])});
-  if(docs.length)def.arqDocumentation=true;
+  if(docs.length||gray)def.arqDocumentation=true;
   if(gray)def.arqGrayPlan=true;
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
   def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
