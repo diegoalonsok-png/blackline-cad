@@ -2681,7 +2681,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.arqDocumentation&&e.arqDocLayer&&['A-ARQ-COTAS','A-ARQ-HATCH'].includes(e.layer)?e.layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0&&!e.arqDocLayer?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -3313,13 +3313,13 @@ function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,f
   if(!forceColor&&!layerFor(e).visible)return;
   const fade=e.xref&&!forceColor&&!state.selected.includes(e.id);if(fade){ctx.save();ctx.globalAlpha*=cadXrefFade}
   if(!forceColor&&!state.selected.includes(e.id))cadDrawRefFast(e);
-  else for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
+  else for(const part of cadBlockChildrenCached(e)){if(part.arqDocLayer&&!layerFor(part).visible)continue;drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));}
   if(fade)ctx.restore();
   if(state.selected.includes(e.id)&&!forceColor){
    drawBlockGrips(e);
   }
   return;
- }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
+ }if(e.type==='dimension'){if(e.arqDocLayer&&!layerFor(e).visible)return;const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
   ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();for(const hole of e.holes||[]){if(hole?.length>2){tracePath({type:'polyline',pts:hole,closed:true});ctx.closePath()}}ctx.setLineDash([]);
   if(cadIsGradient(e)&&!forceColor&&!isSelected){
    const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y),c=screen(P((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2));
@@ -9082,13 +9082,14 @@ function blockDefinition(name){return state.blocks?.[name]||null}
 function selectedBlock(){return blockDefinition($('blockLibrary').value)}
 function normalizeBlockEntities(entries){
  if(!Array.isArray(entries)||entries.length===0||entries.length>50000)throw Error('Block must contain 1–50,000 entities');
- const allowed=new Set(['line','polyline','rect','circle','arc','ellipse','text','dimension']);
+ const allowed=new Set(['line','polyline','rect','circle','arc','ellipse','text','dimension','hatch']);
  return entries.map(e=>{
   if(!e||!allowed.has(e.type))throw Error('Unsupported block entity type');
   const item=clone(e);delete item.id;delete item.blockName;
   const coords=getVertices(item);
   if(coords.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)))throw Error('Invalid block coordinates');
   if(item.type==='polyline'&&(!Array.isArray(item.pts)||item.pts.length<2))throw Error('Invalid polyline');
+  if(item.type==='hatch'&&(!Array.isArray(item.pts)||item.pts.length<3||item.pts.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))))throw Error('Invalid hatch polygon');
   if(['circle','arc'].includes(item.type)&&!(item.r>0))throw Error('Invalid circle/arc radius');
   return item;
  });
@@ -9111,6 +9112,7 @@ function blockInsertionEntities(block,point,scale,angle){
   if(e.ry!==undefined)e.ry*=scale;
   if(e.h!==undefined)e.h*=scale;
   if(e.type==='dimension'&&e.style){e.style.textHeight*=scale;e.style.arrow*=scale}
+  if(e.type==='hatch'&&Number.isFinite(e.hatchSpacing))e.hatchSpacing*=scale;
   if(e.type==='text')e.rotation=(Number(e.rotation)||0)+angle;
   if(e.type==='ellipse')e.rotation=(Number(e.rotation)||0)+theta;
   if(e.type==='arc'){e.a0+=theta;e.a1+=theta}
