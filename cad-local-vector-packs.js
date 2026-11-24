@@ -118,6 +118,8 @@ async function importFile(file){
 const METRES={1:.0254,2:.3048,4:.001,5:.01,6:1,7:1000,8:2.54e-8,9:2.54e-5,10:.9144,11:1e-10,12:1e-9,13:1e-6,14:.1};
 function classify(value){
  const s=String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[_-]/g,' ');
+ // Botanical names take priority; "planta" alone can mean a floor plan.
+ if(/arbol|vegetacion|arbusto|palmera|planta ornamental|planta en maceta|follaje|conifera|cactus|\b(?:tree|trees|shrub|shrubs|bush|bushes|foliage|potted plant)\b/.test(s))return 'Exterior';
  const groups=[
  [/abertura|puerta|ventana|carpinter|persiana|\bdoor\b|\bwindow\b|porton/,'Puertas y ventanas'],
  [/bano|bacha|bidet|inodoro|sanitari|lavatorio|ducha|banera|toilet|urinal|shower|bathtub|\bwc\b/,'Baños'],
@@ -127,7 +129,7 @@ function classify(value){
  [/arbol|vegetacion|arbusto|palmera|tree|shrub|jardin|outdoor/,'Exterior'],
  [/animal|fauna|perro|gato|caballo|\bdog\b|\bcat\b/,'Animales'],
  [/gym|gimnasio|deport|fitness|sport/,'Deportes'],
- [/avion|barco|auto|camion|vehicul|truck|airplane|boat|bicycle|bicicleta|moto|\bcar\b|\bbus\b|aparcamiento|estacionamiento/,'Vehículos'],
+ [/avion|barco|\bauto(?:s|movil|moviles)?\b|camion|vehicul|truck|airplane|boat|bicycle|bicicleta|\bmoto(?:s|cicleta|cicletas)?\b|\b(?:car|cars|bus|buses|autobus|autobuses|omnibus)\b|aparcamiento|estacionamiento/,'Vehículos'],
  [/escalera|stair|pasamanos|baranda|railing/,'Escaleras'],
  [/ilumin|luminaria|lampara|lighting|light fixture/,'Iluminación'],
  [/oficina|office|escritorio/,'Oficina'],
