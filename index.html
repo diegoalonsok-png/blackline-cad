@@ -8739,10 +8739,13 @@ function initAdjustableChrome(){
 })();
 function renderBlockLibrary(){
  const sel=$('blockLibrary');if(!sel)return;const previous=sel.value;
- sel.replaceChildren();
- const start=document.createElement('option');start.value='';start.textContent='Choose block...';sel.append(start);
- Object.keys(state.blocks||{}).sort().forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;sel.append(option)});
- if(state.blocks?.[previous])sel.value=previous;
+ const names=Object.keys(state.blocks||{}).sort(),signature=JSON.stringify(names);
+ if(sel.dataset.blockSignature!==signature){
+  sel.dataset.blockSignature=signature;sel.replaceChildren();
+  const start=document.createElement('option');start.value='';start.textContent='Choose block...';sel.append(start);
+  names.forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;sel.append(option)});
+  if(names.includes(previous))sel.value=previous;
+ }
  if(document.getElementById('cadDocumentBlocks'))cadDocumentBlocksRefresh();
 }
 function blockDefinition(name){return state.blocks?.[name]||null}
@@ -9239,6 +9242,7 @@ async function cadPersonalBlockSave(name){
    tx.oncomplete=()=>resolve(!duplicate);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
   });
   toast(saved?'Bloque guardado en Mis bloques: '+name:'Este bloque ya está en Mis bloques');
+  if(saved)document.dispatchEvent(new Event('cad-personal-blocks-changed'));
  }finally{db.close()}
 }
 function cadPersonalBlockInsert(item){
@@ -9290,14 +9294,14 @@ function cadDocumentBlocksRefresh(){
 }
 function cadDocumentBlockSelection(){
  const name=$('cadDocBlockSelect').value,def=state.blocks?.[name],preview=$('cadDocBlockPreview');
- if(preview._definition!==def||preview._epoch!==cadDrawEpoch){preview._definition=def;preview._epoch=cadDrawEpoch;preview.replaceChildren();if(def)preview.append(cadDocumentBlockPreview(def))}
+ if(preview._definition!==def||preview._entities!==def?.entities){preview._definition=def;preview._entities=def?.entities;preview.replaceChildren();if(def)preview.append(cadDocumentBlockPreview(def))}
  $('cadDocBlockInfo').textContent=def?def.entities.length+' elementos · '+state.entities.filter(e=>e.type==='blockRef'&&e.blockName===name).length+' inserciones':'Seleccioná una definición del archivo';
  for(const b of $('cadDocumentBlocks').querySelectorAll('[data-doc-block-action]'))b.disabled=!def;
 }
 function cadInitDocumentBlocks(dock){
  const panel=document.createElement('section');panel.className='panel';panel.id='cadDocumentBlocks';
  panel.innerHTML='<div class="panel-title"><span>BLOQUES DEL ARCHIVO</span><button type="button" class="btn slim" id="cadDocBlockToggle" aria-expanded="false">+</button></div><div class="panel-content" id="cadDocBlockBody" hidden><small id="cadDocBlockCount"></small><select id="cadDocBlockSelect" aria-label="Bloques del archivo" style="width:100%;margin:6px 0"></select><div id="cadDocBlockPreview"></div><small id="cadDocBlockInfo"></small><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn slim" data-doc-block-action="insert">Insertar</button><button class="btn slim" data-doc-block-action="edit">Editar</button><button class="btn slim" data-doc-block-action="select">Seleccionar instancias</button><button class="btn slim" data-doc-block-action="save">＋ Guardar en galería</button></div></div>';
- dock.append(panel);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockToggle').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh()};
+ const gallery=$('blacklineBlockGallery');dock.insertBefore(panel,gallery?.parentElement===dock?gallery.nextSibling:null);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockToggle').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh()};
  $('cadDocBlockSelect').onchange=cadDocumentBlockSelection;
  panel.addEventListener('click',async e=>{const b=e.target.closest('[data-doc-block-action]');if(!b)return;const name=$('cadDocBlockSelect').value;if(!state.blocks?.[name])return;
   if(b.dataset.docBlockAction==='insert'){$('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';$('insertBlockBtn').click()}
@@ -9572,7 +9576,8 @@ function initPermanentBlockGallery(){
   addFreeOpening('Vano libre '+openingCm(w),'framed-window',w,{vano:true});
  const canUseLibraryPro=()=>!window.CAD2D_PLAN||window.CAD2D_PLAN.can('arq-pro');
  const cats=[...new Set(entries.map(x=>x.cat)),'Mis bloques'];
- let activeCategory=cats[0];
+ let activeCategory=cats[0],personalGalleryRequest=0;
+ document.addEventListener('cad-personal-blocks-changed',()=>{if(activeCategory==='Mis bloques')showCards()});
  const catIcons={Openings:'▯',Furniture:'▤',Sanitary:'◉',Vehicles:'▰',Landscape:'♧'};
  const chooser=$('blCategories');
  for(const cat of cats){
@@ -9666,7 +9671,22 @@ function initPermanentBlockGallery(){
   for(const b of chooser.children){const active=b.dataset.category===activeCategory;b.setAttribute('aria-pressed',String(active));b.style.background=active?'#385263':'';b.style.borderColor=active?'#91bfd5':''}
   const cards=$('blCards');cards.replaceChildren();
   if(activeCategory==='Mis bloques'){
-   cards.textContent='Cargando biblioteca local…';cadPersonalBlocksRead().then(items=>{if(activeCategory!=='Mis bloques')return;cards.replaceChildren();if(!items.length){cards.textContent='Guardá bloques desde Bloques del archivo.';return}for(const item of items){const button=document.createElement('button');button.type='button';button.className='btn';button.style.cssText='padding:4px;min-width:0;white-space:normal';button.append(cadDocumentBlockPreview(item.definition));const label=document.createElement('span');label.textContent=item.name;button.append(label);button.onclick=()=>cadPersonalBlockInsert(item);cards.append(button)}}).catch(err=>{if(activeCategory==='Mis bloques')cards.textContent=err.message});return;
+   const request=++personalGalleryRequest;cards.textContent='Cargando biblioteca local…';
+   cadPersonalBlocksRead().then(items=>{
+    if(activeCategory!=='Mis bloques'||request!==personalGalleryRequest)return;
+    cards.replaceChildren();if(!items.length){cards.textContent='Guardá bloques desde Bloques del archivo.';return}
+    items.sort((a,b)=>a.name.localeCompare(b.name));
+    let offset=0;
+    function more(){
+     cards.querySelector('[data-personal-more]')?.remove();
+     for(const item of items.slice(offset,offset+24)){
+      const button=document.createElement('button');button.type='button';button.className='btn';button.style.cssText='padding:4px;min-width:0;white-space:normal';
+      button.append(cadDocumentBlockPreview(item.definition));const label=document.createElement('span');label.textContent=item.name;button.append(label);button.onclick=()=>cadPersonalBlockInsert(item);cards.append(button);
+     }
+     offset+=24;
+     if(offset<items.length){const b=document.createElement('button');b.type='button';b.className='btn';b.dataset.personalMore='1';b.style.gridColumn='1 / -1';b.textContent='Mostrar más ('+(items.length-offset)+')';b.onclick=more;cards.append(b)}
+    }more();
+   }).catch(err=>{if(activeCategory==='Mis bloques'&&request===personalGalleryRequest)cards.textContent=err.message});return;
   }
   for(const x of entries.filter(x=>x.cat===activeCategory)){
    const button=document.createElement('button');button.type='button';button.className='btn';
