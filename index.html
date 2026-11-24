@@ -4861,6 +4861,93 @@ function cadOverkill(){
  toast('OVERKILL: '+remove.size+' duplicados eliminados');log('OVERKILL');
 }
 
+
+/* Version comparison: the reference is read locally and never replaces the drawing. */
+var cadCompareBusy=false;
+function cadCompareModels(current,previous){
+ if(typeof Worker==='undefined')return Promise.resolve(window.CAD2DCompare.compare(current,previous));
+ return new Promise((resolve,reject)=>{
+  let worker,timer,done=false;
+  const finish=(error,result)=>{if(done)return;done=true;clearTimeout(timer);worker?.terminate();error?reject(Error(error)):resolve(result)};
+  try{worker=new Worker(new URL('cad-model-compare-worker.js?v=20261124-compare-v1',document.baseURI));
+   timer=setTimeout(()=>finish('Tiempo límite de comparación; planos conservados'),60000);
+   worker.onmessage=e=>finish(e.data?.error||(!e.data?.result?'Respuesta inválida':null),e.data?.result);
+   worker.onerror=e=>finish(e.message||'No se pudo iniciar la comparación');
+   worker.onmessageerror=()=>finish('No se pudo recuperar la comparación');
+   worker.postMessage({current,previous});
+  }catch(e){finish(e.message)}
+ });
+}
+async function cadCompareRead(file){
+ if(file.size>64*1024*1024)throw Error('Archivo superior a 64 MiB');
+ let data,txt;
+ if(/\.dwg$/i.test(file.name))txt=await convertDWGAutomatically(file,{textOnly:true});
+ else if(/\.dxf$/i.test(file.name))txt=cadDxfDecode(await file.arrayBuffer());
+ else if(/\.(cadjson|json)$/i.test(file.name))data=JSON.parse(await file.text());
+ else throw Error('Elegí un DWG, DXF o proyecto CAD2D3D');
+ if(!data&&txt){
+  const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');
+  if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF'))data=JSON.parse(txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim());
+  else {
+   if(cadDxfActiveJob)throw Error('Hay una importación en curso; finalizala antes de comparar');
+   const parsed=await cadParseDXFWorker(txt,readDimensionStyle());
+   const unit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode];
+   let originalUnit=unit;
+   if(!originalUnit){originalUnit=window.prompt('Unidades originales del plano de referencia: mm, cm, m, in o ft',state.unit);if(originalUnit===null)throw Error('Comparación cancelada');originalUnit=originalUnit.trim().toLowerCase();}
+   if(!U[originalUnit])throw Error('Unidad de referencia no válida');
+   data={entities:parsed.entities,blocks:parsed.blocks,layers:parsed.layers,unit:originalUnit,warnings:parsed.warnings||[]};
+  }
+ }
+ if(!Array.isArray(data?.entities)||!Array.isArray(data?.layers)||!U[data.unit])throw Error('Proyecto de referencia inválido o sin unidades');
+ return data;
+}
+function cadShowCompare(result,file,epoch,entities,warnings){
+ const old=$('cadCompareDialog');if(old)old.remove();
+ const d=document.createElement('dialog');d.id='cadCompareDialog';
+ d.style.cssText='max-width:min(760px,92vw);max-height:85vh;overflow:auto;background:var(--cad-ui-panel,#17232c);color:var(--cad-ui-text,#e5eef5);border:1px solid #536876;border-radius:6px;padding:18px;box-shadow:0 14px 50px #0008';
+ const esc=escapeHTML,nums=result.rows.slice(0,150).map(x=>'<tr><td>'+esc(x.layer)+'</td><td>'+esc(x.type)+'</td><td style="text-align:right;color:#43bda0">'+x.added+'</td><td style="text-align:right;color:#ef8b80">'+x.removed+'</td></tr>').join('');
+ const changes=(label,items)=>'<p><strong>'+label+' ('+items.length+')</strong> '+items.slice(0,40).map(v=>esc(v.name)+' · '+({added:'nueva',removed:'eliminada',changed:'modificada'}[v.kind])).join(' / ')+(items.length>40?' …':'')+'</p>';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:12px"><strong style="flex:1">COMPARAR PLANOS · DWGCOMPARE</strong><button class="btn" data-close>×</button></div><p>Referencia anterior: '+esc(file.name)+'</p><p><strong style="color:#43bda0">'+result.added.length+' nuevos o modificados</strong> · <strong style="color:#ef8b80">'+result.removed.length+' anteriores ausentes</strong> · '+result.unchanged+' registros coincidentes</p><p style="font-size:12px">Comparación exacta de registros importados, sin redondear, mover ni reescalar. Una modificación puede aparecer como un registro anterior y otro nuevo. No equivale a una comparación binaria DWG ni incluye objetos no recuperados por el importador.</p>'+
+ (warnings.length?'<p style="color:#efb56b">Advertencias del lector: '+esc(warnings.join(' · '))+'</p>':'')+
+ '<table style="width:100%;text-align:left;font-size:12px"><thead><tr><th>Capa</th><th>Tipo</th><th>Nuevos</th><th>Ausentes</th></tr></thead><tbody>'+nums+'</tbody></table>'+(result.rows.length>150?'<p>Mostrando las primeras 150 combinaciones de capa y tipo.</p>':'')+
+ changes('Definiciones de bloques',result.changedBlocks)+changes('Capas',result.changedLayers)+
+ '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-select>Seleccionar cambios actuales</button><button class="btn" data-report>Guardar informe TXT</button><button class="btn" data-close>Cerrar</button></div>';
+ document.body.append(d);
+ d.addEventListener('close',()=>d.remove());
+ d.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>d.close());
+ d.querySelector('[data-select]').onclick=()=>{
+  if(epoch!==cadDrawEpoch||entities!==state.entities)return toast('El dibujo cambió. Repetí DWGCOMPARE.');
+  const ids=new Set([...result.added,...result.affected]);
+  state.selected=state.entities.filter(e=>ids.has(e.id)&&layerFor(e).visible&&!layerFor(e).locked&&!e.cadHidden).map(e=>e.id);updateProps();schedule();d.close();toast(state.selected.length+' cambios actuales seleccionados; capas bloqueadas u ocultas excluidas');
+ };
+ d.querySelector('[data-report]').onclick=()=>{
+  const label=x=>JSON.stringify(String(x));
+  const report=['CAD2D3D · comparación de registros','Referencia: '+file.name,'Coincidentes: '+result.unchanged,'Nuevos/modificados: '+result.added.length,'Anteriores ausentes: '+result.removed.length,'Capa / Tipo / Nuevos / Ausentes',...result.rows.map(x=>[label(x.layer),label(x.type),x.added,x.removed].join(' / ')),'Bloques: '+JSON.stringify(result.changedBlocks),'Capas: '+JSON.stringify(result.changedLayers),'Advertencias: '+warnings.join(' · '),'No incluye información no recuperada por el importador.'].join('\n');
+  download(state.file+'-comparacion.txt',report,'text/plain;charset=utf-8');
+ };
+ if(typeof d.showModal==='function')d.showModal();else d.setAttribute('open','');
+}
+function cadComparePicker(){
+ if(cadCompareBusy)return toast('Ya hay una comparación en curso');
+ if(cadBlockEdit)return toast('Cerrá la edición de bloques antes de comparar');
+ const picker=document.createElement('input');picker.type='file';picker.accept='.dwg,.dxf,.cadjson,.json';
+ picker.onchange=async()=>{
+  const file=picker.files[0];if(!file||cadCompareBusy)return;
+  cadCompareBusy=true;const epoch=cadDrawEpoch,entities=state.entities;
+  try{
+   toast('DWGCOMPARE · leyendo referencia local…');
+   const previous=await cadCompareRead(file);
+   if(epoch!==cadDrawEpoch||entities!==state.entities)throw Error('El dibujo cambió durante la lectura; repetí la comparación');
+   if(state.unit!==previous.unit)throw Error('Las unidades no coinciden: '+state.unit+' / '+previous.unit+'. No se modificó ningún plano.');
+   const current={entities:state.entities,blocks:state.blocks,layers:state.layers,unit:state.unit};
+   const result=await cadCompareModels(current,previous);
+   if(epoch!==cadDrawEpoch||entities!==state.entities)throw Error('El dibujo cambió durante la comparación; repetí el comando');
+   log('DWGCOMPARE · '+result.unchanged+' coincidentes · '+result.added.length+' nuevos/modificados · '+result.removed.length+' anteriores ausentes');
+   cadShowCompare(result,file,epoch,entities,previous.warnings||[]);
+  }catch(e){toast('DWGCOMPARE: '+e.message);log('DWGCOMPARE: '+e.message)}finally{cadCompareBusy=false;}
+ };picker.click();
+}
+
 /* CAD command expansion: line split, 2-point alignment, object listing and quick selection.
    All geometric mutations are undoable and respect locked/hidden layers. */
 function cadBreakAtPoint(p){
@@ -6209,6 +6296,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
  SELECCIONARSIMILARES:'SELECTSIMILAR',SELECCIONINVERSA:'SELECTINVERT'
 });
 const CAD_COMMANDS=[
+ ['DWGCOMPARE','COMPARE / COMPARARPLANOS','Comparar versiones DWG, DXF o CADJSON sin alterar el dibujo'],
  ['PERFORMANCE','RENDIMIENTO','Diagnóstico local de tiempos de dibujo, objetos e historial'],
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['SAVE','QSAVE','Guardar dibujo (DXF)'],['SAVEAS','','Guardar una copia con otro nombre (DXF, DWG o proyecto)'],['SAVEDWG','GUARDARDWG','Guardar dibujo como DWG binario editable'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
@@ -6496,6 +6584,7 @@ function cadDispatchImmediate(upper){
  if(['LIST','LISTAR','LI'].includes(upper))return cadListEntities();
  if(['QSELECT','SELECCIONRAPIDA','QS'].includes(upper))return cadQuickSelect();
  if(['REGEN','REGENALL','REGENERAR','RE'].includes(upper)){schedule();return toast('REGEN: vista regenerada')}
+ if(['DWGCOMPARE','COMPARE','COMPARARPLANOS'].includes(upper))return cadComparePicker();
  if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
  if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
  if(['SELECTINVERT','INVERTSELECTION','INVERTIRSELECCION','INVERTIR'].includes(upper))return cadInvertSelection();
@@ -11122,6 +11211,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-worker-v1"></script>
+<script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261123-local-bidirectional-v4"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
