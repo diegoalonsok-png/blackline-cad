@@ -8310,20 +8310,28 @@ function cad3dProfileSimple(p){
  }return true;
 }
 function cad3dSolidTriangles(r){
+ if(!r||['x','y','z','rot'].some(k=>r[k]!=null&&!Number.isFinite(r[k])))throw Error('Transformación 3D inválida');
+ var required=r.type==='box'?['w','d','h']:r.type==='sphere'?['radius']:['cylinder','cone'].includes(r.type)?['radius','h']:[];
+ if(required.some(k=>!Number.isFinite(r[k])||r[k]<=0))throw Error('Dimensiones del sólido inválidas');
  var g=null;
  if(r.type==='box')g=boxGeom(r.w,r.d,r.h);
  else if(r.type==='sphere'){g=new T.SphereGeometry(r.radius,20,12);g.translate(0,0,r.radius);}
  else if(['cylinder','cone'].includes(r.type)){g=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);g.rotateX(Math.PI/2);g.translate(0,0,r.h/2);}
  else if(r.type==='profile2d'&&r.profileClosed&&r.extrudedHeight>0&&cad3dProfileSimple(r.profilePoints)){
   var p=r.profilePoints,shape=new T.Shape();shape.moveTo(p[0][0],p[0][1]);p.slice(1).forEach(v=>shape.lineTo(v[0],v[1]));shape.closePath();g=new T.ExtrudeGeometry(shape,{depth:r.extrudedHeight,steps:1,bevelEnabled:false});
- }else if(r.type==='boolean'&&Array.isArray(r.triangles)&&r.triangles.length){g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(r.triangles,3));}
+ }else if(r.type==='boolean'&&Array.isArray(r.triangles)&&r.triangles.length){
+  if(r.triangles.length%9||r.triangles.length>120000||!r.triangles.every(Number.isFinite))throw Error('Malla de sólido inválida');
+  var angle=(r.rot||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),t=[];
+  for(var i=0;i<r.triangles.length;i+=3){var x=r.triangles[i],y=r.triangles[i+1];t.push(x*c-y*s+(r.x||0),x*s+y*c+(r.y||0),r.triangles[i+2]+(r.z||0))}
+  if(!t.every(Number.isFinite))throw Error('Transformación de malla inválida');return t;
+ }
  else throw Error('Sólidos compatibles: BOX, SPHERE, CYLINDER, CONE, perfil extrudado y malla resultante. Muros y losas conservan sus propias herramientas.');
  try{
   var m=new T.Matrix4().makeRotationZ((r.rot||0)*Math.PI/180);m.setPosition(r.x||0,r.y||0,r.z||0);
   var out=[],p=g.getAttribute('position'),idx=g.index,v=new T.Vector3(),n=idx?idx.count:p.count;
   if(n*3>120000||n%3)throw Error('Malla demasiado grande o inválida');
   for(var i=0;i<n;i++){v.fromBufferAttribute(p,idx?idx.getX(i):i).applyMatrix4(m);out.push(v.x,v.y,v.z);}
-  return out;
+  if(!out.every(Number.isFinite))throw Error('Coordenadas de sólido inválidas');return out;
  }finally{g.dispose()}
 }
 function cad3dSolidBounds(t){
@@ -8333,7 +8341,7 @@ function cad3dSolidBounds(t){
 }
 function cad3dMakeSolid(t,source,name){
  var v=Math.abs(cad3dSolidKernel().volume(t));
- if(!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite)||v<1e-9)throw Error('El resultado no contiene volumen válido');
+ if(!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite)||!Number.isFinite(v)||v<1e-9)throw Error('El resultado no contiene volumen válido');
  var b=cad3dSolidBounds(t),x=(b.min[0]+b.max[0])/2,y=(b.min[1]+b.max[1])/2,z=b.min[2];
  return {type:'boolean',name,layerId:source.layerId||'0',x,y,z,rot:0,w:Math.max(.01,b.max[0]-b.min[0]),d:Math.max(.01,b.max[1]-b.min[1]),h:Math.max(.01,b.max[2]-z),triangles:t.map((v,i)=>v-[x,y,z][i%3])};
 }
