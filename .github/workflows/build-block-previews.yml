@@ -21,10 +21,10 @@ jobs:
         run: python3 scripts/build_block_previews.py
       - name: Validate and commit generated files
         run: |
-          python3 -c 'import json,pathlib; p=pathlib.Path("assets/block-previews/v1"); rows=json.loads((p/"catalog.json").read_text())["blocks"]; assert len(rows)>1000; assert all((p/(r["id"]+".svg")).is_file() for r in rows); print(len(rows), "verified previews")'
-          git add assets/block-previews/v1
+          python3 -c 'import json,pathlib; p=pathlib.Path("assets/block-previews/v1"); rows=json.loads((p/"catalog.json").read_text())["blocks"]; assert len(rows)>1000; assert all((p/(r["id"]+".svg")).is_file() for r in rows); q=pathlib.Path("assets/block-library/v1"); catalog=json.loads((q/"catalog.json").read_text()); assert catalog["parts"]==16; assert len(catalog["blocks"])==len(rows); assert all((q/(r["id"]+".json")).is_file() for r in rows); print(len(rows), "verified previews and separate geometry files")'
+          git add assets/block-previews/v1 assets/block-library/v1
           if git diff --cached --quiet; then exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Build static CAD gallery previews"
+          git commit -m "Build static CAD gallery previews and individual CAD geometry"
           git push origin HEAD:main
