@@ -9044,6 +9044,92 @@ function updateDynamicReadout(e){
  el.style.top=clamp(e.clientY-rect.top+16,8,Math.max(8,rect.height-34))+'px';
  el.dataset.show='true';
 }
+
+/* MASSPROP / LIST 3D — read-only geometric quantities, in model metres.
+   Analytic primitives and validated simple prisms; architectural gross/net
+   quantities are separated from solid totals because mitres may change them. */
+function cad3dMassProperties(r){
+ const positive=(...v)=>v.every(x=>Number.isFinite(x)&&x>0);
+ const validPosition=[r.x??0,r.y??0,r.z??0,r.rot??0].every(Number.isFinite);
+ const unsupported=reason=>({volume:null,surface:null,center:null,kind:'unsupported',reason});
+ if(!validPosition)return unsupported('Posición inválida');
+ let volume,surface,center=[0,0,0],kind='solid',reason='';
+ const w=r.w,d=r.d,h=r.h,R=r.radius;
+ if(r.type==='box'&&positive(w,d,h)){
+  volume=w*d*h;surface=2*(w*d+w*h+d*h);center[2]=h/2;
+ }else if(r.type==='sphere'&&positive(R)){
+  volume=4*Math.PI*R**3/3;surface=4*Math.PI*R**2;center[2]=R;
+ }else if(r.type==='cylinder'&&positive(R,h)){
+  volume=Math.PI*R**2*h;surface=2*Math.PI*R*(R+h);center[2]=h/2;
+ }else if(r.type==='cone'&&positive(R,h)){
+  volume=Math.PI*R**2*h/3;surface=Math.PI*R*(R+Math.hypot(R,h));center[2]=h/4;
+ }else if(r.type==='profile2d'&&r.profileClosed&&positive(r.extrudedHeight)&&cad3dProfileSimple(r.profilePoints)){
+  const p=r.profilePoints;let cross=0,cx=0,cy=0,perimeter=0;
+  for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],v=a[0]*b[1]-b[0]*a[1];cross+=v;cx+=(a[0]+b[0])*v;cy+=(a[1]+b[1])*v;perimeter+=Math.hypot(b[0]-a[0],b[1]-a[1])}
+  const area=Math.abs(cross)/2;volume=area*r.extrudedHeight;surface=2*area+perimeter*r.extrudedHeight;center=[cx/(3*cross),cy/(3*cross),r.extrudedHeight/2];
+ }else if((r.type==='wall'||r.type==='slab')&&positive(w,d,h)){
+  const wall=r.type==='wall';
+  if(!wall&&((r.pitch||0)!==0||r.slabPolyHoles?.length))return unsupported('Losa inclinada o con cortes poligonales: requiere cálculo de malla');
+  if((r.openings||[]).length>150)return unsupported('Demasiados vanos para cálculo nominal');
+  let span=wall?h:d,thickness=wall?d:h,base=wall?0:-span/2;
+  const cuts=[],clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+  for(const o of r.openings||[]){
+   const dims=wall?[o.w,o.h]:[o.w,o.d];
+   if(!positive(...dims)||![o.offset,wall?o.sill:o.offsetY].every(Number.isFinite))return unsupported('Vano inválido');
+   const lo=wall?o.sill:o.offsetY-o.d/2,hi=wall?o.sill+o.h:o.offsetY+o.d/2;
+   const x0=clamp(o.offset-o.w/2,-w/2,w/2),x1=clamp(o.offset+o.w/2,-w/2,w/2),y0=clamp(lo,base,base+span),y1=clamp(hi,base,base+span);
+   if(x1-x0>.01&&y1-y0>.01)cuts.push([x0,x1,y0,y1]);
+  }
+  // Union of clipped rectangular openings, not a sum: overlaps counted once.
+  const xs=[...new Set(cuts.flatMap(c=>[c[0],c[1]]))].sort((a,b)=>a-b);
+  let removed=0;
+  for(let i=1;i<xs.length;i++){
+   const x=(xs[i-1]+xs[i])/2;
+   const intervals=cuts.filter(c=>c[0]<x&&x<c[1]).map(c=>[c[2],c[3]]).sort((a,b)=>a[0]-b[0]);
+   let covered=0,lo=null,hi=null;
+   for(const [a,b] of intervals){if(lo===null){lo=a;hi=b}else if(a<=hi)hi=Math.max(hi,b);else{covered+=hi-lo;lo=a;hi=b}}
+   if(lo!==null)covered+=hi-lo;removed+=covered*(xs[i]-xs[i-1]);
+  }
+  volume=Math.max(0,w*span-removed)*thickness;
+  if(wall){kind='nominal';reason='Muro neto nominal, sin carpinterías ni ajustes de encuentros';surface=null;center=null}
+  else if(cuts.length){kind='nominal';reason='Losa neta nominal con vanos rectangulares';surface=null;center=null}
+  else {surface=2*(w*d+w*h+d*h);center[2]=h/2}
+ }else return unsupported('Tipo no calculable de forma fiable o dimensiones inválidas');
+ if(!Number.isFinite(volume)||volume<0||surface!==null&&(!Number.isFinite(surface)||surface<0))return unsupported('Resultado fuera de rango');
+ if(center){const a=(r.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),[x,y,z]=center;center=[(r.x||0)+x*c-y*s,(r.y||0)+x*s+y*c,(r.z||0)+z]}
+ return {volume,surface,center,kind,reason};
+}
+function cad3dMassReport(){
+ if(!root)return;
+ const ids=new Set(selected),chosen=records.filter(r=>ids.has(r.id)&&visibleRecord(r));
+ if(!chosen.length)return text('MASSPROP / LIST · Seleccioná los objetos 3D a consultar');
+ root.querySelector('[data-mass-report]')?.remove();
+ const d=document.createElement('dialog');d.setAttribute('data-mass-report','');d.setAttribute('aria-label','Propiedades físicas 3D');
+ d.style.cssText='width:min(590px,92vw);max-height:80vh;overflow:auto;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:6px;padding:14px';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">MASSPROP / LIST · PROPIEDADES 3D</strong><button type="button" class="btn" data-export>TXT</button><button type="button" class="btn" data-close>×</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ const fmt=n=>Number.isFinite(n)?n.toFixed(4):'No calculable';
+ let solid=0,nominal=0,solidCount=0,nominalCount=0,unsupportedCount=0,area=0,areaCount=0;
+ const lines=chosen.map(r=>{
+  const p=cad3dMassProperties(r),layer=layerForRecord(r),out=['#'+r.id+' · '+r.type.toUpperCase()+' · Capa: '+(layer?.name||'0'),'Posición XYZ (m): '+[r.x,r.y,r.z].map(fmt).join(' · '),'Rotación: '+fmt(r.rot||0)+'°'];
+  if(r.type==='sphere')out.push('Radio (m): '+fmt(r.radius));
+  else if(['cylinder','cone'].includes(r.type))out.push('Radio / altura (m): '+fmt(r.radius)+' / '+fmt(r.h));
+  else out.push('Dimensiones de registro (m): '+[r.w,r.d,r.h].map(fmt).join(' × '));
+  if(p.kind==='solid'){solid+=p.volume;solidCount++;if(Number.isFinite(p.surface)){area+=p.surface;areaCount++}}
+  else if(p.kind==='nominal'){nominal+=p.volume;nominalCount++}
+  else unsupportedCount++;
+  if(p.volume!==null)out.push((p.kind==='nominal'?'Volumen nominal: ':'Volumen: ')+fmt(p.volume)+' m³');
+  if(p.surface!==null)out.push('Superficie exterior: '+fmt(p.surface)+' m²');
+  if(p.center)out.push('Centroide XYZ (m): '+p.center.map(fmt).join(' · '));
+  if(p.reason)out.push(p.reason);
+  return out.join('\n');
+ });
+ const report=['Objetos seleccionados: '+chosen.length,'Suma de volúmenes de sólidos ('+solidCount+'): '+fmt(solid)+' m³','Suma de superficies exteriores ('+areaCount+'): '+fmt(area)+' m²','Volumen arquitectónico nominal ('+nominalCount+'): '+fmt(nominal)+' m³','Sin cálculo fiable: '+unsupportedCount,'Las sumas no descuentan intersecciones entre objetos. No se calcula masa sin densidad. Los sólidos analíticos usan dimensiones de diseño, no la discretización gráfica.','',...lines.map(s=>s+'\n──────────────────────────────')].join('\n');
+ d.querySelector('pre').textContent=report;
+ d.querySelector('[data-export]').onclick=()=>download('CAD2D3D-MASSPROP.txt',report,'text/plain;charset=utf-8');
+ d.querySelector('[data-close]').onclick=()=>d.close();
+ d.addEventListener('close',()=>d.remove());root.append(d);d.showModal();text('MASSPROP · '+chosen.length+' objetos consultados');
+}
+
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  var radiusCommand=raw.match(/^(?:RADIO|RADIUS|RRECT|RECTREDONDEADO)\s+(\d+(?:[.,]\d+)?|[.,]\d+)$/i);
@@ -9093,6 +9179,7 @@ function run3DCommand(){
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
+ if(['massprop','list','li','propiedades3d','list3d'].includes(command)){cad3dMassReport();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
