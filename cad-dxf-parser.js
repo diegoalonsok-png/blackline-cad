@@ -8,6 +8,13 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const activeRecords=new Set();let walkCount=0,entityCount=0,vertexCount=0;
  const abortImport=message=>{const err=Error('DXF: '+message+' · dibujo anterior conservado');err.cadImportFatal=true;throw err};
  const checkTime=()=>{if(performance.now()-importStart>20000)abortImport('procesamiento excedió el límite de 20 segundos')};
+ const finitePoint=p=>!!p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
+ const validateGeometry=e=>{
+  for(const key of ['a','b','c','p'])if(e[key]!=null&&!finitePoint(e[key]))throw Error('Coordenada DXF inválida');
+  if(Array.isArray(e.pts)&&!e.pts.every(finitePoint))throw Error('Vértice DXF inválido');
+  for(const key of ['r','rx','ry','h','scale','rotation','a0','a1','hatchSpacing','pwidth'])if(e[key]!=null&&!Number.isFinite(e[key]))throw Error('Magnitud DXF inválida');
+  return e;
+ };
  const budgetEntity=e=>{entityCount++;vertexCount+=Array.isArray(e.pts)?e.pts.length:1;if(entityCount>MAX_ENTITIES||vertexCount>MAX_VERTICES)abortImport('expansión geométrica demasiado grande')};
  if(typeof text==='string'&&text.length>64*1024*1024)abortImport('DXF expandido superior a 64 MiB');
  text=String(text||'').replace(/\\U\+([0-9A-Fa-f]{4})/g,(m,h)=>String.fromCharCode(parseInt(h,16)));
@@ -96,7 +103,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
    const text=type==='MTEXT'?cleanMText(raw):raw.replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[uUoO]/g,'');
    if(!text&&!isDef)return null;
    let h=get(40,.25)||.25,p=P(get(10),get(20)),rot=get(50,0),mw=0,ls=0;
-   if(type==='MTEXT'){const dx=get(11,NaN),dy=get(21,0);if(Number.isFinite(dx))rot=Math.atan2(dy,dx)*180/Math.PI;mw=get(41,0);ls=1.6667*(get(44,1)||1);const lines=text.split('\n'),n=lines.length,sp=h*ls,at=get(71,1),w=(mw>0?mw:Math.max(...lines.map(l=>l.length))*h*.62),cx=((at-1)%3)/2,cy=Math.floor((at-1)/3),r=rot*Math.PI/180;const ox=-w*cx,oy=cy===0?-h:cy===1?((n-1)*sp+h)/2-h:(n-1)*sp;p=P(p.x+ox*Math.cos(r)-oy*Math.sin(r),p.y+ox*Math.sin(r)+oy*Math.cos(r))}
+   if(type==='MTEXT'){const dx=get(11,NaN),dy=get(21,0);if(Number.isFinite(dx))rot=Math.atan2(dy,dx)*180/Math.PI;mw=get(41,0);ls=1.6667*(get(44,1)||1);const lines=text.split('\n'),n=lines.length,sp=h*ls,at=get(71,1),w=(mw>0?mw:lines.reduce((max,l)=>Math.max(max,l.length),0)*h*.62),cx=((at-1)%3)/2,cy=Math.floor((at-1)/3),r=rot*Math.PI/180;const ox=-w*cx,oy=cy===0?-h:cy===1?((n-1)*sp+h)/2-h:(n-1)*sp;p=P(p.x+ox*Math.cos(r)-oy*Math.sin(r),p.y+ox*Math.sin(r)+oy*Math.cos(r))}
    else{const hj=get(72,0),vj=get(73,0);if((hj||vj)&&hj!==5&&hj!==3){const q=P(get(11,p.x),get(21,p.y)),w=text.length*h*.62,f=hj===1||hj===4?.5:hj===2?1:0,r=rot*Math.PI/180,oy=vj===3?-h:vj===2?-h/2:0;p=P(q.x-w*f*Math.cos(r)-oy*Math.sin(r),q.y-w*f*Math.sin(r)+oy*Math.cos(r))}}
    const font=str(7,'').toUpperCase();
    return{type:'text',p,h,rotation:rot,fontFamily:font.includes('MONO')?'Courier New':font.includes('SERIF')?'Times New Roman':'Arial',text,...(mw>0?{mtextWidth:mw}:{}),...(ls>0?{lineSpacing:Math.round(ls*100)/100}:{}),...(isDef?{attdef:{tag:tagName,prompt:str(3,'').trim()||tagName,...(get(70,0)&1?{invisible:true}:{})}}:{})};
@@ -172,7 +179,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
 
  // INSERT de primer nivel → referencia de bloque CAD2D (se mantiene como bloque, no se explota).
  const importedBlocks=Object.create(null),defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
- const importedDimStyles={};
+ const importedDimStyles=Object.create(null);
  function cadDxfBlockRef(def,o,lname,common,sub){
   if(o.cols>1||o.rows>1)return null;
   let A=[Math.cos(o.rot)*o.sx,Math.sin(o.rot)*o.sx,-Math.sin(o.rot)*o.sy,Math.cos(o.rot)*o.sy],ix=o.ix,iy=o.iy;
@@ -224,7 +231,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
         const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
         if(ov&&ov!=='<>'&&!/<>/.test(ov))dim.label=cleanMText(ov).slice(0,120);
         if(common.color)dim.color=common.color;
-        budgetEntity(dim);entities.push(dim);expanded++;continue;
+        validateGeometry(dim);budgetEntity(dim);entities.push(dim);expanded++;continue;
        }
       }
       walk(def.recs,m,sub,depth+1,out);expanded++;continue}
@@ -232,7 +239,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
      if(depth===0&&!out&&!(opts&&opts.explodeInserts)){const ref=cadDxfBlockRef(def,{ix,iy,sx,sy,rot,ext,cols:get(70,1),rows:get(71,1)},lname,common,sub);if(ref){
       // ATTRIB que siguen al INSERT: valores de los atributos de esta referencia.
       if(get(66,0)===1&&importedBlocks[ref.blockName]?.entities.some(c=>c.attdef)){const attrs={};let j=idx+1;for(;j<recs.length&&recs[j][0]==='ATTRIB';j++){const f=fields(recs[j][1]),t=f.str(2,'').trim().toUpperCase();if(t)attrs[t]=cleanMText(f.str(1,''))}if(Object.keys(attrs).length){ref.attrs=attrs;idx=j-1}}
-      budgetEntity(ref);entities.push({...ref,id:entities.length+1});expanded++;continue}}
+      validateGeometry(ref);budgetEntity(ref);entities.push({...ref,id:entities.length+1});expanded++;continue}}
      const cols=Math.max(1,get(70,1)),rows=Math.max(1,get(71,1)),cs=get(44,0),rs=get(45,0);
      if(!Number.isSafeInteger(cols)||!Number.isSafeInteger(rows)||cols*rows>MAX_ENTITIES||cols*rows*Math.max(1,def.recs.length)>MAX_WALK-walkCount)abortImport('matriz INSERT excesiva');
      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
@@ -248,7 +255,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
     let ent=readRecord(type,record,recs,idx);
     if(ent===undefined){if(!silent.has(type))note(type);continue}
     if(!ent)continue;
-    for(const one of[].concat(ent)){const w=xform({...common,...one},m);budgetEntity(w);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
+    for(const one of[].concat(ent)){const w=validateGeometry(xform({...common,...one},m));budgetEntity(w);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
    }catch(error){if(error.cadImportFatal)throw error;note(type);if(unsupported.get(type)<=3)console.warn('Skipped DXF entity',type,error)}
   }
   }finally{activeRecords.delete(recs)}
