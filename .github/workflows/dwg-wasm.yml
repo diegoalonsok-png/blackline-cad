@@ -29,7 +29,7 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import {readFile} from 'node:fs/promises';
-          import init,{dwg_to_dxf,dxf_to_dwg,dwg_to_dxf_partial} from './dwg-wasm/pkg/blackline_dwg.js';
+          import init,{dwg_to_dxf,dxf_to_dwg,dwg_to_dxf_partial,dxf_to_dwg_with_preview} from './dwg-wasm/pkg/blackline_dwg.js';
           await init({module_or_path:await readFile('./dwg-wasm/pkg/blackline_dwg_bg.wasm')});
           const dxf=await readFile('examples/scale-1to1-test.dxf');
           const dwg=dxf_to_dwg(dxf);
@@ -38,6 +38,10 @@ jobs:
           if(!output.includes('SECTION')||!output.includes('LINE'))throw Error('DXF geometry missing');
           const partial=new TextDecoder().decode(dwg_to_dxf_partial(dwg));
           if(!partial.includes('SECTION')||!partial.includes('LINE'))throw Error('Partial mode lost basic geometry');
+          const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a3qkAAAAASUVORK5CYII=','base64');
+          const modern=Buffer.from(dxf.toString().replace(/(\$ACADVER\s+1\s+)AC10\d\d/,'$1AC1027'));
+          const withPreview=dxf_to_dwg_with_preview(modern,png);
+          if(!Buffer.from(withPreview).includes(png))throw Error('Embedded preview bytes missing');
           JS
       - name: Package source and licence notice
         run: |
