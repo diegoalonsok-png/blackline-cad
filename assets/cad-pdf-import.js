@@ -271,7 +271,7 @@ async function traceFile(file,source=null){
 function pickTrace(){const S=C.state;const imgs=S.entities.filter(e=>e.type==='image'&&S.layers.find(l=>l.id===e.layer)?.visible!==false);const selected=imgs.filter(e=>S.selected.includes(e.id));const source=selected.length===1?selected[0]:selected.length===0&&imgs.length===1?imgs[0]:null;if(source){return traceFile(null,{...source,a:{...source.a},b:{...source.b}});}if(selected.length>1||imgs.length>1){C.toast('Seleccioná una sola imagen para CALCO.');return;}const i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';i.onchange=()=>{if(i.files[0])traceFile(i.files[0])};i.click();}
 for(const k of ['CALCO','CALCAR','TRACEPLAN'])EXT.commands[k]=()=>pickTrace();
 const TRACE_ICON='<path d="M3 4h18v16H3z M6 16V8h7v4h5v4z"/><path d="M6 19h12" stroke-dasharray="2 2"/>';
-try{C.ribbon?.add('output','Calco',[{id:'outTracePlan',label:'Calco de planta · CALCO',icon:TRACE_ICON,run:()=>pickTrace()}]);C.ribbon?.rebuild()}catch(e){}
+// CALCO toolbar button hidden; command retained for future development.
 window.CAD2D_TRACE_PLAN=traceFile;
 window.CAD2D_CALCO=pickTrace;
 
