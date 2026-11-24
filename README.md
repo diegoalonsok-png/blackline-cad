@@ -1,6 +1,9 @@
-# Blackline CAD (CAD2D) — CAD 2D online para arquitectura
+# CAD2D3D by Blackline — Online 2D & 3D CAD for Architecture
 
-**Blackline CAD (CAD2D)** is a browser-based 2D drafting application for architectural plans and technical drawing.
+**CAD2D3D by Blackline** (formerly CAD2D / Blackline CAD) is a browser-based application for 2D technical drafting and architectural 3D modeling. Remote DWG conversion is currently disabled; DXF remains the primary interchange workflow.
+
+- **CAD 2D y 3D online (ES):** https://blackline-cad.org/cad-2d-3d-online
+- **Online 2D & 3D CAD (EN):** https://blackline-cad.org/online-2d-3d-cad
 
 - **Official website / aplicación CAD 2D online:** https://blackline-cad.org/
 - **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
