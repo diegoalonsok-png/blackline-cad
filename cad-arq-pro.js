@@ -995,11 +995,49 @@ function openArchitectureAssistant(category){
  }
  panel.hidden=false;panel.querySelector('[data-body]').hidden=false;panel.querySelector('[data-close]').textContent='−';if(category)panel.setCategory(category);panel.scrollIntoView({block:'nearest'});
 }
+
+/* Raster tracing prototype: orthogonal ink strokes, no semantic classification. */
+function tracePlanRaster(data,w,h,threshold=150,minRun=12){
+ if(!Number.isInteger(w)||!Number.isInteger(h)||w<2||h<2||w*h>2500000||data.length!==4*w*h)throw Error('Imagen inválida.');
+ const ink=new Uint8Array(w*h);
+ for(let i=0;i<ink.length;i++){const a=data[i*4+3]/255;ink[i]=a*(.299*data[i*4]+.587*data[i*4+1]+.114*data[i*4+2])+255*(1-a)<threshold?1:0}
+ const result=[];
+ for(const vertical of [false,true]){
+  const outer=vertical?w:h,inner=vertical?h:w,active=[];
+  for(let j=0;j<outer;j++){
+   const runs=[];let i=0;
+   while(i<inner){if(!ink[vertical?i*w+j:j*w+i]){i++;continue}const a=i;while(i<inner&&ink[vertical?i*w+j:j*w+i])i++;if(i-a>=minRun)runs.push([a,i-1]);}
+   const used=new Set();
+   for(const [a,b] of runs){
+    const match=active.find(x=>x.last===j-1&&!used.has(x)&&Math.abs(x.a-a)<=2&&Math.abs(x.b-b)<=2);
+    if(match){match.last=j;used.add(match)}else active.push({a,b,first:j,last:j});
+   }
+  }
+  for(const q of active){const mid=(q.first+q.last)/2;if(q.last-q.first+1>q.b-q.a+1)continue;const a=vertical?[mid,q.a]:[q.a,mid],b=vertical?[mid,q.b]:[q.b,mid];result.push({a,b})}
+ }
+ if(result.length>12000)throw Error('Demasiados trazos: recortá la imagen o aumentá longitud mínima.');
+ return result;
+}
+function openTracePlan(){
+ if(document.getElementById('cadTracePlan'))return;
+ const dlg=document.createElement('dialog');dlg.id='cadTracePlan';dlg.style.cssText='background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:18px;width:min(520px,90vw);max-height:90vh;overflow:auto';
+ dlg.innerHTML='<b>CALCAR PLANTA · prototipo</b><p>JPG / PNG. Detecta trazos horizontales y verticales; no reconoce todavía muebles ni aberturas. Recortá la imagen al área de interés.</p><input type="file" accept="image/png,image/jpeg"><p>Ancho real de la imagen completa (m): <input data-width type="number" min=".01" step=".01" value="3" style="width:90px"></p><p>Umbral: <input data-threshold type="range" min="30" max="240" value="150"> Longitud mínima: <input data-min type="number" min="4" max="200" value="12" style="width:65px"></p><canvas style="width:100%;max-height:45vh;object-fit:contain;background:white"></canvas><p data-status></p><button data-preview>Previsualizar</button> <button data-insert disabled>Insertar trazos</button> <button data-close>Cerrar</button>';
+ document.body.append(dlg);const q=s=>dlg.querySelector(s),cv=q('canvas'),ctx=cv.getContext('2d',{willReadFrequently:true});let original=null,lines=[];
+ const status=s=>q('[data-status]').textContent=s;
+ q('input[type=file]').onchange=async()=>{try{const file=q('input[type=file]').files[0];if(!file)return;if(file.size>25*1024*1024)throw Error('Máximo 25 MB.');const bmp=await createImageBitmap(file);const factor=Math.min(1,1400/Math.max(bmp.width,bmp.height));cv.width=Math.max(2,Math.round(bmp.width*factor));cv.height=Math.max(2,Math.round(bmp.height*factor));ctx.fillStyle='white';ctx.fillRect(0,0,cv.width,cv.height);ctx.drawImage(bmp,0,0,cv.width,cv.height);bmp.close();original=ctx.getImageData(0,0,cv.width,cv.height);q('[data-insert]').disabled=true;status('Imagen cargada. Previsualizá los trazos.')}catch(e){status(e.message)}};
+ const preview=()=>{if(!original)throw Error('Elegí una imagen.');lines=tracePlanRaster(original.data,cv.width,cv.height,+q('[data-threshold]').value,Math.max(4,+q('[data-min]').value||12));ctx.putImageData(original,0,0);ctx.strokeStyle='#d44835';ctx.lineWidth=1.5;ctx.beginPath();for(const l of lines){ctx.moveTo(...l.a);ctx.lineTo(...l.b)}ctx.stroke();status(lines.length+' trazos detectados. Revisá la superposición roja.');q('[data-insert]').disabled=!lines.length;};
+ q('[data-preview]').onclick=()=>{try{preview()}catch(e){status(e.message)}};
+ q('[data-insert]').onclick=()=>{try{preview();const width=+q('[data-width]').value;if(!Number.isFinite(width)||width<=0||width>1000||!lines.length)throw Error('Ancho real o trazos inválidos.');const k=width/cv.width*f(),h=cv.height,copy=lines.slice();dlg.close();startPick(1,'CALCAR · clic en origen',([p])=>{const st=S();let layer=st.layers.find(l=>l.name==='TRACE-REFERENCE');if(layer&&(layer.locked||!layer.visible))return CORE.toast('Desbloqueá y mostrá TRACE-REFERENCE.');CORE.saveHistory();if(!layer){layer={id:'arq-trace-reference',name:'TRACE-REFERENCE',color:'#e5e7eb',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'};st.layers.push(layer)}for(const l of copy)newEntity({type:'line',a:P(p.x+l.a[0]*k,p.y+(h-l.a[1])*k),b:P(p.x+l.b[0]*k,p.y+(h-l.b[1])*k),layer:layer.id});CORE.updateAll();CORE.toast(copy.length+' líneas editables · trazado preliminar, no muros verificados.');});}catch(e){status(e.message)}};
+ q('[data-close]').onclick=()=>dlg.close();dlg.addEventListener('close',()=>dlg.remove());dlg.showModal();
+}
+EXT.commands.CALCARPLANTA=EXT.commands.CALCAR=openTracePlan;
+
 EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureBar();
 EXT.commands.BANO=EXT.commands.BANOS=EXT.commands['BAÑO']=EXT.commands['BAÑOS']=()=>openArchitectureAssistant('Baños completos');
 EXT.commands.COCINA=EXT.commands.COCINAS=()=>openArchitectureAssistant('Cocinas completas');
 CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>toggleArchitectureBar()}]);
 CORE.ribbon.add('home','ASISTENTE',[{id:'arqAssistantHome',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>toggleArchitectureBar()}]);
+CORE.ribbon.add('home','ASISTENTE',[{id:'arqTracePlan',label:'Calcar planta',icon:'<path d="M3 8V3h5M16 3h5v5M21 16v5h-5M8 21H3v-5M7 7h10v10H7z"/>',run:openTracePlan}]);
 CORE.ribbon.rebuild();
 
 /* ---------- Conexión ---------- */
