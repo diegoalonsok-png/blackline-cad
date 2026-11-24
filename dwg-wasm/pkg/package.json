@@ -1,0 +1,16 @@
+{
+  "name": "blackline-dwg-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "license": "MPL-2.0",
+  "files": [
+    "blackline_dwg_bg.wasm",
+    "blackline_dwg.js",
+    "blackline_dwg.d.ts"
+  ],
+  "main": "blackline_dwg.js",
+  "types": "blackline_dwg.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
