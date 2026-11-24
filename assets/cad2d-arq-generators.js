@@ -62,14 +62,30 @@ Builder.prototype.rrect=function(x,y,w,h,r,st,seg=5){
 
 /* ---------- Artefactos (ancho u a lo largo del muro, profundidad v desde el muro) ---------- */
 // Todos se dibujan con el muro en v=0 y el frente hacia +v.
+// Vetted original gallery details: use isotropic scale, never stretch the source.
+ // Fall back to native dimensioned symbols when the source is absent or will not fit.
+function galleryDetail(b,id,x,y,w,d,turn=0){
+ const it=LIB.find(q=>q.id===id&&!q.pro&&!q.paidOnly&&!q.dxfPlan);
+ if(!it||typeof it.gen!=='function'||!(it.w>0&&it.d>0))return false;
+ const rot=turn===90,ow=rot?it.d:it.w,od=rot?it.w:it.d;
+ const k=Math.min(1,w/ow,d/od);
+ if(k<.85)return false;
+ const tmp=new Builder();
+ it.gen(tmp,it.w*k,it.d*k);
+ // Check actual source points and curves conservatively in the source envelope.
+ const bb=bounds(tmp.out);
+ if(!Number.isFinite(bb.minX)||bb.minX<-.015||bb.minY<-.015||bb.maxX>it.w*k+.015||bb.maxY>it.d*k+.015)return false;
+ b.at(x+(w-ow*k)/2+(rot?ow*k:0),y+(d-od*k)/2,turn,q=>it.gen(q,it.w*k,it.d*k));
+ return true;
+}
 const F={
  wc(b){ // inodoro con mochila 0.40 × 0.70
   b.rrect(.03,0,.34,.17,.03);b.ellipse(.20,.45,.18,.25);b.ellipse(.20,.47,.12,.18);b.line(.08,.20,.32,.20);
  },
  wcSuspendido(b){b.rect(.05,0,.30,.08);b.ellipse(.19,.37,.17,.22);b.ellipse(.19,.39,.11,.15)},
- bidet(b){b.rect(.05,0,.28,.06);b.ellipse(.19,.33,.17,.25);b.ellipse(.19,.34,.11,.17);b.circle(.19,.13,.02);b.circle(.19,.46,.018)},
+ bidet(b){if(galleryDetail(b,'dk-bidet-oval',0,0,.38,.58,90))return; b.rect(.05,0,.28,.06);b.ellipse(.19,.33,.17,.25);b.ellipse(.19,.34,.11,.17);b.circle(.19,.13,.02);b.circle(.19,.46,.018)},
  lavatorio(b,w=.60,d=.48){ // vanitory con bacha oval
-  b.rect(0,0,w,d);b.ellipse(w/2,d*.55,Math.min(.21,w*.36),Math.min(.15,d*.32));b.circle(w/2,d*.55,.02);b.circle(w/2,.07,.022);b.line(w/2,.07,w/2,.13);
+  b.rect(0,0,w,d);if(galleryDetail(b,'dk-lavatorio',.025,.025,w-.05,d-.05))return; b.ellipse(w/2,d*.55,Math.min(.21,w*.36),Math.min(.15,d*.32));b.circle(w/2,d*.55,.02);b.circle(w/2,.07,.022);b.line(w/2,.07,w/2,.13);
  },
  lavatorioDoble(b,w=1.40,d=.50){
   b.rect(0,0,w,d);for(const k of [.27,.73]){const cx=w*k;b.ellipse(cx,d*.55,.20,.14);b.circle(cx,d*.55,.02);b.circle(cx,.07,.022);b.line(cx,.07,cx,.13)}
@@ -106,6 +122,7 @@ const F={
   for(let i=0;i<5;i++){const x=w*.70+i*(w*.25)/5;b.line(x,.14,x,d-.12)}b.circle(.06+bw+.02,.05,.025);
  },
  anafe(b,w=.60,d=.60,n=4){
+  if(n===4&&galleryDetail(b,'dk-anafe-4',0,0,w,d))return;
   b.rect(.03,.05,w-.06,d-.10);
   const pos=n===5?[[.22,.22,.09],[.22,.50,.07],[w-.22,.22,.07],[w-.22,.50,.09],[w/2,.36,.11]]:
    n===2?[[w/2,.20,.08],[w/2,.44,.07]]:[[.17,.19,.085],[.17,.43,.07],[w-.17,.19,.07],[w-.17,.43,.085]];
@@ -499,7 +516,7 @@ one('dor-cucheta','Cucheta',DOR,.90,2.00,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.05,.0
 one('dor-cuna','Cuna',DOR,.70,1.30,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<8;i++)b.line(.03,i*D/8,W-.03,i*D/8,{dashed:true})},{family:'cama'});
 
 function tandemRooms(b,W,D,n,side,privateBath){
- const t=.15,c=1.50,p=W/n,top=D-t,base=c+t,door=.90;
+ const t=.15,c=1.50+t,p=W/n,top=D-t,base=c+t,door=.90;
  const seg=(x,y,X,Y)=>{if(Math.hypot(X-x,Y-y)>1e-8)b.line(x,y,X,Y,{width:.22})};
  
  // Open common corridor at both ends; wall along outer corridor edge.
@@ -547,7 +564,7 @@ const ROOMS='Habitaciones completas';
 for(let n=1;n<=12;n++)for(const privateBath of [true,false])for(const side of ['left','right']){
  const kind=privateBath?'suite':'simple';
  const id='arq-room-'+kind+'-'+n+'-'+side;
- def({id,name:(n===1?'Habitación':n+' habitaciones en tándem')+(privateBath?' · baño individual':' · sin baño')+' · '+(side==='left'?'izquierda':'derecha'),cat:ROOMS,family:'arq-room-'+kind+'-'+n,w:n*4,d:7.50,wMin:n*3.8,wMax:n*6,dMin:6.5,dMax:11.5,roomCount:n,privateBath,roomSide:side,
+ def({id,name:(n===1?'Habitación':n+' habitaciones en tándem')+(privateBath?' · baño individual':' · sin baño')+' · '+(side==='left'?'izquierda':'derecha'),cat:ROOMS,family:'arq-room-'+kind+'-'+n,w:n*4,d:7.65,wMin:n*3.8,wMax:n*6,dMin:6.65,dMax:11.65,roomCount:n,privateBath,roomSide:side,
  gen(b,W,D){tandemRooms(b,W,D,n,side,privateBath)}});
 }
 
@@ -709,7 +726,7 @@ function changingDraw(b,W,D,n,m){
  for(const c of s.cells){
   const x=c.x,y=c.y,xx=x+c.w,face=c.back?y:y+c.h,door=.80,h=x+(c.w-door)/2,k=h+door;
   // Partition centrelines; access gap left unobstructed. Inward leaf.
-  b.line(x,y,x,y+c.h,{width:.20});b.line(xx,y,xx,y+c.h,{width:.20});
+  b.line(x,y,x,y+c.h,{width:.20});if(!s.cells.some(other=>other!==c&&other.back===c.back&&Math.abs(other.x-xx)<1e-7))b.line(xx,y,xx,y+c.h,{width:.20});
   b.line(x,face,h,face);b.line(k,face,xx,face);
   const dir=c.back?1:-1;
   b.line(h,face,h,face+dir*door);b.arc(h,face,door,c.back?0:270,c.back?90:360);
