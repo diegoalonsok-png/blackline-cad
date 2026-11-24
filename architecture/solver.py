@@ -323,6 +323,42 @@ def solve_instruction(text):
     plan['brief']=spec
     return plan
 
+def compile_semantic_brief(raw):
+    """Validate model output before drawing; never execute model-generated code."""
+    if not isinstance(raw,dict): raise ValueError("Invalid architectural brief")
+    allowed={"kind","count","alternatives","width","depth","wall","door","window","bathWidth","bathDepth","fixtures","bathFixtures","assumptions","unsupported","seed"}
+    if set(raw)-allowed: raise ValueError("Unknown brief fields")
+    if raw.get("unsupported") or raw.get("kind")=="unsupported":
+        raise ValueError("Requisitos aún no soportados: "+", ".join(map(str,raw.get("unsupported",[]))))
+    spec={k:v for k,v in raw.items() if v is not None and k!="unsupported"}
+    kind=spec.get("kind")
+    if kind not in (*DEFAULTS,"suite_row"): raise ValueError("Unsupported room type")
+    defaults={"bedroom":(4.,5.),"suite_row":(4.,5.),"bathroom":(2.2,2.6),"kitchen":(4.,5.),"living":(5.,6.)}
+    assumptions=list(spec.get("assumptions",[]))
+    for k,v in zip(("width","depth","wall","door","window"),(*defaults[kind],.15,.8,1.2)):
+        if k not in spec:
+            spec[k]=v;assumptions.append(f"{k}: {v:g} m (default)")
+        if type(spec[k]) not in (int,float) or not math.isfinite(spec[k]): raise ValueError("Invalid dimension: "+k)
+    spec["count"]=spec.get("count",1)
+    spec["assumptions"]=assumptions
+    for k in ("fixtures","bathFixtures"):
+        if k in spec and (not isinstance(spec[k],list) or len(spec[k])>12 or any(not isinstance(x,str) or x not in CATALOG for x in spec[k])):
+            raise ValueError("Invalid fixture selection")
+    alternatives=spec.pop("alternatives",1)
+    if type(alternatives) is not int or not 1<=alternatives<=20: raise ValueError("Choose 1–20 variants")
+    if kind=="suite_row":
+        if spec["door"]!=.8 or spec["window"]!=1.2 or "fixtures" in spec: raise ValueError("Custom suite openings or bedroom fixtures are not supported yet")
+        for k,v in (("bathWidth",spec["width"]),("bathDepth",2.4)):
+            if k not in spec: spec[k]=v;assumptions.append(f"{k}: {v:g} m (default)")
+        if alternatives!=1: raise ValueError("Suite alternatives are not supported yet")
+        plan=solve_suite_row(spec)
+    elif alternatives>1:
+        return solve_variants(spec,alternatives)
+    else: plan=solve(spec)
+    plan["brief"]=spec
+    plan["assumptions"]=assumptions
+    return plan
+
 def selftest():
     for kind,w,d,n in [("bedroom",4,5,3),("bathroom",2,2.4,1),("kitchen",4,5,1),("living",5,8,1)]:
         p=solve(dict(kind=kind,width=w,depth=d,count=n))
@@ -370,6 +406,9 @@ def selftest():
     assert p["rooms"][0]["clearBounds"][2:]==[4.,5.]
     assert {a["kind"]:a["width"] for a in p["openings"]}=={"swing-door":.9,"framed-window":2.}
     assert {b["role"] for b in p["blocks"]}=={"bed","wardrobe"}
+    p=compile_semantic_brief(dict(kind="bedroom",width=4,depth=5,door=.9,window=2,fixtures=["bed","wardrobe"]))
+    assert {a["kind"]:a["width"] for a in p["openings"]}=={"swing-door":.9,"framed-window":2.}
+    assert len(p["blocks"])==2
     print("Architecture solver: all checks passed")
 
 if __name__=="__main__":
