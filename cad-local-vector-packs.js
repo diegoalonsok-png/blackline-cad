@@ -168,7 +168,7 @@ async function hexHash(bytes){
  return Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
 }
 function estimatedScale(g,cat){
- const target={'Aberturas':1.2,'Sanitarios':.8,'Cocinas':2.4,'Ascensores':2,'Vegetación':5,'Animales':1,'Deportes':2,'Vehículos':5,'Escaleras':4,'Mobiliario':1.5,'Importados':2}[cat]||2;
+ const target={'Aberturas':1.2,'Puertas y ventanas':1.2,'Sanitarios':.8,'Baños':.8,'Cocinas':2.4,'Ascensores':2,'Vegetación':5,'Exterior':5,'Animales':1,'Deportes':2,'Vehículos':5,'Escaleras':4,'Mobiliario':1.5,'Importados':2}[cat]||2;
  const major=Math.max(g.dx,g.dy);
  // Provisional only: choose a plausible conventional unit, never claim source units.
  const candidates=[1,.01,.001,.0254,.3048].filter(f=>g.dx*f>=.001&&g.dy*f>=.001&&major*f<=100);
@@ -201,7 +201,7 @@ async function fileRow(file,unknownUnit,recover=true){
  const g=vectorize(entities,recover);
  if(g.skipped)flags|=2;
  let scale=METRES[parsed.unitCode]||(!parsed.unitCode&&unknownUnit>0?unknownUnit:0);
- if(!scale&&unknownUnit===-1&&!parsed.unitCode){scale=estimatedScale(g,cat);flags|=1}
+ if(!scale&&unknownUnit===-1&&!parsed.unitCode){scale=estimatedScale(g,categoryFor(file,label));flags|=1}
  if(!scale)throw Error('Unidad no reconocida; seleccionar unidad para DXF sin escala');
  const w=+(g.dx*scale).toPrecision(7),d=+(g.dy*scale).toPrecision(7);
  if(!(w>=.001&&d>=.001&&w<=100&&d<=100))throw Error('Dimensiones fuera de rango: '+w+' × '+d+' m');
