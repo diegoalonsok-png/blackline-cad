@@ -1556,7 +1556,12 @@ const ARCH_STYLES={
   {id:'stair-wood',name:'Escalera recta · madera',w:3.78,d:.95,h:2.70,stepCount:15,rails:'left',railStyle:'wood',railHeight:.90},
   {id:'stair-wide',name:'Escalera ancha · acceso',w:4.50,d:1.60,h:3.00,stepCount:17,rails:'both',railStyle:'glass',railHeight:1.00},
   {id:'stair-l',name:'Escalera en L · descanso',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'l',stairBuild:'waist',rails:'both',railStyle:'metal',railHeight:.95},
-  {id:'stair-u',name:'Escalera en U · descanso',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'u',stairBuild:'waist',landingDepth:1.10,stairGap:.12,rails:'both',railStyle:'metal',railHeight:.95}
+  {id:'stair-u',name:'Escalera en U · descanso',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'u',stairBuild:'waist',landingDepth:1.10,stairGap:.12,rails:'both',railStyle:'metal',railHeight:.95},
+  {id:'stair-t',name:'Escalera imperial en T · bifurcada',w:5.10,d:1.50,h:3.00,stepCount:18,stairLayout:'t',stairBuild:'waist',rails:'both',railStyle:'metal',railHeight:.95},
+  {id:'stair-landing',name:'Escalera recta · descanso intermedio',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'landing',stairBuild:'waist',landingDepth:1.20,rails:'both',railStyle:'metal',railHeight:.95},
+  {id:'stair-spiral',name:'Escalera caracol · eje central',w:4.16,d:.90,h:2.80,stepCount:16,stairLayout:'spiral',stairBuild:'open',innerRadius:.10,turnAngle:360,rails:'left',railStyle:'metal',railHeight:.95},
+  {id:'stair-curved',name:'Escalera curva · 90°',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'curved',stairBuild:'open',innerRadius:1.20,turnAngle:90,rails:'both',railStyle:'metal',railHeight:.95},
+  {id:'stair-semicircle',name:'Escalera semicircular · 180°',w:4.16,d:1.10,h:2.80,stepCount:16,stairLayout:'curved',stairBuild:'open',innerRadius:.85,turnAngle:180,rails:'both',railStyle:'metal',railHeight:.95}
  ],
  railing:[
   {id:'rail-metal',name:'Baranda metálica recta',w:3,d:.06,h:1.00,railStyle:'metal',postSpacing:1,railRise:0},
@@ -1650,7 +1655,7 @@ function cad3dRestoreSavedStairs(){
     postSpacing:clamp(finite(p.postSpacing,1),.35,3)};
    if(item.kind==='stair')Object.assign(spec,{stepCount:clamp(Math.round(finite(p.stepCount,16)),3,48),
     rails:['none','left','right','both'].includes(p.rails)?p.rails:'both',
-    railHeight:clamp(finite(p.railHeight,.95),.60,1.35),stairBuild:cad3dStairConstruction(p),stairLayout:cad3dStairLayout(p),landingDepth:clamp(finite(p.landingDepth,p.d),p.d,Math.max(p.d,5)),stairGap:clamp(finite(p.stairGap,.12),0,2),treadThickness:clamp(finite(p.treadThickness,.05),.015,.30),waistThickness:clamp(finite(p.waistThickness,.18),.08,.40)});
+    railHeight:clamp(finite(p.railHeight,.95),.60,1.35),stairBuild:cad3dStairConstruction(p),stairLayout:cad3dStairLayout(p),innerRadius:clamp(finite(p.innerRadius,cad3dStairLayout(p)==='spiral'?.10:1),.06,20),turnAngle:clamp(finite(p.turnAngle,cad3dStairLayout(p)==='spiral'?360:90),30,720),clockwise:!!p.clockwise,landingDepth:clamp(finite(p.landingDepth,p.d),p.d,Math.max(p.d,5)),stairGap:clamp(finite(p.stairGap,.12),0,2),treadThickness:clamp(finite(p.treadThickness,.05),.015,.30),waistThickness:clamp(finite(p.waistThickness,.18),.08,.40)});
    else spec.railRise=clamp(finite(p.railRise,0),-10,10);
    ARCH_STYLES[item.kind].push(spec);
   });
@@ -1666,7 +1671,7 @@ function cad3dSaveStairPreset(r){
   if(previous.length>=40)return text('Límite: 40 componentes personalizados');
   var id='user-arch-'+Date.now().toString(36)+'-'+(previous.length+1).toString(36);
   var spec={id:id,name:name,w:r.w,d:r.d,h:r.h,railStyle:r.railStyle,postSpacing:r.postSpacing};
-  if(r.type==='stair')Object.assign(spec,{stepCount:r.stepCount,rails:r.rails,railHeight:r.railHeight,stairBuild:cad3dStairConstruction(r),stairLayout:cad3dStairLayout(r),landingDepth:r.landingDepth,stairGap:r.stairGap,treadThickness:r.treadThickness,waistThickness:r.waistThickness});
+  if(r.type==='stair')Object.assign(spec,{stepCount:r.stepCount,rails:r.rails,railHeight:r.railHeight,stairBuild:cad3dStairConstruction(r),stairLayout:cad3dStairLayout(r),innerRadius:r.innerRadius,turnAngle:r.turnAngle,clockwise:r.clockwise,landingDepth:r.landingDepth,stairGap:r.stairGap,treadThickness:r.treadThickness,waistThickness:r.waistThickness});
   else spec.railRise=r.railRise;
   previous.push({kind:r.type,spec:spec});
   localStorage.setItem('blackline-cad3d-stair-components-v1',JSON.stringify(previous));
@@ -4706,7 +4711,9 @@ function cad3dBounds(){
   var height=r.type==='sphere'?(r.radius||1)*2:(r.h||2)+(r.type==='stair'?finite(r.railHeight,.95):r.type==='railing'?Math.max(0,finite(r.railRise,0)):0);
   add((r.x||0)-ex,(r.y||0)-ey,r.z||0);
   add((r.x||0)+ex,(r.y||0)+ey,(r.z||0)+height);
-  if(r.type==='stair'&&cad3dStairLayout(r)!=='straight'){
+  if(r.type==='stair'&&cad3dStairRadial(r)){
+   var rad=cad3dRadialStairPlan(r).outer;add(r.x-rad,r.y-rad,r.z);add(r.x+rad,r.y+rad,r.z+height);
+  }else if(r.type==='stair'&&cad3dStairLayout(r)!=='straight'){
    var p=cad3dStairLayoutPlan(r);p.flights.concat([p.landing]).forEach(function(f){var a=(f.rot||0)*Math.PI/180,co=Math.cos(a),si=Math.sin(a),depth=f.d||r.d;[-1,1].forEach(i=>[-1,1].forEach(j=>{var x=i*f.w/2,y=j*depth/2,q=cad3dStairLocalWorld(r,f.x+x*co-y*si,f.y+x*si+y*co,0);add(q.x,q.y,q.z);add(q.x,q.y,q.z+height);}));});
   }
   if(r.type==='profile2d'&&Array.isArray(r.profilePoints)){
@@ -4904,7 +4911,7 @@ function setPlacement(which){
  var openingHost=which==='opening'&&archStyle(which,activePreset.opening).host;
  var instructions={
   wall:'Muro continuo: clic en cada vértice para seguir dibujando · Enter finaliza · Esc cancela',
-  stair:'Escalera: elegí inicio y dirección / desarrollo de tramos · editá forma, escalones y barandas en Propiedades',
+  stair:'Escalera: dos puntos (caracol/curva: centro y radio exterior) · editá forma, escalones y barandas en Propiedades',
   railing:'Baranda recta: elegí inicio y final del recorrido · editá altura y estilo en Propiedades',
   rectangle:'Rectángulo · marcá dos esquinas opuestas o arrastrá de una a otra',
   ellipse:'Elipse · indicá las esquinas opuestas de su rectángulo envolvente',
@@ -5267,6 +5274,8 @@ function fallbackDraw(){
     });ctx.stroke();
    }
    if(active)points.forEach(function(p){var x=rec.x+c*p[0]-sn*p[1],y=rec.y+sn*p[0]+c*p[1],v=projection(x,y,rec.z||0);ctx.fillStyle='#ffcf60';ctx.fillRect(v.x-3.5,v.y-3.5,7,7);});
+  }else if(rec.type==='stair'&&cad3dStairRadial(rec)){
+   cad3dFallbackRadialStair(projection,rec);
   }else if(rec.type==='stair'&&cad3dStairLayout(rec)!=='straight'){
    var plan=cad3dStairLayoutPlan(rec);plan.flights.forEach(function(f){var world=cad3dStairLocalWorld(rec,f.x,f.y,f.z),fr=Object.assign(cad3dStairFlightRecord(rec,f),world,{rot:(rec.rot||0)+f.rot}),st=cad3dStairSpec(fr);for(var i=0;i<st.n;i++){var h=(i+1)*st.rise;fallbackBox(projection,fr,st.going,st.width,h,-st.run/2+st.going*(i+.5),0,0,'#a5abb1');}if(['left','right','both'].includes(fr.rails)){var sides=fr.rails==='both'?[-1,1]:[fr.rails==='left'?-1:1];sides.forEach(function(side){var a=cad3dStairLocalWorld(fr,-st.run/2,side*(st.width/2-.055),st.rise+finite(fr.railHeight,.95)),b=cad3dStairLocalWorld(fr,st.run/2,side*(st.width/2-.055),fr.h+finite(fr.railHeight,.95)),v=projection(a.x,a.y,a.z),w=projection(b.x,b.y,b.z);ctx.beginPath();ctx.moveTo(v.x,v.y);ctx.lineTo(w.x,w.y);ctx.strokeStyle='#b5bdc3';ctx.stroke();});}});var p=plan.landing,t=cad3dStairLandingThickness(rec,p);fallbackBox(projection,rec,p.w,p.d,t,p.x,p.y,p.z-t,'#a5abb1');
   }else if(rec.type==='stair'){
@@ -6051,8 +6060,9 @@ function placePoint(pt){
   Object.assign(rec,{styleId:style.id,w:len,d:style.d,h:style.h,
    x:(pt.x+firstPoint.x)/2,y:(pt.y+firstPoint.y)/2,z:0,rot:Math.atan2(dy,dx)*180/Math.PI});
   if(kind==='stair')Object.assign(rec,{stepCount:style.stepCount,rails:style.rails,
-   railStyle:style.railStyle,railHeight:style.railHeight,postSpacing:style.postSpacing||1,stairBuild:cad3dStairConstruction(style),stairLayout:cad3dStairLayout(style),landingDepth:style.landingDepth??style.d,stairGap:style.stairGap??.12,treadThickness:style.treadThickness??.05,waistThickness:style.waistThickness??.18});
+   railStyle:style.railStyle,railHeight:style.railHeight,postSpacing:style.postSpacing||1,stairBuild:cad3dStairConstruction(style),stairLayout:cad3dStairLayout(style),innerRadius:style.innerRadius,turnAngle:style.turnAngle,clockwise:!!style.clockwise,landingDepth:style.landingDepth??style.d,stairGap:style.stairGap??.12,treadThickness:style.treadThickness??.05,waistThickness:style.waistThickness??.18});
   else Object.assign(rec,{railStyle:style.railStyle,postSpacing:style.postSpacing,railRise:style.railRise});
+  if(kind==='stair'&&cad3dStairRadial(rec)){rec.x=firstPoint.x;rec.y=firstPoint.y;rec.innerRadius=clamp(len-rec.d,.06,20);}
  }else if(kind==='block3d'){
   var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
   rec=newRecord('block3d');
@@ -7145,15 +7155,78 @@ function cad3dStairConstruction(r){return ['solid','waist','open'].includes(r.st
 function cad3dTreadThickness(r,st){return clamp(finite(r.treadThickness,.05),.015,Math.max(.015,Math.min(.30,st.rise)));}
 /* Two-flight stairs. w is total flight run, excluding landing; d is clear width.
    The first flight retains the same insertion direction as the straight stair. */
-function cad3dStairLayout(r){return ['l','u'].includes(r.stairLayout)?r.stairLayout:'straight';}
+function cad3dStairLayout(r){return ['l','u','t','landing','spiral','curved'].includes(r.stairLayout)?r.stairLayout:'straight';}
+function cad3dStairRadial(r){return ['spiral','curved'].includes(cad3dStairLayout(r));}
+function cad3dRadialStairPlan(r){
+ var n=clamp(Math.round(finite(r.stepCount,16)),6,48),width=Math.max(.30,finite(r.d,1)),rise=Math.max(.015,finite(r.h,2.8))/n;
+ var inner=clamp(finite(r.innerRadius,cad3dStairLayout(r)==='spiral'?.10:1.0),.06,20);
+ var degrees=clamp(finite(r.turnAngle,cad3dStairLayout(r)==='spiral'?360:90),30,720),sweep=degrees*Math.PI/180*(r.clockwise?-1:1);
+ return {n,width,rise,inner,outer:inner+width,sweep,going:Math.abs(sweep)*(inner+width/2)/n};
+}
+function cad3dRadialStepPoly(p,i){
+ var a=p.sweep*i/p.n,b=p.sweep*(i+1)/p.n,segments=Math.max(3,Math.ceil(Math.abs(b-a)*32/Math.PI)),pts=[];
+ for(var j=0;j<=segments;j++){var t=a+(b-a)*j/segments;pts.push([p.outer*Math.cos(t),p.outer*Math.sin(t)]);}
+ for(var j=segments;j>=0;j--){var t=a+(b-a)*j/segments;pts.push([p.inner*Math.cos(t),p.inner*Math.sin(t)]);}
+ return pts;
+}
+function cad3dRadialStepBottom(r,p,i){var top=(i+1)*p.rise;return Math.max(0,top-clamp(finite(r.treadThickness,.05),.015,Math.max(.015,p.rise)));}
+function cad3dRadialRailPoints(r,p,side){
+ var radius=side==='left'?p.outer-.045:p.inner+.045;
+ var count=Math.max(2,Math.min(240,Math.ceil(Math.abs(p.sweep)*radius/.10))),h=clamp(finite(r.railHeight,.95),.60,1.35),pts=[];
+ for(var i=0;i<=count;i++){var t=i/count,a=p.sweep*t;pts.push([radius*Math.cos(a),radius*Math.sin(a),p.rise+(p.n-1)*p.rise*t+h]);}
+ return pts;
+}
+function cad3dBuildRadialStair(r,group){
+ var p=cad3dRadialStairPlan(r),color=String(r.styleId||'').includes('wood')?0x947354:0xaab0b5;
+ for(var i=0;i<p.n;i++){
+ var pts=cad3dRadialStepPoly(p,i),shape=new T.Shape();shape.moveTo(pts[0][0],pts[0][1]);pts.slice(1).forEach(v=>shape.lineTo(v[0],v[1]));shape.closePath();
+ var top=(i+1)*p.rise,base=cad3dRadialStepBottom(r,p,i);
+ var g=new T.ExtrudeGeometry(shape,{depth:top-base,steps:1,bevelEnabled:false});addMesh(g,color,r.id,group,0,0,base);
+ }
+ if(cad3dStairLayout(r)==='spiral'){
+ var pole=new T.CylinderGeometry(p.inner,p.inner,p.n*p.rise,24);pole.rotateX(Math.PI/2);pole.translate(0,0,p.n*p.rise/2);addMesh(pole,0x626f79,r.id,group);
+ }
+ ['left','right'].forEach(function(side){
+ if(r.rails!=='both'&&r.rails!==side)return;
+ var rail=cad3dRadialRailPoints(r,p,side),style=r.railStyle||'metal',col=style==='wood'?0x947252:0x9da9b2,rad=style==='wood'?.042:.032;
+ for(var j=1;j<rail.length;j++)cad3dRailLine(group,r.id,rail[j-1],rail[j],rad,col);
+ var radius=Math.hypot(rail[0][0],rail[0][1]),posts=Math.max(1,Math.min(96,Math.ceil(Math.abs(p.sweep)*radius/clamp(finite(r.postSpacing,1),.35,3))));
+ for(var j=0;j<=posts;j++){
+ var t=j/posts,a=p.sweep*t,x=radius*Math.cos(a),y=radius*Math.sin(a),base=Math.min(p.n,Math.max(1,Math.floor(t*p.n)+1))*p.rise,top=p.rise+(p.n-1)*p.rise*t+clamp(finite(r.railHeight,.95),.60,1.35);
+ cad3dRailLine(group,r.id,[x,y,base],[x,y,top],.02,col);
+ }
+ });
+}
+function cad3dFallbackRadialStair(projection,r){
+ var p=cad3dRadialStairPlan(r),stroke=selected.includes(r.id)?'#efc978':'#5a7585';
+ function project(v,z){var q=cad3dStairLocalWorld(r,v[0],v[1],z);return projection(q.x,q.y,q.z);}
+ for(var i=0;i<p.n;i++){
+ var pts=cad3dRadialStepPoly(p,i),top=(i+1)*p.rise,base=cad3dRadialStepBottom(r,p,i);
+ pts.forEach(function(v,j){var w=pts[(j+1)%pts.length];fallbackPolygon([project(v,base),project(w,base),project(w,top),project(v,top)],'#425a68',stroke,.65);});
+ fallbackPolygon(pts.map(v=>project(v,top)),'#a5abb1',stroke,.85);
+ }
+ ['left','right'].forEach(function(side){if(r.rails!=='both'&&r.rails!==side)return;var pts=cad3dRadialRailPoints(r,p,side);fallbackCtx.beginPath();pts.forEach(function(v,i){var q=project(v,v[2]);if(i)fallbackCtx.lineTo(q.x,q.y);else fallbackCtx.moveTo(q.x,q.y);});fallbackCtx.strokeStyle='#b5bdc3';fallbackCtx.lineWidth=2;fallbackCtx.stroke();});
+}
+
 function cad3dStairLayoutPlan(r){
  var st=cad3dStairSpec(r),layout=cad3dStairLayout(r);
- if(layout==='straight')return null;
+ if(layout==='straight'||cad3dStairRadial(r))return null;
  var n1=Math.floor(st.n/2),n2=st.n-n1,run1=n1*st.going,run2=n2*st.going,width=st.width;
  var depth=clamp(finite(r.landingDepth,width),width,Math.max(width,5)),gap=clamp(finite(r.stairGap,.12),0,2);
- if(layout==='l')depth=width; // square corner landing ensures flush adjoining flights
+ if(layout==='l'||layout==='t')depth=width; // square corner landing ensures flush adjoining flights
  var x0=-st.run/2,end=x0+run1,z=n1*st.rise;
  var flight1={x:x0+run1/2,y:0,z:0,rot:0,w:run1,n:n1,h:z};
+ if(layout==='t'||layout==='landing'){
+ var p={x:end+depth/2,y:0,w:depth,d:width,z:z},flights=[flight1],rails=[];
+ if(layout==='t'){
+  flights.push({x:end+width/2,y:width/2+run2/2,z:z,rot:90,w:run2,n:n2,h:n2*st.rise},{x:end+width/2,y:-width/2-run2/2,z:z,rot:-90,w:run2,n:n2,h:n2*st.rise});
+  rails.push({side:'left',a:[end+width-.055,-width/2],b:[end+width-.055,width/2]});
+ }else{
+  flights.push({x:end+depth+run2/2,y:0,z:z,rot:0,w:run2,n:n2,h:n2*st.rise});
+  [-1,1].forEach(function(sign){rails.push({side:sign<0?'left':'right',a:[end,sign*(width/2-.055)],b:[end+depth,sign*(width/2-.055)]});});
+ }
+ return {flights:flights,landing:p,rails:rails};
+ }
  var flight2=layout==='l'?{x:end+width/2,y:width/2+run2/2,z:z,rot:90,w:run2,n:n2,h:n2*st.rise}:
   {x:end-run2/2,y:width+gap,z:z,rot:180,w:run2,n:n2,h:n2*st.rise};
  var landing={x:end+depth/2,y:layout==='l'?0:(width+gap)/2,w:depth,d:layout==='l'?width:2*width+gap,z:z};
@@ -7185,6 +7258,7 @@ function cad3dBuildTurnedStair(r,group,plan){
  });
 }
 function cad3dBuildStair(r,group){
+ if(cad3dStairRadial(r)){cad3dBuildRadialStair(r,group);return;}
  var plan=cad3dStairLayoutPlan(r);if(plan){cad3dBuildTurnedStair(r,group,plan);return;}
  var st=cad3dStairSpec(r),style=String(r.styleId||'');
  var body=style==='stair-wood'?0x947354:style==='stair-wide'?0xa5a7a0:0xaab0b5;
@@ -7592,7 +7666,7 @@ function renderProps(){
  var keys=focus?[]:(heightEditable?['h']:[]);
  if(!focus)keys.push('x','y','z');
  if(!focus&&r.type!=='boolean')keys.push('rot');
- if(!focus&&['box','wall','slab','block3d','imported3d','stair','railing'].includes(r.type))keys.push('w','d');
+ if(!focus&&['box','wall','slab','block3d','imported3d','stair','railing'].includes(r.type)){if(r.type!=='stair'||!cad3dStairRadial(r))keys.push('w');keys.push('d');}
  if(!focus&&r.type==='slab')keys.push('pitch');
  if(!focus&&['sphere','cone','cylinder'].includes(r.type))keys.push('radius');
  var labels={x:'X (m)',y:'Y (m)',z:'Z (m)',rot:'Rotation (°)',w:['wall','stair','railing'].includes(r.type)?'Length (m)':'Width (m)',d:r.type==='wall'?'Thickness (m)':r.type==='stair'?'Ancho de escalera (m)':r.type==='railing'?'Diámetro pasamanos (m)':'Depth (m)',h:r.type==='slab'?'Slab thickness (m)':r.type==='stair'?'Desnivel total (m)':r.type==='railing'?'Altura de baranda (m)':r.type==='profile2d'?'Extrusion height (m)':'Height (m)',pitch:'Roof slope (°)',radius:'Radius (m)'};
@@ -7608,10 +7682,10 @@ function renderProps(){
   }).join('');};
   html+='<div class="cad3dStairStats"><strong>ARQUITECTURA PARAMÉTRICA · BETA</strong>';
   if(r.type==='stair'){
-   var stSpec=cad3dStairSpec(r),n=stSpec.n;
+   var stSpec=cad3dStairRadial(r)?cad3dRadialStairPlan(r):cad3dStairSpec(r),n=stSpec.n;
    html+='<p>'+n+' peldaños · huella '+stSpec.going.toFixed(3)+' m · contrahuella '+stSpec.rise.toFixed(3)+' m · 2C + H: '+(2*stSpec.rise+stSpec.going).toFixed(3)+' m</p>'+ 
-    '<label>Forma <select data-arch-param="stairLayout">'+options(cad3dStairLayout(r),[['straight','Recta'],['l','L con descanso'],['u','U con descanso']])+'</select></label>'+(cad3dStairLayout(r)==='u'?'<label>Profundidad descanso (m) <input data-arch-param="landingDepth" type="number" step=".05" value="'+Math.max(stSpec.width,finite(r.landingDepth,stSpec.width))+'"></label><label>Separación entre tramos (m) <input data-arch-param="stairGap" type="number" min="0" max="2" step=".05" value="'+clamp(finite(r.stairGap,.12),0,2)+'"></label>':'')+
-    '<label>Construcción <select data-arch-param="stairBuild">'+options(cad3dStairConstruction(r),[['solid','Maciza'],['waist','Losa inclinada'],['open','Huellas abiertas con zancas']])+'</select></label>'+
+    '<label>Forma <select data-arch-param="stairLayout">'+options(cad3dStairLayout(r),[['straight','Recta'],['landing','Recta con descanso'],['l','L con descanso'],['u','U con descanso'],['t','T bifurcada'],['spiral','Caracol'],['curved','Curva / semicircular']])+'</select></label>'+(cad3dStairLayout(r)==='u'?'<label>Profundidad descanso (m) <input data-arch-param="landingDepth" type="number" step=".05" value="'+Math.max(stSpec.width,finite(r.landingDepth,stSpec.width))+'"></label><label>Separación entre tramos (m) <input data-arch-param="stairGap" type="number" min="0" max="2" step=".05" value="'+clamp(finite(r.stairGap,.12),0,2)+'"></label>':'')+
+    (cad3dStairRadial(r)?'<label>Radio interior (m) <input type="number" data-arch-param="innerRadius" min=".06" max="20" step=".05" value="'+stSpec.inner+'"></label><label>Giro (°) <input type="number" data-arch-param="turnAngle" min="30" max="720" step="15" value="'+Math.abs(stSpec.sweep*180/Math.PI).toFixed(1)+'"></label><label>Sentido <select data-arch-param="clockwise">'+options(r.clockwise?'yes':'no',[['no','Antihorario'],['yes','Horario']])+'</select></label><small>Peldaños radiales independientes; verificar estructura y altura libre.</small>':(cad3dStairLayout(r)==='landing'?'<label>Profundidad descanso (m) <input type="number" data-arch-param="landingDepth" step=".05" value="'+Math.max(stSpec.width,finite(r.landingDepth,stSpec.width))+'"></label>':'')+'<label>Construcción <select data-arch-param="stairBuild">'+options(cad3dStairConstruction(r),[['solid','Maciza'],['waist','Losa inclinada'],['open','Huellas abiertas con zancas']])+'</select></label>')+
     '<label>Espesor de huella (m) <input data-arch-param="treadThickness" type="number" min=".015" max=".30" step=".005" value="'+cad3dTreadThickness(r,stSpec).toFixed(3)+'"></label>'+
     '<label>Espesor vertical de losa (m) <input data-arch-param="waistThickness" type="number" min=".08" max=".40" step=".01" value="'+clamp(finite(r.waistThickness,.18),.08,.40)+'"></label>'+
     '<label>Peldaños <input data-arch-param="stepCount" type="number" min="3" max="48" step="1" value="'+n+'"></label>'+
@@ -7683,7 +7757,10 @@ function change(e){
   var key=input.dataset.archParam;
   if(key==='railStyle'&&['metal','wood','glass'].includes(input.value))r.railStyle=input.value;
   else if(key==='rails'&&r.type==='stair'&&['none','left','right','both'].includes(input.value))r.rails=input.value;
-  else if(key==='stairLayout'&&r.type==='stair'&&['straight','l','u'].includes(input.value)){r.stairLayout=input.value;if(input.value!=='straight')r.stepCount=Math.max(6,finite(r.stepCount,16));}
+  else if(key==='stairLayout'&&r.type==='stair'&&['straight','l','u','t','landing','spiral','curved'].includes(input.value)){r.stairLayout=input.value;if(input.value!=='straight')r.stepCount=Math.max(6,finite(r.stepCount,16));}
+  else if(key==='innerRadius'&&r.type==='stair')r.innerRadius=clamp(finite(Number(input.value),.1),.06,20);
+  else if(key==='turnAngle'&&r.type==='stair')r.turnAngle=clamp(finite(Number(input.value),360),30,720);
+  else if(key==='clockwise'&&r.type==='stair')r.clockwise=input.value==='yes';
   else if(key==='landingDepth'&&r.type==='stair')r.landingDepth=clamp(finite(Number(input.value),r.d),Math.max(.30,r.d),Math.max(r.d,5));
   else if(key==='stairGap'&&r.type==='stair')r.stairGap=clamp(finite(Number(input.value),.12),0,2);
   else if(key==='stairBuild'&&r.type==='stair'&&['solid','waist','open'].includes(input.value))r.stairBuild=input.value;
@@ -7743,7 +7820,7 @@ function change(e){
    if(r.type==='wall')r.d=st.d;
    else if(['stair','railing'].includes(r.type)){
     r.w=st.w;r.d=st.d;
-    if(r.type==='stair')Object.assign(r,{stepCount:st.stepCount,rails:st.rails,railStyle:st.railStyle,railHeight:st.railHeight,postSpacing:st.postSpacing||1,stairBuild:cad3dStairConstruction(st),stairLayout:cad3dStairLayout(st),landingDepth:st.landingDepth??st.d,stairGap:st.stairGap??.12,treadThickness:st.treadThickness??.05,waistThickness:st.waistThickness??.18});
+    if(r.type==='stair')Object.assign(r,{stepCount:st.stepCount,rails:st.rails,railStyle:st.railStyle,railHeight:st.railHeight,postSpacing:st.postSpacing||1,stairBuild:cad3dStairConstruction(st),stairLayout:cad3dStairLayout(st),innerRadius:st.innerRadius,turnAngle:st.turnAngle,clockwise:!!st.clockwise,landingDepth:st.landingDepth??st.d,stairGap:st.stairGap??.12,treadThickness:st.treadThickness??.05,waistThickness:st.waistThickness??.18});
     else Object.assign(r,{railStyle:st.railStyle,postSpacing:st.postSpacing,railRise:st.railRise});
    }else{r.pitch=st.pitch;r.slabKind=st.slabKind;}
   }
@@ -8886,7 +8963,7 @@ async function readJSON(e){
    if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
    if(r.type==='stair'){
     o.stepCount=clamp(Math.round(finite(r.stepCount,16)),3,48);
-    o.stairBuild=cad3dStairConstruction(r);o.stairLayout=cad3dStairLayout(r);o.landingDepth=clamp(finite(r.landingDepth,o.d),o.d,Math.max(o.d,5));o.stairGap=clamp(finite(r.stairGap,.12),0,2);o.treadThickness=clamp(finite(r.treadThickness,.05),.015,.30);o.waistThickness=clamp(finite(r.waistThickness,.18),.08,.40);
+    o.stairBuild=cad3dStairConstruction(r);o.stairLayout=cad3dStairLayout(r);o.innerRadius=clamp(finite(r.innerRadius,o.stairLayout==='spiral'?.10:1),.06,20);o.turnAngle=clamp(finite(r.turnAngle,o.stairLayout==='spiral'?360:90),30,720);o.clockwise=!!r.clockwise;o.landingDepth=clamp(finite(r.landingDepth,o.d),o.d,Math.max(o.d,5));o.stairGap=clamp(finite(r.stairGap,.12),0,2);o.treadThickness=clamp(finite(r.treadThickness,.05),.015,.30);o.waistThickness=clamp(finite(r.waistThickness,.18),.08,.40);
     o.rails=['none','left','right','both'].includes(r.rails)?r.rails:'both';
     o.railHeight=clamp(finite(r.railHeight,.95),.6,1.35);
     o.railStyle=['metal','wood','glass'].includes(r.railStyle)?r.railStyle:'metal';
