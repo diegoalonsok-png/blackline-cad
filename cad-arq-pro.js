@@ -245,12 +245,21 @@ function buildPanel(){
   <div style="display:flex;gap:5px"><input type="search" id="arqPanelSearch" placeholder="Buscar: baño, isla, bañera, escalera…" aria-label="Buscar bloque arquitectónico"><button type="button" class="btn slim" id="arqOpenBig" title="Galería grande (GALERIA)">⤢</button></div>
   <button type="button" class="btn slim" id="arqOpenVisual" title="Galería visual en fondo crema · clic en imagen y luego en plano" style="display:block;width:100%;margin:7px 0 4px;text-align:center;background:#e6d3a9;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ Galería visual · bloques detallados</button>
   <button type="button" class="btn slim" id="arqOpenOlimpiadas" title="Abrir biblioteca de bloques 2D · más de 1000 bloques en vista y planta" style="display:block;width:100%;margin:3px 0 6px;text-align:center;background:#e4dccb;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ BLOQUES 2D · 1.000+</button>
+  <div id="arqDrawingBlocksSlot"><button type="button" class="btn slim" id="arqDrawingBlocksFallback" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO</button></div>
   <select id="arqPanelCat" aria-label="Categoría de bloques"></select>
   <div class="arq-grid" id="arqPanelGrid"></div>
   <div id="arqSizeRow" hidden><label>Ancho cm<input type="number" id="arqW" step="5"></label><label>Prof. cm<input type="number" id="arqD" step="5"></label><button type="button" class="btn" id="arqApplySize">Aplicar</button></div>
   <p id="arqHelp" style="font-size:10px;color:#9cb1bc;margin:7px 0 0">Clic en una miniatura y luego en el plano. Al seleccionar el bloque insertado: ▶ ancho, ▲ profundidad, ▼ variantes. Los artefactos se reubican, no se deforman.</p>
  </div>`;
  if(neighbour)neighbour.before(panel);else dock.prepend(panel);
+ // Mount the actual document-block controls inside this palette, not in a different dock.
+ const blockSlot=$('arqDrawingBlocksSlot');
+ function mountDrawingBlocks(){
+  if(typeof window.CAD2D_MOUNT_DOCUMENT_BLOCKS==='function')window.CAD2D_MOUNT_DOCUMENT_BLOCKS(blockSlot);
+  else{const section=$('cadDocumentBlocks');if(section){blockSlot.replaceChildren(section);}}
+ }
+ mountDrawingBlocks();
+ $('arqDrawingBlocksFallback')?.addEventListener('click',()=>{mountDrawingBlocks();const toggle=$('cadDocBlockToggle');if(toggle)toggle.click();else CORE.toast('Recargá CAD2D3D para activar los bloques del plano')});
  $('arqCollapse').onclick=()=>{const body=$('arqPanelBody');body.hidden=!body.hidden;$('arqCollapse').textContent=body.hidden?'+':'−'};
  $('arqPanelSearch').oninput=e=>{query=e.target.value;fillPanelGrid(cardsFor(activeCat,query))};
  $('arqOpenBig').onclick=()=>openModal();
