@@ -6369,7 +6369,7 @@ const CAD_COMMANDS=[
  ['REGEN','','Redraw geometry'],['LAYOUT','','Open paper space'],
  ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
  ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],['COPYCLIP','CTRL+C','Copy selected CAD objects'],['PASTECLIP','CTRL+V','Paste objects at model cursor'],['NEW','','Start a new drawing (confirmation)'],
- ['PURGE','PU','Remove unused unlocked layers'],['MANUAL','','Manual de comandos y atajos'],['EPDF','','Export printable PDF']
+ ['PURGE','PU','Limpiar capas, bloques y estilos de cota sin uso con vista previa'],['MANUAL','','Manual de comandos y atajos'],['EPDF','','Export printable PDF']
 ];
 function executeCADSearchCommand(name){
  $('cadCommandSearch').value='';$('cadCommandResults').hidden=true;
@@ -6513,16 +6513,77 @@ function openCadPaletteByTitle(text){
  matching.classList.remove('collapsed');matching.scrollIntoView({block:'nearest',behavior:'smooth'});
  toast('Opened '+text+' palette');
 }
-function purgeUnusedCadLayers(){
- const references=new Set(state.entities.map(e=>e.layer));
- for(const block of Object.values(state.blocks))for(const e of block.entities)references.add(e.layer);
- references.add(state.layerId);references.add('0');
- const removable=state.layers.filter(layer=>!references.has(layer.id)&&!layer.locked);
- if(!removable.length)return toast('PURGE: no unused unlocked layers');
- if(!window.confirm('Remove '+removable.length+' unused layer(s)? This can be undone.'))return;
- saveHistory();state.layers=state.layers.filter(layer=>!removable.includes(layer));
- updateAll();log('PURGE '+removable.length+' unused layers');toast('Removed '+removable.length+' unused layers');
+
+/* PURGE: preview exact document resources. Never touch personal/global galleries,
+   external references, protected architectural resources or live geometry. */
+function cadPurgePlan(doc,viewportLayers,options){
+ const blocks=doc.blocks||{},styles=doc.dimStyles||{},entities=doc.entities||[];
+ const usedBlocks=new Set(),usedLayers=new Set(['0','walls','openings','dimensions','text',doc.layerId]),usedStyles=new Set([doc.activeDimStyle]);
+ const blockEntries=Object.entries(blocks);
+ // All definitions are scanned, even unused ones: a nested block is retained
+ // until its unused parent has been explicitly removed in a previous pass.
+ const visit=e=>{if(!e||typeof e!=='object')return;if(typeof e.blockName==='string')usedBlocks.add(e.blockName)};
+ entities.forEach(visit);
+ for(const [,def] of blockEntries)if(Array.isArray(def?.entities))def.entities.forEach(visit);
+ const removeBlocks=options.blocks?blockEntries.filter(([name,d])=>d&&Array.isArray(d.entities)&&!usedBlocks.has(name)&&!name.startsWith('xref:')&&!name.startsWith('*')&&!d.xref&&!d.libraryLayer0&&!d.parametric&&!d.arq&&!d.dynamic2d&&!d.pro&&!d.protected).map(([name])=>name):[];
+ const removed=new Set(removeBlocks);
+ const scan=e=>{
+  if(!e||typeof e!=='object')return;
+  if(typeof e.layer==='string')usedLayers.add(e.layer);
+  if(typeof e.dimStyleName==='string')usedStyles.add(e.dimStyleName);
+ };
+ entities.forEach(scan);
+ for(const [name,def] of blockEntries)if(!removed.has(name)&&Array.isArray(def?.entities))def.entities.forEach(scan);
+ for(const preset of doc.layerStates||[]){
+  if(preset?.current)usedLayers.add(preset.current);
+  for(const l of preset?.layers||[])if(l?.id)usedLayers.add(l.id);
+ }
+ for(const id of viewportLayers||[])usedLayers.add(id);
+ const removeLayers=options.layers?(doc.layers||[]).filter(l=>l&&typeof l.id==='string'&&!l.locked&&!l.frozen&&!usedLayers.has(l.id)&&!String(l.name||'').includes('|')&&!/^xref/i.test(l.id)).map(l=>l.id):[];
+ const removeStyles=options.styles?Object.keys(styles).filter(k=>!usedStyles.has(k)&&!/^standard$/i.test(k)):[];
+ return {blocks:removeBlocks,layers:removeLayers,styles:removeStyles};
 }
+function cadPurgeViewportLayers(){
+ const ids=new Set();
+ const add=vps=>{for(const v of vps||[])for(const id of v?.frozenLayers||[])ids.add(id)};
+ add(cadLayoutViewports);
+ for(const layout of cadLayouts||[])add(layout?.state?.viewports);
+ return ids;
+}
+function purgeUnusedCadLayers(){
+ if(cadBlockEdit)return toast('Cerrá BEDIT antes de limpiar el dibujo.');
+ if($('cadPurgeDialog'))return;
+ if(!Array.isArray(state.entities)||!Array.isArray(state.layers)||Object.values(state.blocks||{}).some(d=>!Array.isArray(d?.entities)))return toast('PURGE: estructura inválida; revisá el dibujo antes de limpiar.');
+ const d=document.createElement('div');d.id='cadPurgeDialog';d.className='modal-backdrop show';
+ d.innerHTML='<div class="modal" style="max-width:540px"><div class="modal-head"><h2>PURGE · Recursos sin uso</h2><button type="button" class="btn" data-close>×</button></div><p>Revisá el listado antes de eliminar. No borra objetos del dibujo, bloques de galería ni referencias externas.</p><div style="display:grid;gap:8px"><label><input type="checkbox" data-kind="layers" checked> Capas sin uso</label><label><input type="checkbox" data-kind="blocks"> Bloques del plano sin referencias</label><label><input type="checkbox" data-kind="styles"> Estilos de cota sin uso</label></div><pre style="white-space:pre-wrap;max-height:40vh;overflow:auto;font-size:12px"></pre><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn primary" data-apply>Limpiar selección</button></div><p>Los bloques anidados se conservan mientras exista su definición padre. Ctrl+Z permite deshacer.</p></div>';
+ const options=()=>Object.fromEntries([...d.querySelectorAll('[data-kind]')].map(x=>[x.dataset.kind,x.checked]));
+ const plan=()=>cadPurgePlan(state,cadPurgeViewportLayers(),options());
+ const total=p=>p.layers.length+p.blocks.length+p.styles.length;
+ function render(){
+  const p=plan(),names=new Map(state.layers.map(l=>[l.id,l.name||l.id]));
+  const sections=[['Capas',p.layers.map(id=>names.get(id)||id)],['Bloques',p.blocks],['Estilos de cota',p.styles]];
+  d.querySelector('pre').textContent=sections.map(([title,items])=>title+' ('+items.length+')'+(items.length?'\n  '+items.join('\n  '):' · ninguno')).join('\n\n');
+  d.querySelector('[data-apply]').disabled=!total(p);
+  return p;
+ }
+ d.querySelectorAll('[data-kind]').forEach(x=>x.onchange=render);
+ d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.remove());
+ d.onclick=e=>{if(e.target===d)d.remove()};
+ d.querySelector('[data-apply]').onclick=()=>{
+  if(cadBlockEdit)return toast('Cerrá BEDIT antes de limpiar.');
+  const p=render();if(!total(p))return;
+  if(!window.confirm('Eliminar '+total(p)+' recursos listados del proyecto? No se elimina geometría del modelo.'))return;
+  saveHistory();
+  const layers=new Set(p.layers);state.layers=state.layers.filter(l=>!layers.has(l.id));
+  for(const key of p.blocks)delete state.blocks[key];
+  for(const key of p.styles)delete state.dimStyles[key];
+  updateAll();log('PURGE · '+p.layers.length+' capas · '+p.blocks.length+' bloques · '+p.styles.length+' estilos');
+  toast('PURGE · '+total(p)+' recursos eliminados · Ctrl+Z para deshacer');
+  render();
+ };
+ render();document.body.append(d);
+}
+
 function copyCadProperties(from,to){
  for(const field of ['color','width','linetype']){
   if(from[field]===undefined)delete to[field];else to[field]=from[field];
