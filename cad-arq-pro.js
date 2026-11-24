@@ -49,7 +49,7 @@ function ensureLayer(){
 
 /* ---------- Definiciones de bloque generadas ---------- */
 function defName(item,W,D){return 'ARQ · '+item.name+' · '+cm(W)+'×'+cm(D)}
-function ensureDefinition(item,W,D){
+function ensureDefinition(item,W,D,defer=false){
  const built=LIB.build(item.id,W,D),k=f(),st=S();
  const oldName=defName(item,built.w,built.d);
  // Preserve old colored definitions used by existing drawings. New insertions
@@ -63,7 +63,7 @@ function ensureDefinition(item,W,D){
   def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
   const bb=LIB.bounds(built.entities);
   def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
-  st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
+  st.blocks[name]=def;if(!defer){CORE.renderBlockLibrary();CORE.queueLocalBackup()}
  }
  return name;
 }
@@ -731,6 +731,30 @@ function drawRoomRow(spec,origin){
  const count=CORE.wall.roomRow(spec,origin);
  CORE.toast(count+' habitaciones · muros compartidos · puertas y ventanas paramétricas');
 }
+
+let arqWorker=null,arqIdle=null,arqPending=null,arqSeq=0;
+function solveArchitecture(text){
+ if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
+ if(!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
+ clearTimeout(arqIdle);
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-v1');
+ const worker=arqWorker,id=++arqSeq;
+ return new Promise((resolve,reject)=>{
+  const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
+   if(terminate){worker.terminate();arqWorker=null}else arqIdle=setTimeout(()=>{if(!arqPending&&arqWorker===worker){worker.terminate();arqWorker=null}},45000);
+   if(err)reject(err);else resolve(value)};
+  const timeout=setTimeout(()=>done(Error('Architecture engine timed out.'),null,true),60000);
+  arqPending=id;worker.onmessage=e=>{if(e.data.id===id)done(e.data.error?Error(e.data.error):null,e.data.plan)};
+  worker.onerror=e=>done(Error(e.message||'Python engine unavailable'),null,true);
+  worker.postMessage({id,text});
+ });
+}
+function applyArchitecture(plan,origin){
+ if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
+ // Validate individual library objects before touching the drawing.
+ for(const b of plan.blocks){const it=byId(b.catalogId);if(!it||!allowed(it)||it.dxfPlan)throw Error('Block unavailable: '+b.catalogId)}
+ return CORE.wall.applyPlan(plan,origin,b=>{const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true)});
+}
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
@@ -771,11 +795,18 @@ function openArchitectureAssistant(category){
    preview();if(!it){model.selectedIndex=-1;q('[data-preview]').replaceChildren();say('No hay una configuración compatible. Elegí un modelo o cambiá las medidas.')}
   }
   const drawButton=document.createElement('button');drawButton.className='btn';drawButton.textContent='Dibujar instrucción / Draw instruction';drawButton.style.cssText='display:block;width:100%;margin:6px 0';q('[data-insert]').before(drawButton);
-  function drawInstruction(){try{const raw=q('[data-command]').value, spec=parseRoomRow(raw);if(!spec){interpret();const {it,W,D}=valid();if(armInsert(it,W,D))say('Clic en el plano para insertar el ambiente.');return}say(spec.count+' habitaciones de '+spec.W+' × '+spec.D+' m; muro '+spec.T+' m. '+(spec.defaults?'Se usaron medidas predeterminadas cuando faltaban. ':'')+'Clic en el origen del conjunto.');startPick(1,'ARQASSIST · origen de habitaciones',([p])=>{try{drawRoomRow(spec,p);say('Habitaciones dibujadas.')}catch(e){say(e.message)}})}catch(e){say(e.message)}}
+  async function drawInstruction(){
+   const raw=q('[data-command]').value.trim();if(!raw)return say('Escribí qué necesitás / Describe the layout.');
+   drawButton.disabled=true;say('Calculando distribución / Calculating layout…');
+   try{const plan=await solveArchitecture(raw);
+    say((plan.assumptions||[]).join(' · ')+' · Clic en el origen / Click insertion origin');
+    startPick(1,'ARQASSIST · origin / origen',([p])=>{try{const n=applyArchitecture(plan,p);say(n+' entidades CAD dibujadas / entities drawn.')}catch(e){say(e.message)}});
+   }catch(e){say(e.message)}finally{drawButton.disabled=false}
+  }
   drawButton.onclick=drawInstruction;
   q('[data-command]').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();drawInstruction()}});
-  q('[data-interpret]').onclick=()=>{try{if(parseRoomRow(q('[data-command]').value))drawInstruction();else interpret()}catch(e){say(e.message)}};
-  q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;interpret()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
+  q('[data-interpret]').onclick=drawInstruction;
+  q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;drawInstruction()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
   q('[data-insert]').onclick=()=>{try{const {it,W,D}=valid();if(armInsert(it,W,D))say('Clic en el plano para insertar.')}catch(e){say(e.message)}};
   q('[data-close]').onclick=()=>{const body=q('[data-body]');body.hidden=!body.hidden;q('[data-close]').textContent=body.hidden?'+':'−'};
   panel.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')panel.hidden=true});
