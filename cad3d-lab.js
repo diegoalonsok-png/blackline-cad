@@ -5588,7 +5588,11 @@ function resize(){
 function loop(){
  if(!renderer){if(fallbackCanvas)fallbackDraw();return;}
  if(frame)return;
- function tick(){frame=0;if(!renderer||root.hidden)return;renderer.render(scene,camera);cad3dLightGlyphs();frame=requestAnimationFrame(tick);}
+ var lastRender=-Infinity;
+ function tick(now){frame=0;if(!renderer||root.hidden)return;
+  if(!cad3dHeavyViewport||now-lastRender>=32){renderer.render(scene,camera);cad3dLightGlyphs();lastRender=now;}
+  frame=requestAnimationFrame(tick);
+ }
  frame=requestAnimationFrame(tick);
 }
 function panView(dx,dy,canvas){
@@ -7465,7 +7469,11 @@ function buildObject(r){
  if(r.type==='stair')cad3dBuildStair(r,group);
  if(r.type==='railing')cad3dBuildRailing(r,group);
  if(r.type==='block3d')buildCAD3DBlock(r,group);
- if(r.type==='imported3d')cad3dBuildImportedMesh(r,group);
+ if(r.type==='imported3d'){
+  cad3dBuildImportedMesh(r,group);
+  group.userData.importMeshSource=r.meshVertices;
+  group.userData.importMeshKey=cad3dImportMeshKey(r);
+ }
  if(r.type==='profile2d')cad3dBuildProfile(r,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
  if(r.type==='slab'&&r.slabPolyHoles?.length)cad3dBuildSlabWithHoles(r,group);
@@ -7522,6 +7530,16 @@ function visitMeshes(visitor){
 }
 
 /* Snapshots store only CAD3D document state. Cameras, UI focus and render caches are excluded. */
+var cad3dHistoryMeshIds=new WeakMap(),cad3dHistoryMeshes=new Map(),cad3dHistoryMeshSerial=0;
+function cad3dHistoryMeshRef(mesh){
+ var id=cad3dHistoryMeshIds.get(mesh);
+ if(!id){id=++cad3dHistoryMeshSerial;cad3dHistoryMeshIds.set(mesh,id);}
+ cad3dHistoryMeshes.set(id,mesh);return {cadMeshRef:id};
+}
+function cad3dHistoryMeshPrune(){
+ var keep=new Set();cad3dHistory.entries.forEach(function(json){for(var match of json.matchAll(/"cadMeshRef":(\d+)/g))keep.add(Number(match[1]));});
+ cad3dHistoryMeshes.forEach(function(mesh,id){if(!keep.has(id))cad3dHistoryMeshes.delete(id);});
+}
 function cad3dHistoryJSON(){
  var materials={};
  Object.keys(cad3dCustomMaterials).forEach(function(id){
@@ -7530,7 +7548,7 @@ function cad3dHistoryJSON(){
    mix:finite(m.mix,0),bump:finite(m.bump,1),roughness:finite(m.roughness,85)};
  });
  return JSON.stringify({records:records,layers:layers,currentLayer:currentLayer,
-  serial:serial,underlay:underlay,materials:materials});
+  serial:serial,underlay:underlay,materials:materials},function(k,v){return k==='meshVertices'&&Array.isArray(v)?cad3dHistoryMeshRef(v):v;});
 }
 function cad3dHistoryButtons(){
  if(!root)return;
@@ -7551,7 +7569,7 @@ function cad3dHistoryCapture(){
  try{json=cad3dHistoryJSON();}catch(e){console.warn('CAD3D history snapshot error',e);return;}
  if(json===cad3dHistory.entries[cad3dHistory.index])return;
  if(json.length>cad3dHistory.charBudget){
-  text('Modelo grande: historial 3D no disponible para este cambio');
+  cad3dHistoryMeshPrune();text('Modelo grande: historial 3D no disponible para este cambio');
   return;
  }
  // Drop redo only after a genuinely new editing operation.
@@ -7564,12 +7582,13 @@ function cad3dHistoryCapture(){
  while(cad3dHistory.entries.length>2&&(cad3dHistory.entries.length>cad3dHistory.limit||cad3dHistory.chars>cad3dHistory.charBudget)){
   cad3dHistory.chars-=cad3dHistory.entries.shift().length;cad3dHistory.index--;
  }
+ cad3dHistoryMeshPrune();
  cad3dHistoryButtons();
 }
 function cad3dHistoryRestore(index){
  if(index<0||index>=cad3dHistory.entries.length||index===cad3dHistory.index)return false;
  var state;
- try{state=JSON.parse(cad3dHistory.entries[index]);}catch(e){text('No se pudo recuperar el estado 3D');return false;}
+ try{state=JSON.parse(cad3dHistory.entries[index],function(k,v){if(k==='meshVertices'&&v?.cadMeshRef){var mesh=cad3dHistoryMeshes.get(v.cadMeshRef);if(!mesh)throw Error('Malla histórica no disponible');return mesh;}return v;});}catch(e){text('No se pudo recuperar el estado 3D');return false;}
  cad3dHistory.replaying=true;
  try{
   setPlacement(null);cad3dMaterialPaint=false;selectedOpeningId=null;dragging=null;
@@ -7837,12 +7856,29 @@ function cad3dSectionSetup(){
  update();
 }
 
+/* Keep imported GPU geometry when only position or another record changes. */
+function cad3dImportMeshKey(r){return [r.w,r.d,r.h,r.materialColor||''].join('|');}
+var cad3dHeavyViewport=false;
 function redraw(){
  cad3dHistoryCapture();
  if(fallbackCanvas){fallbackDraw();render3DGrips();cad3dRenderPlanWalls();return;}
  if(!modelRoot)return;
+ var existing=new Map(),visible=records.filter(visibleRecord),triangles=0;
+ modelRoot.children.slice().forEach(function(group){
+  if(group.userData.importMeshSource)existing.set(group.userData.owner,group);
+ });
+ var reused=new Map();
+ visible.forEach(function(r){
+  if(r.type!=='imported3d')return;
+  triangles+=(r.meshVertices?.length||0)/9;
+  var g=existing.get(r.id);
+  if(g&&g.userData.importMeshSource===r.meshVertices&&g.userData.importMeshKey===cad3dImportMeshKey(r)){
+   modelRoot.remove(g);g.position.set(r.x||0,r.y||0,r.z||0);g.rotation.z=(r.rot||0)*Math.PI/180;reused.set(r.id,g);
+  }
+ });
+ cad3dHeavyViewport=triangles>45000||visible.length>350;
  disposeMeshes(modelRoot);
- modelRoot.clear();records.filter(visibleRecord).forEach(function(record){modelRoot.add(buildObject(record));});
+ modelRoot.clear();visible.forEach(function(record){modelRoot.add(reused.get(record.id)||buildObject(record));});
  modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();cad3dSectionApply();render3DGrips();cad3dRenderPlanWalls();
 }
 function highlight(){
@@ -8423,6 +8459,10 @@ function applyRenderStyle(){
     m.castShadow=false;m.receiveShadow=sunSettings.enabled&&sunSettings.onFaces;
     return;
    }
+  if(m.parent?.userData.importMeshSource){
+   if(m.userData.importStyle===renderStyle)return;
+   m.userData.importStyle=renderStyle;
+  }
   if(m.userData.cadBaseColor===undefined)m.userData.cadBaseColor=m.material.color.getHex();
   m.children.filter(function(ch){return ch.userData?.cadSketch;}).forEach(function(ch){
    m.remove(ch);ch.geometry.dispose();ch.material.dispose();
