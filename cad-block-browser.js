@@ -123,6 +123,9 @@
 #cadBlockBrowser.visual .card .preview{display:grid;place-items:center;padding:7px;background:var(--paper-bg,#fffaf0);border:1px solid #c8bca8;border-radius:4px;color:var(--paper-ink,#293238);width:100%;box-sizing:border-box;min-width:0}
 #cadBlockBrowser.visual .card .preview svg{color:inherit}
 #cadBlockBrowser .static-block-preview{filter:var(--static-preview-filter,none);max-height:220px}
+/* Static SVGs use dark ink; adapt only their presentation to the browser theme. */
+#cadBlockBrowser:not(.visual) .static-block-preview{filter:brightness(0) invert(.88)}
+.bl-light #cadBlockBrowser:not(.visual) .static-block-preview{filter:none}
 #cadBlockBrowser.visual .tools{flex-wrap:wrap}
 #cadBlockBrowser.visual .paper-palette{flex:1 0 auto}
 #cadBlockBrowser.visual .card .nm{color:#35362e;font-weight:600}
