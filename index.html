@@ -2117,6 +2117,7 @@ function validateDimStyle(style){
   arrow:number(style.arrow,.12,.001,100000),
   suffix:String(style.suffix||'').slice(0,30),
   displayUnit:['drawing','mm','cm','m','in','ft'].includes(style.displayUnit)?style.displayUnit:'drawing',
+  ...(style.hideUnit===true?{hideUnit:true}:{}),
   tolerance:number(style.tolerance,0,0,100000),
   arrowType:['arrow','tick','dot','open','none'].includes(style.arrowType)?style.arrowType:'arrow',
   color:/^#[0-9a-f]{6}$/i.test(style.color||'')?style.color:'',
@@ -2184,7 +2185,7 @@ function cadDimensionPrimitivesRaw(e){
   if(aType==='dot'){items.push({type:'hatch',pts:Array.from({length:16},(_,i)=>add(p,P(arrow*.22*Math.cos(i*TAU/16),arrow*.22*Math.sin(i*TAU/16)))),layer,width,hatchStyle:'solid'});return}
   if(aType==='open'){line(p,add(p,add(mul(u,arrow),mul(n,arrow*.33))));line(p,add(p,sub(mul(u,arrow),mul(n,arrow*.33))));return}
   const w1=add(p,add(mul(u,arrow),mul(n,arrow*.28))),w2=add(p,sub(mul(u,arrow),mul(n,arrow*.28)));items.push({type:'hatch',pts:[p,w1,w2],layer,width,hatchStyle:'solid'});line(p,w1);line(p,w2)};
- const format=v=>{const target=U[st.displayUnit]?st.displayUnit:state.unit,converted=v*U[state.unit]/U[target],tol=(Number(st.tolerance)||0)*U[state.unit]/U[target],unitLabel=st.displayUnit&&st.displayUnit!=='drawing'?' '+target:'';return converted.toFixed(precision)+(tol>0?' ±'+tol.toFixed(precision):'')+unitLabel+suffix};
+ const format=v=>{const target=U[st.displayUnit]?st.displayUnit:state.unit,converted=v*U[state.unit]/U[target],tol=(Number(st.tolerance)||0)*U[state.unit]/U[target],unitLabel=st.hideUnit!==true&&st.displayUnit&&st.displayUnit!=='drawing'?' '+target:'';return converted.toFixed(precision)+(tol>0?' ±'+tol.toFixed(precision):'')+unitLabel+suffix};
  if(!e.a||!e.b||!e.p)return [];
  if(mode==='leader'){
   line(e.a,e.b);tip(e.a,sub(e.b,e.a));
@@ -2681,7 +2682,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.arqDocumentation&&e.arqDocLayer&&['A-ARQ-COTAS','A-ARQ-HATCH','A-ARQ-MUROS','A-ARQ-ABERTURAS','A-ARQ-MOBILIARIO','A-ARQ-SANITARIOS','A-ARQ-EQUIPAMIENTO','A-ARQ-TEXTOS','A-ARQ-GEOMETRIA'].includes(e.layer)?e.layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0&&!e.arqDocLayer&&!definition.arqGrayPlan?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -3313,13 +3314,13 @@ function drawEntity(e,forceColor){if(e.type==='image')return drawImageEntity(e,f
   if(!forceColor&&!layerFor(e).visible)return;
   const fade=e.xref&&!forceColor&&!state.selected.includes(e.id);if(fade){ctx.save();ctx.globalAlpha*=cadXrefFade}
   if(!forceColor&&!state.selected.includes(e.id))cadDrawRefFast(e);
-  else for(const part of cadBlockChildrenCached(e))drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));
+  else for(const part of cadBlockChildrenCached(e)){if(part.arqDocLayer&&!layerFor(part).visible)continue;drawEntity(part,forceColor||(state.selected.includes(e.id)?displayColors.selection:null));}
   if(fade)ctx.restore();
   if(state.selected.includes(e.id)&&!forceColor){
    drawBlockGrips(e);
   }
   return;
- }if(e.type==='dimension'){const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
+ }if(e.type==='dimension'){if(e.arqDocLayer&&!layerFor(e).visible)return;const color=forceColor||(state.selected.includes(e.id)?displayColors.selection:null);for(const part of dimensionPrimitives(e))drawEntity(part,color);return}const lay=layerFor(e);if(!forceColor&&!lay.visible)return;ctx.save();const isSelected=state.selected.includes(e.id);ctx.strokeStyle=forceColor||(isSelected?displayColors.selection:cadScreenColor(e.color||lay.color));ctx.fillStyle=ctx.strokeStyle;ctx.lineWidth=isSelected?Math.max(2.5,(e.width??lay.width??.25)*3+1):Math.max(.75,(e.width??lay.width??.25)*3);if(isSelected)ctx.setLineDash([5,3]);else{const dash=cadLinetypeDash(e,lay);if(dash)ctx.setLineDash(dash)}if(!isSelected&&e.pwidth>0&&(e.type==='polyline'||e.type==='rect'))ctx.lineWidth=Math.max(ctx.lineWidth,e.pwidth*state.view.scale);ctx.lineCap='round';ctx.lineJoin='round';if(e.type==='hatch'){
   ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();for(const hole of e.holes||[]){if(hole?.length>2){tracePath({type:'polyline',pts:hole,closed:true});ctx.closePath()}}ctx.setLineDash([]);
   if(cadIsGradient(e)&&!forceColor&&!isSelected){
    const xs=e.pts.map(p=>p.x),ys=e.pts.map(p=>p.y),c=screen(P((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2));
@@ -9082,13 +9083,14 @@ function blockDefinition(name){return state.blocks?.[name]||null}
 function selectedBlock(){return blockDefinition($('blockLibrary').value)}
 function normalizeBlockEntities(entries){
  if(!Array.isArray(entries)||entries.length===0||entries.length>50000)throw Error('Block must contain 1–50,000 entities');
- const allowed=new Set(['line','polyline','rect','circle','arc','ellipse','text','dimension']);
+ const allowed=new Set(['line','polyline','rect','circle','arc','ellipse','text','dimension','hatch']);
  return entries.map(e=>{
   if(!e||!allowed.has(e.type))throw Error('Unsupported block entity type');
   const item=clone(e);delete item.id;delete item.blockName;
   const coords=getVertices(item);
   if(coords.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)))throw Error('Invalid block coordinates');
   if(item.type==='polyline'&&(!Array.isArray(item.pts)||item.pts.length<2))throw Error('Invalid polyline');
+  if(item.type==='hatch'&&(!Array.isArray(item.pts)||item.pts.length<3||item.pts.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))))throw Error('Invalid hatch polygon');
   if(['circle','arc'].includes(item.type)&&!(item.r>0))throw Error('Invalid circle/arc radius');
   return item;
  });
@@ -9111,6 +9113,7 @@ function blockInsertionEntities(block,point,scale,angle){
   if(e.ry!==undefined)e.ry*=scale;
   if(e.h!==undefined)e.h*=scale;
   if(e.type==='dimension'&&e.style){e.style.textHeight*=scale;e.style.arrow*=scale}
+  if(e.type==='hatch'&&Number.isFinite(e.hatchSpacing))e.hatchSpacing*=scale;
   if(e.type==='text')e.rotation=(Number(e.rotation)||0)+angle;
   if(e.type==='ellipse')e.rotation=(Number(e.rotation)||0)+theta;
   if(e.type==='arc'){e.a0+=theta;e.a1+=theta}
@@ -11463,7 +11466,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
 <script src="cad-performance.js?v=20261124-spatial-v2"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261123-quiet-pro-1"></script><script src="cad-cloud.js?v=20261120-1850"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261124-gray-layers-v2"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
 <script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script><script src="assets/cad2d-olympiadas-pro.js?v=20261122-hires20"></script>
 <script src="assets/cad2d-olimpiadas-banos-20261123.js?v=20261123-v1"></script>
 <script src="assets/cad2d-olimpiadas-cocinas-20261123.js?v=20261123-v1"></script>
@@ -11473,7 +11476,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
+<script src="cad-arq-pro.js?v=20261124-gray-layers-v2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-no-insert-v3"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
