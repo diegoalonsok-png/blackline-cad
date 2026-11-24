@@ -2682,7 +2682,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.arqDocumentation&&e.arqDocLayer&&['A-ARQ-COTAS','A-ARQ-HATCH'].includes(e.layer)?e.layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0&&!e.arqDocLayer&&!definition.arqGrayPlan?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.arqDocumentation&&e.arqDocLayer&&['A-ARQ-COTAS','A-ARQ-HATCH','A-ARQ-MUROS','A-ARQ-ABERTURAS','A-ARQ-MOBILIARIO','A-ARQ-SANITARIOS','A-ARQ-EQUIPAMIENTO','A-ARQ-TEXTOS','A-ARQ-GEOMETRIA'].includes(e.layer)?e.layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0&&!e.arqDocLayer&&!definition.arqGrayPlan?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -11466,7 +11466,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
 <script src="cad-performance.js?v=20261124-spatial-v2"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261123-quiet-pro-1"></script><script src="cad-cloud.js?v=20261120-1850"></script>
-<script src="assets/cad2d-arq-generators.js?v=20261124-bedroom-v1"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
+<script src="assets/cad2d-arq-generators.js?v=20261124-gray-layers-v2"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
 <script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script><script src="assets/cad2d-olympiadas-pro.js?v=20261122-hires20"></script>
 <script src="assets/cad2d-olimpiadas-banos-20261123.js?v=20261123-v1"></script>
 <script src="assets/cad2d-olimpiadas-cocinas-20261123.js?v=20261123-v1"></script>
@@ -11476,7 +11476,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261124-gray-plan-v1"></script>
+<script src="cad-arq-pro.js?v=20261124-gray-layers-v2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-worker-v1"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
