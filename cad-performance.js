@@ -46,5 +46,28 @@
   if(b)return overlap(b,v);
   return typeof fallback==='function'?fallback(e):true;
  }
- return Object.freeze({viewport,overlap,basicBounds,inViewport});
+
+ // Read-only bounding-volume hierarchy. Built for a single calculation,
+ // never retained across geometry edits. Unknown bounds are always included.
+ function spatialIndex(items,bounds){
+  const entries=[],unknown=[];
+  items.forEach((value,i)=>{const b=bounds(value);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX<=b.maxX&&b.minY<=b.maxY)entries.push({b,i,value});else unknown.push({i,value});});
+  function build(list){
+   if(!list.length)return null;
+   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+   for(const e of list){const b=e.b;minX=Math.min(minX,b.minX);minY=Math.min(minY,b.minY);maxX=Math.max(maxX,b.maxX);maxY=Math.max(maxY,b.maxY);}
+   const b={minX,minY,maxX,maxY};
+   if(list.length<=16)return {b,list};
+   const x=maxX-minX>=maxY-minY;list.sort((a,c)=>x?(a.b.minX+a.b.maxX-c.b.minX-c.b.maxX):(a.b.minY+a.b.maxY-c.b.minY-c.b.maxY));
+   const mid=list.length>>1;return {b,left:build(list.slice(0,mid)),right:build(list.slice(mid))};
+  }
+  const tree=build(entries);
+  return function query(box){
+   if(!box||![box.minX,box.maxX,box.minY,box.maxY].every(Number.isFinite))return items.slice();
+   const result=unknown.slice();
+   function visit(n){if(!n||!overlap(n.b,box))return;if(n.list){for(const e of n.list)if(overlap(e.b,box))result.push(e);}else{visit(n.left);visit(n.right);}}
+   visit(tree);return result.sort((a,b)=>a.i-b.i).map(e=>e.value);
+  };
+ }
+ return Object.freeze({viewport,overlap,basicBounds,inViewport,spatialIndex});
 });
