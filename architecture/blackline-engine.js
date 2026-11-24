@@ -132,6 +132,32 @@ if(neg(t))out.delete(t.k);else out.add(t.k)}
 const R=(x,y,w,d)=>({x,y,w,d});
 const inside=(r,w,d)=>r.x>=-1e-7&&r.y>=-1e-7&&r.x+r.w<=w+1e-7&&r.y+r.d<=d+1e-7;
 const overlap=(a,b,g=0)=>a.x<b.x+b.w+g-1e-7&&b.x<a.x+a.w+g-1e-7&&a.y<b.y+b.d+g-1e-7&&b.y<a.y+a.d+g-1e-7;
+/* Layout knowledge derived from our CAD library, assets/cad2d-arq-generators.js.
+   Preferences only: all native block envelopes and access zones still go through
+   the same collision solver. No scaling of sanitary fixtures. */
+function bathroomPattern(w,d,fixtures,seed){
+ const has=k=>fixtures.includes(k);
+ if(!fixtures.length||fixtures.some(k=>!['toilet','bidet','basin','shower','bathtub'].includes(k)))return null;
+ const targets={};
+ let id;
+ if(has('bathtub')||has('shower')){
+  const wet=has('bathtub')?'bathtub':'shower',wetD=C[wet][2],wetW=C[wet][1];
+  id=wet==='bathtub'?(has('bidet')?'bano-completo':'bano-banera'):(has('bidet')?'bano-ducha-bidet':'bano-minimo');
+  targets[wet]={rot:180,x:0,y:d-wetD};
+  if(has('toilet'))targets.toilet={rot:270,x:0,y:d-wetD-.12-C.toilet[1]};
+  if(has('bidet'))targets.bidet={rot:270,x:0,y:d-wetD-.24-(has('toilet')?C.toilet[1]:0)-C.bidet[1]};
+  if(has('basin'))targets.basin={rot:90,x:w-C.basin[2],y:.25};
+  if(has('bathtub')&&has('shower')){id='bano-principal';targets.shower={rot:180,x:w-C.shower[1],y:d-C.shower[2]};}
+ }else{
+  id='bano-toilette';if(has('toilet'))targets.toilet={rot:180,x:(w-C.toilet[1])/2,y:d-C.toilet[2]};
+  if(has('bidet'))targets.bidet={rot:270,x:0,y:.25};
+  if(has('basin'))targets.basin={rot:90,x:w-C.basin[2],y:.12};
+ }
+ // Alternate between original and mirror layouts without changing the dimensions.
+ if(seed%2)for(const [k,v] of Object.entries(targets)){const fw=v.rot%180?C[k][2]:C[k][1];v.x=w-v.x-fw;if(v.rot===90||v.rot===270)v.rot=(v.rot+180)%360;}
+ return {id,targets};
+}
+
 function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
  let rng=seed+1;const rand=()=>{rng=(Math.imul(rng,1664525)+1013904223)>>>0;return rng/4294967296};
  const sorted=fixtures.slice().sort((a,b)=>C[b][1]*C[b][2]-C[a][1]*C[a][2]),placed=[],options=new Map();let nodes=0;
@@ -154,6 +180,16 @@ function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
   options.set(key,opts);
  }
  function dfs(i){if(i===sorted.length)return true;for(const o of options.get(sorted[i])){if(++nodes>35000)return false;if(placed.some(p=>overlap(p.r,o.r,.03)||overlap(p.a,o.r,.03)||overlap(p.r,o.a,.03)))continue;placed.push(o);if(dfs(i+1))return true;placed.pop()}return false}
+ const pattern=bathroomPattern(w,d,fixtures,seed);
+ if(pattern){
+  const saved=new Map(options);
+  for(const [key,opts] of options){const target=pattern.targets[key];if(!target)continue;
+   const score=o=> (o.rot===target.rot?0:4)+Math.hypot(o.r.x-target.x,o.r.y-target.y);
+   options.set(key,opts.slice().sort((a,b)=>score(a)-score(b)));
+  }
+  if(dfs(0))return placed;
+  placed.length=0;nodes=0;for(const [k,v] of saved)options.set(k,v);
+ }
  if(!dfs(0))throw Error('No encuentro una distribución sin interferencias con esas medidas. Aumentá el ambiente o reducí equipamiento.');
  return placed;
 }
@@ -456,6 +492,6 @@ function run(raw){
  throw error;
  }
 }
-const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,correctText,catalog:C});
+const api=Object.freeze({interpret,solve,detailInstruction,solveDetail,run,correctText,bathroomPattern,catalog:C});
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BlacklineArchitectureAI=api;
 })(typeof self!=='undefined'?self:globalThis);
