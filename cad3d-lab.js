@@ -2421,6 +2421,48 @@ function cad3dImportTriangles(vertices,faces,fileName){
  records.push(rec);selected=[rec.id];redraw();renderProps();
  text(fileName+' importado · '+(triangles.length/3)+' triángulos · geometría editable por escala/posición');
 }
+/* Static 3D Studio binary meshes; local import, no external dependencies. */
+function cad3dParse3DS(buffer,name){
+ var dv=new DataView(buffer),verts=[],faces=[],objects=0;
+ function chunk(at,end){
+  if(at+6>end)throw Error('Cabecera 3DS incompleta');
+  var id=dv.getUint16(at,true),length=dv.getUint32(at+2,true);
+  if(length<6||length>end-at)throw Error('Bloque 3DS inválido o truncado');
+  return {id:id,start:at+6,end:at+length};
+ }
+ function children(start,end,visit){for(var at=start;at<end;){var c=chunk(at,end);visit(c);at=c.end;}}
+ function mesh(c){
+  var points=null,indices=null;
+  children(c.start,c.end,function(part){
+   var at=part.start;if(part.id!==0x4110&&part.id!==0x4120)return;
+   if(at+2>part.end)throw Error('Malla 3DS incompleta');
+   var n=dv.getUint16(at,true);at+=2;
+   if(part.id===0x4110){
+    if(at+n*12>part.end||verts.length+n>400000)throw Error('Vértices 3DS inválidos o excesivos');
+    points=[];for(var i=0;i<n;i++,at+=12){var v=[dv.getFloat32(at,true),dv.getFloat32(at+4,true),dv.getFloat32(at+8,true)];if(!v.every(Number.isFinite))throw Error('Coordenadas 3DS inválidas');points.push(v);}
+   }else{
+    if(at+n*8>part.end||faces.length+n>120000)throw Error('Caras 3DS inválidas o excesivas');
+    indices=[];for(var i=0;i<n;i++,at+=8)indices.push([dv.getUint16(at,true),dv.getUint16(at+2,true),dv.getUint16(at+4,true)]);
+   }
+  });
+  if(!points||!indices||!indices.length)return;
+  if(indices.some(f=>f.some(i=>i>=points.length)))throw Error('Índice de cara 3DS inválido');
+  var base=verts.length;points.forEach(v=>verts.push(v));indices.forEach(f=>faces.push(f.map(i=>base+i)));objects++;
+ }
+ var main=chunk(0,dv.byteLength);if(main.id!==0x4d4d)throw Error('Cabecera 3DS inválida');
+ children(main.start,main.end,function(c){
+  if(c.id!==0x3d3d)return;
+  children(c.start,c.end,function(o){
+   if(o.id!==0x4000)return;
+   var at=o.start;while(at<o.end&&dv.getUint8(at)!==0)at++;
+   if(at>=o.end)throw Error('Nombre de objeto 3DS truncado');
+   children(at+1,o.end,function(m){if(m.id===0x4100)mesh(m);});
+  });
+ });
+ if(!objects)throw Error('El archivo 3DS no contiene mallas estáticas válidas');
+ // Static Z-up vertex positions only; no keyframe transforms, original materials or textures.
+ cad3dImportTriangles(verts,faces,name);
+}
 function cad3dParseSTL(buffer,name){
  var view=new DataView(buffer),binary=buffer.byteLength>=84&&84+view.getUint32(80,true)*50===buffer.byteLength;
  var verts=[],faces=[];
@@ -2485,6 +2527,7 @@ async function cad3dImportMeshFile(file){
  var name=file.name,ext=name.split('.').pop().toLowerCase();
  if(file.size>18000000)throw Error('Archivo mayor a 18 MB');
  if(ext==='obj')return cad3dImportOBJ(await file.text(),name);
+ if(ext==='3ds')return cad3dParse3DS(await file.arrayBuffer(),name);
  if(ext==='stl')return cad3dParseSTL(await file.arrayBuffer(),name);
  if(ext==='off')return cad3dParseOFF(await file.text(),name);
  if(ext==='ply')return cad3dParsePLY(await file.text(),name);
@@ -2505,36 +2548,28 @@ async function cad3dImportMeshFile(file){
   var buffers=(j.buffers||[]).map(function(b){var uri=b.uri.split(','),str=atob(uri[1]),buf=new Uint8Array(str.length);for(var i=0;i<str.length;i++)buf[i]=str.charCodeAt(i);return buf.buffer;});
   return cad3dParseGLTFDocument(j,buffers,name);
  }
- throw Error('Formato no admitido directamente. Para SKP/DAE/FBX/3DS exportá GLB, OBJ o STL.');
+ throw Error('Formato no admitido directamente. Para SKP/DAE/FBX/STEP/IGES exportá GLB, OBJ o STL.');
 }
 
 function cad3dImportOBJ(content,fileName){
- var verts=[],tris=[],lines=content.split(/\r?\n/),limit=120000;
- lines.forEach(function(raw){
-  var line=raw.trim();if(line.startsWith('v ')){
-   var v=line.split(/\s+/).slice(1,4).map(Number);
-   if(v.length===3&&v.every(Number.isFinite))verts.push(v);
-  }else if(line.startsWith('f ')){
-   var indices=line.split(/\s+/).slice(1).map(function(token){
-    var n=parseInt(token.split('/')[0],10);
-    return n<0?verts.length+n:n-1;
+ var verts=[],faces=[],count=0;
+ content.replace(/\\\r?\n/g,' ').split(/\r?\n/).forEach(function(raw){
+  var line=raw.replace(/#.*/,'').trim(),tokens=line.split(/\s+/);
+  if(tokens[0]==='v'){
+   var v=tokens.slice(1,4).map(Number);
+   if(v.length!==3||!v.every(Number.isFinite))throw Error('Vértice OBJ inválido');
+   if(verts.length>=400000)throw Error('OBJ supera 400.000 vértices');verts.push(v);
+  }else if(tokens[0]==='f'){
+   var indices=tokens.slice(1).map(function(token){
+    var str=token.split('/')[0];if(!/^-?\d+$/.test(str))return NaN;
+    var n=Number(str);return n<0?verts.length+n:n-1;
    });
-   if(indices.length<3||indices.some(function(i){return i<0||i>=verts.length;}))return;
-   for(var i=1;i<indices.length-1&&tris.length<limit;i++)tris.push(indices[0],indices[i],indices[i+1]);
+   if(indices.length<3||indices.some(i=>!Number.isInteger(i)||i<0||i>=verts.length))throw Error('Cara OBJ inválida');
+   count+=indices.length-2;if(count>120000)throw Error('OBJ supera el límite de 120.000 triángulos');
+   faces.push(indices);
   }
  });
- if(!tris.length)throw Error('El archivo OBJ no contiene caras válidas');
- if(tris.length>360000)throw Error('OBJ supera el límite de 120.000 triángulos');
- var bounds=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
- tris.forEach(function(i){var v=verts[i];for(var a=0;a<3;a++){bounds[a]=Math.min(bounds[a],v[a]);max[a]=Math.max(max[a],v[a]);}});
- if(!bounds.every(Number.isFinite)||!max.every(Number.isFinite))throw Error('OBJ contiene coordenadas inválidas');
- var size=max.map(function(n,i){return Math.max(.001,n-bounds[i]);});
- // OBJ models from SketchUp normally use Z as vertical axis. Local coordinates are Z-up.
- var normalized=tris.map(function(i){var v=verts[i];return [(v[0]-(max[0]+bounds[0])/2)/size[0],(v[1]-(max[1]+bounds[1])/2)/size[1],(v[2]-bounds[2])/size[2]];}).flat();
- var r=newRecord('imported3d');
- Object.assign(r,{name:fileName.replace(/\.obj$/i,''),meshVertices:normalized,x:0,y:0,z:0,w:size[0],d:size[1],h:size[2]});
- records.push(r);selected=[r.id];redraw();renderProps();
- text('OBJ importado: '+r.name+' · '+(tris.length/3)+' triángulos · podés moverlo, rotarlo o escalarlo');
+ cad3dImportTriangles(verts,faces,fileName);
 }
 function cad3dBuildImportedMesh(r,group){
  if(!r.meshVertices||!r.meshVertices.length)return;
@@ -4190,7 +4225,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
  
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
@@ -9135,7 +9170,7 @@ async function readJSON(e){
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
-  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d','profile2d','stair','railing'];
+  var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d','profile2d','stair','railing','imported3d'];
   var sanitized=data.records.filter(function(r){return r&&accepted.includes(r.type);}).map(function(r){
    var o={id:finite(r.id,0),type:r.type,layerId:importedLayers.some(function(l){return l.id===r.layerId;})?r.layerId:'0',x:finite(r.x,0),y:finite(r.y,0),z:finite(r.z,0),rot:finite(r.rot,0),
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
@@ -9146,6 +9181,11 @@ async function readJSON(e){
     o.profileClosed=!!r.profileClosed;
     o.extrudedHeight=o.profileClosed?clamp(finite(r.extrudedHeight,0),0,1000):0;
     o.h=o.extrudedHeight;o.name=String(r.name||'2D profile').slice(0,80);
+   }
+   if(r.type==='imported3d'){
+    if(!Array.isArray(r.meshVertices)||!r.meshVertices.length||r.meshVertices.length>1080000||r.meshVertices.length%9||!r.meshVertices.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Malla 3D guardada inválida');
+    o.meshVertices=r.meshVertices.slice();o.name=String(r.name||'Imported model').slice(0,120);
+    if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
    if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
    if(r.type==='stair'){
