@@ -7498,18 +7498,27 @@ function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.e
 // Guardado automático como SAVETIME de AutoCAD: cada N minutos (5 por defecto) si hubo cambios.
 // Si el dibujo ya se guardó en un archivo (Save), se reescribe ese mismo .dxf; si no, copia en el navegador.
 let cad2dSaveMinutes=5,cad2dLastAutoSig='',cad2dLastAutoTime=Date.now();
-try{const m=Number(localStorage.getItem('cad2d-savetime'));if(m>=0&&m<=120)cad2dSaveMinutes=m}catch(e){}
-function cad2dDrawingSignature(){return state.entities.length+':'+state.history.length+':'+state.future.length+':'+(state.entities.at(-1)?.id||0)}
+try{const raw=localStorage.getItem('cad2d-savetime'),m=Number(raw);if(raw!==null&&m>=0&&m<=120)cad2dSaveMinutes=m}catch(e){}
+function cad2dDrawingSignature(){return cadDrawEpoch+':'+state.entities.length+':'+state.history.length+':'+state.future.length+':'+(state.entities.at(-1)?.id||0)}
 async function cad2dAutoSave(force=false){
+ if(cadSaveBusy)return;
  const sig=cad2dDrawingSignature();if(!force&&sig===cad2dLastAutoSig)return;
- const hh=new Date().toTimeString().slice(0,5);
- try{await cadWriteBak()}catch(err){console.warn('[CAD2D BAK]',err)}
+ cadSaveBusy=true;
+ const hh=new Date().toTimeString().slice(0,5),h=cadProjectSaveHandle,name=state.file,original=state.entities;
+ const unchanged=()=>h===cadProjectSaveHandle&&name===state.file&&original===state.entities&&sig===cad2dDrawingSignature();
  try{
-  const h=cadProjectSaveHandle,ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
-  if(ok){const w=await h.createWritable();await w.write(cadDxfWithProject(state.file));await w.close();toast('Autosave · '+h.name+' · '+hh)}
-  else{if(typeof persistLocalBackup==='function')await persistLocalBackup();toast('Autosave (browser copy) · '+hh)}
-  cad2dLastAutoSig=sig;cad2dLastAutoTime=Date.now();log('AUTOSAVE '+hh);
+  try{await cadWriteBak()}catch(err){console.warn('[CAD2D BAK]',err)}
+  if(!unchanged())return;
+  const ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
+  if(!unchanged())return;
+  if(ok){
+   const contents=cadDxfWithProject(name),w=await h.createWritable();
+   try{if(!unchanged()){await w.abort();return}await w.write(contents);await w.close()}catch(error){try{await w.abort()}catch(e){}throw error}
+   toast('Autosave · '+h.name+' · '+hh)
+  }else{if(typeof persistLocalBackup==='function')await persistLocalBackup();toast('Autosave (browser copy) · '+hh)}
+  if(unchanged()){cad2dLastAutoSig=sig;cad2dLastAutoTime=Date.now();log('AUTOSAVE '+hh)}
  }catch(err){console.warn('[CAD2D AUTOSAVE]',err)}
+ finally{cadSaveBusy=false}
 }
 setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
 /* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
