@@ -149,11 +149,11 @@ function traceRuns(mask,w,h,min){
  }
  scan(false);scan(true);return result;
 }
-async function traceFile(file){
+async function traceFile(file,source=null){
  const S=C.state;if(S.tool!=='select'||S.stage?.length)return C.toast('Terminá el comando actual antes de calcar.');
  let bitmap,doc;
  try{
-  if(/\.pdf$/i.test(file.name)){
+  if(source){bitmap=new Image();bitmap.src=source.src;await bitmap.decode();}else if(/\.pdf$/i.test(file.name)){
    const L=await pdfjs();doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
    const no=doc.numPages===1?1:Number(prompt('Página del PDF (1–'+doc.numPages+')','1'));
    if(!Number.isInteger(no)||no<1||no>doc.numPages)return;
@@ -165,10 +165,10 @@ async function traceFile(file){
   const ratio=Math.min(1,1800/Math.max(bitmap.width,bitmap.height)),w=Math.max(1,Math.round(bitmap.width*ratio)),h=Math.max(1,Math.round(bitmap.height*ratio));
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
   const pix=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
-  for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<145?1:0;
+  for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<205?1:0;
   const lines=traceRuns(mask,w,h,Math.max(18,Math.round(Math.max(w,h)*.025)));
   if(!lines.length||lines.length>4000)return C.toast('Calco: no se detectaron trazos útiles o hay demasiado ruido.');
-  const real=Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
+  const real=source?Math.abs(source.b.x-source.a.x)*C.U[S.unit]/1000:Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
   if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
@@ -181,9 +181,10 @@ async function traceFile(file){
    d.append(title,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
+  if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
   const k=real/w*1000/C.U[S.unit];if(!Number.isFinite(k)||k<=0)return C.toast('Unidad inválida.');
   const center=C.world?C.world({x:C.canvas.clientWidth/2,y:C.canvas.clientHeight/2}):C.P(0,0);
-  const Q=p=>C.P(center.x+(p[0]-w/2)*k,center.y+(h/2-p[1])*k);
+  const Q=source?p=>C.P(Math.min(source.a.x,source.b.x)+p[0]/w*Math.abs(source.b.x-source.a.x),Math.max(source.a.y,source.b.y)-p[1]/h*Math.abs(source.b.y-source.a.y)):p=>C.P(center.x+(p[0]-w/2)*k,center.y+(h/2-p[1])*k);
   const layerName='CALCO-REFERENCIA';let layer=S.layers.find(l=>l.name===layerName);
   if(layer&&(layer.locked||layer.visible===false))return C.toast('La capa CALCO-REFERENCIA está bloqueada u oculta.');
   C.saveHistory();if(!layer){layer={id:'calco_'+Date.now().toString(36),name:layerName,color:'#e5e5e5',visible:true,locked:false};S.layers.push(layer);}
@@ -191,11 +192,12 @@ async function traceFile(file){
   S.selected=ids;C.updateAll();C.zoomExtents?.();C.toast('CALCO: '+ids.length+' líneas editables. Verificá escala y corregí discontinuidades.');
  }catch(e){C.toast('Calco: '+(e?.message||e));}finally{bitmap?.close?.();doc?.destroy?.();}
 }
-function pickTrace(){const i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';i.onchange=()=>{if(i.files[0])traceFile(i.files[0])};i.click();}
+function pickTrace(){const S=C.state;const imgs=S.entities.filter(e=>e.type==='image'&&S.layers.find(l=>l.id===e.layer)?.visible!==false);const selected=imgs.filter(e=>S.selected.includes(e.id));const source=selected.length===1?selected[0]:selected.length===0&&imgs.length===1?imgs[0]:null;if(source){return traceFile(null,{...source,a:{...source.a},b:{...source.b}});}if(selected.length>1||imgs.length>1){C.toast('Seleccioná una sola imagen para CALCO.');return;}const i=document.createElement('input');i.type='file';i.accept='.jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf';i.onchange=()=>{if(i.files[0])traceFile(i.files[0])};i.click();}
 for(const k of ['CALCO','CALCAR','TRACEPLAN'])EXT.commands[k]=()=>pickTrace();
 const TRACE_ICON='<path d="M3 4h18v16H3z M6 16V8h7v4h5v4z"/><path d="M6 19h12" stroke-dasharray="2 2"/>';
 try{C.ribbon?.add('output','Calco',[{id:'outTracePlan',label:'Calco de planta · CALCO',icon:TRACE_ICON,run:()=>pickTrace()}]);C.ribbon?.rebuild()}catch(e){}
 window.CAD2D_TRACE_PLAN=traceFile;
+window.CAD2D_CALCO=pickTrace;
 
 window.CAD2D_PDF_IMPORT=importPdf;
 })();
