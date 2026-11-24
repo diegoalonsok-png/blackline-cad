@@ -2,7 +2,7 @@
 """Build static SVG thumbnails from the existing, approved CAD vector packs.
 No dependencies, no network, no changes to original source geometry.
 Run from repository root: python3 scripts/build_block_previews.py
-Output: assets/block-previews/v1 (served by Cloudflare Pages).
+Output: assets/block-previews/v1 (previews), assets/block-library/v1 (catalog and individual geometry).
 """
 import base64
 import json
@@ -13,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets/block-previews/v1"
+LIB = ROOT / "assets/block-library/v1"
 
 def rows_from_pack(path):
     text = path.read_text(encoding="utf-8")
@@ -41,10 +42,12 @@ def thumbnail(row):
 
 def main():
     files = sorted((ROOT/"assets").glob("cad2d-olimpiadas3-[0-9][0-9].js"))
-    if not files:
-        raise SystemExit("No source packs found")
+    if len(files) != 16:
+        raise SystemExit("Expected all 16 source packs; incomplete library not published")
     catalog, seen = [], set()
     OUT.mkdir(parents=True, exist_ok=True)
+    LIB.mkdir(parents=True, exist_ok=True)
+    library = []
     for path in files:
         for row in rows_from_pack(path):
             svg, meta = thumbnail(row)
@@ -55,9 +58,16 @@ def main():
             if not target.exists() or target.read_text(encoding="utf-8") != svg:
                 target.write_text(svg,encoding="utf-8")
             catalog.append(meta)
+            # Keep exact original encoded geometry, including its source identity.
+            block_id, source, name, cat, w, h, data, hash_ = row[:8]
+            payload = {"id":block_id,"source":source,"sourceHash":hash_,"data":data}
+            geometry = LIB / (block_id+".json")
+            geometry.write_text(json.dumps(payload,separators=(",",":"))+"\n",encoding="utf-8")
+            library.append({**meta,"source":source})
     output = {"version":1,"blocks":catalog}
     (OUT/"catalog.json").write_text(json.dumps(output,ensure_ascii=False,separators=(",",":"))+"\n",encoding="utf-8")
-    print(f"{len(catalog)} thumbnails in {OUT}")
+    (LIB/"catalog.json").write_text(json.dumps({"version":1,"parts":len(files),"blocks":library},ensure_ascii=False,separators=(",",":"))+"\n",encoding="utf-8")
+    print(f"{len(catalog)} thumbnails and independent CAD geometry files")
 
 if __name__ == "__main__":
     main()
