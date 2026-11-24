@@ -1,0 +1,43 @@
+name: Publish tested DWG WASM
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-dwg-wasm.yml']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Download verified build
+        uses: actions/download-artifact@v4
+        with:
+          name: blackline-dwg-wasm-tested
+          run-id: 45307603094
+          github-token: ${{ github.token }}
+          path: dwg-wasm/pkg
+      - name: Recheck conversion
+        run: |
+          node --input-type=module <<'JS'
+          import {readFile} from 'node:fs/promises';
+          import init,{dwg_to_dxf,dxf_to_dwg} from './dwg-wasm/pkg/blackline_dwg.js';
+          await init({module_or_path:await readFile('./dwg-wasm/pkg/blackline_dwg_bg.wasm')});
+          const source=await readFile('examples/scale-1to1-test.dxf');
+          const dwg=dxf_to_dwg(source);
+          const dxf=new TextDecoder().decode(dwg_to_dxf(dwg));
+          if(!/^AC10\d{2}/.test(new TextDecoder().decode(dwg.slice(0,6)))||!dxf.includes('LINE'))throw Error('Roundtrip failed');
+          JS
+      - name: Publish tested runtime to main
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f dwg-wasm/pkg/blackline_dwg.js dwg-wasm/pkg/blackline_dwg_bg.wasm dwg-wasm/pkg/package.json dwg-wasm/pkg/SOURCE-NOTICE.md dwg-wasm/pkg/Cargo.lock
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Publish verified local DWG DXF WebAssembly runtime"
+          git pull --rebase origin main
+          git push origin HEAD:main
