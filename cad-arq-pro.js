@@ -790,6 +790,28 @@ CORE.canvas.addEventListener('pointerdown',async e=>{
  const value=Number(raw.replace(',','.'));if(!(value>=1.2&&value<=20))return CORE.toast('Medida inválida / Invalid dimension');
  try{const plan=await solveArchitecture('',{...h.meta.brief,[h.axis]:value});applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
 },true);
+
+let arqCommandEpoch=0;
+EXT.cancelArchitectureCommand=()=>{
+ arqCommandEpoch++;
+ if(pick.active&&pick.mode==='arq-command'){pick.active=false;pick.points=[];CORE.schedule()}
+};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
+EXT.drawArchitectureCommand=async raw=>{
+ const epoch=++arqCommandEpoch;
+ CORE.toast('ARQASSIST · Calculando / Calculating…');
+ try{
+  const plan=await solveArchitecture(raw);
+  if(epoch!==arqCommandEpoch)return;
+  if(S().tool!=='select'||S().stage.length)return CORE.toast('ARQASSIST · command cancelled');
+  CORE.log('ARQASSIST · '+(plan.assumptions||[]).join(' · '));
+  startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{
+   if(epoch!==arqCommandEpoch)return;
+   try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD / entities drawn')}
+   catch(e){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}
+  },'arq-command');
+ }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}}
+};
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
