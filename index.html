@@ -2671,16 +2671,16 @@ let cadDrawEpoch=0;const cadChildCache=new WeakMap();
 const cadDefSigCache=new WeakMap();
 function cadDefSig(def){
  if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
- let sig;try{sig=(def.entities?.length||0)+'|'+JSON.stringify(def.entities)+'|'+JSON.stringify(def.base||null)}catch(e){sig=String(Math.random())}
+ let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.arq,def.libraryLayer0,def.name,def.dynamic,def.dyn])}catch(e){sig=String(Math.random())}
  cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
 }
 function cadBlockChildrenCached(ref){
  const def=state.blocks?.[ref.blockName];
  let sig;try{sig=JSON.stringify(ref)}catch(e){return blockChildren(ref)}
- const c=cadChildCache.get(ref),dsig=cadDefSig(def);
- if(c&&c.sig===sig&&c.def===def&&c.dsig===dsig&&(c.nested===0||c.epoch===cadDrawEpoch))return c.out;
+ const c=cadChildCache.get(ref),dsig=cadDefSig(def),unit=state.unit;
+ if(c&&c.sig===sig&&c.def===def&&c.dsig===dsig&&c.unit===unit&&(c.nested===0||c.epoch===cadDrawEpoch))return c.out;
  const out=blockChildren(ref),nested=def?.entities?.some?.(x=>x.type==='blockRef')?1:0;
- cadChildCache.set(ref,{sig,def,dsig,nested,epoch:cadDrawEpoch,out});return out;
+ cadChildCache.set(ref,{sig,def,dsig,unit,nested,epoch:cadDrawEpoch,out});return out;
 }
 function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
