@@ -774,7 +774,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-detail-v1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-compact-v1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -866,6 +866,7 @@ EXT.drawArchitectureCommand=async raw=>{
   if(epoch!==arqCommandEpoch)return;
   if(S().tool!=='select'||S().stage.length)return CORE.toast('ARQASSIST · command cancelled');
   CORE.log('ARQASSIST · '+(plan.assumptions||[]).join(' · '));
+  if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;
   startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{
    if(epoch!==arqCommandEpoch)return;
    try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD / entities drawn')}
