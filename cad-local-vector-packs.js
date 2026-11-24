@@ -97,13 +97,128 @@ async function importFile(file){
   return {added,duplicates:rows.length-added,invalid:pack.rows.length-rows.length};
  }finally{busy=false;}
 }
-function choose(){
- if(busy)return;
- const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
- input.addEventListener('change',()=>{if(input.files?.[0])importFile(input.files[0]).catch(e=>say('Importación DXF: '+e.message));},{once:true});
- input.click();
+
+const METRES={1:.0254,2:.3048,4:.001,5:.01,6:1,7:1000,8:2.54e-8,9:2.54e-5,10:.9144,11:1e-10,12:1e-9,13:1e-6,14:.1};
+function categoryFor(file){
+ const s=(file.webkitRelativePath||file.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const groups=[[/abertura|puerta|ventana|carpinter/,'Aberturas'],[/bano|bacha|bidet|inodoro|sanitari|lavatorio|ducha|banera/,'Sanitarios'],[/cocina|anafe|horno|heladera/,'Cocinas'],[/ascensor/,'Ascensores'],[/arbol|vegetacion|planta vegetal/,'Vegetación'],[/animal/,'Animales'],[/gym|deport/,'Deportes'],[/avion|barco|auto|camion|vehicul/,'Vehículos'],[/escalera/,'Escaleras'],[/mueble|silla|mesa|sofa/,'Mobiliario']];
+ return groups.find(x=>x[0].test(s))?.[1]||'Importados';
 }
-window.CAD2D_LOCAL_VECTOR_PACKS=Object.freeze({choose,importFile,restore});
+function vectorize(entities){
+ const lines=[],add=(a,b)=>{
+  if(!a||!b||![a.x,a.y,b.x,b.y].every(Number.isFinite))throw Error('Coordenadas inválidas');
+  if(a.x===b.x&&a.y===b.y)return;
+  if(lines.length>=10000)throw Error('Más de 10.000 segmentos');
+  lines.push([a.x,a.y,b.x,b.y]);
+ };
+ const poly=(p,closed)=>{for(let i=1;i<p.length;i++)add(p[i-1],p[i]);if(closed&&p.length>2)add(p.at(-1),p[0])};
+ for(const e of entities){
+  if(e.type==='line')add(e.a,e.b);
+  else if(e.type==='polyline')poly(e.pts,e.closed);
+  else if(e.type==='rect')poly([e.a,{x:e.b.x,y:e.a.y},e.b,{x:e.a.x,y:e.b.y}],true);
+  else if(['circle','arc','ellipse'].includes(e.type)){
+   const tau=2*Math.PI, a=e.type==='arc'?e.a0:0;
+   const span=e.type==='arc'?((e.a1-a)%tau+tau)%tau||tau:tau;
+   const rx=e.rx||e.r,ry=e.ry||e.r,rot=e.rotation||0;
+   if(!(rx>0&&ry>0&&Number.isFinite(span)))throw Error('Curva inválida');
+   const n=Math.max(8,Math.ceil(96*span/tau)),pts=[];
+   for(let i=0;i<=n;i++){const t=a+span*i/n,x=rx*Math.cos(t),y=ry*Math.sin(t);pts.push({x:e.c.x+x*Math.cos(rot)-y*Math.sin(rot),y:e.c.y+x*Math.sin(rot)+y*Math.cos(rot)})}
+   poly(pts,false);
+  }else throw Error('Geometría no compatible: '+e.type);
+ }
+ if(lines.length<8)throw Error('Bloque demasiado simple (menos de 8 segmentos)');
+ let x=Infinity,y=Infinity,X=-Infinity,Y=-Infinity;
+ for(const [a,b,c,d] of lines){x=Math.min(x,a,c);y=Math.min(y,b,d);X=Math.max(X,a,c);Y=Math.max(Y,b,d)}
+ if(!(X>x&&Y>y))throw Error('Bloque sin superficie 2D');
+ return {lines,x,y,dx:X-x,dy:Y-y};
+}
+async function hexHash(bytes){
+ const digest=await crypto.subtle.digest('SHA-256',bytes);
+ return Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+}
+async function fileRow(file,unknownUnit){
+ let bytes=await file.arrayBuffer();
+ if(/\.dwg$/i.test(file.name)){
+  // Strict conversion: do not silently accept an incomplete AEC result.
+  bytes=await new Promise((resolve,reject)=>{
+   const worker=new Worker(new URL('cad-dwg-local-worker.js?v=20261123-wasm-v4',document.baseURI),{type:'module'});
+   const timer=setTimeout(()=>finish('Tiempo límite DWG'),180000);
+   let done=false;
+   function finish(err,out){if(done)return;done=true;clearTimeout(timer);worker.terminate();err?reject(Error(err)):resolve(out)}
+   worker.onmessage=e=>finish(e.data.error,e.data.output);
+   worker.onerror=e=>finish(e.message||'Error del motor DWG');
+   try{worker.postMessage({bytes,direction:'dwg-dxf',allowPartial:false},[bytes])}catch(e){finish(e.message)}
+  });
+ }
+ if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('Archivo vacío');
+ const parser=globalThis.CAD2DDxfParser;if(!parser)throw Error('Motor DXF no disponible');
+ const parsed=parser.parse(new TextDecoder('windows-1252').decode(bytes),{explodeInserts:true});
+ if(parsed.warnings?.length)throw Error('DXF incompleto: '+parsed.warnings.join(', ').slice(0,200));
+ const g=vectorize(parsed.entities||[]),scale=METRES[parsed.unitCode]||(!parsed.unitCode?unknownUnit:0);
+ if(!scale)throw Error('Unidad no reconocida; seleccionar unidad para DXF sin escala');
+ const w=+(g.dx*scale).toPrecision(7),d=+(g.dy*scale).toPrecision(7);
+ if(!(w>=.001&&d>=.001&&w<=100&&d<=100))throw Error('Dimensiones fuera de rango: '+w+' × '+d+' m');
+ const q=(v,o,l)=>Math.max(0,Math.min(65535,Math.round((v-o)/l*65535)));
+ const normalized=g.lines.map(([a,b,c,d])=>{
+  const p=[q(a,g.x,g.dx),q(b,g.y,g.dy)],r=[q(c,g.x,g.dx),q(d,g.y,g.dy)];
+  return p[0]>r[0]||(p[0]===r[0]&&p[1]>r[1])?[...r,...p]:[...p,...r];
+ }).filter(a=>a[0]!==a[2]||a[1]!==a[3]);
+ normalized.sort((a,b)=>a[0]-b[0]||a[1]-b[1]||a[2]-b[2]||a[3]-b[3]);
+ const unique=normalized.filter((a,i)=>!i||a.some((v,j)=>v!==normalized[i-1][j]));
+ if(unique.length<8)throw Error('Bloque demasiado simple después de quitar duplicados');
+ const raw=new Uint8Array(unique.length*8),view=new DataView(raw.buffer);
+ unique.forEach((a,i)=>a.forEach((v,j)=>view.setUint16(i*8+j*2,v,true)));
+ let binary='';for(let i=0;i<raw.length;i+=8192)binary+=String.fromCharCode(...raw.subarray(i,i+8192));
+ const hash=(await hexHash(new TextEncoder().encode(w+'|'+d+'|'+btoa(binary)))).slice(0,24);
+ const name=safe(file.name.replace(/\.(dwg|dxf)$/i,'').replace(/__[a-f0-9]{12}$/i,'').replace(/_/g,' '))||'Bloque';
+ return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,categoryFor(file),w,d,btoa(binary),hash,0];
+}
+async function importDrawings(files,unknownUnit=0,onProgress=()=>{},shouldStop=()=>false){
+ if(busy)throw Error('Ya hay una importación en curso');
+ busy=true;let added=0,duplicates=0,failed=[],processed=0;
+ try{
+  await restore();await loadExisting();
+  for(const file of files){
+   if(shouldStop())break;
+   try{
+    if(!/\.(dwg|dxf)$/i.test(file.name)||!file.size||file.size>64*1024*1024)throw Error('Archivo no compatible o mayor a 64 MiB');
+    const row=validate(await fileRow(file,unknownUnit));
+    if(!row)throw Error('Bloque vectorial no válido');
+    const fresh=filterNew([row]);
+    if(fresh.length){await persist(fresh);added+=register(fresh)}else duplicates++;
+   }catch(e){failed.push({file:file.name,error:String(e.message||e)})}
+   processed++;onProgress({processed,total:files.length,added,duplicates,failed:failed.length,file:file.name});
+  }
+  return {processed,added,duplicates,failed};
+ }finally{busy=false;refresh()}
+}
+function openDrawingImport(){
+ if(busy)return;
+ const pane=document.createElement('dialog');
+ pane.style.cssText='background:#23313b;color:#f2f5f6;border:1px solid #657985;border-radius:10px;padding:16px;width:min(480px,90vw)';
+ pane.innerHTML='<strong>Importar bloques DWG / DXF</strong><p>Los dibujos se convierten localmente. Los bloques con errores o geometría incompleta no se incorporan. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".dwg,.dxf,.json"></label><p><label>Unidad si el dibujo no la declara: <select><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
+ document.body.appendChild(pane);
+ const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input'),unit=pane.querySelector('select');
+ let active=false,stop=false;
+ close.onclick=()=>{if(active){stop=true;close.disabled=true;status.textContent+='\nDeteniendo después del archivo actual…'}else pane.close()};
+ pane.addEventListener('cancel',e=>{if(active){e.preventDefault();stop=true}});
+ pane.addEventListener('close',()=>pane.remove(),{once:true});
+ start.onclick=async()=>{
+  const files=Array.from(input.files||[]);if(!files.length)return;
+  active=true;stop=false;start.disabled=input.disabled=unit.disabled=true;close.textContent='Detener';
+  try{
+   if(files.length===1&&/\.json$/i.test(files[0].name)){const r=await importFile(files[0]);status.textContent=r?JSON.stringify(r):'Importación no iniciada';return}
+   if(files.some(f=>/\.json$/i.test(f.name)))throw Error('Importá cada paquete JSON por separado');
+   const r=await importDrawings(files,Number(unit.value),p=>{status.textContent=p.processed+'/'+p.total+' · '+p.added+' nuevos · '+p.duplicates+' duplicados · '+p.failed+' rechazados\n'+p.file},()=>stop);
+   status.textContent=r.processed+'/'+files.length+' procesados · '+r.added+' nuevos · '+r.duplicates+' duplicados · '+r.failed.length+' rechazados\n'+r.failed.slice(0,20).map(x=>x.file+': '+x.error).join('\n')+(r.failed.length>20?'\nSe muestran los primeros 20 errores.':'');
+  }catch(e){status.textContent=String(e.message||e)}
+  finally{active=false;start.disabled=input.disabled=unit.disabled=close.disabled=false;close.textContent='Cerrar'}
+ };
+ pane.showModal();
+}
+
+function choose(){openDrawingImport()}
+window.CAD2D_LOCAL_VECTOR_PACKS=Object.freeze({choose,importFile,restore,importDrawings});
 const ext=window.CAD2D_EXTENSIONS;if(ext?.commands)ext.commands.IMPORTBLOCKPACK=choose;
 restore();
 })();
