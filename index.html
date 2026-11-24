@@ -4825,27 +4825,40 @@ function arraySelected(){
 
 /* Independent 2D CAD quality tools: non-destructive when validation fails. */
 function cadGeometryKey(e){
- const n=v=>Number(v.toFixed(7)),pt=p=>n(p.x)+','+n(p.y);
- if(e.type==='line'){const a=pt(e.a),b=pt(e.b);return 'line:'+([a,b].sort().join('|'))}
- if(e.type==='circle')return 'circle:'+pt(e.c)+'|'+n(e.r);
- if(e.type==='rect'){const x=[e.a.x,e.b.x].sort((a,b)=>a-b),y=[e.a.y,e.b.y].sort((a,b)=>a-b);return 'rect:'+x.map(n).join(',')+'|'+y.map(n).join(',')}
- if(e.type==='polyline'){const pts=e.pts.map(pt),reversed=[...pts].reverse();const left=pts.join('|'),right=reversed.join('|');return 'polyline:'+String(!!e.closed)+':'+(left<right?left:right)}
- return null;
+ const pt=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y)?JSON.stringify([p.x,p.y]):null;
+ // Exact duplicates only. Never round real coordinates or discard architectural,
+ // association or custom metadata. Keep directional polylines intact.
+ const common=['id','type','layer','color','width','linetype','lineweight','ltscale','cadHidden'];
+ const geometry={line:['a','b'],circle:['c','r'],rect:['a','b'],polyline:['pts','closed','pwidth']};
+ const allowed=geometry[e.type];if(!allowed||e.cadHidden||Object.keys(e).some(k=>!common.includes(k)&&!allowed.includes(k)))return null;
+ let shape;
+ if(e.type==='line'){const a=pt(e.a),b=pt(e.b);if(!a||!b)return null;shape=[a,b].sort();}
+ if(e.type==='circle'){const c=pt(e.c);if(!c||!(e.r>0)||!Number.isFinite(e.r))return null;shape=[c,e.r];}
+ if(e.type==='rect'){if(!pt(e.a)||!pt(e.b))return null;shape=[[e.a.x,e.b.x].sort((a,b)=>a-b),[e.a.y,e.b.y].sort((a,b)=>a-b)];}
+ if(e.type==='polyline'){if(!Array.isArray(e.pts)||e.pts.length<2||e.pts.some(p=>!pt(p)))return null;shape=[e.pts.map(pt),!!e.closed,e.pwidth??null];}
+ return JSON.stringify([e.type,shape,common.slice(2).map(k=>e[k]??null)]);
+}
+function cadDuplicateIds(entities,targets,editable){
+ const seen=new Set(),remove=new Set(),protectedIds=new Set();
+ for(const e of entities){
+  if(e.assoc)for(const v of Object.values(e.assoc))if(v&&typeof v==='object'&&v.id!=null)protectedIds.add(v.id);
+  for(const k of ['autoOpeningRef','autoOpeningJambRef','hostId','wallId','sourceId','refId'])if(e[k]!=null)protectedIds.add(e[k]);
+ }
+ for(const e of entities){
+  if(targets&&!targets.has(e.id)||!editable(e))continue;
+  const key=cadGeometryKey(e);if(key===null)continue;
+  if(seen.has(key)&&!protectedIds.has(e.id))remove.add(e.id);else seen.add(key);
+ }
+ return remove;
 }
 function cadOverkill(){
- const seen=new Set(),remove=new Set(),targets=state.selected.length?new Set(state.selected):null;
- for(const e of state.entities){
-  if(targets&&!targets.has(e.id))continue;
-  const l=layerFor(e);if(!l.visible||l.locked)continue;
-  const geom=cadGeometryKey(e);if(!geom)continue;
-  // Duplication is only safe within the same layer and explicit properties.
-  const key=geom+'|'+e.layer+'|'+(e.color||'')+'|'+(e.width||'')+'|'+(e.linetype||'');
-  if(seen.has(key))remove.add(e.id);else seen.add(key);
- }
- if(!remove.size)return toast('OVERKILL: no identical geometry to remove');
+ const targets=state.selected.length?new Set(state.selected):null;
+ const remove=cadDuplicateIds(state.entities,targets,e=>{const l=layerFor(e);return l.visible&&!l.locked});
+ if(!remove.size)return toast('OVERKILL: no hay duplicados exactos seguros para eliminar');
+ if(!window.confirm('OVERKILL: eliminar '+remove.size+' duplicados exactos '+(targets?'de la selección':'de capas visibles y editables')+'? Se conservan los objetos arquitectónicos, cotas asociadas y diferencias de propiedades. Ctrl+Z deshace.'))return;
  saveHistory();state.entities=state.entities.filter(e=>!remove.has(e.id));
  state.selected=state.selected.filter(id=>!remove.has(id));updateAll();
- toast('OVERKILL: '+remove.size+' duplicate objects removed');log('OVERKILL');
+ toast('OVERKILL: '+remove.size+' duplicados eliminados');log('OVERKILL');
 }
 
 /* CAD command expansion: line split, 2-point alignment, object listing and quick selection.
