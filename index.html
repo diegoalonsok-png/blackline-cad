@@ -8311,7 +8311,7 @@ async function cadXrefAttachFile(file,handle){
  if(state.blocks['REFX:'+name]&&!window.confirm('Ya hay una referencia «'+name+'». ¿Reemplazarla con este archivo?'))return;
  let parsed;try{toast('Leyendo '+file.name+'…');parsed=await cadXrefRead(file)}catch(e){return alert('No se pudo vincular '+file.name+': '+e.message)}
  saveHistory();
- const key=cadXrefApply(name,parsed,file);if(handle)cadXrefHandles.set(key,handle);
+ const key=cadXrefApply(name,parsed,file);if(handle)cadXrefHandles.set(key,handle);else cadXrefHandles.delete(key);
  if(!state.entities.some(e=>e.type==='blockRef'&&e.blockName===key)){
   const layer=(state.layers.find(l=>l.name==='XREF')||(state.layers.push({id:'xref',name:'XREF',color:'#9aa7b0',visible:true,locked:false,width:.18}),state.layers.at(-1))).id;
   state.entities.push({id:state.nextId++,type:'blockRef',blockName:key,p:P(0,0),scale:1,rotation:0,layer,xref:true});
@@ -8324,16 +8324,22 @@ async function cadXrefReload(only,quiet){
  if(!keys.length){if(!quiet)toast('No hay referencias externas en el dibujo · REFX para vincular una');return}
  let n=0;
  for(const key of keys){
-  const def=state.blocks[key];let file=null,h=cadXrefHandles.get(key);
+  const def=state.blocks[key];if(!def?.xref)continue;
+  let file=null,h=cadXrefHandles.get(key);
   if(def.xref?.cloudId){try{if(await cadXrefLoadCloud(def.xref.cloudId,key.slice(5),true))n++}catch(e){if(!quiet)toast('No se pudo recargar '+key.slice(5)+': '+e.message)}continue}
   try{
    if(h){if((await h.queryPermission?.({mode:'read'}))==='prompt'&&!quiet)await h.requestPermission({mode:'read'});file=await h.getFile()}
    else if(!quiet){if(!window.confirm('Para recargar «'+key.slice(5)+'» elegí otra vez el archivo '+def.xref.file))continue;
-    if(window.showOpenFilePicker){[h]=await window.showOpenFilePicker();cadXrefHandles.set(key,h);file=await h.getFile()}
+    if(window.showOpenFilePicker){[h]=await window.showOpenFilePicker({types:[{description:'Planos DXF o DWG',accept:{'application/dxf':['.dxf'],'application/acad':['.dwg']}}]});file=await h.getFile()}
     else file=await new Promise(ok=>{const i=document.createElement('input');i.type='file';i.accept='.dxf,.dwg';i.onchange=()=>ok(i.files[0]);i.click()})}
    if(!file)continue;
    if(quiet&&file.lastModified&&file.lastModified<=def.xref.lastModified)continue;
-   const parsed=await cadXrefRead(file);saveHistory();cadXrefApply(key.slice(5),parsed,file);n++;
+   const parsed=await cadXrefRead(file);
+   // A detach, bind, replacement or drawing switch during file I/O invalidates this reload.
+   if(state.blocks[key]!==def)continue;
+   saveHistory();cadXrefApply(key.slice(5),parsed,file);
+   if(h)cadXrefHandles.set(key,h);else cadXrefHandles.delete(key);
+   n++;
   }catch(e){if(!quiet)toast('No se pudo recargar '+key.slice(5)+': '+e.message)}
  }
  if(n){renderLayers?.();updateAll();toast(n+' referencia(s) externa(s) actualizada(s)')}else if(!quiet)toast('Las referencias ya estaban al día');
@@ -8361,7 +8367,11 @@ const cadApiBase=()=>{try{return new URL((window.CAD2D_AUTH_CONFIG||{}).statusUr
 async function cadApi(path){const b=cadApiBase();if(!b)throw Error('la nube no está configurada');const r=await fetch(b+path,{credentials:'include',headers:{accept:'application/json'}});const j=await r.json().catch(()=>({}));if(r.status===401)throw Error('iniciá sesión (Account) para usar la nube');if(!r.ok)throw Error(j.error||('HTTP '+r.status));return j}
 function cadFlattenProject(proj){const saved=state.blocks;state.blocks=proj.blocks||{};try{const out=[];const walk=(list,d)=>{for(const e of list||[]){if(e.type==='blockRef'){if(d<8)walk(blockChildren(e),d+1)}else out.push(e)}};walk(proj.entities,0);return out}finally{state.blocks=saved}}
 async function cadXrefLoadCloud(id,name,isReload){
- const j=await cadApi('/api/xref/projects/'+encodeURIComponent(id));let proj;try{proj=JSON.parse(j.data)}catch(e){throw Error('proyecto ilegible')}
+ const expected=isReload?state.blocks['REFX:'+cadXrefSafe(name)]:null;
+ if(isReload&&(!expected?.xref||expected.xref.cloudId!==id))return false;
+ const j=await cadApi('/api/xref/projects/'+encodeURIComponent(id));
+ if(isReload&&state.blocks['REFX:'+cadXrefSafe(name)]!==expected)return false;
+ let proj;try{proj=JSON.parse(j.data)}catch(e){throw Error('proyecto ilegible')}
  const parsed={entities:cadFlattenProject(proj),layers:proj.layers||[],unitCode:{in:1,ft:2,mm:4,cm:5,m:6}[proj.unit]||0};
  if(!parsed.entities.length)throw Error('el proyecto no tiene objetos');
  const nm=cadXrefSafe(name||j.name);saveHistory();
