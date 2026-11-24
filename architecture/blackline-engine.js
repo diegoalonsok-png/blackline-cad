@@ -590,6 +590,34 @@ function doubleSuiteCorridor(plan,passage){
  p.warning+=' Doble crujía: verificar salidas de emergencia, accesibilidad y ventilación.';
  return p;
 }
+// Individual rear cubicles; one clear common aisle, independent native doors.
+function collectiveCabins(spec){
+ const {width:w,depth:d,count:n,fixtures}=spec,t=.15,door=.7,cellW=1.1,cellD=1.65;
+ const cells=fixtures.filter(k=>k==='toilet'||k==='shower'),other=fixtures.filter(k=>k!=='toilet'&&k!=='shower');
+ if(!cells.length||n<1||n>10||w>20||d>20||d<cellD+2.2||cells.length*(cellW+t)-t>w+1e-7)throw Error('Cabinas: aumentá el ancho o profundidad para alojar todas las cabinas y la circulación.');
+ const p=solve({...spec,fixtures:[]});
+ p.blocks=[];p.brief=spec;
+ for(let i=0;i<n;i++){
+  const x=t+i*(w+t),y=t,back=y+d,front=back-cellD-t/2,pre='v0-cab'+i+'-';
+  const wall=(id,a,b)=>p.walls.push({id:pre+id,a,b,thickness:t,layer:'WALLS',join:'native'});
+  const put=(key,xx,yy,rot=0)=>{const [catalogId,bw,bd]=C[key],fw=rot%180?bd:bw,fd=rot%180?bw:bd;const [ox,oy]=({0:[0,0],90:[fw,0],180:[fw,fd],270:[0,fd]})[rot];p.blocks.push({catalogId,role:key,point:[xx+ox,yy+oy],rotation:rot,scale:1,layer:'FIXTURES',envelope:[xx,yy,fw,fd],nominalSize:[bw,bd]});};
+  for(let j=0;j<cells.length;j++){
+   const a=x-t/2+j*(cellW+t),b=a+cellW+t,host='front'+j;
+   if(b>x+w+t/2+1e-7)throw Error('Cabinas fuera del recinto.');
+   wall(host,[a,front],[b,front]);
+   if(b<x+w+t/2-1e-7)wall('side'+j,[b,front],[b,back+t/2]);
+   p.openings.push({host:pre+host,kind:'swing-door',offset:(cellW+t)/2,width:door,layer:'OPENINGS'});
+   const k=cells[j],bw=C[k][1],bd=C[k][2];put(k,a+t/2+(cellW-bw)/2,back-bd,180);
+  }
+  // Keep the central entry door zone and a 1.2 m aisle clear.
+  const low=d-cellD-t-1.2;
+  if(other.length){const lay=arrange(w,low,other,[R((w-spec.door)/2,0,spec.door,spec.door)],0);
+   for(const o of lay)put(o.key,x+o.r.x,y+o.r.y,o.rot);
+  }
+ }
+ p.status='approximate';p.warning='Cabinas individuales preliminares de 1,10 × 1,65 m; puertas y tabiques nativos. Verificar giros, privacidad, accesibilidad y normativa.';
+ p.assumptions.push(p.warning);return p;
+}
 function run(raw){
  const {text,corrections}=correctText(internationalText(raw));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
@@ -597,7 +625,8 @@ function run(raw){
  const collective=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?(?:(\d+)\s+)?(?:banos?|vestuarios?)\s+(?:colectivos?\s+)?(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)\s*(?:m|mts|metros)?\s+con\s+(.+)$/);
  if(collective){
   const names={ducha:'shower',duchas:'shower',inodoro:'toilet',inodoros:'toilet',lavatorio:'basin',lavatorios:'basin',bidet:'bidet',bidets:'bidet'};
-  const tail=collective[4].replace(/\s+cada uno\s*$/,'').trim();
+  const cabins=/\b(?:en cabinas|con cabinas)(?: individuales)?\b/.test(collective[4]);
+  const tail=collective[4].replace(/\s+(?:en|con) cabinas(?: individuales)?\s*$/,'').replace(/\s+cada uno\s*$/,'').trim();
   const pieces=tail.split(/\s*(?:,|\+|\by\b)\s*/);
   const fixtures=[];
   let quantified=true;
@@ -610,6 +639,7 @@ function run(raw){
   if(quantified&&fixtures.length){
    if(fixtures.length>12)throw Error('Hasta doce artefactos por baño colectivo.');
    const spec={kind:'bathroom',count:Number(collective[1]||1),width:num(collective[2]),depth:num(collective[3]),wall:.15,door:.9,window:1.2,fixtures,assumptions:['Baño colectivo preliminar: cantidades explícitas de artefactos respetadas.','Sin cabinas, bancos ni lockers; comprobar privacidad, circulación y normativa.']};
+   if(cabins){spec.assumptions=['Cantidades explícitas de artefactos respetadas. Cabinas de medida inicial.'];return collectiveCabins(spec);}
    const p=solve(spec);p.status='approximate';p.warning=spec.assumptions.join(' ');return p;
   }
  }
