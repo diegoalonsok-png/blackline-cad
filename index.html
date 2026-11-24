@@ -1435,7 +1435,18 @@ function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente pun
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-300);try{window.dispatchEvent(new CustomEvent('cad2d-log'))}catch(e){};$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
-function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}function layerFor(e){const l=state.layers.find(l=>l.id===e.layer)||state.layers[0];return l?.frozen?{...l,visible:false}:l}
+function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}var cadScopedLayerLookup=null;
+function cadWithLayerLookup(fn){
+ const previous=cadScopedLayerLookup,layers=state.layers,map=new Map();
+ for(const l of layers)if(!map.has(l.id))map.set(l.id,l);
+ cadScopedLayerLookup={layers,length:layers.length,map};
+ try{return fn()}finally{cadScopedLayerLookup=previous}
+}
+function layerFor(e){
+ const c=cadScopedLayerLookup,layers=state.layers;
+ const l=(c&&c.layers===layers&&c.length===layers.length?c.map.get(e.layer):layers.find(l=>l.id===e.layer))||layers[0];
+ return l?.frozen?{...l,visible:false}:l;
+}
 // Capa de cotas: usa DIMENSIONS/COTAS si existe; si el dibujo (p. ej. un DXF importado) no la tiene, la crea.
 function cadDimLayerId(){
  let l=state.layers.find(x=>x.id==='dimensions')||state.layers.find(x=>/^(DIMENSIONS?|COTAS?|A-ANNO-DIMS|DIM)$/i.test(x.name));
@@ -2162,7 +2173,8 @@ function cadDrawArqPoche(visibleForPaint){
  ctx.restore();
 }
 
-function draw(){drawPending=false;const perfStart=performance.now();let painted=0;
+function draw(){return cadWithLayerLookup(cadDrawFrame)}
+function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let painted=0;
  if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  const selectedIds=new Set(state.selected);
@@ -3852,7 +3864,8 @@ function cadOsnapEnabled(kind){return cadOneShotOsnap?kind===cadOneShotOsnap:cad
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
 function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
 
-function snapPoint(p,gripBase=null){
+function snapPoint(p,gripBase=null){return cadWithLayerLookup(()=>cadSnapPointIndexed(p,gripBase))}
+function cadSnapPointIndexed(p,gripBase){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
 // Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
 // the drawing endpoint, not which geometry the cursor may inspect for tracking.
@@ -3984,7 +3997,8 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
-function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
+function pick(p){return cadWithLayerLookup(()=>cadPickIndexed(p))}
+function cadPickIndexed(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
   if(!s.length){s.push(P(p.x,p.y));prompt();schedule();return}
@@ -6320,7 +6334,8 @@ function boundsEntity(e){if(cadIsMText(e)){return cadBoundsUnion(cadMTextLines(e
   const box=cadBoundsUnion(kids)||{minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
   if(hit&&hit.out===kids)hit.box=box;return {...box};
  }if(e.type==='dimension'){return cadBoundsUnion(dimensionPrimitives(e))}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse'){const a=Number(e.rotation)||0,co=Math.cos(a),si=Math.sin(a),dx=Math.hypot(e.rx*co,e.ry*si),dy=Math.hypot(e.rx*si,e.ry*co);pts.push(P(e.c.x-dx,e.c.y-dy),P(e.c.x+dx,e.c.y+dy));}if(e.type==='hatch')pts=e.pts||[];if(e.type==='text'){if(e.textPath==='circle'){const r=Number(e.textRadius)||0;pts.push(P(e.p.x-r-e.h,e.p.y-r-e.h),P(e.p.x+r+e.h,e.p.y+r+e.h))}else pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));}if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
-function getBounds(entities=state.entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
+function getBounds(entities=state.entities){return cadWithLayerLookup(()=>cadGetBoundsIndexed(entities))}
+function cadGetBoundsIndexed(entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
 function zoomWindowToPixels(a,b){
  const w=wrap.clientWidth,h=wrap.clientHeight,x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y);
  const dx=x1-x0,dy=y1-y0;if(dx<8||dy<8)return false;
