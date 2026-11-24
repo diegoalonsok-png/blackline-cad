@@ -7565,6 +7565,7 @@ function cadRecoverDxfTail(input){
  if(raw.length>64*1024*1024||raw.includes('\0')||/^AutoCAD Binary DXF/i.test(raw))throw Error('DXF binario o superior a 64 MiB');
  let offset=0,section='',pending=false,completeEntities=false,lastClosed=0,lastEntity=-1,compound=-1,lastType='',sequence=false,eof=0,invalid=false;
  const warnings=[];
+ const withNewline=text=>text.endsWith('\n')?text:text+'\n';
  function line(){if(offset>=raw.length)return null;const end=raw.indexOf('\n',offset),start=offset;offset=end<0?raw.length:end+1;return {value:raw.slice(start,end<0?raw.length:end),start}}
  while(offset<raw.length){
   const a=line(),b=line();
@@ -7577,7 +7578,7 @@ function cadRecoverDxfTail(input){
   if(key===0&&v==='EOF'){if(section||pending){invalid=true;break}eof=offset;break}
   if(section==='ENTITIES'){
    if(key===0){
-    if(v==='POLYLINE'||v==='INSERT'){compound=a.start;sequence=v==='POLYLINE'}
+    if(v==='POLYLINE'||v==='INSERT'){if(sequence){invalid=true;break}compound=a.start;sequence=v==='POLYLINE'}
     else if(v==='VERTEX'||v==='ATTRIB'){if(compound<0){invalid=true;break}sequence=true}
     else if(v==='SEQEND'){if(compound<0){invalid=true;break}sequence=false;compound=-1}
     else {if(sequence){invalid=true;break}compound=-1}
@@ -7589,11 +7590,11 @@ function cadRecoverDxfTail(input){
  if(eof){
   if(!completeEntities)throw Error('No se encontró una sección ENTITIES completa');
   if(raw.slice(eof).trim())warnings.push('Se omitieron datos posteriores a EOF (incluidos metadatos nativos, si existían).');
-  return {text:raw.slice(0,eof).trimEnd()+'\n',warnings};
+  return {text:withNewline(raw.slice(0,eof)),warnings};
  }
  if(completeEntities&&lastClosed){
   warnings.push('Se conservaron las secciones completas; se descartó la cola incompleta y se añadió EOF.');
-  return {text:raw.slice(0,lastClosed).trimEnd()+'\n0\nEOF\n',warnings};
+  return {text:withNewline(raw.slice(0,lastClosed))+'0\nEOF\n',warnings};
  }
  if(section==='ENTITIES'&&lastEntity>=0){
   // The final record may be truncated even if the last group is paired.
@@ -7601,7 +7602,7 @@ function cadRecoverDxfTail(input){
   const cut=compound>=0?compound:lastEntity;
   if(lastType==='SEQEND')throw Error('Secuencia final sin delimitador seguro; probá COPIAS.');
   warnings.push('Se descartó el último registro o conjunto incompleto de ENTITIES; se añadieron ENDSEC y EOF.');
-  return {text:raw.slice(0,cut).trimEnd()+'\n0\nENDSEC\n0\nEOF\n',warnings};
+  return {text:withNewline(raw.slice(0,cut))+'0\nENDSEC\n0\nEOF\n',warnings};
  }
  throw Error('No hay una sección de geometría recuperable con seguridad. Probá COPIAS.');
 }
@@ -7632,7 +7633,7 @@ function cadRecoverDialog(){
    const parsed=await cadParseDXFWorker(repaired.text,readDimensionStyle());
    if(!parsed.entities.length&&!Object.keys(parsed.blocks||{}).length)throw Error('No se recuperaron entidades ni definiciones de bloque compatibles');
    let unit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode];
-   if(!unit){const v=window.prompt('Unidades ORIGINALES del dibujo recuperado (mm, cm, m, in, ft):','mm');if(v===null)throw Error('Recuperación cancelada');unit=v.trim().toLowerCase();if(!U[unit])throw Error('Unidad inválida')}
+   if(!unit){const v=window.prompt('Unidades ORIGINALES del dibujo recuperado (mm, cm, m, in, ft):','mm');if(v===null)throw Error('Recuperación cancelada');unit=v.trim().toLowerCase();if(!['mm','cm','m','in','ft'].includes(unit))throw Error('Unidad inválida')}
    const layers=parsed.layers.length?parsed.layers:[{id:'0',name:'0',visible:true,locked:false,color:'#c6cbd1',width:.25,linetype:'CONTINUOUS'}];
    const filename=cadCleanDrawingName(f.name.replace(/\.[^.]+$/,''))+'-RECUPERADO';
    const nextId=parsed.entities.reduce((n,e)=>Math.max(n,e.id||0),0)+1;
