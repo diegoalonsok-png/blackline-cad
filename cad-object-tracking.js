@@ -54,5 +54,20 @@
   }
   return {point:best.point,rays:[best],intersection:false};
  }
- return Object.freeze({project,acquire,projectRays});
+ // ORTHO is a hard constraint: OTRACK can change only the free coordinate.
+ function projectOrtho(pointer,base,anchors,scale,tolerancePixels=10,axis){
+  if(!valid(pointer)||!valid(base)||!(scale>0))return null;
+  const h=axis?axis==='h':Math.abs(pointer.x-base.x)>=Math.abs(pointer.y-base.y);
+  const limit=tolerancePixels/scale,coord=h?'x':'y';
+  const point=h?{x:pointer.x,y:base.y}:{x:base.x,y:pointer.y};
+  let best=null,distance=limit;
+  for(const a of anchors||[]){
+   if(!valid(a))continue;
+   const d=Math.abs(pointer[coord]-a[coord]);
+   if(d<distance){distance=d;best=a}
+  }
+  if(best)point[coord]=best[coord];
+  return {point,axis:h?'h':'v',vertical:h&&best?{x:best.x,y:best.y}:null,horizontal:!h&&best?{x:best.x,y:best.y}:null,intersection:!!best};
+ }
+ return Object.freeze({project,acquire,projectRays,projectOrtho});
 });
