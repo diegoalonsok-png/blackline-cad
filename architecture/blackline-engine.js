@@ -81,7 +81,7 @@ function interpret(raw){
  let count=explicit??(assumedCount?3:1);if(alt)count=1;
  const implicitRow=count>1&&!row;
  if(implicitRow&&/\b(?:separad[oa]s?|independientes?|separate|detached)\b/.test(s))throw Error('Ambientes separados: indicá una distribución compatible.');
- if(suite&&count>1&&!tokens.some(t=>t.k==='private'))throw Error('Indicá si cada habitación tiene su propio baño.');
+ if(suite&&count>1&&!tokens.some(t=>t.k==='private')&&!/\bbanos\b/.test(s))throw Error('Indicá si cada habitación tiene su propio baño.');
  if(suite&&/\b(?:compartid[oa]s?|shared|comun)\b/.test(s))throw Error('Baño compartido: requiere una distribución conectada todavía no implementada.');
  if(/\b(?:frente a|enfrente de|a la izquierda|a la derecha|junto a|al fondo|centrad[oa]|esquina|opposite|next to)\b/.test(s))throw Error('La posición relativa solicitada todavía no está soportada; no se omitirá silenciosamente.');
  if(/\b(?:accesibles?|adaptad[oa]s?|sillas? de ruedas|wheelchair|discapacitados?)\b/.test(s))throw Error('Accesibilidad: falta implementar y verificar las áreas de maniobra y transferencia.');
@@ -205,8 +205,10 @@ function solve(spec){
  const {width:w,depth:d,wall:t,door,window:win,count:n}=spec;
  const kind=spec.kind,suite=kind==='suite_row',base=suite?'bedroom':kind;
  if(!DEFAULT[base]||![w,d,t,door,win].every(Number.isFinite)||w<(base==='bathroom'?.9:1.2)||d<1.2||w>20||d>20||t<.08||t>.5||(door!==0&&door<.6)||door>Math.min(1.2,(spec.sideDoor?d:w)-.3+1e-9)||win<0||win>w-.3||!Number.isInteger(n)||n<1||n>30)throw Error('Dimensiones o cantidad fuera del rango del motor.');
- const bd=suite?spec.bathDepth:0;
- if(suite&&(Math.abs(spec.bathWidth-w)>1e-6||!Number.isFinite(bd)||bd<1.5||bd>20))throw Error('Por ahora el baño privado debe tener el mismo ancho que el dormitorio.');
+ const bd=suite?spec.bathDepth:0,bathW=suite?spec.bathWidth:w,compactSuite=suite&&bathW<w-1e-6;
+ if(suite&&(!Number.isFinite(bathW)||bathW<1.5||bathW>w+1e-6||!Number.isFinite(bd)||bd<1.5||bd>20))throw Error('El baño privado debe medir al menos 1,50 m de ancho y no superar el dormitorio.');
+ if(compactSuite&&spec.closetDepth)throw Error('Baño compacto con vestidor: configuración aún no disponible.');
+ const bathOffset=(bathW-.8)/2;
  const amount=spec.alternatives||1;if(!Number.isInteger(amount)||amount<1||amount>20||amount>1&&n>1)throw Error('Hasta 20 alternativas individuales o 30 ambientes contiguos.');
  const items=spec.fixtures||DEFAULT[base][2],bathItems=spec.bathFixtures||DEFAULT.bathroom[2];if(!Array.isArray(items)||!Array.isArray(bathItems)||[...items,...bathItems].some(k=>!C[k])||items.length>12||bathItems.length>12)throw Error('Equipamiento no reconocido.');
  const out={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks:[],rooms:[],virtualDimensions:[],connections:[],variants:[],brief:spec,assumptions:[...(spec.assumptions||[])]};
@@ -217,21 +219,21 @@ function solve(spec){
  const edge=side?d:w,doorX=spec.doorX??(edge-door)/2;if(!Number.isFinite(doorX)||doorX<.03||doorX+door>edge-.03)throw Error('Posición de puerta inválida.');
  const doorZones=door?[side?R(side==='left'?0:w-door,doorX,door,door):R(doorX,0,door,door)]:[],bathDoor=.8;
  for(let seed=0;seed<amount*6;seed++){
-  let lay,blay,clay;try{lay=(spec.compactTransverse?[{key:'bathtub150',rot:180,r:R(0,d-.75,1.5,.75)},{key:'toilet',rot:90,r:R(w-.70,d-.75-.10-.40,.70,.40)},{key:'bidet',rot:90,r:R(w-.58,d-.75-.10-.40-.10-.38,.58,.38)}]:null)||(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...((suite||cd)?[R((w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
+  let lay,blay,clay;try{lay=(spec.compactTransverse?[{key:'bathtub150',rot:180,r:R(0,d-.75,1.5,.75)},{key:'toilet',rot:90,r:R(w-.70,d-.75-.10-.40,.70,.40)},{key:'bidet',rot:90,r:R(w-.58,d-.75-.10-.40-.10-.38,.58,.38)}]:null)||(spec.templateLayout?compactBathTemplate(spec)?.layout:null)||arrange(w,d,items,[...doorZones,...((suite||cd)?[R(compactSuite?bathOffset:(w-bathDoor)/2,d-bathDoor,bathDoor,bathDoor)]:[])],seed,!!spec.compact);
    if(cd)clay=arrange(w,cd,['wardrobe'],[R((w-bathDoor)/2,0,bathDoor,bathDoor),...(suite?[R((w-bathDoor)/2,cd-bathDoor,bathDoor,bathDoor)]:[])],seed);
-   if(suite)blay=arrange(w,bd,bathItems,[R((w-bathDoor)/2,0,bathDoor,bathDoor)],seed)}catch(e){if(amount===1)throw e;continue}
+   if(suite)blay=arrange(bathW,bd,bathItems,[R((bathW-bathDoor)/2,0,bathDoor,bathDoor)],seed,!!spec.compact)}catch(e){if(amount===1)throw e;continue}
   const signature=JSON.stringify([lay,blay,clay].filter(Boolean).map(l=>l.map(o=>[o.key,o.rot,Math.round(o.r.x/.3),Math.round(o.r.y/.3)])));if(seen.has(signature))continue;seen.add(signature);
   const v=out.variants.length,p='v'+v+'-',dx=(v%cols)*(n*step+t+1.5),dy=Math.floor(v/cols)*(fullD+2*t+1.5);
   const pt=(x,y)=>[x+dx,y+dy];
   const wall=(id,a,b)=>{out.walls.push({id:p+id,a:pt(...a),b:pt(...b),thickness:t,layer:'WALLS',join:'native'})};
   const opening=(host,kind,offset,width)=>{if(width>0)out.openings.push({host:p+host,kind,offset,width,layer:'OPENINGS'})};
-  const room=(id,kind,x,y,h,front,back,i)=>{
-   out.rooms.push({id:p+id,kind,clearBounds:[x+dx,y+dy,w,h]});
-   out.virtualDimensions.push({room:p+id,axis:'width',value:w,between:[p+'side'+i,p+'side'+(i+1)],editable:true},{room:p+id,axis:'depth',value:h,between:[p+front,p+back],editable:true});
+  const room=(id,kind,x,y,h,front,back,i,rw=w)=>{
+   out.rooms.push({id:p+id,kind,clearBounds:[x+dx,y+dy,rw,h]});
+   out.virtualDimensions.push({room:p+id,axis:'width',value:rw,between:[p+'side'+i,p+(rw===w?'side'+(i+1):'bathside'+i)],editable:rw===w},{room:p+id,axis:'depth',value:h,between:[p+front,p+back],editable:true});
   };
   const blocks=(layout,x,y,kind)=>{for(const o of layout){const [id,bw,bd]=C[o.key],r=o.r,[ox,oy]=({0:[0,0],90:[r.w,0],180:[r.w,r.d],270:[0,r.d]})[o.rot];
    out.blocks.push({catalogId:id,role:o.key,point:pt(x+r.x+ox,y+r.y+oy),rotation:o.rot,scale:1,layer:kind==='bathroom'?'FIXTURES':kind==='kitchen'?'KITCHEN':'FURNITURE',envelope:[x+r.x+dx,y+r.y+dy,r.w,r.d],nominalSize:[bw,bd]})}};
-  for(let i=0;i<=n;i++){const x=t/2+i*step;const A=[x,t/2],B=[x,fullD+1.5*t];wall('side'+i,...(side==='left'&&i===0?[B,A]:[A,B]));}
+  for(let i=0;i<=n;i++){const x=t/2+i*step;const A=[x,t/2],B=[x,compactSuite&&i===n?d+1.5*t:fullD+1.5*t];wall('side'+i,...(side==='left'&&i===0?[B,A]:[A,B]));}
   for(let i=0;i<n;i++){
    const x=t+i*step,a=x-t/2,b=a+step,front='front'+i,back='back'+i,rear='rear'+i;
    wall(front,[a,t/2],[b,t/2]);wall(back,[a,d+1.5*t],[b,d+1.5*t]);if(side){opening(side==='left'?'side0':'side1','swing-door',t/2+(side==='left'?d-doorX-door/2:doorX+door/2),door);}else opening(front,'swing-door',t/2+doorX+door/2,door);
@@ -239,10 +241,10 @@ function solve(spec){
    if(suite||cd){
     const offset=step/2-door/2-win/2-.2;
     if(win&&offset-win/2<=t/2)throw Error('No hay espacio en fachada para la puerta y ventana solicitadas.');
-    opening(front,'framed-window',offset,win);opening(back,'swing-door',step/2,bathDoor);
+    opening(front,'framed-window',offset,win);opening(back,'swing-door',compactSuite?t/2+bathW/2:step/2,bathDoor);
     let prev=back,from='room'+i;
     if(cd){const closetBack='closetback'+i;wall(closetBack,[a,d+shift+1.5*t],[b,d+shift+1.5*t]);room('closet'+i,'closet',x,d+2*t,cd,back,closetBack,i);blocks(clay,x,d+2*t,'closet');out.connections.push({from:p+from,to:p+'closet'+i,via:p+back,private:true});prev=closetBack;from='closet'+i;if(suite)opening(prev,'swing-door',step/2,bathDoor);}
-    if(suite){wall(rear,[a,fullD+1.5*t],[b,fullD+1.5*t]);opening(rear,'framed-window',step/2,Math.min(.8,w-.3));room('bath'+i,'bathroom',x,d+shift+2*t,bd,prev,rear,i);blocks(blay,x,d+shift+2*t,'bathroom');out.connections.push({from:p+from,to:p+'bath'+i,via:p+prev,private:true});}
+    if(suite){const end=compactSuite?a+bathW+t:b;if(compactSuite)wall('bathside'+i,[end,d+1.5*t],[end,fullD+1.5*t]);wall(rear,[a,fullD+1.5*t],[end,fullD+1.5*t]);opening(rear,'framed-window',compactSuite?(bathW+t)/2:step/2,Math.min(.8,bathW-.3));room('bath'+i,'bathroom',x,d+shift+2*t,bd,prev,rear,i,bathW);blocks(blay,x,d+shift+2*t,'bathroom');out.connections.push({from:p+from,to:p+'bath'+i,via:p+prev,private:true});}
    }else opening(back,'framed-window',step/2,win);
   }
   out.variants.push({id:p.slice(0,-1),number:v+1});if(out.variants.length===amount)break;
