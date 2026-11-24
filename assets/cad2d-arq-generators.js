@@ -11,7 +11,7 @@ const DEG=Math.PI/180;
 
 /* ---------- Constructor de geometría con pila de transformaciones ---------- */
 function Builder(){
- this.out=[];this.stack=[{x:0,y:0,a:0}];
+ this.out=[];this.stack=[{x:0,y:0,a:0}];this.arqRole=null;
 }
 Builder.prototype.t=function(){return this.stack[this.stack.length-1]};
 Builder.prototype.tp=function(x,y){
@@ -24,7 +24,9 @@ Builder.prototype.at=function(x,y,a,fn){
  try{fn(this)}finally{this.stack.pop()}
  return this;
 };
+Builder.prototype.role=function(role,fn){const prev=this.arqRole;this.arqRole=role;try{return fn(this)}finally{this.arqRole=prev}};
 Builder.prototype.push=function(e,style){
+ if(style?.role||this.arqRole)e.arqRole=style?.role||this.arqRole;
  if(style&&style.dashed)e.linetype='DASHED';
  if(style&&style.width)e.width=style.width;
  this.out.push(e);return this;
@@ -157,8 +159,16 @@ const F={
  }
 };
 
+// Explicit fixture roles carry through to detailed gallery geometry.
+const sanitaryFunctions=new Set(['wc','wcSuspendido','bidet','lavatorio','lavatorioDoble','lavatorioPie','lavatorioChico','lavatorioAccesible','ducha','duchaPiso','banera','baneraEsquinera','mingitorio','barra']);
+const furnitureFunctions=new Set(['banqueta','silla','mesa']);
+for(const key of Object.keys(F)){
+ const draw=F[key],role=sanitaryFunctions.has(key)?'sanitary':furnitureFunctions.has(key)?'furniture':'equipment';
+ F[key]=function(b,...args){return b.role(role,()=>draw(b,...args))};
+}
 /* Mesa con sillas alrededor (local: 0..W × 0..D incluyendo sillas). */
-function mesaConSillas(b,W,D,{round=false}={}){
+function mesaConSillas(b,W,D,opts){return b.role('furniture',()=>mesaConSillasGeometry(b,W,D,opts))}
+function mesaConSillasGeometry(b,W,D,{round=false}={}){
  const ch=.50,td=D-2*ch;
  if(round){
   const r=Math.min(W,D)/2-ch;b.circle(W/2,D/2,r);
@@ -182,7 +192,7 @@ function wallPlacer(b,W,D){
   if(side==='E')return b.at(W,s,90,fn);
  };
 }
-const perimeter=(b,W,D)=>b.rect(0,0,W,D,{width:.05});
+const perimeter=(b,W,D)=>b.rect(0,0,W,D,{width:.05,role:'wall'});
 const clamp=(n,a,z)=>Math.max(a,Math.min(z,n));
 const turning=(b,cx,cy,r=.75)=>{b.circle(cx,cy,r,{dashed:true})};
 
@@ -289,9 +299,9 @@ function bathLayoutSpec(W,D,program,variant){
 }
 function drawBathLayout(b,W,D,program,variant){
  const s=bathLayoutSpec(W,D,program,variant),t=s.t,a=(W-s.doorWidth)/2,z=a+s.doorWidth;
- for(const [x0,y0,x1,y1] of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(x0,y0,x1,y1,{width:.22});
+ for(const [x0,y0,x1,y1] of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(x0,y0,x1,y1,{width:.22,role:'wall'});
  // Outward-opening leaf; external circulation must be checked in context.
- b.line(a,0,a,-s.doorWidth);b.arc(a,0,s.doorWidth,270,360);
+ b.role('opening',()=>{b.line(a,0,a,-s.doorWidth);b.arc(a,0,s.doorWidth,270,360)});
  for(const r of s.rects){
   if(r.key==='shower')b.at(r.x,r.y,0,q=>F.ducha(q,r.w,r.h,false));
   else if(r.key==='tub')b.at(r.x,r.y,0,q=>F.banera(q,r.w,r.h));
@@ -399,12 +409,12 @@ function drawKitchenLayout(b,W,D,family,v){
  const s=kitchenLayoutSpec(W,D,family,v),t=s.t,door=.90;
  if(s.doorSide==='front'){
   const a=(W-door)/2,z=a+door;
-  for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22});
-  b.line(a,0,a,-door);b.arc(a,0,door,270,360);
+  for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22,role:'wall'});
+  b.role('opening',()=>{b.line(a,0,a,-door);b.arc(a,0,door,270,360)});
  }else{
   const a=(D-door)/2,z=a+door;
-  for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
-  b.line(0,a,-door,a);b.arc(0,a,door,90,180);
+  for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22,role:'wall'});
+  b.role('opening',()=>{b.line(0,a,-door,a);b.arc(0,a,door,90,180)});
  }
  for(const r of s.modules){
   b.at(r.x+r.w,D-t,180,q=>{
@@ -510,7 +520,8 @@ one('mob-tv','Mueble TV',MOB,1.80,.45,(b,W,D)=>{b.rect(0,0,W,D);b.rect(W*.15,D-.
 
 /* ===== DORMITORIO ===== */
 const DOR='Dormitorio';
-function cama(b,W,D,{mesas=true}={}){
+function cama(b,W,D,opts){return b.role('furniture',()=>camaGeometry(b,W,D,opts))}
+function camaGeometry(b,W,D,{mesas=true}={}){
  const mw=mesas?.50:0,bw=W-2*mw;b.rect(mw,0,bw,D);b.line(mw,D-.55,mw+bw,D-.55);
  const n=bw>1.2?2:1;for(let i=0;i<n;i++)b.rrect(mw+.08+i*bw/n,D-.48,bw/n-.16,.38,.06);
  b.line(mw,D*.45,mw+bw,D*.30,{dashed:true});
@@ -525,7 +536,7 @@ one('dor-cuna','Cuna',DOR,.70,1.30,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<8;i++
 
 function tandemRooms(b,W,D,n,side,privateBath){
  const t=.15,c=1.50+t,p=W/n,top=D-t,base=c+t,door=.90;
- const seg=(x,y,X,Y)=>{if(Math.hypot(X-x,Y-y)>1e-8)b.line(x,y,X,Y,{width:.22})};
+ const seg=(x,y,X,Y)=>{if(Math.hypot(X-x,Y-y)>1e-8)b.line(x,y,X,Y,{width:.22,role:'wall'})};
  
  // Open common corridor at both ends; wall along outer corridor edge.
  seg(0,0,W,0);seg(0,.15,W,.15);
@@ -544,8 +555,8 @@ function tandemRooms(b,W,D,n,side,privateBath){
   seg(a,base,hinge,base);seg(end,base,z,base);
   seg(hinge,c,hinge,base);seg(end,c,end,base);
   const h=side==='left'?end:hinge;
-  b.line(h,base,h,base+door);
-  b.arc(h,base,door,side==='left'?90:0,side==='left'?180:90);
+  b.role('opening',()=>{b.line(h,base,h,base+door);
+  b.arc(h,base,door,side==='left'?90:0,side==='left'?180:90)});
   if(privateBath){
    const bw=1.80,bd=2.05,bx=side==='left'?a:z-bw,by=base;
    const inner=side==='left'?bx+bw:bx;
@@ -580,7 +591,8 @@ for(let n=1;n<=12;n++)for(const privateBath of [true,false])for(const side of ['
 /* Wardrobes and independent suites. Original layouts, metres, exterior dimensions.
    Cabinet depth .60 m; design clearance targets are advisory, not code certification. */
 const CLOSETS='Vestidores completos';
-function wardrobe(b,x,y,w,d,drawers){
+function wardrobe(b,x,y,w,d,drawers){return b.role('furniture',()=>wardrobeGeometry(b,x,y,w,d,drawers))}
+function wardrobeGeometry(b,x,y,w,d,drawers){
  b.rect(x,y,w,d);
  const along=w>=d,n=Math.max(1,Math.ceil((along?w:d)/.75));
  for(let i=1;i<n;i++){if(along)b.line(x+w*i/n,y,x+w*i/n,y+d);else b.line(x,y+d*i/n,x+w,y+d*i/n)}
@@ -590,9 +602,9 @@ function wardrobe(b,x,y,w,d,drawers){
 }
 function roomShell(b,W,D,doorX,doorW,t=.12){
  const a=doorX,z=a+doorW;
- for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22});
+ for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22,role:'wall'});
  // Open outward: clearance outside the local envelope must be reviewed at placement.
- b.line(a,0,a,-doorW);b.arc(a,0,doorW,270,360);
+ b.role('opening',()=>{b.line(a,0,a,-doorW);b.arc(a,0,doorW,270,360)});
 }
 function closetSpec(W,D,kind,side,drawers){
  const t=.12,dep=.60,back=kind==='u'||kind==='l'?dep:0;
@@ -635,11 +647,11 @@ function suiteDraw(b,W,D,bedType,side,closetKind){
  roomShell(b,W,D,s.doorX,.90,s.t);
  for(const [x,isBath] of [[s.bathX,true],[s.closetX,false]]){
   const isLeft=x<W/2,inner=isLeft?x+s.bw:x,other=inner+(isLeft?s.part:-s.part),y=s.base+s.cd;
-  for(const xx of [inner,other])b.line(xx,s.base,xx,y+s.part,{width:.22});
+  for(const xx of [inner,other])b.line(xx,s.base,xx,y+s.part,{width:.22,role:'wall'});
   // Access from sleeping area; pocket door leaves the passage unobstructed.
   const a=x+(s.bw-.80)/2,z=a+.80;
-  for(const yy of [y,y+s.part]){b.line(x,yy,a,yy,{width:.22});b.line(z,yy,x+s.bw,yy,{width:.22})}
-  b.line(a,y,a,y+s.part,{width:.22});b.line(z,y,z,y+s.part,{width:.22});
+  for(const yy of [y,y+s.part]){b.line(x,yy,a,yy,{width:.22,role:'wall'});b.line(z,yy,x+s.bw,yy,{width:.22,role:'wall'})}
+  b.line(a,y,a,y+s.part,{width:.22,role:'wall'});b.line(z,y,z,y+s.part,{width:.22,role:'wall'});
   b.line(z,y+.06,z+.65,y+.06);
   b.text(x+.72,y-.30,isBath?'BAÑO':'VESTIDOR',.10);
  }
@@ -675,14 +687,14 @@ function gymSpec(W,D,n,showers){
 }
 function gymDraw(b,W,D,n,showers){
  const s=gymSpec(W,D,n,showers),t=s.t,a=(D-s.entry)/2,z=a+s.entry;
- for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
- b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180);
+ for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22,role:'wall'});
+ b.role('opening',()=>{b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180)});
  const x0=t+1.80;
  for(let i=0;i<n;i++){
   const x=x0+i*s.p,xx=x+s.p,door=.75,h=x+(s.p-door)/2,k=h+door;
   b.line(x,s.rowY,x,D-t,{width:.20});
   b.line(x,s.rowY,h,s.rowY);b.line(k,s.rowY,xx,s.rowY);
-  b.line(h,s.rowY,h,s.rowY+door);b.arc(h,s.rowY,door,0,90);
+  b.role('opening',()=>{b.line(h,s.rowY,h,s.rowY+door);b.arc(h,s.rowY,door,0,90)});
   if(showers){
    const y=t+s.depth;
    b.line(x,t,x,y,{width:.20});b.line(x,y,h,y);b.line(k,y,xx,y);
@@ -729,15 +741,15 @@ function changingSpec(W,D,n,m){
 }
 function changingDraw(b,W,D,n,m){
  const s=changingSpec(W,D,n,m),t=s.t,a=(s.backY+s.frontY-s.entry)/2,z=a+s.entry;
- for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
- b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180);
+ for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22,role:'wall'});
+ b.role('opening',()=>{b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180)});
  for(const c of s.cells){
   const x=c.x,y=c.y,xx=x+c.w,face=c.back?y:y+c.h,door=.80,h=x+(c.w-door)/2,k=h+door;
   // Partition centrelines; access gap left unobstructed. Inward leaf.
   b.line(x,y,x,y+c.h,{width:.20});if(!s.cells.some(other=>other!==c&&other.back===c.back&&Math.abs(other.x-xx)<1e-7))b.line(xx,y,xx,y+c.h,{width:.20});
   b.line(x,face,h,face);b.line(k,face,xx,face);
   const dir=c.back?1:-1;
-  b.line(h,face,h,face+dir*door);b.arc(h,face,door,c.back?0:270,c.back?90:360);
+  b.role('opening',()=>{b.line(h,face,h,face+dir*door);b.arc(h,face,door,c.back?0:270,c.back?90:360)});
  }
  for(const r of s.rects){
   if(r.key==='locker')wardrobe(b,r.x,r.y,r.w,r.h,false);
@@ -773,7 +785,7 @@ function hotelSpec(W,D,mode,large){
 function hotelDraw(b,W,D,mode,large){
  const s=hotelSpec(W,D,mode,large),t=s.t,a=(D-s.entry)/2,z=a+s.entry;
  // Separate receiving and dispatch access gaps on opposite sides.
- for(const p of [[0,0,W,0],[0,D,W,D],[0,0,0,a],[0,z,0,D],[W,0,W,a],[W,z,W,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[W-t,t,W-t,a],[W-t,z,W-t,D-t],[0,a,t,a],[0,z,t,z],[W-t,a,W,a],[W-t,z,W,z]])b.line(...p,{width:.22});
+ for(const p of [[0,0,W,0],[0,D,W,D],[0,0,0,a],[0,z,0,D],[W,0,W,a],[W,z,W,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[W-t,t,W-t,a],[W-t,z,W-t,D-t],[0,a,t,a],[0,z,t,z],[W-t,a,W,a],[W-t,z,W,z]])b.line(...p,{width:.22,role:'wall'});
  for(const r of s.rects){
   b.rect(r.x,r.y,r.w,r.h);
   if(r.key==='cold'){b.at(r.x,r.y,0,q=>F.heladera(q,.75,.75));b.at(r.x+.75,r.y,0,q=>F.heladera(q,.75,.75))}
@@ -813,11 +825,11 @@ function bedroomSpec(W,D,kind,side,desk,opening={}){
 }
 function bedroomDraw(b,W,D,kind,side,desk,opening){
  const s=bedroomSpec(W,D,kind,side,desk,opening),{t,a,z,wx,wz,left}=s,door=s.openings[0].width;
- for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,wx,D],[wz,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,wx,D-t],[wz,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t],[wx,D-t,wx,D],[wz,D-t,wz,D]])b.line(...p,{width:.22});
+ for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,wx,D],[wz,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,wx,D-t],[wz,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t],[wx,D-t,wx,D],[wz,D-t,wz,D]])b.line(...p,{width:.22,role:'wall'});
  const f=.04,leaf=door-2*f,h=left?a+f:z-f;
- b.rect(a,0,f,t);b.rect(z-f,0,f,t);b.line(h,t,h,t+leaf);b.arc(h,t,leaf,left?0:90,left?90:180);
- b.rect(wx,D-t,f,t);b.rect(wz-f,D-t,f,t);
- for(const yy of [D-t+.025,D-t/2-.008,D-t/2+.008,D-.025])b.line(wx+f,yy,wz-f,yy);
+ b.role('opening',()=>{b.rect(a,0,f,t);b.rect(z-f,0,f,t);b.line(h,t,h,t+leaf);b.arc(h,t,leaf,left?0:90,left?90:180)});
+ b.role('opening',()=>{b.rect(wx,D-t,f,t);b.rect(wz-f,D-t,f,t);
+ for(const yy of [D-t+.025,D-t/2-.008,D-t/2+.008,D-.025])b.line(wx+f,yy,wz-f,yy)});
  for(const r of s.rects){
   if(r.key==='wardrobe')wardrobe(b,r.x,r.y,r.w,r.h,true);
   else if(r.key==='bed')b.at(r.x,r.y,0,q=>cama(q,r.w,r.h,{mesas:false}));
