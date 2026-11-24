@@ -4984,7 +4984,7 @@ function cadLayerStatesDialog(){
  const selected=()=> (state.layerStates||[]).find(p=>p.name===list.value);
  function change(next,name){saveHistory();state.layerStates=next;updateAll();refresh(name);}
  d.querySelector('[data-save]').onclick=()=>{const raw=window.prompt('Nombre del estado de capas:','Arquitectura');if(raw===null)return;const name=raw.trim().slice(0,80);if(!name)return toast('Ingresá un nombre');const old=state.layerStates||[],existing=old.find(p=>p.name.toLowerCase()===name.toLowerCase());if(existing&&!window.confirm('¿Actualizar el estado '+existing.name+'?'))return;if(!existing&&old.length>=50)return toast('Máximo 50 estados por dibujo');change([...old.filter(p=>p!==existing),cadLayerStateCapture(name,state.layers,state.layerId)],name);toast('Estado guardado: '+name);};
- d.querySelector('[data-restore]').onclick=()=>{const p=selected();if(!p)return;const plan=cadLayerStatePlan(state.layers,p,state.layerId);if(!plan.matched)return toast('No hay capas coincidentes');if(!plan.current)return toast('El estado dejaría todas las capas no editables; restauración cancelada');saveHistory();state.layers=plan.layers;state.layerId=plan.current;state.selected=state.selected.filter(id=>{const e=state.entities.find(e=>e.id===id);return e&&layerFor(e).visible&&!layerFor(e).locked});updateAll();try{if(cadActiveSpace==='layout')renderLayoutWorkspace()}catch(e){}toast('Estado restaurado: '+p.name+' · '+plan.matched+' capas');d.close();};
+ d.querySelector('[data-restore]').onclick=()=>{const p=selected();if(!p)return;const plan=cadLayerStatePlan(state.layers,p,state.layerId);if(!plan.matched)return toast('No hay capas coincidentes');if(!plan.current)return toast('El estado dejaría todas las capas no editables; restauración cancelada');saveHistory();state.layers=plan.layers;state.layerId=plan.current;const ids=new Set(state.selected);state.selected=state.entities.filter(e=>ids.has(e.id)&&layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);updateAll();try{if(cadActiveSpace==='layout')renderLayoutWorkspace()}catch(e){}toast('Estado restaurado: '+p.name+' · '+plan.matched+' capas');d.close();};
  d.querySelector('[data-rename]').onclick=()=>{const p=selected();if(!p)return;const raw=window.prompt('Nuevo nombre:',p.name);if(raw===null)return;const name=raw.trim().slice(0,80);if(!name||(state.layerStates||[]).some(x=>x!==p&&x.name.toLowerCase()===name.toLowerCase()))return toast('Nombre inválido o repetido');change(state.layerStates.map(x=>x===p?{...x,name}:x),name);};
  d.querySelector('[data-delete]').onclick=()=>{const p=selected();if(p&&window.confirm('¿Eliminar estado '+p.name+'?'))change(state.layerStates.filter(x=>x!==p));};
  d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());refresh();d.showModal();
@@ -7646,7 +7646,7 @@ function importSVG(source,name){
    }catch(ex){skipped.add(tag)}
  }
  if(!items.length)throw Error('No supported SVG primitives found. Supported: line, rect, circle, ellipse, polyline, polygon, basic M/L/H/V paths, text. Complex curves and transforms require DXF conversion.');
- saveHistory();
+ saveHistory();state.layerStates=[];
  const layerId='SVG';state.layers=[{id:layerId,name:'SVG Import',color:'#cbd3db',visible:true,locked:false}];
  state.entities=items.map((e,i)=>({...e,id:i+1,layer:layerId,width:state.lineWidth}));
  state.nextId=items.length+1;state.layerId=layerId;state.selected=[];
