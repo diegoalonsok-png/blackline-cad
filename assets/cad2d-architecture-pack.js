@@ -6,25 +6,27 @@
 (()=>{
 "use strict";
 const NS="http://www.w3.org/2000/svg";
-const FILE="assets/cad2d-architecture-pack-28.json";
+const BASE="assets/architecture-demand-v1/",FILE=BASE+"catalog.json";
 const FACTOR={m:1,cm:100,mm:1000,in:39.37007874015748,ft:3.28083989501312};
 const PREFIX="CAD2D Arquitectura 2026 · ";
 const $=id=>document.getElementById(id);
 let catalog=null,selected="Todos",filter="";
 function safePack(pack){
- if(pack?.schema!=="cad2d-architecture-blocks-v1"||pack.units!=="m"||pack.blocks?.length!==28)
-  throw Error("El catálogo de bloques no coincide con su versión verificada");
- const ids=new Set();
+ if(pack?.schema!=="cad2d-architecture-metadata-v1"||pack.units!=="m"||pack.blocks?.length!==28)throw Error("Catálogo inválido");
+ const ids=new Set(),keys=new Set();
  for(const item of pack.blocks){
-  if(!item.id||ids.has(item.id)||!Array.isArray(item.parts)||!item.parts.length||item.parts.length>100||
-    !(item.width>0&&item.depth>0&&item.width<20&&item.depth<20))throw Error("Bloque inválido");
-  ids.add(item.id);
-  for(const part of item.parts){
-   if(!Array.isArray(part)||!["line","rect","circle","ellipse"].includes(part[0])||
-    part.slice(1).some(n=>!Number.isFinite(n)))throw Error("Geometría inválida");
-  }
+  if(typeof item.id!=="string"||!item.id||ids.has(item.id)||!/^block-\d{2}$/.test(item.key)||keys.has(item.key)||!(item.width>0&&item.depth>0&&item.width<20&&item.depth<20)||"parts" in item)throw Error("Metadatos inválidos");
+  ids.add(item.id);keys.add(item.key);
  }
  return pack;
+}
+function safeBlock(item,meta){
+ if(item?.id!==meta.id||item.width!==meta.width||item.depth!==meta.depth||!Array.isArray(item.parts)||!item.parts.length||item.parts.length>100)throw Error("Bloque inválido");
+ for(const p of item.parts){
+  const size={line:5,rect:5,circle:4,ellipse:5}[p?.[0]];
+  if(!Array.isArray(p)||p.length!==size||p.slice(1).some(n=>!Number.isFinite(n)))throw Error("Geometría inválida");
+ }
+ return item;
 }
 function geometry(item,unit){
  const mul=FACTOR[unit]||1,p=(x,y)=>({x:x*mul,y:y*mul});
@@ -36,31 +38,10 @@ function geometry(item,unit){
  });
 }
 function thumbnail(item){
- const svg=document.createElementNS(NS,"svg");
- svg.setAttribute("viewBox",[-.08,-item.depth-.08,item.width+.16,item.depth+.16].join(" "));
- svg.setAttribute("role","img");svg.setAttribute("aria-label","Planta de "+item.id);
- svg.style.cssText="display:block;width:100%;height:96px;background:#111923;border-radius:6px";
- const group=document.createElementNS(NS,"g");
- group.setAttribute("transform","scale(1 -1)");
- group.setAttribute("fill","none");group.setAttribute("stroke","#e6f1f7");
- group.setAttribute("stroke-width",String(Math.max(.006,Math.min(item.width,item.depth)/125)));
- for(const part of item.parts){
-  let el;
-  if(part[0]==="line"){
-   el=document.createElementNS(NS,"line");
-   [["x1",part[1]],["y1",part[2]],["x2",part[3]],["y2",part[4]]].forEach(([k,v])=>el.setAttribute(k,v));
-  }else if(part[0]==="rect"){
-   el=document.createElementNS(NS,"rect");
-   [["x",part[1]],["y",part[2]],["width",part[3]],["height",part[4]]].forEach(([k,v])=>el.setAttribute(k,v));
-  }else if(part[0]==="circle"||part[0]==="ellipse"){
-   el=document.createElementNS(NS,part[0]);
-   el.setAttribute("cx",part[1]);el.setAttribute("cy",part[2]);
-   if(part[0]==="circle")el.setAttribute("r",part[3]);
-   else {el.setAttribute("rx",part[3]);el.setAttribute("ry",part[4]);}
-  }
-  if(el)group.append(el);
- }
- svg.append(group);return svg;
+ const img=document.createElement("img");
+ img.src=BASE+item.key+".svg";img.alt="Planta de "+item.id;img.loading="lazy";img.decoding="async";
+ img.style.cssText="display:block;width:100%;height:96px;object-fit:contain;background:#111923;border-radius:6px";
+ return img;
 }
 function init(){
  const container=$("blBody"),api=window.BlacklineBlockAPI;
@@ -109,18 +90,23 @@ function init(){
    const button=document.createElement("button");button.type="button";
    button.className="btn slim";button.style.cssText="font-size:10px;width:100%";
    button.textContent="Insertar bloque";
-   button.addEventListener("click",()=>{
-    const key=PREFIX+item.id;
+   button.addEventListener("click",async()=>{
+    const key=PREFIX+item.id;button.disabled=true;
     try{
-     if(!api.hasBlock(key))api.addBlock(key,geometry(item,api.unit()));
+     if(!api.hasBlock(key)){
+      const response=await fetch(BASE+item.key+".json",{cache:"no-store"});
+      if(!response.ok)throw Error("HTTP "+response.status);
+      const block=safeBlock(await response.json(),item);
+      if(!api.hasBlock(key))api.addBlock(key,geometry(block,api.unit()));
+     }
      api.selectBlock(key);
      status.textContent=item.id+" · seleccionado. Un clic en el plano para insertar. Podés escalar, girar o espejar la referencia.";
      button.textContent="Seleccionado · clic en plano";
-    }catch(err){status.textContent="No se pudo preparar el bloque: "+err.message}
+    }catch(err){status.textContent="No se pudo preparar el bloque: "+err.message}finally{button.disabled=false}
    });
    cell.append(thumbnail(item),label,measure,button);cards.append(cell);
   }
-  status.textContent=visible.length+" bloques visibles de "+catalog.blocks.length+" disponibles. Los 28 se cargan en la paleta solamente cuando los elegís.";
+  status.textContent=visible.length+" bloques visibles de "+catalog.blocks.length+" disponibles. La geometría se descarga solamente al elegir un bloque.";
  }
  search.addEventListener("input",()=>{filter=search.value.toLocaleLowerCase().trim();show()});
  fetch(FILE,{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()})
