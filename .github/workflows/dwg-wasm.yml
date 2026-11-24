@@ -3,11 +3,16 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['dwg-wasm/**', '.github/workflows/dwg-wasm.yml']
+    paths: ['dwg-wasm/src/**', 'dwg-wasm/Cargo.toml', 'dwg-wasm/README.md', '.github/workflows/dwg-wasm.yml']
 permissions:
   contents: read
+concurrency:
+  group: dwg-wasm-main
+  cancel-in-progress: true
 jobs:
   test-build:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -24,13 +29,15 @@ jobs:
         run: |
           node --input-type=module <<'JS'
           import {readFile} from 'node:fs/promises';
-          import init,{dwg_to_dxf,dxf_to_dwg} from './dwg-wasm/pkg/blackline_dwg.js';
+          import init,{dwg_to_dxf,dxf_to_dwg,dwg_to_dxf_partial} from './dwg-wasm/pkg/blackline_dwg.js';
           await init({module_or_path:await readFile('./dwg-wasm/pkg/blackline_dwg_bg.wasm')});
           const dxf=await readFile('examples/scale-1to1-test.dxf');
           const dwg=dxf_to_dwg(dxf);
           if(!new TextDecoder().decode(dwg.slice(0,6)).match(/^AC10\d\d$/))throw Error('DWG header invalid');
           const output=new TextDecoder().decode(dwg_to_dxf(dwg));
           if(!output.includes('SECTION')||!output.includes('LINE'))throw Error('DXF geometry missing');
+          const partial=new TextDecoder().decode(dwg_to_dxf_partial(dwg));
+          if(!partial.includes('SECTION')||!partial.includes('LINE'))throw Error('Partial mode lost basic geometry');
           JS
       - name: Package source and licence notice
         run: |
@@ -40,3 +47,16 @@ jobs:
         with:
           name: blackline-dwg-wasm-tested
           path: dwg-wasm/pkg/
+
+      - name: Publish tested runtime to main
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main
+          git diff --quiet HEAD origin/main -- dwg-wasm/src dwg-wasm/Cargo.toml dwg-wasm/README.md .github/workflows/dwg-wasm.yml || { echo 'Build is stale; refusing publication'; exit 1; }
+          git add -f dwg-wasm/pkg/blackline_dwg.js dwg-wasm/pkg/blackline_dwg_bg.wasm dwg-wasm/pkg/Cargo.lock dwg-wasm/pkg/SOURCE-NOTICE.md dwg-wasm/pkg/package.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Publish tested DWG WASM runtime'
+          git rebase origin/main
+          git push origin HEAD:main
