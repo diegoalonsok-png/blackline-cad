@@ -812,6 +812,29 @@ EXT.drawArchitectureCommand=async raw=>{
   },'arq-command');
  }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}}
 };
+
+/* Free-text architecture bar is separate from the CAD command interpreter. */
+function openArchitectureBar(focus=true){
+ let bar=document.getElementById('cadArqInstructionBar');
+ if(!bar){
+  const host=document.getElementById('canvasWrap');if(!host)return;
+  bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
+  bar.style.cssText='position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:7;display:flex;align-items:center;gap:6px;padding:5px 7px;width:min(620px,calc(100% - 24px));box-sizing:border-box;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--text);box-shadow:0 2px 9px #0004;font-size:11px';
+  bar.innerHTML='<b style="white-space:nowrap;color:var(--cyan)">ARQASSIST</b><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Ej.: Habitación de 4 x 5 con baño / Bedroom 4 x 5" style="flex:1;min-width:0;width:100%;height:27px;padding:4px 7px;color:var(--text);background:var(--input);border:1px solid var(--border);border-radius:4px"><button type="button" class="btn slim" data-arq-run title="Draw instruction">Dibujar</button><button type="button" class="btn slim" data-arq-close title="Hide ARQASSIST">×</button>';
+  host.append(bar);
+  const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]');
+  const submit=async()=>{
+   const raw=input.value.trim();if(!raw){input.focus();return}
+   if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
+   run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
+  };
+  input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
+  for(const type of ['pointerdown','pointerup','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
+  run.addEventListener('click',submit);
+  bar.querySelector('[data-arq-close]').onclick=()=>{EXT.cancelArchitectureCommand();bar.style.display='none'};
+ }
+ bar.style.display='flex';if(focus)bar.querySelector('[data-arq-text]').focus();
+}
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
@@ -872,11 +895,11 @@ function openArchitectureAssistant(category){
  }
  panel.hidden=false;panel.querySelector('[data-body]').hidden=false;panel.querySelector('[data-close]').textContent='−';if(category)panel.setCategory(category);panel.scrollIntoView({block:'nearest'});
 }
-EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureAssistant();
+EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureBar();
 EXT.commands.BANO=EXT.commands.BANOS=EXT.commands['BAÑO']=EXT.commands['BAÑOS']=()=>openArchitectureAssistant('Baños completos');
 EXT.commands.COCINA=EXT.commands.COCINAS=()=>openArchitectureAssistant('Cocinas completas');
-CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureAssistant()}]);
-CORE.ribbon.add('home','ASISTENTE',[{id:'arqAssistantHome',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureAssistant()}]);
+CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureBar()}]);
+CORE.ribbon.add('home','ASISTENTE',[{id:'arqAssistantHome',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureBar()}]);
 CORE.ribbon.rebuild();
 
 /* ---------- Conexión ---------- */
@@ -884,6 +907,6 @@ const canvas=CORE.canvas;
 canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
-buildPanel();buildModal();updateIsoBadge();openArchitectureAssistant();
+buildPanel();buildModal();updateIsoBadge();openArchitectureBar(false);
 window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
