@@ -121,23 +121,29 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  function readHatch(record){
   const {get,str}=fields(record),solid=get(70)===1;
   let k=record.findIndex(q=>q[0]===91);if(k<0)return null;const nPaths=Number(record[k][1]);k++;
+  if(!Number.isSafeInteger(nPaths)||nPaths<0||nPaths>record.length-k)throw Error('HATCH cantidad de contornos inválida');
+  let hatchVertices=0;
+  const checkHatchBudget=n=>{if(hatchVertices+n>MAX_VERTICES-vertexCount)abortImport('expansión de sombreado demasiado grande')};
   const paths=[],num=()=>{if(!Number.isInteger(k)||k<0||k>=record.length)throw Error('HATCH truncado');const n=Number(record[k++][1]);if(!Number.isFinite(n))throw Error('HATCH valor inválido');return n},peek=()=>record[k]?.[0];
   const count=()=>{const n=num();if(!Number.isSafeInteger(n)||n<0||n>record.length-k)throw Error('HATCH cantidad inválida');return n};
   for(let pi=0;pi<nPaths&&k<record.length;pi++){
+   if((pi&255)===0)checkTime();
    while(k<record.length&&peek()!==92)k++;const flags=num(),pts=[];
-   if(flags&2){const hasB=num();num();const nv=num();const verts=[];
+   if(flags&2){const hasB=num();num();const nv=count();const verts=[];
     for(let v=0;v<nv&&k<record.length;v++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();let b=0;if(hasB&&peek()===42)b=num();verts.push({p:P(x,y),b})}
-    if(verts.length>=3)paths.push({pts:vertsToPts(verts,true),outer:Boolean(flags&1)});
+    if(verts.length>=3){const contour=vertsToPts(verts,true);checkHatchBudget(contour.length);hatchVertices+=contour.length;paths.push({pts:contour,outer:Boolean(flags&1)})}
    }else{
-    const ne=num();
+    const ne=count();
     for(let ei=0;ei<ne&&k<record.length;ei++){
+     if((ei&1023)===0)checkTime();
+     checkHatchBudget(pts.length);
      while(k<record.length&&peek()!==72)k++;const et=num();
      if(et===1){const x1=num(),y1=num(),x2=num(),y2=num();if(!pts.length)pts.push(P(x1,y1));pts.push(P(x2,y2))}
      else if(et===2){const cx=num(),cy=num(),r=num(),a0=num()*Math.PI/180,a1=num()*Math.PI/180,ccw=num();let sw=a1-a0;if(sw<=0)sw+=Math.PI*2;const arc=ccw?arcPts(P(cx,cy),r,a0,sw):arcPts(P(cx,cy),r,-a0,-sw);pts.push(...(pts.length?arc.slice(1):arc))}
      else if(et===3){const cx=num(),cy=num(),mx=num(),my=num(),ra=num(),s0=num()*Math.PI/180,s1=num()*Math.PI/180,ccw=num();const rx=Math.hypot(mx,my),ry=rx*ra,rot=Math.atan2(my,mx);let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=24;for(let j=pts.length?1:0;j<=n;j++){let t=s0+sw*j/n;if(!ccw)t=-t;const x=rx*Math.cos(t),y=ry*Math.sin(t);pts.push(P(cx+x*Math.cos(rot)-y*Math.sin(rot),cy+x*Math.sin(rot)+y*Math.cos(rot)))}}
      else if(et===4){k++;k++;k++;const nk=count(),nc=count();k+=nk;for(let j=0;j<nc;j++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();if(peek()===42)k++;if(j||!pts.length)pts.push(P(x,y))}if(peek()===97){const nf=count();if(nf*2>record.length-k)throw Error('HATCH spline truncado');k+=nf*2;if(peek()===12)k+=4}}
     }
-    if(pts.length>=3)paths.push({pts,outer:Boolean(flags&1)});
+    checkHatchBudget(pts.length);if(pts.length>=3){hatchVertices+=pts.length;paths.push({pts,outer:Boolean(flags&1)})}
    }
    while(k<record.length&&peek()!==97)k++;if(peek()===97){const ns=count();k+=ns}
   }
