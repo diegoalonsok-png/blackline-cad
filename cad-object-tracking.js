@@ -58,16 +58,23 @@
  function projectOrtho(pointer,base,anchors,scale,tolerancePixels=10,axis){
   if(!valid(pointer)||!valid(base)||!(scale>0))return null;
   const h=axis?axis==='h':Math.abs(pointer.x-base.x)>=Math.abs(pointer.y-base.y);
-  const limit=tolerancePixels/scale,coord=h?'x':'y';
-  const point=h?{x:pointer.x,y:base.y}:{x:base.x,y:pointer.y};
-  let best=null,distance=limit;
+  const limit=tolerancePixels/scale;
+  // A true intersection close to the physical cursor takes precedence over
+  // dominant-axis selection, but never permits a diagonal from the last point.
+  const candidates=[];
   for(const a of anchors||[]){
    if(!valid(a))continue;
-   const d=Math.abs(pointer[coord]-a[coord]);
-   if(d<distance){distance=d;best=a}
+   for(const horizontal of [true,false]){
+    const p=horizontal?{x:a.x,y:base.y}:{x:base.x,y:a.y};
+    if(Math.hypot(p.x-base.x,p.y-base.y)<1e-8)continue;
+    const d=Math.hypot(pointer.x-p.x,pointer.y-p.y);
+    if(d<=limit)candidates.push({a,p,h:horizontal,d});
+   }
   }
-  if(best)point[coord]=best[coord];
-  return {point,axis:h?'h':'v',vertical:h&&best?{x:best.x,y:best.y}:null,horizontal:!h&&best?{x:best.x,y:best.y}:null,intersection:!!best};
+  candidates.sort((a,b)=>a.d-b.d||Number(b.h===h)-Number(a.h===h));
+  const best=candidates[0];
+  if(best)return {point:best.p,axis:best.h?'h':'v',vertical:best.h?{...best.a}:null,horizontal:!best.h?{...best.a}:null,intersection:true};
+  return {point:h?{x:pointer.x,y:base.y}:{x:base.x,y:pointer.y},axis:h?'h':'v',vertical:null,horizontal:null,intersection:false};
  }
  return Object.freeze({project,acquire,projectRays,projectOrtho});
 });
