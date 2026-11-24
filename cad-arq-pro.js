@@ -47,22 +47,70 @@ function ensureLayer(){
  return layer;
 }
 
+
+const DOC_DIMS='A-ARQ-COTAS',DOC_HATCH='A-ARQ-HATCH';
+const docEligible=item=>['Baños completos','Cocinas completas','Habitaciones completas','Vestidores completos','Dormitorios en suite','Sanitarios colectivos','Cocinas hoteleras'].includes(item.cat);
+function ensureDocLayer(id,color){
+ const st=S();let layer=st.layers.find(l=>l.id===id);
+ if(!layer){layer={id,name:id,color,visible:true,locked:false,width:.13};st.layers.push(layer)}
+ return layer;
+}
+function docChoices(item){
+ return docEligible(item)?{dims:$('arqDocDims')?.checked??true,hatch:$('arqDocHatch')?.checked??true}:{dims:false,hatch:false};
+}
+function docGeometry(entities,W,D,opts){
+ const out=[],eps=1e-6;
+ if(opts.hatch){
+  // Match the actual parallel outer and inner faces; never bridge an entry gap.
+  const ls=entities.filter(e=>e.type==='line'&&e.a&&e.b);
+  for(const axis of ['x','y']){
+   const along=axis==='x'?'y':'x',limit=axis==='x'?W:D;
+   const axisLines=ls.filter(e=>Math.abs(e.a[axis]-e.b[axis])<eps);
+   for(const edge of [0,limit]){
+    const outer=axisLines.filter(e=>Math.abs(e.a[axis]-edge)<eps);
+    const inner=axisLines.filter(e=>[.12,.15].some(t=>Math.abs(e.a[axis]-(edge===0?t:limit-t))<eps));
+    for(const a of outer)for(const b of inner){
+     const p=Math.max(Math.min(a.a[along],a.b[along]),Math.min(b.a[along],b.b[along]));
+     const q=Math.min(Math.max(a.a[along],a.b[along]),Math.max(b.a[along],b.b[along]));
+     if(q-p<.02)continue;
+     const v=b.a[axis],pt=(x,y)=>axis==='x'?{x,y}:{x:y,y:x};
+     // Trim horizontal strips at the vertical wall corners to avoid duplicate fill.
+     const p2=axis==='y'?Math.max(p,.15):p,q2=axis==='y'?Math.min(q,W-.15):q;
+     if(q2-p2<.02)continue;
+     out.push({type:'hatch',pts:[pt(edge,p2),pt(edge,q2),pt(v,q2),pt(v,p2)],hatchStyle:'solid',width:.05,layer:DOC_HATCH,arqDocLayer:true,color:'#a2a2a2'});
+    }
+   }
+  }
+ }
+ if(opts.dims){
+  const style={precision:2,textHeight:.12,arrow:.10,displayUnit:'m',suffix:'',arrowType:'tick',extOffset:.05,extBeyond:.08};
+  for(const [a,b,p] of [[P(0,D),P(W,D),P(W/2,D+.35)],[P(W,0),P(W,D),P(W+.35,D/2)]])
+   out.push({type:'dimension',mode:'aligned',a,b,p,style:{...style},width:.13,layer:DOC_DIMS,arqDocLayer:true});
+ }
+ return out;
+}
+
 /* ---------- Definiciones de bloque generadas ---------- */
 function defName(item,W,D){return 'ARQ · '+item.name+' · '+cm(W)+'×'+cm(D)}
-function ensureDefinition(item,W,D){
+function ensureDefinition(item,W,D,opts=docChoices(item)){
  const built=LIB.build(item.id,W,D),k=f(),st=S();
- const oldName=defName(item,built.w,built.d);
+ const docs=docEligible(item)?docGeometry(built.entities,built.w,built.d,opts):[];
+ const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix;
+ if(docs.some(e=>e.layer===DOC_DIMS))ensureDocLayer(DOC_DIMS,'#e8d38a');
+ if(docs.some(e=>e.layer===DOC_HATCH))ensureDocLayer(DOC_HATCH,'#a2a2a2');
  // Preserve old colored definitions used by existing drawings. New insertions
  // receive a separate white/0 definition instead of silently mutating history.
  const name=st.blocks[oldName]&&!st.blocks[oldName].libraryLayer0?oldName+' · Layer 0':oldName;
  if(!st.blocks[name]){
   const ents=built.entities.map(e=>scaleEntity(e,k));
   for(const e of ents){e.layer='0';e.color='#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
-  const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities(ents)});
+  const docEnts=docs.map(e=>scaleEntity(e,k));
+  const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities([...docEnts.filter(e=>e.type==='hatch'),...ents,...docEnts.filter(e=>e.type==='dimension')])});
+  if(docs.length)def.arqDocumentation=true;
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
   def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
   const bb=LIB.bounds(built.entities);
-  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
+  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,doc:docs.length?{...opts}:{dims:false,hatch:false},ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
   st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
  }
  return name;
@@ -72,6 +120,7 @@ function scaleEntity(e,k){
  for(const key of ['a','b','c','p'])if(o[key])o[key]={x:o[key].x*k,y:o[key].y*k};
  if(o.pts)o.pts=o.pts.map(p=>({x:p.x*k,y:p.y*k}));
  if(o.r)o.r*=k;if(o.rx)o.rx*=k;if(o.ry)o.ry*=k;if(o.h)o.h*=k;
+ if(o.type==='dimension'&&o.style)for(const key of ['textHeight','arrow','extOffset','extBeyond'])if(Number.isFinite(o.style[key]))o.style[key]*=k;
  return o;
 }
 const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
@@ -364,6 +413,7 @@ function buildPanel(){
   <button type="button" class="btn slim" id="arqOpenOlimpiadas" title="Abrir biblioteca de bloques 2D · más de 1000 bloques en vista y planta" style="display:block;width:100%;margin:3px 0 6px;text-align:center;background:#e4dccb;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ BLOQUES 2D · 1.000+</button>
   <div id="arqDrawingBlocksSlot"><button type="button" class="btn slim" id="arqDrawingBlocksFallback" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO</button></div>
   <select id="arqPanelCat" aria-label="Categoría de bloques"></select>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin:5px 0"><label><input type="checkbox" id="arqDocDims" checked> Cotas generales</label><label><input type="checkbox" id="arqDocHatch" checked> Hatch muros</label></div>
   <div class="arq-grid" id="arqPanelGrid"></div>
   <div id="arqSizeRow" hidden><label>Ancho cm<input type="number" id="arqW" step="5"></label><label>Prof. cm<input type="number" id="arqD" step="5"></label><button type="button" class="btn" id="arqApplySize">Aplicar</button></div>
   <p id="arqHelp" style="font-size:10px;color:#9cb1bc;margin:7px 0 0">Clic en una miniatura y luego en el plano. Al seleccionar el bloque insertado: ▶ ancho, ▲ profundidad, ▼ variantes. Los artefactos se reubican, no se deforman.</p>
@@ -533,14 +583,14 @@ function resizeRef(ref,W,D){
  const d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
  if(Math.abs(w-a.w)<1e-6&&Math.abs(d-a.d)<1e-6)return CORE.toast('Sin cambios · rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm');
  CORE.saveHistory();
- ref.blockName=ensureDefinition(item,w,d);delete ref.dynamic;
+ ref.blockName=ensureDefinition(item,w,d,a.doc||{dims:false,hatch:false});delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);
  CORE.toast(item.name+' → '+cm(w)+' × '+cm(d)+' cm · Ctrl+Z deshace');
 }
 function swapVariant(ref,id){
  const a=arqOf(ref),item=byId(id);if(!a||!item)return;
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d);delete ref.dynamic;
+ CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d,a.doc||{dims:false,hatch:false});delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
 }
 function variantMenu(ref,x,y){
