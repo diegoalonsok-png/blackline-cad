@@ -5008,51 +5008,86 @@ function cadBreakAtPoint(p){
  state.selected=[a.id,b.id];state.tool='select';state.stage=[];updateAll();
  toast('BREAKATPOINT: línea dividida en dos · Ctrl+Z para deshacer');
 }
+
+/* LIST: complete read-only inspection of selected model entities. */
+function cadListRecord(e,layer,unit,precision){
+ const fmt=n=>Number.isFinite(n)?Number(n).toFixed(precision):'—';
+ const point=p=>p?'('+fmt(p.x)+', '+fmt(p.y)+')':'—';
+ const measure=(title,n)=>title+': '+fmt(n)+' '+unit;
+ const angle=n=>fmt(((n%360)+360)%360)+'°';
+ const rect=cadRectangleGeometry(e);
+ const color=e.color||layer.color||'BYLAYER',linetype=e.linetype||layer.linetype||'CONTINUOUS',width=e.width??layer.width??.25;
+ let length=null,area=null,details=[];
+ if(rect){
+  length=2*(rect.w+rect.h);area=rect.w*rect.h;
+  details.push(measure('Ancho',rect.w),measure('Largo',rect.h),'Origen: '+point(rect.a),'Rotación: '+angle(Math.atan2(rect.u.y,rect.u.x)*180/Math.PI));
+ }else if(e.type==='line'){
+  length=dist(e.a,e.b);
+  details.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Delta X',e.b.x-e.a.x),measure('Delta Y',e.b.y-e.a.y),'Ángulo: '+angle(Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x)*180/Math.PI));
+ }else if(e.type==='circle'||e.type==='arc'){
+  details.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
+  if(e.type==='circle'){length=TAU*e.r;area=Math.PI*e.r*e.r}
+  else {const sweep=arcSweep(e.a0,e.a1);length=e.r*sweep;details.push('Ángulo inicial: '+angle(e.a0*180/Math.PI),'Ángulo final: '+angle(e.a1*180/Math.PI),'Ángulo incluido: '+fmt(sweep*180/Math.PI)+'°',measure('Cuerda',2*e.r*Math.sin(sweep/2)),'Área de sector: '+fmt(e.r*e.r*sweep/2)+' '+unit+'²','Área de segmento: '+fmt(e.r*e.r*(sweep-Math.sin(sweep))/2)+' '+unit+'²')}
+ }else if(e.type==='polyline'){
+  const path=cadQuickPathInfo(e);length=path.length;area=e.closed?cadEntityArea(e):null;
+  details.push(e.closed?'Cerrada':'Abierta','Vértices: '+e.pts.length,'Segmentos: '+path.sides,'Primer vértice: '+point(e.pts[0]));
+ }else if(e.type==='ellipse'){
+  length=cadQuickEllipsePerimeter(e.rx,e.ry);area=Math.PI*e.rx*e.ry;
+  details.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry),'Rotación: '+angle((e.rotation||0)*180/Math.PI));
+ }else if(e.type==='blockRef'){
+  details.push('Bloque: '+e.blockName,'Inserción: '+point(e.p),'Escala: '+fmt(e.scale??1),'Rotación: '+angle(e.rotation||0));
+ }else if(e.type==='hatch'){
+  area=cadQuickHatchArea(e);length=cadQuickPathInfo({pts:e.pts,closed:true}).length;
+  details.push('Patrón: '+(e.hatchStyle||'solid'),'Islas: '+(e.holes||[]).length);
+ }else if(e.type==='text'){
+  details.push('Texto: '+e.text,measure('Altura',e.h),'Inserción: '+point(e.p),'Fuente: '+(e.fontFamily||'Arial'),'Rotación: '+angle(e.rotation||0));
+ }else if(e.type==='dimension'){
+  details.push('Tipo de cota: '+(e.mode||'aligned'),'Estilo: '+(e.dimStyleName||'Predeterminado'),'Inicio: '+point(e.a),'Fin: '+point(e.b),'Posición: '+point(e.p),measure('Distancia entre puntos',dist(e.a,e.b)));
+ }else if(e.type==='image'){
+  details.push('Esquina A: '+point(e.a),'Esquina B: '+point(e.b),measure('Ancho',Math.abs(e.b.x-e.a.x)),measure('Alto',Math.abs(e.b.y-e.a.y)));
+ }
+ if(cadQuickWidthEntity(e))details.push(measure('Grosor global',e.pwidth||0));
+ if(Number.isFinite(length))details.push(measure(e.type==='ellipse'?'Perímetro aproximado':e.type==='hatch'?'Perímetro exterior':rect||e.type==='circle'||e.closed?'Perímetro':'Longitud',length));
+ if(Number.isFinite(area))details.push((e.type==='hatch'?'Área neta':'Área')+': '+fmt(area)+' '+unit+'²');
+ const type=rect?'RECTÁNGULO':e.type.toUpperCase();
+ const visible=layer.visible!==false&&!e.cadHidden,locked=!!layer.locked;
+ const header=['#'+e.id+' · '+type,'Capa: '+layer.name,'Color: '+color+(e.color?'':' (por capa)'),'Tipo de línea: '+linetype+(e.linetype?'':' (por capa)'),'Espesor de impresión: '+fmt(width)+' mm','Estado: '+(visible?'Visible':'Oculto')+(locked?' · Bloqueado':'')];
+ return {id:e.id,type,layer:layer.name,color,linetype,width,visible,locked,length,area,details,report:header.concat(details).join('\n')};
+}
+function cadListCsv(records,unit){
+ // Neutralize spreadsheet formulas in user-controlled strings; numeric cells remain numeric.
+ const cell=v=>{if(v==null)return '""';let s=String(v);if(typeof v==='string'&&/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+ const header=['ID','Tipo','Capa','Color','Tipo de línea','Espesor (mm)','Visible','Bloqueado','Longitud o perímetro ('+unit+')','Área ('+unit+'²)','Detalles'];
+ const rows=records.map(r=>[r.id,r.type,r.layer,r.color,r.linetype,r.width,r.visible?'Sí':'No',r.locked?'Sí':'No',r.length,r.area,r.details.join(' | ')]);
+ return '\uFEFF'+[header,...rows].map(r=>r.map(cell).join(',')).join('\r\n');
+}
 function cadListEntities(){
  const chosen=selectedCadEntities();
  if(!chosen.length)return toast('LIST: seleccioná objetos para consultar sus propiedades');
- const format=n=>Number(n).toFixed(state.precision),point=p=>'('+format(p.x)+', '+format(p.y)+')';
- const measure=(title,n)=>title+': '+format(n)+' '+state.unit;
- const rows=chosen.map(e=>{
-  const layer=layerFor(e),rect=cadRectangleGeometry(e);
-  const data=['#'+e.id+' · '+(rect?'RECTÁNGULO':e.type.toUpperCase()),
-   'Capa: '+layer.name+' · '+format(e.width??layer.width??.25)+' mm'];
-  if(rect){
-   data.push(measure('Ancho',rect.w),measure('Largo',rect.h),measure('Perímetro',2*(rect.w+rect.h)));
-  }else if(e.type==='line'){
-   data.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Longitud',dist(e.a,e.b)));
-  }else if(e.type==='circle'||e.type==='arc'){
-   data.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
-   if(e.type==='circle')data.push(measure('Perímetro',TAU*e.r));
-   else data.push(measure('Longitud',e.r*arcSweep(e.a0,e.a1)),'Ángulo incluido: '+format(arcSweep(e.a0,e.a1)*180/Math.PI)+'°');
-  }else if(e.type==='polyline'){
-   const path=cadQuickPathInfo(e);
-   data.push(e.closed?'Cerrada · '+path.sides+' lados':'Abierta · '+e.pts.length+' vértices',
-    measure(e.closed?'Perímetro':'Longitud',path.length));
-  }else if(e.type==='ellipse'){
-   data.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry));
-  }else if(e.type==='blockRef')data.push('Bloque: '+e.blockName,'Inserción: '+point(e.p));
-  else if(e.type==='hatch')data.push('Patrón: '+(e.hatchStyle||'solid'));
-  else if(e.type==='text')data.push('Texto: '+e.text,measure('Altura',e.h));
-  if(cadQuickWidthEntity(e))data.push(measure('Grosor global',e.pwidth||0));
-  const area=cadEntityArea(e);
-  if(Number.isFinite(area))data.push('Área: '+format(area)+' '+state.unit+'²');
-  return data.join('\n');
- });
- const content=chosen.length+(chosen.length===1?' objeto seleccionado':' objetos seleccionados')+' · '+state.unit+
-  '\n\n'+rows.join('\n\n──────────────────────────────\n\n');
+ const unit=state.unit,records=chosen.map(e=>cadListRecord(e,layerFor(e),unit,state.precision));
+ const sum=k=>records.reduce((n,r)=>n+(Number.isFinite(r[k])?r[k]:0),0);
+ const count=k=>records.filter(r=>Number.isFinite(r[k])).length;
+ const fmt=n=>n.toFixed(state.precision);
+ const summary=[chosen.length+' objeto(s) seleccionado(s) · '+unit];
+ if(count('length'))summary.push('Suma de longitudes y perímetros: '+fmt(sum('length'))+' '+unit+' ('+count('length')+' objetos)');
+ if(count('area'))summary.push('Suma de áreas: '+fmt(sum('area'))+' '+unit+'² ('+count('area')+' objetos; no descuenta superposiciones)');
+ const rows=records.map(r=>r.report);
+ const content=summary.join('\n')+'\n\n'+rows.join('\n\n──────────────────────────────\n\n');
  log('LIST · '+chosen.length+' objeto(s)\n'+rows.slice(0,15).join('\n\n'));
  $('cadListResult')?.remove();
  const box=document.createElement('section');box.id='cadListResult';box.setAttribute('role','dialog');
  box.setAttribute('aria-label','LIST · Objetos seleccionados');
- box.innerHTML='<header><strong>LIST · OBJETOS</strong><button type="button">Cerrar</button></header><pre></pre>';
+ box.innerHTML='<header style="flex-wrap:wrap"><strong>LIST · OBJETOS</strong><div style="display:flex;gap:4px"><button type="button" data-txt>TXT</button><button type="button" data-csv>CSV</button><button type="button" data-close>Cerrar</button></div></header><pre></pre>';
  box.querySelector('pre').textContent=content;
- const close=box.querySelector('button');
+ const close=box.querySelector('[data-close]');
  function dismiss(){box.remove();canvas.focus({preventScroll:true})}
  close.onclick=dismiss;
+ box.querySelector('[data-txt]').onclick=()=>download('LIST-objetos.txt',content,'text/plain;charset=utf-8');
+ box.querySelector('[data-csv]').onclick=()=>download('LIST-objetos.csv',cadListCsv(records,unit),'text/csv;charset=utf-8');
  box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
  document.body.append(box);close.focus({preventScroll:true});
 }
+
 function cadQuickSelect(){
  const all=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked);
  const types=[...new Set(all.map(e=>e.type))].sort();
