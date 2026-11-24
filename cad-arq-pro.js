@@ -708,6 +708,52 @@ EXT.context.push(info=>{
  return {top,bottom:out};
 });
 
+
+/* Independent architecture assistant: uses the existing regenerative ARQ engine. */
+function openArchitectureAssistant(category){
+ let panel=document.getElementById('arqAssistant');
+ if(!panel){
+  panel=document.createElement('section');panel.id='arqAssistant';
+  panel.style.cssText='position:fixed;top:105px;right:24px;width:min(390px,92vw);max-height:80vh;overflow:auto;z-index:1200;background:#151e26;color:#dce8ef;border:1px solid #405464;border-radius:10px;padding:12px;box-shadow:0 8px 30px #0008;font:13px Arial';
+  panel.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center"><b>CAD2D3D · ARCHITECTURE ASSISTANT</b><button data-close aria-label="Cerrar">×</button></div><p>Ambientes paramétricos · medidas en metros</p><label>Tipo <select data-cat><option>Baños completos</option><option>Cocinas completas</option></select></label><p><label>Configuración <select data-model style="width:100%"></select></label></p><div style="display:flex;gap:8px"><label>Ancho <input data-w type="number" step=".05" style="width:85px"></label><label>Largo <input data-d type="number" step=".05" style="width:85px"></label></div><div data-preview style="margin:10px 0;background:#0d1418;color:#dce8ef;border-radius:6px"></div><label>Instrucción (tipo y medidas)<textarea data-command rows="2" style="width:100%;box-sizing:border-box" placeholder="Baño con ducha y bidet de 1.80 x 2.40"></textarea></label><div style="display:flex;gap:6px;margin:6px 0"><button data-interpret>Interpretar</button><button data-voice>Dictar</button></div><p data-status role="status" style="min-height:30px;color:#b2cbd8"></p><button data-insert style="width:100%;padding:8px">Insertar en plano</button>';
+  document.body.appendChild(panel);
+  const q=s=>panel.querySelector(s),cat=q('[data-cat]'),model=q('[data-model]'),w=q('[data-w]'),d=q('[data-d]'),status=q('[data-status]');
+  const say=s=>status.textContent=s;
+  const available=()=>LIB.library.filter(x=>x.cat===cat.value&&!x.hideFromGallery&&!x.dxfPlan&&!x.paidOnly&&typeof x.gen==='function');
+  const selected=()=>available().find(x=>x.id===model.value);
+  const valid=()=>{const it=selected(),W=Number(w.value),D=Number(d.value);if(!it||!Number.isFinite(W)||!Number.isFinite(D)||W<it.wMin||W>it.wMax||D<it.dMin||D>it.dMax)throw Error('Dimensiones fuera del rango de esta configuración.');return {it,W,D}};
+  const preview=()=>{try{const {it,W,D}=valid();q('[data-preview]').innerHTML=svgFor(it,W,D,{height:170});say('Vista preliminar. Verificar accesos y circulación antes de construir.')}catch(e){q('[data-preview]').replaceChildren();say(e.message)}};
+  const defaults=()=>{const it=selected();if(!it)return;w.min=it.wMin;w.max=it.wMax;d.min=it.dMin;d.max=it.dMax;w.value=it.w;d.value=it.d;preview()};
+  const refresh=()=>{model.replaceChildren(...available().map(it=>new Option(it.name,it.id)));defaults()};
+  cat.onchange=refresh;model.onchange=defaults;w.oninput=d.oninput=preview;
+  const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  function interpret(){
+   const s=norm(q('[data-command]').value),m=s.match(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)/);
+   if(/cocina/.test(s))cat.value='Cocinas completas';else if(/bano|toilette/.test(s))cat.value='Baños completos';refresh();
+   let list=available(),it;
+   const keys=cat.value==='Baños completos'?['toilette','ducha y bidet','banera y bidet','doble bacha','accesible','banera','ducha']:['isla','lineal','en l','en u','paralela'];
+   for(const key of keys){if(s.includes(key)){it=list.find(x=>norm(x.name).includes(key));if(it)break}}
+   if(!it&&cat.value==='Baños completos'&&s.includes('bidet')&&s.includes('ducha'))it=list.find(x=>x.id==='bano-ducha-bidet');
+   if(it){model.value=it.id;defaults()}
+   if(m){w.value=m[1].replace(',','.');d.value=m[2].replace(',','.')}
+   preview();if(!it)say('Revisá la configuración seleccionada. Solo se interpretan tipos y medidas, no instrucciones libres de distribución.');
+  }
+  q('[data-interpret]').onclick=interpret;
+  q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;interpret()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
+  q('[data-insert]').onclick=()=>{try{const {it,W,D}=valid();if(armInsert(it,W,D))panel.hidden=true}catch(e){say(e.message)}};
+  q('[data-close]').onclick=()=>panel.hidden=true;
+  panel.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')panel.hidden=true});
+  panel.setCategory=value=>{cat.value=value;refresh()};
+  refresh();
+ }
+ panel.hidden=false;if(category)panel.setCategory(category);
+}
+EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureAssistant();
+EXT.commands.BANO=EXT.commands.BANOS=EXT.commands['BAÑO']=EXT.commands['BAÑOS']=()=>openArchitectureAssistant('Baños completos');
+EXT.commands.COCINA=EXT.commands.COCINAS=()=>openArchitectureAssistant('Cocinas completas');
+CORE.ribbon.add('arq','ASISTENTE',[{id:'arqAssistantOpen',label:'Asistente paramétrico',icon:'<rect x="3" y="3" width="18" height="18"/><path d="M3 12h18M12 3v18"/>',run:()=>openArchitectureAssistant()}]);
+CORE.ribbon.rebuild();
+
 /* ---------- Conexión ---------- */
 const canvas=CORE.canvas;
 canvas.addEventListener('pointerdown',onPointerDown,true);
