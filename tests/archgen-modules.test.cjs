@@ -76,3 +76,40 @@ test('ARCHGEN integración: comando, puente, aberturas paramétricas y capas de 
  assert.match(js,/commands\.ARCHGEN=openPalette/);
  assert.match(js,/CAD2D_ARCHGEN_INSERT/);
 });
+
+test('ARCHGEN resize preserves furniture dimensions, wall attachment and openings',()=>{
+ const resize=globalThis.CAD2D_ARCHGEN.resizeModel;
+ for(const spec of [{kind:'bath',width:3,depth:3},{kind:'bedroom',width:5,depth:4.5}]){
+  const model=generate({...spec,wall:.2,count:12})[0];
+  const original=JSON.stringify(model);
+  const expanded=resize(model,spec.width+.8,spec.depth+.6);
+  assert.equal(JSON.stringify(model),original);
+  assert.equal(expanded.width,spec.width+.8);
+  assert.equal(expanded.depth,spec.depth+.6);
+  assert.equal(expanded.area,expanded.width*expanded.depth);
+  assert.equal(expanded.wall,model.wall);
+  assert.equal(expanded.door.width,model.door.width);
+  assert.equal(expanded.window.width,model.window.width);
+  for(const [i,a] of expanded.items.entries()){
+   const b=model.items[i];
+   assert.deepEqual([a.id,a.w,a.d,a.rotation,a.side],[b.id,b.w,b.d,b.rotation,b.side]);
+   assert.ok(within(a,expanded.width,expanded.depth));
+   if(a.side==='N')assert.ok(Math.abs((expanded.depth-a.y)-(model.depth-b.y))<eps);
+   if(a.side==='E')assert.ok(Math.abs((expanded.width-a.x)-(model.width-b.x))<eps);
+   if(a.side==='S')assert.equal(a.y,b.y);
+   if(a.side==='W')assert.equal(a.x,b.x);
+   for(const other of expanded.items.slice(0,i))assert.ok(!overlap(a,other));
+  }
+  const restored=resize(expanded,spec.width,spec.depth);
+  for(const [i,a] of restored.items.entries()){
+   assert.ok(Math.abs(a.x-model.items[i].x)<eps);
+   assert.ok(Math.abs(a.y-model.items[i].y)<eps);
+  }
+ }
+});
+test('ARCHGEN resize rejects impossible dimensions without modifying the original',()=>{
+ const model=generate({kind:'bedroom',width:5,depth:4.5,count:1})[0];
+ const old=JSON.stringify(model);
+ assert.throws(()=>globalThis.CAD2D_ARCHGEN.resizeModel(model,1.5,1.5),/espacio|interferencias/);
+ assert.equal(JSON.stringify(model),old);
+});
