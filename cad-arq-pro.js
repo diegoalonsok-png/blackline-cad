@@ -55,6 +55,18 @@ function ensureDocLayer(id,color){
  if(!layer){layer={id,name:id,color,visible:true,locked:false,width:.13};st.layers.push(layer)}
  return layer;
 }
+function isCleanOpening(item){
+ if(item.dynamicOpening)return true;
+ return /^(?:alz-(?:puerta|ventana)|dk-(?:puerta|ventana|pano|corrediza)|cv-ventana)/.test(item.id)||(['Carpinterías','Aberturas','Puertas y ventanas'].includes(item.cat)&&/puerta|ventana|ventanal|paño fijo|pano fijo|portón|door|window/i.test(item.name));
+}
+function cleanPlanEntities(item,entities){
+ return isCleanOpening(item)?entities.filter(e=>!['text','dimension','mtext','attdef','attrib'].includes(e.type)&&!e.attdef):entities;
+}
+function grayPlanColor(e){
+ if(e.type==='hatch')return '#a2a2a2';
+ if(e.type==='text')return '#8c8c8c';
+ return e.width>=.18?'#707070':'#b0b0b0';
+}
 function docChoices(item){
  return docEligible(item)?{dims:$('arqDocDims')?.checked??true,hatch:$('arqDocHatch')?.checked??true}:{dims:false,hatch:false};
 }
@@ -83,7 +95,7 @@ function docGeometry(entities,W,D,opts){
   }
  }
  if(opts.dims){
-  const style={precision:2,textHeight:.12,arrow:.10,displayUnit:'m',suffix:'',arrowType:'tick',extOffset:.05,extBeyond:.08};
+  const style={precision:2,textHeight:.12,arrow:.10,displayUnit:'m',hideUnit:true,suffix:'',color:'#909090',arrowType:'tick',extOffset:.05,extBeyond:.08};
   for(const [a,b,p] of [[P(0,D),P(W,D),P(W/2,D+.35)],[P(W,0),P(W,D),P(W+.35,D/2)]])
    out.push({type:'dimension',mode:'aligned',a,b,p,style:{...style},width:.13,layer:DOC_DIMS,arqDocLayer:true});
  }
@@ -95,19 +107,22 @@ function defName(item,W,D){return 'ARQ · '+item.name+' · '+cm(W)+'×'+cm(D)}
 function ensureDefinition(item,W,D,opts=docChoices(item),openingOptions){
  const opening=item.arqBedroom?{...item.openingDefaults,...openingOptions}:undefined;
  const built=LIB.build(item.id,W,D,opening),k=f(),st=S();
+ const gray=docEligible(item)||isCleanOpening(item);
+ built.entities=cleanPlanEntities(item,built.entities);
  const docs=docEligible(item)?docGeometry(built.entities,built.w,built.d,opts):[];
- const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix+(opening?' · P'+cm(opening.doorWidth)+'x'+cm(opening.doorHeight)+' V'+cm(opening.windowWidth)+'x'+cm(opening.windowHeight):'');
- if(docs.some(e=>e.layer===DOC_DIMS))ensureDocLayer(DOC_DIMS,'#e8d38a');
+ const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix+(gray?' · Gris v1':'')+(opening?' · P'+cm(opening.doorWidth)+'x'+cm(opening.doorHeight)+' V'+cm(opening.windowWidth)+'x'+cm(opening.windowHeight):'');
+ if(docs.some(e=>e.layer===DOC_DIMS))ensureDocLayer(DOC_DIMS,'#909090');
  if(docs.some(e=>e.layer===DOC_HATCH))ensureDocLayer(DOC_HATCH,'#a2a2a2');
  // Preserve old colored definitions used by existing drawings. New insertions
  // receive a separate white/0 definition instead of silently mutating history.
  const name=st.blocks[oldName]&&!st.blocks[oldName].libraryLayer0?oldName+' · Layer 0':oldName;
  if(!st.blocks[name]){
   const ents=built.entities.map(e=>scaleEntity(e,k));
-  for(const e of ents){e.layer='0';e.color='#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
+  for(const e of ents){e.layer='0';e.color=gray?grayPlanColor(e):'#ffffff';if(e.width===undefined)e.width=e.type==='text'?.09:.13}
   const docEnts=docs.map(e=>scaleEntity(e,k));
   const def=CORE.cadPrepareDynamicBlock({name,entities:CORE.normalizeBlockEntities([...docEnts.filter(e=>e.type==='hatch'),...ents,...docEnts.filter(e=>e.type==='dimension')])});
   if(docs.length)def.arqDocumentation=true;
+  if(gray)def.arqGrayPlan=true;
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
   def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
   const bb=LIB.bounds(built.entities);
@@ -155,7 +170,7 @@ function finishPendingInsert(){
 /* ---------- Miniaturas SVG con la misma geometría que se inserta ---------- */
 const NS='http://www.w3.org/2000/svg';
 function svgFor(item,W,D,{height=96,pad=.08}={}){
- const {entities}=LIB.build(item.id,W??item.w,D??item.d),b=LIB.bounds(entities);
+ const entities=cleanPlanEntities(item,LIB.build(item.id,W??item.w,D??item.d).entities),b=LIB.bounds(entities);
  const w=Math.max(.01,b.maxX-b.minX),h=Math.max(.01,b.maxY-b.minY),p=Math.max(w,h)*pad;
  const sw=Math.max(w,h)/160;
  let body='';
