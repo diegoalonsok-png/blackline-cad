@@ -348,6 +348,64 @@ def({id:'kit-con-lavadero',name:'Cocina en L + lavadero',cat:KIT,family:'cocina'
   const L=lx-.05-.72;at('N',.72,L,bb=>{F.mesada(bb,L);bb.at(L/2-.45,0,0,x=>F.bacha(x,.90,.58))});at('N',0,.70,bb=>F.heladera(bb));
   const leg=Math.max(1.0,D-1.95);at('W',.35,leg,bb=>{F.mesada(bb,leg);bb.at(.20,0,0,x=>F.anafe(x))})}});
 
+
+/* Original modular kitchens. Exterior room dimensions; reference aisle target 1.10 m.
+   Generous starting dimensions, no claim of regulatory compliance. */
+const kitchenFamilies=[['lineal','Cocina lineal'],['parallel','Cocina paralela'],['l','Cocina en L'],['u','Cocina en U'],['island','Cocina con isla'],['peninsula','Cocina con península']];
+const kitchenOrders=[['fridge','sink','prep','hob','work'],['fridge','hob','prep','sink','work'],['work','sink','prep','hob','fridge'],['work','hob','prep','sink','fridge']];
+function kitchenLayoutSpec(W,D,family,v){
+ const t=.12,back=D-t-.70,lo=t+.60,hi=W-t-.60,span=hi-lo;
+ const sink=v>=4?1.20:.90,work=span-.70-sink-.60-.60;
+ if(work<.40-1e-8)throw Error('Falta superficie de apoyo');
+ let x=lo;const modules=kitchenOrders[v%4].map(key=>{
+  const w={fridge:.70,sink,prep:.60,hob:.60,work}[key],r={key,x,y:back,w,h:.70};x+=w;return r});
+ const extras=[];
+ const add=(key,x,y,w,h)=>extras.push({key,x,y,w,h});
+ if(family==='parallel')add('front',lo,t,span,.60);
+ if(['l','u','peninsula'].includes(family))add('left',t,1.05,.60,back-1.05);
+ if(family==='u')add('right',W-t-.60,1.05,.60,back-1.05);
+ if(family==='island')add('island',(W-2.20)/2,(D-.70-.90)/2,2.20,.90);
+ if(family==='peninsula')add('peninsula',lo,1.05,1.85,.90);
+ const aisle=family==='island'?Math.min(extras[0].y-t,back-(extras[0].y+.90),(W-2.20)/2-t):family==='parallel'?back-t-.60:family==='peninsula'?Math.min(back-1.95,W-t-lo-1.85):family==='u'?W-2*t-1.20:family==='l'?W-2*t-.60:back-t;
+ if(aisle<1.10-1e-8)throw Error('Circulación inferior a 1,10 m');
+ return {t,modules,extras,aisle,doorSide:family==='parallel'?'left':'front'};
+}
+function drawKitchenLayout(b,W,D,family,v){
+ const s=kitchenLayoutSpec(W,D,family,v),t=s.t,door=.90;
+ if(s.doorSide==='front'){
+  const a=(W-door)/2,z=a+door;
+  for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(...p,{width:.22});
+  b.line(a,0,a,-door);b.arc(a,0,door,270,360);
+ }else{
+  const a=(D-door)/2,z=a+door;
+  for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
+  b.line(0,a,-door,a);b.arc(0,a,door,90,180);
+ }
+ for(const r of s.modules){
+  b.at(r.x+r.w,D-t,180,q=>{
+   if(r.key==='fridge')F.heladera(q,r.w,.70);
+   else{
+    F.mesada(q,r.w,.60);
+    if(r.key==='sink')(r.w>1?F.bachaDoble:F.bacha)(q,r.w,.60);
+    if(r.key==='hob')F.anafe(q,.60,.60);
+    if(r.key==='prep')q.line(0,.08,r.w,.08,{dashed:true});
+   }
+  });
+ }
+ for(const r of s.extras){
+  b.rect(r.x,r.y,r.w,r.h);
+  if(r.key==='left'||r.key==='right'){
+   const n=Math.ceil(r.h/.60);for(let i=1;i<n;i++)b.line(r.x,r.y+r.h*i/n,r.x+r.w,r.y+r.h*i/n);
+  }else{
+   const n=Math.ceil(r.w/.60);for(let i=1;i<n;i++)b.line(r.x+r.w*i/n,r.y,r.x+r.w*i/n,r.y+r.h);
+  }
+  if(r.key==='island'||r.key==='peninsula')b.text(r.x+.10,r.y+.12,r.key==='island'?'ISLA':'PENÍNSULA',.09);
+ }
+}
+for(const [family,label] of kitchenFamilies)for(let v=0;v<8;v++){
+ def({id:'arq-kitchen-'+family+'-'+(v+1),name:label+' · '+(v>=4?'doble bacha':'bacha simple')+' · variante '+(v%4+1),cat:KIT,family:'arq-kitchen-'+family,w:5.40,d:4.80,wMin:5.00,wMax:8,dMin:4.40,dMax:7,pro:['island','peninsula'].includes(family),arqKitchenVariant:true,layoutSpec:(W,D)=>kitchenLayoutSpec(W,D,family,v),gen(b,W,D){drawKitchenLayout(b,W,D,family,v)}});
+}
+
 /* ===== ARTEFACTOS SANITARIOS (bloques sueltos) ===== */
 const SAN='Sanitarios';
 const one=(id,name,cat,w,d,fn,extra={})=>def({id,name,cat,family:extra.family||id,w,d,...extra,gen(b,W,D){fn(b,W,D)}});
