@@ -5282,6 +5282,8 @@ function fallbackDraw(){
     var top=projection(rec.x+x*ca,rec.y+x*sa,rec.z+z+rec.h);
     ctx.beginPath();ctx.moveTo(foot.x,foot.y);ctx.lineTo(top.x,top.y);ctx.stroke();
    }
+  }else if(rec.type==='slab'&&rec.slabPolyHoles?.length){
+   cad3dFallbackSlabHoles(projection,rec);
   }else if(rec.type==='wall'||rec.type==='slab'){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
@@ -5847,6 +5849,76 @@ function hostHitAt(e,type){
  return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
 }
 /* Validate architectural opening edits before changing the wall geometry. */
+/* Polygonal through-holes in rectangular architectural slabs. Coordinates are slab-local. */
+function cad3dPolyCross(a,b,c){return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);}
+function cad3dPolyOn(a,b,c){return Math.abs(cad3dPolyCross(a,b,c))<1e-8&&c[0]>=Math.min(a[0],b[0])-1e-8&&c[0]<=Math.max(a[0],b[0])+1e-8&&c[1]>=Math.min(a[1],b[1])-1e-8&&c[1]<=Math.max(a[1],b[1])+1e-8;}
+function cad3dPolyIntersect(a,b,c,d){
+ var ab1=cad3dPolyCross(a,b,c),ab2=cad3dPolyCross(a,b,d),cd1=cad3dPolyCross(c,d,a),cd2=cad3dPolyCross(c,d,b);
+ return ((ab1>1e-8&&ab2< -1e-8||ab1< -1e-8&&ab2>1e-8)&&(cd1>1e-8&&cd2< -1e-8||cd1< -1e-8&&cd2>1e-8))||cad3dPolyOn(a,b,c)||cad3dPolyOn(a,b,d)||cad3dPolyOn(c,d,a)||cad3dPolyOn(c,d,b);
+}
+function cad3dPolyArea(p){return p.reduce(function(sum,v,i){var q=p[(i+1)%p.length];return sum+v[0]*q[1]-q[0]*v[1];},0)/2;}
+function cad3dPolyInside(p,q){var inside=false;for(var i=0,j=p.length-1;i<p.length;j=i++){
+ var a=p[i],b=p[j];if(cad3dPolyOn(a,b,q))return true;
+ if((a[1]>q[1])!==(b[1]>q[1])&&q[0]<(b[0]-a[0])*(q[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+ }return inside;}
+function cad3dPolyOverlaps(a,b){
+ for(var i=0;i<a.length;i++)for(var j=0;j<b.length;j++)if(cad3dPolyIntersect(a[i],a[(i+1)%a.length],b[j],b[(j+1)%b.length]))return true;
+ return cad3dPolyInside(a,b[0])||cad3dPolyInside(b,a[0]);
+}
+function cad3dSlabRectPoly(o){return [[o.offset-o.w/2,o.offsetY-o.d/2],[o.offset+o.w/2,o.offsetY-o.d/2],[o.offset+o.w/2,o.offsetY+o.d/2],[o.offset-o.w/2,o.offsetY+o.d/2]];}
+function cad3dPolyValid(p,r){
+ if(!Array.isArray(p)||p.length<3||p.length>512||!p.every(function(v){return Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)&&Math.abs(v[0])<r.w/2-.001&&Math.abs(v[1])<r.d/2-.001;}))return false;
+ if(Math.abs(cad3dPolyArea(p))<.0001)return false;
+ for(var i=0;i<p.length;i++){
+ var a=p[i],b=p[(i+1)%p.length];if(Math.hypot(a[0]-b[0],a[1]-b[1])<.0001)return false;
+ for(var j=i+1;j<p.length;j++){if(j===i+1||i===0&&j===p.length-1)continue;if(cad3dPolyIntersect(a,b,p[j],p[(j+1)%p.length]))return false;}
+ }return true;
+}
+function cad3dSlabHoles(r){return (r.slabPolyHoles||[]).concat((r.openings||[]).map(cad3dSlabRectPoly));}
+function cad3dSlabHolesValid(r){
+ var holes=cad3dSlabHoles(r);
+ return holes.every(function(p,i){return cad3dPolyValid(p,r)&&holes.slice(0,i).every(function(q){return !cad3dPolyOverlaps(p,q);});});
+}
+function cad3dCutSlabPolyline(){
+ var chosen=records.filter(function(r){return selected.includes(r.id);});
+ var slab=chosen.find(r=>r.type==='slab'),profile=chosen.find(r=>r.type==='profile2d');
+ if(chosen.length!==2||!slab||!profile||!editableRecord(slab)||!editableRecord(profile))return text('Seleccioná una losa y una polilínea cerrada (dos objetos editables).');
+ if(!profile.profileClosed||profile.extrudedHeight>0)return text('El contorno debe ser una polilínea cerrada sin extruir.');
+ if((slab.slabPolyHoles||[]).length>=32)return text('Límite de 32 cortes poligonales por losa.');
+ var a=(profile.rot||0)*Math.PI/180,b=(slab.rot||0)*Math.PI/180,c=Math.cos(a),d=Math.sin(a),u=Math.cos(b),v=Math.sin(b);
+ var p=(profile.profilePoints||[]).map(function(pt){var x=profile.x+pt[0]*c-pt[1]*d-slab.x,y=profile.y+pt[0]*d+pt[1]*c-slab.y;return [x*u+y*v,-x*v+y*u];});
+ if(p.length>3&&Math.hypot(p[0][0]-p[p.length-1][0],p[0][1]-p[p.length-1][1])<1e-7)p.pop();
+ var proposal=Object.assign({},slab,{slabPolyHoles:(slab.slabPolyHoles||[]).concat([p])});
+ if(!cad3dSlabHolesValid(proposal))return text('Corte inválido: el contorno debe ser simple, quedar dentro de la losa y no tocar otros vanos.');
+ cad3dHistoryStart();slab.slabPolyHoles=proposal.slabPolyHoles;
+ records=records.filter(r=>r.id!==profile.id);selected=[slab.id];selectedOpeningId=null;
+ setPlacement(null);redraw();renderProps();text('Losa perforada · corte pasante real · Ctrl+Z deshace');
+}
+function cad3dSlabOuter(r){return [[-r.w/2,-r.d/2],[r.w/2,-r.d/2],[r.w/2,r.d/2],[-r.w/2,r.d/2]];}
+function cad3dBuildSlabWithHoles(r,group){
+ var shape=new T.Shape(),outer=cad3dSlabOuter(r);
+ function path(target,p){target.moveTo(p[0][0],p[0][1]);p.slice(1).forEach(v=>target.lineTo(v[0],v[1]));target.closePath();}
+ path(shape,outer);
+ cad3dSlabHoles(r).forEach(function(p){var h=new T.Path();path(h,p);shape.holes.push(h);});
+ var g=new T.ExtrudeGeometry(shape,{depth:r.h,steps:1,bevelEnabled:false});
+ var pos=g.getAttribute('position'),slope=Math.tan((r.pitch||0)*Math.PI/180);
+ if(slope)for(var i=0;i<pos.count;i++)pos.setZ(i,pos.getZ(i)+pos.getX(i)*slope);
+ g.computeVertexNormals();g.clearGroups();
+ var n=g.getAttribute('normal');
+ // Assign material face groups by normal, including sloped caps and diagonal cut walls.
+ for(var i=0;i<pos.count;i+=3){var x=n.getX(i),y=n.getY(i),z=n.getZ(i),face=Math.abs(z)>.5?(z>0?4:5):Math.abs(x)>Math.abs(y)?(x>0?0:1):(y>0?2:3);g.addGroup(i,3,face);}
+ var mesh=addMesh(g,r.slabKind==='roof'?0x89939a:0xb5bdc3,r.id,group,0,0,0);
+ mesh.userData.cadWallPart=true;cad3dAddWallTextures(r,mesh,g,0,0,0);
+}
+function cad3dFallbackSlabHoles(projection,r){
+ var a=(r.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),slope=Math.tan((r.pitch||0)*Math.PI/180),ctx=fallbackCtx;
+ var loops=[cad3dSlabOuter(r)].concat(cad3dSlabHoles(r));
+ function project(p,z){return projection(r.x+p[0]*c-p[1]*s,r.y+p[0]*s+p[1]*c,r.z+z+p[0]*slope);}
+ var wire=['wire2d','wireframe'].includes(renderStyle),stroke=selected.includes(r.id)?'#efc978':wire?'#ffffff':'#5a7585';
+ loops.forEach(function(p){p.forEach(function(v,i){var q=p[(i+1)%p.length];fallbackPolygon([project(v,0),project(q,0),project(q,r.h),project(v,r.h)],'#425a68',stroke,.85);});});
+ ctx.beginPath();loops.forEach(function(p){p.forEach(function(v,i){var q=project(v,r.h);if(i===0)ctx.moveTo(q.x,q.y);else ctx.lineTo(q.x,q.y);});ctx.closePath();});
+ if(!wire){ctx.fillStyle='#b5bdc3';ctx.fill('evenodd');}ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();
+}
 function openingFitsCADHost(host,item,excludeId){
  if(!host||!Number.isFinite(item.offset)||!Number.isFinite(item.w)||item.w<=0)return false;
  if(Math.abs(item.offset)+item.w/2>host.w/2+1e-6)return false;
@@ -5855,6 +5927,7 @@ function openingFitsCADHost(host,item,excludeId){
  }else if(host.type==='slab'){
   if(!Number.isFinite(item.offsetY)||!Number.isFinite(item.d)||item.d<=0||Math.abs(item.offsetY)+item.d/2>host.d/2+1e-6)return false;
  }
+ if(host.type==='slab'&&host.slabPolyHoles?.length){var polygon=cad3dSlabRectPoly(item);if(!cad3dPolyValid(polygon,host)||host.slabPolyHoles.some(p=>cad3dPolyOverlaps(p,polygon)))return false;}
  return !(host.openings||[]).some(function(other){
   if(other.id===excludeId)return false;
   if(Math.abs(other.offset-item.offset)>=(other.w+item.w)/2+.015)return false;
@@ -5889,7 +5962,7 @@ function placeOpening(e){
   if(slab)return Math.abs((other.offsetY||0)-(op.offsetY||0))<((other.d||0)+(op.d||0))/2+.015;
   return Math.max(other.sill||0,op.sill||0)<Math.min((other.sill||0)+(other.h||0),(op.sill||0)+op.h)+.015;
  });
- if(overlaps){text('La abertura se superpone a otra existente. Elegí otro lugar del muro.');return;}
+ if(overlaps||!openingFitsCADHost(rec,op,op.id)){text('La abertura no entra o se superpone a otra existente.');return;}
  rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();
  // Remain armed for another opening on this wall or a different wall.
  text((kind==='door'?'Puerta colocada':kind==='window'?'Ventana colocada':'Vano colocado')+
@@ -6150,6 +6223,7 @@ function get3DGripDefinitions(r,openingId){
 }
 function valid3DGripCandidate(r){
  if(!Number.isFinite(r.x+r.y+r.z+(r.rot||0)))return false;
+ if(r.type==='slab'&&r.slabPolyHoles?.length&&!cad3dSlabHolesValid(r))return false;
  var keys=['w','d','h','radius'];
  for(var k of keys)if(r[k]!=null&&(!Number.isFinite(r[k])||r[k]<.01||r[k]>1000))return false;
  if((r.type==='wall'||r.type==='slab')&&(r.openings||[]).some(function(o){
@@ -7094,7 +7168,8 @@ function buildObject(r){
  if(r.type==='imported3d')cad3dBuildImportedMesh(r,group);
  if(r.type==='profile2d')cad3dBuildProfile(r,group);
  var wallJoin=r.type==='wall'?wallJoinOffsets(r):null;
- if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
+ if(r.type==='slab'&&r.slabPolyHoles?.length)cad3dBuildSlabWithHoles(r,group);
+ else if(r.type==='wall'||r.type==='slab')architectureParts(r,function(w,d,h,x,y,z,color,slope,openingId,motion){
   var g=boxGeom(w,d,h);
   if(wallJoin&&openingId==null)applyWallMiter(g,r,w,x,wallJoin);
   if(slope){
@@ -7431,12 +7506,13 @@ function renderProps(){
  if(!root)return;var p=root.querySelector('.props');
  if(typeof render3DGrips==='function')render3DGrips();
  if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
- if(selected.length!==1){p.innerHTML='<p>'+selected.length+' sólidos seleccionados. Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>';return;}
+ if(selected.length!==1){var pair=records.filter(r=>selected.includes(r.id));p.innerHTML='<p>'+selected.length+' objetos seleccionados.</p>'+(pair.length===2&&pair.some(r=>r.type==='slab')&&pair.some(r=>r.type==='profile2d')?'<button class="btn" data-slab-poly-cut>Perforar losa con polilínea</button>':'<p>Booleanas: elegí exactamente dos BOX sin rotación (prototipo).</p>');return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
  var focus=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
  var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
  '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
+ if(r.type==='slab'&&!focus){html+='<div class="detail"><strong>CORTES DE LOSA</strong><p>Dibujá un contorno cerrado y seleccioná los dos objetos. Comando LOSACORTE.</p>'+(r.slabPolyHoles||[]).map(function(p,i){return '<p>Corte '+(i+1)+' · '+Math.abs(cad3dPolyArea(p)).toFixed(2)+' m² <button class="btn" data-remove-slab-poly="'+i+'">Cerrar vano</button></p>';}).join('')+'</div>';}
  var host=['wall','slab','stair','railing'].includes(r.type);
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
  if(!focus&&r.type==='profile2d')html+='<div class="detail">2D PROFILE: '+escapeHtml(r.name||'Profile')+
@@ -7635,6 +7711,7 @@ function change(e){
   else if(name==='rot')val=clamp(val,-3600,3600);
   else if(name==='pitch')val=clamp(val,-45,45);
   else val=clamp(val,-10000,10000);
+  if(r.type==='slab'&&r.slabPolyHoles?.length&&['w','d'].includes(name)&&!cad3dSlabHolesValid(Object.assign({},r,{[name]:val}))){renderProps();text('La nueva medida dejaría un corte fuera de la losa.');return;}
   r[name]=val;
  }
  redraw();renderProps();text('Parámetros actualizados · geometría 3D regenerada');
@@ -7657,6 +7734,8 @@ function cad3dFocusObject(id){
  applyViewCamera();text('Cámara centrada en '+(r.name||r.type));
 }
 function clickProps(e){
+ if(e.target.closest('[data-slab-poly-cut]')){cad3dCutSlabPolyline();return;}
+ var cut=e.target.closest('[data-remove-slab-poly]');if(cut){var r=records.find(v=>selected.length===1&&v.id===selected[0]&&v.type==='slab'&&editableRecord(v));var i=Number(cut.dataset.removeSlabPoly);if(r&&r.slabPolyHoles&&Number.isInteger(i)&&i>=0&&i<r.slabPolyHoles.length){r.slabPolyHoles.splice(i,1);redraw();renderProps();text('Corte eliminado · losa regenerada');}return;}
  if(e.target.closest('[data-save-arch-preset]')){
   var component=records.find(function(x){return selected.length===1&&selected[0]===x.id;});
   if(component&&['stair','railing'].includes(component.type))cad3dSaveStairPreset(component);
@@ -8443,6 +8522,7 @@ function run3DCommand(){
  var aliases={L:'line',PL:'polyline',POLI:'polyline',POLILINEA:'polyline',RECT:'rectangle',REC:'rectangle',C:'circle',CIRCULO:'circle',ARC:'arc',ARCO:'arc',MURO:'wall',LOSA:'slab',PISO:'floor',PLATFORM:'floor',SOL:'sun',PUERTA:'door',VENTANA:'window',VANO:'opening',M:'materials',MV:'move',CO:'copy',RO:'rotate',E:'extrude',EXTRUDE:'extrude',EXTRUIR:'extrude',EF:'extrudeface',EXTRUDEFACE:'extrudeface',ER:'erase',BORRAR:'erase',DI:'dist'};
  var command=Object.prototype.hasOwnProperty.call(aliases,upper)?aliases[upper]:upper.toLowerCase();
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
+ if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
@@ -8734,6 +8814,9 @@ async function readJSON(e){
      else{op.offsetY=finite(v.offsetY,0);op.d=clamp(finite(v.d,1),.05,1000);}
      return op;
     });
+   }
+   if(r.type==='slab'&&Array.isArray(r.slabPolyHoles)){
+    o.slabPolyHoles=[];r.slabPolyHoles.slice(0,32).forEach(function(p){if(cad3dSlabHolesValid(Object.assign({},o,{slabPolyHoles:o.slabPolyHoles.concat([p])})))o.slabPolyHoles.push(p);});
    }
    if((r.type==='wall'||r.type==='slab')&&r.faceMaterials&&typeof r.faceMaterials==='object'){
     var paint={};
