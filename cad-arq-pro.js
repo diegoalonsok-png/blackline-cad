@@ -49,7 +49,7 @@ function ensureLayer(){
 
 
 const DOC_DIMS='A-ARQ-COTAS',DOC_HATCH='A-ARQ-HATCH';
-const docEligible=item=>['Baños completos','Cocinas completas','Habitaciones completas','Vestidores completos','Dormitorios en suite','Sanitarios colectivos','Cocinas hoteleras'].includes(item.cat);
+const docEligible=item=>['Dormitorios completos','Baños completos','Cocinas completas','Habitaciones completas','Vestidores completos','Dormitorios en suite','Sanitarios colectivos','Cocinas hoteleras'].includes(item.cat);
 function ensureDocLayer(id,color){
  const st=S();let layer=st.layers.find(l=>l.id===id);
  if(!layer){layer={id,name:id,color,visible:true,locked:false,width:.13};st.layers.push(layer)}
@@ -92,10 +92,11 @@ function docGeometry(entities,W,D,opts){
 
 /* ---------- Definiciones de bloque generadas ---------- */
 function defName(item,W,D){return 'ARQ · '+item.name+' · '+cm(W)+'×'+cm(D)}
-function ensureDefinition(item,W,D,opts=docChoices(item)){
- const built=LIB.build(item.id,W,D),k=f(),st=S();
+function ensureDefinition(item,W,D,opts=docChoices(item),openingOptions){
+ const opening=item.arqBedroom?{...item.openingDefaults,...openingOptions}:undefined;
+ const built=LIB.build(item.id,W,D,opening),k=f(),st=S();
  const docs=docEligible(item)?docGeometry(built.entities,built.w,built.d,opts):[];
- const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix;
+ const docSuffix=docs.length?' · '+(opts.dims?'C':'')+(opts.hatch?'H':''):'',oldName=defName(item,built.w,built.d)+docSuffix+(opening?' · P'+cm(opening.doorWidth)+'x'+cm(opening.doorHeight)+' V'+cm(opening.windowWidth)+'x'+cm(opening.windowHeight):'');
  if(docs.some(e=>e.layer===DOC_DIMS))ensureDocLayer(DOC_DIMS,'#e8d38a');
  if(docs.some(e=>e.layer===DOC_HATCH))ensureDocLayer(DOC_HATCH,'#a2a2a2');
  // Preserve old colored definitions used by existing drawings. New insertions
@@ -110,7 +111,7 @@ function ensureDefinition(item,W,D,opts=docChoices(item)){
   // La familia ARQ regenera geometría en lugar de deformarla: el estiramiento genérico se desactiva.
   def.dynamic2d=false;def.dynamicActions=true;def.pro=Boolean(item.pro);def.paidOnly=Boolean(item.paidOnly);def.libraryLayer0=true;
   const bb=LIB.bounds(built.entities);
-  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,doc:docs.length?{...opts}:{dims:false,hatch:false},ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
+  def.arq={id:item.id,w:built.w,d:built.d,unit:st.unit,...(opening?{opening,openings:built.openings}:{}),doc:docs.length?{...opts}:{dims:false,hatch:false},ext:bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:null};
   st.blocks[name]=def;CORE.renderBlockLibrary();CORE.queueLocalBackup();
  }
  return name;
@@ -353,6 +354,16 @@ function parseArqRequest(raw){
    if(/\b(?:paralelo|parallel)\b/.test(s))filters.push(/paralelo/);
    return {kind:'catalog',category:'Dormitorios en suite',dims,count:null,filters};
   }
+  if(n===1&&!privateBath&&!/\b(?:tandem|hotel|corredor|corridor)\b/.test(s)){
+   const filters=[];
+   if(/\b(?:individual|single)\b/.test(s))filters.push(/individual/);
+   if(/\bqueen\b/.test(s))filters.push(/queen/);
+   if(/\bking\b/.test(s))filters.push(/king/);
+   if(/\b(?:familiar|family)\b/.test(s))filters.push(/familiar/);
+   if(/\b(?:dos camas|twin)\b/.test(s))filters.push(/dos camas/);
+   if(/\b(?:escritorio|desk)\b/.test(s))filters.push(/escritorio/);
+   return {kind:'catalog',category:'Dormitorios completos',dims,count:null,filters};
+  }
   const moduleDims=dims||[4,6];
   return {kind:'rooms',category,n,privateBath,dims:[moduleDims[0]*n,moduleDims[1]+1.65],moduleDims};
  }
@@ -417,6 +428,7 @@ function buildPanel(){
   <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:11px;margin:5px 0"><label><input type="checkbox" id="arqDocDims" checked> Cotas generales</label><label><input type="checkbox" id="arqDocHatch" checked> Hatch muros</label></div>
   <div class="arq-grid" id="arqPanelGrid"></div>
   <div id="arqSizeRow" hidden><label>Ancho cm<input type="number" id="arqW" step="5"></label><label>Prof. cm<input type="number" id="arqD" step="5"></label><button type="button" class="btn" id="arqApplySize">Aplicar</button></div>
+  <div id="arqOpeningRow" hidden style="font-size:11px;margin:5px 0"><div>ABERTURAS · cm</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px"><label>Puerta ancho<input type="number" id="arqDoorW" min="80" max="110" step="5" style="width:100%"></label><label>Puerta alto<input type="number" id="arqDoorH" min="190" max="250" step="5" style="width:100%"></label><label>Ventana ancho<input type="number" id="arqWindowW" min="80" max="240" step="5" style="width:100%"></label><label>Ventana alto<input type="number" id="arqWindowH" min="60" max="180" step="5" style="width:100%"></label></div><button type="button" class="btn slim" id="arqOpeningApply">Aplicar aberturas</button></div>
   <p id="arqHelp" style="font-size:10px;color:#9cb1bc;margin:7px 0 0">Clic en una miniatura y luego en el plano. Al seleccionar el bloque insertado: ▶ ancho, ▲ profundidad, ▼ variantes. Los artefactos se reubican, no se deforman.</p>
  </div>`;
  if(neighbour)neighbour.before(panel);else dock.prepend(panel);
@@ -441,16 +453,29 @@ function buildPanel(){
   CORE.toast('El explorador de bloques todavía no está disponible');
  };
  $('arqApplySize').onclick=applySizeRow;
+ $('arqOpeningApply').onclick=applyBedroomOpenings;
  for(const id of ['arqW','arqD'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applySizeRow()}});
  renderPanel();
 }
 function syncSizeRow(item,arq){
+ const op=$('arqOpeningRow');if(op){op.hidden=!item.arqBedroom;if(item.arqBedroom){const o=arq?.opening||item.openingDefaults;for(const [id,key] of [['arqDoorW','doorWidth'],['arqDoorH','doorHeight'],['arqWindowW','windowWidth'],['arqWindowH','windowHeight']])$(id).value=cm(o[key]);}}
  const row=$('arqSizeRow');if(!row)return;
  row.hidden=!isDynamic(item);if(row.hidden)return;
  $('arqW').value=cm(arq?.w??item.w);$('arqD').value=cm(arq?.d??item.d);
  $('arqW').min=cm(item.wMin);$('arqW').max=cm(item.wMax);$('arqD').min=cm(item.dMin);$('arqD').max=cm(item.dMax);
  $('arqD').disabled=item.lockAspect||item.dMin===item.dMax;
  row.dataset.item=item.id;
+}
+function applyBedroomOpenings(){
+ const ref=selectedArqRef(),a=ref&&arqOf(ref),item=a&&byId(a.id);
+ if(!item?.arqBedroom||!allowed(item)||CORE.layerFor(ref).locked||!CORE.layerFor(ref).visible)return CORE.toast('Seleccioná un dormitorio editable.');
+ const opening={doorWidth:Number($('arqDoorW').value)/100,doorHeight:Number($('arqDoorH').value)/100,windowWidth:Number($('arqWindowW').value)/100,windowHeight:Number($('arqWindowH').value)/100};
+ try{
+  LIB.build(item.id,a.w,a.d,opening); // Validate before modifying the drawing or undo history.
+  CORE.saveHistory();
+  ref.blockName=ensureDefinition(item,a.w,a.d,a.doc||{dims:false,hatch:false},opening);delete ref.dynamic;
+  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Aberturas regeneradas · Ctrl+Z deshace');
+ }catch(e){CORE.toast(e.message)}
 }
 function applySizeRow(){
  const item=byId($('arqSizeRow').dataset.item);if(!item)return;
@@ -584,14 +609,14 @@ function resizeRef(ref,W,D){
  const d=item.lockAspect?w*(item.d/item.w):Math.max(item.dMin,Math.min(item.dMax,D));
  if(Math.abs(w-a.w)<1e-6&&Math.abs(d-a.d)<1e-6)return CORE.toast('Sin cambios · rango '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm');
  CORE.saveHistory();
- ref.blockName=ensureDefinition(item,w,d,a.doc||{dims:false,hatch:false});delete ref.dynamic;
+ ref.blockName=ensureDefinition(item,w,d,a.doc||{dims:false,hatch:false},a.opening);delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);
  CORE.toast(item.name+' → '+cm(w)+' × '+cm(d)+' cm · Ctrl+Z deshace');
 }
 function swapVariant(ref,id){
  const a=arqOf(ref),item=byId(id);if(!a||!item)return;
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d,a.doc||{dims:false,hatch:false});delete ref.dynamic;
+ CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d,a.doc||{dims:false,hatch:false},a.opening);delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
 }
 function variantMenu(ref,x,y){
