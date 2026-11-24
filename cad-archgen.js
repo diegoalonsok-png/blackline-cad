@@ -5,9 +5,61 @@
 (function(root){
 'use strict';
 const overlap=(a,b)=>a.x<b.x+b.w-1e-8&&b.x<a.x+a.w-1e-8&&a.y<b.y+b.d-1e-8&&b.y<a.y+a.d-1e-8;
+// Kitchen typologies: continuous cabinet runs, not independent randomly scattered appliances.
+function generateKitchens(width,depth,wall,count,lib){
+ const out=[],groups=new Map(),seen=new Set(),cache=new Map(),doorWidth=.9;
+ const dim=id=>{if(!cache.has(id)){const b=lib.bounds(lib.build(id).entities);cache.set(id,{w:b.maxX-b.minX,d:b.maxY-b.minY})}return cache.get(id)};
+ const within=a=>a.x>=-1e-8&&a.y>=-1e-8&&a.x+a.w<=width+1e-8&&a.y+a.d<=depth+1e-8;
+ const front=(a,gap)=>a.side==='N'?{x:a.x,y:a.y-gap,w:a.w,d:gap}:a.side==='W'?{x:a.x+a.w,y:a.y,w:gap,d:a.d}:a.side==='E'?{x:a.x-gap,y:a.y,w:gap,d:a.d}:null;
+ const run=(ids,side,align)=>{
+  const horizontal=side==='N',span=horizontal?width:depth,corner=horizontal?.08:.85;
+  const length=ids.reduce((s,id)=>s+dim(id).w,0);
+  if(length>span-corner-.08+1e-8)return null;
+  let at=.08+(span-corner-.08-length)*align;
+  const result=[];
+  for(const id of ids){const b=dim(id),p=horizontal?{x:at,y:depth-b.d-.04,w:b.w,d:b.d,rotation:0}:side==='W'?{x:.04,y:at,w:b.d,d:b.w,rotation:90}:{x:width-b.d-.04,y:at,w:b.d,d:b.w,rotation:270};result.push({id,...p,side});at+=b.w}
+  return result;
+ };
+ const equipment=[['kq-bacha','kq-cocina','kq-heladera'],['kq-bacha2','kq-cocina','kq-heladera'],['kq-bacha','kq-cocina','kq-heladera2']];
+ const types=[['Lineal',['N']],['Lineal lateral',['W']],['En L',['N','W']],['En L invertida',['N','E']],['Paralela',['W','E']],['En U',['N','W','E']],['Con isla',['N']],['En L con isla',['N','W']]];
+ const permutations=a=>a.length<2?[a]:a.flatMap((v,i)=>permutations(a.filter((_,j)=>j!==i)).map(p=>[v,...p]));
+ for(const [name,sides] of types)for(const ids of equipment)for(const order of permutations(ids))for(const addCounter of [true,false]){
+  const parts=order.slice();if(addCounter)parts.splice(1,0,'kq-mesada');
+  // Require a work surface, either independent counter or the sink's drainboard.
+  for(const split of sides.length===1?[0]:sides.length===2?[1,2,3]:[1,2]){
+   const runs=sides.length===1?[parts]:sides.length===2?[parts.slice(0,split),parts.slice(split)]:[parts.slice(0,split),parts.slice(split,split+1),parts.slice(split+1)];
+   if(runs.some(r=>!r.length))continue;
+   for(const align of [0,.5,1]){
+    const placed=runs.map((r,i)=>run(r,sides[i],align));if(placed.some(x=>!x))continue;
+    const items=placed.flat();
+    if(name.includes('isla')){
+     const b=dim('kq-isla');items.push({id:'kq-isla',x:(width-b.w)/2,y:(depth-b.d)/2,w:b.w,d:b.d,rotation:0,side:'I'});
+    }
+    if(items.some((a,i)=>!within(a)||items.slice(0,i).some(b=>overlap(a,b))))continue;
+    const free=items.filter(a=>a.side!=='I').map(a=>front(a,.95));
+    if(free.some((a,i)=>!within(a)||items.some((b,j)=>j!==i&&overlap(a,b))))continue;
+    const island=items.find(a=>a.side==='I');if(island){
+     const ring={x:island.x-.95,y:island.y-.95,w:island.w+1.9,d:island.d+1.9};
+     if(!within(ring)||items.some(a=>a!==island&&overlap(a,ring)))continue;
+    }
+    for(const dx of [.12,(width-doorWidth)/2,width-doorWidth-.12]){
+     const swing={x:dx,y:0,w:doorWidth,d:doorWidth};if(dx<.08||dx+doorWidth>width-.08||items.some(a=>overlap(a,swing)))continue;
+     const key=name+'|'+runs.map(r=>r.join(',')).join('|'),sig=key+'|'+align+'|'+dx;
+     if(seen.has(sig))continue;seen.add(sig);
+     if(!groups.has(key))groups.set(key,[]);const g=groups.get(key);if(g.length>=2)continue;
+     g.push({kind:'kitchen',typology:name+(addCounter?' · mesada':' · compacta'),width,depth,wall,items:items.slice(),door:{x:dx,width:doorWidth,outward:false},window:{x:(width-.9)/2,width:.9},turn:null,transfer:null,area:width*depth});
+    }
+   }
+  }
+ }
+ const families=new Map();for(const [key,values] of groups){const name=key.split('|')[0];if(!families.has(name))families.set(name,[]);families.get(name).push(values)}
+ for(let rank=0;rank<2&&out.length<count;rank++)for(let i=0;i<Math.max(0,...[...families.values()].map(v=>v.length))&&out.length<count;i++)for(const v of families.values()){if(v[i]?.[rank])out.push(v[i][rank]);if(out.length===count)break}
+ return out;
+}
 function generate({kind='bath',width=3,depth=3,wall=.2,count=50}={}){
- if(!['bath','accessible','bedroom'].includes(kind)||![width,depth,wall,count].every(Number.isFinite)||width<1.5||depth<1.5||width>20||depth>20||wall<.08||wall>.6||!Number.isInteger(count)||count<1||count>100)throw Error('Parámetros ARCHGEN inválidos');
+ if(!['bath','accessible','bedroom','kitchen'].includes(kind)||![width,depth,wall,count].every(Number.isFinite)||width<1.5||depth<1.5||width>20||depth>20||wall<.08||wall>.6||!Number.isInteger(count)||count<1||count>100)throw Error('Parámetros ARCHGEN inválidos');
  const lib=root.CAD2D_ARQ_LIBRARY;if(!lib?.build)throw Error('Biblioteca arquitectónica no disponible');
+ if(kind==='kitchen')return generateKitchens(width,depth,wall,count,lib);
  const accessible=kind==='accessible',doorWidth=accessible?1:.9;
  if(accessible&&(width<2.8||depth<2.8))return [];
  const bounds=new Map(),get=id=>{if(!bounds.has(id)){const b=lib.bounds(lib.build(id).entities);bounds.set(id,{w:b.maxX-b.minX,d:b.maxY-b.minY})}return bounds.get(id)};
@@ -109,7 +161,7 @@ function openPalette(){
  document.querySelector('[data-archgen-palette]')?.remove();
  const dlg=document.createElement('dialog');dlg.dataset.archgenPalette='1';
  dlg.style.cssText='width:min(960px,94vw);max-height:86vh;overflow:auto;background:#f4eddb;color:#38332c;border:1px solid #bcb29e;border-radius:6px;padding:14px;font:13px Arial,sans-serif';
- dlg.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">ARCHGEN · Módulos arquitectónicos · Experimental</strong><button type="button" data-close>×</button></div><hr><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Familia <select data-kind><option value="bath">Baños</option><option value="accessible">Baños accesibles</option><option value="bedroom">Dormitorios</option></select></label><label>Ancho (m) <input data-w type="number" min="1.5" max="20" step=".05" value="3" style="width:70px"></label><label>Largo (m) <input data-d type="number" min="1.5" max="20" step=".05" value="3" style="width:70px"></label><label>Muro (m) <input data-wall type="number" min=".08" max=".6" step=".01" value=".20" style="width:65px"></label><label>Variantes <input data-count type="number" min="1" max="100" value="50" style="width:55px"></label><label><input data-dim type="checkbox" checked> Cotas</label><label><input data-hatch type="checkbox"> HATCH pisos</label><button type="button" data-generate>Generar</button></div><p data-status role="status"></p><div data-gallery style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px"></div><hr><div style="display:flex;gap:8px;align-items:center"><label>X (m) <input data-x type="number" step=".1" value="0" style="width:85px"></label><label>Y (m) <input data-y type="number" step=".1" value="0" style="width:85px"></label><button type="button" data-insert disabled>Insertar seleccionados</button><button type="button" data-all>Seleccionar todos</button></div>';
+ dlg.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">ARCHGEN · Módulos arquitectónicos · Experimental</strong><button type="button" data-close>×</button></div><hr><div style="display:flex;flex-wrap:wrap;gap:10px"><label>Familia <select data-kind><option value="bath">Baños</option><option value="accessible">Baños accesibles</option><option value="bedroom">Dormitorios</option><option value="kitchen">Cocinas</option></select></label><label>Ancho (m) <input data-w type="number" min="1.5" max="20" step=".05" value="3" style="width:70px"></label><label>Largo (m) <input data-d type="number" min="1.5" max="20" step=".05" value="3" style="width:70px"></label><label>Muro (m) <input data-wall type="number" min=".08" max=".6" step=".01" value=".20" style="width:65px"></label><label>Variantes <input data-count type="number" min="1" max="100" value="50" style="width:55px"></label><label><input data-dim type="checkbox" checked> Cotas</label><label><input data-hatch type="checkbox"> HATCH pisos</label><button type="button" data-generate>Generar</button></div><p data-status role="status"></p><div data-gallery style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px"></div><hr><div style="display:flex;gap:8px;align-items:center"><label>X (m) <input data-x type="number" step=".1" value="0" style="width:85px"></label><label>Y (m) <input data-y type="number" step=".1" value="0" style="width:85px"></label><button type="button" data-insert disabled>Insertar seleccionados</button><button type="button" data-all>Seleccionar todos</button></div>';
  const q=s=>dlg.querySelector(s),num=s=>q(s).valueAsNumber;
  let models=[],chosen=new Set();
  const status=t=>q('[data-status]').textContent=t;
@@ -146,7 +198,7 @@ function openPalette(){
    status(models.length+' alternativas preliminares. Revisar funcionalidad y medidas antes de utilizar en obra.');
   }catch(e){models=[];q('[data-gallery]').replaceChildren();status(e.message)}refresh();
  }
- q('[data-kind]').onchange=()=>{const bedroom=q('[data-kind]').value==='bedroom';q('[data-w]').value=bedroom?5:3;q('[data-d]').value=bedroom?4.5:3;render()};
+ q('[data-kind]').onchange=()=>{const kind=q('[data-kind]').value;q('[data-w]').value=kind==='bedroom'||kind==='kitchen'?5:3;q('[data-d]').value=kind==='bedroom'?4.5:kind==='kitchen'?4:3;render()};
  q('[data-generate]').onclick=render;
  q('[data-all]').onclick=()=>{Array.from(q('[data-gallery]').children).forEach((card,i)=>{if(!chosen.has(i))card.click()})};
  q('[data-insert]').onclick=()=>{try{if(!Number.isFinite(num('[data-x]'))||!Number.isFinite(num('[data-y]')))throw Error('Origen inválido');const n=root.CAD2D_ARCHGEN_INSERT([...chosen].sort((a,b)=>a-b).map(i=>models[i]),{x:num('[data-x]'),y:num('[data-y]')},{dimensions:q('[data-dim]').checked,floorHatch:q('[data-hatch]').checked});dlg.close();core.zoomExtents();core.toast('ARCHGEN: '+n+' módulos insertados')}catch(e){status(e.message)}};
