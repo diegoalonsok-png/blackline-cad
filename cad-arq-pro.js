@@ -716,7 +716,7 @@ function parseRoomRow(raw){
  const s=String(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(!/\b(?:habitacion(?:es)?|dormitorios?|rooms?|bedrooms?)\b/.test(s))return null;
  if(!/\b(?:tandem|fila|row|alinead[oa]s?|side by side)\b/.test(s))return null;
- if(/\b(?:bano|banos|bathroom|bathrooms|suite|vestidor|closet|ventana|windows?)\b/.test(s))throw Error('Esta versión genera muros y accesos de habitaciones en fila; todavía no admite baños privados, ventanas ni vestidores en esta orden.');
+ if(/\b(?:bano|banos|bathroom|bathrooms|suite|vestidor|closet|ventana|windows?)\b/.test(s))throw Error('Esta versión genera muros, puertas y ventanas de habitaciones en fila; todavía no admite baños privados, ventanas personalizadas ni vestidores en esta orden.');
  const words={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
  const n=s.match(/\b(\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:habitacion(?:es)?|dormitorios?|rooms?|bedrooms?)\b/);
  const m=s.match(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)/);
@@ -727,27 +727,10 @@ function parseRoomRow(raw){
  return {count,W,D,T,defaults:!m||!t};
 }
 function drawRoomRow(spec,origin){
- const {count,W,D,T}=spec,k=f(),st=S(),total=count*W+(count+1)*T,door=.80;
- const existing=st.layers.find(x=>x.name==='A-MUROS'),opening=st.layers.find(x=>x.name==='A-ABERTURAS');
- if(existing&&(existing.locked||existing.visible===false)||opening&&(opening.locked||opening.visible===false))throw Error('Desbloqueá y mostrá las capas de muros y aberturas.');
- CORE.saveHistory();
- const layer=(name)=>{let l=st.layers.find(x=>x.name===name);if(!l){let id=name,i=1;while(st.layers.some(x=>x.id===id))id=name+'-'+i++;l={id,name,color:'#ffffff',visible:true,locked:false,width:.13};st.layers.push(l)}return l.id};
- const walls=layer('A-MUROS'),doors=layer('A-ABERTURAS');
- const p=(x,y)=>P(origin.x+x*k,origin.y+y*k);
- const line=(a,b,L)=>newEntity({type:'line',a:p(...a),b:p(...b),layer:L});
- const rect=(x,y,w,h)=>newEntity({type:'rect',a:p(x,y),b:p(x+w,y+h),layer:walls});
- // Continuous back wall; single shared partition per adjacent pair.
- rect(0,D+T,total,T);
- for(let i=0;i<=count;i++)rect(i*(W+T),0,T,D+T);
- for(let i=0;i<count;i++){
-  const left=T+i*(W+T),hinge=left+(W-door)/2;
-  rect(left,0,hinge-left,T);rect(hinge+door,0,left+W-hinge-door,T);
-  line([hinge,T],[hinge,T+door],doors);
-  newEntity({type:'arc',c:p(hinge,T),r:door*k,a0:0,a1:Math.PI/2,layer:doors});
- }
- CORE.updateAll();CORE.queueLocalBackup();CORE.toast(count+' habitaciones dibujadas · muros compartidos · accesos 0.80 m');
+ if(typeof CORE.wall.roomRow!=='function')throw Error('Recargá CAD2D3D para activar el motor de muros nativos.');
+ const count=CORE.wall.roomRow(spec,origin);
+ CORE.toast(count+' habitaciones · muros compartidos · puertas y ventanas paramétricas');
 }
-
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
