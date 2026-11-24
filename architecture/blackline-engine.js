@@ -5,7 +5,7 @@
 'use strict';
 const C=Object.freeze({
  toilet:['san-wc',.40,.70],bidet:['san-bidet',.38,.58],basin:['san-lav',.60,.48],
- shower:['san-ducha',.90,.90],bathtub:['san-banera',1.70,.75],bathtub150:['san-banera',1.50,.75],
+ shower:['san-ducha',.90,.90],shower75:['san-ducha',.75,.75],basin45:['san-lav',.45,.40],toiletCompact:['san-wc-susp',.38,.60],bathtub:['san-banera',1.70,.75],bathtub150:['san-banera',1.50,.75],
  bed:['dor-queen',2.60,2],wardrobe:['mob-placard',1.80,.62],
  singlebed:['dor-cama1',1.40,2],doublebed:['dor-cama2',2.40,1.90],kingbed:['dor-king',3,2],
  sink:['kq-bacha',.80,.60],range:['kq-cocina',.60,.62],fridge:['kq-heladera',.70,.70],
@@ -143,7 +143,7 @@ const overlap=(a,b,g=0)=>a.x<b.x+b.w+g-1e-7&&b.x<a.x+a.w+g-1e-7&&a.y<b.y+b.d+g-1
    the same collision solver. No scaling of sanitary fixtures. */
 function bathroomPattern(w,d,fixtures,seed){
  const has=k=>fixtures.includes(k);
- if(!fixtures.length||fixtures.some(k=>!['toilet','bidet','basin','shower','bathtub','bathtub150'].includes(k)))return null;
+ if(!fixtures.length||fixtures.some(k=>!['toilet','bidet','basin','shower','bathtub','bathtub150','shower75','basin45','toiletCompact'].includes(k)))return null;
  const targets={};
  let id;
  if(has('bathtub')||has('bathtub150')||has('shower')){
@@ -175,7 +175,7 @@ function arrange(w,d,fixtures,protectedZones,seed=0,compact=false){
    for(let j=0;j<=Math.ceil(edge/step);j++){
     const accessRot=['bed','singlebed','doublebed','kingbed'].includes(key)?(rot+180)%360:rot;
     const z=Math.min(edge,j*step),r=horizontal?R(z,accessRot===0?0:d-fd,fw,fd):R(accessRot===90?w-fw:0,z,fw,fd);
-    const gap=['toilet','bidet','basin','shower','bathtub','bathtub150'].includes(key)?(compact?.25:.60):.75;
+    const gap=['toilet','bidet','basin','shower','bathtub','bathtub150','shower75','basin45','toiletCompact'].includes(key)?(compact?.25:.60):.75;
     // Bed catalogue headboard is local +Y; place headboard at wall (rotation 180/90).
     // Beds have their headboard at local +Y; their access direction is reversed.
     const a=accessRot===0?R(r.x,r.y,r.w,r.d+gap):accessRot===90?R(r.x-gap,r.y,r.w+gap,r.d):accessRot===180?R(r.x,r.y-gap,r.w,r.d+gap):R(r.x,r.y,r.w+gap,r.d);
@@ -544,21 +544,38 @@ function run(raw){
  }
  const tpl=compactBathTemplate(spec);
  if(tpl){try{const p=solve({...spec,fixtures:['bathtub','toilet','bidet'],doorX:tpl.doorX,templateLayout:tpl.layout});notes.push('Modelo compacto basado en baño completo de biblioteca; lavatorio no colocado. Holguras y circulación no verificadas.');return mark(p)}catch(e){}}
- // Try the original dimensions, all requested fixtures and alternate door positions first.
- // A partial plan is a last resort and must disclose each missing fixture.
- for(let i=0;i<essential.length;i++)attempts.push(essential.slice(0,essential.length-i-1));
- for(const fixtures of attempts){
-  const doors=[(spec.width-spec.door)/2,.08,spec.width-spec.door-.08].map(doorX=>({doorX}));
-  if(spec.kind==='bathroom'&&spec.count===1&&spec.door&&!spec.closetDepth)for(const sideDoor of ['right','left'])for(const doorX of [.08,(spec.depth-spec.door)/2,spec.depth-spec.door-.08])doors.push({sideDoor,doorX});
-  for(const position of doors){
-   try{const omitted=spec.fixtures.filter(k=>!fixtures.includes(k));
-    const missing=essential.filter(k=>!fixtures.includes(k));
-    const labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',bathtub150:'bañadera de 1,50 m',shower:'ducha'};
-    const warning='APROXIMACIÓN: distribución preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'');
-    const placement=position.sideDoor?' Acceso lateral para liberar el frente.':'';const p=solve({...spec,fixtures,...position,compact:true,assumptions:[...spec.assumptions,warning+placement]});p.status='approximate';p.warning=[...notes,warning+placement].join(' ');return p;
+ // Search subsets by maximum retained explicit equipment, then total equipment.
+ // Compact catalogue alternatives are regenerated at real dimensions, not scaled.
+ const all=spec.fixtures,labels={toilet:'inodoro',bidet:'bidet',basin:'lavatorio',bathtub:'bañadera',bathtub150:'bañadera de 1,50 m',shower:'ducha'};
+ const subsets=[];
+ if(all.length<=10){for(let mask=0;mask<(1<<all.length);mask++)subsets.push(all.filter((_,i)=>mask&(1<<i)));}
+ else subsets.push(all,essential,...essential.map((_,i)=>essential.slice(0,essential.length-i-1)));
+ subsets.sort((a,b)=>essential.filter(k=>b.includes(k)).length-essential.filter(k=>a.includes(k)).length||b.length-a.length);
+ const doors=[(spec.width-spec.door)/2,.08,spec.width-spec.door-.08].map(doorX=>({doorX}));
+ if(spec.kind==='bathroom'&&spec.count===1&&spec.door&&!spec.closetDepth)for(const sideDoor of ['right','left'])for(const doorX of [.08,(spec.depth-spec.door)/2,spec.depth-spec.door-.08])doors.push({sideDoor,doorX});
+ const smaller={shower:'shower75',basin:'basin45',toilet:'toiletCompact'};
+ const names={shower75:'ducha 0,75 × 0,75',basin45:'lavatorio 0,45 × 0,40',toiletCompact:'inodoro suspendido compacto'};
+ let tries=0;
+ for(const retained of subsets){
+  const options=[retained];
+  if(spec.kind==='bathroom'&&!/\b(?:ducha|lavatorio|inodoro)\s+(?:de\s+)?\d/.test(text)){
+   const compact=retained.map(k=>smaller[k]||k);
+   if(compact.some((k,i)=>k!==retained[i]))options.push(compact);
+  }
+  for(const fixtures of options)for(const position of doors){
+   if(++tries>240)break;
+   try{
+    const omitted=all.filter(k=>!retained.includes(k)),missing=essential.filter(k=>!retained.includes(k));
+    const substitutions=fixtures.filter(k=>names[k]).map(k=>names[k]);
+    const warning='APROXIMACIÓN: distribución preliminar con holguras reducidas. Revisar circulación y normativa antes de construir.'+(missing.length?' No se pudieron colocar: '+missing.map(k=>labels[k]||k).join(', ')+'.':'')+(omitted.filter(k=>!missing.includes(k)).length?' Equipamiento automático omitido: '+omitted.filter(k=>!missing.includes(k)).map(k=>labels[k]||k).join(', ')+'.':'')+(substitutions.length?' Artefactos compactos: '+substitutions.join(', ')+'.':'')+(position.sideDoor?' Acceso lateral para liberar el frente.':'');
+    const p=solve({...spec,fixtures,...position,compact:true,assumptions:[...spec.assumptions,warning]});
+    if(!p.blocks.length&&retained.length)continue;
+    p.status='approximate';p.warning=[...notes,warning].join(' ');return p;
    }catch(e){}
   }
+  if(tries>240)break;
  }
+
  throw error;
  }
 }
