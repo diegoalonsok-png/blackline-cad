@@ -679,6 +679,58 @@ for(let n=2;n<=8;n++)for(const showers of [true,false]){
  def({id:'arq-gym-'+n+'-'+(showers?'showers':'lockers'),name:'Gimnasio · '+n+' WC + '+(showers?n+' duchas':'guardado'),cat:GYM,family:'arq-gym-'+n,w:mw+.40,d:5.60,wMin:mw,wMax:mw+3,dMin:5.20,dMax:8,arqGym:true,stallCount:n,showerCount:showers?n:0,
  layoutSpec:(W,D)=>gymSpec(W,D,n,showers),gen(b,W,D){gymDraw(b,W,D,n,showers)}});
 }
+
+/* Collective changing facilities: independent wet/dry capacity.
+   Advisory planning geometry only; accessibility, fixture ratios and local regulations require review. */
+function changingSpec(W,D,n,m){
+ const t=.15,bay=2.70,p=(W-2*t-bay)/Math.max(n,m,1),backDepth=1.80,frontDepth=2.40;
+ const backY=D-t-backDepth,frontY=t+frontDepth,aisle=backY-frontY;
+ if(p<1.25-1e-8||aisle<1.50-1e-8)throw Error('Vestuarios: circulación o cabinas insuficientes');
+ const rects=[],cells=[];
+ for(let i=0;i<n;i++){
+  const x=t+bay+i*p;
+  cells.push({x,y:backY,w:p,h:backDepth,back:true});
+  rects.push({key:'wc',x:x+(p-.40)/2,y:D-t-.75,w:.40,h:.75});
+ }
+ for(let i=0;i<m;i++){
+  const x=t+bay+i*p;
+  cells.push({x,y:t,w:p,h:frontDepth,back:false});
+  rects.push({key:'shower',x:x+(p-.90)/2,y:t+.10,w:.90,h:.90});
+ }
+ rects.push({key:'sink',x:t+.10,y:D-t-.55,w:1.80,h:.55});
+ rects.push({key:'locker',x:t+.10,y:t,w:1.80,h:.60});
+ rects.push({key:'bench',x:t+.10,y:t+1.50,w:1.60,h:.42});
+ return {t,bay,p,backY,frontY,aisle,rects,cells,entry:1.00};
+}
+function changingDraw(b,W,D,n,m){
+ const s=changingSpec(W,D,n,m),t=s.t,a=(s.backY+s.frontY-s.entry)/2,z=a+s.entry;
+ for(const p of [[0,0,W,0],[0,D,W,D],[W,0,W,D],[0,0,0,a],[0,z,0,D],[t,t,W-t,t],[t,D-t,W-t,D-t],[W-t,t,W-t,D-t],[t,t,t,a],[t,z,t,D-t],[0,a,t,a],[0,z,t,z]])b.line(...p,{width:.22});
+ b.line(0,a,-s.entry,a);b.arc(0,a,s.entry,90,180);
+ for(const c of s.cells){
+  const x=c.x,y=c.y,xx=x+c.w,face=c.back?y:y+c.h,door=.80,h=x+(c.w-door)/2,k=h+door;
+  // Partition centrelines; access gap left unobstructed. Inward leaf.
+  b.line(x,y,x,y+c.h,{width:.20});b.line(xx,y,xx,y+c.h,{width:.20});
+  b.line(x,face,h,face);b.line(k,face,xx,face);
+  const dir=c.back?1:-1;
+  b.line(h,face,h,face+dir*door);b.arc(h,face,door,c.back?0:270,c.back?90:360);
+ }
+ for(const r of s.rects){
+  if(r.key==='locker')wardrobe(b,r.x,r.y,r.w,r.h,false);
+  else if(r.key==='bench'){b.rrect(r.x,r.y,r.w,r.h,.04);for(let i=1;i<4;i++)b.line(r.x+.03,r.y+r.h*i/4,r.x+r.w-.03,r.y+r.h*i/4)}
+  else if(r.key==='wc')b.at(r.x+r.w,D-t,180,q=>F.wc(q));
+  else if(r.key==='shower')b.at(r.x,r.y,0,q=>F.ducha(q,r.w,r.h,false));
+  else b.at(r.x+r.w,D-t,180,q=>F.lavatorioDoble(q,r.w,r.h));
+ }
+ b.text(t+.10,t+.77,'LOCKERS',.11);b.text(t+.10,t+2.05,'BANCO',.11);
+ b.text(t+s.bay+.10,s.backY-.22,'WC · '+n,.12);
+ if(m)b.text(t+s.bay+.10,s.frontY+.12,'DUCHAS · '+m,.12);
+}
+for(let n=2;n<=8;n++)for(let m=0;m<=8;m++){
+ const mw=Math.ceil((.30+2.70+Math.max(n,m)*1.25)*20)/20;
+ def({id:'arq-changing-'+n+'-'+m,name:'Vestuario colectivo · '+n+' WC + '+m+' duchas · bancos y lockers',cat:GYM,family:'arq-changing-'+n+'-'+m,w:mw+.40,d:6.50,wMin:mw,wMax:mw+3,dMin:6.10,dMax:9,arqChanging:true,stallCount:n,showerCount:m,hasBench:true,hasLockers:true,
+ layoutSpec:(W,D)=>changingSpec(W,D,n,m),gen(b,W,D){changingDraw(b,W,D,n,m)}});
+}
+
 const HOTEL='Cocinas hoteleras';
 function hotelSpec(W,D,mode,large){
  const t=.15,L=W-2*t,back=D-t-.75,front=t,mid=(D-.90)/2;
