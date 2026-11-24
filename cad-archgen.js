@@ -5,10 +5,30 @@
 (function(root){
 'use strict';
 const overlap=(a,b)=>a.x<b.x+b.w-1e-8&&b.x<a.x+a.w-1e-8&&a.y<b.y+b.d-1e-8&&b.y<a.y+a.d-1e-8;
+// Prefer explicitly curated, equivalent plan drawings at their original metric size.
+// Rotation offsets align the source drawing to the semantic component's native orientation.
+const detailedPlanSources=Object.freeze({
+ 'san-wc':['dk-inodoro-mochila',0],
+ 'san-bidet':['dk-bidet-oval',90],
+ 'san-banera':['dk-banera-160',0],
+ 'dor-cama1':['dk-cama-1p',180],
+ 'kq-anafe4':['dk-anafe-4',0]
+});
+function preferredBlock(id,lib){
+ const entry=detailedPlanSources[id],available=entry&&lib.library.find(v=>v.id===entry[0]&&!v.hideFromGallery&&!v.pro&&!v.paidOnly);
+ const sourceId=available?entry[0]:id,offset=available?entry[1]:0;
+ const box=lib.bounds(lib.build(sourceId).entities),w=box.maxX-box.minX,d=box.maxY-box.minY;
+ if(![w,d].every(v=>Number.isFinite(v)&&v>0))throw Error('Bloque sin medidas válidas: '+sourceId);
+ const swap=offset%180!==0;
+ return {sourceId,offset,w:swap?d:w,d:swap?w:d,quality:available?'detailed-gallery':'standard-fallback'};
+}
+function sourcePlacement(p,b){
+ return {...p,sourceId:b.sourceId,quality:b.quality,rotation:((p.rotation+b.offset)%360+360)%360};
+}
 // Kitchen typologies: continuous cabinet runs, not independent randomly scattered appliances.
 function generateKitchens(width,depth,wall,count,lib){
  const out=[],groups=new Map(),seen=new Set(),cache=new Map(),doorWidth=.9;
- const dim=id=>{if(!cache.has(id)){const b=lib.bounds(lib.build(id).entities);cache.set(id,{w:b.maxX-b.minX,d:b.maxY-b.minY})}return cache.get(id)};
+ const dim=id=>{if(!cache.has(id))cache.set(id,preferredBlock(id,lib));return cache.get(id)};
  const within=a=>a.x>=-1e-8&&a.y>=-1e-8&&a.x+a.w<=width+1e-8&&a.y+a.d<=depth+1e-8;
  const front=(a,gap)=>a.side==='N'?{x:a.x,y:a.y-gap,w:a.w,d:gap}:a.side==='W'?{x:a.x+a.w,y:a.y,w:gap,d:a.d}:a.side==='E'?{x:a.x-gap,y:a.y,w:gap,d:a.d}:null;
  const run=(ids,side,align)=>{
@@ -17,10 +37,10 @@ function generateKitchens(width,depth,wall,count,lib){
   if(length>span-corner-.08+1e-8)return null;
   let at=.08+(span-corner-.08-length)*align;
   const result=[];
-  for(const id of ids){const b=dim(id),p=horizontal?{x:at,y:depth-b.d-.04,w:b.w,d:b.d,rotation:0}:side==='W'?{x:.04,y:at,w:b.d,d:b.w,rotation:90}:{x:width-b.d-.04,y:at,w:b.d,d:b.w,rotation:270};result.push({id,...p,side});at+=b.w}
+  for(const id of ids){const b=dim(id),p=horizontal?{x:at,y:depth-b.d-.04,w:b.w,d:b.d,rotation:0}:side==='W'?{x:.04,y:at,w:b.d,d:b.w,rotation:90}:{x:width-b.d-.04,y:at,w:b.d,d:b.w,rotation:270};result.push(sourcePlacement({id,...p,side},b));at+=b.w}
   return result;
  };
- const equipment=[['kq-bacha','kq-cocina','kq-heladera'],['kq-bacha2','kq-cocina','kq-heladera'],['kq-bacha','kq-cocina','kq-heladera2']];
+ const equipment=[['kq-bacha','kq-cocina','kq-heladera'],['kq-bacha2','kq-cocina','kq-heladera'],['kq-bacha','kq-cocina','kq-heladera2'],['kq-bacha2','kq-anafe4','kq-heladera']];
  const types=[['Lineal',['N']],['Lineal lateral',['W']],['En L',['N','W']],['En L invertida',['N','E']],['Paralela',['W','E']],['En U',['N','W','E']],['Con isla',['N']],['En L con isla',['N','W']]];
  const permutations=a=>a.length<2?[a]:a.flatMap((v,i)=>permutations(a.filter((_,j)=>j!==i)).map(p=>[v,...p]));
  for(const [name,sides] of types)for(const ids of equipment)for(const order of permutations(ids))for(const addCounter of [true,false]){
@@ -33,7 +53,7 @@ function generateKitchens(width,depth,wall,count,lib){
     const placed=runs.map((r,i)=>run(r,sides[i],align));if(placed.some(x=>!x))continue;
     const items=placed.flat();
     if(name.includes('isla')){
-     const b=dim('kq-isla');items.push({id:'kq-isla',x:(width-b.w)/2,y:(depth-b.d)/2,w:b.w,d:b.d,rotation:0,side:'I'});
+     const b=dim('kq-isla');items.push(sourcePlacement({id:'kq-isla',x:(width-b.w)/2,y:(depth-b.d)/2,w:b.w,d:b.d,rotation:0,side:'I'},b));
     }
     if(items.some((a,i)=>!within(a)||items.slice(0,i).some(b=>overlap(a,b))))continue;
     const free=items.filter(a=>a.side!=='I').map(a=>front(a,.95));
@@ -62,7 +82,7 @@ function generate({kind='bath',width=3,depth=3,wall=.2,count=50}={}){
  if(kind==='kitchen')return generateKitchens(width,depth,wall,count,lib);
  const accessible=kind==='accessible',doorWidth=accessible?1:.9;
  if(accessible&&(width<2.8||depth<2.8))return [];
- const bounds=new Map(),get=id=>{if(!bounds.has(id)){const b=lib.bounds(lib.build(id).entities);bounds.set(id,{w:b.maxX-b.minX,d:b.maxY-b.minY})}return bounds.get(id)};
+ const bounds=new Map(),get=id=>{if(!bounds.has(id))bounds.set(id,preferredBlock(id,lib));return bounds.get(id)};
  const within=a=>a.x>=-1e-8&&a.y>=-1e-8&&a.x+a.w<=width+1e-8&&a.y+a.d<=depth+1e-8;
  const sides=['N','W','E','S'];
  const placements=(id,bed=false)=>{
@@ -79,7 +99,7 @@ function generate({kind='bath',width=3,depth=3,wall=.2,count=50}={}){
     if(side==='E'){x=width-b.d-.06;y=a;rotation=90}
     if(bed||id==='mob-placard')rotation=(rotation+180)%360;
     const p={id,x,y,w:horizontal?b.w:b.d,d:horizontal?b.d:b.w,rotation,side,slot};
-    if(within(p))out.push(p);
+    if(within(p))out.push(sourcePlacement(p,b));
    }
   }
   return out;
@@ -183,7 +203,7 @@ function resizeModel(model,width,depth){
  }
  return {...model,width,depth,area:width*depth,items,door,window};
 }
-root.CAD2D_ARCHGEN=Object.freeze({generate,resizeModel});
+root.CAD2D_ARCHGEN=Object.freeze({generate,resizeModel,preferredBlock});
 if(typeof document==='undefined'||!root.CAD2D_CORE)return;
 function openPalette(){
  const core=root.CAD2D_CORE,lib=root.CAD2D_ARQ_LIBRARY;
@@ -210,7 +230,7 @@ function openPalette(){
   wallOutline([[dx0,-t],[-t,-t],[-t,d+t],[wx0,d+t],[wx0,d],[0,d],[0,0],[dx0,0]]);
   wallOutline([[dx1,-t],[w+t,-t],[w+t,d+t],[wx1,d+t],[wx1,d],[w,d],[w,0],[dx1,0]]);
   for(const item of m.items){
-   const b=lib.build(item.id),bb=lib.bounds(b.entities),r=(item.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+   const b=lib.build(item.sourceId||item.id),bb=lib.bounds(b.entities),r=(item.rotation||0)*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
    const cs=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([x,y])=>[x*c-y*s,x*s+y*c]),ox=item.x-Math.min(...cs.map(v=>v[0])),oy=item.y-Math.min(...cs.map(v=>v[1]));
    const tr=p=>({x:ox+p.x*c-p.y*s,y:oy+p.x*s+p.y*c});
    for(const e of b.entities){
