@@ -345,7 +345,7 @@
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
    const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=pageSize();paint();el.querySelector('.grid').scrollTop=pos;return}
-   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id,epoch=++selectionEpoch;try{let insertId=targetId;if(!LIB.library.some(x=>x.id===targetId)&&/^olymp3-/.test(targetId)){card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));try{insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId)}finally{card.removeAttribute('aria-busy')}}if(epoch!==selectionEpoch||!el||el.style.display==='none'||el.classList.contains('min'))return;if(ARQ.insert(insertId)===false)return;armedId=targetId}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
+   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id,epoch=++selectionEpoch;try{let insertId=targetId;if(!LIB.library.some(x=>x.id===targetId)&&/^olymp3-/.test(targetId)){card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));try{insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId)}finally{card.removeAttribute('aria-busy')}}if(epoch!==selectionEpoch||!el||el.style.display==='none'||el.classList.contains('min'))return;if(ARQ.insert(insertId)===false)return;armedId=targetId;if(commandGallery){close();CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'));return}}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
   });
   // Mover desde la barra de título.
   const hd=el.querySelector('.hd');let drag=null;
@@ -366,7 +366,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){commandGallery=false;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -379,7 +379,8 @@
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
- function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;paint()}
+ let commandGallery=false;
+ function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=36;if(st.w<innerWidth-30||st.h<innerHeight-30)st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16});commandGallery=true;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
