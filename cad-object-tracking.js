@@ -8,7 +8,7 @@
  'use strict';
  const valid=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
  function project(pointer,anchors,scale,tolerancePixels=10){
-  if(!valid(pointer)||!Array.isArray(anchors)||!(scale>0))return null;
+  if(!valid(pointer)||!Array.isArray(anchors)||!Number.isFinite(scale)||!(scale>0)||!Number.isFinite(tolerancePixels)||tolerancePixels<=0)return null;
   const limit=tolerancePixels/scale;
   let horizontal=null,vertical=null;
   let closestH=limit,closestV=limit;
@@ -33,9 +33,10 @@
  // Rastreo como AutoCAD: rayos desde cada punto adquirido a 0/90/180/270° (y a los ángulos polares si POLAR está activo).
  // Devuelve el punto sobre el rayo más cercano al cursor, o la intersección de dos rayos de puntos distintos.
  function projectRays(pointer,anchors,scale,tolerancePixels=10,angles=[0,90]){
-  if(!valid(pointer)||!Array.isArray(anchors)||!(scale>0))return null;
+  if(!valid(pointer)||!Array.isArray(anchors)||!Number.isFinite(scale)||!(scale>0)||!Number.isFinite(tolerancePixels)||tolerancePixels<=0)return null;
   const limit=tolerancePixels/scale,dirs=[];
-  for(const deg of angles){const a=deg*Math.PI/180;dirs.push([Math.cos(a),Math.sin(a)]);}
+  if(!Array.isArray(angles))return null;
+  for(const deg of angles){if(!Number.isFinite(deg))continue;const a=deg*Math.PI/180;dirs.push([Math.cos(a),Math.sin(a)]);}
   const hits=[];
   for(const anchor of anchors){if(!valid(anchor))continue;
    for(const [ux,uy] of dirs){
@@ -49,6 +50,9 @@
    if(h.anchor===best.anchor)continue;
    const den=best.ux*h.uy-best.uy*h.ux;if(Math.abs(den)<1e-9)continue;
    const dx=h.anchor.x-best.anchor.x,dy=h.anchor.y-best.anchor.y,s=(dx*h.uy-dy*h.ux)/den;
+   const t=(dx*best.uy-dy*best.ux)/den;
+   // An intersection behind either acquired ray is not a valid tracking target.
+   if(s<-1e-9||t<-1e-9)continue;
    const ip={x:best.anchor.x+best.ux*s,y:best.anchor.y+best.uy*s};
    if(Math.hypot(ip.x-pointer.x,ip.y-pointer.y)<limit*1.6)return {point:ip,rays:[best,h],intersection:true};
   }
@@ -56,7 +60,7 @@
  }
  // ORTHO is a hard constraint: OTRACK can change only the free coordinate.
  function projectOrtho(pointer,base,anchors,scale,tolerancePixels=10,axis){
-  if(!valid(pointer)||!valid(base)||!(scale>0))return null;
+  if(!valid(pointer)||!valid(base)||!Number.isFinite(scale)||!(scale>0)||!Number.isFinite(tolerancePixels)||tolerancePixels<=0)return null;
   const h=axis?axis==='h':Math.abs(pointer.x-base.x)>=Math.abs(pointer.y-base.y);
   const limit=tolerancePixels/scale,coord=h?'x':'y';
   const point=h?{x:pointer.x,y:base.y}:{x:base.x,y:pointer.y};
