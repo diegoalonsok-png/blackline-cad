@@ -362,6 +362,16 @@ def({id:'esc-curva',name:'Escalera curva semicircular',cat:ST,family:'escalera',
 def({id:'esc-caracol-inversa',name:'Escalera caracol · giro inverso',cat:ST,family:'escalera',w:1.8,d:1.8,wMin:1.2,wMax:2.6,dMin:1.2,dMax:2.6,lockAspect:true,
  gen(b,W,D){const r=Math.min(W,D)/2,c=W/2,y=D/2;b.circle(c,y,r);b.circle(c,y,.10);for(let i=0;i<=14;i++){const a=-i*300/14*DEG;b.line(c+.10*Math.cos(a),y+.10*Math.sin(a),c+r*Math.cos(a),y+r*Math.sin(a));}b.arc(c,y,r*.65,60,360,{dashed:true});}});
 
+
+const RAIL='Pasamanos';
+one('rail-plan-straight','Pasamanos recto · planta',RAIL,3,.12,(b,W,D)=>{b.rect(0,D*.3,W,D*.4);const n=Math.max(2,Math.ceil(W/1.2));for(let i=0;i<=n;i++)b.circle(.04+(W-.08)*i/n,D/2,Math.min(.035,D*.28));},{wMin:.6,wMax:8,dMin:.10,dMax:.20,family:'rail-plan'});
+one('rail-plan-L','Pasamanos en L · planta',RAIL,2.4,2.4,(b,W,D)=>{const q=.06;b.poly([[0,0],[q,0],[q,D-q],[W,D-q],[W,D],[0,D]],true);for(const [x,y] of [[q/2,.06],[q/2,D/2],[q/2,D-q/2],[W/2,D-q/2],[W-.06,D-q/2]])b.circle(x,y,.025);},{wMin:1,wMax:5,dMin:1,dMax:5,family:'rail-plan'});
+one('rail-plan-U','Pasamanos en U · planta',RAIL,2.4,3.4,(b,W,D)=>{const q=.06;b.poly([[0,0],[q,0],[q,D-q],[W-q,D-q],[W-q,0],[W,0],[W,D],[0,D]],true);for(const x of [q/2,W-q/2])for(const y of [.06,D/2,D-q/2])b.circle(x,y,.025);},{wMin:1.2,wMax:5,dMin:1,dMax:6,family:'rail-plan'});
+one('rail-plan-curve','Pasamanos curvo · planta',RAIL,3,1.5,(b,W,D)=>{const r=Math.min(W/2,D),c=W/2;b.arc(c,0,r,0,180);b.arc(c,0,r-.06,0,180);for(let i=1;i<8;i++){const a=i*Math.PI/8;b.circle(c+(r-.03)*Math.cos(a),(r-.03)*Math.sin(a),.025)}},{wMin:1.5,wMax:6,dMin:.8,dMax:3,family:'rail-plan'});
+one('rail-elev-vertical','Baranda con barrotes · alzado',RAIL,3,1.05,(b,W,D)=>{b.rect(0,D-.05,W,.05);b.rect(0,.10,W,.035);const n=Math.max(2,Math.ceil(W/.12));for(let i=0;i<=n;i++)b.line(i*W/n,.135,i*W/n,D-.05);},{wMin:.6,wMax:8,dMin:.8,dMax:1.4,family:'rail-elevation'});
+one('rail-elev-glass','Baranda de vidrio · alzado',RAIL,3,1.05,(b,W,D)=>{b.rect(0,D-.05,W,.05);b.rect(0,.02,W,.08);const n=Math.max(1,Math.ceil(W/1.2));for(let i=0;i<n;i++)b.rect(i*W/n+.02,.10,W/n-.04,D-.15);},{wMin:.6,wMax:8,dMin:.8,dMax:1.4,family:'rail-elevation'});
+one('rail-elev-horizontal','Baranda con travesaños · alzado',RAIL,3,1.05,(b,W,D)=>{b.rect(0,D-.05,W,.05);const n=Math.max(1,Math.ceil(W/1.2));for(let i=0;i<=n;i++)b.line(i*W/n,0,i*W/n,D);for(let i=1;i<5;i++)b.line(0,i*D/5,W,i*D/5);},{wMin:.6,wMax:8,dMin:.8,dMax:1.4,family:'rail-elevation'});
+
 /* ===== MOBILIARIO ===== */
 const MOB='Mobiliario';
 one('mob-mesa4','Mesa comedor 4 personas',MOB,1.20,1.80,(b,W,D)=>mesaConSillas(b,W,D),{wMin:.90,wMax:1.40,dMin:1.70,dMax:2.00,family:'mesa'});
