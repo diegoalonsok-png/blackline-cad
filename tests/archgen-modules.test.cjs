@@ -35,13 +35,13 @@ for(const spec of cases)test('ARCHGEN '+spec.kind+' '+spec.width+'x'+spec.depth+
   assert.ok(!keys.has(key),'alternativa duplicada');keys.add(key);
   const swing={x:m.door.x,y:0,w:m.door.width,d:m.door.outward?.35:m.door.width};
   for(const [i,a] of m.items.entries()){
-   const meta=lib.library.find(b=>b.id===a.id);
+   const meta=lib.library.find(b=>b.id===(a.sourceId||a.id));
    assert.ok(meta&&!meta.pro&&!meta.paidOnly,'bloque libre: '+a.id);
    assert.ok([a.x,a.y,a.w,a.d,a.rotation].every(Number.isFinite),a.id);
    assert.ok(a.w>0&&a.d>0&&within(a,m.width,m.depth),'fuera del ambiente: '+a.id);
    assert.ok(!overlap(a,swing),'interferencia con puerta: '+a.id);
    for(const b of m.items.slice(0,i))assert.ok(!overlap(a,b),a.id+' choca con '+b.id);
-   const bb=lib.bounds(lib.build(a.id).entities),r=a.rotation*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+   const bb=lib.bounds(lib.build(a.sourceId||a.id).entities),r=a.rotation*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
    const w=bb.maxX-bb.minX,d=bb.maxY-bb.minY;
    assert.ok(Math.abs(a.w-(Math.abs(c)*w+Math.abs(s)*d))<eps,'ancho real '+a.id);
    assert.ok(Math.abs(a.d-(Math.abs(s)*w+Math.abs(c)*d))<eps,'largo real '+a.id);
@@ -112,4 +112,27 @@ test('ARCHGEN resize rejects impossible dimensions without modifying the origina
  const old=JSON.stringify(model);
  assert.throws(()=>globalThis.CAD2D_ARCHGEN.resizeModel(model,1.5,1.5),/espacio|interferencias/);
  assert.equal(JSON.stringify(model),old);
+});
+
+test('ARCHGEN selects detailed gallery drawings before schematic fallbacks',()=>{
+ const vm=require('node:vm');
+ const root=path.join(__dirname,'..');
+ const context=vm.createContext({window:{}});
+ for(const file of ['assets/cad2d-arq-generators.js','assets/cad2d-dk-blocks.js'])
+  vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),context,{filename:file});
+ const gallery=context.window.CAD2D_ARQ_LIBRARY;
+ const resolve=globalThis.CAD2D_ARCHGEN.preferredBlock;
+ for(const [role,id] of [['san-wc','dk-inodoro-mochila'],['san-bidet','dk-bidet-oval'],['san-banera','dk-banera-160'],['dor-cama1','dk-cama-1p'],['kq-anafe4','dk-anafe-4']]){
+  const choice=resolve(role,gallery);
+  assert.equal(choice.sourceId,id);
+  assert.equal(choice.quality,'detailed-gallery');
+  const b=gallery.bounds(gallery.build(id).entities);
+  assert.ok(Math.abs(choice.w-(choice.offset%180?b.maxY-b.minY:b.maxX-b.minX))<eps);
+  assert.ok(Math.abs(choice.d-(choice.offset%180?b.maxX-b.minX:b.maxY-b.minY))<eps);
+ }
+ const chosen=gallery.library.find(x=>x.id==='dk-inodoro-mochila');
+ chosen.hideFromGallery=true;
+ assert.equal(resolve('san-wc',gallery).sourceId,'san-wc');
+ chosen.hideFromGallery=false;chosen.pro=true;
+ assert.equal(resolve('san-wc',gallery).sourceId,'san-wc');
 });
