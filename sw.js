@@ -1,7 +1,7 @@
 /* Blackline CAD · service worker: permite instalar la app y abrirla sin conexión.
  * Estrategia «red primero»: siempre se usa la versión publicada más nueva; la copia guardada
  * solo se usa si no hay conexión. Nunca guarda llamadas a la API, pagos ni analítica. */
-const CACHE='blackline-cad-v3';
+const CACHE='blackline-cad-v4';
 const SCOPE=new URL(self.registration.scope).pathname;
 const CORE=['./','./index.html','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'];
 self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}));self.skipWaiting()});
@@ -9,6 +9,10 @@ self.addEventListener('activate',ev=>{ev.waitUntil(caches.keys().then(keys=>Prom
 self.addEventListener('fetch',ev=>{
  const req=ev.request,url=new URL(req.url);
  if(req.method!=='GET'||url.origin!==self.location.origin||req.headers.has('range')||req.cache==='no-store')return;   // API, Stripe, Google: siempre por red
+ // Library geometry must never enter the service-worker cache. Metadata and thumbnails are separate.
+ if(/\/assets\/block-library\/v1\/(?!catalog\.json$)/i.test(url.pathname)||/\/assets\/cad2d-olimpiadas3-\d+\.js$/i.test(url.pathname)){
+  ev.respondWith(fetch(req,{cache:'no-store'}));return;
+ }
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
  // The converter must never run with a stale or mixed JS/WASM runtime.
  if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|cad-(?:block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
