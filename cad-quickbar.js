@@ -19,18 +19,18 @@
   ['pdf','Plot / PDF · Ctrl+P','<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><text x="7.3" y="17" font-size="5.4" font-weight="700" font-family="Arial" fill="currentColor" stroke="none">PDF</text>',run('PLOT')]
  ];
  const css=document.createElement('style');
- css.textContent=`#cadQuickBar{position:absolute;z-index:40;display:flex;align-items:center;gap:2px;padding:5px 8px 5px 4px;border-radius:999px;background:#202326;border:1.5px solid #7c838a;box-shadow:0 8px 22px #0008;user-select:none;touch-action:none}
-#cadQuickBar button{all:unset;cursor:pointer;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;color:#f2f5f7}
-#cadQuickBar button:hover{background:#3a4046}
-#cadQuickBar button:focus-visible{outline:2px solid #9adff3}
-#cadQuickBar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-#cadQuickBar .qb-handle{cursor:grab;width:22px;color:#c9d0d6;font-size:15px;letter-spacing:-2px}
-#cadQuickBar .qb-handle:active{cursor:grabbing}
-#cadQuickBar .qb-sep{width:1px;height:22px;background:#4e555c;margin:0 4px}
-#cadQuickBar.qb-min button:not(.qb-handle):not(.qb-toggle),#cadQuickBar.qb-min .qb-sep{display:none}
-.bl-light #cadQuickBar{background:#ffffff;border-color:#9aa6ae}
-.bl-light #cadQuickBar button{color:#18232b}
-.bl-light #cadQuickBar button:hover{background:#e6edf2}`;
+ css.textContent=`:is(#cadQuickBar,#cadArqInstructionBar){position:absolute;z-index:40;display:flex;align-items:center;gap:2px;padding:5px 8px 5px 4px;border-radius:999px;background:#202326;border:1.5px solid #7c838a;box-shadow:0 8px 22px #0008;user-select:none;touch-action:none}
+:is(#cadQuickBar,#cadArqInstructionBar) button{all:unset;cursor:pointer;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;color:#f2f5f7}
+:is(#cadQuickBar,#cadArqInstructionBar) button:hover{background:#3a4046}
+:is(#cadQuickBar,#cadArqInstructionBar) button:focus-visible{outline:2px solid #9adff3}
+:is(#cadQuickBar,#cadArqInstructionBar) svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+:is(#cadQuickBar,#cadArqInstructionBar) .qb-handle{cursor:grab;width:22px;color:#c9d0d6;font-size:15px;letter-spacing:-2px}
+:is(#cadQuickBar,#cadArqInstructionBar) .qb-handle:active{cursor:grabbing}
+:is(#cadQuickBar,#cadArqInstructionBar) .qb-sep{width:1px;height:22px;background:#4e555c;margin:0 4px}
+:is(#cadQuickBar,#cadArqInstructionBar).qb-min button:not(.qb-handle):not(.qb-toggle),:is(#cadQuickBar,#cadArqInstructionBar).qb-min .qb-sep{display:none}
+.bl-light :is(#cadQuickBar,#cadArqInstructionBar){background:#ffffff;border-color:#9aa6ae}
+.bl-light :is(#cadQuickBar,#cadArqInstructionBar) button{color:#18232b}
+.bl-light :is(#cadQuickBar,#cadArqInstructionBar) button:hover{background:#e6edf2}`;
  document.head.append(css);
  const bar=document.createElement('div');bar.id='cadQuickBar';bar.setAttribute('role','toolbar');bar.setAttribute('aria-label','Quick CAD bar');
  const handle=document.createElement('button');handle.className='qb-handle';handle.type='button';handle.title='Drag to move · double-click to collapse';handle.textContent='⠿';bar.append(handle);
