@@ -11380,6 +11380,20 @@ window.CAD2D_CORE=Object.freeze({
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
+ savePersonalBlock:async name=>{if(cadBlockEdit)throw Error('Cerrá el editor de bloques.');return cadPersonalBlockSave(name)},
+ exportTrace:async (entities,name,format)=>{
+  if(!Array.isArray(entities)||!entities.length||entities.length>12000||entities.some(e=>e.type!=='line'||![e.a?.x,e.a?.y,e.b?.x,e.b?.y].every(Number.isFinite)))throw Error('Trazado inválido');
+  name=cadCleanDrawingName(name);
+  const layers=[{id:'0',name:'0',color:'#ffffff',visible:true,width:.18,linetype:'CONTINUOUS'}];
+  if(format==='dxf')return exportDXF(entities,name,layers);
+  if(format!=='dwg')throw Error('Formato inválido');
+  const local=window.CAD2D_DWG_BATCH?.convertLocal;if(typeof local!=='function')throw Error('Conversor DWG local no disponible. Exportá DXF.');
+  const dxf=buildDXFText(entities,name,layers).replace(/(\$ACADVER\r?\n1\r?\n)AC1015(?=\r?\n)/,'$1AC1027');
+  const bytes=await local(new File([dxf],name+'.dxf',{type:'application/dxf'}),'dxf-dwg');
+  if(!cadDwgIsBinary(bytes))throw Error('El conversor no devolvió un DWG válido. Exportá DXF.');
+  return download(name+'.dwg',new Blob([bytes],{type:'application/acad'}),'application/acad');
+ },
+
  explicitWallLayerName,eraseSelected,copySelectedCadObjects,pasteCadObjects,
  command:text=>{$('command').value=String(text);runCommand()},
  lastCommand:()=>cad2dLastCommand,
