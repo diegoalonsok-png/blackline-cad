@@ -7947,7 +7947,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  // DXF R2000 (AC1015) completo: handles, owners y marcadores de subclase, para que AutoCAD y lectores estrictos lo abran.
  let next=0x30;const H=()=>(next++).toString(16).toUpperCase();
  const LW=[0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211];
- const lw=w=>{const v=Math.round((Number(w)||.25)*100);return String(LW.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a))};
+ const lw=w=>{const num=w==null?NaN:Number(w);const v=Math.round((Number.isFinite(num)?Math.max(0,num):.25)*100);return String(LW.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a))};
  const LT={CONTINUOUS:['Solid line',[]],DASHED:['Dashed __ __ __',[.5,-.25]],HIDDEN:['Hidden _ _ _',[.25,-.125]],CENTER:['Center ____ _ ____',[1.25,-.25,.25,-.25]],DOT:['Dot . . .',[0,-.25]],PHANTOM:['Phantom ____ _ _ ____',[1.25,-.25,.25,-.25,.25,-.25]],DASHDOT:['Dash dot __ . __',[.5,-.25,0,-.25]]};
  const ltName=n=>{let u=String(n||'').toUpperCase();if(u==='DOTTED')u='DOT';return u==='BYLAYER'||u==='BYBLOCK'?u:LT[u]?u:'CONTINUOUS'};
  const ltLayer=n=>{const u=ltName(n);return u==='BYLAYER'||u==='BYBLOCK'?'CONTINUOUS':u};
@@ -7955,7 +7955,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const layerList=layers.some(l=>l.name==='0')?layers:[{name:'0',color:'#ffffff',visible:true,width:.25},...layers];
  const fonts=[['STANDARD','arial.ttf'],['CAD2D_MONO','cour.ttf'],['CAD2D_SERIF','times.ttf']];
  const hTables={},rec=[],tables=[];
- const table=(name,entries,extra=[])=>{const th=H();hTables[name]=th;const out=['0','TABLE','2',name,'5',th,'330','0','100','AcDbSymbolTable','70',String(entries.length),...extra];for(const f of entries)out.push(...f(th));out.push('0','ENDTAB');tables.push(...out)};
+ const table=(name,entries,extra=[])=>{const th=H();hTables[name]=th;const out=['0','TABLE','2',name,'5',th,'330','0','100','AcDbSymbolTable','70',String(entries.length),...extra];for(const f of entries)out.push(...f(th));out.push('0','ENDTAB');for(const value of out)tables.push(value)};
  const symRec=(type,sub,name,th,body,hc='5')=>['0',type,hc,H(),'330',th,'100','AcDbSymbolTableRecord','100',sub,'2',name,'70','0',...body];
  const msBR=H(),psBR=H(),root='C',grp='D';
  // Bloques nativos: cada referencia se exporta como INSERT de una definición BLOCK (AutoCAD la ve como bloque
@@ -7988,7 +7988,8 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   ...[...blockDefs.values()].map(d=>th=>['0','BLOCK_RECORD','5',d.br,'330',th,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord','2',d.name])]);
  const blk=(br,name,ps)=>['0','BLOCK','5',H(),'330',br,'100','AcDbEntity',...(ps?['67','1']:[]),'8','0','100','AcDbBlockBegin','2',name,'70','0','10','0','20','0','30','0','3',name,'1','','0','ENDBLK','5',H(),'330',br,'100','AcDbEntity',...(ps?['67','1']:[]),'8','0','100','AcDbBlockEnd'];
  const blocks=[...blk(msBR,'*Model_Space',false),...blk(psBR,'*Paper_Space',true)];
- const ents=[];let OUT=ents,OWN=null;const pos=(x,y)=>['10',dxfNum(x),'20',dxfNum(y),'30','0'];
+ const ents=[];let OUT=ents,OWN=null;
+ const appendPoints=(out,pts)=>{for(const p of pts)out.push('10',dxfNum(p.x),'20',dxfNum(p.y))};const pos=(x,y)=>['10',dxfNum(x),'20',dxfNum(y),'30','0'];
  const head=(type,e,lay,color,extra=[])=>{const b=['0',type,'5',H(),'330',OWN||msBR,'100','AcDbEntity','8',lay.name];const t=ltName(e.linetype||'BYLAYER');b.push('6',t==='CONTINUOUS'?'Continuous':t);const c=color??(e.color?hex(e.color):null);if(c)b.push('420',c);b.push('370',lw(e.width??lay.width??.25),...extra);return b};
  const text=(e,lay,p,color)=>{if(cadIsMText(e)){
   // MTEXT editable en AutoCAD: inserción arriba a la izquierda, renglones con \P, ancho de caja y interlineado.
@@ -8001,9 +8002,9 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const writeList=list=>{
  for(const source of flattenCADEntities(list,{keepMText:true})){for(const e of source.type==='hatch'&&source.hatchStyle&&source.hatchStyle!=='solid'&&!cadIsGradient(source)?cadHatchPatternPrimitives(source,12000):[source]){
   const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))continue;
-  if(e.type==='hatch'){if(!(e.pts?.length>2))continue;OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2','SOLID','70','1','71','0','91','1','92','2','72','0','73','1','93',String(e.pts.length),...e.pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]),'97','0','75','0','76','1','98','0');if(cadIsGradient(e)){const c2=hex(e.color2||'#ffffff'),c1=hex(e.color||'#888888');OUT.push('450','1','451','0','452','0','453','2','460',dxfNum((Number(e.hatchAngle)||0)*Math.PI/180),'461','0','462','1','463','0','63','7','421',c1,'463','1','63','7','421',c2,'470',e.hatchStyle==='gradient-radial'?'SPHERICAL':'LINEAR')}}
+  if(e.type==='hatch'){if(!(e.pts?.length>2))continue;OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2','SOLID','70','1','71','0','91','1','92','2','72','0','73','1','93',String(e.pts.length));appendPoints(OUT,e.pts);OUT.push('97','0','75','0','76','1','98','0');if(cadIsGradient(e)){const c2=hex(e.color2||'#ffffff'),c1=hex(e.color||'#888888');OUT.push('450','1','451','0','452','0','453','2','460',dxfNum((Number(e.hatchAngle)||0)*Math.PI/180),'461','0','462','1','463','0','63','7','421',c1,'463','1','63','7','421',c2,'470',e.hatchStyle==='gradient-radial'?'SPHERICAL':'LINEAR')}}
   else if(e.type==='line'||e.type==='dimension')OUT.push(...head('LINE',e,lay),'100','AcDbLine',...pos(e.a.x,e.a.y),'11',dxfNum(e.b.x),'21',dxfNum(e.b.y),'31','0');
-  else if(e.type==='polyline'||e.type==='rect'){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;OUT.push(...head('LWPOLYLINE',e,lay),'100','AcDbPolyline','90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),'43',dxfNum(e.pwidth||0),...pts.flatMap(p=>['10',dxfNum(p.x),'20',dxfNum(p.y)]))}
+  else if(e.type==='polyline'||e.type==='rect'){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;OUT.push(...head('LWPOLYLINE',e,lay),'100','AcDbPolyline','90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),'43',dxfNum(e.pwidth||0));appendPoints(OUT,pts)}
   else if(e.type==='circle'){if(!(e.r>0))continue;OUT.push(...head('CIRCLE',e,lay),'100','AcDbCircle',...pos(e.c.x,e.c.y),'40',dxfNum(e.r))}
   else if(e.type==='arc'){if(!(e.r>0))continue;OUT.push(...head('ARC',e,lay),'100','AcDbCircle',...pos(e.c.x,e.c.y),'40',dxfNum(e.r),'100','AcDbArc','50',dxfNum(((e.a0*180/Math.PI)%360+360)%360),'51',dxfNum(((e.a1*180/Math.PI)%360+360)%360))}
   else if(e.type==='ellipse'){const major=Math.max(e.rx,e.ry),minor=Math.min(e.rx,e.ry),rotation=(e.rotation||0)+(e.ry>e.rx?Math.PI/2:0);if(!(major>0&&minor>0))continue;OUT.push(...head('ELLIPSE',e,lay),'100','AcDbEllipse',...pos(e.c.x,e.c.y),'11',dxfNum(major*Math.cos(rotation)),'21',dxfNum(major*Math.sin(rotation)),'31','0','40',dxfNum(minor/major),'41','0','42',dxfNum(TAU))}
@@ -8017,7 +8018,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  OUT=ents;OWN=null;writeList(entities.filter(e=>!refDef.has(e)));
  for(const d of blockDefs.values()){
   const body=[];OUT=body;OWN=d.br;writeList(d.ents);
-  blocks.push('0','BLOCK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockBegin','2',d.name,'70','0','10','0','20','0','30','0','3',d.name,'1','',...body,'0','ENDBLK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
+  blocks.push('0','BLOCK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockBegin','2',d.name,'70','0','10','0','20','0','30','0','3',d.name,'1','');for(const value of body)blocks.push(value);blocks.push('0','ENDBLK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
  }
  OUT=ents;OWN=null;
  for(const [r,d] of refDef){
