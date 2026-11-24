@@ -154,7 +154,7 @@
   if(!pkg||pkg.catalogReady||catalogOpening||pkg.loaded===pkg.total)return;
   catalogOpening=(async()=>{
    try{await pkg.loadCatalog();paint()}
-   catch(err){if(!pkg.loading&&pkg.loaded<pkg.total)await pkg.load()}
+   catch(err){CORE.toast(T('Block catalog unavailable. Reopen the gallery to retry.','Catálogo de bloques no disponible. Volvé a abrir la galería para reintentar.'))}
   })().catch(err=>CORE.toast('Bloques 2D: '+err.message)).finally(()=>{catalogOpening=null});
  }
  function galleryItems(){
