@@ -113,7 +113,7 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
     const es=core.state.entities.filter(e=>!ids.has(e.id));
     const refs=es.filter(e=>e.type==='blockRef');
     const openings=refs.filter(e=>core.state.blocks[e.blockName]?.parametric);
-    return {variants,entities:es.length,openings:openings.map(e=>({kind:core.state.blocks[e.blockName].parametric.kind,width:e.params?.width,cut:es.some(f=>f.autoOpeningRef===e.id)})),furniture:refs.length-openings.length,dimensions:es.filter(e=>e.type==='dimension').length,hatches:es.filter(e=>e.type==='hatch').length};
+    return {variants,entities:es.length,openings:openings.map(e=>({kind:core.state.blocks[e.blockName].parametric.kind,width:e.params?.width,cut:es.some(f=>f.autoOpeningRef===e.id)})),furniture:refs.length-openings.length,ordinary:refs.filter(e=>!openings.includes(e)).every(e=>{const def=core.state.blocks[e.blockName];return def&&!def.parametric&&!def.dynamic2d&&!def.dynamicActions&&!e.params}),dimensions:es.filter(e=>e.type==='dimension').length,hatches:es.filter(e=>e.type==='hatch').length};
    })()`);
    console.log(spec.kind+' CAD insertion: '+JSON.stringify(result));
    assert.ok(!result.error,result.error);
@@ -123,6 +123,7 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
    assert.deepEqual(result.openings.map(e=>e.kind).sort(),['framed-window','swing-door']);
    assert.ok(result.openings.every(e=>e.width>0&&e.cut),'parametric openings cut their own walls');
    assert.ok(result.furniture>=2);
+   assert.equal(result.ordinary,true,'furniture and fixtures remain conventional CAD blocks');
    assert.equal(result.dimensions,2);
    assert.equal(result.hatches,1);
    await evaluate("window.CAD2D_CORE.undo()");
