@@ -1677,6 +1677,45 @@ function cadGenerateRoomRow(spec,origin){
 
 /* Import geometry computed by the independent architecture solver as native CAD entities.
  * Work on an isolated entity set, then commit as a single undo step. */
+
+/* ARQ orthogonal wall junctions: deterministic union boundary at L/T/+ nodes.
+   Work on native paired faces before openings are cut. */
+function cadJoinGeneratedArqFaces(pairs){
+ const nodes=new Map(),eps=1e-7;
+ const key=p=>Math.round(p.x/eps)+','+Math.round(p.y/eps);
+ for(const pair of pairs){
+  const m=pair[0].wall2d,A=m.guideA,B=m.guideB,L=Math.hypot(B.x-A.x,B.y-A.y);
+  if(!(L>eps)||Math.min(Math.abs(B.x-A.x),Math.abs(B.y-A.y))>eps)return false;
+  for(const tip of ['a','b']){
+   const p=tip==='a'?A:B,q=tip==='a'?B:A,u={x:(q.x-p.x)/L,y:(q.y-p.y)/L};
+   const k=key(p);if(!nodes.has(k))nodes.set(k,[]);
+   nodes.get(k).push({pair,tip,p,u,t:m.thickness});
+  }
+ }
+ // A T whose host is not segmented needs the existing generic joiner.
+ for(const arms of nodes.values())for(const pair of pairs){
+  const p=arms[0].p,m=pair[0].wall2d,a=m.guideA,b=m.guideB;
+  if(Math.abs(a.x-b.x)<eps&&Math.abs(p.x-a.x)<eps&&p.y>Math.min(a.y,b.y)+eps&&p.y<Math.max(a.y,b.y)-eps)return false;
+  if(Math.abs(a.y-b.y)<eps&&Math.abs(p.y-a.y)<eps&&p.x>Math.min(a.x,b.x)+eps&&p.x<Math.max(a.x,b.x)-eps)return false;
+ }
+ const dot=(a,b)=>a.x*b.x+a.y*b.y;
+ for(const arms of nodes.values()){
+  if(arms.length<2)continue;
+  for(const arm of arms){
+   const others=arms.filter(x=>x!==arm),opposite=others.some(x=>dot(x.u,arm.u)<-.99);
+   for(const face of arm.pair){
+    const p=arm.p,base=face[arm.tip],offset={x:base.x-p.x,y:base.y-p.y};
+    const perpendicular=others.filter(x=>Math.abs(dot(x.u,arm.u))<.01);
+    const toward=perpendicular.find(x=>dot(x.u,offset)>eps);
+    const away=perpendicular.find(x=>dot(x.u,offset)<-eps);
+    const shift=toward?toward.t/2:!opposite&&away?-away.t/2:0;
+    face[arm.tip]={x:base.x+arm.u.x*shift,y:base.y+arm.u.y*shift};
+   }
+  }
+ }
+ return true;
+}
+
 function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
  if(plan?.schema!=='blackline.architecture.v1'||plan.units!=='m'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks)||plan.walls.length>500||plan.openings.length>300||plan.blocks.length>500)throw Error('Invalid architecture plan');
  if(!autoOpeningEnabled||!window.BlacklineAutoOpening)throw Error('Enable automatic wall openings.');
@@ -1706,7 +1745,8 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    hosts.set(w.id,{w,A,B,L,at,openings,segments});
   }
   // Native junction solver on generated walls only, before cutting openings.
-  for(const host of hosts.values())for(const pair of host.segments)cadWallJoinNewFaces(pair);
+  const arqPairs=[...hosts.values()].flatMap(host=>host.segments);
+  if(!cadJoinGeneratedArqFaces(arqPairs))for(const pair of arqPairs)cadWallJoinNewFaces(pair);
   for(const o of plan.openings)if(!hosts.has(o.host))throw Error('Unknown opening host');
   for(const host of hosts.values())for(let i=0;i<host.openings.length;i++){
    const o=host.openings[i],w=host.w,center=host.at(o.offset),start=host.at(o.offset-o.width/2);
