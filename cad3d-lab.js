@@ -2523,9 +2523,37 @@ function cad3dParseGLTFDocument(json,buffers,name){
  verts=verts.map(v=>[v[0],-v[2],v[1]]);
  cad3dImportTriangles(verts,faces,name);
 }
+/* STEP / IGES / BREP are triangulated locally by a dedicated, on-demand WASM worker. */
+async function cad3dImportOCCT(file,ext){
+ var format=['step','stp'].includes(ext)?'step':['iges','igs'].includes(ext)?'iges':'brep';
+ var scale=1;
+ if(format==='brep'){
+  var unit=window.prompt('Unidades del archivo BREP (mm, cm, m, in, ft). BREP no define unidades.','mm');
+  if(unit===null){text('Importación BREP cancelada');return;}
+  scale={mm:.001,cm:.01,m:1,in:.0254,ft:.3048}[unit.trim().toLowerCase()];
+  if(!scale)throw Error('Unidad BREP no admitida');
+ }
+ text('Importando '+format.toUpperCase()+' localmente · Open CASCADE WASM…');
+ var buffer=await file.arrayBuffer();
+ var mesh=await new Promise(function(resolve,reject){
+  var worker=new Worker(new URL('assets/cad3d-occt-worker.js',document.baseURI)),timer;
+  function finish(error,data){clearTimeout(timer);worker.terminate();if(error)reject(Error(error));else resolve(data);}
+  timer=setTimeout(function(){finish('Tiempo límite de importación CAD superado');},120000);
+  worker.onmessage=function(e){finish(e.data.error,e.data);};
+  worker.onerror=function(e){finish(e.message||'No se pudo cargar el motor Open CASCADE');};
+  worker.onmessageerror=function(){finish('Respuesta del motor CAD inválida');};
+  try{worker.postMessage({format:format,buffer:buffer,brepScale:scale},[buffer]);}catch(err){finish(err.message);}
+ });
+ var pos=mesh.positions,idx=mesh.indices,vertices=[],faces=[];
+ if(!(pos instanceof Float64Array)||!(idx instanceof Uint32Array)||pos.length%3||idx.length%3||pos.length>1200000||idx.length>360000)throw Error('Respuesta CAD inválida');
+ for(var i=0;i<pos.length;i+=3)vertices.push([pos[i],pos[i+1],pos[i+2]]);
+ for(var i=0;i<idx.length;i+=3)faces.push([idx[i],idx[i+1],idx[i+2]]);
+ cad3dImportTriangles(vertices,faces,file.name);
+}
 async function cad3dImportMeshFile(file){
  var name=file.name,ext=name.split('.').pop().toLowerCase();
  if(file.size>18000000)throw Error('Archivo mayor a 18 MB');
+ if(['step','stp','iges','igs','brep','brp'].includes(ext))return cad3dImportOCCT(file,ext);
  if(ext==='obj')return cad3dImportOBJ(await file.text(),name);
  if(ext==='3ds')return cad3dParse3DS(await file.arrayBuffer(),name);
  if(ext==='stl')return cad3dParseSTL(await file.arrayBuffer(),name);
@@ -2548,7 +2576,7 @@ async function cad3dImportMeshFile(file){
   var buffers=(j.buffers||[]).map(function(b){var uri=b.uri.split(','),str=atob(uri[1]),buf=new Uint8Array(str.length);for(var i=0;i<str.length;i++)buf[i]=str.charCodeAt(i);return buf.buffer;});
   return cad3dParseGLTFDocument(j,buffers,name);
  }
- throw Error('Formato no admitido directamente. Para SKP/DAE/FBX/STEP/IGES exportá GLB, OBJ o STL.');
+ throw Error('Formato no admitido directamente. Para SKP/DAE/FBX exportá GLB, OBJ o STL.');
 }
 
 function cad3dImportOBJ(content,fileName){
@@ -4225,7 +4253,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
  
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
@@ -4431,7 +4459,7 @@ function build(){
  });
  root.querySelector('.cad3dOBJInput').addEventListener('change',async function(e){
   var file=e.target.files&&e.target.files[0];if(!file)return;
-  try{await cad3dImportMeshFile(file);}catch(err){text('Error al importar 3D: '+err.message);}
+  try{this.disabled=true;await cad3dImportMeshFile(file);}catch(err){text('Error al importar 3D: '+err.message);}finally{this.disabled=false;}
   this.value='';
  });
  root.querySelector('.cad3dBlockSearch').addEventListener('input',cad3dBlockCatalogItems);
@@ -9185,6 +9213,7 @@ async function readJSON(e){
    if(r.type==='imported3d'){
     if(!Array.isArray(r.meshVertices)||!r.meshVertices.length||r.meshVertices.length>1080000||r.meshVertices.length%9||!r.meshVertices.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Malla 3D guardada inválida');
     o.meshVertices=r.meshVertices.slice();o.name=String(r.name||'Imported model').slice(0,120);
+    ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
    if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
