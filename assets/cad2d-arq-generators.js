@@ -790,6 +790,45 @@ for(const [mode,label] of [['restaurant','Restaurante'],['banquet','Banquetes'],
  layoutSpec:(W,D)=>hotelSpec(W,D,mode,large),gen(b,W,D){hotelDraw(b,W,D,mode,large)}});
 }
 
+
+/* Independent bedrooms: checked layout envelopes and variable opening dimensions. */
+const BEDROOMS='Dormitorios completos';
+function bedroomSpec(W,D,kind,side,desk,opening={}){
+ const t=.12,bedD=2,door=Number(opening.doorWidth??.90),windowWidth=Number(opening.windowWidth??1.50),doorHeight=Number(opening.doorHeight??2.05),windowHeight=Number(opening.windowHeight??1.20);
+ if(![door,windowWidth,doorHeight,windowHeight].every(Number.isFinite)||door<.80||door>1.10||windowWidth<.80||windowWidth>2.40||doorHeight<1.90||doorHeight>2.50||windowHeight<.60||windowHeight>1.80)throw Error('Dimensiones de abertura inválidas');
+ const left=side==='left',a=left?t+.15:W-t-.15-door,z=a+door;
+ const closetW=1.80,bedW=kind==='single'?.90:kind==='queen'?1.60:kind==='king'?2:kind==='twin'?2.40:2.90;
+ const rects=[{key:'wardrobe',x:left?W-t-closetW:t,y:t,w:closetW,h:.60}];
+ const x=(W-bedW)/2,y=D-t-bedD-.10;
+ if(kind==='twin'||kind==='family')rects.push({key:'bed',x,y,w:.90,h:bedD},{key:'bed',x:x+bedW-(kind==='family'?1.40:.90),y,w:kind==='family'?1.40:.90,h:bedD});
+ else rects.push({key:'bed',x,y,w:bedW,h:bedD});
+ if(desk)rects.push({key:'desk',x:left?W-t-1.10:t,y:1.65,w:1.10,h:.55});
+ const wx=(W-windowWidth)/2,wz=wx+windowWidth;
+ if(x-t<.60-1e-8||y-2.20<.80-1e-8||wz>W-t-.25||wx<t+.25)throw Error('Dormitorio sin espacio libre');
+ const swing={x:a,y:t,w:door,h:door};
+ const overlap=(a,b)=>Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x)>1e-8&&Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y)>1e-8;
+ for(const r of rects){if(r.x<t-1e-8||r.y<t-1e-8||r.x+r.w>W-t+1e-8||r.y+r.h>D-t+1e-8||overlap(r,swing))throw Error('Interferencia de puerta o mueble fuera del local')}
+ for(let i=0;i<rects.length;i++)for(let j=i+1;j<rects.length;j++)if(overlap(rects[i],rects[j]))throw Error('Interferencia entre muebles');
+ return {t,rects,swing,openings:[{id:'entry',kind:'swing-door',width:door,height:doorHeight,frameWidth:.04,frameDepth:t,hinge:left?'left':'right',x:a,y:t},{id:'window',kind:'framed-window',width:windowWidth,height:windowHeight,frameWidth:.04,frameDepth:t,x:wx,y:D-t}],a,z,wx,wz,left};
+}
+function bedroomDraw(b,W,D,kind,side,desk,opening){
+ const s=bedroomSpec(W,D,kind,side,desk,opening),{t,a,z,wx,wz,left}=s,door=s.openings[0].width;
+ for(const p of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,wx,D],[wz,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,wx,D-t],[wz,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t],[wx,D-t,wx,D],[wz,D-t,wz,D]])b.line(...p,{width:.22});
+ const f=.04,leaf=door-2*f,h=left?a+f:z-f;
+ b.rect(a,0,f,t);b.rect(z-f,0,f,t);b.line(h,t,h,t+leaf);b.arc(h,t,leaf,left?0:90,left?90:180);
+ b.rect(wx,D-t,f,t);b.rect(wz-f,D-t,f,t);
+ for(const yy of [D-t+.025,D-t/2-.008,D-t/2+.008,D-.025])b.line(wx+f,yy,wz-f,yy);
+ for(const r of s.rects){
+  if(r.key==='wardrobe')wardrobe(b,r.x,r.y,r.w,r.h,true);
+  else if(r.key==='bed')b.at(r.x,r.y,0,q=>cama(q,r.w,r.h,{mesas:false}));
+  else {b.rrect(r.x,r.y,r.w,r.h,.035);b.line(r.x+.08,r.y+.10,r.x+r.w-.08,r.y+.10);b.rect(r.x+.15,r.y+.16,.45,.26)}
+ }
+}
+for(const [kind,label] of [['single','Individual'],['queen','Queen'],['king','King'],['twin','Dos camas'],['family','Familiar']])for(const side of ['left','right'])for(const desk of [true,false]){
+ const mw=kind==='family'?4.40:kind==='twin'?3.90:3.60;
+ def({id:'arq-bedroom-'+kind+'-'+side+'-'+(desk?'desk':'basic'),name:'Dormitorio '+label+' · '+(side==='left'?'acceso izquierdo':'acceso derecho')+' · '+(desk?'escritorio':'placard'),cat:BEDROOMS,family:'arq-bedroom-'+kind,w:mw+.40,d:5.70,wMin:mw,wMax:7,dMin:5.30,dMax:9,arqBedroom:true,openingDefaults:{doorWidth:.90,doorHeight:2.05,windowWidth:1.50,windowHeight:1.20},layoutSpec:(W,D,o)=>bedroomSpec(W,D,kind,side,desk,o),gen(b,W,D,o){bedroomDraw(b,W,D,kind,side,desk,o)}});
+}
+
 /* ===== EXTERIOR Y VEGETACIÓN ===== */
 const EXT='Exterior';
 one('ext-arbol','Árbol caducifolio',EXT,3.00,3.00,(b,W)=>{const r=W/2,n=14,pts=[];for(let i=0;i<=n*2;i++){const a=i*180/n*DEG,rr=i%2?r*.86:r;pts.push([r+rr*Math.cos(a),r+rr*Math.sin(a)])}b.poly(pts,true);b.circle(r,r,r*.12);for(let i=0;i<6;i++){const a=i*60*DEG;b.line(r,r,r+r*.6*Math.cos(a),r+r*.6*Math.sin(a))}},{wMin:1.0,wMax:8.0,lockAspect:true,family:'arbol'});
@@ -1058,13 +1097,13 @@ one('cv-pickup-lat','Pickup · vista lateral',CV,5.30,1.80,(b,W,D)=>{piso(b,W);c
  rueda(b,1.00,r);rueda(b,4.20,r);b.poly([[1.08,1.06],[1.52,1.62],[2.05,1.62],[2.05,1.06]],true);b.poly([[2.15,1.06],[2.15,1.62],[2.70,1.62],[2.72,1.06]],true);
  b.line(2.90,1.04,2.90,.56);b.line(2.10,.58,2.10,1.64);b.rect(.12,.70,.16,.10);b.rect(W-.12,.72,.07,.16)},{wMin:4.8,wMax:6,dMin:1.6,dMax:2,family:'cv-pickup'});
 /* ---------- API ---------- */
-function build(id,W,D){
+function build(id,W,D,openingOptions){
  const d=LIB.find(x=>x.id===id);if(!d)throw Error('Bloque inexistente: '+id);
  const w=clamp(Number(W)||d.w,d.wMin,d.wMax),h=d.lockAspect?w*(d.d/d.w):clamp(Number(D)||d.d,d.dMin,d.dMax);
- const b=new Builder();d.gen(b,w,h);
+ const b=new Builder();d.gen(b,w,h,openingOptions);
  const bad=b.out.find(e=>JSON.stringify(e).includes('null')||JSON.stringify(e).includes('NaN'));
  if(bad)throw Error('Geometría inválida en '+id);
- return {entities:b.out,w,d:h};
+ return {entities:b.out,w,d:h,...(d.arqBedroom?{openings:d.layoutSpec(w,h,openingOptions).openings}:{})};
 }
 function bounds(entities){
  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
