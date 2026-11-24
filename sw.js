@@ -7,7 +7,7 @@ self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.a
 self.addEventListener('activate',ev=>{ev.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('blackline-cad-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',ev=>{
  const req=ev.request,url=new URL(req.url);
- if(req.method!=='GET'||url.origin!==self.location.origin)return;   // API, Stripe, Google: siempre por red
+ if(req.method!=='GET'||url.origin!==self.location.origin||req.headers.has('range')||req.cache==='no-store')return;   // API, Stripe, Google: siempre por red
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
  // The converter must never run with a stale or mixed JS/WASM runtime.
  if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|cad-(?:block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
@@ -15,7 +15,7 @@ self.addEventListener('fetch',ev=>{
  }
  const appEntry=req.mode==='navigate'&&(url.pathname==='/'||url.pathname==='/index.html');
  ev.respondWith(fetch(req,appEntry?{cache:'reload'}:undefined).then(res=>{
-  if(res&&res.ok&&res.type==='basic'){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{})}
+  if(res&&res.ok&&res.status===200&&res.type==='basic'&&!/\b(?:no-store|private)\b/i.test(res.headers.get('Cache-Control')||'')){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy)).catch(()=>{})}
   return res;
- }).catch(()=>caches.match(req,{ignoreSearch:req.mode==='navigate'}).then(hit=>hit||(req.mode==='navigate'?caches.match('./index.html'):Response.error()))));
+ }).catch(()=>caches.match(req).then(async hit=>hit||(appEntry?await caches.match('./index.html'):null)||Response.error())));
 });
