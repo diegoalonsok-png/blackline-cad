@@ -4383,10 +4383,11 @@ function regularPolygon(center,vertex,sides){
 function hatchPolygonSegments(vertices,spacing,angleDegrees,limit=12000){
  const theta=angleDegrees*Math.PI/180,direction=P(Math.cos(theta),Math.sin(theta)),normal=P(-direction.y,direction.x);
  const project=p=>P(p.x*direction.x+p.y*direction.y,p.x*normal.x+p.y*normal.y);
- const raw=vertices.map(project);
- const minV=Math.min(...raw.map(p=>p.y)),maxV=Math.max(...raw.map(p=>p.y));
+ if(!Array.isArray(vertices)||vertices.length<3||!Number.isFinite(spacing)||spacing<=0||!Number.isFinite(angleDegrees))return null;
+ const raw=[];let minV=Infinity,maxV=-Infinity;
+ for(const v of vertices){if(!v||!Number.isFinite(v.x)||!Number.isFinite(v.y))return null;const p=project(v);if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return null;raw.push(p);minV=Math.min(minV,p.y);maxV=Math.max(maxV,p.y)}
  const start=Math.ceil((minV+1e-9)/spacing),end=Math.floor((maxV-1e-9)/spacing);
- if(end-start>limit)return null;
+ if(!Number.isSafeInteger(start)||!Number.isSafeInteger(end)||end-start>limit)return null;
  const output=[];
  for(let index=start;index<=end;index++){
   const y=index*spacing,intersections=[];
