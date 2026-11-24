@@ -820,29 +820,23 @@ function openArchitectureBar(focus=true){
  if(!bar){
   const host=document.getElementById('canvasWrap');if(!host)return;
   const css=document.createElement('style');css.id='cadArqBarStyle';css.textContent=`
-#cadArqInstructionBar{position:absolute;z-index:40;display:flex;align-items:center;gap:2px;padding:5px 8px 5px 4px;border-radius:999px;background:#202326;border:1.5px solid #7c838a;box-shadow:0 8px 22px #0008;user-select:none;width:min(620px,calc(100% - 12px));box-sizing:border-box;color:#f2f5f7}
-#cadArqInstructionBar button{all:unset;cursor:pointer;flex:none;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;color:#f2f5f7}
-#cadArqInstructionBar button:hover{background:#3a4046}
-#cadArqInstructionBar button:focus-visible,#cadArqInstructionBar input:focus-visible{outline:2px solid #9adff3}
+#cadArqInstructionBar{width:min(620px,calc(100% - 12px));box-sizing:border-box;color:#f2f5f7}
+#cadArqInstructionBar button{flex:none}
 #cadArqInstructionBar button:disabled{opacity:.4;cursor:wait}
-#cadArqInstructionBar svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-#cadArqInstructionBar .arq-handle{cursor:grab;width:22px;color:#c9d0d6;font-size:15px;letter-spacing:-2px;touch-action:none}
-#cadArqInstructionBar .arq-handle:active{cursor:grabbing}
-#cadArqInstructionBar .arq-sep{width:1px;height:22px;background:#4e555c;margin:0 4px;flex:none}
+#cadArqInstructionBar .qb-handle{touch-action:none}
+#cadArqInstructionBar .qb-sep{flex:none}
 #cadArqInstructionBar b{font:600 11px Arial,sans-serif;white-space:nowrap;padding:0 3px}
-#cadArqInstructionBar input{flex:1;min-width:0;width:100%;height:30px;background:transparent;border:0;border-radius:15px;padding:0 8px;color:inherit;font:12px Arial,sans-serif;user-select:text}
+#cadArqInstructionBar input{flex:1;min-width:0;width:100%;height:30px;background:transparent;border:0;border-radius:15px;padding:0 8px;color:inherit;font:12px Arial,sans-serif;user-select:text;touch-action:auto}
+#cadArqInstructionBar input:focus-visible{outline:2px solid #9adff3}
 #cadArqInstructionBar input::placeholder{color:#929aa1}
-.bl-light #cadArqInstructionBar{background:#fff;border-color:#9aa6ae;color:#18232b}
-.bl-light #cadArqInstructionBar button{color:#18232b}
-.bl-light #cadArqInstructionBar button:hover{background:#e6edf2}
-.bl-light #cadArqInstructionBar .arq-handle{color:#64727b}
+.bl-light #cadArqInstructionBar{color:#18232b}
 #cadArqInstructionBar.arq-min{width:auto}
-#cadArqInstructionBar.arq-min input,#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .arq-sep{display:none}
+#cadArqInstructionBar.arq-min input,#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .qb-sep{display:none}
 `;document.head.append(css);
   bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
-  bar.innerHTML='<button class="arq-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="arq-sep"></span><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"><span class="arq-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><input type="text" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
   host.append(bar);
-  const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.arq-handle');
+  const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const KEY='cad2d-arqbar-pos';
   const place=(x,y)=>{const w=host.clientWidth,h=host.clientHeight;x=Math.max(4,Math.min(w-bar.offsetWidth-4,x));y=Math.max(4,Math.min(h-bar.offsetHeight-4,y));bar.style.left=x+'px';bar.style.top=y+'px'};
   let pos=null;try{pos=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
