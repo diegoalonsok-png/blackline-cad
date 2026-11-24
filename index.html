@@ -3161,9 +3161,13 @@ function cadComputeWallTGaps(entities=state.entities){
  const groups=new Map();for(const f of faces){if(!groups.has(f.wall2d.group))groups.set(f.wall2d.group,[]);groups.get(f.wall2d.group).push(f)}
  const tips=[];for(const g of groups.values()){if(g.length!==2)continue;for(const k of ['a','b'])tips.push({group:g[0].wall2d.group,p:[g[0][k],g[1][k]]})}
  const tol=Math.max(1e-6,.002*1000/U[state.unit]),gaps=new Map();
+ // Only wall-end pairs whose bounding box can overlap this wall face.
+ const tipBounds=tip=>({minX:Math.min(tip.p[0].x,tip.p[1].x),maxX:Math.max(tip.p[0].x,tip.p[1].x),minY:Math.min(tip.p[0].y,tip.p[1].y),maxY:Math.max(tip.p[0].y,tip.p[1].y)});
+ const query=tips.length>128?window.BlacklinePerformance?.spatialIndex?.(tips,tipBounds):null;
  for(const h of faces){
   const vx=h.b.x-h.a.x,vy=h.b.y-h.a.y,L2=vx*vx+vy*vy;if(L2<1e-12)continue;const L=Math.sqrt(L2);
-  for(const tip of tips){
+  const nearby=query?query({minX:Math.min(h.a.x,h.b.x)-tol,maxX:Math.max(h.a.x,h.b.x)+tol,minY:Math.min(h.a.y,h.b.y)-tol,maxY:Math.max(h.a.y,h.b.y)+tol}):tips;
+  for(const tip of nearby){
    if(tip.group===h.wall2d.group)continue;
    const ts=[];
    for(const q of tip.p){const t=((q.x-h.a.x)*vx+(q.y-h.a.y)*vy)/L2,d=Math.abs((q.x-h.a.x)*vy-(q.y-h.a.y)*vx)/L;if(d>tol||t<=1e-6||t>=1-1e-6)break;ts.push(t)}
@@ -3196,14 +3200,17 @@ function cadComputeWallCaps(entities=state.entities){
  const touch=new Map(),add=(p,id)=>{if(!p)return;const k=key(p);if(!touch.has(k))touch.set(k,new Set());touch.get(k).add(id)};
  for(const e of entities){if(e.cadHidden)continue;if(e.type==='line'){add(e.a,e.id);add(e.b,e.id)}else if(e.type==='polyline'&&Array.isArray(e.pts))for(const q of e.pts)add(q,e.id)}
  const near=(p,id)=>{const [x,y]=key(p).split(',').map(Number);for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++){const t=touch.get((x+i)+','+(y+j));if(t&&[...t].some(o=>o!==id))return true}return false};
- const onOther=(p,f)=>faces.some(h=>{if(h===f||h.wall2d.group===f.wall2d.group)return false;const vx=h.b.x-h.a.x,vy=h.b.y-h.a.y,L2=vx*vx+vy*vy;if(L2<1e-12)return false;const t=((p.x-h.a.x)*vx+(p.y-h.a.y)*vy)/L2;if(t<-1e-6||t>1+1e-6)return false;return Math.abs((p.x-h.a.x)*vy-(p.y-h.a.y)*vx)/Math.sqrt(L2)<=tol});
+ const faceBounds=h=>{const pad=tol+Math.hypot(h.b.x-h.a.x,h.b.y-h.a.y)*1e-6;return {minX:Math.min(h.a.x,h.b.x)-pad,maxX:Math.max(h.a.x,h.b.x)+pad,minY:Math.min(h.a.y,h.b.y)-pad,maxY:Math.max(h.a.y,h.b.y)+pad}};
+ const faceQuery=faces.length>128?window.BlacklinePerformance?.spatialIndex?.(faces,faceBounds):null;
+ const onOther=(p,f)=>(faceQuery?faceQuery({minX:p.x,maxX:p.x,minY:p.y,maxY:p.y}):faces).some(h=>{if(h===f||h.wall2d.group===f.wall2d.group)return false;const vx=h.b.x-h.a.x,vy=h.b.y-h.a.y,L2=vx*vx+vy*vy;if(L2<1e-12)return false;const t=((p.x-h.a.x)*vx+(p.y-h.a.y)*vy)/L2;if(t<-1e-6||t>1+1e-6)return false;return Math.abs((p.x-h.a.x)*vy-(p.y-h.a.y)*vx)/Math.sqrt(L2)<=tol});
  const free=[];
  for(const f of faces)for(const tip of ['a','b']){const p=f[tip];if(!near(p,f.id)&&!onOther(p,f))free.push({f,tip,p})}
- const caps=[],used=new Set();
+ const caps=[],used=new Set(),byGroup=new Map();
+ free.forEach((item,i)=>{const group=item.f.wall2d.group;if(!byGroup.has(group))byGroup.set(group,[]);byGroup.get(group).push(i)});
  for(let i=0;i<free.length;i++){
   if(used.has(i))continue;const A=free[i];let best=-1,bd=Infinity;
-  for(let j=i+1;j<free.length;j++){
-   if(used.has(j))continue;const B=free[j];
+  for(const j of byGroup.get(A.f.wall2d.group)||[]){
+   if(j<=i||used.has(j))continue;const B=free[j];
    if(B.f.wall2d.group!==A.f.wall2d.group||B.f.wall2d.face===A.f.wall2d.face)continue;
    const d=Math.hypot(B.p.x-A.p.x,B.p.y-A.p.y),t=thick(A.f);
    if(d<=t*1.6+tol&&d<bd){best=j;bd=d}
@@ -3857,7 +3864,7 @@ function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hit
   return;
  }
  if(t==='rotate'){if(!s.length){s.push(p);prompt();return}let pivot=s[0],d=dist(pivot,p);let v=cad2dTypedValue!==null?cad2dTypedValue:ang(pivot,p)*180/Math.PI;cad2dTypedValue=null;if(!Number.isFinite(v)){s.length=0;return}saveHistory();let rad=v*Math.PI/180;state.entities=state.entities.map(e=>{if(!state.selected.includes(e.id))return e;let c=transformEntity(e,q=>{let z=sub(q,pivot);return t==='rotate'?add(pivot,P(z.x*Math.cos(rad)-z.y*Math.sin(rad),z.x*Math.sin(rad)+z.y*Math.cos(rad))):add(pivot,mul(z,v))});if(e.r)c.r=t==='scale'?e.r*v:e.r;if(e.rx)c.rx=t==='scale'?e.rx*v:e.rx;if(e.ry)c.ry=t==='scale'?e.ry*v:e.ry;if(e.h)c.h=t==='scale'?e.h*v:e.h;if(t==='scale'&&c.type==='dimension'&&c.style){c.style.textHeight*=v;c.style.arrow*=v}if(t==='rotate'&&c.type==='arc'){c.a0+=rad;c.a1+=rad}if(c.type==='blockRef'){if(t==='rotate')c.rotation=(Number(c.rotation)||0)+v;if(t==='scale')c.scale=(Number(c.scale)||1)*v}return c});s.length=0;updateAll();log(t.toUpperCase());return}}
-function eraseSelected(){if(!state.selected.length)return toast('Seleccioná un objeto / Select an object to erase');saveHistory();state.entities=state.entities.filter(e=>!state.selected.includes(e.id));state.selected=[];updateAll();log('ERASE')}
+function eraseSelected(){if(!state.selected.length)return toast('Seleccioná un objeto / Select an object to erase');saveHistory();const ids=new Set(state.selected);state.entities=state.entities.filter(e=>!ids.has(e.id));state.selected=[];updateAll();log('ERASE')}
 function duplicateSelected(){if(!state.selected.length)return;saveHistory();for(const id of [...state.selected]){const e=state.entities.find(x=>x.id===id);if(e){let c=transformEntity(e,p=>add(p,P(state.grid*.5,-state.grid*.5)));newEntity({...c,id:undefined})}}state.selected=[];updateAll()}
 function offsetSelected(){if(!state.selected.length)return toast('Select line or circle, then Offset');let amount=Number(window.prompt(`Offset distance (${state.unit}):`,String(state.grid)));if(!Number.isFinite(amount)||amount===0)return;saveHistory();for(const id of state.selected){const e=state.entities.find(x=>x.id===id);if(!e)continue;if(e.type==='line'){let v=sub(e.b,e.a),len=Math.hypot(v.x,v.y)||1,delta=P(-v.y*amount/len,v.x*amount/len);newEntity({...clone(e),id:undefined,a:add(e.a,delta),b:add(e.b,delta)})}else if(e.type==='circle'&&e.r+amount>0)newEntity({...clone(e),id:undefined,r:e.r+amount})}updateAll();log('OFFSET')}
 /* Trim a LINE against the nearest real crossing from another LINE.
@@ -5215,7 +5222,7 @@ function cadApplyWindowSelection(start,end,shift,path){
   if(poly)return cadLassoHitsBox(poly,bb,crossing);
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
  }).map(e=>e.id);
- state.selected=shift?state.selected.filter(id=>!ids.includes(id)):[...new Set([...state.selected,...ids])];
+ const affected=new Set(ids);state.selected=shift?state.selected.filter(id=>!affected.has(id)):[...new Set([...state.selected,...ids])];
  cadLastWindowSelectionAt=performance.now();updateProps();schedule();
  toast((crossing?'Ventana verde · cruce':'Ventana azul · contenido')+' · '+ids.length+' objetos');
 }
@@ -6020,7 +6027,7 @@ function cadUpdateImagePropertiesEditor(e){
   props.addEventListener('change',ev=>cadApplyImageProperty(props,ev));
  }
 }
-function updateProps(){const ids=state.selected,items=state.entities.filter(e=>ids.includes(e.id));
+function updateProps(){const ids=state.selected,selectedIds=new Set(ids),items=state.entities.filter(e=>selectedIds.has(e.id));
  cadUpdateImageBar(items.length===1&&items[0].type==='image'?items[0]:null);
  const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
  const blockUI=$('blSelectedBlockEditor');
@@ -6314,7 +6321,7 @@ function cutSelectedCadObjects(){
  saveHistory();state.entities=state.entities.filter(e=>!selected.has(e.id));state.selected=[];updateAll();toast('Cut '+selected.size+' objects');
 }
 
-function selectedCadEntities(){return state.entities.filter(e=>state.selected.includes(e.id))}
+function selectedCadEntities(){const ids=new Set(state.selected);return state.entities.filter(e=>ids.has(e.id))}
 function areaOfPolygon(vertices){
  if(!Array.isArray(vertices)||vertices.length<3)return 0;
  let sum=0;for(let i=0;i<vertices.length;i++){const a=vertices[i],b=vertices[(i+1)%vertices.length];sum+=a.x*b.y-b.x*a.y}
@@ -11272,7 +11279,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-wall-join.js?v=20261120-1850"></script>
 <script src="cad-wall-grip.js?v=20261120-1850"></script>
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
-<script src="cad-performance.js?v=20261120-1850"></script>
+<script src="cad-performance.js?v=20261124-spatial-v2"></script>
 <script src="assets/cad-pdf-import.js?v=20261120-1930"></script><script src="cad-plan.js?v=20261123-quiet-pro-1"></script><script src="cad-cloud.js?v=20261120-1850"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261120-1850"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="assets/cad2d-dk-blocks.js?v=20261120-1850"></script>
 <script src="assets/cad2d-modern-pro-blocks.js?v=20261122-1"></script><script src="assets/cad2d-olympiadas-pro.js?v=20261122-hires20"></script>
