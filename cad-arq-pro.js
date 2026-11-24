@@ -967,16 +967,36 @@ function arqPlanThumbnail(plan){
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+[minX-pad,-maxY-pad,maxX-minX+2*pad,maxY-minY+2*pad].join(' ')+'" style="width:100%;height:142px;display:block;background:#f4efe3;border-radius:4px" role="img" aria-label="Planta arquitectónica">'+body+'</svg>';
 }
 async function openArqPlanCatalogue(category){
- const old=document.getElementById('arqPlanCatalogue');if(old){old.remove();}
+ const old=document.getElementById('arqPlanCatalogue');if(old){old.close();old.remove();}
  const dlg=document.createElement('dialog');dlg.id='arqPlanCatalogue';
- dlg.style.cssText='width:min(760px,94vw);max-height:80vh;overflow:auto;background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:14px;box-sizing:border-box';
- const header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px';
+ dlg.style.cssText='position:fixed;inset:auto;margin:0;z-index:1200;width:min(760px,94vw);height:min(620px,80vh);min-width:min(300px,94vw);min-height:min(220px,80vh);max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);resize:both;overflow:hidden;background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:14px;box-sizing:border-box';
+ const header=document.createElement('div');header.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex:none;cursor:move;touch-action:none;user-select:none';header.title='Arrastrar para mover / Drag to move';
  const title=document.createElement('strong');title.textContent='ARQASSIST · '+({bathroom:'Baños / Bathrooms',kitchen:'Cocinas / Kitchens',bedroom:'Habitaciones / Bedrooms',laundry:'Lavaderos / Laundry',office:'Oficinas / Offices',dining:'Comedores / Dining',closet:'Vestidores / Dressing'}[category]||'Plantas');
- const close=document.createElement('button');close.className='btn slim';close.textContent='×';close.setAttribute('aria-label','Cerrar / Close');close.onclick=()=>dlg.close();header.append(title,close);dlg.append(header);
- const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px';dlg.append(grid);
+ const close=document.createElement('button');close.className='btn slim';close.textContent='×';close.setAttribute('aria-label','Cerrar / Close');close.onclick=()=>dlg.close();const handle=document.createElement('span');handle.textContent='⠿';handle.setAttribute('aria-hidden','true');handle.style.cssText='opacity:.75;font-size:18px;line-height:1';title.style.flex='1';header.append(handle,title,close);dlg.append(header);
+ const grid=document.createElement('div');grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(min(158px,100%),1fr));gap:9px;overflow:auto;min-height:0;flex:1;align-content:start;padding-right:3px';dlg.append(grid);
  const fmt=n=>n.toFixed(2);
  const status=document.createElement('p');status.textContent='Cargando catálogo…';dlg.append(status);
- dlg.addEventListener('close',()=>dlg.remove());document.body.append(dlg);dlg.showModal();
+ const storageKey='cad2d.arqCatalogue.palette.v1';
+ let saved={};try{saved=JSON.parse(localStorage.getItem(storageKey)||'{}')||{}}catch(e){}
+ const clamp=(v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+ const fit=()=>{const r=dlg.getBoundingClientRect();dlg.style.left=clamp(r.left,6,Math.max(6,innerWidth-r.width-6))+'px';dlg.style.top=clamp(r.top,6,Math.max(6,innerHeight-r.height-6))+'px';};
+ const remember=()=>{if(!dlg.isConnected||!dlg.open)return;const r=dlg.getBoundingClientRect();try{localStorage.setItem(storageKey,JSON.stringify({x:r.left,y:r.top,w:r.width,h:r.height}))}catch(e){}};
+ dlg.setAttribute('aria-label','ARQASSIST · Galería de plantas');
+ document.body.append(dlg);dlg.show();dlg.style.display='flex';dlg.style.flexDirection='column';
+ if(Number.isFinite(saved.w))dlg.style.width=clamp(saved.w,Math.min(300,innerWidth-12),innerWidth-12)+'px';
+ if(Number.isFinite(saved.h))dlg.style.height=clamp(saved.h,Math.min(220,innerHeight-12),innerHeight-12)+'px';
+ dlg.style.left=(Number.isFinite(saved.x)?saved.x:(innerWidth-dlg.offsetWidth)/2)+'px';
+ dlg.style.top=(Number.isFinite(saved.y)?saved.y:(innerHeight-dlg.offsetHeight)/2)+'px';fit();
+ let drag=null;
+ header.addEventListener('pointerdown',e=>{if(e.button!==0||e.target.closest('button'))return;const r=dlg.getBoundingClientRect();drag={id:e.pointerId,x:e.clientX-r.left,y:e.clientY-r.top};header.setPointerCapture(e.pointerId);e.preventDefault();});
+ header.addEventListener('pointermove',e=>{if(!drag||drag.id!==e.pointerId)return;dlg.style.left=clamp(e.clientX-drag.x,6,Math.max(6,innerWidth-dlg.offsetWidth-6))+'px';dlg.style.top=clamp(e.clientY-drag.y,6,Math.max(6,innerHeight-dlg.offsetHeight-6))+'px';});
+ const stopDrag=e=>{if(drag&&drag.id===e.pointerId){drag=null;remember();}};
+ header.addEventListener('pointerup',stopDrag);header.addEventListener('pointercancel',stopDrag);header.addEventListener('lostpointercapture',stopDrag);
+ const onResize=()=>{if(!dlg.isConnected)return;fit();remember();};
+ const observer=typeof ResizeObserver==='function'?new ResizeObserver(onResize):null;observer?.observe(dlg);
+ window.addEventListener('resize',onResize);
+ dlg.addEventListener('close',()=>{observer?.disconnect();window.removeEventListener('resize',onResize);dlg.remove();});
+ dlg.addEventListener('keydown',e=>{if(e.key==='Escape'){e.stopPropagation();dlg.close();}});
  let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;status.remove();
  for(const item of items.filter(x=>x.category===category).sort((a,b)=>a.area-b.area)){
   const button=document.createElement('button');button.className='btn arq-card';button.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
@@ -987,7 +1007,7 @@ async function openArqPlanCatalogue(category){
    catch(e){CORE.toast(e.message)}finally{button.disabled=false}};
   grid.append(button);
  }
- const foot=document.createElement('p');foot.style.cssText='font-size:12px;opacity:.8;margin-bottom:0';foot.textContent='Seleccioná una planta para insertarla como muros, aberturas y bloques independientes. / Select a plan to insert editable CAD objects.';dlg.append(foot);
+ const foot=document.createElement('p');foot.style.cssText='font-size:12px;opacity:.8;margin-bottom:0;flex:none';foot.textContent='Seleccioná una planta para insertarla como muros, aberturas y bloques independientes. / Select a plan to insert editable CAD objects.';dlg.append(foot);
 }
 
 /* Free-text architecture bar is separate from the CAD command interpreter. */
