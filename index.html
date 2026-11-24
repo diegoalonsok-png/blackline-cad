@@ -1954,7 +1954,7 @@ function draw(){drawPending=false;const perfStart=performance.now();let painted=
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
-  const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,state.mouse);
+  const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,world(pointer));
   const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
   if(candidate){drawEntity(candidate,'#ffce78');cadGripLabel(job,candidate,dest)}
  }
@@ -3617,14 +3617,17 @@ function cadOsnapEnabled(kind){return cadOneShotOsnap?kind===cadOneShotOsnap:cad
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
 function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
 
-function snapPoint(p){
+function snapPoint(p,gripBase=null){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
 // Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
 // the drawing endpoint, not which geometry the cursor may inspect for tracking.
 const rawPointer=P(p.x,p.y);
-const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)&&!(state.tool==='stretch'&&state.modifyCandidate?.phase==='window');
+const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect','circle','ellipse','polygon','zoomWindow','donut','revcloud'].includes(state.tool)&&!(state.tool==='stretch'&&state.modifyCandidate?.phase==='window')));
+ const orthoBase=orthoLocksPointer?(gripBase||state.stage.at(-1)):null;
+ const orthoAxis=orthoBase?(Math.abs(rawPointer.x-orthoBase.x)>=Math.abs(rawPointer.y-orthoBase.y)?'h':'v'):null;
+ const constrain=pt=>!orthoBase?pt:orthoAxis==='h'?P(pt.x,orthoBase.y):P(orthoBase.x,pt.y);
  // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en AutoCAD).
- if(orthoLocksPointer){const a=state.stage[state.stage.length-1];q=Math.abs(q.x-a.x)>Math.abs(q.y-a.y)?P(q.x,a.y):P(a.x,q.y)}
+ if(orthoLocksPointer){q=constrain(q)}
   else if(state.polarOn&&state.stage.length&&['line','polyline','rect','polygon','dimension','move','copy'].includes(state.tool)){
    const a=state.stage[state.stage.length-1],vx=q.x-a.x,vy=q.y-a.y,r=Math.hypot(vx,vy);
    if(r>1e-10){
@@ -3636,7 +3639,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
  if(state.osnapOn||cadOneShotOsnap){
   // With ORTHO + OTRACK, search OSNAP around the physical cursor, not the
   // axis-constrained endpoint. This allows acquiring a second, off-axis vertex.
-  const osnapProbe=orthoLocksPointer&&trackingEligible()?rawPointer:q;
+  const osnapProbe=orthoLocksPointer?rawPointer:q;
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
   for(const e of state.entities){
@@ -3718,30 +3721,31 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
    else cadOtrackReleaseHover();
    // An off-axis vertex may be acquired as an OTRACK reference, but it must
    // not move the committed drawing point off the active ORTHO axis.
-   if(orthoLocksPointer&&osnapProbe===rawPointer){
-    const base=state.stage.at(-1),horizontal=Math.abs(q.y-base.y)<1e-9;
-    const offAxis=horizontal?Math.abs(nearest.y-base.y)>1e-9:Math.abs(nearest.x-base.x)>1e-9;
-    if(offAxis)return q;
+   if(orthoLocksPointer){
+    const projected=constrain(nearest);
+    const offAxis=dist(projected,nearest)>1e-9;
+    if(offAxis){
+     if(trackingEligible()){otrkGuide={point:projected,vertical:orthoAxis==='h'?nearest:null,horizontal:orthoAxis==='v'?nearest:null,intersection:true};}
+     return trackingEligible()?projected:q;
+    }
    }
-   return snapIndicator.point;
+   return constrain(snapIndicator.point);
   }
  }
  // The pointer left its OSNAP marker: allow a later visit to the same point.
  cadOtrackReleaseHover();
  if(trackingEligible()&&otrkAnchors.length&&window.BlacklineTrackingMath){
-  if(state.orthoOn&&state.stage.length){
-   // Con ORTHO, el punto queda sobre la dirección ortogonal y se alinea con la referencia más cercana.
-   const a=state.stage.at(-1),horiz=Math.abs(q.y-a.y)<1e-9,lim=10/state.view.scale;let best=null;
-   for(const t of otrkAnchors){const d=horiz?Math.abs(q.x-t.x):Math.abs(q.y-t.y);if(d<lim&&(!best||d<best.d))best={d,t}}
-   if(best){const pt=horiz?P(best.t.x,a.y):P(a.x,best.t.y);otrkGuide={point:pt,vertical:horiz?best.t:null,horizontal:horiz?null:best.t,intersection:false};return pt}
+  if(orthoLocksPointer){
+   const guide=BlacklineTrackingMath.projectOrtho?.(rawPointer,orthoBase,otrkAnchors,state.view.scale,10,orthoAxis);
+   if(guide?.intersection){otrkGuide=guide;return constrain(guide.point)}
   }else{
    const angs=[0,90,180,270];if(state.polarOn){const inc=Number(state.polarAngle)||45;for(let a=inc;a<360-1e-9;a+=inc)if(!angs.some(x=>Math.abs(x-a)<1e-6))angs.push(a)}
    const guide=BlacklineTrackingMath.projectRays?BlacklineTrackingMath.projectRays(q,otrkAnchors,state.view.scale,10,angs):BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
    if(guide){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
   }
  }
- if(state.snapOn&&state.grid>0)return P(Math.round(q.x/state.grid)*state.grid,Math.round(q.y/state.grid)*state.grid);
- return q;
+ if(state.snapOn&&state.grid>0)return constrain(P(Math.round(q.x/state.grid)*state.grid,Math.round(q.y/state.grid)*state.grid));
+ return constrain(q);
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
@@ -5504,8 +5508,9 @@ let cadGripTyped='';
 // has no state.stage base point. Keep preview, typed length and commit identical.
 // Grip OTRACK: use the vertex being moved as the acquisition point.
 function cadGripTrackingDestination(job,point){
- const snapped=snapPoint(point);
+ const snapped=snapPoint(point,job?.grip?.p||null);
  if(!job||(!state.orthoOn&&!otrkOn))return snapped;
+ if(state.orthoOn)return snapped;
  const g=job.grip;
  if(!g?.p)return snapped;
  const base=g.p;
@@ -5542,9 +5547,9 @@ function cadGripPerpendicularTyped(job,target,value){
 function cadGripTypedDest(job){
  const v=Number(cadGripTyped);if(!cadGripTyped||!(v>0))return null;
  const e=job.original,g=job.grip;
- if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=cadGripTrackingDestination(job,state.mouse),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
- const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=cadGripTrackingDestination(job,state.mouse),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
- const m=cadGripTrackingDestination(job,state.mouse),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
+ if(e.type==='line'&&g.kind!=='move'){const fixed=g.index===0?e.b:e.a,m=cadGripTrackingDestination(job,world(pointer)),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const nb=cadGripNeighbours(e,g);if(nb.length===1){const fixed=nb[0],m=cadGripTrackingDestination(job,world(pointer)),perpendicular=cadGripPerpendicularTyped(job,m,v);if(perpendicular)return perpendicular;const d=sub(m,fixed),L=Math.hypot(d.x,d.y)||1;return add(fixed,mul(d,v/L))}
+ const m=cadGripTrackingDestination(job,world(pointer)),d=sub(m,g.p),L=Math.hypot(d.x,d.y)||1;return add(g.p,mul(d,v/L));
 }
 function cadGripNeighbours(e,g){
  if(e.type!=='polyline'||g.kind!=='vertex')return [];const p=e.pts,i=g.index,n=p.length,out=[];
@@ -5837,7 +5842,7 @@ canvas.addEventListener('pointermove',ev=>{
   $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
   schedule();return;
  }
- state.mouse=(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
+ state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
   if(window.BlacklineWallGrip){
@@ -6883,7 +6888,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}
  const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
- {const n=Number(value.replace(',','.'));if(/^\d*[.,]?\d+$/.test(value)&&n>0&&otrkGuide?.rays?.length===1&&!otrkGuide.intersection&&trackingEligible()&&state.tool!=='select'){const r=otrkGuide.rays[0];otrkGuide=null;handlePoint(P(r.anchor.x+r.ux*n,r.anchor.y+r.uy*n),false);schedule();return}}
+ {const n=Number(value.replace(',','.'));if(/^\d*[.,]?\d+$/.test(value)&&n>0&&!state.orthoOn&&otrkGuide?.rays?.length===1&&!otrkGuide.intersection&&trackingEligible()&&state.tool!=='select'){const r=otrkGuide.rays[0];otrkGuide=null;handlePoint(P(r.anchor.x+r.ux*n,r.anchor.y+r.uy*n),false);schedule();return}}
 /* ---------- Opciones de comando por teclado (estilo AutoCAD) ---------- */
  {const num=value.replace(',','.'),isNum=/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(num),n=Number(num),t=state.tool,st=state.stage,opt=rawOption;
   const say=m=>{log(m);$('command').placeholder=m;toast(m);cadRenderOptionChips()};
@@ -7046,6 +7051,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
    // OSNAP can snap to the starting point while the mouse has moved. Keep its real bearing.
    if(magnitude<1e-9){delta=sub(world(pointer),origin);magnitude=Math.hypot(delta.x,delta.y);}
    if(magnitude<1e-9){delta=P(1,0);magnitude=1;}
+   if(state.orthoOn){delta=Math.abs(delta.x)>=Math.abs(delta.y)?P(Math.sign(delta.x)||1,0):P(0,Math.sign(delta.y)||1);magnitude=1;}
    if(!Number.isFinite(length)||length<=0)return toast('Longitud / Length must be positive');
    // If the cursor has not moved, default to +X (predictable axis).
    const dest=add(origin,mul(delta,length/magnitude));
@@ -11456,7 +11462,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script defer src="assets/cad2d-architecture-pack.js?v=20261120-1850"></script>
 <script src="cad-osnap-math.js?v=20261120-1850"></script>
 <script src="cad-scale-math.js?v=20261120-1850"></script>
-<script src="cad-object-tracking.js?v=20261120-1850"></script>
+<script src="cad-object-tracking.js?v=20261124-ortho-v2"></script>
 <script src="cad-auto-opening.js?v=20261120-1850"></script>
 <script src="cad-wall-join.js?v=20261120-1850"></script>
 <script src="cad-wall-grip.js?v=20261120-1850"></script>
