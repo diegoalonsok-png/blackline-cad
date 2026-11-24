@@ -7165,12 +7165,18 @@ async function convertDWGAutomatically(file,options={}){
  if(!info.valid)throw Error(info.message);
  const local=window.CAD2D_DWG_BATCH?.convertLocal;
  if(typeof local!=='function')throw Error('El conversor local todavía no se cargó. Recargá CAD2D3D y volvé a intentar.');
- toast('Convirtiendo '+file.name+' a DXF localmente…');
+ const started=performance.now();
+ log('DWG [1/3] Conversión local · '+info.version+' · '+Math.round(file.size/1024)+' KiB');
+ toast('DWG 1/3 · convirtiendo '+file.name+'…');
  const bytes=await local(file,'dwg-dxf');
  if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('El conversor no devolvió un archivo válido.');
+ log('DWG [2/3] DXF generado · '+Math.round(bytes.byteLength/1024)+' KiB · '+((performance.now()-started)/1000).toFixed(1)+' s');
  const dxf=await cadDxfDecode(bytes);
  if(!/\bSECTION\b/.test(dxf.slice(0,20000)))throw Error('El resultado no es un DXF reconocido. El original no se modificó.');
  if(options.textOnly)return dxf;
+ toast('DWG 3/3 · importando geometría y bloques…');
+ log('DWG [3/3] Importación del modelo');
+ await new Promise(resolve=>setTimeout(resolve,40));
  importDXF(dxf,file.name.replace(/\.(dwg|dwt)$/i,'.dxf'));
  cadSetDrawingName(file.name.replace(/\.dwt$/i,'.dwg'));
  log('DWG convertido localmente · comprobar capas, bloques y escala 1:1.');
@@ -7507,9 +7513,18 @@ function importSVG(source,name){
 }
 
 function importDXF(text,name,opts){
+ // Bounds protect the main thread against malformed arrays, cyclic block references
+ // and unexpected expansion. Exceeding them aborts before replacing the open drawing.
+ const importStart=performance.now(),MAX_PAIRS=3500000,MAX_WALK=2000000,MAX_ENTITIES=350000,MAX_VERTICES=2500000;
+ const activeRecords=new Set();let walkCount=0,entityCount=0,vertexCount=0;
+ const abortImport=message=>{const err=Error('DXF: '+message+' · dibujo anterior conservado');err.cadImportFatal=true;throw err};
+ const checkTime=()=>{if(performance.now()-importStart>20000)abortImport('procesamiento excedió el límite de 20 segundos')};
+ const budgetEntity=e=>{entityCount++;vertexCount+=Array.isArray(e.pts)?e.pts.length:1;if(entityCount>MAX_ENTITIES||vertexCount>MAX_VERTICES)abortImport('expansión geométrica demasiado grande')};
+ if(typeof text==='string'&&text.length>64*1024*1024)abortImport('DXF expandido superior a 64 MiB');
  text=String(text||'').replace(/\\U\+([0-9A-Fa-f]{4})/g,(m,h)=>String.fromCharCode(parseInt(h,16)));
  const raw=text.replace(/\r/g,'').split('\n'),pairs=[];
- for(let i=0;i<raw.length-1;i+=2){const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
+ if(raw.length>MAX_PAIRS*2+2)abortImport('demasiados registros DXF');
+ for(let i=0;i<raw.length-1;i+=2){if((i&8191)===0)checkTime();const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
  let section='',table='',unitCode=0,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0;
  const ACI_HEX='000000ff0000ffff0000ff0000ffff0000ffff00ffffffff808080c0c0c0ff0000ff7f7fa50000a552527f00007f3f3f4c00004c2626260000261313ff3f00ff9f7fa52900a567527f1f007f4f3f4c13004c2f26260900261713ff7f00ffbf7fa55200a57c527f3f007f5f3f4c26004c3926261300261c13ffbf00ffdf7fa57c00a591527f5f007f6f3f4c39004c4226261c00262113ffff00ffff7fa5a500a5a5527f7f007f7f3f4c4c004c4c26262600262613bfff00dfff7f7ca50091a5525f7f006f7f3f394c00424c261c26002126137fff00bfff7f52a5007ca5523f7f005f7f3f264c00394c261326001c26133fff009fff7f29a50067a5521f7f004f7f3f134c002f4c2609260017261300ff007fff7f00a50052a552007f003f7f3f004c00264c2600260013261300ff3f7fff9f00a52952a567007f1f3f7f4f004c13264c2f00260913581700ff7f7fffbf00a55252a57c007f3f3f7f5f004c26264c3900261313581c00ffbf7fffdf00a57c52a591007f5f3f7f6f004c39264c4200261c13585800ffff7fffff00a5a552a5a5007f7f3f7f7f004c4c264c4c00262613585800bfff7fdfff007ca55291a5005f7f3f6f7f00394c26427e001c26135858007fff7fbfff0052a5527ca5003f7f3f5f7f00264c26397e001326131c58003fff7f9fff0029a55267a5001f7f3f4f7f00134c262f7e0009261317580000ff7f7fff0000a55252a500007f3f3f7f00004c26267e0000261313583f00ff9f7fff2900a56752a51f007f4f3f7f13004c2f267e0900261713587f00ffbf7fff5200a57c52a53f007f5f3f7f26004c39267e1300261c1358bf00ffdf7fff7c00a59152a55f007f6f3f7f39004c42264c1c0026581358ff00ffff7fffa500a5a552a57f007f7f3f7f4c004c4c264c260026581358ff00bfff7fdfa5007ca552917f005f7f3f6f4c00394c264226001c581358ff007fff7fbfa50052a5527c7f003f7f3f5f4c00264c263926001358131cff003fff7f9fa50029a552677f001f7f3f4f4c00134c262f260009581317000000656565666666999999ccccccffffff';
  const aciHex=n=>{n=Math.abs(Math.round(n));return n>=1&&n<=255?'#'+ACI_HEX.substr(n*6,6):'#c7cbd0'};
@@ -7522,7 +7537,7 @@ function importDXF(text,name,opts){
  // --- Parse sections: tables, block definitions and model-space records ---
  const blocksDef=new Map(),modelRecs=[];let curBlock=null;
  for(let i=0;i<pairs.length;){
-  const [code,val]=pairs[i];
+  if((i&8191)===0)checkTime();const [code,val]=pairs[i];
   if(code===0&&val==='SECTION'){section=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';table='';i+=2;continue}
   if(code===0&&val==='ENDSEC'){section='';table='';i++;continue}
   if(section==='HEADER'&&code===9&&val==='$INSUNITS'){unitCode=Number(pairs[i+1]?.[1]||0);i+=2;continue}
@@ -7552,7 +7567,7 @@ function importDXF(text,name,opts){
  const tp=(m,p)=>P(m[0]*p.x+m[2]*p.y+m[4],m[1]*p.x+m[3]*p.y+m[5]);
  const tv=(m,x,y)=>P(m[0]*x+m[2]*y,m[1]*x+m[3]*y);
  const isId=m=>m.every((v,k)=>Math.abs(v-ID[k])<1e-12);
- const arcPts=(c,r,a0,sweep)=>{const n=Math.max(6,Math.ceil(Math.abs(sweep)/(Math.PI/24)));return Array.from({length:n+1},(_,k)=>P(c.x+r*Math.cos(a0+sweep*k/n),c.y+r*Math.sin(a0+sweep*k/n)))};
+ const arcPts=(c,r,a0,sweep)=>{if(![c.x,c.y,r,a0,sweep].every(Number.isFinite)||Math.abs(sweep)>Math.PI*2+1e-6)throw Error('Arco DXF inválido');const n=Math.max(6,Math.ceil(Math.abs(sweep)/(Math.PI/24)));return Array.from({length:n+1},(_,k)=>P(c.x+r*Math.cos(a0+sweep*k/n),c.y+r*Math.sin(a0+sweep*k/n)))};
  const bulgePts=(p1,p2,b)=>{const d=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(d<1e-12||Math.abs(b)<1e-10)return[p2];const th=4*Math.atan(b),r=d*(1+b*b)/(4*Math.abs(b)),ux=(p2.x-p1.x)/d,uy=(p2.y-p1.y)/d,h=d/2*(1-b*b)/(2*b),c=P((p1.x+p2.x)/2-uy*h,(p1.y+p2.y)/2+ux*h);return arcPts(c,r,Math.atan2(p1.y-c.y,p1.x-c.x),th).slice(1)};
  const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];out.push(...bulgePts(a.p,b.p,a.b||0))}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
@@ -7595,7 +7610,7 @@ function importDXF(text,name,opts){
   }
   if(type==='ELLIPSE'){const mx=get(11),my=get(21),rx=Math.hypot(mx,my);if(!(rx>0))return null;const s0=get(41,0),s1=get(42,Math.PI*2),c=P(get(10),get(20)),ry=rx*get(40,1),rot=Math.atan2(my,mx);
    if(Math.abs(s1-s0-Math.PI*2)<1e-6)return{type:'ellipse',c,rx,ry,rotation:rot};
-   let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=Math.max(8,Math.ceil(sw/(Math.PI/24)));return{type:'polyline',closed:false,pts:Array.from({length:n+1},(_,k)=>{const t=s0+sw*k/n,x=rx*Math.cos(t),y=ry*Math.sin(t);return P(c.x+x*Math.cos(rot)-y*Math.sin(rot),c.y+x*Math.sin(rot)+y*Math.cos(rot))})}}
+   let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;if(!Number.isFinite(sw)||sw<=0||sw>Math.PI*2+1e-6)throw Error('Elipse DXF inválida');const n=Math.max(8,Math.ceil(sw/(Math.PI/24)));return{type:'polyline',closed:false,pts:Array.from({length:n+1},(_,k)=>{const t=s0+sw*k/n,x=rx*Math.cos(t),y=ry*Math.sin(t);return P(c.x+x*Math.cos(rot)-y*Math.sin(rot),c.y+x*Math.sin(rot)+y*Math.cos(rot))})}}
   if(type==='SPLINE'){const fit=[],ctl=[];let lx=null,lc=0;for(const [c,v]of record){if(c===10||c===11){lx=Number(v);lc=c}else if((c===20&&lc===10)||(c===21&&lc===11)){(lc===11?fit:ctl).push(P(lx,Number(v)))}}const pts=fit.length>=2?fit:ctl;return pts.length>=2?{type:'polyline',pts,closed:Boolean(get(70)&1)}:null}
   if(type==='SOLID'||type==='TRACE'){const q=[P(get(10),get(20)),P(get(11),get(21)),P(get(13,get(12)),get(23,get(22))),P(get(12),get(22))];return{type:'hatch',pts:q,hatchStyle:'solid',width:.05}}
   if(type==='HATCH')return readHatch(record);
@@ -7604,7 +7619,8 @@ function importDXF(text,name,opts){
  function readHatch(record){
   const {get,str}=fields(record),solid=get(70)===1;
   let k=record.findIndex(q=>q[0]===91);if(k<0)return null;const nPaths=Number(record[k][1]);k++;
-  const paths=[],num=()=>Number(record[k++]?.[1]),peek=()=>record[k]?.[0];
+  const paths=[],num=()=>{if(!Number.isInteger(k)||k<0||k>=record.length)throw Error('HATCH truncado');const n=Number(record[k++][1]);if(!Number.isFinite(n))throw Error('HATCH valor inválido');return n},peek=()=>record[k]?.[0];
+  const count=()=>{const n=num();if(!Number.isSafeInteger(n)||n<0||n>record.length-k)throw Error('HATCH cantidad inválida');return n};
   for(let pi=0;pi<nPaths&&k<record.length;pi++){
    while(k<record.length&&peek()!==92)k++;const flags=num(),pts=[];
    if(flags&2){const hasB=num();num();const nv=num();const verts=[];
@@ -7617,11 +7633,11 @@ function importDXF(text,name,opts){
      if(et===1){const x1=num(),y1=num(),x2=num(),y2=num();if(!pts.length)pts.push(P(x1,y1));pts.push(P(x2,y2))}
      else if(et===2){const cx=num(),cy=num(),r=num(),a0=num()*Math.PI/180,a1=num()*Math.PI/180,ccw=num();let sw=a1-a0;if(sw<=0)sw+=Math.PI*2;const arc=ccw?arcPts(P(cx,cy),r,a0,sw):arcPts(P(cx,cy),r,-a0,-sw);pts.push(...(pts.length?arc.slice(1):arc))}
      else if(et===3){const cx=num(),cy=num(),mx=num(),my=num(),ra=num(),s0=num()*Math.PI/180,s1=num()*Math.PI/180,ccw=num();const rx=Math.hypot(mx,my),ry=rx*ra,rot=Math.atan2(my,mx);let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=24;for(let j=pts.length?1:0;j<=n;j++){let t=s0+sw*j/n;if(!ccw)t=-t;const x=rx*Math.cos(t),y=ry*Math.sin(t);pts.push(P(cx+x*Math.cos(rot)-y*Math.sin(rot),cy+x*Math.sin(rot)+y*Math.cos(rot)))}}
-     else if(et===4){k++;k++;k++;const nk=num(),nc=num();k+=nk;for(let j=0;j<nc;j++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();if(peek()===42)k++;if(j||!pts.length)pts.push(P(x,y))}if(peek()===97){const nf=num();for(let j=0;j<nf;j++){k+=2}if(peek()===12)k+=4}}
+     else if(et===4){k++;k++;k++;const nk=count(),nc=count();k+=nk;for(let j=0;j<nc;j++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();if(peek()===42)k++;if(j||!pts.length)pts.push(P(x,y))}if(peek()===97){const nf=count();if(nf*2>record.length-k)throw Error('HATCH spline truncado');k+=nf*2;if(peek()===12)k+=4}}
     }
     if(pts.length>=3)paths.push({pts,outer:Boolean(flags&1)});
    }
-   while(k<record.length&&peek()!==97)k++;if(peek()===97){const ns=num();k+=ns}
+   while(k<record.length&&peek()!==97)k++;if(peek()===97){const ns=count();k+=ns}
   }
   if(!paths.length)return null;
   const name=str(2,'SOLID'),style=solid?'solid':patFor(name);
@@ -7639,7 +7655,7 @@ function importDXF(text,name,opts){
    case 'line':out.a=tp(m,e.a);out.b=tp(m,e.b);return out;
    case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
    case 'circle':if(uni){out.c=tp(m,e.c);out.r=e.r*s;return out}return{...e,type:'polyline',closed:true,pts:arcPts(e.c,e.r,0,Math.PI*2).slice(1).map(p=>tp(m,p))};
-   case 'arc':{let sw=e.a1-e.a0;while(sw<=0)sw+=Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}
+   case 'arc':{let sw=e.a1-e.a0;if(!Number.isFinite(sw))throw Error('Arco DXF inválido');sw=((sw%(Math.PI*2))+(Math.PI*2))%(Math.PI*2)||Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}
    case 'ellipse':{const mj=tv(m,Math.cos(e.rotation),Math.sin(e.rotation));return{...e,c:tp(m,e.c),rx:e.rx*Math.hypot(mj.x,mj.y),ry:e.ry*s*s/Math.max(1e-12,Math.hypot(mj.x,mj.y)),rotation:Math.atan2(mj.y,mj.x)}}
    case 'text':return{...e,p:tp(m,e.p),h:e.h*sy,rotation:(e.rotation||0)+rotDeg};
   }
@@ -7664,7 +7680,11 @@ function importDXF(text,name,opts){
  // --- Walk records, expanding INSERT and DIMENSION blocks ---
  let expanded=0;
  function walk(recs,m,ctx,depth,out){
+  if(activeRecords.has(recs))abortImport('referencia circular de bloques');
+  if(depth>24)abortImport('anidamiento de bloques excesivo');
+  activeRecords.add(recs);try{
   for(let idx=0;idx<recs.length;idx++){
+   if(++walkCount>MAX_WALK)abortImport('demasiadas referencias expandidas');if((walkCount&1023)===0)checkTime();
    const [type,record]=recs[idx];
    if(type==='VERTEX'||type==='SEQEND')continue;
    const {get,str}=fields(record);
@@ -7679,7 +7699,7 @@ function importDXF(text,name,opts){
    try{
     if(type==='INSERT'||type==='DIMENSION'){
      const def=blocksDef.get(str(2,''));if(!def){note(type);continue}
-     if(depth>12)continue;
+     if(depth>12)abortImport('anidamiento de bloques superior a 12 niveles');
      const sub={layer:lname,color:common.color||(indexColor===0?ctx?.color:undefined)||layer.color,linetype:common.linetype,width:common.width};
      if(type==='DIMENSION'){
       // Cota lineal o alineada de primer nivel → cota nativa de CAD2D (editable, asociable); las demás se dibujan con su bloque.
@@ -7696,7 +7716,7 @@ function importDXF(text,name,opts){
         const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
         if(ov&&ov!=='<>'&&!/<>/.test(ov))dim.label=cleanMText(ov).slice(0,120);
         if(common.color)dim.color=common.color;
-        entities.push(dim);expanded++;continue;
+        budgetEntity(dim);entities.push(dim);expanded++;continue;
        }
       }
       walk(def.recs,m,sub,depth+1,out);expanded++;continue}
@@ -7704,9 +7724,11 @@ function importDXF(text,name,opts){
      if(depth===0&&!out&&!(opts&&opts.explodeInserts)){const ref=cadDxfBlockRef(def,{ix,iy,sx,sy,rot,ext,cols:get(70,1),rows:get(71,1)},lname,common,sub);if(ref){
       // ATTRIB que siguen al INSERT: valores de los atributos de esta referencia.
       if(get(66,0)===1&&importedBlocks[ref.blockName]?.entities.some(c=>c.attdef)){const attrs={};let j=idx+1;for(;j<recs.length&&recs[j][0]==='ATTRIB';j++){const f=fields(recs[j][1]),t=f.str(2,'').trim().toUpperCase();if(t)attrs[t]=cleanMText(f.str(1,''))}if(Object.keys(attrs).length){ref.attrs=attrs;idx=j-1}}
-      entities.push({...ref,id:entities.length+1});expanded++;continue}}
+      budgetEntity(ref);entities.push({...ref,id:entities.length+1});expanded++;continue}}
      const cols=Math.max(1,get(70,1)),rows=Math.max(1,get(71,1)),cs=get(44,0),rs=get(45,0);
+     if(!Number.isSafeInteger(cols)||!Number.isSafeInteger(rows)||cols*rows>MAX_ENTITIES||cols*rows*Math.max(1,def.recs.length)>MAX_WALK-walkCount)abortImport('matriz INSERT excesiva');
      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      if(((r*cols+c)&1023)===0)checkTime();
       const ox=c*cs,oy=r*rs,tx=ix+ox*Math.cos(rot)-oy*Math.sin(rot),ty=iy+ox*Math.sin(rot)+oy*Math.cos(rot);
       let L=[Math.cos(rot)*sx,Math.sin(rot)*sx,-Math.sin(rot)*sy,Math.cos(rot)*sy,tx,ty];
       L=mul2(L,[1,0,0,1,-def.base.x,-def.base.y]);
@@ -7718,9 +7740,10 @@ function importDXF(text,name,opts){
     let ent=readRecord(type,record,recs,idx);
     if(ent===undefined){if(!silent.has(type))note(type);continue}
     if(!ent)continue;
-    for(const one of[].concat(ent)){const w=xform({...common,...one},m);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
-   }catch(error){note(type);console.warn('Skipped DXF entity',type,error)}
+    for(const one of[].concat(ent)){const w=xform({...common,...one},m);budgetEntity(w);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
+   }catch(error){if(error.cadImportFatal)throw error;note(type);if(unsupported.get(type)<=3)console.warn('Skipped DXF entity',type,error)}
   }
+  }finally{activeRecords.delete(recs)}
  }
  walk(modelRecs,ID,null,0);
  // Preserve named definitions even when they have no INSERT in model space.
