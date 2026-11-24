@@ -283,6 +283,23 @@ function compactBathTemplate(spec){
 function compoundInstruction(text){
  const s=normalize(text).replace(/\bentreda\b/g,'entrada');
  const isHouse=/\b(?:casa|vivienda|house)\b/.test(s);
+ // Explicit size groups, including elliptical references ("una más").
+ if(!isHouse&&/\b(?:habitacion(?:es)?|dormitorios?)\b/.test(s)&&!/\b(?:banos?|cocinas?|vestidores?|living|comedor|oficina|corte|seccion|escalera|pasamanos|sin|con|mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia|versiones|variantes|alternativas)\b/.test(s)){
+  const clauses=s.split(/\s+(?:y\s+)+|\s*\+\s*|;\s*/).filter(x=>x.trim());
+  const groups=[];
+  for(let i=0;i<clauses.length;i++){
+   const part=clauses[i],size=dimensions(part);
+   const q=part.match(/\b(\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|veinte)\s+(?:(?:habitacion(?:es)?|dormitorios?)\b|mas\b|de\b)/);
+   if(!size||!q||(!i&&!/\b(?:habitacion(?:es)?|dormitorios?)\b/.test(part)))break;
+   const count=Number(numberWords[q[1]]||q[1]);
+   if(!Number.isInteger(count)||count<1||count>30||!size.every(x=>x>=1.2&&x<=15))throw Error('Cantidad o dimensiones fuera de rango.');
+   groups.push({count,size});
+  }
+  if(groups.length>1&&groups.length===clauses.length){
+   if(groups.reduce((n,g)=>n+g.count,0)>30)throw Error('Hasta treinta habitaciones por conjunto.');
+   return {kind:'compound_bedrooms',variants:1,groups};
+  }
+ }
  const hasBedroom=/\b(?:habitaciones?|dormitorios?)\b/.test(s),hasBath=/\bbanos?\b/.test(s),hasKitchen=/\bcocinas?\b/.test(s);
  if(!isHouse&&!(hasBath&&hasKitchen&&!hasBedroom))return null;
  if(/\b(?:mueve|modifica|achica|agranda|desplaza|elimina|borra|cambia)\w*\b/.test(s))return null;
@@ -314,7 +331,7 @@ function compoundPlan(spec){
  if(spec.kind==='compound_house'){
   if(spec.assumedBedrooms)notes.add('Cantidad no indicada: se proponen dos dormitorios.');
   notes.add('Circulación común de 1,20 m; medidas de ambientes no indicadas adoptadas como propuesta.');
- }else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
+ }else if(spec.kind==='compound_bedrooms')notes.add('Habitaciones contiguas en fila, acceso independiente desde el exterior; muro de 0,15 m y aberturas iniciales.');else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
  let dx=0;
  for(let v=0;v<spec.variants;v++){
   const prefix='v'+v+'-',rects=[],requests=[],raw=[],roomSpecs=[];
@@ -328,7 +345,9 @@ function compoundPlan(spec){
   };
   const fixture=(id,kind,size,items=DEFAULT[kind][2])=>({id,kind,size,items});
   let total=0;
-  if(spec.kind==='compound_pair'){
+  if(spec.kind==='compound_bedrooms'){
+   let index=0;for(const group of spec.groups)for(let n=0;n<group.count;n++){makeRoom('bed'+index++,'bedroom',total,0,...group.size,'S',DEFAULT.bedroom[2]);total+=group.size[0]+t;}
+  }else if(spec.kind==='compound_pair'){
    const items=[fixture('bath','bathroom',spec.bathSize),fixture('kitchen','kitchen',spec.kitchenSize)];if(v%2)items.reverse();
    for(const item of items){makeRoom(item.id,item.kind,total,0,...item.size,'S',item.items);total+=item.size[0]+t+1.5;}
   }else{
