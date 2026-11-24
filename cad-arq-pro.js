@@ -938,7 +938,7 @@ let arqCataloguePromise=null;
 function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-house-v1',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
 function arqCatalogueCategory(raw){
  const s=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m2|m²|sqm))?$/.test(s))return 'house';
+ if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m\s*(?:2|²|\^2)|mts?\s*(?:2|²)?|sqm)?)?$/.test(s))return 'house';
  if(/^(?:bnao|bno|banio|banios|bnaos|banoo|banoss)$/.test(s))return 'bathroom';
  if(/^(?:bano|banos|toilette|mostrar banos|listado de banos|bathroom|bathrooms|salle de bains|bagno|bagni|banheiro|banheiros|badezimmer|浴室|卫生间|衛生間|ванная|حمام|욕실)$/.test(s))return 'bathroom';
  if(/^(?:cocina|cocinas|kitchen|kitchens|cuisine|cucina|cozinha|kuche|厨房|キッチン|кухня|مطبخ)$/.test(s))return 'kitchen';
@@ -970,7 +970,7 @@ function arqPlanThumbnail(plan){
   body+='<g transform="translate('+b.point[0]+' '+(-b.point[1])+') rotate('+(-b.rotation)+')" color="#343e40">'+svg.slice(i,j)+'</g>';}
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+[minX-pad,-maxY-pad,maxX-minX+2*pad,maxY-minY+2*pad].join(' ')+'" style="width:100%;height:142px;display:block;background:#f4efe3;border-radius:4px" role="img" aria-label="Planta arquitectónica">'+body+'</svg>';
 }
-async function openArqPlanCatalogue(category){
+async function openArqPlanCatalogue(category,query=''){
  const old=document.getElementById('arqPlanCatalogue');if(old){old.close();old.remove();}
  const dlg=document.createElement('dialog');dlg.id='arqPlanCatalogue';
  dlg.style.cssText='position:fixed;inset:auto;margin:0;z-index:1200;width:min(760px,94vw);height:min(620px,80vh);min-width:min(300px,94vw);min-height:min(220px,80vh);max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);resize:both;overflow:hidden;background:#25282d;color:#e6e7eb;border:1px solid #777;border-radius:12px;padding:14px;box-sizing:border-box';
@@ -1011,7 +1011,10 @@ async function openArqPlanCatalogue(category){
   return;
  }
  let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;status.remove();
- for(const item of items.filter(x=>x.category===category).sort((a,b)=>a.area-b.area)){
+ const requestedArea=category==='house'?String(query).match(/\d+(?:[.,]\d+)?/):null;
+ const filtered=items.filter(x=>x.category===category&&(!requestedArea||Math.abs(x.area-Number(requestedArea[0].replace(',','.')))<.5)).sort((a,b)=>a.area-b.area);
+ if(!filtered.length){const note=document.createElement('p');note.textContent='No hay modelos para esta superficie todavía.';grid.append(note);}
+ for(const item of filtered){
   const button=document.createElement('button');button.className='btn arq-card';button.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
   const img=document.createElement('img');img.src=new URL(item.id+'.svg',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.category==='house'?fmt(item.area)+' m² cubiertos · '+fmt(w)+' × '+fmt(d)+' m':item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard',counter:'Mesada',kingbed:'Cama king',bunk:'Cucheta',crib:'Cuna',desk:'Escritorio',washer:'Lavarropas',dryer:'Secarropas',laundrySink:'Pileta',bookshelf:'Biblioteca',table8:'Mesa para ocho'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
   if(item.preliminary){const note=document.createElement('small');note.textContent='Preliminar / Preliminary';note.style.color='#dfc28b';button.append(note);}
@@ -1052,7 +1055,7 @@ function openArchitectureBar(focus=true){
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
   const updateCatalogue=()=>{const category=arqCatalogueCategory(input.value);catalogue.hidden=!category;catalogue.style.display=category?'':'none';if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
-  catalogue.onclick=()=>{const cat=arqCatalogueCategory(input.value);if(!cat)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat);};
+  catalogue.onclick=()=>{const cat=arqCatalogueCategory(input.value);if(!cat)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
 
   const KEY='cad2d-arqbar-pos';
   const place=(x,y)=>{const w=host.clientWidth,h=host.clientHeight;x=Math.max(4,Math.min(w-bar.offsetWidth-4,x));y=Math.max(4,Math.min(h-bar.offsetHeight-4,y));bar.style.left=x+'px';bar.style.top=y+'px'};
@@ -1070,7 +1073,7 @@ function openArchitectureBar(focus=true){
    const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw)){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
-   const category=arqCatalogueCategory(raw);if(category){EXT.cancelArchitectureCommand();openArqPlanCatalogue(category);return;}
+   const category=arqCatalogueCategory(raw);if(category){EXT.cancelArchitectureCommand();openArqPlanCatalogue(category,raw);return;}
    run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
   };
   input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
