@@ -138,14 +138,27 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  // --- Transform one entity by matrix m ---
  function xform(e,m){
   if(isId(m))return e;
-  const det=m[0]*m[3]-m[1]*m[2],sx=Math.hypot(m[0],m[1]),sy=Math.hypot(m[2],m[3]),uni=Math.abs(sx-sy)<1e-6*Math.max(sx,sy),s=Math.sqrt(Math.abs(det)),rotDeg=Math.atan2(m[1],m[0])*180/Math.PI;
+  const det=m[0]*m[3]-m[1]*m[2],sx=Math.hypot(m[0],m[1]),sy=Math.hypot(m[2],m[3]),uni=sx>0&&sy>0&&Math.abs(sx-sy)<1e-6*Math.max(sx,sy)&&Math.abs((m[0]/sx)*(m[2]/sy)+(m[1]/sx)*(m[3]/sy))<1e-6,s=Math.sqrt(Math.abs(det)),rotDeg=Math.atan2(m[1],m[0])*180/Math.PI;
   const out={...e};
   switch(e.type){
    case 'line':out.a=tp(m,e.a);out.b=tp(m,e.b);return out;
    case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
    case 'circle':if(uni){out.c=tp(m,e.c);out.r=e.r*s;return out}return{...e,type:'polyline',closed:true,pts:arcPts(e.c,e.r,0,Math.PI*2).slice(1).map(p=>tp(m,p))};
    case 'arc':{let sw=e.a1-e.a0;if(!Number.isFinite(sw))throw Error('Arco DXF inválido');sw=((sw%(Math.PI*2))+(Math.PI*2))%(Math.PI*2)||Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}
-   case 'ellipse':{const mj=tv(m,Math.cos(e.rotation),Math.sin(e.rotation));return{...e,c:tp(m,e.c),rx:e.rx*Math.hypot(mj.x,mj.y),ry:e.ry*s*s/Math.max(1e-12,Math.hypot(mj.x,mj.y)),rotation:Math.atan2(mj.y,mj.x)}}
+   case 'ellipse':{
+    // Recover principal axes of the affine-transformed ellipse.
+    const co=Math.cos(e.rotation||0),si=Math.sin(e.rotation||0);
+    const u=tv(m,e.rx*co,e.rx*si),v=tv(m,-e.ry*si,e.ry*co);
+    const k=Math.max(Math.abs(u.x),Math.abs(u.y),Math.abs(v.x),Math.abs(v.y));
+    if(!Number.isFinite(k)||k<=0)throw Error('Elipse DXF degenerada');
+    const ux=u.x/k,uy=u.y/k,vx=v.x/k,vy=v.y/k;
+    const xx=ux*ux+vx*vx,yy=uy*uy+vy*vy,xy=ux*uy+vx*vy;
+    const major=Math.sqrt((xx+yy+Math.hypot(xx-yy,2*xy))/2);
+    const minor=Math.abs(ux*vy-uy*vx)/major;
+    const rx=k*major,ry=k*minor;
+    if(!Number.isFinite(rx)||!Number.isFinite(ry)||ry<=0)throw Error('Elipse DXF degenerada');
+    return {...e,c:tp(m,e.c),rx,ry,rotation:Math.atan2(2*xy,xx-yy)/2};
+   }
    case 'text':return{...e,p:tp(m,e.p),h:e.h*sy,rotation:(e.rotation||0)+rotDeg};
   }
   return out;
