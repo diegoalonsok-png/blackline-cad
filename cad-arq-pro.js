@@ -714,29 +714,40 @@ function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
   panel=document.createElement('section');panel.id='arqAssistant';
-  panel.className='panel';panel.style.cssText='min-width:0';
+  panel.className='panel';panel.setAttribute('translate','no');panel.style.cssText='min-width:0';
   panel.innerHTML='<div class="panel-title"><span>ARCHITECTURE ASSISTANT</span><button class="btn slim" data-close aria-label="Contraer">−</button></div><div class="panel-content" data-body style="padding:8px"><p>Ambientes paramétricos · medidas en metros</p><label>Tipo <select data-cat><option value="bath">Baños completos</option><option value="kitchen">Cocinas completas</option></select></label><p><label>Configuración <select data-model style="width:100%"></select></label></p><div style="display:flex;gap:8px"><label>Ancho <input data-w type="number" step=".05" style="width:85px"></label><label>Largo <input data-d type="number" step=".05" style="width:85px"></label></div><div data-preview style="margin:10px 0;background:#0d1418;color:#dce8ef;border-radius:6px"></div><label>Instrucción (tipo y medidas)<textarea data-command rows="2" style="width:100%;box-sizing:border-box" placeholder="Baño con ducha y bidet de 1.80 x 2.40"></textarea></label><div style="display:flex;gap:6px;margin:6px 0"><button data-interpret>Interpretar</button><button data-voice>Dictar</button></div><p data-status role="status" style="min-height:30px;color:#b2cbd8"></p><button data-insert style="width:100%;padding:8px">Insertar en plano</button></div>';
   const dock=document.querySelector('.workspace>.sidebar.rightside');if(!dock)return;dock.prepend(panel);panel.querySelectorAll('button').forEach(b=>b.classList.add('btn','slim'));panel.querySelectorAll('input,select,textarea').forEach(e=>{e.style.maxWidth='100%';e.style.minWidth='0'});
   const q=s=>panel.querySelector(s),cat=q('[data-cat]'),model=q('[data-model]'),w=q('[data-w]'),d=q('[data-d]'),status=q('[data-status]');
   const say=s=>status.textContent=s;
   const available=()=>LIB.library.filter(x=>(cat.value==='bath'?x.family==='bano':x.family==='cocina')&&!x.hideFromGallery&&!x.dxfPlan&&!x.paidOnly&&typeof x.gen==='function');
-  const selected=()=>available().find(x=>x.id===model.value);
-  const valid=()=>{const it=selected(),W=Number(w.value),D=Number(d.value);if(!it||!Number.isFinite(W)||!Number.isFinite(D)||W<it.wMin||W>it.wMax||D<it.dMin||D>it.dMax)throw Error('Dimensiones fuera del rango de esta configuración.');return {it,W,D}};
+  let currentModels=[];const selected=()=>currentModels.find(x=>x.id===model.value)||currentModels[model.selectedIndex];const fits=(it,W,D)=>it&&W>=it.wMin&&W<=it.wMax&&D>=it.dMin&&D<=it.dMax;
+  const valid=()=>{const it=selected(),W=Number(w.value),D=Number(d.value);if(!it)throw Error('Elegí una configuración.');if(!Number.isFinite(W)||!Number.isFinite(D)||!fits(it,W,D))throw Error('Rango de '+it.name+': ancho '+it.wMin+'–'+it.wMax+'; largo '+it.dMin+'–'+it.dMax+' m. Elegí otro modelo si es necesario.');return {it,W,D}};
   const preview=()=>{try{const {it,W,D}=valid();q('[data-preview]').innerHTML=svgFor(it,W,D,{height:170});say('Vista preliminar. Verificar accesos y circulación antes de construir.')}catch(e){q('[data-preview]').replaceChildren();say(e.message)}};
   const defaults=()=>{const it=selected();if(!it){w.value=d.value='';preview();return}w.min=it.wMin;w.max=it.wMax;d.min=it.dMin;d.max=it.dMax;w.value=it.w;d.value=it.d;preview()};
-  const refresh=()=>{model.replaceChildren(...available().map(it=>new Option(it.name,it.id)));defaults()};
+  const refresh=()=>{currentModels=available();model.replaceChildren(...currentModels.map(it=>new Option(it.name,it.id)));model.selectedIndex=currentModels.length?0:-1;defaults()};
   cat.onchange=refresh;model.onchange=defaults;w.oninput=d.oninput=preview;
   const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   function interpret(){
-   const s=norm(q('[data-command]').value),m=s.match(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)/);
-   if(/cocina/.test(s))cat.value='kitchen';else if(/bano|toilette/.test(s))cat.value='bath';refresh();
-   let list=available(),it;
-   const keys=cat.value==='bath'?['toilette','ducha y bidet','banera y bidet','doble bacha','accesible','banera','ducha']:['isla','lineal','en l','en u','paralela'];
-   for(const key of keys){if(s.includes(key)){it=list.find(x=>norm(x.name).includes(key));if(it)break}}
-   if(!it&&cat.value==='bath'&&s.includes('bidet')&&s.includes('ducha'))it=list.find(x=>x.id==='bano-ducha-bidet');
-   if(it){model.value=it.id;defaults()}
-   if(m){w.value=m[1].replace(',','.');d.value=m[2].replace(',','.')}
-   preview();if(!it)say('Revisá la configuración seleccionada. Solo se interpretan tipos y medidas, no instrucciones libres de distribución.');
+   const raw=q('[data-command]').value.trim();if(!raw)return say('Escribí una instrucción, por ejemplo: Baño con ducha y bidet de 1.80 x 2.40.');
+   const s=norm(raw),m=s.match(/(\d+(?:[.,]\d+)?)\s*(?:[x×]|por)\s*(\d+(?:[.,]\d+)?)/);
+   if(/cocina|kitchen/.test(s))cat.value='kitchen';else if(/bano|toilette|bathroom/.test(s))cat.value='bath';refresh();
+   const W=m?Number(m[1].replace(',','.')):null,D=m?Number(m[2].replace(',','.')):null;
+   let id=null;
+   if(cat.value==='bath'){
+    if(/toilette/.test(s))id='bano-toilette';
+    else if(/accesible/.test(s))id='bano-accesible';
+    else if(/banera/.test(s)&&/bidet/.test(s))id='bano-completo';
+    else if(/ducha/.test(s)&&/bidet/.test(s))id='bano-ducha-bidet';
+    else if(/banera/.test(s))id='bano-banera';
+    else if(/suite|doble bacha|doble lavabo/.test(s))id='bano-suite';
+    else if(/ducha/.test(s))id='bano-minimo';
+   }else{
+    if(/isla/.test(s))id='kit-isla';else if(/peninsula/.test(s))id='kit-peninsula';else if(/en l\b/.test(s))id='kit-L';else if(/en u\b/.test(s))id='kit-U';else if(/paralela/.test(s))id='kit-paralela';else if(/lineal/.test(s))id='kit-lineal';
+   }
+   const it=id?currentModels.find(x=>x.id===id):m?currentModels.find(x=>fits(x,W,D)&&allowed(x)):selected();
+   if(it){model.selectedIndex=currentModels.indexOf(it);defaults()}
+   if(m){w.value=W;d.value=D}
+   preview();if(!it){model.selectedIndex=-1;q('[data-preview]').replaceChildren();say('No hay una configuración compatible. Elegí un modelo o cambiá las medidas.')}
   }
   q('[data-interpret]').onclick=interpret;
   q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;interpret()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
