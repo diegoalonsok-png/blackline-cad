@@ -38,7 +38,8 @@ test('Structured app metadata describes product without asserting unsupported fe
  const item=JSON.parse(match[1]);
  assert.equal(item['@type'],'WebApplication');
  assert.equal(item.url,base);
- assert.equal(item.name,'Blackline CAD');
+ assert.equal(item.name,'Blackline CAD2D3D');
+ assert.equal(item.alternateName,'CAD2D3D');
  assert.equal(item.applicationCategory,'DesignApplication');
  assert(!('offers' in item),'Pricing must not be invented');
 });
@@ -59,7 +60,7 @@ test('Technical guide supports real CAD workflows and honest format limitations'
 
 test('CAD editor exposes a heading without changing rendering scripts',()=>{
  const html=fs.readFileSync('index.html','utf8');
- const heading=html.match(/<h1 class="brand"[^>]*>CAD2D<small>ARCHITECTURAL DRAFTING · 2D<\/small><\/h1>/);
+ const heading=html.match(/<h1 class="brand"[^>]*>CAD2D3D<small>ARCHITECTURAL CAD · 2D \+ 3D<\/small><\/h1>/);
  assert(heading,'Brand heading must remain a visible, semantic H1');
  assert.equal((html.match(/<h1\b/g)||[]).length,1);
 });
