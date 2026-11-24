@@ -33,6 +33,15 @@ function download(name,data){
  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 async function convertLocal(file,direction){
+ try{return await convertOnce(file,direction,false)}
+ catch(err){
+  const reason=String(err.message||err);
+  if(direction!=='dwg-dxf'||!reason.startsWith('AEC_OMISSIONS:'))throw err;
+  if(!window.confirm(reason.replace('AEC_OMISSIONS: ','')+'\n\nLa copia DXF puede quedar incompleta y perder objetos o propiedades arquitectónicas. El DWG original no cambia. ¿Abrir o convertir solamente lo recuperable?'))throw Error('Conversión cancelada; DWG original conservado.');
+  return await convertOnce(file,direction,true);
+ }
+}
+async function convertOnce(file,direction,allowPartial){
  if(!file.size||file.size>64*1024*1024)throw Error('Archivo vacío o mayor a 64 MiB');
  let bytes=await file.arrayBuffer();
  if(direction==='dxf-dwg'){
@@ -47,12 +56,12 @@ async function convertLocal(file,direction){
   }
  }
  return new Promise((resolve,reject)=>{
-  const worker=new Worker(new URL('cad-dwg-local-worker.js?v=20261123-wasm-v2',document.baseURI),{type:'module'}),timer=setTimeout(()=>finish('Tiempo límite de conversión'),180000);
+  const worker=new Worker(new URL('cad-dwg-local-worker.js?v=20261123-wasm-v3',document.baseURI),{type:'module'}),timer=setTimeout(()=>finish('Tiempo límite de conversión'),180000);
   let done=false;
   function finish(error,output){if(done)return;done=true;clearTimeout(timer);worker.terminate();if(error)reject(Error(error));else resolve(output)}
   worker.onmessage=e=>finish(e.data.error,e.data.output);
   worker.onerror=e=>finish(e.message||'No pudo iniciarse el motor');
-  try{worker.postMessage({bytes,direction},[bytes])}catch(err){finish(err.message)}
+  try{worker.postMessage({bytes,direction,allowPartial},[bytes])}catch(err){finish(err.message)}
  });
 }
 async function run(){
