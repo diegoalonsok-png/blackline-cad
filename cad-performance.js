@@ -10,7 +10,7 @@
  function finite(p){return p&&Number.isFinite(p.x)&&Number.isFinite(p.y)}
  function viewport(view,w,h,pad=30){
   const s=view?.scale,ox=view?.ox,oy=view?.oy;
-  if(!(s>0)&&s!==1)return null;
+  if(!(s>0)||w<0||h<0||pad<0)return null;
   if(![s,ox,oy,w,h,pad].every(Number.isFinite))return null;
   return {minX:(-pad-ox)/s,maxX:(w+pad-ox)/s,
    minY:(oy-h-pad)/s,maxY:(oy+pad)/s};
@@ -21,8 +21,10 @@
  function basicBounds(e){
   if(!e||typeof e!=='object')return null;
   if((e.type==='line'||e.type==='rect')&&finite(e.a)&&finite(e.b)){
-   return {minX:Math.min(e.a.x,e.b.x),maxX:Math.max(e.a.x,e.b.x),
+   const b={minX:Math.min(e.a.x,e.b.x),maxX:Math.max(e.a.x,e.b.x),
     minY:Math.min(e.a.y,e.b.y),maxY:Math.max(e.a.y,e.b.y)};
+   if(finite(e.p)){b.minX=Math.min(b.minX,e.p.x);b.maxX=Math.max(b.maxX,e.p.x);b.minY=Math.min(b.minY,e.p.y);b.maxY=Math.max(b.maxY,e.p.y);}
+   return b;
   }
   if((e.type==='circle'||e.type==='arc')&&finite(e.c)&&Number.isFinite(e.r)&&e.r>=0){
    return {minX:e.c.x-e.r,maxX:e.c.x+e.r,minY:e.c.y-e.r,maxY:e.c.y+e.r};
@@ -41,6 +43,7 @@
   return null;
  }
  function inViewport(e,v,fallback){
+  if(!v)return true;
   const b=basicBounds(e);
   // Keep the existing exact bounds calculator for complex CAD entities.
   if(b)return overlap(b,v);
@@ -63,7 +66,7 @@
   }
   const tree=build(entries);
   return function query(box){
-   if(!box||![box.minX,box.maxX,box.minY,box.maxY].every(Number.isFinite))return items.slice();
+   if(!box||![box.minX,box.maxX,box.minY,box.maxY].every(Number.isFinite)||box.minX>box.maxX||box.minY>box.maxY)return items.slice();
    const result=unknown.slice();
    function visit(n){if(!n||!overlap(n.b,box))return;if(n.list){for(const e of n.list)if(overlap(e.b,box))result.push(e);}else{visit(n.left);visit(n.right);}}
    visit(tree);return result.sort((a,b)=>a.i-b.i).map(e=>e.value);
