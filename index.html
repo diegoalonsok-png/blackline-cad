@@ -1739,7 +1739,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    const segments=[];
    for(let j=0;j<boundaries.length-1;j++){
     const a=at(boundaries[j]),b=at(boundaries[j+1]),faces=cadWallFaces(a,b,w.thickness*k,'center'),group='wall-'+state.nextId;
-    const pair=faces.map((face,i)=>({id:state.nextId++,type:'line',...face,layer:wallLayer,width:.25,wall2d:{group,face:i,thickness:w.thickness*k,justify:'center',guideA:clone(a),guideB:clone(b)},arqBatch:batch,arqWall:w.id}));
+    const pair=faces.map((face,i)=>({id:state.nextId++,type:'line',...face,layer:wallLayer,color:'#ffffff',width:.35,wall2d:{group,face:i,thickness:w.thickness*k,justify:'center',guideA:clone(a),guideB:clone(b)},arqBatch:batch,arqWall:w.id}));
     state.entities.push(...pair);segments.push(pair);
    }
    hosts.set(w.id,{w,A,B,L,at,openings,segments});
@@ -2079,6 +2079,55 @@ function cadPerfReport(){
  const report='PERFORMANCE · '+state.entities.length+' objetos · '+cadPerfVisible+' visibles · '+state.layers.length+' capas · '+(n?'dibujo p50 '+samples[Math.floor((n-1)*.5)].toFixed(1)+' ms / p95 '+samples[Math.floor((n-1)*.95)].toFixed(1)+' ms':'sin muestras')+' · historial estimado '+(cadHistoryBytes()/1048576).toFixed(1)+' MiB · '+state.history.length+' deshacer / '+state.future.length+' rehacer';
  log(report);toast(report);return report;
 }
+
+/* ARQ presentation: visual wall poche derived from current native wall faces.
+   No extra selectable geometry, no stale fill across moved openings. */
+function cadArqWallPochePolygons(entities,visible=()=>true){
+ const groups=new Map(),result=[];
+ for(const e of entities){
+  if(e.type!=='line'||!e.arqBatch||!e.wall2d||e.cadHidden||!visible(e))continue;
+  const m=e.wall2d;if(![0,1].includes(m.face)||!(m.thickness>0))continue;
+  const key=JSON.stringify([e.arqBatch,m.group,e.autoOpeningRef??null,e.autoOpeningRole??null]);
+  if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);
+ }
+ for(const pair of groups.values()){
+  if(pair.length!==2||pair[0].wall2d.face===pair[1].wall2d.face)continue;
+  const [a,b]=pair;
+  const len=(p,q)=>Math.hypot(p.x-q.x,p.y-q.y),L=len(a.a,a.b),M=len(b.a,b.b);
+  if(!(L>1e-8&&M>1e-8))continue;
+  const ux=(a.b.x-a.a.x)/L,uy=(a.b.y-a.a.y)/L,vx=(b.b.x-b.a.x)/M,vy=(b.b.y-b.a.y)/M;
+  if(Math.abs(ux*vy-uy*vx)>1e-5)continue;
+  const sep=Math.abs((b.a.x-a.a.x)*uy-(b.a.y-a.a.y)*ux);
+  if(Math.abs(sep-a.wall2d.thickness)>Math.max(1e-7,a.wall2d.thickness*.01))continue;
+  const [ba,bb]=ux*vx+uy*vy<0?[b.b,b.a]:[b.a,b.b];
+  // Require overlapping projections; never bridge unrelated line fragments.
+  const t=p=>(p.x-a.a.x)*ux+(p.y-a.a.y)*uy;
+  if(Math.min(L,t(bb))-Math.max(0,t(ba))<=1e-8)continue;
+  result.push([a.a,a.b,bb,ba]);
+ }
+ return result;
+}
+let cadArqPocheEnabled=true;
+try{cadArqPocheEnabled=localStorage.getItem('cad-arq-poche')!=='0'}catch(e){}
+window.CAD2D_ARQ_POCHE=()=>{cadArqPocheEnabled=!cadArqPocheEnabled;try{localStorage.setItem('cad-arq-poche',cadArqPocheEnabled?'1':'0')}catch(e){}schedule();toast('ARQ · relleno gráfico '+(cadArqPocheEnabled?'ON':'OFF'));return cadArqPocheEnabled;};
+function cadDrawArqPoche(visibleForPaint){
+ if(!cadArqPocheEnabled)return;
+ const light=(cadHexLum(displayColors.background)?.l||0)>.5;
+ const polygons=cadArqWallPochePolygons(state.entities,e=>layerFor(e).visible&&visibleForPaint(e));
+ ctx.save();ctx.fillStyle=light?'#b9bdbe':'#666b70';ctx.setLineDash([]);
+ for(const poly of polygons){ctx.beginPath();poly.forEach((p,i)=>{const q=screen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();}
+ // Wet areas use the actual regenerated block size and transformation.
+ ctx.fillStyle=light?'#e0e4e4':'#41494d';
+ for(const e of state.entities){
+  if(e.type!=='blockRef'||!e.arqBatch||!['shower','shower75'].includes(e.arqRole)||e.cadHidden||!layerFor(e).visible||!visibleForPaint(e))continue;
+  const m=state.blocks[e.blockName]?.arq;if(!m||m.unit!==state.unit||!(m.w>0&&m.d>0&&e.scale>0))continue;
+  const k=1000/U[state.unit]*e.scale,a=e.rotation*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
+  const pts=[[0,0],[m.w,0],[m.w,m.d],[0,m.d]].map(([x,y])=>{x*=e.flipBlockX?-k:k;y*=k;return screen(P(e.p.x+x*co-y*si,e.p.y+x*si+y*co))});
+  ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();
+ }
+ ctx.restore();
+}
+
 function draw(){drawPending=false;const perfStart=performance.now();let painted=0;
  if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
@@ -2090,6 +2139,7 @@ function draw(){drawPending=false;const perfStart=performance.now();let painted=
  for(const e of state.entities){
   if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e);painted++;}
  }
+ cadDrawArqPoche(visibleForPaint);
  for(const e of state.entities){
   if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
@@ -9391,7 +9441,7 @@ function autoCutWallForOpening(ref,block){
   if(!wall||dist(ends[0].left,ends[1].left)<1e-9)continue;
   const createJamb=(a,b,side)=>({
    id:state.nextId++,type:'line',a:P(a.x,a.y),b:P(b.x,b.y),
-   layer:wall.layer,width:wall.width,
+   layer:wall.layer,width:wall.width,...(wall.arqBatch?{color:wall.color,arqBatch:wall.arqBatch,arqWall:wall.arqWall}:{}),
    autoOpeningJambRef:ref.id,autoOpeningJambSide:side,
    autoOpeningJambGroup:wall.wall2d?.group||('paired-'+ref.id)
   });
