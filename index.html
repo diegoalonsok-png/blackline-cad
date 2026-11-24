@@ -3642,6 +3642,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
   // With ORTHO + OTRACK, search OSNAP around the physical cursor, not the
   // axis-constrained endpoint. This allows acquiring a second, off-axis vertex.
   const osnapProbe=orthoLocksPointer&&trackingEligible()?rawPointer:q;
+  const probeScreen=screen(osnapProbe);
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
   const lookup=cadSelectionLayerLookup(),tol=11/state.view.scale;
@@ -3706,7 +3707,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
-   for(const [v,kind] of candidates){const d=dist(screen(v),screen(osnapProbe));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
+   for(const [v,kind] of candidates){if(!v||!Number.isFinite(v.x)||!Number.isFinite(v.y))continue;const d=dist(screen(v),probeScreen);if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
   if(cadOsnapEnabled('INT'))for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
@@ -3715,7 +3716,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
    if(!cross)continue;
    const along=(p,x,y)=>{const v=sub(y,x),length=v.x*v.x+v.y*v.y;if(length<1e-12)return false;const t=((p.x-x.x)*v.x+(p.y-x.y)*v.y)/length;return t>=-1e-8&&t<=1+1e-8};
    if(!along(cross,a.a,a.b)||!along(cross,b.a,b.b))continue;
-   const distance=dist(screen(cross),screen(osnapProbe));
+   const distance=dist(screen(cross),probeScreen);
    if(distance<=minPixels+1e-8){minPixels=distance;nearest=cross;type='INT'}
   }
   if(nearest){
