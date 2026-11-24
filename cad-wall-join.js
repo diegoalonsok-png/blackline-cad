@@ -10,12 +10,16 @@
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
  const copy=p=>({x:p.x,y:p.y});
  function intersection(a,b,c,d){
-  const ux=b.x-a.x,uy=b.y-a.y,vx=d.x-c.x,vy=d.y-c.y;
+  if(![a,b,c,d].every(valid))return null;
+  const lu=dist(a,b),lv=dist(c,d);
+  if(!Number.isFinite(lu)||!Number.isFinite(lv)||lu===0||lv===0)return null;
+  const ux=(b.x-a.x)/lu,uy=(b.y-a.y)/lu,vx=(d.x-c.x)/lv,vy=(d.y-c.y)/lv;
   const den=ux*vy-uy*vx;
-  if(Math.abs(den)<1e-10*Math.hypot(ux,uy)*Math.hypot(vx,vy))return null;
+  if(!Number.isFinite(den)||Math.abs(den)<1e-10)return null;
   const dx=c.x-a.x,dy=c.y-a.y;
-  const t=(dx*vy-dy*vx)/den,s=(dx*uy-dy*ux)/den;
-  return {point:{x:a.x+t*ux,y:a.y+t*uy},t,s};
+  const along=(dx*vy-dy*vx)/den,other=(dx*uy-dy*ux)/den;
+  const t=along/lu,s=other/lv,point={x:a.x+along*ux,y:a.y+along*uy};
+  return valid(point)&&Number.isFinite(t)&&Number.isFinite(s)?{point,t,s}:null;
  }
  function plan(incoming,existing,tolerance){
   if(!incoming||incoming.type!=='line'||!valid(incoming.a)||!valid(incoming.b)||
@@ -24,7 +28,7 @@
   const updates=new Map();
   for(const end of ['a','b']){
    let best=null;
-   for(const wall of existing){
+   for(const wall of Array.isArray(existing)?existing:[]){
     if(!wall||wall.id===incoming.id||wall.type!=='line'||
        !valid(wall.a)||!valid(wall.b)||dist(wall.a,wall.b)<=1e-8)continue;
     const crossing=intersection(candidate.a,candidate.b,wall.a,wall.b);
