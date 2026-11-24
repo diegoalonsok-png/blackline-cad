@@ -16,6 +16,11 @@ async function init(){
 self.onmessage=async({data})=>{
  const id=data?.id;
  try{
+  if(!data.semantic){
+   if(!self.BlacklineArchitectureAI)importScripts('blackline-engine.js?v=20261124-own-v2');
+   const plan=data.brief?self.BlacklineArchitectureAI.solve(data.brief):self.BlacklineArchitectureAI.run(data.text);
+   self.postMessage({id,plan});return;
+  }
   const py=await init();let output;
   if(data.brief){
    py.globals.set('_arq_spec_json',JSON.stringify(data.brief));
