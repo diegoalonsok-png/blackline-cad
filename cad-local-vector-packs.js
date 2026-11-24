@@ -71,13 +71,29 @@ async function loadExisting(){
  const p=window.CAD2D_OLYMPIADAS3;
  if(p&&p.loaded<p.total){const out=await p.load();if(out.loaded!==p.total)throw Error('No se completó la carga de la biblioteca existente. Reintentá antes de importar para evitar duplicados.');}
 }
+async function verifyStored(){
+ const saved=await readAll(),registered=new Map(L.library.filter(x=>/^userdx4-/.test(x.id)).map(x=>[x.id,x]));
+ const categories=Object.create(null),missing=[],invalid=[],entries=[];
+ for(const item of saved){const row=validate(item.row);if(!row){invalid.push(String(item.id||''));continue}const [id,,name,oldCat,w,d,,,,]=row,cat=restoredCategory(name,oldCat),block=registered.get(id);
+  const entry={id,name,category:cat,width:w,depth:d,registered:Boolean(block),visible:Boolean(block&&!block.hideFromGallery)};entries.push(entry);
+  categories[cat]??={stored:0,visible:0};categories[cat].stored++;if(entry.visible)categories[cat].visible++;if(!entry.visible)missing.push(id);
+ }
+ return {stored:saved.length,valid:entries.length,visible:entries.filter(x=>x.visible).length,categories,missing,invalid,entries};
+}
+function downloadReport(data,name){const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+function showVerification(status,info){
+ const lines=['VERIFICACIÓN DE BIBLIOTECA LOCAL',info.stored+' guardados en el navegador · '+info.visible+' visibles en la biblioteca',...Object.entries(info.categories).sort(([a],[b])=>a.localeCompare(b)).map(([cat,n])=>cat+': '+n.visible+' visibles / '+n.stored+' guardados')];
+ if(info.missing.length)lines.push(info.missing.length+' guardados pero no visibles');if(info.invalid.length)lines.push(info.invalid.length+' registros no válidos');
+ status.append(document.createElement('br'),document.createTextNode(lines.join('\n')));
+ const button=document.createElement('button');button.type='button';button.className='btn slim';button.textContent='Descargar inventario de bloques guardados';button.onclick=()=>downloadReport(info,'cad2d3d-inventario-bloques.json');status.append(document.createElement('br'),button);
+}
 async function restore(){
  if(restoring)return restoring;
  restoring=(async()=>{
   const stored=await readAll();if(!stored.length)return 0;
   await loadExisting();
   const count=register(stored.map(x=>validate(x.row)).filter(Boolean));if(count)refresh();return count;
- })().catch(e=>{console.warn('DXF local',e);return 0});
+ })().catch(e=>{console.warn('DXF local',e);restoring=null;return 0});
  return restoring;
 }
 async function importFile(file){
@@ -334,30 +350,33 @@ function openDrawingImport(){
  if(busy)return;
  const pane=document.createElement('dialog');
  pane.style.cssText='background:#23313b;color:#f2f5f6;border:1px solid #657985;border-radius:10px;padding:16px;width:min(480px,90vw)';
- pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Los bloques se organizan automáticamente por nombre y carpetas del ZIP. Se admiten dibujos sin punto de inserción y definiciones de bloques sin INSERT. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
+ pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Los bloques se organizan automáticamente por nombre y carpetas del ZIP. Se admiten dibujos sin punto de inserción y definiciones de bloques sin INSERT. La recuperación opcional conserva geometría compatible y marca los bloques parciales. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="-1">Estimar escala · revisar</option><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><p><label><input type="checkbox" data-recover checked> Recuperar geometría compatible aunque falten entidades</label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-verify>Verificar bloques guardados</button> <button type="button" class="btn slim" data-show>Ver importados</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
  document.body.appendChild(pane);
- const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input[type=file]'),unit=pane.querySelector('select'),recovery=pane.querySelector('[data-recover]');
+ const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input[type=file]'),unit=pane.querySelector('select'),recovery=pane.querySelector('[data-recover]'),verify=pane.querySelector('[data-verify]'),show=pane.querySelector('[data-show]');
  let active=false,stop=false;
+ verify.onclick=async()=>{verify.disabled=true;try{await restore();const info=await verifyStored();status.textContent='';showVerification(status,info)}catch(e){status.textContent='No se pudo leer la biblioteca local: '+String(e.message||e)}finally{verify.disabled=active}};
+ show.onclick=()=>{if(active)return;pane.close();window.CAD2D_BLOCK_BROWSER?.openImported?.()};
  close.onclick=()=>{if(active){stop=true;close.disabled=true;status.textContent+='\nDeteniendo después del archivo actual…'}else pane.close()};
  pane.addEventListener('cancel',e=>{if(active){e.preventDefault();stop=true}});
  pane.addEventListener('close',()=>pane.remove(),{once:true});
  start.onclick=async()=>{
   const files=Array.from(input.files||[]);if(!files.length)return;
-  active=true;stop=false;start.disabled=input.disabled=unit.disabled=recovery.disabled=true;close.textContent='Detener';
+  active=true;stop=false;start.disabled=input.disabled=unit.disabled=recovery.disabled=verify.disabled=show.disabled=true;close.textContent='Detener';
   try{
-   if(files.length===1&&/\.json$/i.test(files[0].name)){const r=await importFile(files[0]);status.textContent=r?JSON.stringify(r):'Importación no iniciada';return}
+   if(files.length===1&&/\.json$/i.test(files[0].name)){const r=await importFile(files[0]);status.textContent=r?JSON.stringify(r):'Importación no iniciada';showVerification(status,await verifyStored());return}
    if(files.some(f=>/\.json$/i.test(f.name)))throw Error('Importá cada paquete JSON por separado');
    const r=await importDrawings(files,Number(unit.value),p=>{status.textContent=p.scanning?'Leyendo ZIP: '+p.file:p.processed+'/'+p.total+' · '+p.added+' nuevos · '+p.duplicates+' duplicados · '+p.failed+' rechazados\n'+p.estimated+' escala estimada · '+p.partial+' parciales\n'+p.file+(p.lastError?'\nÚltimo rechazo: '+p.lastError:'')},()=>stop,recovery.checked);
    status.textContent=r.processed+'/'+r.total+' dibujos procesados · '+r.added+' nuevos · '+r.duplicates+' duplicados · '+r.failed.length+' rechazados\n'+r.estimated+' escala estimada · '+r.partial+' parciales\n'+r.failed.slice(0,20).map(x=>x.file+': '+x.error).join('\n')+(r.failed.length>20?'\nSe muestran los primeros 20 errores.':'');
    if(r.failed.length){const report=document.createElement('button');report.type='button';report.className='btn slim';report.textContent='Descargar informe de rechazos';report.onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(r,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='cad2d3d-rechazos.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};status.append(document.createElement('br'),report)}
+   showVerification(status,await verifyStored());
   }catch(e){status.textContent=String(e.message||e)}
-  finally{active=false;start.disabled=input.disabled=unit.disabled=recovery.disabled=close.disabled=false;close.textContent='Cerrar'}
+  finally{active=false;start.disabled=input.disabled=unit.disabled=recovery.disabled=verify.disabled=show.disabled=close.disabled=false;close.textContent='Cerrar'}
  };
  pane.showModal();
 }
 
 function choose(){openDrawingImport()}
-window.CAD2D_LOCAL_VECTOR_PACKS=Object.freeze({choose,importFile,restore,importDrawings});
+window.CAD2D_LOCAL_VECTOR_PACKS=Object.freeze({choose,importFile,restore,importDrawings,verifyStored});
 const ext=window.CAD2D_EXTENSIONS;if(ext?.commands)ext.commands.IMPORTBLOCKPACK=choose;
 restore();
 })();
