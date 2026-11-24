@@ -8,12 +8,31 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const activeRecords=new Set();let walkCount=0,entityCount=0,vertexCount=0;
  const abortImport=message=>{const err=Error('DXF: '+message+' · dibujo anterior conservado');err.cadImportFatal=true;throw err};
  const checkTime=()=>{if(performance.now()-importStart>20000)abortImport('procesamiento excedió el límite de 20 segundos')};
+ const finitePoint=p=>!!p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
+ const validateGeometry=e=>{
+  for(const key of ['a','b','c','p'])if(e[key]!=null&&!finitePoint(e[key]))throw Error('Coordenada DXF inválida');
+  if(Array.isArray(e.pts)&&!e.pts.every(finitePoint))throw Error('Vértice DXF inválido');
+  for(const key of ['r','rx','ry','h','scale','rotation','a0','a1','hatchSpacing','pwidth'])if(e[key]!=null&&!Number.isFinite(e[key]))throw Error('Magnitud DXF inválida');
+  return e;
+ };
  const budgetEntity=e=>{entityCount++;vertexCount+=Array.isArray(e.pts)?e.pts.length:1;if(entityCount>MAX_ENTITIES||vertexCount>MAX_VERTICES)abortImport('expansión geométrica demasiado grande')};
  if(typeof text==='string'&&text.length>64*1024*1024)abortImport('DXF expandido superior a 64 MiB');
  text=String(text||'').replace(/\\U\+([0-9A-Fa-f]{4})/g,(m,h)=>String.fromCharCode(parseInt(h,16)));
- const raw=text.replace(/\r/g,'').split('\n'),pairs=[];
- if(raw.length>MAX_PAIRS*2+2)abortImport('demasiados registros DXF');
- for(let i=0;i<raw.length-1;i+=2){if((i&8191)===0)checkTime();const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
+ // Read line pairs without allocating an additional array of every input line.
+ const source=text.replace(/\r/g,''),pairs=[];
+ let cursor=0,lines=1;
+ while(cursor<=source.length){
+  const endCode=source.indexOf('\n',cursor);
+  if(endCode<0)break;
+  const endValue=source.indexOf('\n',endCode+1);
+  lines+=endValue<0?1:2;
+  if(lines>MAX_PAIRS*2+2)abortImport('demasiados registros DXF');
+  if(((lines-1)&8191)===0||cursor===0)checkTime();
+  const code=Number(source.slice(cursor,endCode).trim());
+  if(Number.isFinite(code))pairs.push([code,source.slice(endCode+1,endValue<0?source.length:endValue).trim()]);
+  if(endValue<0)break;
+  cursor=endValue+1;
+ }
  let section='',table='',unitCode=0,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0;
  const ACI_HEX='000000ff0000ffff0000ff0000ffff0000ffff00ffffffff808080c0c0c0ff0000ff7f7fa50000a552527f00007f3f3f4c00004c2626260000261313ff3f00ff9f7fa52900a567527f1f007f4f3f4c13004c2f26260900261713ff7f00ffbf7fa55200a57c527f3f007f5f3f4c26004c3926261300261c13ffbf00ffdf7fa57c00a591527f5f007f6f3f4c39004c4226261c00262113ffff00ffff7fa5a500a5a5527f7f007f7f3f4c4c004c4c26262600262613bfff00dfff7f7ca50091a5525f7f006f7f3f394c00424c261c26002126137fff00bfff7f52a5007ca5523f7f005f7f3f264c00394c261326001c26133fff009fff7f29a50067a5521f7f004f7f3f134c002f4c2609260017261300ff007fff7f00a50052a552007f003f7f3f004c00264c2600260013261300ff3f7fff9f00a52952a567007f1f3f7f4f004c13264c2f00260913581700ff7f7fffbf00a55252a57c007f3f3f7f5f004c26264c3900261313581c00ffbf7fffdf00a57c52a591007f5f3f7f6f004c39264c4200261c13585800ffff7fffff00a5a552a5a5007f7f3f7f7f004c4c264c4c00262613585800bfff7fdfff007ca55291a5005f7f3f6f7f00394c26427e001c26135858007fff7fbfff0052a5527ca5003f7f3f5f7f00264c26397e001326131c58003fff7f9fff0029a55267a5001f7f3f4f7f00134c262f7e0009261317580000ff7f7fff0000a55252a500007f3f3f7f00004c26267e0000261313583f00ff9f7fff2900a56752a51f007f4f3f7f13004c2f267e0900261713587f00ffbf7fff5200a57c52a53f007f5f3f7f26004c39267e1300261c1358bf00ffdf7fff7c00a59152a55f007f6f3f7f39004c42264c1c0026581358ff00ffff7fffa500a5a552a57f007f7f3f7f4c004c4c264c260026581358ff00bfff7fdfa5007ca552917f005f7f3f6f4c00394c264226001c581358ff007fff7fbfa50052a5527c7f003f7f3f5f4c00264c263926001358131cff003fff7f9fa50029a552677f001f7f3f4f4c00134c262f260009581317000000656565666666999999ccccccffffff';
  const aciHex=n=>{n=Math.abs(Math.round(n));return n>=1&&n<=255?'#'+ACI_HEX.substr(n*6,6):'#c7cbd0'};
@@ -25,8 +44,9 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const getLayer=(name)=>{if(!layers.has(name))layers.set(name,{id:name,name,color:'#c6cbd1',visible:true,locked:false,width:.25,linetype:'CONTINUOUS'});return layers.get(name)};
  // --- Parse sections: tables, block definitions and model-space records ---
  const blocksDef=new Map(),modelRecs=[];let curBlock=null;
+ let scanCheckpoint=0;
  for(let i=0;i<pairs.length;){
-  if((i&8191)===0)checkTime();const [code,val]=pairs[i];
+  if(i>=scanCheckpoint){checkTime();scanCheckpoint=i+8192;}const [code,val]=pairs[i];
   if(code===0&&val==='SECTION'){section=pairs[i+1]?.[0]===2?pairs[i+1][1]:'';table='';i+=2;continue}
   if(code===0&&val==='ENDSEC'){section='';table='';i++;continue}
   if(section==='HEADER'&&code===9&&val==='$INSUNITS'){unitCode=Number(pairs[i+1]?.[1]||0);i+=2;continue}
@@ -34,7 +54,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   if(section==='TABLES'&&code===0&&val==='ENDTAB'){table='';i++;continue}
   if(code!==0){i++;continue}
   let record=[],type=val;i++;
-  while(i<pairs.length&&pairs[i][0]!==0)record.push(pairs[i++]);
+  while(i<pairs.length&&pairs[i][0]!==0){if(i>=scanCheckpoint){checkTime();scanCheckpoint=i+8192;}record.push(pairs[i++]);}
   const {get,str}=fields(record);
   if(section==='TABLES'&&table==='LAYER'&&type==='LAYER'){
    let name=str(2,'0'),flags=get(70),colorIndex=get(62,7),trueColor=get(420,NaN),weight=get(370,-1);
@@ -58,7 +78,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const isId=m=>m.every((v,k)=>Math.abs(v-ID[k])<1e-12);
  const arcPts=(c,r,a0,sweep)=>{if(![c.x,c.y,r,a0,sweep].every(Number.isFinite)||Math.abs(sweep)>Math.PI*2+1e-6)throw Error('Arco DXF inválido');const n=Math.max(6,Math.ceil(Math.abs(sweep)/(Math.PI/24)));return Array.from({length:n+1},(_,k)=>P(c.x+r*Math.cos(a0+sweep*k/n),c.y+r*Math.sin(a0+sweep*k/n)))};
  const bulgePts=(p1,p2,b)=>{const d=Math.hypot(p2.x-p1.x,p2.y-p1.y);if(d<1e-12||Math.abs(b)<1e-10)return[p2];const th=4*Math.atan(b),r=d*(1+b*b)/(4*Math.abs(b)),ux=(p2.x-p1.x)/d,uy=(p2.y-p1.y)/d,h=d/2*(1-b*b)/(2*b),c=P((p1.x+p2.x)/2-uy*h,(p1.y+p2.y)/2+ux*h);return arcPts(c,r,Math.atan2(p1.y-c.y,p1.x-c.x),th).slice(1)};
- const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];out.push(...bulgePts(a.p,b.p,a.b||0))}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
+ const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];if((k&1023)===0)checkTime();const segment=bulgePts(a.p,b.p,a.b||0);if(out.length+segment.length>MAX_VERTICES-vertexCount)abortImport('expansión de polilínea demasiado grande');out.push(...segment)}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
  const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
  const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
@@ -83,7 +103,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
    const text=type==='MTEXT'?cleanMText(raw):raw.replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').replace(/%%[uUoO]/g,'');
    if(!text&&!isDef)return null;
    let h=get(40,.25)||.25,p=P(get(10),get(20)),rot=get(50,0),mw=0,ls=0;
-   if(type==='MTEXT'){const dx=get(11,NaN),dy=get(21,0);if(Number.isFinite(dx))rot=Math.atan2(dy,dx)*180/Math.PI;mw=get(41,0);ls=1.6667*(get(44,1)||1);const lines=text.split('\n'),n=lines.length,sp=h*ls,at=get(71,1),w=(mw>0?mw:Math.max(...lines.map(l=>l.length))*h*.62),cx=((at-1)%3)/2,cy=Math.floor((at-1)/3),r=rot*Math.PI/180;const ox=-w*cx,oy=cy===0?-h:cy===1?((n-1)*sp+h)/2-h:(n-1)*sp;p=P(p.x+ox*Math.cos(r)-oy*Math.sin(r),p.y+ox*Math.sin(r)+oy*Math.cos(r))}
+   if(type==='MTEXT'){const dx=get(11,NaN),dy=get(21,0);if(Number.isFinite(dx))rot=Math.atan2(dy,dx)*180/Math.PI;mw=get(41,0);ls=1.6667*(get(44,1)||1);const lines=text.split('\n'),n=lines.length,sp=h*ls,at=get(71,1),w=(mw>0?mw:lines.reduce((max,l)=>Math.max(max,l.length),0)*h*.62),cx=((at-1)%3)/2,cy=Math.floor((at-1)/3),r=rot*Math.PI/180;const ox=-w*cx,oy=cy===0?-h:cy===1?((n-1)*sp+h)/2-h:(n-1)*sp;p=P(p.x+ox*Math.cos(r)-oy*Math.sin(r),p.y+ox*Math.sin(r)+oy*Math.cos(r))}
    else{const hj=get(72,0),vj=get(73,0);if((hj||vj)&&hj!==5&&hj!==3){const q=P(get(11,p.x),get(21,p.y)),w=text.length*h*.62,f=hj===1||hj===4?.5:hj===2?1:0,r=rot*Math.PI/180,oy=vj===3?-h:vj===2?-h/2:0;p=P(q.x-w*f*Math.cos(r)-oy*Math.sin(r),q.y-w*f*Math.sin(r)+oy*Math.cos(r))}}
    const font=str(7,'').toUpperCase();
    return{type:'text',p,h,rotation:rot,fontFamily:font.includes('MONO')?'Courier New':font.includes('SERIF')?'Times New Roman':'Arial',text,...(mw>0?{mtextWidth:mw}:{}),...(ls>0?{lineSpacing:Math.round(ls*100)/100}:{}),...(isDef?{attdef:{tag:tagName,prompt:str(3,'').trim()||tagName,...(get(70,0)&1?{invisible:true}:{})}}:{})};
@@ -108,23 +128,29 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  function readHatch(record){
   const {get,str}=fields(record),solid=get(70)===1;
   let k=record.findIndex(q=>q[0]===91);if(k<0)return null;const nPaths=Number(record[k][1]);k++;
+  if(!Number.isSafeInteger(nPaths)||nPaths<0||nPaths>record.length-k)throw Error('HATCH cantidad de contornos inválida');
+  let hatchVertices=0;
+  const checkHatchBudget=n=>{if(hatchVertices+n>MAX_VERTICES-vertexCount)abortImport('expansión de sombreado demasiado grande')};
   const paths=[],num=()=>{if(!Number.isInteger(k)||k<0||k>=record.length)throw Error('HATCH truncado');const n=Number(record[k++][1]);if(!Number.isFinite(n))throw Error('HATCH valor inválido');return n},peek=()=>record[k]?.[0];
   const count=()=>{const n=num();if(!Number.isSafeInteger(n)||n<0||n>record.length-k)throw Error('HATCH cantidad inválida');return n};
   for(let pi=0;pi<nPaths&&k<record.length;pi++){
+   if((pi&255)===0)checkTime();
    while(k<record.length&&peek()!==92)k++;const flags=num(),pts=[];
-   if(flags&2){const hasB=num();num();const nv=num();const verts=[];
+   if(flags&2){const hasB=num();num();const nv=count();const verts=[];
     for(let v=0;v<nv&&k<record.length;v++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();let b=0;if(hasB&&peek()===42)b=num();verts.push({p:P(x,y),b})}
-    if(verts.length>=3)paths.push({pts:vertsToPts(verts,true),outer:Boolean(flags&1)});
+    if(verts.length>=3){const contour=vertsToPts(verts,true);checkHatchBudget(contour.length);hatchVertices+=contour.length;paths.push({pts:contour,outer:Boolean(flags&1)})}
    }else{
-    const ne=num();
+    const ne=count();
     for(let ei=0;ei<ne&&k<record.length;ei++){
+     if((ei&1023)===0)checkTime();
+     checkHatchBudget(pts.length);
      while(k<record.length&&peek()!==72)k++;const et=num();
      if(et===1){const x1=num(),y1=num(),x2=num(),y2=num();if(!pts.length)pts.push(P(x1,y1));pts.push(P(x2,y2))}
      else if(et===2){const cx=num(),cy=num(),r=num(),a0=num()*Math.PI/180,a1=num()*Math.PI/180,ccw=num();let sw=a1-a0;if(sw<=0)sw+=Math.PI*2;const arc=ccw?arcPts(P(cx,cy),r,a0,sw):arcPts(P(cx,cy),r,-a0,-sw);pts.push(...(pts.length?arc.slice(1):arc))}
      else if(et===3){const cx=num(),cy=num(),mx=num(),my=num(),ra=num(),s0=num()*Math.PI/180,s1=num()*Math.PI/180,ccw=num();const rx=Math.hypot(mx,my),ry=rx*ra,rot=Math.atan2(my,mx);let sw=s1-s0;if(sw<=0)sw+=Math.PI*2;const n=24;for(let j=pts.length?1:0;j<=n;j++){let t=s0+sw*j/n;if(!ccw)t=-t;const x=rx*Math.cos(t),y=ry*Math.sin(t);pts.push(P(cx+x*Math.cos(rot)-y*Math.sin(rot),cy+x*Math.sin(rot)+y*Math.cos(rot)))}}
      else if(et===4){k++;k++;k++;const nk=count(),nc=count();k+=nk;for(let j=0;j<nc;j++){while(k<record.length&&peek()!==10)k++;const x=num(),y=num();if(peek()===42)k++;if(j||!pts.length)pts.push(P(x,y))}if(peek()===97){const nf=count();if(nf*2>record.length-k)throw Error('HATCH spline truncado');k+=nf*2;if(peek()===12)k+=4}}
     }
-    if(pts.length>=3)paths.push({pts,outer:Boolean(flags&1)});
+    checkHatchBudget(pts.length);if(pts.length>=3){hatchVertices+=pts.length;paths.push({pts,outer:Boolean(flags&1)})}
    }
    while(k<record.length&&peek()!==97)k++;if(peek()===97){const ns=count();k+=ns}
   }
@@ -153,7 +179,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
 
  // INSERT de primer nivel → referencia de bloque CAD2D (se mantiene como bloque, no se explota).
  const importedBlocks=Object.create(null),defName=n=>n.startsWith('*')?'ANON_'+n.slice(1):n;
- const importedDimStyles={};
+ const importedDimStyles=Object.create(null);
  function cadDxfBlockRef(def,o,lname,common,sub){
   if(o.cols>1||o.rows>1)return null;
   let A=[Math.cos(o.rot)*o.sx,Math.sin(o.rot)*o.sx,-Math.sin(o.rot)*o.sy,Math.cos(o.rot)*o.sy],ix=o.ix,iy=o.iy;
@@ -205,7 +231,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
         const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
         if(ov&&ov!=='<>'&&!/<>/.test(ov))dim.label=cleanMText(ov).slice(0,120);
         if(common.color)dim.color=common.color;
-        budgetEntity(dim);entities.push(dim);expanded++;continue;
+        validateGeometry(dim);budgetEntity(dim);entities.push(dim);expanded++;continue;
        }
       }
       walk(def.recs,m,sub,depth+1,out);expanded++;continue}
@@ -213,7 +239,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
      if(depth===0&&!out&&!(opts&&opts.explodeInserts)){const ref=cadDxfBlockRef(def,{ix,iy,sx,sy,rot,ext,cols:get(70,1),rows:get(71,1)},lname,common,sub);if(ref){
       // ATTRIB que siguen al INSERT: valores de los atributos de esta referencia.
       if(get(66,0)===1&&importedBlocks[ref.blockName]?.entities.some(c=>c.attdef)){const attrs={};let j=idx+1;for(;j<recs.length&&recs[j][0]==='ATTRIB';j++){const f=fields(recs[j][1]),t=f.str(2,'').trim().toUpperCase();if(t)attrs[t]=cleanMText(f.str(1,''))}if(Object.keys(attrs).length){ref.attrs=attrs;idx=j-1}}
-      budgetEntity(ref);entities.push({...ref,id:entities.length+1});expanded++;continue}}
+      validateGeometry(ref);budgetEntity(ref);entities.push({...ref,id:entities.length+1});expanded++;continue}}
      const cols=Math.max(1,get(70,1)),rows=Math.max(1,get(71,1)),cs=get(44,0),rs=get(45,0);
      if(!Number.isSafeInteger(cols)||!Number.isSafeInteger(rows)||cols*rows>MAX_ENTITIES||cols*rows*Math.max(1,def.recs.length)>MAX_WALK-walkCount)abortImport('matriz INSERT excesiva');
      for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
@@ -229,7 +255,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
     let ent=readRecord(type,record,recs,idx);
     if(ent===undefined){if(!silent.has(type))note(type);continue}
     if(!ent)continue;
-    for(const one of[].concat(ent)){const w=xform({...common,...one},m);budgetEntity(w);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
+    for(const one of[].concat(ent)){const w=validateGeometry(xform({...common,...one},m));budgetEntity(w);if(one.width&&one.type==='hatch')w.width=one.width;if(out){if(!w.color&&lname!==(ctx?.layer)&&layer.color)w.color=layer.color;out.push(w)}else entities.push({...w,id:entities.length+1})}
    }catch(error){if(error.cadImportFatal)throw error;note(type);if(unsupported.get(type)<=3)console.warn('Skipped DXF entity',type,error)}
   }
   }finally{activeRecords.delete(recs)}
@@ -241,6 +267,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:'0',color:undefined,linetype:'BYLAYER',width:.25},1,list);
   if(list.length)importedBlocks[defName(def.name)]={name:defName(def.name),entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'};
  }
+ checkTime();
  blockCount=0;
  return {entities,layers:[...layers.values()],blocks:importedBlocks,unitCode,dimStyles:importedDimStyles,warnings:[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')')};
 }

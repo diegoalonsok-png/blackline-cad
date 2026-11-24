@@ -10,7 +10,10 @@ const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const from = html.indexOf('function snapPoint(p){');
 const to = html.indexOf('\nfunction segmentDist(', from);
 assert.ok(from >= 0 && to > from, 'CAD2D snapPoint source is available');
-const source = html.slice(from, to);
+const lookupFrom = html.indexOf('function cadSelectionLayerLookup(){');
+const lookupTo = html.indexOf('\nfunction pick(', lookupFrom);
+assert.ok(lookupFrom >= 0 && lookupTo > lookupFrom, 'CAD2D layer lookup source is available');
+const source = html.slice(lookupFrom, lookupTo) + '\n' + html.slice(from, to);
 
 function editor({orthoOn = true, otrackOn = true} = {}) {
  const anchors = [];
@@ -18,7 +21,8 @@ function editor({orthoOn = true, otrackOn = true} = {}) {
  const state = {
   orthoOn, osnapOn: true, polarOn: false, snapOn: false,
   stage: [{x:10,y:0}], tool:'line', view:{scale:10},
-  entities:[{type:'line',a:{x:7,y:5},b:{x:7,y:9}}]
+  layers:[{id:'0',visible:true,locked:false}],
+  entities:[{type:'line',layer:'0',a:{x:7,y:5},b:{x:7,y:9}}]
  };
  const context = vm.createContext({
   state, Math, P:(x,y)=>({x,y}),
@@ -75,3 +79,14 @@ test('with ORTHO disabled, standard endpoint snapping still works',()=>{
  assert.equal(p.x,7);assert.equal(p.y,5);
  assert.equal(cad.acquired.length,1);
 });
+
+// The optimized lookup must retain actual visibility and locking semantics.
+for (const property of ['locked','frozen','hidden']) {
+ test('OTRACK ignores '+property+' layer geometry',()=>{
+  const cad=editor();
+  if(property==='hidden')cad.state.layers[0].visible=false;
+  else cad.state.layers[0][property]=true;
+  cad.point(7,5);
+  assert.equal(cad.acquired.length,0);
+ });
+}

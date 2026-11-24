@@ -9,7 +9,7 @@ const extract=(a,b)=>{
 };
 const ctx={clamp:(v,a,b)=>Math.max(a,Math.min(b,v)),Math,Number,String};
 vm.runInNewContext(extract('function cad3DOpeningDefaults','var importSequence=0;')+'\n'+
- extract('function architectureParts(r,part){','/* Build a true miter'),ctx);
+ extract('function cad3DGlazingPattern(','/* Build a true miter'),ctx);
 function renderOpening(kind,styleId,opts={}){
  const wall={type:'wall',w:7,d:.22,h:3.6,openings:[
   {id:20,kind,styleId,offset:0,w:3,h:2.1,sill:0.4,...opts}

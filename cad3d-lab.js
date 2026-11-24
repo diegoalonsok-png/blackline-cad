@@ -8310,20 +8310,28 @@ function cad3dProfileSimple(p){
  }return true;
 }
 function cad3dSolidTriangles(r){
+ if(!r||['x','y','z','rot'].some(k=>r[k]!=null&&!Number.isFinite(r[k])))throw Error('Transformación 3D inválida');
+ var required=r.type==='box'?['w','d','h']:r.type==='sphere'?['radius']:['cylinder','cone'].includes(r.type)?['radius','h']:[];
+ if(required.some(k=>!Number.isFinite(r[k])||r[k]<=0))throw Error('Dimensiones del sólido inválidas');
  var g=null;
  if(r.type==='box')g=boxGeom(r.w,r.d,r.h);
  else if(r.type==='sphere'){g=new T.SphereGeometry(r.radius,20,12);g.translate(0,0,r.radius);}
  else if(['cylinder','cone'].includes(r.type)){g=new T.CylinderGeometry(r.type==='cone'?0:r.radius,r.radius,r.h,32);g.rotateX(Math.PI/2);g.translate(0,0,r.h/2);}
  else if(r.type==='profile2d'&&r.profileClosed&&r.extrudedHeight>0&&cad3dProfileSimple(r.profilePoints)){
   var p=r.profilePoints,shape=new T.Shape();shape.moveTo(p[0][0],p[0][1]);p.slice(1).forEach(v=>shape.lineTo(v[0],v[1]));shape.closePath();g=new T.ExtrudeGeometry(shape,{depth:r.extrudedHeight,steps:1,bevelEnabled:false});
- }else if(r.type==='boolean'&&Array.isArray(r.triangles)&&r.triangles.length){g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(r.triangles,3));}
+ }else if(r.type==='boolean'&&Array.isArray(r.triangles)&&r.triangles.length){
+  if(r.triangles.length%9||r.triangles.length>120000||!r.triangles.every(Number.isFinite))throw Error('Malla de sólido inválida');
+  var angle=(r.rot||0)*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle),t=[];
+  for(var i=0;i<r.triangles.length;i+=3){var x=r.triangles[i],y=r.triangles[i+1];t.push(x*c-y*s+(r.x||0),x*s+y*c+(r.y||0),r.triangles[i+2]+(r.z||0))}
+  if(!t.every(Number.isFinite))throw Error('Transformación de malla inválida');return t;
+ }
  else throw Error('Sólidos compatibles: BOX, SPHERE, CYLINDER, CONE, perfil extrudado y malla resultante. Muros y losas conservan sus propias herramientas.');
  try{
   var m=new T.Matrix4().makeRotationZ((r.rot||0)*Math.PI/180);m.setPosition(r.x||0,r.y||0,r.z||0);
   var out=[],p=g.getAttribute('position'),idx=g.index,v=new T.Vector3(),n=idx?idx.count:p.count;
   if(n*3>120000||n%3)throw Error('Malla demasiado grande o inválida');
   for(var i=0;i<n;i++){v.fromBufferAttribute(p,idx?idx.getX(i):i).applyMatrix4(m);out.push(v.x,v.y,v.z);}
-  return out;
+  if(!out.every(Number.isFinite))throw Error('Coordenadas de sólido inválidas');return out;
  }finally{g.dispose()}
 }
 function cad3dSolidBounds(t){
@@ -8333,7 +8341,7 @@ function cad3dSolidBounds(t){
 }
 function cad3dMakeSolid(t,source,name){
  var v=Math.abs(cad3dSolidKernel().volume(t));
- if(!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite)||v<1e-9)throw Error('El resultado no contiene volumen válido');
+ if(!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite)||!Number.isFinite(v)||v<1e-9)throw Error('El resultado no contiene volumen válido');
  var b=cad3dSolidBounds(t),x=(b.min[0]+b.max[0])/2,y=(b.min[1]+b.max[1])/2,z=b.min[2];
  return {type:'boolean',name,layerId:source.layerId||'0',x,y,z,rot:0,w:Math.max(.01,b.max[0]-b.min[0]),d:Math.max(.01,b.max[1]-b.min[1]),h:Math.max(.01,b.max[2]-z),triangles:t.map((v,i)=>v-[x,y,z][i%3])};
 }
@@ -9013,6 +9021,21 @@ function checkVisibleShadows(){
  }catch(err){report('Shadow image comparison unavailable: '+String(err?.message||err));}
  finally{sunLight.castShadow=lightWasCasting;renderer.shadowMap.needsUpdate=true;renderer.render(scene,camera);}
 }
+// Diagnostic only: quantized edge matching does not resolve T-junctions.
+function cad3dMeshTopology(t){
+ if(!Array.isArray(t)||!t.length||t.length%9||t.length>120000||!t.every(Number.isFinite))return {invalid:true,degenerate:0,open:0,nonManifold:0,orientation:0};
+ const edges=new Map(),eps=1e-7,origin=t.slice(0,3);let degenerate=0;
+ const key=p=>p.map((v,i)=>Math.round((v-origin[i])/eps)).join(',');
+ for(let i=0;i<t.length;i+=9){
+  const p=t.slice(i,i+3),q=t.slice(i+3,i+6),r=t.slice(i+6,i+9),keys=[key(p),key(q),key(r)];
+  const u=q.map((v,j)=>v-p[j]),v=r.map((v,j)=>v-p[j]);
+  if(new Set(keys).size<3||Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])<=eps*eps){degenerate++;continue}
+  for(let j=0;j<3;j++){const a=keys[j],b=keys[(j+1)%3],forward=a<b,k=forward?a+'|'+b:b+'|'+a,e=edges.get(k)||[0,0];e[0]++;e[1]+=forward?1:-1;edges.set(k,e)}
+ }
+ let open=0,nonManifold=0,orientation=0;
+ for(const [count,balance] of edges.values()){if(count===1)open++;else if(count>2)nonManifold++;else if(balance!==0)orientation++}
+ return {invalid:false,degenerate,open,nonManifold,orientation};
+}
 function verify3DSolids(){
  var supported=new Set(['box','sphere','cylinder','cone','wall','slab','boolean','stair','railing']);
  var invalid=records.filter(function(r){
@@ -9020,12 +9043,15 @@ function verify3DSolids(){
   var dims=r.type==='sphere'?[r.radius]:r.type==='cylinder'||r.type==='cone'?[r.radius,r.h]:r.type==='boolean'?[]:[r.w,r.d,r.h];
   return dims.some(function(v){return !Number.isFinite(v)||v<=0;});
  });
+ var topologyWarnings=0,topologyChecked=0;
+ for(const r of records){if(r.type!=='boolean')continue;topologyChecked++;const q=cad3dMeshTopology(r.triangles);if(q.invalid||q.degenerate||q.open||q.nonManifold||q.orientation){topologyWarnings++;console.warn('[CHECK3D] malla '+r.id,q)}}
  var meshCount=0,geometryValid=true;
  if(T&&modelRoot)modelRoot.traverse(function(o){if(o.isMesh){meshCount++;var p=o.geometry?.getAttribute('position');if(!p||p.count<3)geometryValid=false;}});
  var ok=!invalid.length&&geometryValid&&(records.length===0||!T||!modelRoot||meshCount>0);
  var message=records.length===0?'No 3D objects yet. Create a Box, Wall or Sphere.':
  (ok?'3D geometry OK: '+records.length+' object(s)'+(T&&modelRoot?' · '+meshCount+' mesh(es)':' · compatibility preview mode'):
  '3D geometry warning: '+invalid.length+' invalid record(s), '+meshCount+' mesh(es).');
+ if(topologyChecked)message+=' · Topología: '+topologyWarnings+'/'+topologyChecked+' mallas con indicios (incluye posibles uniones en T; no certifica cierre).';
  root.querySelector('.solidCheck').textContent=message;text(message);return ok;
 }
 function updateDynamicReadout(e){
@@ -9048,6 +9074,22 @@ function updateDynamicReadout(e){
 /* MASSPROP / LIST 3D — read-only geometric quantities, in model metres.
    Analytic primitives and validated simple prisms; architectural gross/net
    quantities are separated from solid totals because mitres may change them. */
+function cad3dMeshMass(t){
+ const q=cad3dMeshTopology(t);
+ if(q.invalid||q.degenerate||q.nonManifold||q.orientation||q.open)return null;
+ const o=t.slice(0,3),moment=[0,0,0];let signed=0,surface=0;
+ for(let i=0;i<t.length;i+=9){
+  const a=t.slice(i,i+3).map((v,j)=>v-o[j]),b=t.slice(i+3,i+6).map((v,j)=>v-o[j]),c=t.slice(i+6,i+9).map((v,j)=>v-o[j]);
+  const u=b.map((v,j)=>v-a[j]),v=c.map((v,j)=>v-a[j]);
+  const cross=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+  surface+=Math.hypot(...cross)/2;
+  const dv=(a[0]*cross[0]+a[1]*cross[1]+a[2]*cross[2])/6;
+  signed+=dv;for(let j=0;j<3;j++)moment[j]+=dv*(a[j]+b[j]+c[j])/4;
+ }
+ if(!Number.isFinite(signed)||Math.abs(signed)<1e-9||!Number.isFinite(surface)||surface<=0)return null;
+ const center=moment.map((v,j)=>v/signed+o[j]);
+ return center.every(Number.isFinite)?{volume:Math.abs(signed),surface,center}:null;
+}
 function cad3dMassProperties(r){
  const positive=(...v)=>v.every(x=>Number.isFinite(x)&&x>0);
  const validPosition=[r.x??0,r.y??0,r.z??0,r.rot??0].every(Number.isFinite);
@@ -9063,6 +9105,10 @@ function cad3dMassProperties(r){
   volume=Math.PI*R**2*h;surface=2*Math.PI*R*(R+h);center[2]=h/2;
  }else if(r.type==='cone'&&positive(R,h)){
   volume=Math.PI*R**2*h/3;surface=Math.PI*R*(R+Math.hypot(R,h));center[2]=h/4;
+ }else if(r.type==='boolean'){
+  const mesh=cad3dMeshMass(r.triangles);
+  if(!mesh)return unsupported('Malla sin cierre verificable por aristas; consultá CHECK3D (posibles uniones en T)');
+  volume=mesh.volume;surface=mesh.surface;center=mesh.center;reason='Magnitudes de malla triangulada; no certifica ausencia de autointersecciones.';
  }else if(r.type==='profile2d'&&r.profileClosed&&positive(r.extrudedHeight)&&cad3dProfileSimple(r.profilePoints)){
   const p=r.profilePoints;let cross=0,cx=0,cy=0,perimeter=0;
   for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],v=a[0]*b[1]-b[0]*a[1];cross+=v;cx+=(a[0]+b[0])*v;cy+=(a[1]+b[1])*v;perimeter+=Math.hypot(b[0]-a[0],b[1]-a[1])}
@@ -9130,6 +9176,74 @@ function cad3dMassReport(){
  d.addEventListener('close',()=>d.remove());root.append(d);d.showModal();text('MASSPROP · '+chosen.length+' objetos consultados');
 }
 
+
+/* INTERFERE: read-only collision detection for supported analytic primitives.
+   Other types are explicitly excluded; never treat a bounding box as proof. */
+function cad3dInterferenceShape(r){
+ const valid=(...v)=>v.every(Number.isFinite),positive=(...v)=>valid(...v)&&v.every(x=>x>0);
+ const x=r.x??0,y=r.y??0,z=r.z??0,rot=r.rot??0;
+ if(!valid(x,y,z,rot))return null;
+ if(r.type==='sphere'&&positive(r.radius)){
+  const R=r.radius;return {id:r.id,kind:'sphere',x,y,z:z+R,R,minX:x-R,maxX:x+R,minY:y-R,maxY:y+R,minZ:z,maxZ:z+2*R};
+ }
+ if(!(r.type==='box'||r.type==='slab'&&!r.pitch&&!r.openings?.length&&!r.slabPolyHoles?.length)||!positive(r.w,r.d,r.h))return null;
+ const a=rot*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),u=[c,sn],v=[-sn,c],hx=r.w/2,hy=r.d/2;
+ const dx=Math.abs(c)*hx+Math.abs(sn)*hy,dy=Math.abs(sn)*hx+Math.abs(c)*hy;
+ return {id:r.id,kind:'box',x,y,z:z+r.h/2,u,v,hx,hy,hz:r.h/2,minX:x-dx,maxX:x+dx,minY:y-dy,maxY:y+dy,minZ:z,maxZ:z+r.h};
+}
+function cad3dInterferencePair(a,b,eps=1e-8){
+ if(Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX)<=eps||Math.min(a.maxY,b.maxY)-Math.max(a.minY,b.minY)<=eps||Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ)<=eps)return false;
+ const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
+ if(a.kind==='sphere'&&b.kind==='sphere')return Math.hypot(dx,dy,dz)<a.R+b.R-eps;
+ if(a.kind==='box'&&b.kind==='box'){
+  const dot=(p,q)=>p[0]*q[0]+p[1]*q[1];
+  for(const axis of [a.u,a.v,b.u,b.v]){
+   const ra=a.hx*Math.abs(dot(a.u,axis))+a.hy*Math.abs(dot(a.v,axis)),rb=b.hx*Math.abs(dot(b.u,axis))+b.hy*Math.abs(dot(b.v,axis));
+   if(ra+rb-Math.abs(dx*axis[0]+dy*axis[1])<=eps)return false;
+  }
+  return true;
+ }
+ const box=a.kind==='box'?a:b,sphere=a.kind==='sphere'?a:b,X=sphere.x-box.x,Y=sphere.y-box.y,Z=sphere.z-box.z;
+ const qx=Math.max(0,Math.abs(X*box.u[0]+Y*box.u[1])-box.hx),qy=Math.max(0,Math.abs(X*box.v[0]+Y*box.v[1])-box.hy),qz=Math.max(0,Math.abs(Z)-box.hz);
+ return Math.hypot(qx,qy,qz)<sphere.R-eps;
+}
+function cad3dInterferenceScan(input,selectedIds,scope,limit=200000){
+ const shapes=[],unsupported=[],ids=new Set(selectedIds);
+ for(const r of input){const s=cad3dInterferenceShape(r);if(s)shapes.push(s);else unsupported.push({id:r.id,type:r.type})}
+ shapes.sort((a,b)=>a.minX-b.minX);
+ const pairs=[];let tested=0,found=0,truncated=false;
+ outer:for(let i=0;i<shapes.length;i++){
+  const a=shapes[i];
+  for(let j=i+1;j<shapes.length;j++){
+   const b=shapes[j];if(b.minX>=a.maxX-1e-8)break;
+   if(++tested>limit){truncated=true;break outer}
+   if(scope==='selection'&&(!ids.has(a.id)||!ids.has(b.id)))continue;
+   if(scope==='against'&&!ids.has(a.id)&&!ids.has(b.id))continue;
+   if(cad3dInterferencePair(a,b)){found++;if(pairs.length<300)pairs.push([a.id,b.id])}
+  }
+ }
+ return {pairs,found,tested:Math.min(tested,limit),truncated,unsupported,supported:shapes.length};
+}
+function cad3dInterferenceReport(){
+ if(!root)return;
+ if(root.querySelector('[data-interfere-report]'))return;
+ const d=document.createElement('dialog');d.setAttribute('data-interfere-report','');
+ d.style.cssText='width:min(590px,92vw);max-height:80vh;overflow:auto;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:6px;padding:14px';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">INTERFERE · Interferencias 3D</strong><button type="button" class="btn" data-close>×</button></div><p>Comprueba prismas, esferas y losas horizontales sin huecos. El contacto sin penetración no se considera interferencia.</p><label>Alcance <select data-scope><option value="all">Modelo visible</option><option value="selection">Entre objetos seleccionados</option><option value="against">Selección contra modelo visible</option></select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" class="btn" data-scan>Analizar</button><button type="button" class="btn" data-select disabled>Seleccionar interferencias listadas</button><button type="button" class="btn" data-export disabled>TXT</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ let result=null,report='';
+ const output=d.querySelector('pre'),select=d.querySelector('[data-select]'),exp=d.querySelector('[data-export]'),scope=d.querySelector('[data-scope]');
+ d.querySelector('[data-scan]').onclick=()=>{
+  if(scope.value!=='all'&&!selected.length){output.textContent='Seleccioná objetos antes de usar este alcance.';return}
+  result=cad3dInterferenceScan(records.filter(visibleRecord),selected,scope.value);
+  report=['Interferencias confirmadas: '+result.found,'Objetos compatibles: '+result.supported,'Pares examinados en barrido X: '+result.tested,'Objetos visibles no evaluados: '+result.unsupported.length,result.truncated?'ANÁLISIS PARCIAL: alcanzado el límite de pares.':'Barrido de objetos compatibles completado.',result.found>result.pairs.length?'Detalle limitado a '+result.pairs.length+' pares.':'','PARES:',...result.pairs.map(p=>'#'+p[0]+' ↔ #'+p[1]),'','NO EVALUADOS:',...result.unsupported.slice(0,150).map(x=>'#'+x.id+' · '+x.type),result.unsupported.length>150?'Listado de no evaluados limitado a 150.':'','No se verificaron muros, escaleras, cilindros, conos, mallas o sólidos booleanos. La ausencia de resultados no certifica un modelo libre de interferencias.'].filter(Boolean).join('\n');
+  output.textContent=report;select.disabled=!result.pairs.length;exp.disabled=false;
+ };
+ scope.onchange=()=>{result=null;report='';output.textContent='';select.disabled=true;exp.disabled=true};
+ select.onclick=()=>{if(!result)return;const ids=new Set(result.pairs.flat());selected=records.filter(r=>ids.has(r.id)&&editableRecord(r)).map(r=>r.id);highlight();renderProps();render3DGrips();d.close();text('INTERFERE · '+selected.length+' objetos editables seleccionados')};
+ exp.onclick=()=>{if(report)download('CAD2D3D-INTERFERE.txt',report,'text/plain;charset=utf-8')};
+ d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());root.append(d);d.showModal();
+}
+
 function run3DCommand(){
  var input=root.querySelector('#cad3dCommand'),raw=input.value.trim();input.value='';
  var radiusCommand=raw.match(/^(?:RADIO|RADIUS|RRECT|RECTREDONDEADO)\s+(\d+(?:[.,]\d+)?|[.,]\d+)$/i);
@@ -9180,6 +9294,7 @@ function run3DCommand(){
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
  if(['massprop','list','li','propiedades3d','list3d'].includes(command)){cad3dMassReport();return;}
+ if(['interfere','interferencia','interferencias','clash'].includes(command)){cad3dInterferenceReport();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
