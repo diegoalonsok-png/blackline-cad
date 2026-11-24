@@ -128,6 +128,7 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 /* ---------- Inserción ---------- */
 let pendingInsert=null,lastItem=null;
 function armInsert(item,W,D){
+ window.CAD2D_DYNAMIC_OPENINGS?.enhance?.();
  if(!allowed(item)){
   if(plan()?.upsell)plan().upsell(item.paidOnly?'Blackline Select requiere membresía PRO o Estudio confirmada':'Bloque Pro: '+item.name);
   else CORE.toast('Requiere membresía PRO o Estudio');
@@ -264,7 +265,7 @@ function chips(container,onPick){
   b.onclick=()=>{activeCat=cat;onPick()};container.append(b);
  }
 }
-window.CAD2D_ARQ_REFRESH=()=>{const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
+window.CAD2D_ARQ_REFRESH=()=>{window.CAD2D_DYNAMIC_OPENINGS?.enhance?.();const s=$('arqPanelCat');if(s)s.innerHTML='';renderPanel()};
 function fillPanelGrid(items){
  const grid=$('arqPanelGrid');if(!grid)return;
  const cap=48;
@@ -353,7 +354,7 @@ function parseArqRequest(raw){
    return {kind:'catalog',category:'Dormitorios en suite',dims,count:null,filters};
   }
   const moduleDims=dims||[4,6];
-  return {kind:'rooms',category,n,privateBath,dims:[moduleDims[0]*n,moduleDims[1]+1.5],moduleDims};
+  return {kind:'rooms',category,n,privateBath,dims:[moduleDims[0]*n,moduleDims[1]+1.65],moduleDims};
  }
  const number=s.match(/\b(\d+)\s+(?:distribuciones|alternativas|variantes|layouts|options|bano(?:s)?|cocina(?:s)?|bathroom(?:s)?|kitchen(?:s)?)\b/);
  const count=number?Number(number[1]):null;
@@ -383,7 +384,7 @@ function runArqRequest(raw){
   const items=LIB.library.filter(x=>x.cat===category&&x.roomCount===n&&(privateBath===null||x.privateBath===privateBath)&&dims[0]>=x.wMin&&dims[0]<=x.wMax&&dims[1]>=x.dMin&&dims[1]<=x.dMax);
   activeCat=category;query='';$('arqPanelCat').value=category;
   $('arqPanelGrid').replaceChildren(...items.map(x=>makeCard(x,100,dims)));
-  msg.textContent=items.length?items.length+' alternativas · '+n+' habitación(es), módulo nominal '+cm(moduleDims[0])+' × '+cm(moduleDims[1])+' cm + corredor de 150 cm. Medidas libres interiores menores por muros. Revisá normativa y circulación. Clic para insertar.':'No hay una configuración para esas dimensiones. Probá módulos de 3,80–6 m por 5–10 m.';
+  msg.textContent=items.length?items.length+' alternativas · '+n+' habitación(es), módulo nominal '+cm(moduleDims[0])+' × '+cm(moduleDims[1])+' cm + corredor libre de 150 cm y muro exterior de 15 cm. Medidas libres interiores menores por muros. Revisá normativa y circulación. Clic para insertar.':'No hay una configuración para esas dimensiones. Probá módulos de 3,80–6 m por 5–10 m.';
   return true;
  }
  if(request.kind!=='catalog'){
