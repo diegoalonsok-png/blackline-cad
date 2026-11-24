@@ -8957,17 +8957,20 @@ function backupTransaction(mode,action){
   if(!backupDb){reject(Error('Local backup database unavailable'));return}
   let tx;
   try{tx=backupDb.transaction('drawings',mode)}catch(ex){reject(ex);return}
-  const request=action(tx.objectStore('drawings'));
-  request.onsuccess=()=>resolve(request.result);
-  request.onerror=()=>reject(request.error||Error('Local backup error'));
+  let request,result;
+  tx.oncomplete=()=>resolve(result);
   tx.onabort=()=>reject(tx.error||Error('Backup transaction aborted'));
+  tx.onerror=()=>reject(tx.error||Error('Backup transaction failed'));
+  try{request=action(tx.objectStore('drawings'))}catch(ex){try{tx.abort()}catch(_){}reject(ex);return}
+  request.onsuccess=()=>{result=request.result};
+  request.onerror=()=>reject(request.error||Error('Local backup error'));
  });
 }
 function backupPayload(){
  return {format:'CAD2D-2',entities:clone(cadBlockEdit?cadBlockEdit.entities:state.entities),layers:clone(state.layers),
  blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,unit:state.unit,grid:state.grid,
  precision:state.precision,nextId:state.nextId,layerId:state.layerId,layerStates:clone(state.layerStates||[]),
- file:state.file,layout:collectLayoutState(),layouts:cadLayoutsSnapshot(),savedAt:new Date().toISOString(),modelScale:'1:1'};
+ file:state.file,ctb:clone(state.ctb||{}),layout:collectLayoutState(),layouts:cadLayoutsSnapshot(),savedAt:new Date().toISOString(),modelScale:'1:1'};
 }
 function backupStatus(message){const el=$('backupStatus');if(el)el.textContent=message}
 async function persistLocalBackup(){
