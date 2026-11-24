@@ -222,12 +222,36 @@ async function traceFile(file,source=null){
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
    undo.textContent='Deshacer marca';undo.className='btn';
    const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);pc.strokeStyle='#008b99';for(const wall of walls){pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
-    pc.fillStyle='#b64912';pc.font=Math.max(12,w/70)+'px sans-serif';for(const [i,b] of placements.entries()){pc.beginPath();pc.arc(b.x,b.y,Math.max(4,w/180),0,2*Math.PI);pc.fill();pc.fillText((i+1)+' '+b.name,b.x+6,b.y-6);}};
+    pc.fillStyle='#b64912';pc.font=Math.max(12,w/70)+'px sans-serif';for(const [i,b] of placements.entries()){pc.beginPath();pc.arc(b.x,b.y,Math.max(4,w/180),0,2*Math.PI);pc.fill();pc.fillText((i+1)+' '+b.name,b.x+6,b.y-6);if(b.aiBox){const [x0,y0,x1,y1]=b.aiBox;pc.strokeStyle='#b64912';pc.lineWidth=2;pc.strokeRect(x0,y0,x1-x0,y1-y0);}}};
    // Position click is the insertion origin, not the centre; source image is kept.
    preview.onclick=e=>{const it=candidates.find(i=>i.id===picker.value);if(!it)return;const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h),x=(e.clientX-rect.left-(rect.width-w*scale)/2)/scale,y=(e.clientY-rect.top-(rect.height-h*scale)/2)/scale;if(x<0||x>w||y<0||y>h)return;placements.push({x,y,id:it.id,name:it.name,w:it.w,d:it.d,rotation:Number(rot.value)});redraw();};
    undo.onclick=()=>{placements.pop();redraw();};
-   controls.append(picker,rot,undo);const hint=document.createElement('p');hint.textContent='Opcional: elegí un bloque y marcá su punto de inserción sobre la imagen. Los objetos aún requieren identificación manual.';
-   redraw();d.append(title,hint,controls,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+   const ai=document.createElement('button');ai.className='btn';ai.textContent='Reconocer con IA local (experimental)';
+   const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
+   ai.onclick=async()=>{if(!confirm('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?'))return;
+    ai.disabled=true;ok.disabled=true;aiStatus.textContent='Cargando modelo local…';
+    try{
+     const module=await import(new URL('cad-calco-vision.mjs',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?'Descargando '+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':'Preparando IA local…';});
+     if(!d.isConnected)return;
+     let n=0;const sx=real/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h:sx;
+     for(const det of found){const id=module.catalogId(det.label),it=candidates.find(x=>x.id===id);if(!it)continue;
+      const [x0,y0,x1,y1]=det.box.map((v,i)=>Math.max(0,Math.min(i%2?h:w,v)));if(x1<=x0||y1<=y0)continue;
+      const bw=(x1-x0)*sx,bd=(y1-y0)*sy,ratio=bw/bd,normal=it.w/it.d,turn=Math.abs(Math.log(ratio/normal))>Math.abs(Math.log(ratio*normal));
+      const aw=turn?bd:bw,ad=turn?bw:bd;
+      if(aw<it.w*.45||aw>it.w*2||ad<it.d*.45||ad>it.d*2)continue;
+      const cx=(x0+x1)/2,cy=(y0+y1)/2;
+      if(placements.some(p=>p.id===id&&Math.hypot((p.x-cx)*sx,(p.y-cy)*sy)<Math.min(it.w,it.d)*.45))continue;
+      // Infer axis only; facing direction needs visual review. Anchor at block corner.
+      const angle=turn?90:0,x=cx+(turn?it.d:-it.w)/2/sx,y=cy+(turn?it.w:it.d)/2/sy;
+      placements.push({x,y,id:it.id,name:it.name+' (IA)',w:it.w,d:it.d,rotation:angle,aiBox:[x0,y0,x1,y1]});n++;
+     }
+     redraw();aiStatus.textContent=n+' candidatos añadidos de '+found.length+' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.';
+    }catch(e){if(d.isConnected)aiStatus.textContent='IA local no disponible: '+String(e.message||e).slice(0,180)+'. Podés seguir con el marcado manual.';}
+    finally{ai.disabled=false;ok.disabled=false;}
+   };
+   controls.append(picker,rot,undo,ai);const hint=document.createElement('p');hint.textContent='Opcional: elegí un bloque y marcá su punto de inserción sobre la imagen. Los objetos aún requieren identificación manual.';
+   redraw();d.append(title,hint,controls,aiStatus,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
   if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
