@@ -12,7 +12,8 @@ const detailedPlanSources=Object.freeze({
  'san-bidet':['dk-bidet-oval',90],
  'san-banera':['dk-banera-160',0],
  'dor-cama1':['dk-cama-1p',180],
- 'kq-anafe4':['dk-anafe-4',0]
+ 'kq-anafe4':['dk-anafe-4',0],
+ 'kq-cocina':['cc0-kitchen-3',0]
 });
 // Fixture symbols are pure vector geometry, without source drawing annotations.
 function fixtureGeometry(id,lib=root.CAD2D_ARQ_LIBRARY){
@@ -22,8 +23,9 @@ function fixtureGeometry(id,lib=root.CAD2D_ARQ_LIBRARY){
  return {...built,entities};
 }
 function preferredBlock(id,lib){
- const entry=detailedPlanSources[id],available=entry&&lib.library.find(v=>v.id===entry[0]&&!v.hideFromGallery&&!v.pro&&!v.paidOnly);
- const sourceId=available?entry[0]:id,offset=available?entry[1]:0;
+ const candidates=[detailedPlanSources[id],...(id==='san-banera'?[['cc0-bath-1',0]]:[])].filter(Boolean);
+ const entry=candidates.find(([key])=>lib.library.some(v=>v.id===key&&!v.hideFromGallery&&!v.pro&&!v.paidOnly));
+ const available=Boolean(entry),sourceId=available?entry[0]:id,offset=available?entry[1]:0;
  const box=lib.bounds(fixtureGeometry(sourceId,lib).entities),w=box.maxX-box.minX,d=box.maxY-box.minY;
  if(![w,d].every(v=>Number.isFinite(v)&&v>0))throw Error('Bloque sin medidas válidas: '+sourceId);
  const swap=offset%180!==0;
