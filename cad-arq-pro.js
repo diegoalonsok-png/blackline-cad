@@ -1090,6 +1090,7 @@ function openTracePlan(){
 }
 EXT.commands.CALCARPLANTA=EXT.commands.CALCAR=openTracePlan;
 
+EXT.commands.ARQRELLENO=EXT.commands.ARQPOCHE=()=>window.CAD2D_ARQ_POCHE?.();
 EXT.commands.ARQASSIST=EXT.commands.ASISTENTEARQ=()=>openArchitectureBar();
 EXT.commands.BANO=EXT.commands.BANOS=EXT.commands['BAÑO']=EXT.commands['BAÑOS']=()=>openArchitectureAssistant('Baños completos');
 EXT.commands.COCINA=EXT.commands.COCINAS=()=>openArchitectureAssistant('Cocinas completas');
