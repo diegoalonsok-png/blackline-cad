@@ -196,11 +196,12 @@ function arqSimpleName(item){
  const matching=LIB.library.filter(x=>patterns.find(p=>p[1].test(String(x.name||'')))?.[0]===type).sort((a,b)=>String(a.id).localeCompare(String(b.id)));
  return type+' '+(matching.findIndex(x=>x.id===item.id)+1);
 }
-function makeCard(item,height){
+function makeCard(item,height,dims){
+ const W=dims?.[0],D=dims?.[1];
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
  b.title=arqSimpleName(item)+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
- b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
- b.onclick=()=>{if(armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
+ b.innerHTML=(dims?svgFor(item,W,D,{height}):thumb(item,height))+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${dims?cm(W)+'×'+cm(D)+' cm':sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
+ b.onclick=()=>{if(armInsert(item,W,D)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
 function chips(container,onPick){
@@ -233,6 +234,56 @@ function renderPanel(){
  sel.value=activeCat;
  fillPanelGrid(cardsFor(activeCat,query));
 }
+function parseArqRequest(raw){
+ const s=String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ if(!/^(?:mostra(?:me|r)?|muestra(?:me)?|mostrar|ver|lista(?:me|r|do)?|show(?: me)?|list|construi(?:me|r)?|construye(?:me)?|crea(?:me|r)?|genera(?:me|r)?|disena(?:me|r)?|build|create|generate|design)\b/.test(s))return null;
+ const generate=/^(?:construi|construye|crea|genera|disena|build|create|generate|design)/.test(s);
+ const room=/\b(?:habitacion(?:es)?|dormitorio(?:s)?|hotel(?:es)?|bedroom(?:s)?|room(?:s)?|tandem|vestidor(?:es)?)\b/.test(s);
+ if(room)return {kind:'unsupported'};
+ const bath=/\b(?:bano(?:s)?|bathroom(?:s)?|toilette(?:s)?)\b/.test(s);
+ const kitchen=/\b(?:cocina(?:s)?|kitchen(?:s)?)\b/.test(s);
+ if(bath===kitchen)return {kind:'unsupported'};
+ const category=bath?'Baños completos':'Cocinas completas';
+ const match=s.match(/(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)\s*(cm|mm|m)?\b/);
+ const unit=(n,u)=>Number(n.replace(',','.'))/({cm:100,mm:1000,m:1}[u]||1);
+ const dims=match?[unit(match[1],match[2]||match[4]),unit(match[3],match[4]||match[2])]:null;
+ if(dims&&dims.some(n=>!Number.isFinite(n)||n<=0||n>30))return {kind:'invalid'};
+ const number=s.match(/\b(\d+)\s+(?:distribuciones|alternativas|variantes|layouts|options|bano(?:s)?|cocina(?:s)?|bathroom(?:s)?|kitchen(?:s)?)\b/);
+ const count=number?Number(number[1]):null;
+ if(count!==null&&(count<1||count>500))return {kind:'invalid'};
+ if(generate&&count!==null&&count>1)return {kind:'unsupported'};
+ const filters=[];
+ if(bath){
+  if(/\b(?:bidet)\b/.test(s))filters.push(/bidet/);
+  if(/\b(?:ducha|shower)\b/.test(s))filters.push(/ducha/);
+  if(/\b(?:banera|banadera|bathtub)\b/.test(s))filters.push(/banera|banadera/);
+  if(/\b(?:accesible|accessible)\b/.test(s))filters.push(/accesible/);
+  if(/\b(?:toilette)\b/.test(s))filters.push(/toilette/);
+ }else{
+  if(/\b(?:isla|island)\b/.test(s))filters.push(/isla/);
+  if(/\b(?:peninsula)\b/.test(s))filters.push(/peninsula/);
+  if(/\b(?:en l|l-shaped)\b/.test(s))filters.push(/en l\b/);
+  if(/\b(?:en u|u-shaped)\b/.test(s))filters.push(/en u\b/);
+ }
+ return {kind:'catalog',category,dims,count,filters};
+}
+function runArqRequest(raw){
+ const request=parseArqRequest(raw);
+ if(!request)return false;
+ const msg=$('arqHelp');
+ if(request.kind!=='catalog'){
+  msg.textContent=request.kind==='invalid'?'Medidas o cantidad inválidas.':'Esta orden requiere el generador de habitaciones o conjuntos; todavía no disponible. No se modificó el dibujo.';
+  return true;
+ }
+ const normalize=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+ const {category,dims,count,filters}=request;
+ const items=LIB.library.filter(x=>x.cat===category&&!x.hideFromGallery&&filters.every(rx=>rx.test(normalize(x.name)))&&(!dims||(typeof x.gen==='function'&&!x.lockAspect&&dims[0]>=(x.wMin??x.w)&&dims[0]<=(x.wMax??x.w)&&dims[1]>=(x.dMin??x.d)&&dims[1]<=(x.dMax??x.d))));
+ activeCat=category;query='';$('arqPanelCat').value=category;
+ const shown=count===null?items:items.slice(0,count);
+ $('arqPanelGrid').replaceChildren(...shown.map(x=>makeCard(x,74,dims)));
+ msg.textContent=shown.length+' configuraciones disponibles'+(count!==null&&shown.length<count?' de '+count+' solicitadas':'')+(dims?' · '+cm(dims[0])+' × '+cm(dims[1])+' cm':'')+'. '+(shown.length?'Seleccioná una miniatura para insertar.':'Probá otras dimensiones o características.');
+ return true;
+}
 function buildPanel(){
  if($('arqPanel'))return;
  // Se ubica junto a la paleta de bloques existente (visible por defecto); si no existe, en el primer dock.
@@ -242,7 +293,7 @@ function buildPanel(){
  const panel=document.createElement('section');panel.className='panel';panel.id='arqPanel';
  panel.innerHTML=`<div class="panel-title"><span>GALERÍA ARQ · BAÑOS · COCINAS · BLOQUES</span><button type="button" id="arqCollapse" class="btn slim" title="Contraer / expandir" aria-label="Contraer galería arquitectónica">−</button></div>
  <div id="arqPanelBody" class="panel-content" style="padding:8px">
-  <div style="display:flex;gap:5px"><input type="search" id="arqPanelSearch" placeholder="Buscar: baño, isla, bañera, escalera…" aria-label="Buscar bloque arquitectónico"><button type="button" class="btn slim" id="arqOpenBig" title="Galería grande (GALERIA)">⤢</button></div>
+  <div style="display:flex;gap:5px"><input type="search" id="arqPanelSearch" placeholder="Buscar o pedir: mostrame baños…" aria-label="Buscar bloque arquitectónico"><button type="button" class="btn slim" id="arqOpenBig" title="Galería grande (GALERIA)">⤢</button></div>
   <button type="button" class="btn slim" id="arqOpenVisual" title="Galería visual en fondo crema · clic en imagen y luego en plano" style="display:block;width:100%;margin:7px 0 4px;text-align:center;background:#e6d3a9;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ Galería visual · bloques detallados</button>
   <button type="button" class="btn slim" id="arqOpenOlimpiadas" title="Abrir biblioteca de bloques 2D · más de 1000 bloques en vista y planta" style="display:block;width:100%;margin:3px 0 6px;text-align:center;background:#e4dccb;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ BLOQUES 2D · 1.000+</button>
   <div id="arqDrawingBlocksSlot"><button type="button" class="btn slim" id="arqDrawingBlocksFallback" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO</button></div>
@@ -262,6 +313,7 @@ function buildPanel(){
  $('arqDrawingBlocksFallback')?.addEventListener('click',()=>{mountDrawingBlocks();const toggle=$('cadDocBlockToggle');if(toggle)toggle.click();else CORE.toast('Recargá CAD2D3D para activar los bloques del plano')});
  $('arqCollapse').onclick=()=>{const body=$('arqPanelBody');body.hidden=!body.hidden;$('arqCollapse').textContent=body.hidden?'+':'−'};
  $('arqPanelSearch').oninput=e=>{query=e.target.value;fillPanelGrid(cardsFor(activeCat,query))};
+ $('arqPanelSearch').addEventListener('keydown',e=>{if(e.key==='Enter'&&runArqRequest(e.currentTarget.value)){e.preventDefault();e.stopPropagation()}});
  $('arqOpenBig').onclick=()=>openModal();
  $('arqOpenVisual').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
   if(browser?.openVisual)return browser.openVisual();
