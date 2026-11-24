@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 use acadrust::{DwgReader, DwgWriter, DxfReader, DxfWriter};
+use acadrust::document::{Preview, PreviewFormat};
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 
@@ -66,6 +67,39 @@ pub fn dwg_to_dxf(input: &[u8]) -> Result<Vec<u8>, JsValue> {
 #[wasm_bindgen]
 pub fn dxf_to_dwg(input: &[u8]) -> Result<Vec<u8>, JsValue> {
     convert(input, true).map_err(|e| JsValue::from_str(&e))
+}
+
+
+// Optional thumbnail for the native DWG writer. Never append image bytes
+// after EOF: the writer must construct the preview section and checksums.
+#[wasm_bindgen]
+pub fn dxf_to_dwg_with_preview(input: &[u8], png: &[u8]) -> Result<Vec<u8>, JsValue> {
+    fn encode(input: &[u8], png: &[u8]) -> Result<Vec<u8>, String> {
+        if input.is_empty() || input.len() > MAX_BYTES || png.len() < 24 || png.len() > 2 * 1024 * 1024
+            || !png.starts_with(b"\x89PNG\r\n\x1a\n") || &png[12..16] != b"IHDR" {
+            return Err("Datos DXF o miniatura PNG inválidos".into());
+        }
+        let width = u32::from_be_bytes(png[16..20].try_into().unwrap());
+        let height = u32::from_be_bytes(png[20..24].try_into().unwrap());
+        if width == 0 || height == 0 || width > 1024 || height > 1024 {
+            return Err("Dimensiones de miniatura inválidas".into());
+        }
+        let mut doc = DxfReader::from_reader(Cursor::new(input.to_vec()))
+            .and_then(|r| r.read()).map_err(|e| e.to_string())?;
+        if doc.version < acadrust::DxfVersion::AC1027 {
+            return Err("La miniatura PNG requiere DWG 2013 o posterior".into());
+        }
+        let expected = doc.entities().count();
+        doc.preview = Some(Preview { format: PreviewFormat::Png, data: png.to_vec() });
+        let bytes = DwgWriter::write_to_vec(&doc).map_err(|e| e.to_string())?;
+        if bytes.is_empty() || bytes.len() > MAX_BYTES * 4 { return Err("Salida vacía o excesiva".into()); }
+        let mut reader = DwgReader::from_stream(Cursor::new(bytes.clone()));
+        let check = reader.read().map_err(|e| format!("No se pudo reabrir DWG: {e}"))?;
+        if check.entities().count() != expected { return Err("Cambió la cantidad de entidades; conversión rechazada".into()); }
+        if check.preview.as_ref() != doc.preview.as_ref() { return Err("No se pudo verificar la miniatura DWG".into()); }
+        Ok(bytes)
+    }
+    encode(input, png).map_err(|e| JsValue::from_str(&e))
 }
 
 #[cfg(test)]
