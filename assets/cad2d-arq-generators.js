@@ -73,7 +73,15 @@ function galleryDetail(b,id,x,y,w,d,turn=0){
  const tmp=new Builder();
  it.gen(tmp,it.w*k,it.d*k);
  // Check actual source points and curves conservatively in the source envelope.
- const bb=bounds(tmp.out);
+ const pts=[];
+ for(const e of tmp.out){
+  if(e.type==='arc'){
+   let z=e.a1;while(z<e.a0)z+=Math.PI*2;
+   const angles=[e.a0,z];for(let i=Math.ceil(e.a0/(Math.PI/2));i*Math.PI/2<z;i++)angles.push(i*Math.PI/2);
+   for(const a of angles)pts.push({x:e.c.x+e.r*Math.cos(a),y:e.c.y+e.r*Math.sin(a)});
+  }else{const q=bounds([e]);pts.push({x:q.minX,y:q.minY},{x:q.maxX,y:q.maxY})}
+ }
+ const bb={minX:Math.min(...pts.map(p=>p.x)),minY:Math.min(...pts.map(p=>p.y)),maxX:Math.max(...pts.map(p=>p.x)),maxY:Math.max(...pts.map(p=>p.y))};
  if(!Number.isFinite(bb.minX)||bb.minX<-.015||bb.minY<-.015||bb.maxX>it.w*k+.015||bb.maxY>it.d*k+.015)return false;
  b.at(x+(w-ow*k)/2+(rot?ow*k:0),y+(d-od*k)/2,turn,q=>it.gen(q,it.w*k,it.d*k));
  return true;
