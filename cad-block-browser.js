@@ -122,6 +122,7 @@
 #cadBlockBrowser .paper-palette button[aria-pressed=true]{outline:2px solid #8a6231;outline-offset:2px}
 #cadBlockBrowser.visual .card .preview{display:grid;place-items:center;padding:7px;background:var(--paper-bg,#fffaf0);border:1px solid #c8bca8;border-radius:4px;color:var(--paper-ink,#293238);width:100%;box-sizing:border-box;min-width:0}
 #cadBlockBrowser.visual .card .preview svg{color:inherit}
+#cadBlockBrowser .static-block-preview{filter:var(--static-preview-filter,none);max-height:220px}
 #cadBlockBrowser.visual .tools{flex-wrap:wrap}
 #cadBlockBrowser.visual .paper-palette{flex:1 0 auto}
 #cadBlockBrowser.visual .card .nm{color:#35362e;font-weight:600}
@@ -204,14 +205,57 @@
   return out;
  }
  const simpleName=(it,names)=>{const n=names.get(it.id)||tr(it.name);return /^userdx4-/.test(it.id)?n.replace(/ · escala estimada| · parcial/g,'')+(it.importFlags&1?' · '+T('check scale','revisar escala'):'')+(it.importFlags&6?' · '+T('partial','parcial'):''):n};
+ // Prebuilt thumbnails are optional; local geometry remains the insertion source.
+ let previewObserver=null,previewFrame=0,previewQueue=[],previewEpoch=0,staticIds=new Set(),staticLoad=null;
+ function loadStaticPreviews(){
+  if(staticLoad)return staticLoad;
+  staticLoad=fetch('/assets/block-previews/v1/catalog.json',{cache:'default'}).then(r=>{if(!r.ok)throw Error('no preview catalog');return r.json()}).then(data=>{
+   if(data.version!==1||!Array.isArray(data.blocks))return;
+   staticIds=new Set(data.blocks.map(x=>x.id).filter(x=>/^olymp3-[a-z0-9_-]+$/i.test(x)));
+   if(el&&el.style.display!=='none'&&!el.classList.contains('min'))paint();
+  }).catch(()=>{staticLoad=null});
+  return staticLoad;
+ }
+ function resetPreviews(){
+  previewEpoch++;previewObserver?.disconnect();previewObserver=null;previewQueue=[];
+  if(previewFrame)cancelAnimationFrame(previewFrame);previewFrame=0;
+ }
+ function mountPreviews(grid){
+  const epoch=previewEpoch;
+  function render(node){
+   if(epoch!==previewEpoch||!node.isConnected)return;
+   const id=node.dataset.previewId,h=Number(node.dataset.previewHeight);
+   if(staticIds.has(id)){
+    const img=document.createElement('img');img.alt='';img.decoding='async';img.loading='lazy';
+    img.style.cssText='display:block;width:100%;height:100%;object-fit:contain';
+    img.className='static-block-preview';
+    img.onerror=()=>{if(epoch===previewEpoch&&node.isConnected)node.innerHTML=ARQ.thumb(id,h)};
+    img.src='/assets/block-previews/v1/'+encodeURIComponent(id)+'.svg';node.replaceChildren(img);
+   }else{try{node.innerHTML=ARQ.thumb(id,h)}catch(e){node.textContent='—'}}
+  }
+  function pump(){
+   previewFrame=0;if(epoch!==previewEpoch)return;
+   const until=performance.now()+6;
+   do{const node=previewQueue.shift();if(!node)break;render(node)}while(previewQueue.length&&performance.now()<until);
+   if(previewQueue.length)previewFrame=requestAnimationFrame(pump);
+  }
+  const enqueue=node=>{previewQueue.push(node);if(!previewFrame)previewFrame=requestAnimationFrame(pump)};
+  const nodes=grid.querySelectorAll('[data-preview-id]');
+  if(typeof IntersectionObserver==='function'){
+   previewObserver=new IntersectionObserver(entries=>{for(const entry of entries)if(entry.isIntersecting){previewObserver?.unobserve(entry.target);enqueue(entry.target)}},{root:grid,rootMargin:'120px'});
+   nodes.forEach(node=>previewObserver.observe(node));
+  }else nodes.forEach(enqueue);
+ }
  function paint(){
   if(!el||el.style.display==='none'||el.classList.contains('min'))return;
+  resetPreviews();
   const allItems=items(),pool=allItems.filter(inView),names=simpleBlockNames(),counts=new Map();
   for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
   const visual=st.view==='visual'||st.view==='olymp3'||st.view==='imported';
   const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
+  el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
   el.classList.toggle('visual',visual);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
@@ -229,7 +273,8 @@
   });
   const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview">${ARQ.thumb(it.id,visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72))}</span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it,names)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it,names)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  mountPreviews(grid);
   if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
@@ -244,6 +289,7 @@
   Object.assign(el.style,{left:st.x+'px',top:st.y+'px',width:st.w+'px',height:st.h+'px'});
  }
  function open(){
+  loadStaticPreviews();
   if(el){el.classList.remove('min');el.style.display='flex';place();paint();loadOlimpiadas();el.querySelector('input').focus();return}
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
@@ -260,7 +306,7 @@
    const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
-   if(a==='min'){el.classList.toggle('min');if(!el.classList.contains('min'))paint();return}
+   if(a==='min'){el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
@@ -287,7 +333,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){if(el)el.style.display='none';armedId=null}
+ function close(){resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
