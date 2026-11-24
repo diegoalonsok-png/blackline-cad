@@ -223,6 +223,68 @@ def({id:'bano-publico',name:'Sanitario público · cabinas + mingitorios',cat:BA
   const m=clamp(Math.floor((D-1.75)/.70),1,4);for(let i=0;i<m;i++){at('E',.25+i*.70,.36,F.mingitorio);if(i<m-1)b.rect(W-.45,.25+i*.70+.53,.45,.02)}
   const lw=Math.min(1.80,D-1.80);at('W',.20,lw,bb=>{F.mesada(bb,lw,.50);for(let k=0;k<Math.max(1,Math.floor(lw/.60));k++){const cx=.30+k*.60;bb.ellipse(cx,.28,.18,.13);bb.circle(cx,.07,.02)}})}});
 
+
+/* Original bathroom layouts; dimensions in metres, design heuristics, not code certification.
+   W/D are outside wall dimensions. No reproduction of reference-book drawings. */
+const bathFixtures={
+ wc:{w:.40,d:.75,draw:b=>F.wc(b)},
+ bidet:{w:.40,d:.60,draw:b=>F.bidet(b)},
+ sink:{w:.60,d:.55,draw:b=>F.lavatorio(b,.60,.55)},
+ double:{w:1.25,d:.55,draw:b=>F.lavatorioDoble(b,1.25,.55)},
+ washer:{w:.60,d:.60,draw:b=>F.lavarropas(b)}
+};
+const bathPrograms=[
+ ['wc','Toilette',null,['wc','sink']],
+ ['shower','Baño con ducha','shower',['wc','sink']],
+ ['shower-bidet','Baño con ducha y bidet','shower',['wc','bidet','sink']],
+ ['tub','Baño con bañera','tub',['wc','sink']],
+ ['tub-bidet','Baño con bañera y bidet','tub',['wc','bidet','sink']],
+ ['shower-double','Baño con ducha y doble bacha','shower',['wc','double']],
+ ['tub-double','Baño con bañera y doble bacha','tub',['wc','double']],
+ ['laundry','Baño con ducha y lavadero','shower',['wc','sink','washer']]
+];
+// Slots: left-front, left-back, right-front, right-back. Six distinct arrangements.
+const bathSlots=[[0,1,3],[0,2,1],[0,3,2],[1,0,2],[1,2,3],[1,3,0]];
+function bathLayoutSpec(W,D,program,variant){
+ const t=.12,wet=program[2],keys=program[3],usableW=W-2*t;
+ const slotLength=Math.max(...keys.map(k=>bathFixtures[k].w));
+ const y1=t+.18,y2=y1+slotLength+.20,wetDepth=wet==='shower'?.90:wet==='tub'?.75:0;
+ const wetY=D-t-wetDepth,positions=bathSlots[variant],rects=[];
+ if(usableW<2.20||y2+slotLength+.65>wetY+1e-8)throw Error('Baño sin espacio de uso suficiente');
+ for(let i=0;i<keys.length;i++){
+  const key=keys[i],f=bathFixtures[key],slot=positions[i],right=slot>=2;
+  const y=(slot%2?y2:y1)+(slotLength-f.w)/2;
+  rects.push({key,x:right?W-t-f.d:t,y,w:f.d,h:f.w,right});
+ }
+ if(wet){
+  const w=wet==='shower'?1.00:1.70,x=variant%2?t:W-t-w;
+  rects.push({key:wet,x,y:wetY,w,h:wetDepth});
+ }
+ return {t,rects,clearWidth:usableW-2*Math.max(...keys.map(k=>bathFixtures[k].d)),doorWidth:.90};
+}
+function drawBathLayout(b,W,D,program,variant){
+ const s=bathLayoutSpec(W,D,program,variant),t=s.t,a=(W-s.doorWidth)/2,z=a+s.doorWidth;
+ for(const [x0,y0,x1,y1] of [[0,0,a,0],[z,0,W,0],[0,0,0,D],[W,0,W,D],[0,D,W,D],[t,t,a,t],[z,t,W-t,t],[t,t,t,D-t],[W-t,t,W-t,D-t],[t,D-t,W-t,D-t],[a,0,a,t],[z,0,z,t]])b.line(x0,y0,x1,y1,{width:.22});
+ // Outward-opening leaf; external circulation must be checked in context.
+ b.line(a,0,a,-s.doorWidth);b.arc(a,0,s.doorWidth,270,360);
+ for(const r of s.rects){
+  if(r.key==='shower')b.at(r.x,r.y,0,q=>F.ducha(q,r.w,r.h,false));
+  else if(r.key==='tub')b.at(r.x,r.y,0,q=>F.banera(q,r.w,r.h));
+  else if(r.right)b.at(r.x+r.w,r.y,90,bathFixtures[r.key].draw);
+  else b.at(r.x,r.y+r.h,-90,bathFixtures[r.key].draw);
+ }
+}
+for(const program of bathPrograms){
+ const slotLength=Math.max(...program[3].map(k=>bathFixtures[k].w));
+ const wetDepth=program[2]==='shower'?.90:program[2]==='tub'?.75:0;
+ const minD=Math.ceil((.24+.18+2*slotLength+.20+.65+wetDepth)*20)/20;
+ const minW=2.45;
+ for(let v=0;v<6;v++){
+  def({id:'arq-bath-'+program[0]+'-'+(v+1),name:program[1]+' · distribución '+(v+1),cat:BATH,family:'arq-bath-'+program[0],w:2.60,d:Math.max(3.10,minD+.15),wMin:minW,wMax:4.5,dMin:minD,dMax:6.0,arqBathVariant:true,
+   layoutSpec:(W,D)=>bathLayoutSpec(W,D,program,v),gen(b,W,D){drawBathLayout(b,W,D,program,v)}});
+ }
+}
+
 /* ===== COCINAS COMPLETAS ===== */
 const KIT='Cocinas completas';
 def({id:'kit-kitchenette',name:'Kitchenette lineal',cat:KIT,family:'cocina',w:1.80,d:1.20,wMin:1.20,wMax:2.40,dMin:.90,dMax:1.80,
