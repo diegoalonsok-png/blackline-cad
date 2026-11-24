@@ -107,13 +107,15 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
     const cards=q('[data-gallery]').children;
     if(!cards.length)return {error:q('[data-status]').textContent};
     const variants=cards.length;
-    cards[0].click();
+    const selectedCard=spec.kind==='bath'?Array.from(cards).find(c=>c.textContent.includes('Bañera')):cards[0];
+    if(!selectedCard)return {error:'Expected bathtub variant not found'};
+    selectedCard.click();
     q('[data-insert]').click();
     if(dlg.open)return {error:q('[data-status]').textContent};
     const es=core.state.entities.filter(e=>!ids.has(e.id));
     const refs=es.filter(e=>e.type==='blockRef');
     const openings=refs.filter(e=>core.state.blocks[e.blockName]?.parametric);
-    return {variants,entities:es.length,openings:openings.map(e=>({kind:core.state.blocks[e.blockName].parametric.kind,width:e.params?.width,cut:es.some(f=>f.autoOpeningRef===e.id)})),furniture:refs.length-openings.length,detailed:refs.filter(e=>!openings.includes(e)&&e.blockName.startsWith('ARCHGEN · dk-')).length,clean:refs.filter(e=>!openings.includes(e)).every(e=>core.state.blocks[e.blockName].entities.every(p=>!['text','mtext','dimension','leader','mleader','attribute','attdef'].includes(String(p.type).toLowerCase()))),ordinary:refs.filter(e=>!openings.includes(e)).every(e=>{const def=core.state.blocks[e.blockName];return def&&!def.parametric&&!def.dynamic2d&&!def.dynamicActions&&!e.params}),dimensions:es.filter(e=>e.type==='dimension').length,hatches:es.filter(e=>e.type==='hatch').length};
+    return {variants,entities:es.length,openings:openings.map(e=>({kind:core.state.blocks[e.blockName].parametric.kind,width:e.params?.width,cut:es.some(f=>f.autoOpeningRef===e.id)})),furniture:refs.length-openings.length,detailed:refs.filter(e=>!openings.includes(e)&&/^ARCHGEN · (dk-|cc0-)/.test(e.blockName)).length,clean:refs.filter(e=>!openings.includes(e)).every(e=>core.state.blocks[e.blockName].entities.every(p=>!['text','mtext','dimension','leader','mleader','attribute','attdef'].includes(String(p.type).toLowerCase()))),ordinary:refs.filter(e=>!openings.includes(e)).every(e=>{const def=core.state.blocks[e.blockName];return def&&!def.parametric&&!def.dynamic2d&&!def.dynamicActions&&!e.params}),dimensions:es.filter(e=>e.type==='dimension').length,hatches:es.filter(e=>e.type==='hatch').length};
    })()`);
    console.log(spec.kind+' CAD insertion: '+JSON.stringify(result));
    assert.ok(!result.error,result.error);
@@ -125,7 +127,7 @@ test('browser: ARCHGEN gallery, native insertion and undo for four families', {t
    assert.ok(result.furniture>=2);
    assert.equal(result.ordinary,true,'furniture and fixtures remain conventional CAD blocks');
    assert.equal(result.clean,true,'fixture blocks contain no embedded labels or dimensions');
-   if(spec.kind==='bath')assert.ok(result.detailed>=1,'actual bath insertion uses detailed gallery definitions');
+   if(spec.kind==='bath'||spec.kind==='kitchen')assert.ok(result.detailed>=1,'actual insertion uses available original gallery definitions');
    assert.equal(result.dimensions,2);
    assert.equal(result.hatches,1);
    await evaluate("window.CAD2D_CORE.undo()");
