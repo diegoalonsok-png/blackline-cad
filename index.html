@@ -3646,7 +3646,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
   const nearbyLines=[];
   const lookup=cadSelectionLayerLookup(),tol=11/state.view.scale;
   for(const e of state.entities){
-   const lay=lookup(e);if(!lay.visible||lay.locked)continue;
+   const lay=lookup(e);if(!lay.visible||lay.locked||e.cadHidden)continue;
    const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e);if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
@@ -5063,7 +5063,7 @@ function cadListRecord(e,layer,unit,precision){
  if(Number.isFinite(length))details.push(measure(e.type==='ellipse'?'Perímetro aproximado':e.type==='hatch'?'Perímetro exterior':rect||e.type==='circle'||e.closed?'Perímetro':'Longitud',length));
  if(Number.isFinite(area))details.push((e.type==='hatch'?'Área neta':'Área')+': '+fmt(area)+' '+unit+'²');
  const type=rect?'RECTÁNGULO':e.type.toUpperCase();
- const visible=layer.visible!==false&&!e.cadHidden,locked=!!layer.locked;
+ const visible=layer.visible!==false&&!layer.frozen&&!e.cadHidden,locked=!!layer.locked;
  const header=['#'+e.id+' · '+type,'Capa: '+layer.name,'Color: '+color+(e.color?'':' (por capa)'),'Tipo de línea: '+linetype+(e.linetype?'':' (por capa)'),'Espesor de impresión: '+fmt(width)+' mm','Estado: '+(visible?'Visible':'Oculto')+(locked?' · Bloqueado':'')];
  return {id:e.id,type,layer:layer.name,color,linetype,width,visible,locked,length,area,details,report:header.concat(details).join('\n')};
 }
@@ -5489,7 +5489,7 @@ function cadApplyWindowSelection(start,end,shift,path){
  const l=Math.min(start.x,end.x),r=Math.max(start.x,end.x),t=Math.min(start.y,end.y),b=Math.max(start.y,end.y);
  const lookup=cadSelectionLayerLookup();
  const ids=state.entities.filter(e=>{
-  const layer=lookup(e);if(!layer.visible||layer.locked)return false;
+  const layer=lookup(e);if(!layer.visible||layer.locked||e.cadHidden)return false;
   const bb=cadSelectionBox(e);if(!bb)return false;
   if(poly)return cadLassoHitsBox(poly,bb,crossing);
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
