@@ -756,14 +756,25 @@ async function understandArchitecture(text){
  }finally{worker?.terminate();arqSemanticBusy=false}
 }
 async function solveArchitecture(text,brief=null){
- const interpreted=brief||await understandArchitecture(text);
- return solveGeometry('',interpreted);
+ // Own engine is always the default: no WebGPU, downloads or API charges.
+ return solveGeometry(text,brief,false);
 }
-function solveGeometry(text,brief=null){
+EXT.commands.ARQAI=async()=>{
+ const bar=document.getElementById('cadArqInstructionBar'),raw=bar?.querySelector('[data-arq-text]')?.value.trim();
+ if(!raw)return CORE.toast('Escribí primero una instrucción en ARQASSIST.');
+ if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');
+ const epoch=++arqCommandEpoch;
+ try{
+  const brief=await understandArchitecture(raw);if(epoch!==arqCommandEpoch)return;
+  const plan=await solveGeometry('',brief,true);if(epoch!==arqCommandEpoch)return;
+  startPick(1,'ARQAI · clic en origen / click origin',([p])=>{if(epoch===arqCommandEpoch)try{applyArchitecture(plan,p)}catch(e){CORE.toast(e.message)}},'arq-command');
+ }catch(e){if(epoch===arqCommandEpoch)CORE.toast(e.message)}
+};
+function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-semantic-v3');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261124-own-engine-v4');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -772,7 +783,7 @@ function solveGeometry(text,brief=null){
   const timeout=setTimeout(()=>done(Error('Architecture engine timed out.'),null,true),60000);
   arqPending=id;worker.onmessage=e=>{if(e.data.id===id)done(e.data.error?Error(e.data.error):null,e.data.plan)};
   worker.onerror=e=>done(Error(e.message||'Python engine unavailable'),null,true);
-  worker.postMessage({id,text,brief});
+  worker.postMessage({id,text,brief,semantic});
  });
 }
 function applyArchitecture(plan,origin,replaceBatch=null){
