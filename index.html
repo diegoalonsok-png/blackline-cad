@@ -3737,7 +3737,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
  if(trackingEligible()&&otrkAnchors.length&&window.BlacklineTrackingMath){
   if(orthoLocksPointer){
    const guide=BlacklineTrackingMath.projectOrtho?.(rawPointer,orthoBase,otrkAnchors,state.view.scale,10,orthoAxis);
-   if(guide?.intersection){otrkGuide=guide;return constrain(guide.point)}
+   if(guide?.intersection){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
   }else{
    const angs=[0,90,180,270];if(state.polarOn){const inc=Number(state.polarAngle)||45;for(let a=inc;a<360-1e-9;a+=inc)if(!angs.some(x=>Math.abs(x-a)<1e-6))angs.push(a)}
    const guide=BlacklineTrackingMath.projectRays?BlacklineTrackingMath.projectRays(q,otrkAnchors,state.view.scale,10,angs):BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
@@ -6106,7 +6106,7 @@ function drawZoomWindow(a,b){
  ctx.setLineDash(crossing?[6,4]:[]);ctx.fillRect(x,y,width,height);ctx.strokeRect(x,y,width,height);ctx.restore();
 }
 function zoomExtents(entities){cadRememberView();const b=getBounds(Array.isArray(entities)?entities:undefined),w=wrap.clientWidth,h=wrap.clientHeight,dx=Math.max(1e-5,b.maxX-b.minX),dy=Math.max(1e-5,b.maxY-b.minY);state.view.scale=Math.min(w*.8/dx,h*.8/dy);state.view.ox=w/2-(b.minX+b.maxX)/2*state.view.scale;state.view.oy=h/2+(b.minY+b.maxY)/2*state.view.scale;schedule()}
-function toggle(prop,id){state[prop]=!state[prop];$(id).classList.toggle('on',state[prop]);schedule()}
+function toggle(prop,id){state[prop]=!state[prop];$(id).classList.toggle('on',state[prop]);$(id).setAttribute('aria-pressed',String(state[prop]));if(prop==='orthoOn'){otrkGuide=null;if(state.mouse&&state.stage.length){/* endpoint recalculates on next physical pointer event */}}schedule()}
 function togglePolar(){
  state.polarOn=!state.polarOn;
  const btn=$('polarToggle');btn.classList.toggle('on',state.polarOn);btn.setAttribute('aria-pressed',String(state.polarOn));
@@ -11462,7 +11462,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script defer src="assets/cad2d-architecture-pack.js?v=20261120-1850"></script>
 <script src="cad-osnap-math.js?v=20261120-1850"></script>
 <script src="cad-scale-math.js?v=20261120-1850"></script>
-<script src="cad-object-tracking.js?v=20261124-ortho-v2"></script>
+<script src="cad-object-tracking.js?v=20261124-ortho-intersection-v2"></script>
 <script src="cad-auto-opening.js?v=20261120-1850"></script>
 <script src="cad-wall-join.js?v=20261120-1850"></script>
 <script src="cad-wall-grip.js?v=20261120-1850"></script>
