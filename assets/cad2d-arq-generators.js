@@ -378,6 +378,59 @@ one('dor-king','Cama King 2,00',DOR,3.00,2.00,(b,W,D)=>cama(b,W,D),{wMin:2.80,wM
 one('dor-cucheta','Cucheta',DOR,.90,2.00,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.05,.05,W-.10,D-.10,{dashed:true});b.rrect(.10,D-.45,W-.20,.36,.05);b.rect(W,.30,.06,.80)},{family:'cama'});
 one('dor-cuna','Cuna',DOR,.70,1.30,(b,W,D)=>{b.rect(0,0,W,D);for(let i=1;i<8;i++)b.line(.03,i*D/8,W-.03,i*D/8,{dashed:true})},{family:'cama'});
 
+function tandemRooms(b,W,D,n,side,privateBath){
+ const t=.15,c=1.50,p=W/n,top=D-t,base=c+t,door=.90;
+ const seg=(x,y,X,Y)=>{if(Math.hypot(X-x,Y-y)>1e-8)b.line(x,y,X,Y,{width:.22})};
+ const pair=(x,y,X,Y)=>{seg(x,y,X,Y)};
+ // Open common corridor at both ends; wall along outer corridor edge.
+ seg(0,0,W,0);seg(0,.15,W,.15);
+ seg(0,D,W,D);seg(t,top,W-t,top);
+ for(let j=0;j<=n;j++){
+  const x=j*p;
+  if(j===0){seg(0,c,0,D);seg(t,base,t,top)}
+  else if(j===n){seg(W,c,W,D);seg(W-t,base,W-t,top)}
+  else{seg(x-t/2,base,x-t/2,top);seg(x+t/2,base,x+t/2,top)}
+ }
+ for(let i=0;i<n;i++){
+  const a=i*p+(i===0?t:t/2),z=(i+1)*p-(i===n-1?t:t/2),w=z-a;
+  // Every room opens onto the common corridor. Actual breaks in both wall faces.
+  const hinge=side==='left'?z-.20-door:a+.20, end=hinge+door;
+  seg(i*p,c,hinge,c);seg(end,c,(i+1)*p,c);
+  seg(a,base,hinge,base);seg(end,base,z,base);
+  seg(hinge,c,hinge,base);seg(end,c,end,base);
+  const h=side==='left'?end:hinge;
+  b.line(h,base,h,base+door);
+  b.arc(h,base,door,side==='left'?90:0,side==='left'?180:90);
+  if(privateBath){
+   const bw=1.80,bd=2.05,bx=side==='left'?a:z-bw,by=base;
+   const inner=side==='left'?bx+bw:bx;
+   const ax=side==='left'?inner:inner-t;
+   seg(ax,by,ax,by+bd);seg(ax+t,by,ax+t,by+bd);
+   // Sliding bath door: gap on both faces, parallel leaf, no false wall line across aperture.
+   const x0=side==='left'?bx+.15:bx+.80,x1=x0+.75,y=by+bd;
+   for(const yy of [y,y+t]){seg(bx,yy,x0,yy);seg(x1,yy,bx+bw,yy)}
+   seg(x0,y,x0,y+t);seg(x1,y,x1,y+t);
+   b.line(x1,y+.06,x1+.60<=bx+bw?x1+.60:x0-.60,y+.06);
+   b.at(bx+.12,by+.10,0,q=>F.ducha(q,.85,.85,false));
+   b.at(bx+1.28,by+.10,0,q=>F.wc(q));
+   b.at(bx+.08,by+1.38,0,q=>F.lavatorio(q,.55,.43));
+  }
+  const bedW=2.40,bedD=1.90;
+  b.at(a+(w-bedW)/2,top-bedD-.10,0,q=>cama(q,bedW,bedD));
+  b.text(a+.12,top-bedD-.37,'HAB '+String(i+1).padStart(2,'0'),.10);
+ }
+ b.text(.25,.55,'CIRCULACIÓN COMÚN',.13);
+}
+/* Original hotel/dormitory arrays. Width = module pitch × count; depth includes 1.50 m corridor.
+   Concept layouts only; local code, accessibility and furniture clearance must be reviewed. */
+const ROOMS='Habitaciones completas';
+for(let n=1;n<=12;n++)for(const privateBath of [true,false])for(const side of ['left','right']){
+ const kind=privateBath?'suite':'simple';
+ const id='arq-room-'+kind+'-'+n+'-'+side;
+ def({id,name:(n===1?'Habitación':n+' habitaciones en tándem')+(privateBath?' · baño individual':' · sin baño')+' · '+(side==='left'?'izquierda':'derecha'),cat:ROOMS,family:'arq-room-'+kind+'-'+n,w:n*4,d:7.50,wMin:n*3.8,wMax:n*6,dMin:7.0,dMax:11.5,roomCount:n,privateBath,roomSide:side,
+ gen(b,W,D){tandemRooms(b,W,D,n,side,privateBath)}});
+}
+
 /* ===== EXTERIOR Y VEGETACIÓN ===== */
 const EXT='Exterior';
 one('ext-arbol','Árbol caducifolio',EXT,3.00,3.00,(b,W)=>{const r=W/2,n=14,pts=[];for(let i=0;i<=n*2;i++){const a=i*180/n*DEG,rr=i%2?r*.86:r;pts.push([r+rr*Math.cos(a),r+rr*Math.sin(a)])}b.poly(pts,true);b.circle(r,r,r*.12);for(let i=0;i<6;i++){const a=i*60*DEG;b.line(r,r,r+r*.6*Math.cos(a),r+r*.6*Math.sin(a))}},{wMin:1.0,wMax:8.0,lockAspect:true,family:'arbol'});
