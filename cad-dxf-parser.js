@@ -236,7 +236,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  }
  walk(modelRecs,ID,null,0);
  // Preserve named definitions even when they have no INSERT in model space.
- if(!opts?.explodeInserts)for(const def of blocksDef.values()){
+ if(!opts?.explodeInserts||opts?.collectDefinitions)for(const def of blocksDef.values()){
   if(!def.name||def.name.startsWith('*')||Object.prototype.hasOwnProperty.call(importedBlocks,defName(def.name)))continue;
   const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:'0',color:undefined,linetype:'BYLAYER',width:.25},1,list);
   if(list.length)importedBlocks[defName(def.name)]={name:defName(def.name),entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'};
