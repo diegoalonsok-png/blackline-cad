@@ -6338,6 +6338,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
  SELECCIONARSIMILARES:'SELECTSIMILAR',SELECCIONINVERSA:'SELECTINVERT'
 });
 const CAD_COMMANDS=[
+ ['RECOVER','RECUPERAR','Analizar DWG/DXF y descargar copia recuperada sin sobrescribir'],['DRAWINGRECOVERY','COPIAS','Abrir copias de seguridad del dibujo'],
  ['LAYERSTATE','ESTADOSCAPAS','Guardar y restaurar estados de capas del dibujo'],
  ['DWGCOMPARE','COMPARE / COMPARARPLANOS','Comparar versiones DWG, DXF o CADJSON sin alterar el dibujo'],
  ['PERFORMANCE','RENDIMIENTO','Diagnóstico local de tiempos de dibujo, objetos e historial'],
@@ -7249,7 +7250,96 @@ async function cadBakChooseDir(){
  if(!window.showDirectoryPicker)return toast('Este navegador no permite elegir carpeta: usá Chrome o Edge. Las copias igual se guardan en el navegador.');
  try{const d=await window.showDirectoryPicker({id:'cad2d-bak',mode:'readwrite'});cadBakDir=d;await backupTransaction('readwrite',st=>st.put(d,'bakdir'));toast('Copias .bak en la carpeta «'+d.name+'» cada '+(cad2dSaveMinutes||5)+' min');cadWriteBak().catch(()=>{})}catch(e){}
 }
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','RECUPERAR','RECOVER'])X.commands[k]=()=>cadShowBackups();X.commands.CARPETABAK=()=>cadBakChooseDir();X.commands.CARPETADWGBAK=()=>cadDwgChooseBakDir()}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','DRAWINGRECOVERY'])X.commands[k]=()=>cadShowBackups();for(const k of ['RECUPERAR','RECOVER'])X.commands[k]=()=>cadRecoverDialog();X.commands.CARPETABAK=()=>cadBakChooseDir();X.commands.CARPETADWGBAK=()=>cadDwgChooseBakDir()}
+
+/* RECOVER: conservative ASCII DXF tail salvage. Never overwrite source or
+   replace the active model. All recovered geometry passes the existing reader. */
+function cadRecoverDxfTail(input){
+ const raw=String(input||'').replace(/^\uFEFF/,'').replace(/\r\n/g,'\n');
+ if(raw.length>64*1024*1024||raw.includes('\0')||/^AutoCAD Binary DXF/i.test(raw))throw Error('DXF binario o superior a 64 MiB');
+ let offset=0,section='',pending=false,completeEntities=false,lastClosed=0,lastEntity=-1,compound=-1,lastType='',sequence=false,eof=0,invalid=false;
+ const warnings=[];
+ function line(){if(offset>=raw.length)return null;const end=raw.indexOf('\n',offset),start=offset;offset=end<0?raw.length:end+1;return {value:raw.slice(start,end<0?raw.length:end),start}}
+ while(offset<raw.length){
+  const a=line(),b=line();
+  if(!a||!b){if(a?.value.trim())warnings.push('Último par DXF incompleto');break}
+  if(!/^\s*\d{1,4}\s*$/.test(a.value)){invalid=true;break}
+  const key=Number(a.value),v=b.value.trim();
+  if(pending){if(key!==2||!v){invalid=true;break}section=v;pending=false;lastEntity=-1;compound=-1;sequence=false;lastType='';continue}
+  if(key===0&&v==='SECTION'){if(section){invalid=true;break}pending=true;continue}
+  if(key===0&&v==='ENDSEC'){if(!section||sequence){invalid=true;break}if(section==='ENTITIES')completeEntities=true;section='';lastClosed=offset;lastEntity=-1;continue}
+  if(key===0&&v==='EOF'){if(section||pending){invalid=true;break}eof=offset;break}
+  if(section==='ENTITIES'){
+   if(key===0){
+    if(v==='POLYLINE'||v==='INSERT'){compound=a.start;sequence=v==='POLYLINE'}
+    else if(v==='VERTEX'||v==='ATTRIB'){if(compound<0){invalid=true;break}sequence=true}
+    else if(v==='SEQEND'){if(compound<0){invalid=true;break}sequence=false;compound=-1}
+    else {if(sequence){invalid=true;break}compound=-1}
+    lastEntity=a.start;lastType=v;
+   }else if(key===66&&v==='1'&&lastType==='INSERT')sequence=true;
+  }
+ }
+ if(invalid)throw Error('Estructura interna irregular; no se pueden distinguir registros seguros. Probá COPIAS.');
+ if(eof){
+  if(!completeEntities)throw Error('No se encontró una sección ENTITIES completa');
+  if(raw.slice(eof).trim())warnings.push('Se omitieron datos posteriores a EOF (incluidos metadatos nativos, si existían).');
+  return {text:raw.slice(0,eof).trimEnd()+'\n',warnings};
+ }
+ if(completeEntities&&lastClosed){
+  warnings.push('Se conservaron las secciones completas; se descartó la cola incompleta y se añadió EOF.');
+  return {text:raw.slice(0,lastClosed).trimEnd()+'\n0\nEOF\n',warnings};
+ }
+ if(section==='ENTITIES'&&lastEntity>=0){
+  // The final record may be truncated even if the last group is paired.
+  // Drop it in full, including a possible compound POLYLINE/INSERT sequence.
+  const cut=compound>=0?compound:lastEntity;
+  if(lastType==='SEQEND')throw Error('Secuencia final sin delimitador seguro; probá COPIAS.');
+  warnings.push('Se descartó el último registro o conjunto incompleto de ENTITIES; se añadieron ENDSEC y EOF.');
+  return {text:raw.slice(0,cut).trimEnd()+'\n0\nENDSEC\n0\nEOF\n',warnings};
+ }
+ throw Error('No hay una sección de geometría recuperable con seguridad. Probá COPIAS.');
+}
+function cadRecoverDialog(){
+ if(cadBlockEdit)return toast('Cerrá BEDIT antes de RECOVER.');
+ if($('cadRecoverDialog'))return;
+ const d=document.createElement('div');d.id='cadRecoverDialog';d.className='modal-backdrop show';
+ d.innerHTML='<div class="modal" style="max-width:560px"><div class="modal-head"><h2>RECOVER · Recuperar dibujo</h2><button type="button" class="btn" data-close>×</button></div><p>Recuperá geometría legible de un DWG, DXF o copia de seguridad. El archivo original y el dibujo abierto permanecen intactos.</p><input type="file" accept=".dwg,.dxf,.bak,.sv$,.tmp" data-file><pre style="white-space:pre-wrap;max-height:36vh;overflow:auto" data-info></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-backups>Copias de seguridad</button><button type="button" class="btn primary" data-run>Analizar archivo</button><button type="button" class="btn" data-save disabled>Descargar proyecto recuperado</button></div><p>La recuperación puede ser parcial: no reconstruye datos perdidos ni repara directamente el binario DWG.</p></div>';
+ const file=d.querySelector('[data-file]'),info=d.querySelector('[data-info]'),run=d.querySelector('[data-run]'),save=d.querySelector('[data-save]');let result=null,busy=false;
+ d.querySelector('[data-close]').onclick=()=>d.remove();
+ d.onclick=e=>{if(e.target===d)d.remove()};
+ d.querySelector('[data-backups]').onclick=()=>{d.remove();cadShowBackups().catch(e=>toast('COPIAS: '+e.message))};
+ file.onchange=()=>{result=null;save.disabled=true;info.textContent=''};
+ run.onclick=async()=>{
+  if(busy)return;
+  const f=file.files[0];if(!f)return toast('RECOVER: elegí un archivo');
+  if(f.size>64*1024*1024)return toast('RECOVER: máximo 64 MiB por archivo');
+  if(cadDxfActiveJob)return toast('Finalizá primero la importación en curso');
+  busy=true;file.disabled=true;run.disabled=true;save.disabled=true;result=null;
+  info.textContent='Analizando archivo local…';
+  try{
+   const header=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer());
+   const isDwg=/^AC10\d\d/.test(header)||/\.dwg$/i.test(f.name);
+   if(!isDwg&&/^\s*[\[{]/.test(header))throw Error('La copia es un proyecto JSON. Usá COPIAS o ABRIR; esta recuperación es para DWG/DXF.');
+   const txt=isDwg?await convertDWGAutomatically(new File([f],f.name.replace(/\.[^.]+$/,'.dwg'),{type:f.type}),{textOnly:true}):await cadDxfDecode(await f.arrayBuffer());
+   const repaired=cadRecoverDxfTail(txt);
+   if(cadDxfActiveJob)throw Error('Hay otra lectura DXF en curso');
+   const parsed=await cadParseDXFWorker(repaired.text,readDimensionStyle());
+   if(!parsed.entities.length&&!Object.keys(parsed.blocks||{}).length)throw Error('No se recuperaron entidades ni definiciones de bloque compatibles');
+   let unit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode];
+   if(!unit){const v=window.prompt('Unidades ORIGINALES del dibujo recuperado (mm, cm, m, in, ft):','mm');if(v===null)throw Error('Recuperación cancelada');unit=v.trim().toLowerCase();if(!U[unit])throw Error('Unidad inválida')}
+   const layers=parsed.layers.length?parsed.layers:[{id:'0',name:'0',visible:true,locked:false,color:'#c6cbd1',width:.25,linetype:'CONTINUOUS'}];
+   const filename=cadCleanDrawingName(f.name.replace(/\.[^.]+$/,''))+'-RECUPERADO';
+   const nextId=parsed.entities.reduce((n,e)=>Math.max(n,e.id||0),0)+1;
+   result={format:'CAD2D-2',filename,modelScale:'1:1',entities:parsed.entities,layers,layerId:layers[0].id,blocks:parsed.blocks||{},dimStyles:parsed.dimStyles||{},activeDimStyle:'',layerStates:[],unit,grid:unit==='m'?1:unit==='mm'?100:10,precision:2,nextId};
+   info.textContent='Geometría legible recuperada: '+parsed.entities.length+' objetos · '+layers.length+' capas · '+Object.keys(result.blocks).length+' bloques · '+unit+'\n\n'+[...repaired.warnings,...(parsed.warnings||[]).map(w=>'Compatibilidad: '+w),'La copia CADJSON conserva el modelo 2D interpretado; no garantiza recuperar láminas, metadatos nativos o geometría no soportada. Revisá el plano antes de utilizarlo.'].join('\n');
+   save.disabled=false;
+  }catch(e){info.textContent='No fue posible recuperar el archivo: '+e.message+'\nEl original y el dibujo abierto no se modificaron. Probá COPIAS.'}
+  finally{busy=false;run.disabled=false;file.disabled=false}
+ };
+ save.onclick=()=>{if(result)download(result.filename+'.cadjson',JSON.stringify(result),'application/json')};
+ document.body.append(d);
+}
+
 async function cadShowBackups(){
  document.getElementById('cadBakDlg')?.remove();
  const keys=(await cadBakKeys()).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
