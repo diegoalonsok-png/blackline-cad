@@ -1444,10 +1444,28 @@ function cadDimLayerId(){
 function ensureArchitecturalLayer(kind){const id=kind==='walls'?'walls':'openings',name=kind==='walls'?'WALLS':'OPENINGS';const existing=state.layers.find(l=>l.id===id||l.name.toUpperCase()===name);if(existing)return existing.id;state.layers.push({id,name,color:kind==='walls'?'#ff3333':'#e0ba83',visible:true,locked:false,width:kind==='walls'?.30:.05,linetype:'CONTINUOUS'});return id}
 function explicitWallLayerName(name){return /^(WALLS?|MUROS?|A[-_ ]?WALL|A[-_ ]?MURO|PAREDES?|MAMPOSTERIA|MAMPOSTERÍA)$/i.test(String(name||'').trim())}
 function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallLayerName(l.name)){l.width=Math.max(l.width||0,.30)}}}function curLayer(){return state.layers.find(l=>l.id===state.layerId)||state.layers[0]}
-function historySnapshot(){return {entities:clone(state.entities),layers:clone(state.layers),blocks:clone(state.blocks),dimStyles:clone(state.dimStyles),activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId}}function syncCadHeaderHistoryButtons(){const u=$('cadHeaderUndo'),r=$('cadHeaderRedo');if(u)u.disabled=!state.history.length;if(r)r.disabled=!state.future.length}
-function saveHistory(){state.history.push(historySnapshot());if(state.history.length>75)state.history.shift();state.future=[];syncCadHeaderHistoryButtons()}
-function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
-function redo(){clearOtrackAnchors(false);if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());Object.assign(state,state.future.pop());state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('REDO')}
+// Keep the undo/redo budget proportional to drawing size rather than retaining
+// 75 complete copies of a very large imported drawing.
+var cadHistorySizes=new WeakMap(),cadHistoryBudget=96*1024*1024;
+function historySnapshot(){
+ const json=JSON.stringify({entities:state.entities,layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId});
+ const snap=JSON.parse(json);cadHistorySizes.set(snap,json.length*4);return snap;
+}
+function cadHistoryBytes(){
+ let bytes=0;for(const stack of [state.history,state.future])for(const item of stack){let size=cadHistorySizes.get(item);if(size===undefined){size=JSON.stringify(item).length*4;cadHistorySizes.set(item,size)}bytes+=size;}return bytes;
+}
+function cadTrimHistory(){
+ while(state.history.length>75)state.history.shift();
+ while(state.future.length>75)state.future.shift();
+ let bytes=cadHistoryBytes();
+ while(bytes>cadHistoryBudget&&(state.history.length>1||state.future.length>1)){
+  const stack=state.history.length>1&&(state.future.length<=1||state.history.length>=state.future.length)?state.history:state.future;
+  bytes-=cadHistorySizes.get(stack.shift())||0;
+ }
+}function syncCadHeaderHistoryButtons(){const u=$('cadHeaderUndo'),r=$('cadHeaderRedo');if(u)u.disabled=!state.history.length;if(r)r.disabled=!state.future.length}
+function saveHistory(){state.history.push(historySnapshot());state.future=[];cadTrimHistory();syncCadHeaderHistoryButtons()}
+function undo(){clearOtrackAnchors(false);if(!state.history.length)return toast('Nothing to undo');state.future.push(historySnapshot());Object.assign(state,state.history.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('UNDO')}
+function redo(){clearOtrackAnchors(false);if(!state.future.length)return toast('Nothing to redo');state.history.push(historySnapshot());Object.assign(state,state.future.pop());cadTrimHistory();state.selected=[];updateAll();syncCadHeaderHistoryButtons();log('REDO')}
 $('cadHeaderUndo')?.addEventListener('click',()=>{if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();syncCadHeaderHistoryButtons()});
 $('cadHeaderRedo')?.addEventListener('click',()=>{redo();syncCadHeaderHistoryButtons()});
 syncCadHeaderHistoryButtons();
@@ -1912,7 +1930,13 @@ function cadDrawMeasureTag(){
  ctx.fillStyle='#e9dcc7';ctx.font='500 11px Inter,Arial,sans-serif';ctx.fillText(info.sub,cx,y+36);
  ctx.restore();
 }
-function draw(){drawPending=false;
+var cadPerfFrames=[],cadPerfVisible=0;
+function cadPerfReport(){
+ const samples=cadPerfFrames.slice().sort((a,b)=>a-b),n=samples.length;
+ const report='PERFORMANCE · '+state.entities.length+' objetos · '+cadPerfVisible+' visibles · '+state.layers.length+' capas · '+(n?'dibujo p50 '+samples[Math.floor((n-1)*.5)].toFixed(1)+' ms / p95 '+samples[Math.floor((n-1)*.95)].toFixed(1)+' ms':'sin muestras')+' · historial estimado '+(cadHistoryBytes()/1048576).toFixed(1)+' MiB · '+state.history.length+' deshacer / '+state.future.length+' rehacer';
+ log(report);toast(report);return report;
+}
+function draw(){drawPending=false;const perfStart=performance.now();let painted=0;
  if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  const selectedIds=new Set(state.selected);
@@ -1921,12 +1945,12 @@ function draw(){drawPending=false;
   ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
   : inViewport(e,w,h);
  for(const e of state.entities){
-  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e))drawEntity(e);
+  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e);painted++;}
  }
  for(const e of state.entities){
   if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
-  drawEntity(e);
+  drawEntity(e);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
  }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
@@ -2001,7 +2025,7 @@ function draw(){drawPending=false;
   ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
   ctx.fillStyle='#ffe15a';ctx.fillRect(a.x-3,a.y-3,6,6);ctx.restore();
  }
- drawOtrackGuides();drawWallDragMeasurement();cadDrawOpeningWallClearances();cadDrawOpeningDisplacement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();}
+ drawOtrackGuides();drawWallDragMeasurement();cadDrawOpeningWallClearances();cadDrawOpeningDisplacement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();cadPerfVisible=painted;cadPerfFrames.push(performance.now()-perfStart);if(cadPerfFrames.length>120)cadPerfFrames.shift();}
 function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
@@ -3610,7 +3634,7 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
   const nearbyLines=[];
   for(const e of state.entities){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
-   const box=boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
+   const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
    // not just their insertion point. Read-only: never alter block entities.
@@ -6165,6 +6189,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
  SELECCIONARSIMILARES:'SELECTSIMILAR',SELECCIONINVERSA:'SELECTINVERT'
 });
 const CAD_COMMANDS=[
+ ['PERFORMANCE','RENDIMIENTO','Diagnóstico local de tiempos de dibujo, objetos e historial'],
  ['PRUEBA5X4','','Cargar el cuarto de verificación 5×4 m con puerta y ventana'],
  ['SAVE','QSAVE','Guardar dibujo (DXF)'],['SAVEAS','','Guardar una copia con otro nombre (DXF, DWG o proyecto)'],['SAVEDWG','GUARDARDWG','Guardar dibujo como DWG binario editable'],['MURO','WALL','Dibujar muro con espesor real y justificación izquierda, centro o derecha'],['ABERTURAS','OPENINGS','Seleccionar capa de aberturas de línea 0.05 mm o aplicar a selección'],
  ['BREAKATPOINT','BAP','Partir línea en un punto, sin eliminar tramo'],['ALIGN','ALN','Alinear objetos por dos pares de puntos sin escalar'],['LIST','LI','Mostrar geometría y propiedades de la selección'],['QSELECT','QS','Selección rápida por tipo y capa'],['REGEN','RE','Redibujar la vista'],
@@ -6491,6 +6516,7 @@ function cadDispatchNamed(value){
 
  if(cmd==='REGENERAR'||cmd==='REDIBUJAR')return schedule();
  if(cmd==='REGEN'||cmd==='RE'||cmd==='REDRAW')return schedule();
+ if(cmd==='PERFORMANCE'||cmd==='RENDIMIENTO')return cadPerfReport();
  if(cmd==='SAVE'||cmd==='QSAVE')return saveJSON();if(cmd==='SAVEAS')return saveAsJSON();if(cmd==='SAVEDWG'||cmd==='GUARDARDWG')return saveJSON(true,'dwg');
  if(cmd==='ABRIR')return openFile();if(cmd==='OPEN')return openFile();
  if(cmd==='NUEVO')cmd='NEW';if(cmd==='NEW'){
@@ -11267,5 +11293,6 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-local-vector-packs.js?v=20261123-selection-v1"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
-<script defer src="cad3d-lab.js?v=20261123-stair-icons-v63"></script>
+<script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
+<script defer src="cad3d-lab.js?v=20261124-solid-v64"></script>
 </body></html>
