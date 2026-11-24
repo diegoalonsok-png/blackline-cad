@@ -710,6 +710,44 @@ EXT.context.push(info=>{
 
 
 /* Independent architecture assistant: uses the existing regenerative ARQ engine. */
+
+// Deterministic natural-language room-row generator; no external AI service.
+function parseRoomRow(raw){
+ const s=String(raw).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ if(!/\b(?:habitacion(?:es)?|dormitorios?|rooms?|bedrooms?)\b/.test(s))return null;
+ if(!/\b(?:tandem|fila|row|alinead[oa]s?|side by side)\b/.test(s))return null;
+ if(/\b(?:bano|banos|bathroom|bathrooms|suite|vestidor|closet|ventana|windows?)\b/.test(s))throw Error('Esta versión genera muros y accesos de habitaciones en fila; todavía no admite baños privados, ventanas ni vestidores en esta orden.');
+ const words={un:1,una:1,uno:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+ const n=s.match(/\b(\d+|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:habitacion(?:es)?|dormitorios?|rooms?|bedrooms?)\b/);
+ const m=s.match(/(\d+(?:[.,]\d+)?)\s*(?:x|×|por|by)\s*(\d+(?:[.,]\d+)?)/);
+ const t=s.match(/(?:muros?|walls?)\s+(?:de\s+|of\s+)?(\d+(?:[.,]\d+)?)\s*(cm|mm|m\b)?/);
+ const num=x=>Number(x.replace(',','.'));
+ const count=n?(words[n[1]]||Number(n[1])):0,W=m?num(m[1]):4,D=m?num(m[2]):5,T=t?num(t[1])/(t[2]==='cm'?100:t[2]==='mm'?1000:1):.15;
+ if(!Number.isInteger(count)||count<1||count>30||W<1.5||W>20||D<1.5||D>20||T<.08||T>.5)throw Error('Indicá entre 1 y 30 habitaciones, medidas de 1.50 a 20 m y muros de 0.08 a 0.50 m.');
+ return {count,W,D,T,defaults:!m||!t};
+}
+function drawRoomRow(spec,origin){
+ const {count,W,D,T}=spec,k=f(),st=S(),total=count*W+(count+1)*T,door=.80;
+ const existing=st.layers.find(x=>x.name==='A-MUROS'),opening=st.layers.find(x=>x.name==='A-ABERTURAS');
+ if(existing&&(existing.locked||existing.visible===false)||opening&&(opening.locked||opening.visible===false))throw Error('Desbloqueá y mostrá las capas de muros y aberturas.');
+ CORE.saveHistory();
+ const layer=(name)=>{let l=st.layers.find(x=>x.name===name);if(!l){let id=name,i=1;while(st.layers.some(x=>x.id===id))id=name+'-'+i++;l={id,name,color:'#ffffff',visible:true,locked:false,width:.13};st.layers.push(l)}return l.id};
+ const walls=layer('A-MUROS'),doors=layer('A-ABERTURAS');
+ const p=(x,y)=>P(origin.x+x*k,origin.y+y*k);
+ const line=(a,b,L)=>newEntity({type:'line',a:p(...a),b:p(...b),layer:L});
+ const rect=(x,y,w,h)=>newEntity({type:'rect',a:p(x,y),b:p(x+w,y+h),layer:walls});
+ // Continuous back wall; single shared partition per adjacent pair.
+ rect(0,D+T,total,T);
+ for(let i=0;i<=count;i++)rect(i*(W+T),0,T,D+T);
+ for(let i=0;i<count;i++){
+  const left=T+i*(W+T),hinge=left+(W-door)/2;
+  rect(left,0,hinge-left,T);rect(hinge+door,0,left+W-hinge-door,T);
+  line([hinge,T],[hinge,T+door],doors);
+  newEntity({type:'arc',c:p(hinge,T),r:door*k,a0:0,a1:Math.PI/2,layer:doors});
+ }
+ CORE.updateAll();CORE.queueLocalBackup();CORE.toast(count+' habitaciones dibujadas · muros compartidos · accesos 0.80 m');
+}
+
 function openArchitectureAssistant(category){
  let panel=document.getElementById('arqAssistant');
  if(!panel){
@@ -749,7 +787,11 @@ function openArchitectureAssistant(category){
    if(m){w.value=W;d.value=D}
    preview();if(!it){model.selectedIndex=-1;q('[data-preview]').replaceChildren();say('No hay una configuración compatible. Elegí un modelo o cambiá las medidas.')}
   }
-  q('[data-interpret]').onclick=interpret;
+  const drawButton=document.createElement('button');drawButton.className='btn';drawButton.textContent='Dibujar instrucción / Draw instruction';drawButton.style.cssText='display:block;width:100%;margin:6px 0';q('[data-insert]').before(drawButton);
+  function drawInstruction(){try{const raw=q('[data-command]').value, spec=parseRoomRow(raw);if(!spec){interpret();const {it,W,D}=valid();if(armInsert(it,W,D))say('Clic en el plano para insertar el ambiente.');return}say(spec.count+' habitaciones de '+spec.W+' × '+spec.D+' m; muro '+spec.T+' m. '+(spec.defaults?'Se usaron medidas predeterminadas cuando faltaban. ':'')+'Clic en el origen del conjunto.');startPick(1,'ARQASSIST · origen de habitaciones',([p])=>{try{drawRoomRow(spec,p);say('Habitaciones dibujadas.')}catch(e){say(e.message)}})}catch(e){say(e.message)}}
+  drawButton.onclick=drawInstruction;
+  q('[data-command]').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();drawInstruction()}});
+  q('[data-interpret]').onclick=()=>{try{if(parseRoomRow(q('[data-command]').value))drawInstruction();else interpret()}catch(e){say(e.message)}};
   q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;interpret()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
   q('[data-insert]').onclick=()=>{try{const {it,W,D}=valid();if(armInsert(it,W,D))say('Clic en el plano para insertar.')}catch(e){say(e.message)}};
   q('[data-close]').onclick=()=>{const body=q('[data-body]');body.hidden=!body.hidden;q('[data-close]').textContent=body.hidden?'+':'−'};
