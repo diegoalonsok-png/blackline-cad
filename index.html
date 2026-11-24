@@ -1940,19 +1940,24 @@ function draw(){drawPending=false;const perfStart=performance.now();let painted=
  if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  const selectedIds=new Set(state.selected);
+ // Rebuild once per frame: no stale layer cache after edits, import or undo.
+ const paintLayers=new Map();
+ for(const layer of state.layers)if(!paintLayers.has(layer.id))paintLayers.set(layer.id,layer);
+ const paintLayerVisible=e=>{const l=paintLayers.get(e.layer)||state.layers[0];return !l?.frozen&&l?.visible;};
+
  // Both paint passes use conservative viewport culling; selection membership is O(1).
  const visibleForPaint=e=>fastView
   ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
   : inViewport(e,w,h);
  for(const e of state.entities){
-  if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e);painted++;}
+  if(e.type==='hatch'&&!e.onTop&&paintLayerVisible(e)&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e);painted++;}
  }
  for(const e of state.entities){
-  if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
+  if((e.type==='hatch'&&!e.onTop)||!paintLayerVisible(e)||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
   drawEntity(e);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
+ }if(cadWallCapCache)for(const c of cadWallCapCache){if(paintLayerVisible(c))drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,state.mouse);
   const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
@@ -2026,7 +2031,7 @@ function draw(){drawPending=false;const perfStart=performance.now();let painted=
   ctx.fillStyle='#ffe15a';ctx.fillRect(a.x-3,a.y-3,6,6);ctx.restore();
  }
  drawOtrackGuides();drawWallDragMeasurement();cadDrawOpeningWallClearances();cadDrawOpeningDisplacement();drawCadLiveMeasure();drawCrosshair();drawSnapMarker();cadPerfVisible=painted;cadPerfFrames.push(performance.now()-perfStart);if(cadPerfFrames.length>120)cadPerfFrames.shift();}
-function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.fillRect(x-1,y-1,2,2)}}
+function drawGrid(w,h){const s=state.view.scale*state.grid;if(!Number.isFinite(s)||s<3)return;const step=s<13?Math.ceil(14/s):1,spacing=s*step;if(spacing>1800)return;const ox=((state.view.ox%spacing)+spacing)%spacing,oy=((state.view.oy%spacing)+spacing)%spacing;ctx.beginPath();for(let x=ox;x<w;x+=spacing){ctx.moveTo(x,0);ctx.lineTo(x,h)}for(let y=oy;y<h;y+=spacing){ctx.moveTo(0,y);ctx.lineTo(w,y)}ctx.lineWidth=.6;ctx.strokeStyle=displayColors.grid;ctx.stroke();if(spacing>24&&spacing<180){ctx.fillStyle=displayColors.grid;ctx.beginPath();for(let x=ox;x<w;x+=spacing)for(let y=oy;y<h;y+=spacing)ctx.rect(x-1,y-1,2,2);ctx.fill()}}
 function drawAxes(w,h){ctx.strokeStyle=displayColors.axes;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(state.view.ox,0);ctx.lineTo(state.view.ox,h);ctx.stroke();ctx.strokeStyle=displayColors.axes;ctx.beginPath();ctx.moveTo(0,state.view.oy);ctx.lineTo(w,state.view.oy);ctx.stroke()}
 function hasActiveCadCommand(){return (state.tool!=='select'&&state.tool!=='pan')||state.stage.length>0||!!state.modifyCandidate}
 function drawCrosshair(){
@@ -3639,9 +3644,10 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
   const osnapProbe=orthoLocksPointer&&trackingEligible()?rawPointer:q;
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
+  const lookup=cadSelectionLayerLookup(),tol=11/state.view.scale;
   for(const e of state.entities){
-   const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
-   const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
+   const lay=lookup(e);if(!lay.visible||lay.locked)continue;
+   const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e);if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
    // not just their insertion point. Read-only: never alter block entities.
@@ -3745,7 +3751,14 @@ const orthoLocksPointer=state.orthoOn&&state.stage.length&&!['rect','circle','el
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
-function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
+// Local to each synchronous selection query: never cache geometry or layers across edits.
+function cadSelectionLayerLookup(){
+ const layers=new Map();
+ for(const l of state.layers)if(!layers.has(l.id))layers.set(l.id,l);
+ const fallback=state.layers[0];
+ return e=>{const l=layers.get(e.layer)||fallback;return l?.frozen?{...l,visible:false}:l};
+}
+function pick(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;const lookup=cadSelectionLayerLookup();for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=lookup(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
   if(!s.length){s.push(P(p.x,p.y));prompt();schedule();return}
@@ -5008,48 +5021,82 @@ function cadBreakAtPoint(p){
  state.selected=[a.id,b.id];state.tool='select';state.stage=[];updateAll();
  toast('BREAKATPOINT: línea dividida en dos · Ctrl+Z para deshacer');
 }
+
+/* LIST: complete read-only inspection of selected model entities. */
+function cadListRecord(e,layer,unit,precision){
+ const fmt=n=>Number.isFinite(n)?Number(n).toFixed(precision):'—';
+ const point=p=>p?'('+fmt(p.x)+', '+fmt(p.y)+')':'—';
+ const measure=(title,n)=>title+': '+fmt(n)+' '+unit;
+ const angle=n=>fmt(((n%360)+360)%360)+'°';
+ const rect=cadRectangleGeometry(e);
+ const color=e.color||layer.color||'BYLAYER',linetype=e.linetype||layer.linetype||'CONTINUOUS',width=e.width??layer.width??.25;
+ let length=null,area=null,details=[];
+ if(rect){
+  length=2*(rect.w+rect.h);area=rect.w*rect.h;
+  details.push(measure('Ancho',rect.w),measure('Largo',rect.h),'Origen: '+point(rect.a),'Rotación: '+angle(Math.atan2(rect.u.y,rect.u.x)*180/Math.PI));
+ }else if(e.type==='line'){
+  length=dist(e.a,e.b);
+  details.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Delta X',e.b.x-e.a.x),measure('Delta Y',e.b.y-e.a.y),'Ángulo: '+angle(Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x)*180/Math.PI));
+ }else if(e.type==='circle'||e.type==='arc'){
+  details.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
+  if(e.type==='circle'){length=TAU*e.r;area=Math.PI*e.r*e.r}
+  else {const sweep=arcSweep(e.a0,e.a1);length=e.r*sweep;details.push('Ángulo inicial: '+angle(e.a0*180/Math.PI),'Ángulo final: '+angle(e.a1*180/Math.PI),'Ángulo incluido: '+fmt(sweep*180/Math.PI)+'°',measure('Cuerda',2*e.r*Math.sin(sweep/2)),'Área de sector: '+fmt(e.r*e.r*sweep/2)+' '+unit+'²','Área de segmento: '+fmt(e.r*e.r*(sweep-Math.sin(sweep))/2)+' '+unit+'²')}
+ }else if(e.type==='polyline'){
+  const path=cadQuickPathInfo(e);length=path.length;area=e.closed?cadEntityArea(e):null;
+  details.push(e.closed?'Cerrada':'Abierta','Vértices: '+e.pts.length,'Segmentos: '+path.sides,'Primer vértice: '+point(e.pts[0]));
+ }else if(e.type==='ellipse'){
+  length=cadQuickEllipsePerimeter(e.rx,e.ry);area=Math.PI*e.rx*e.ry;
+  details.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry),'Rotación: '+angle((e.rotation||0)*180/Math.PI));
+ }else if(e.type==='blockRef'){
+  details.push('Bloque: '+e.blockName,'Inserción: '+point(e.p),'Escala: '+fmt(e.scale??1),'Rotación: '+angle(e.rotation||0));
+ }else if(e.type==='hatch'){
+  area=cadQuickHatchArea(e);length=cadQuickPathInfo({pts:e.pts,closed:true}).length;
+  details.push('Patrón: '+(e.hatchStyle||'solid'),'Islas: '+(e.holes||[]).length);
+ }else if(e.type==='text'){
+  details.push('Texto: '+e.text,measure('Altura',e.h),'Inserción: '+point(e.p),'Fuente: '+(e.fontFamily||'Arial'),'Rotación: '+angle(e.rotation||0));
+ }else if(e.type==='dimension'){
+  details.push('Tipo de cota: '+(e.mode||'aligned'),'Estilo: '+(e.dimStyleName||'Predeterminado'),'Inicio: '+point(e.a),'Fin: '+point(e.b),'Posición: '+point(e.p),measure('Distancia entre puntos',dist(e.a,e.b)));
+ }else if(e.type==='image'){
+  details.push('Esquina A: '+point(e.a),'Esquina B: '+point(e.b),measure('Ancho',Math.abs(e.b.x-e.a.x)),measure('Alto',Math.abs(e.b.y-e.a.y)));
+ }
+ if(cadQuickWidthEntity(e))details.push(measure('Grosor global',e.pwidth||0));
+ if(Number.isFinite(length))details.push(measure(e.type==='ellipse'?'Perímetro aproximado':e.type==='hatch'?'Perímetro exterior':rect||e.type==='circle'||e.closed?'Perímetro':'Longitud',length));
+ if(Number.isFinite(area))details.push((e.type==='hatch'?'Área neta':'Área')+': '+fmt(area)+' '+unit+'²');
+ const type=rect?'RECTÁNGULO':e.type.toUpperCase();
+ const visible=layer.visible!==false&&!e.cadHidden,locked=!!layer.locked;
+ const header=['#'+e.id+' · '+type,'Capa: '+layer.name,'Color: '+color+(e.color?'':' (por capa)'),'Tipo de línea: '+linetype+(e.linetype?'':' (por capa)'),'Espesor de impresión: '+fmt(width)+' mm','Estado: '+(visible?'Visible':'Oculto')+(locked?' · Bloqueado':'')];
+ return {id:e.id,type,layer:layer.name,color,linetype,width,visible,locked,length,area,details,report:header.concat(details).join('\n')};
+}
+function cadListCsv(records,unit){
+ // Neutralize spreadsheet formulas in user-controlled strings; numeric cells remain numeric.
+ const cell=v=>{if(v==null)return '""';let s=String(v);if(typeof v==='string'&&/^[\s]*[=+\-@\t\r]/.test(s))s="'"+s;return '"'+s.replace(/"/g,'""')+'"'};
+ const header=['ID','Tipo','Capa','Color','Tipo de línea','Espesor (mm)','Visible','Bloqueado','Longitud o perímetro ('+unit+')','Área ('+unit+'²)','Detalles'];
+ const rows=records.map(r=>[r.id,r.type,r.layer,r.color,r.linetype,r.width,r.visible?'Sí':'No',r.locked?'Sí':'No',r.length,r.area,r.details.join(' | ')]);
+ return '\uFEFF'+[header,...rows].map(r=>r.map(cell).join(',')).join('\r\n');
+}
 function cadListEntities(){
  const chosen=selectedCadEntities();
  if(!chosen.length)return toast('LIST: seleccioná objetos para consultar sus propiedades');
- const format=n=>Number(n).toFixed(state.precision),point=p=>'('+format(p.x)+', '+format(p.y)+')';
- const measure=(title,n)=>title+': '+format(n)+' '+state.unit;
- const rows=chosen.map(e=>{
-  const layer=layerFor(e),rect=cadRectangleGeometry(e);
-  const data=['#'+e.id+' · '+(rect?'RECTÁNGULO':e.type.toUpperCase()),
-   'Capa: '+layer.name+' · '+format(e.width??layer.width??.25)+' mm'];
-  if(rect){
-   data.push(measure('Ancho',rect.w),measure('Largo',rect.h),measure('Perímetro',2*(rect.w+rect.h)));
-  }else if(e.type==='line'){
-   data.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Longitud',dist(e.a,e.b)));
-  }else if(e.type==='circle'||e.type==='arc'){
-   data.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
-   if(e.type==='circle')data.push(measure('Perímetro',TAU*e.r));
-   else data.push(measure('Longitud',e.r*arcSweep(e.a0,e.a1)),'Ángulo incluido: '+format(arcSweep(e.a0,e.a1)*180/Math.PI)+'°');
-  }else if(e.type==='polyline'){
-   const path=cadQuickPathInfo(e);
-   data.push(e.closed?'Cerrada · '+path.sides+' lados':'Abierta · '+e.pts.length+' vértices',
-    measure(e.closed?'Perímetro':'Longitud',path.length));
-  }else if(e.type==='ellipse'){
-   data.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry));
-  }else if(e.type==='blockRef')data.push('Bloque: '+e.blockName,'Inserción: '+point(e.p));
-  else if(e.type==='hatch')data.push('Patrón: '+(e.hatchStyle||'solid'));
-  else if(e.type==='text')data.push('Texto: '+e.text,measure('Altura',e.h));
-  if(cadQuickWidthEntity(e))data.push(measure('Grosor global',e.pwidth||0));
-  const area=cadEntityArea(e);
-  if(Number.isFinite(area))data.push('Área: '+format(area)+' '+state.unit+'²');
-  return data.join('\n');
- });
- const content=chosen.length+(chosen.length===1?' objeto seleccionado':' objetos seleccionados')+' · '+state.unit+
-  '\n\n'+rows.join('\n\n──────────────────────────────\n\n');
+ const unit=state.unit,records=chosen.map(e=>cadListRecord(e,layerFor(e),unit,state.precision));
+ const sum=k=>records.reduce((n,r)=>n+(Number.isFinite(r[k])?r[k]:0),0);
+ const count=k=>records.filter(r=>Number.isFinite(r[k])).length;
+ const fmt=n=>n.toFixed(state.precision);
+ const summary=[chosen.length+' objeto(s) seleccionado(s) · '+unit];
+ if(count('length'))summary.push('Suma de longitudes y perímetros: '+fmt(sum('length'))+' '+unit+' ('+count('length')+' objetos)');
+ if(count('area'))summary.push('Suma de áreas: '+fmt(sum('area'))+' '+unit+'² ('+count('area')+' objetos; no descuenta superposiciones)');
+ const rows=records.map(r=>r.report);
+ const content=summary.join('\n')+'\n\n'+rows.join('\n\n──────────────────────────────\n\n');
  log('LIST · '+chosen.length+' objeto(s)\n'+rows.slice(0,15).join('\n\n'));
  $('cadListResult')?.remove();
  const box=document.createElement('section');box.id='cadListResult';box.setAttribute('role','dialog');
  box.setAttribute('aria-label','LIST · Objetos seleccionados');
- box.innerHTML='<header><strong>LIST · OBJETOS</strong><button type="button">Cerrar</button></header><pre></pre>';
+ box.innerHTML='<header style="flex-wrap:wrap"><strong>LIST · OBJETOS</strong><div style="display:flex;gap:4px"><button type="button" data-txt>TXT</button><button type="button" data-csv>CSV</button><button type="button" data-close>Cerrar</button></div></header><pre></pre>';
  box.querySelector('pre').textContent=content;
- const close=box.querySelector('button');
+ const close=box.querySelector('[data-close]');
  function dismiss(){box.remove();canvas.focus({preventScroll:true})}
  close.onclick=dismiss;
+ box.querySelector('[data-txt]').onclick=()=>download('LIST-objetos.txt',content,'text/plain;charset=utf-8');
+ box.querySelector('[data-csv]').onclick=()=>download('LIST-objetos.csv',cadListCsv(records,unit),'text/csv;charset=utf-8');
  box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
  document.body.append(box);close.focus({preventScroll:true});
 }
@@ -5440,8 +5487,9 @@ function cadApplyWindowSelection(start,end,shift,path){
  const useLasso=Array.isArray(path)&&path.length>=2;
  const poly=useLasso?[start,...path]:null;
  const l=Math.min(start.x,end.x),r=Math.max(start.x,end.x),t=Math.min(start.y,end.y),b=Math.max(start.y,end.y);
+ const lookup=cadSelectionLayerLookup();
  const ids=state.entities.filter(e=>{
-  const layer=layerFor(e);if(!layer.visible||layer.locked)return false;
+  const layer=lookup(e);if(!layer.visible||layer.locked)return false;
   const bb=cadSelectionBox(e);if(!bb)return false;
   if(poly)return cadLassoHitsBox(poly,bb,crossing);
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
@@ -6066,8 +6114,15 @@ document.addEventListener('contextmenu',ev=>{
 });
 function boundsEntity(e){if(cadIsMText(e)){const bs=cadMTextLines(e).map(boundsEntity).filter(Boolean);if(!bs.length)return {minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};return {minX:Math.min(...bs.map(b=>b.minX)),minY:Math.min(...bs.map(b=>b.minY)),maxX:Math.max(...bs.map(b=>b.maxX)),maxY:Math.max(...bs.map(b=>b.maxY))}}if(e.type==='blockRef'){
   const kids=cadBlockChildrenCached(e),hit=cadChildCache.get(e);if(hit&&hit.out===kids&&hit.box)return {...hit.box};
-  const boxes=kids.map(boundsEntity).filter(Boolean);
-  const box=boxes.length?{minX:Math.min(...boxes.map(b=>b.minX)),minY:Math.min(...boxes.map(b=>b.minY)),maxX:Math.max(...boxes.map(b=>b.maxX)),maxY:Math.max(...boxes.map(b=>b.maxY))}:{minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
+  // Accumulate bounds directly: large blocks must not exceed the argument limit
+  // of Math.min/Math.max or allocate four additional coordinate arrays.
+  let box=null;
+  for(const child of kids){
+   const b=boundsEntity(child);if(!b)continue;
+   if(!box)box={minX:b.minX,minY:b.minY,maxX:b.maxX,maxY:b.maxY};
+   else{box.minX=Math.min(box.minX,b.minX);box.minY=Math.min(box.minY,b.minY);box.maxX=Math.max(box.maxX,b.maxX);box.maxY=Math.max(box.maxY,b.maxY)}
+  }
+  if(!box)box={minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
   if(hit&&hit.out===kids)hit.box=box;return {...box};
  }if(e.type==='dimension'){const all=dimensionPrimitives(e).map(boundsEntity).filter(Boolean);if(!all.length)return null;return {minX:Math.min(...all.map(x=>x.minX)),minY:Math.min(...all.map(x=>x.minY)),maxX:Math.max(...all.map(x=>x.maxX)),maxY:Math.max(...all.map(x=>x.maxY))}}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse')pts.push(P(e.c.x-e.rx,e.c.y-e.ry),P(e.c.x+e.rx,e.c.y+e.ry));if(e.type==='hatch')pts=e.pts||[];if(e.type==='text'){if(e.textPath==='circle'){const r=Number(e.textRadius)||0;pts.push(P(e.p.x-r-e.h,e.p.y-r-e.h),P(e.p.x+r+e.h,e.p.y+r+e.h))}else pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));}if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
 function getBounds(entities=state.entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
@@ -6420,6 +6475,7 @@ Object.assign(CAD2D_TYPED_ALIASES,{
  SELECCIONARSIMILARES:'SELECTSIMILAR',SELECCIONINVERSA:'SELECTINVERT'
 });
 const CAD_COMMANDS=[
+ ['RECOVER','RECUPERAR','Analizar DWG/DXF y descargar copia recuperada sin sobrescribir'],['DRAWINGRECOVERY','COPIAS','Abrir copias de seguridad del dibujo'],
  ['AUDIT','AUDITAR','Comprobar integridad del dibujo e informar incidencias'],
  ['LAYERSTATE','ESTADOSCAPAS','Guardar y restaurar estados de capas del dibujo'],
  ['DWGCOMPARE','COMPARE / COMPARARPLANOS','Comparar versiones DWG, DXF o CADJSON sin alterar el dibujo'],
@@ -6453,7 +6509,7 @@ const CAD_COMMANDS=[
  ['BATCHPLOT','PUBLISH / PUBLICARLAMINAS','Exportar láminas a PDF vectorial multipágina'],
  ['PLOT','','Print to vector PDF'],['QSAVE','CTRL+S','Save project locally'],
  ['OPEN','CTRL+O','Open DXF, SVG or CAD project'],['COPYCLIP','CTRL+C','Copy selected CAD objects'],['PASTECLIP','CTRL+V','Paste objects at model cursor'],['NEW','','Start a new drawing (confirmation)'],
- ['PURGE','PU','Remove unused unlocked layers'],['MANUAL','','Manual de comandos y atajos'],['EPDF','','Export printable PDF']
+ ['PURGE','PU','Limpiar capas, bloques y estilos de cota sin uso con vista previa'],['MANUAL','','Manual de comandos y atajos'],['EPDF','','Export printable PDF']
 ];
 function executeCADSearchCommand(name){
  $('cadCommandSearch').value='';$('cadCommandResults').hidden=true;
@@ -6682,15 +6738,75 @@ function cadAuditDrawing(){
  render(initial);document.body.append(box);log('AUDIT · '+initial.total+' incidencias');
 }
 
+
+/* PURGE: preview exact document resources. Never touch personal/global galleries,
+   external references, protected architectural resources or live geometry. */
+function cadPurgePlan(doc,viewportLayers,options){
+ const blocks=doc.blocks||{},styles=doc.dimStyles||{},entities=doc.entities||[];
+ const usedBlocks=new Set(),usedLayers=new Set(['0','walls','openings','dimensions','text',doc.layerId]),usedStyles=new Set([doc.activeDimStyle]);
+ const blockEntries=Object.entries(blocks);
+ // All definitions are scanned, even unused ones: a nested block is retained
+ // until its unused parent has been explicitly removed in a previous pass.
+ const visit=e=>{if(!e||typeof e!=='object')return;if(typeof e.blockName==='string')usedBlocks.add(e.blockName)};
+ entities.forEach(visit);
+ for(const [,def] of blockEntries)if(Array.isArray(def?.entities))def.entities.forEach(visit);
+ const removeBlocks=options.blocks?blockEntries.filter(([name,d])=>d&&Array.isArray(d.entities)&&!usedBlocks.has(name)&&!name.startsWith('xref:')&&!name.startsWith('*')&&!d.xref&&!d.libraryLayer0&&!d.parametric&&!d.arq&&!d.dynamic2d&&!d.pro&&!d.protected).map(([name])=>name):[];
+ const removed=new Set(removeBlocks);
+ const scan=e=>{
+  if(!e||typeof e!=='object')return;
+  if(typeof e.layer==='string')usedLayers.add(e.layer);
+  if(typeof e.dimStyleName==='string')usedStyles.add(e.dimStyleName);
+ };
+ entities.forEach(scan);
+ for(const [name,def] of blockEntries)if(!removed.has(name)&&Array.isArray(def?.entities))def.entities.forEach(scan);
+ for(const preset of doc.layerStates||[]){
+  if(preset?.current)usedLayers.add(preset.current);
+  for(const l of preset?.layers||[])if(l?.id)usedLayers.add(l.id);
+ }
+ for(const id of viewportLayers||[])usedLayers.add(id);
+ const removeLayers=options.layers?(doc.layers||[]).filter(l=>l&&typeof l.id==='string'&&!l.locked&&!l.frozen&&!usedLayers.has(l.id)&&!String(l.name||'').includes('|')&&!/^xref/i.test(l.id)).map(l=>l.id):[];
+ const removeStyles=options.styles?Object.keys(styles).filter(k=>!usedStyles.has(k)&&!/^standard$/i.test(k)):[];
+ return {blocks:removeBlocks,layers:removeLayers,styles:removeStyles};
+}
+function cadPurgeViewportLayers(){
+ const ids=new Set();
+ const add=vps=>{for(const v of vps||[])for(const id of v?.frozenLayers||[])ids.add(id)};
+ add(cadLayoutViewports);
+ for(const layout of cadLayouts||[])add(layout?.state?.viewports);
+ return ids;
+}
 function purgeUnusedCadLayers(){
- const references=new Set(state.entities.map(e=>e.layer));
- for(const block of Object.values(state.blocks))for(const e of block.entities)references.add(e.layer);
- references.add(state.layerId);references.add('0');
- const removable=state.layers.filter(layer=>!references.has(layer.id)&&!layer.locked);
- if(!removable.length)return toast('PURGE: no unused unlocked layers');
- if(!window.confirm('Remove '+removable.length+' unused layer(s)? This can be undone.'))return;
- saveHistory();state.layers=state.layers.filter(layer=>!removable.includes(layer));
- updateAll();log('PURGE '+removable.length+' unused layers');toast('Removed '+removable.length+' unused layers');
+ if(cadBlockEdit)return toast('Cerrá BEDIT antes de limpiar el dibujo.');
+ if($('cadPurgeDialog'))return;
+ if(!Array.isArray(state.entities)||!Array.isArray(state.layers)||Object.values(state.blocks||{}).some(d=>!Array.isArray(d?.entities)))return toast('PURGE: estructura inválida; revisá el dibujo antes de limpiar.');
+ const d=document.createElement('div');d.id='cadPurgeDialog';d.className='modal-backdrop show';
+ d.innerHTML='<div class="modal" style="max-width:540px"><div class="modal-head"><h2>PURGE · Recursos sin uso</h2><button type="button" class="btn" data-close>×</button></div><p>Revisá el listado antes de eliminar. No borra objetos del dibujo, bloques de galería ni referencias externas.</p><div style="display:grid;gap:8px"><label><input type="checkbox" data-kind="layers" checked> Capas sin uso</label><label><input type="checkbox" data-kind="blocks"> Bloques del plano sin referencias</label><label><input type="checkbox" data-kind="styles"> Estilos de cota sin uso</label></div><pre style="white-space:pre-wrap;max-height:40vh;overflow:auto;font-size:12px"></pre><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn primary" data-apply>Limpiar selección</button></div><p>Los bloques anidados se conservan mientras exista su definición padre. Ctrl+Z permite deshacer.</p></div>';
+ const options=()=>Object.fromEntries([...d.querySelectorAll('[data-kind]')].map(x=>[x.dataset.kind,x.checked]));
+ const plan=()=>cadPurgePlan(state,cadPurgeViewportLayers(),options());
+ const total=p=>p.layers.length+p.blocks.length+p.styles.length;
+ function render(){
+  const p=plan(),names=new Map(state.layers.map(l=>[l.id,l.name||l.id]));
+  const sections=[['Capas',p.layers.map(id=>names.get(id)||id)],['Bloques',p.blocks],['Estilos de cota',p.styles]];
+  d.querySelector('pre').textContent=sections.map(([title,items])=>title+' ('+items.length+')'+(items.length?'\n  '+items.join('\n  '):' · ninguno')).join('\n\n');
+  d.querySelector('[data-apply]').disabled=!total(p);
+  return p;
+ }
+ d.querySelectorAll('[data-kind]').forEach(x=>x.onchange=render);
+ d.querySelectorAll('[data-close]').forEach(x=>x.onclick=()=>d.remove());
+ d.onclick=e=>{if(e.target===d)d.remove()};
+ d.querySelector('[data-apply]').onclick=()=>{
+  if(cadBlockEdit)return toast('Cerrá BEDIT antes de limpiar.');
+  const p=render();if(!total(p))return;
+  if(!window.confirm('Eliminar '+total(p)+' recursos listados del proyecto? No se elimina geometría del modelo.'))return;
+  saveHistory();
+  const layers=new Set(p.layers);state.layers=state.layers.filter(l=>!layers.has(l.id));
+  for(const key of p.blocks)delete state.blocks[key];
+  for(const key of p.styles)delete state.dimStyles[key];
+  updateAll();log('PURGE · '+p.layers.length+' capas · '+p.blocks.length+' bloques · '+p.styles.length+' estilos');
+  toast('PURGE · '+total(p)+' recursos eliminados · Ctrl+Z para deshacer');
+  render();
+ };
+ render();document.body.append(d);
 }
 function copyCadProperties(from,to){
  for(const field of ['color','width','linetype']){
@@ -7420,7 +7536,96 @@ async function cadBakChooseDir(){
  if(!window.showDirectoryPicker)return toast('Este navegador no permite elegir carpeta: usá Chrome o Edge. Las copias igual se guardan en el navegador.');
  try{const d=await window.showDirectoryPicker({id:'cad2d-bak',mode:'readwrite'});cadBakDir=d;await backupTransaction('readwrite',st=>st.put(d,'bakdir'));toast('Copias .bak en la carpeta «'+d.name+'» cada '+(cad2dSaveMinutes||5)+' min');cadWriteBak().catch(()=>{})}catch(e){}
 }
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','RECUPERAR','RECOVER'])X.commands[k]=()=>cadShowBackups();X.commands.CARPETABAK=()=>cadBakChooseDir();X.commands.CARPETADWGBAK=()=>cadDwgChooseBakDir()}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of ['COPIAS','BACKUPS','BAK','DRAWINGRECOVERY'])X.commands[k]=()=>cadShowBackups();for(const k of ['RECUPERAR','RECOVER'])X.commands[k]=()=>cadRecoverDialog();X.commands.CARPETABAK=()=>cadBakChooseDir();X.commands.CARPETADWGBAK=()=>cadDwgChooseBakDir()}
+
+/* RECOVER: conservative ASCII DXF tail salvage. Never overwrite source or
+   replace the active model. All recovered geometry passes the existing reader. */
+function cadRecoverDxfTail(input){
+ const raw=String(input||'').replace(/^\uFEFF/,'').replace(/\r\n/g,'\n');
+ if(raw.length>64*1024*1024||raw.includes('\0')||/^AutoCAD Binary DXF/i.test(raw))throw Error('DXF binario o superior a 64 MiB');
+ let offset=0,section='',pending=false,completeEntities=false,lastClosed=0,lastEntity=-1,compound=-1,lastType='',sequence=false,eof=0,invalid=false;
+ const warnings=[];
+ function line(){if(offset>=raw.length)return null;const end=raw.indexOf('\n',offset),start=offset;offset=end<0?raw.length:end+1;return {value:raw.slice(start,end<0?raw.length:end),start}}
+ while(offset<raw.length){
+  const a=line(),b=line();
+  if(!a||!b){if(a?.value.trim())warnings.push('Último par DXF incompleto');break}
+  if(!/^\s*\d{1,4}\s*$/.test(a.value)){invalid=true;break}
+  const key=Number(a.value),v=b.value.trim();
+  if(pending){if(key!==2||!v){invalid=true;break}section=v;pending=false;lastEntity=-1;compound=-1;sequence=false;lastType='';continue}
+  if(key===0&&v==='SECTION'){if(section){invalid=true;break}pending=true;continue}
+  if(key===0&&v==='ENDSEC'){if(!section||sequence){invalid=true;break}if(section==='ENTITIES')completeEntities=true;section='';lastClosed=offset;lastEntity=-1;continue}
+  if(key===0&&v==='EOF'){if(section||pending){invalid=true;break}eof=offset;break}
+  if(section==='ENTITIES'){
+   if(key===0){
+    if(v==='POLYLINE'||v==='INSERT'){compound=a.start;sequence=v==='POLYLINE'}
+    else if(v==='VERTEX'||v==='ATTRIB'){if(compound<0){invalid=true;break}sequence=true}
+    else if(v==='SEQEND'){if(compound<0){invalid=true;break}sequence=false;compound=-1}
+    else {if(sequence){invalid=true;break}compound=-1}
+    lastEntity=a.start;lastType=v;
+   }else if(key===66&&v==='1'&&lastType==='INSERT')sequence=true;
+  }
+ }
+ if(invalid)throw Error('Estructura interna irregular; no se pueden distinguir registros seguros. Probá COPIAS.');
+ if(eof){
+  if(!completeEntities)throw Error('No se encontró una sección ENTITIES completa');
+  if(raw.slice(eof).trim())warnings.push('Se omitieron datos posteriores a EOF (incluidos metadatos nativos, si existían).');
+  return {text:raw.slice(0,eof).trimEnd()+'\n',warnings};
+ }
+ if(completeEntities&&lastClosed){
+  warnings.push('Se conservaron las secciones completas; se descartó la cola incompleta y se añadió EOF.');
+  return {text:raw.slice(0,lastClosed).trimEnd()+'\n0\nEOF\n',warnings};
+ }
+ if(section==='ENTITIES'&&lastEntity>=0){
+  // The final record may be truncated even if the last group is paired.
+  // Drop it in full, including a possible compound POLYLINE/INSERT sequence.
+  const cut=compound>=0?compound:lastEntity;
+  if(lastType==='SEQEND')throw Error('Secuencia final sin delimitador seguro; probá COPIAS.');
+  warnings.push('Se descartó el último registro o conjunto incompleto de ENTITIES; se añadieron ENDSEC y EOF.');
+  return {text:raw.slice(0,cut).trimEnd()+'\n0\nENDSEC\n0\nEOF\n',warnings};
+ }
+ throw Error('No hay una sección de geometría recuperable con seguridad. Probá COPIAS.');
+}
+function cadRecoverDialog(){
+ if(cadBlockEdit)return toast('Cerrá BEDIT antes de RECOVER.');
+ if($('cadRecoverDialog'))return;
+ const d=document.createElement('div');d.id='cadRecoverDialog';d.className='modal-backdrop show';
+ d.innerHTML='<div class="modal" style="max-width:560px"><div class="modal-head"><h2>RECOVER · Recuperar dibujo</h2><button type="button" class="btn" data-close>×</button></div><p>Recuperá geometría legible de un DWG, DXF o copia de seguridad. El archivo original y el dibujo abierto permanecen intactos.</p><input type="file" accept=".dwg,.dxf,.bak,.sv$,.tmp" data-file><pre style="white-space:pre-wrap;max-height:36vh;overflow:auto" data-info></pre><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn" data-backups>Copias de seguridad</button><button type="button" class="btn primary" data-run>Analizar archivo</button><button type="button" class="btn" data-save disabled>Descargar proyecto recuperado</button></div><p>La recuperación puede ser parcial: no reconstruye datos perdidos ni repara directamente el binario DWG.</p></div>';
+ const file=d.querySelector('[data-file]'),info=d.querySelector('[data-info]'),run=d.querySelector('[data-run]'),save=d.querySelector('[data-save]');let result=null,busy=false;
+ d.querySelector('[data-close]').onclick=()=>d.remove();
+ d.onclick=e=>{if(e.target===d)d.remove()};
+ d.querySelector('[data-backups]').onclick=()=>{d.remove();cadShowBackups().catch(e=>toast('COPIAS: '+e.message))};
+ file.onchange=()=>{result=null;save.disabled=true;info.textContent=''};
+ run.onclick=async()=>{
+  if(busy)return;
+  const f=file.files[0];if(!f)return toast('RECOVER: elegí un archivo');
+  if(f.size>64*1024*1024)return toast('RECOVER: máximo 64 MiB por archivo');
+  if(cadDxfActiveJob)return toast('Finalizá primero la importación en curso');
+  busy=true;file.disabled=true;run.disabled=true;save.disabled=true;result=null;
+  info.textContent='Analizando archivo local…';
+  try{
+   const header=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer());
+   const isDwg=/^AC10\d\d/.test(header)||/\.dwg$/i.test(f.name);
+   if(!isDwg&&/^\s*[\[{]/.test(header))throw Error('La copia es un proyecto JSON. Usá COPIAS o ABRIR; esta recuperación es para DWG/DXF.');
+   const txt=isDwg?await convertDWGAutomatically(new File([f],f.name.replace(/\.[^.]+$/,'.dwg'),{type:f.type}),{textOnly:true}):await cadDxfDecode(await f.arrayBuffer());
+   const repaired=cadRecoverDxfTail(txt);
+   if(cadDxfActiveJob)throw Error('Hay otra lectura DXF en curso');
+   const parsed=await cadParseDXFWorker(repaired.text,readDimensionStyle());
+   if(!parsed.entities.length&&!Object.keys(parsed.blocks||{}).length)throw Error('No se recuperaron entidades ni definiciones de bloque compatibles');
+   let unit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode];
+   if(!unit){const v=window.prompt('Unidades ORIGINALES del dibujo recuperado (mm, cm, m, in, ft):','mm');if(v===null)throw Error('Recuperación cancelada');unit=v.trim().toLowerCase();if(!U[unit])throw Error('Unidad inválida')}
+   const layers=parsed.layers.length?parsed.layers:[{id:'0',name:'0',visible:true,locked:false,color:'#c6cbd1',width:.25,linetype:'CONTINUOUS'}];
+   const filename=cadCleanDrawingName(f.name.replace(/\.[^.]+$/,''))+'-RECUPERADO';
+   const nextId=parsed.entities.reduce((n,e)=>Math.max(n,e.id||0),0)+1;
+   result={format:'CAD2D-2',filename,modelScale:'1:1',entities:parsed.entities,layers,layerId:layers[0].id,blocks:parsed.blocks||{},dimStyles:parsed.dimStyles||{},activeDimStyle:'',layerStates:[],unit,grid:unit==='m'?1:unit==='mm'?100:10,precision:2,nextId};
+   info.textContent='Geometría legible recuperada: '+parsed.entities.length+' objetos · '+layers.length+' capas · '+Object.keys(result.blocks).length+' bloques · '+unit+'\n\n'+[...repaired.warnings,...(parsed.warnings||[]).map(w=>'Compatibilidad: '+w),'La copia CADJSON conserva el modelo 2D interpretado; no garantiza recuperar láminas, metadatos nativos o geometría no soportada. Revisá el plano antes de utilizarlo.'].join('\n');
+   save.disabled=false;
+  }catch(e){info.textContent='No fue posible recuperar el archivo: '+e.message+'\nEl original y el dibujo abierto no se modificaron. Probá COPIAS.'}
+  finally{busy=false;run.disabled=false;file.disabled=false}
+ };
+ save.onclick=()=>{if(result)download(result.filename+'.cadjson',JSON.stringify(result),'application/json')};
+ document.body.append(d);
+}
+
 async function cadShowBackups(){
  document.getElementById('cadBakDlg')?.remove();
  const keys=(await cadBakKeys()).sort((a,b)=>+b.split(':').pop()- +a.split(':').pop());
@@ -7863,21 +8068,23 @@ function cadApplyParsedDXF(parsed,name){
 
 
 var cadDxfOpenSequence=0,cadDxfActiveJob=null;
-function cadParseDXFWorker(text,style){
- if(typeof Worker==='undefined')return Promise.resolve().then(()=>window.CAD2DDxfParser.parse(text,{},style));
+function cadParseDXFWorker(text,style,options={}){
+ if(typeof Worker==='undefined')return Promise.resolve().then(()=>window.CAD2DDxfParser.parse(text,options,style));
  return new Promise((resolve,reject)=>{
   let worker,timer,finished=false;
   const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
   const cancel=()=>finish(Error('Importación cancelada; dibujo anterior conservado'));
   if(cadDxfActiveJob)cadDxfActiveJob();
-  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-worker-v1',document.baseURI));}
+  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-memory-v1',document.baseURI));}
   catch(e){return finish(Error('No se pudo iniciar el lector DXF local: '+e.message))}
   cadDxfActiveJob=cancel;
-  timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),45000);
+  // Allow larger local drawings more time, with a bounded watchdog.
+  const timeout=Math.min(180000,45000+Math.floor(text.length/1000000)*3000);
+  timer=setTimeout(()=>finish(Error('El lector DXF excedió el tiempo límite; dibujo anterior conservado')),timeout);
   worker.onmessage=e=>{const {error,result}=e.data||{};finish(error?Error(error):!result?Error('Respuesta inválida del lector DXF'):null,result)};
   worker.onerror=e=>finish(Error('Error del lector DXF local: '+(e.message||'recargá CAD2D3D')));
   worker.onmessageerror=()=>finish(Error('No se pudo recuperar el modelo del lector local'));
-  try{worker.postMessage({text,options:{},style});}catch(e){finish(e)}
+  try{worker.postMessage({text,options,style});}catch(e){finish(e)}
  });
 }
 async function cadOpenDXFAsync(text,name){
@@ -7892,7 +8099,7 @@ async function cadOpenDXFAsync(text,name){
    Se ubica con un clic (esquina inferior izquierda del plano) y respeta las unidades del dibujo. */
 async function cadInsertDxfPlan(url,label,opts={}){
  let parsed;
- try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=importDXF(await cadDxfDecode(await r.arrayBuffer()),label||'plano',{parseOnly:true})}
+ try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=await cadParseDXFWorker(await cadDxfDecode(await r.arrayBuffer()),readDimensionStyle(),{parseOnly:true})}
  catch(e){return toast('No se pudo cargar el plano: '+e.message)}
  const fromUnit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
  let minX=Infinity,minY=Infinity;
@@ -11475,7 +11682,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
 <script src="cad-arq-pro.js?v=20261123-document-blocks-v3"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261124-worker-v1"></script>
+<script src="cad-dxf-parser.js?v=20261124-memory-v1"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261123-local-bidirectional-v4"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
@@ -11485,5 +11692,5 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
-<script defer src="cad3d-lab.js?v=20261124-massprop-v1"></script>
+<script defer src="cad3d-lab.js?v=20261124-massprop-interfere-v1"></script>
 </body></html>
