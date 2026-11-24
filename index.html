@@ -1692,16 +1692,20 @@ function cadJoinGeneratedArqFaces(pairs){
    nodes.get(k).push({pair,tip,p,u,t:m.thickness});
   }
  }
- // A T whose host is not segmented needs the existing generic joiner.
+ // Add virtual through-arms at interior T nodes; never rejoin the whole
+ // plan with the order-dependent interactive wall joiner.
  for(const arms of nodes.values())for(const pair of pairs){
   const p=arms[0].p,m=pair[0].wall2d,a=m.guideA,b=m.guideB;
-  if(Math.abs(a.x-b.x)<eps&&Math.abs(p.x-a.x)<eps&&p.y>Math.min(a.y,b.y)+eps&&p.y<Math.max(a.y,b.y)-eps)return false;
-  if(Math.abs(a.y-b.y)<eps&&Math.abs(p.y-a.y)<eps&&p.x>Math.min(a.x,b.x)+eps&&p.x<Math.max(a.x,b.x)-eps)return false;
+  let u=null;
+  if(Math.abs(a.x-b.x)<eps&&Math.abs(p.x-a.x)<eps&&p.y>Math.min(a.y,b.y)+eps&&p.y<Math.max(a.y,b.y)-eps)u={x:0,y:1};
+  if(Math.abs(a.y-b.y)<eps&&Math.abs(p.y-a.y)<eps&&p.x>Math.min(a.x,b.x)+eps&&p.x<Math.max(a.x,b.x)-eps)u={x:1,y:0};
+  if(u)arms.push({virtual:true,p,u,t:m.thickness},{virtual:true,p,u:{x:-u.x,y:-u.y},t:m.thickness});
  }
  const dot=(a,b)=>a.x*b.x+a.y*b.y;
  for(const arms of nodes.values()){
   if(arms.length<2)continue;
   for(const arm of arms){
+   if(arm.virtual)continue;
    const others=arms.filter(x=>x!==arm),opposite=others.some(x=>dot(x.u,arm.u)<-.99);
    for(const face of arm.pair){
     const p=arm.p,base=face[arm.tip],offset={x:base.x-p.x,y:base.y-p.y};
