@@ -173,10 +173,88 @@ async function fileRow(file,unknownUnit){
  const name=safe(file.name.replace(/\.(dwg|dxf)$/i,'').replace(/__[a-f0-9]{12}$/i,'').replace(/_/g,' '))||'Bloque';
  return ['userdx4-'+hash.slice(0,20),'archivo-'+hash,name,categoryFor(file),w,d,btoa(binary),hash,0];
 }
+
+// ZIP classic (stored/deflate), parsed locally. No extraction to disk or network.
+const ZIP_MAX=256*1024*1024, ZIP_ENTRY=64*1024*1024, ZIP_TOTAL=1024*1024*1024, ZIP_COUNT=20000;
+const crcTable=Uint32Array.from({length:256},(_,i)=>{let v=i;for(let j=0;j<8;j++)v=(v&1)?(0xedb88320^(v>>>1)):(v>>>1);return v>>>0});
+function zipCRC(bytes){let c=0xffffffff;for(const b of bytes)c=crcTable[(c^b)&255]^(c>>>8);return (c^0xffffffff)>>>0}
+function zipDirectory(buffer){
+ const bytes=new Uint8Array(buffer),v=new DataView(buffer),u16=i=>v.getUint16(i,true),u32=i=>v.getUint32(i,true);
+ if(bytes.length<22||bytes.length>ZIP_MAX)throw Error('ZIP vacío o mayor a 256 MiB');
+ let end=-1;
+ for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--)if(u32(i)===0x06054b50&&i+22+u16(i+20)===bytes.length){end=i;break}
+ if(end<0)throw Error('Directorio ZIP no encontrado');
+ const count=u16(end+10),size=u32(end+12),offset=u32(end+16);
+ if(u16(end+4)||u16(end+6)||u16(end+8)!==count||count===65535||size===0xffffffff||offset===0xffffffff)throw Error('ZIP64 o ZIP multidisco no compatible');
+ if(count>ZIP_COUNT||offset+size>end)throw Error('Directorio ZIP inválido o demasiado grande');
+ const rows=[];let p=offset;
+ for(let n=0;n<count;n++){
+  if(p+46>offset+size||u32(p)!==0x02014b50)throw Error('Entrada ZIP inválida');
+  const flags=u16(p+8),method=u16(p+10),crc=u32(p+16),compressed=u32(p+20),length=u32(p+24),nl=u16(p+28),xl=u16(p+30),cl=u16(p+32),local=u32(p+42);
+  if(p+46+nl+xl+cl>offset+size)throw Error('Nombre ZIP truncado');
+  const name=new TextDecoder(flags&2048?'utf-8':'windows-1252').decode(bytes.subarray(p+46,p+46+nl)).replace(/\\/g,'/');
+  p+=46+nl+xl+cl;
+  if(!/\.(dwg|dxf|zip)$/i.test(name)||name.startsWith('__MACOSX/')||name.split('/').some(x=>x==='..'||x.startsWith('._'))||name.startsWith('/')||/^[A-Za-z]:/.test(name))continue;
+  rows.push({name,flags,method,crc,compressed,length,local});
+ }
+ return {bytes,v,rows,offset};
+}
+async function zipExtract(z,r){
+ if(r.flags&1)throw Error('Entrada ZIP cifrada');
+ if(r.length>ZIP_ENTRY||r.compressed>ZIP_ENTRY||r.length===0xffffffff||r.local===0xffffffff)throw Error('Entrada ZIP mayor a 64 MiB o ZIP64');
+ if(r.local+30>z.offset||z.v.getUint32(r.local,true)!==0x04034b50)throw Error('Cabecera local ZIP inválida');
+ if(z.v.getUint16(r.local+8,true)!==r.method||(z.v.getUint16(r.local+6,true)&1))throw Error('Cabecera ZIP inconsistente');
+ const begin=r.local+30+z.v.getUint16(r.local+26,true)+z.v.getUint16(r.local+28,true);
+ if(begin+r.compressed>z.offset)throw Error('Datos ZIP truncados');
+ const src=z.bytes.subarray(begin,begin+r.compressed);let out;
+ if(r.method===0){if(src.length!==r.length)throw Error('Longitud ZIP inválida');out=src.slice()}
+ else if(r.method===8){
+  if(typeof DecompressionStream!=='function')throw Error('El navegador no dispone de descompresión ZIP');
+  const reader=new Blob([src]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+  out=new Uint8Array(r.length);let pos=0;
+  try{while(true){const {value,done}=await reader.read();if(done)break;if(pos+value.length>out.length)throw Error('ZIP excede longitud declarada');out.set(value,pos);pos+=value.length}}
+  finally{await reader.cancel().catch(()=>{});reader.releaseLock()}
+  if(pos!==out.length)throw Error('Longitud ZIP descomprimida inválida');
+ }else throw Error('Compresión ZIP no compatible: '+r.method);
+ if(zipCRC(out)!==r.crc)throw Error('CRC ZIP incorrecto');
+ return out.buffer;
+}
+async function collectZip(buffer,prefix,state,depth=0){
+ if(depth>4)throw Error('Máximo cuatro niveles de ZIP internos');
+ const z=zipDirectory(buffer);
+ for(const r of z.rows){
+  if(state.shouldStop())return;
+  if(++state.count>ZIP_COUNT)throw Error('Máximo 20.000 entradas CAD/ZIP por lote');
+  const full=prefix+'/'+r.name;
+  try{
+   if(r.length>ZIP_ENTRY)throw Error('Entrada mayor a 64 MiB');
+   if(state.bytes+r.length>ZIP_TOTAL)throw Error('Límite de 1 GiB descomprimido por lote');
+   state.bytes+=r.length;
+   if(/\.zip$/i.test(r.name))await collectZip(await zipExtract(z,r),full,state,depth+1);
+   else{
+    const name=r.name.split('/').at(-1);
+    state.files.push({name,webkitRelativePath:full,size:r.length,arrayBuffer:()=>zipExtract(z,r)});
+   }
+  }catch(e){state.failed.push({file:full,error:String(e.message||e)})}
+ }
+}
+async function expandArchives(files,onProgress,shouldStop){
+ const state={files:[],failed:[],bytes:0,count:0,shouldStop};
+ for(const f of files){
+  if(shouldStop())break;
+  if(!/\.zip$/i.test(f.name)){state.files.push(f);continue}
+  onProgress({scanning:true,file:f.name});
+  try{if(f.size>ZIP_MAX)throw Error('ZIP mayor a 256 MiB');await collectZip(await f.arrayBuffer(),f.name,state)}
+  catch(e){state.failed.push({file:f.name,error:String(e.message||e)})}
+ }
+ return state;
+}
+
 async function importDrawings(files,unknownUnit=0,onProgress=()=>{},shouldStop=()=>false){
  if(busy)throw Error('Ya hay una importación en curso');
- busy=true;let added=0,duplicates=0,failed=[],processed=0;
+ busy=true;let added=0,duplicates=0,failed=[],processed=0,total=0;
  try{
+  const expanded=await expandArchives(files,onProgress,shouldStop);files=expanded.files;failed=expanded.failed;total=files.length;
   await restore();await loadExisting();
   for(const file of files){
    if(shouldStop())break;
@@ -186,17 +264,17 @@ async function importDrawings(files,unknownUnit=0,onProgress=()=>{},shouldStop=(
     if(!row)throw Error('Bloque vectorial no válido');
     const fresh=filterNew([row]);
     if(fresh.length){await persist(fresh);added+=register(fresh)}else duplicates++;
-   }catch(e){failed.push({file:file.name,error:String(e.message||e)})}
+   }catch(e){failed.push({file:file.webkitRelativePath||file.name,error:String(e.message||e)})}
    processed++;onProgress({processed,total:files.length,added,duplicates,failed:failed.length,file:file.name});
   }
-  return {processed,added,duplicates,failed};
+  return {processed,total,added,duplicates,failed};
  }finally{busy=false;refresh()}
 }
 function openDrawingImport(){
  if(busy)return;
  const pane=document.createElement('dialog');
  pane.style.cssText='background:#23313b;color:#f2f5f6;border:1px solid #657985;border-radius:10px;padding:16px;width:min(480px,90vw)';
- pane.innerHTML='<strong>Importar bloques DWG / DXF</strong><p>Los dibujos se convierten localmente. Los bloques con errores o geometría incompleta no se incorporan. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".dwg,.dxf,.json"></label><p><label>Unidad si el dibujo no la declara: <select><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
+ pane.innerHTML='<strong>Importar bloques ZIP / DWG / DXF</strong><p>Seleccioná ZIP completos o dibujos sueltos. Se leen las carpetas y ZIP internos sin descomprimir manualmente. Los dibujos se convierten localmente. Los bloques con errores o geometría incompleta no se incorporan. Las curvas se aproximan con segmentos. Verificá las medidas.</p><label>Archivos <input type="file" multiple accept=".zip,.dwg,.dxf,.json,application/zip"></label><p><label>Unidad si el dibujo no la declara: <select><option value="0">Omitir sin unidad</option><option value="1">Metros</option><option value=".01">Centímetros</option><option value=".001">Milímetros</option><option value=".0254">Pulgadas</option></select></label></p><div role="status" style="white-space:pre-wrap;max-height:200px;overflow:auto"></div><p><button type="button" class="btn slim" data-start>Importar</button> <button type="button" class="btn slim" data-close>Cerrar</button></p>';
  document.body.appendChild(pane);
  const status=pane.querySelector('[role=status]'),start=pane.querySelector('[data-start]'),close=pane.querySelector('[data-close]'),input=pane.querySelector('input'),unit=pane.querySelector('select');
  let active=false,stop=false;
@@ -209,8 +287,8 @@ function openDrawingImport(){
   try{
    if(files.length===1&&/\.json$/i.test(files[0].name)){const r=await importFile(files[0]);status.textContent=r?JSON.stringify(r):'Importación no iniciada';return}
    if(files.some(f=>/\.json$/i.test(f.name)))throw Error('Importá cada paquete JSON por separado');
-   const r=await importDrawings(files,Number(unit.value),p=>{status.textContent=p.processed+'/'+p.total+' · '+p.added+' nuevos · '+p.duplicates+' duplicados · '+p.failed+' rechazados\n'+p.file},()=>stop);
-   status.textContent=r.processed+'/'+files.length+' procesados · '+r.added+' nuevos · '+r.duplicates+' duplicados · '+r.failed.length+' rechazados\n'+r.failed.slice(0,20).map(x=>x.file+': '+x.error).join('\n')+(r.failed.length>20?'\nSe muestran los primeros 20 errores.':'');
+   const r=await importDrawings(files,Number(unit.value),p=>{status.textContent=p.scanning?'Leyendo ZIP: '+p.file:p.processed+'/'+p.total+' · '+p.added+' nuevos · '+p.duplicates+' duplicados · '+p.failed+' rechazados\n'+p.file},()=>stop);
+   status.textContent=r.processed+'/'+r.total+' dibujos procesados · '+r.added+' nuevos · '+r.duplicates+' duplicados · '+r.failed.length+' rechazados\n'+r.failed.slice(0,20).map(x=>x.file+': '+x.error).join('\n')+(r.failed.length>20?'\nSe muestran los primeros 20 errores.':'');
   }catch(e){status.textContent=String(e.message||e)}
   finally{active=false;start.disabled=input.disabled=unit.disabled=close.disabled=false;close.textContent='Cerrar'}
  };
