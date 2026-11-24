@@ -11453,6 +11453,58 @@ function cad2dDrawExtensions(){
   ctx.save();try{overlay(ctx)}catch(error){console.error('[CAD2D ext overlay]',error)}ctx.restore();
  }
 }
+/* ARCHGEN experimental bridge. Atomic insert; uses native opening fragments. */
+window.CAD2D_ARCHGEN_INSERT=function(models,origin,options={}){
+ if(state.unit!=='m')throw Error('ARCHGEN requiere un dibujo configurado en metros');
+ if(!Array.isArray(models)||!models.length||models.length>100||!origin||![origin.x,origin.y].every(Number.isFinite))throw Error('Selección ARCHGEN inválida');
+ const lib=window.CAD2D_ARQ_LIBRARY;if(!lib?.build)throw Error('Biblioteca arquitectónica no disponible');
+ const before=historySnapshot(),selected=state.selected.slice();
+ const layer=(name,color,width=.13)=>{
+  let l=state.layers.find(l=>l.name.toUpperCase()===name||l.id===name);
+  if(l&&(l.locked||!l.visible||l.frozen))throw Error('Capa no editable: '+name);
+  if(!l){l={id:name,name,color,visible:true,locked:false,width};state.layers.push(l)}return l.id;
+ };
+ const put=e=>{e.id=state.nextId++;state.entities.push(e);return e};
+ const rect=(a,b,l)=>put({type:'rect',a,b,layer:l,width:.25});
+ const dimension=(a,b,p,mode,l)=>put({type:'dimension',a,b,p,mode,layer:l,style:{...readDimensionStyle(),precision:2,displayUnit:'m',textHeight:.12,arrow:.08,suffix:''}});
+ try{
+  const walls=layer('MUROS','#ff3333',.30),doors=layer('PUERTAS','#e0ba83'),windows=layer('VENTANAS','#66c8df'),furniture=layer('MOBILIARIO','#d9d9d9'),sanitary=layer('SANITARIOS','#85c59b'),labels=layer('TEXTOS','#d9d9d9'),areas=layer('SUPERFICIES','#85c59b'),dims=options.dimensions!==false?layer('COTAS','#92c697'):null,floor=options.floorHatch?layer('HATCH-PISOS','#777777'):null,clearance=layer('ACCESIBILIDAD','#aab8c6');
+  const pitchX=Math.max(...models.map(m=>m.width+2*m.wall))+3,pitchY=Math.max(...models.map(m=>m.depth+2*m.wall))+3;
+  const opening=(wall,x,y,width,kind,l,flip,thick)=>{
+   const name='ARCHGEN · '+kind+' · m',params={width,frameWidth:.035,frameDepth:thick,mirror:false};
+   if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(1,0),layer:l}],parametric:{kind,defaults:{...params}},dynamicActions:true};
+   const ref=put({type:'blockRef',blockName:name,p:P(x,y),scale:1,rotation:0,layer:l,params,wallThickness:thick,autoOpeningRectId:wall.id,flipOpeningSide:flip,lineweight:.05});
+   if(cadCutRectWallForOpening(ref,width)!==1)throw Error('No se pudo vincular el vano al muro');
+  };
+  models.forEach((m,i)=>{
+   if(![m.width,m.depth,m.wall,m.door?.x,m.door?.width,m.window?.x,m.window?.width].every(Number.isFinite)||m.width<=0||m.depth<=0||m.wall<=0||!Array.isArray(m.items))throw Error('Modelo inválido');
+   const x=origin.x+i%5*pitchX,y=origin.y+Math.floor(i/5)*pitchY,w=m.width,d=m.depth,t=m.wall,p=(a,b)=>P(x+a,y+b);
+   if(floor)put({type:'hatch',pts:[p(0,0),p(w,0),p(w,d),p(0,d)],layer:floor,hatchStyle:'solid',width:.05});
+   const south=rect(p(-t,-t),p(w+t,0),walls),north=rect(p(-t,d),p(w+t,d+t),walls);
+   rect(p(-t,0),p(0,d),walls);rect(p(w,0),p(w+t,d),walls);
+   opening(south,x+m.door.x,y-t/2,m.door.width,'swing-door',doors,!!m.door.outward,t);
+   opening(north,x+m.window.x,y+d+t/2,m.window.width,'framed-window',windows,false,t);
+   for(const item of m.items){
+    const sourceId=item.sourceId||item.id,meta=lib.library.find(v=>v.id===sourceId);if(!meta||meta.pro||meta.paidOnly)throw Error('Componente libre no disponible: '+sourceId);
+    const l=item.id.startsWith('san-')?sanitary:item.id.startsWith('kq-')?layer(/^(kq-(heladera2?|cocina|anafe\d*|horno|lv|micro))$/.test(item.id)?'ELECTRODOMESTICOS':'COCINAS','#e6ab78'):furniture;
+    const built=window.CAD2D_ARCHGEN.fixtureGeometry(sourceId,lib),bb=lib.bounds(built.entities);
+    if(![bb.minX,bb.minY,bb.maxX,bb.maxY].every(Number.isFinite))throw Error('Bloque inválido');
+    const name='ARCHGEN · '+sourceId+' · m · fijo limpio';
+    if(!state.blocks[name])state.blocks[name]={name,entities:normalizeBlockEntities(built.entities.map(e=>({...e,layer:l}))),dynamic2d:false,dynamicActions:false};
+    const ang=item.rotation||0,rad=ang*Math.PI/180,c=Math.cos(rad),sn=Math.sin(rad);
+    const corners=[[bb.minX,bb.minY],[bb.maxX,bb.minY],[bb.maxX,bb.maxY],[bb.minX,bb.maxY]].map(([a,b])=>[a*c-b*sn,a*sn+b*c]);
+    const minX=Math.min(...corners.map(v=>v[0])),minY=Math.min(...corners.map(v=>v[1])),bw=Math.max(...corners.map(v=>v[0]))-minX,bd=Math.max(...corners.map(v=>v[1]))-minY;
+    if(bw>item.w+.08||bd>item.d+.08)throw Error('Componente excede su reserva: '+item.id);
+    put({type:'blockRef',blockName:name,p:p(item.x-minX,item.y-minY),rotation:ang,scale:1,layer:l});
+   }
+   if(m.turn)put({type:'circle',c:p(m.turn.x,m.turn.y),r:m.turn.r,layer:clearance,linetype:'DASHED',width:.05});
+   put({type:'text',p:p(0,-.85),text:(m.kind==='accessible'?'BAÑO ACCESIBLE':m.kind==='bedroom'?'DORMITORIO':m.kind==='kitchen'?'COCINA':'BAÑO')+' '+String(i+1).padStart(2,'0'),h:.16,rotation:0,fontFamily:'Arial',layer:labels});
+   put({type:'text',p:p(0,-1.1),text:(w*d).toFixed(2)+' m²',h:.13,rotation:0,fontFamily:'Arial',layer:areas});
+   if(dims){dimension(p(0,d),p(w,d),p(0,d+t+.35),'horizontal',dims);dimension(p(0,0),p(0,d),p(-t-.35,0),'vertical',dims)}
+  });
+  saveHistory(before);state.selected=[];updateAll();return models.length;
+ }catch(e){Object.assign(state,before);state.selected=selected;updateAll();throw e}
+};
 window.CAD2D_CORE=Object.freeze({
  get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
@@ -11712,6 +11764,8 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-local-vector-packs.js?v=20261123-selection-v1"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
+<script src="assets/cc0-bathroom-blocks.js"></script><script src="assets/cc0-kitchen-blocks.js"></script>
+<script src="cad-archgen.js?v=20261124-quality-v6"></script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
 <script defer src="cad3d-lab.js?v=20261124-massprop-interfere-v1"></script>
 </body></html>
