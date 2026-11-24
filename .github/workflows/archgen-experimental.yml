@@ -19,3 +19,13 @@ jobs:
 
       - name: Test ARCHGEN in Chromium
         run: node --test tests/archgen-browser.test.cjs
+        env:
+          ARCHGEN_SCREENSHOTS: archgen-previews
+      - name: Upload CAD screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archgen-cad-previews
+          path: archgen-previews/*.png
+          if-no-files-found: warn
+          retention-days: 14
