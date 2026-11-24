@@ -7018,23 +7018,19 @@ async function inspectDWGHeader(file){
  return {valid:true,code,release,message:'DWG identified: '+code+' (AutoCAD '+release+'), '+(file.size/1048576).toFixed(2)+' MB. Header verified only; entities, blocks, layers and 1:1 scale have NOT been read.'};
 }
 
-async function convertDWGAutomatically(file){
- if(!DWG_CONVERTER_ENDPOINT){const info=await inspectDWGHeader(file);$('dwgInspection').textContent=info.message;throw Error(info.message+' The drawing was not imported. CAD2D can currently open ASCII DXF and basic SVG. Original DWG unchanged.')}
- if(!/^https:\/\//i.test(DWG_CONVERTER_ENDPOINT))throw Error('DWG endpoint requires HTTPS.');
- {let ok=false;try{ok=localStorage.getItem('cad2d-dwg-consent')==='1'}catch(e){}
-  if(!ok){if(!window.confirm('Para abrir el archivo .dwg, CAD2D lo envía cifrado a su servicio de conversión, lo convierte a DXF y lo borra inmediatamente: no se guarda ninguna copia.\n\nSi aceptás, no se vuelve a preguntar en este navegador. ¿Continuar?'))return;try{localStorage.setItem('cad2d-dwg-consent','1')}catch(e){}}}
- const form=new FormData();form.append('file',file,file.name);
- toast('Convirtiendo '+file.name+' a DXF…');
- let response;
- const slowT=setTimeout(()=>toast('El conversor de DWG se está iniciando (pasa si estuvo un rato sin uso): puede tardar hasta un minuto. Las siguientes aperturas son inmediatas.'),6000);
- try{response=await fetch(DWG_CONVERTER_ENDPOINT,{method:'POST',body:form,cache:'no-store'})}
- catch(err){throw Error('El conversor de DWG no está disponible en este momento. Mientras tanto, en AutoCAD usá Guardar como → DXF y abrí ese archivo. El DWG original no se modificó.')}finally{clearTimeout(slowT)}
- if(!response.ok){const msg=(await response.text().catch(()=>'')).slice(0,200);throw Error('No se pudo convertir el DWG ('+response.status+(msg?': '+msg:'')+'). Probá guardarlo como DXF desde AutoCAD. El original no se modificó.')}
- const dxf=await response.text();
- if(!/\bSECTION\b/.test(dxf.slice(0,10000)))throw Error('DWG converter response is not recognized ASCII DXF');
- if(arguments[1]?.textOnly)return dxf;
- importDXF(dxf,file.name.replace(/\.dwg$/i,'.dxf'));
- log('DWG converted via external service; verify layers, unsupported entities and 1:1 units.');
+async function convertDWGAutomatically(file,options={}){
+ const info=await inspectDWGHeader(file);
+ if(!info.valid)throw Error(info.message);
+ const local=window.CAD2D_DWG_BATCH?.convertLocal;
+ if(typeof local!=='function')throw Error('El conversor local todavía no se cargó. Recargá CAD2D3D y volvé a intentar.');
+ toast('Convirtiendo '+file.name+' a DXF localmente…');
+ const bytes=await local(file,'dwg-dxf');
+ if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('El conversor no devolvió un archivo válido.');
+ const dxf=await cadDxfDecode(bytes);
+ if(!/\bSECTION\b/.test(dxf.slice(0,20000)))throw Error('El resultado no es un DXF reconocido. El original no se modificó.');
+ if(options.textOnly)return dxf;
+ importDXF(dxf,file.name.replace(/\.(dwg|dwt)$/i,'.dxf'));
+ log('DWG convertido localmente · comprobar capas, bloques y escala 1:1.');
 }
 
 // Acceso limitado para el conversor por lotes: devuelve texto DXF sin alterar el dibujo abierto.
