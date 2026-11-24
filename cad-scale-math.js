@@ -11,9 +11,11 @@
  function referenceRadius(entities,origin,bounds){
   let far=0;
   for(const entity of entities){
-   const b=bounds(entity);if(!b)continue;
-   for(const x of [b.minX,b.maxX])for(const y of [b.minY,b.maxY])
-    far=Math.max(far,Math.hypot(x-origin.x,y-origin.y));
+   const b=bounds(entity);if(!b||![b.minX,b.maxX,b.minY,b.maxY].every(Number.isFinite)||b.minX>b.maxX||b.minY>b.maxY)continue;
+   for(const x of [b.minX,b.maxX])for(const y of [b.minY,b.maxY]){
+    const distance=Math.hypot(x-origin.x,y-origin.y);
+    if(Number.isFinite(distance))far=Math.max(far,distance);
+   }
   }
   return far>1e-10?far:1;
  }
@@ -23,8 +25,7 @@
   return Number.isFinite(factor)&&factor>=1e-4&&factor<=1e4?factor:null;
  }
  function scaleEntity(entity,origin,factor){
-  if(!(factor>0)&&factor!==1)throw Error('Invalid SCALE factor');
-  if(!Number.isFinite(factor))throw Error('Invalid SCALE factor');
+  if(!Number.isFinite(factor)||factor<=0)throw Error('Invalid SCALE factor');
   const copy=JSON.parse(JSON.stringify(entity)),map=p=>scalePoint(p,origin,factor);
   if(copy.p)copy.p=map(copy.p);
   if(copy.a)copy.a=map(copy.a);
@@ -34,6 +35,10 @@
   if(copy.type==='blockRef')copy.scale=(Number(copy.scale)||1)*factor;
   else{
    for(const prop of ['r','rx','ry','h'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
+   if(copy.type==='text'){
+    // Model-space text box and circular path must scale with glyph height.
+    for(const prop of ['mtextWidth','textRadius'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
+   }
    if(copy.type==='dimension'&&copy.style){
     for(const prop of ['textHeight','arrow','gap','extensionOffset','extensionExtension','tickSize']){
      if(Number.isFinite(copy.style[prop]))copy.style[prop]*=factor;
