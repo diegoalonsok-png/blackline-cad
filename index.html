@@ -9289,7 +9289,7 @@ function cadDocumentBlocksRefresh(){
  const names=Object.keys(state.blocks||{}).sort((a,b)=>a.localeCompare(b));
  const signature=JSON.stringify(names);
  if(list.dataset.signature!==signature){list.dataset.signature=signature;list.replaceChildren();const empty=new Option('Elegir bloque…','');list.add(empty);for(const n of names)list.add(new Option(n,n));if(names.includes(prior))list.value=prior;}
- $('cadDocBlockCount').textContent=names.length+' definiciones en el documento';
+ $('cadDocBlockCount').textContent=names.length+' definiciones en el documento';$('cadDocBlockBadge').textContent='('+names.length+')';
  if(!$('cadDocBlockBody').hidden)cadDocumentBlockSelection();
 }
 function cadDocumentBlockSelection(){
@@ -9299,9 +9299,17 @@ function cadDocumentBlockSelection(){
  for(const b of $('cadDocumentBlocks').querySelectorAll('[data-doc-block-action]'))b.disabled=!def;
 }
 function cadInitDocumentBlocks(dock){
- const panel=document.createElement('section');panel.className='panel';panel.id='cadDocumentBlocks';
- panel.innerHTML='<div class="panel-title"><span>BLOQUES DEL ARCHIVO</span><button type="button" class="btn slim" id="cadDocBlockToggle" aria-expanded="false">+</button></div><div class="panel-content" id="cadDocBlockBody" hidden><small id="cadDocBlockCount"></small><select id="cadDocBlockSelect" aria-label="Bloques del archivo" style="width:100%;margin:6px 0"></select><div id="cadDocBlockPreview"></div><small id="cadDocBlockInfo"></small><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn slim" data-doc-block-action="insert">Insertar</button><button class="btn slim" data-doc-block-action="edit">Editar</button><button class="btn slim" data-doc-block-action="select">Seleccionar instancias</button><button class="btn slim" data-doc-block-action="save">＋ Guardar en galería</button></div></div>';
- const gallery=$('blacklineBlockGallery');dock.insertBefore(panel,gallery?.parentElement===dock?gallery.nextSibling:null);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockToggle').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh()};
+ const panel=document.createElement('section');panel.className='cad-document-blocks';panel.id='cadDocumentBlocks';
+ panel.innerHTML='<button type="button" class="btn slim" id="cadDocBlockToggle" aria-controls="cadDocBlockBody" aria-expanded="false" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO <span id="cadDocBlockBadge">(0)</span> <span id="cadDocBlockArrow">+</span></button><div class="panel-content" id="cadDocBlockBody" style="padding:6px 0" hidden><small id="cadDocBlockCount"></small><select id="cadDocBlockSelect" aria-label="Bloques del archivo" style="width:100%;margin:6px 0"></select><div id="cadDocBlockPreview"></div><small id="cadDocBlockInfo"></small><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px"><button class="btn slim" data-doc-block-action="insert">Insertar</button><button class="btn slim" data-doc-block-action="edit">Editar</button><button class="btn slim" data-doc-block-action="select">Seleccionar instancias</button><button class="btn slim" data-doc-block-action="save">＋ Guardar en galería</button></div><div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px"><small>Mis bloques guardados</small><select id="cadDocSavedSelect" aria-label="Mis bloques guardados" style="width:100%;margin:4px 0"></select><button type="button" class="btn slim" id="cadDocSavedInsert" style="width:100%" disabled>Insertar bloque guardado</button></div></div>';
+ const gallery=$('blacklineBlockGallery');dock.insertBefore(panel,gallery?.parentElement===dock?gallery.nextSibling:null);$('cadDocBlockToggle').onclick=()=>{const body=$('cadDocBlockBody');body.hidden=!body.hidden;$('cadDocBlockArrow').textContent=body.hidden?'+':'−';$('cadDocBlockToggle').setAttribute('aria-expanded',String(!body.hidden));cadDocumentBlocksRefresh();if(!body.hidden)refreshSaved()};
+ let savedItems=[],savedRequest=0;
+ async function refreshSaved(){
+  const seq=++savedRequest,sel=$('cadDocSavedSelect'),previous=sel.value;
+  try{const items=await cadPersonalBlocksRead();if(seq!==savedRequest)return;savedItems=items.sort((a,b)=>a.name.localeCompare(b.name));sel.replaceChildren(new Option('Elegir bloque guardado…',''));for(const item of savedItems)sel.add(new Option(item.name,String(item.id)));if(savedItems.some(x=>String(x.id)===previous))sel.value=previous;sel.onchange();}catch(err){if(seq===savedRequest){sel.replaceChildren(new Option('Biblioteca no disponible',''));$('cadDocSavedInsert').disabled=true}}
+ }
+ $('cadDocSavedSelect').onchange=()=>{$('cadDocSavedInsert').disabled=!$('cadDocSavedSelect').value};
+ $('cadDocSavedInsert').onclick=()=>{const item=savedItems.find(x=>String(x.id)===$('cadDocSavedSelect').value);if(item)cadPersonalBlockInsert(item)};
+ document.addEventListener('cad-personal-blocks-changed',()=>{if(!$('cadDocBlockBody').hidden)refreshSaved()});
  $('cadDocBlockSelect').onchange=cadDocumentBlockSelection;
  panel.addEventListener('click',async e=>{const b=e.target.closest('[data-doc-block-action]');if(!b)return;const name=$('cadDocBlockSelect').value;if(!state.blocks?.[name])return;
   if(b.dataset.docBlockAction==='insert'){$('blockLibrary').value=name;$('blockScale').value='1';$('blockRotation').value='0';$('insertBlockBtn').click()}
@@ -11055,6 +11063,9 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
 <script src="cad-arq-pro.js?v=20261123-olimpiadas1251-v2"></script>
+<script>
+(function(){const panel=document.getElementById("cadDocumentBlocks"),anchor=document.getElementById("arqOpenOlimpiadas");if(panel&&anchor){anchor.after(panel);const toggle=panel.querySelector("#cadDocBlockToggle");if(toggle)toggle.className=anchor.className;}})();
+</script>
 <script src="cad-dwg-batch.js?v=20261123-1"></script>
 <script src="cad-autocad-plus.js?v=20261121-1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261121-1"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261120-1850"></script>
