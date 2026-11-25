@@ -489,7 +489,10 @@
   const rows=await r.json(),area=parseArea(raw),house=/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw);
   if(!Array.isArray(rows))return [];
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
-  return rows.filter(x=>x.license==='CC0'&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>({title:x.title,area:x.area??null,thumb:file(x.thumb),url:file(x.image),cadUrl:file(x.original),source:safeHttps(x.source),license:x.license+' · '+(x.author||'')})).filter(x=>x.thumb&&x.url&&x.source);
+  return rows.filter(x=>/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
+   const original=file(x.original),image=file(x.image)||(/\.(?:png|jpe?g|webp|pdf)$/i.test(original||'')?original:null),cad=file(x.cad)||(/\.(?:dxf|dwg)$/i.test(original||'')?original:null);
+   return {title:x.title,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:safeHttps(x.source),license:x.license+' · '+(x.author||'')};
+  }).filter(x=>x.thumb&&(x.url||x.cadUrl)&&x.source);
  }
  async function searchWeb(raw){
   if(houseMode)return searchHouseGallery(raw);
@@ -525,7 +528,7 @@
    const img=document.createElement('img');img.src=item.thumb;img.alt=item.title;img.loading='lazy';img.referrerPolicy='no-referrer';
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';actions.append(button);card.append(img,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url)actions.append(button);card.append(img,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=webItems.length;label.textContent=webItems.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
