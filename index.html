@@ -6817,7 +6817,7 @@ const CAD_COMMANDS=[
  ['DEDIT','DED','Editar texto de una cota seleccionada (<> = medida)'],['DIMSTYLE','D (EN)','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
  ['DIMDIAMETER','','Circle diameter'],['LEADER','','Leader with label'],
- ['MISPROYECTOS','CLOUD','Mis proyectos en la nube: abrir, compartir, versiones'],['GUARDARNUBE','CLOUDSAVE','Guardar el dibujo en la nube'],['LOCAL','ROOM','Marcar un local: clic adentro, nombre y m²'],['SUPERFICIES','PLANILLA','Planilla de locales y superficies, muros y aberturas'],['NUEVALAMINA','LAYOUT+','Nueva lámina (layout)'],['ROTULO','TITLEBLOCK','Datos del rótulo de la lámina'],['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
+ ['MISPROYECTOS','CLOUD','Mis proyectos en la nube: abrir, compartir, versiones'],['GUARDARNUBE','CLOUDSAVE','Guardar el dibujo en la nube'],['LOCAL','ROOM','Marcar un local: clic adentro, nombre y m²'],['SUPERFICIES','PLANILLA','Planilla de locales y superficies, muros y aberturas'],['DATAEXTRACTION','COMPUTO','Cantidades, longitudes, superficies y atributos en CSV'],['NUEVALAMINA','LAYOUT+','Nueva lámina (layout)'],['ROTULO','TITLEBLOCK','Datos del rótulo de la lámina'],['DIST','DI','Measure distance'],['AREA','','Measure closed or selected polygon'],
  ['ID','','Inspect exact XY coordinate'],['LIST','LI','List selected entity properties'],
  ['SELECTALL','','Select visible unlocked objects'],['MATCHPROP','MA','Copy object properties'],
  ['LAYER','LA','Layer manager'],['LTYPE','LT','Layer linetype settings'],['PROPERTIES','PR','Selected properties'],
@@ -8659,7 +8659,7 @@ window.cadAttDefCommand=cadAttDefCommand;
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};
  for(const k of['ATTDEF','ATT','DEFATRIB','ATRIBDEF','DEFINIRATRIBUTO'])X.commands[k]=()=>cadAttDefCommand();
  for(const k of['ATTEDIT','ATE','EATTEDIT','EDITATRIB','EDITARATRIBUTOS'])X.commands[k]=()=>cadAttEditCommand();
- for(const k of['ATTEXT','EATTEXT','DATAEXTRACTION','EXTRAERATRIB','EXTRAERATRIBUTOS'])X.commands[k]=()=>cadAttExtCommand();}
+ for(const k of['ATTEXT','EATTEXT','EXTRAERATRIB','EXTRAERATRIBUTOS'])X.commands[k]=()=>cadAttExtCommand();X.commands.DATAEXTRACTION=()=>cadDataExtraction();X.commands.COMPUTO=()=>cadDataExtraction();}
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['MTEXT','TEXTOM','TEXTOMULTILINEA','MTEXTO'])X.commands[k]=()=>cadMTextCommand()}
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['NUEVALAMINA','LAYOUTNEW','LAYOUT+','LAMINA'])X.commands[k]=()=>cadAddLayout();for(const k of['ROTULO','TITLEBLOCK','DATOSROTULO'])X.commands[k]=()=>cadEditTitleFields()}
 const paperSizes={A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],A0:[841,1189],LETTER:[215.9,279.4],LEGAL:[215.9,355.6],ARCHD:[609.6,914.4],'ARCH E':[914.4,1219.2]};
@@ -10624,16 +10624,56 @@ function cadRoomSchedule(){
  for(const k of['LOCALES','ROOM'])X.commands[k]=()=>cadRoomTool();window.cadRoomTool=cadRoomTool;
  for(const k of['SUPERFICIES','PLANILLA','SCHEDULE','AREASCHEDULE','PLANILLALOCALES'])X.commands[k]=()=>cadRoomSchedule();}
 
-function cadExportScheduleCsv(){
- const q=v=>'"'+String(v).replace(/"/g,'""')+'"',rows=[['Type','Name','Layer','Count','Total length ('+state.unit+')']];
- const blocks=new Map(),layers=new Map();
- for(const e of state.entities){const lay=layerFor(e).name;
-  if(e.type==='blockRef'){const k=e.blockName+'|'+lay;blocks.set(k,(blocks.get(k)||0)+1)}
-  const L=e.type==='line'?dist(e.a,e.b):e.type==='polyline'?e.pts.slice(1).reduce((s,p,i)=>s+dist(e.pts[i],p),0)+(e.closed?dist(e.pts.at(-1),e.pts[0]):0):e.type==='circle'?TAU*e.r:0;
-  const r=layers.get(lay)||{n:0,len:0};r.n++;r.len+=L;layers.set(lay,r)}
- for(const [k,n] of blocks){const [name,lay]=k.split('|');rows.push(['Block',name,lay,n,''])}
- for(const [lay,r] of layers)rows.push(['Layer','',lay,r.n,r.len.toFixed(3).replace('.',',')]);
- download(state.file+'-schedule.csv','﻿'+rows.map(r=>r.map(q).join(';')).join('\r\n'),'text/csv');toast('Schedule exported · '+(rows.length-1)+' rows');
+// Quantities are grouped by layer and object type, not by overlapping regions.
+function cadQuantityRows(entities,layers,scale){
+ const map=new Map(),byLayer=new Map(layers.map(l=>[l.id,l])),finite=n=>Number.isFinite(n)&&n>=0;
+ const point=p=>p&&Number.isFinite(p.x)&&Number.isFinite(p.y);
+ const distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+ const polygon=pts=>{if(!Array.isArray(pts)||pts.length<3||!pts.every(point))return null;const o=pts[0];let sum=0;for(let i=1;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];sum+=(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);}return Math.abs(sum)/2;};
+ const curved=e=>Array.isArray(e.bulges)?e.bulges.some(v=>Number(v)!==0):!!e.bulges||!!e.bulge;
+ const row=(layer,type,name,note)=>{const key=JSON.stringify([layer.id,type,name,note]);if(!map.has(key))map.set(key,{layer:layer.name,type,name,note,count:0,length:0,area:0,lengthCount:0,areaCount:0});return map.get(key);};
+ for(const e of entities){
+  const l=byLayer.get(e.layer)||layers[0]||{id:'0',name:'0'};
+  if(e.cadHidden)continue;
+  let len=null,area=null,name='',note='',type=e.type;
+  if(e.type==='blockRef'){name=e.blockName||'';note=e.xref?'Referencia externa, no expandida':'Inserciones directas, sin expandir';}
+  else if(e.type==='line'&&point(e.a)&&point(e.b)){len=distance(e.a,e.b);if(e.wall2d)note='Caras de muro, no longitud de eje';}
+  else if(e.type==='rect'&&point(e.a)&&point(e.b)){const w=Math.abs(e.b.x-e.a.x),h=Math.abs(e.b.y-e.a.y);len=2*(w+h);area=w*h;}
+  else if(e.type==='circle'&&finite(e.r)){len=2*Math.PI*e.r;area=Math.PI*e.r*e.r;}
+  else if(e.type==='arc'&&finite(e.r)&&Number.isFinite(e.a0)&&Number.isFinite(e.a1)){const sweep=arcSweep(e.a0,e.a1);if(finite(sweep))len=e.r*sweep;}
+  else if(e.type==='ellipse'&&finite(e.rx)&&finite(e.ry)){area=Math.PI*e.rx*e.ry;note='Área de elipse completa; perímetro no incluido';}
+  else if(e.type==='polyline'&&Array.isArray(e.pts)&&e.pts.length>=2&&e.pts.every(point)){
+   if(curved(e))note='Curvas: medición omitida';
+   else {len=0;for(let i=1;i<e.pts.length;i++)len+=distance(e.pts[i-1],e.pts[i]);if(e.closed){len+=distance(e.pts.at(-1),e.pts[0]);area=polygon(e.pts);note='Área algebraica absoluta; verificar contorno simple';}}
+   if(e.roomName){type='local';name=e.roomName;}
+  }else if(e.type==='hatch'){const outer=polygon(e.pts),holes=(e.holes||[]).map(polygon);if(outer!==null&&holes.every(a=>a!==null)){const net=outer-holes.reduce((a,b)=>a+b,0);if(net>=0)area=net;}note='Área neta de contornos; verificar islas y solapes';}
+  const r=row(l,type,name,note);r.count++;
+  if(finite(len)&&finite(len*scale)){r.length+=len*scale;r.lengthCount++;}
+  if(finite(area)&&finite(area*scale*scale)){r.area+=area*scale*scale;r.areaCount++;}
+ }
+ return [...map.values()].sort((a,b)=>a.layer.localeCompare(b.layer)||a.type.localeCompare(b.type)||a.name.localeCompare(b.name));
+}
+function cadQuantityCSV(rows){
+ const q=v=>{let s=String(v??'');if(/^\s*[=+@-]/.test(s)&&!/^[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[-+]?\d+)?$/i.test(s.trim()))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+ return '\uFEFF'+rows.map(r=>r.map(q).join(';')).join('\r\n');
+}
+function cadExportScheduleCsv(objects=state.entities){
+ const rows=cadQuantityRows(objects,state.layers,U[state.unit]/1000),num=v=>Number(v.toFixed(6)).toString().replace('.',',');
+ const csv=[['Capa','Tipo','Nombre','Cantidad','Longitud (m)','Objetos medidos en longitud','Área (m²)','Objetos medidos en área','Alcance'],...rows.map(r=>[r.layer,r.type,r.name,r.count,r.lengthCount?num(r.length):'',r.lengthCount,r.areaCount?num(r.area):'',r.areaCount,r.note])];
+ download(state.file+'-schedule.csv',cadQuantityCSV(csv),'text/csv;charset=utf-8');toast('Cómputo exportado · '+rows.length+' grupos; áreas no descuentan solapes');
+}
+function cadDataExtraction(){
+ if($('cadDataExtraction'))return;
+ const d=document.createElement('dialog');d.id='cadDataExtraction';
+ d.style.cssText='width:min(460px,92vw);background:var(--cad-ui-panel,#17232c);color:var(--cad-ui-text,#e5eef5);border:1px solid #536876;border-radius:6px;padding:14px';
+ d.innerHTML='<header style="display:flex;align-items:center;justify-content:space-between"><strong>DATAEXTRACTION · Cómputo</strong><button class="btn" data-close>×</button></header><p class="help">Exportá cantidades, longitudes y áreas agrupadas por capa y tipo. Se usan metros y m² independientemente de la unidad del dibujo. Los totales no descuentan solapes ni expanden bloques.</p><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-all>Dibujo completo</button><button class="btn" data-selection>Selección</button><button class="btn" data-visible>Capas visibles</button><button class="btn" data-attributes>Atributos de bloques</button><button class="btn" data-rooms>Planilla de locales</button></div>';
+ d.querySelector('[data-selection]').disabled=!state.selected.length;
+ d.querySelector('[data-all]').onclick=()=>{cadExportScheduleCsv();d.close()};
+ d.querySelector('[data-selection]').onclick=()=>{cadExportScheduleCsv(selectedCadEntities());d.close()};
+ d.querySelector('[data-visible]').onclick=()=>{cadExportScheduleCsv(state.entities.filter(e=>layerFor(e).visible));d.close()};
+ d.querySelector('[data-attributes]').onclick=()=>{d.close();cadAttExtCommand()};
+ d.querySelector('[data-rooms]').onclick=()=>{d.close();cadRoomSchedule()};
+ d.querySelector('[data-close]').onclick=()=>d.close();d.addEventListener('close',()=>d.remove());document.body.append(d);d.showModal();
 }
 function cadExportActiveBlock(){
  const ref=cadActiveBlockRef();if(ref&&state.blocks[ref.blockName])$('blockLibrary').value=ref.blockName;
