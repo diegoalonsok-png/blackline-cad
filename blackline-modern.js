@@ -48,6 +48,10 @@ function revealBlocks(){
  if(!gallery)return;
  if(!gallery.classList.contains('floating')&&right)right.prepend(gallery);
  const body=$('blBody');if(body)body.hidden=false;
+ gallery.classList.remove('collapsed');
+ gallery.style.setProperty('min-height','230px','important');
+ const dockToggle=gallery.querySelector('[data-palette-act="collapse"]');if(dockToggle){dockToggle.textContent='−';dockToggle.setAttribute('aria-expanded','true')}
+
  const toggle=$('blCollapse');if(toggle){toggle.textContent='−';toggle.setAttribute('aria-expanded','true');}
  if(right)right.scrollTop=0;
  gallery.scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -111,6 +115,20 @@ function updateRail(){
 if(ribbon){new MutationObserver(updateRail).observe(ribbon,{childList:true,subtree:false});updateRail();}
 const gallery=$('blacklineBlockGallery'),body=$('blBody'),categories=$('blCategories'),cards=$('blCards'),select=$('blockLibrary');
 if(gallery&&body&&categories&&cards&&select){
+ // Keep the native and dockable collapse controls in sync. Opening the
+ // library must reveal its existing parametric cards, not fetch geometry.
+ const nativeToggle=$('blCollapse'),dockToggle=gallery.querySelector('[data-palette-act="collapse"]');
+ function syncLibraryVisibility(open){
+  body.hidden=!open;gallery.classList.toggle('collapsed',!open);
+  for(const toggle of [nativeToggle,dockToggle])if(toggle){toggle.textContent=open?'−':'+';toggle.setAttribute('aria-expanded',String(open))}
+  gallery.style.setProperty('min-height',open?'230px':'0','important');
+  if(open&&!gallery.classList.contains('floating'))gallery.style.height='';
+ }
+ syncLibraryVisibility(true);
+ for(const toggle of [nativeToggle,dockToggle])if(toggle)toggle.addEventListener('click',event=>{
+  event.preventDefault();event.stopImmediatePropagation();syncLibraryVisibility(body.hidden||gallery.classList.contains('collapsed'));window.dispatchEvent(new Event('resize'));
+ },true);
+
  const search=d.createElement('input');
  search.type='search';search.className='bl-block-search';search.placeholder='Buscar en la categoría actual…';
  search.setAttribute('aria-label','Buscar bloques arquitectónicos');categories.before(search);
