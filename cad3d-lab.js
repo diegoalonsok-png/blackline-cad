@@ -6685,7 +6685,8 @@ function cad3dMaterialMarkup(){
  '<option value="Todos">Todos los materiales</option>'+
  [...new Set(CAD3D_MATERIALS.map(function(m){return m[2];}))].map(function(v){return '<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>';}).join('')+
  '<option value="Propios">Materiales creados</option></select></label>'+
- '<details class="cad3dMaterialEditor" open><summary>＋ Crear material · Mezclar color y relieve</summary>'+
+ '<div class="cad3dMaterialsGrid"></div>'+
+ '<details class="cad3dMaterialEditor"><summary>＋ Crear material · Mezclar color y relieve</summary>'+
  '<div class="cad3dMaterialEditorBody">'+
  '<canvas class="cad3dMaterialLivePreview" data-mat-livepreview width="320" height="78" aria-label="Vista previa de color y textura"></canvas>'+
  '<label>Nombre <input type="text" maxlength="70" data-mat-newname placeholder="Mi material nuevo"></label>'+
@@ -6697,7 +6698,6 @@ function cad3dMaterialMarkup(){
  '<button type="button" class="cad3dMatSave" data-mat-save>Guardar propiedades de mi material</button>'+
  '<small>El tinte se mezcla con la textura sin reemplazarla. El relieve es visual (bump mapping), no altera muros ni medidas.</small>'+
  '</div></details>'+
- '<div class="cad3dMaterialsGrid"></div>'+
  '<div class="cad3dMaterialsControls"><button class="btn" type="button" data-mat-upload>＋ Importar JPG / PNG</button>'+
  '<input data-mat-input type="file" hidden accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">'+
  '<button class="btn" type="button" data-mat-paint>Pintar: OFF</button></div>'+
@@ -6974,7 +6974,8 @@ function cad3dMaterialSetup(){
    c.getContext('2d').drawImage(bitmap,0,0,c.width,c.height);bitmap.close?.();
    var id='user-'+(++cad3dMaterialCounter);
    cad3dCustomMaterials[id]={name:file.name.slice(0,70),image:c.toDataURL('image/jpeg',.78)};
-   cad3dTextureCanvases[id]=c;cad3dMaterialId=id;cad3dMaterialPaint=true;
+   cad3dTextureCanvases[id]=c;cad3dMaterialId=id;cad3dMaterialPaint=true;cad3dEndZoom();
+   root.querySelector('.view')?.classList.remove('cad3dPanning');
    if(placing)setPlacement(null);cad3dNavigationTool='select';cad3dSyncCompactBars();
    cad3dMaterialRender();cad3dHistoryCapture();cad3dMaterialMsg('JPG listo. Ajustá ancho/alto y clic en el muro.');
   }catch(error){cad3dMaterialMsg('No se pudo abrir el JPG: '+String(error.message||error));}
@@ -6984,7 +6985,8 @@ function cad3dMaterialSetup(){
  });
  p.querySelector('.cad3dMaterialsGrid').addEventListener('click',function(e){
   var button=e.target.closest('[data-mat-id]');if(!button)return;
-  cad3dMaterialId=button.dataset.matId;cad3dMaterialPaint=true;
+  cad3dMaterialId=button.dataset.matId;cad3dMaterialPaint=true;cad3dEndZoom();
+  root.querySelector('.view')?.classList.remove('cad3dPanning');
   var saved=cad3dCustomMaterials[cad3dMaterialId];
   if(saved){
    cad3dMaterialBrush.tint=/^#[a-f0-9]{6}$/i.test(saved.tint||'')?saved.tint:'#ffffff';
@@ -7010,7 +7012,8 @@ function cad3dMaterialSetup(){
    tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
    bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness};
   cad3dTextureCanvases[id]=out;
-  cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;
+  cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;cad3dEndZoom();
+  if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
   p.querySelector('[data-mat-newname]').value='';
   cad3dMaterialRender();cad3dHistoryCapture();
   cad3dMaterialMsg('Material «'+name+'» creado · clic sobre un muro o piso para pegar');
@@ -7041,7 +7044,7 @@ function cad3dMaterialSetup(){
  });
  p.querySelector('[data-mat-paint]').addEventListener('click',function(){
   cad3dMaterialPaint=!cad3dMaterialPaint;
-  if(cad3dMaterialPaint){if(placing)setPlacement(null);cad3dNavigationTool='select';cad3dSyncCompactBars();}
+  if(cad3dMaterialPaint){cad3dEndZoom();if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();}
   cad3dMaterialRender();
  });
  p.querySelector('[data-mat-clear]').addEventListener('click',function(){
