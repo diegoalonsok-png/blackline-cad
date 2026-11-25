@@ -333,7 +333,7 @@
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
   let repaintFrame=0;const schedulePaint=()=>{if(!repaintFrame)repaintFrame=requestAnimationFrame(()=>{repaintFrame=0;paint()})};
-  q.addEventListener('input',()=>{st.q=q.value;visibleCount=pageSize();schedulePaint()});
+  q.addEventListener('input',()=>{selectionEpoch++;st.q=q.value;visibleCount=pageSize();schedulePaint()});
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();schedulePaint()});
   el.addEventListener('click',async e=>{
    const a=e.target.closest('[data-a]')?.dataset.a;
@@ -342,10 +342,32 @@
    if(a==='min'){selectionEpoch++;el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
    if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
-   const v=e.target.closest('[data-v]')?.dataset.v;if(v){st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
-   const c=e.target.closest('[data-c]');if(c){st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
+   const v=e.target.closest('[data-v]')?.dataset.v;if(v){selectionEpoch++;st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
+   const c=e.target.closest('[data-c]');if(c){selectionEpoch++;st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=pageSize();paint();el.querySelector('.grid').scrollTop=pos;return}
-   const card=e.target.closest('[data-id]');if(card){const targetId=card.dataset.id,epoch=++selectionEpoch;try{let insertId=targetId;if(!LIB.library.some(x=>x.id===targetId)&&/^olymp3-/.test(targetId)){card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));try{insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId)}finally{card.removeAttribute('aria-busy')}}if(epoch!==selectionEpoch||!el||el.style.display==='none'||el.classList.contains('min'))return;if(await ARQ.insert(insertId)===false)return;if(epoch!==selectionEpoch)return;armedId=targetId;if(commandGallery){close();CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'));return}}catch(err){CORE.toast(String(err?.message||err));return}el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'))}
+   const card=e.target.closest('[data-id]');
+   if(card){
+    const targetId=card.dataset.id,epoch=++selectionEpoch,initial=CORE.state;
+    const entities=initial.entities,blocks=initial.blocks,tool=initial.tool,stageLength=initial.stage?.length;
+    const current=()=>epoch===selectionEpoch&&el&&el.style.display!=='none'&&!el.classList.contains('min')&&CORE.state.entities===entities&&CORE.state.blocks===blocks&&CORE.state.tool===tool&&CORE.state.stage?.length===stageLength;
+    try{
+     let insertId=targetId;
+     const item=LIB.library.find(x=>x.id===targetId),dk=window.CAD2D_DK_DEMAND;
+     const olymp=!item&&/^olymp3-/.test(targetId);
+     const remote=item?.remoteDK&&dk&&!dk.isReady(targetId)&&ARQ.canEdit(targetId);
+     if(olymp||remote){
+      card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));
+      try{if(olymp)insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId);else await dk.prepare(targetId)}
+      finally{card.removeAttribute('aria-busy')}
+     }
+     if(!current())return;
+     if(await ARQ.insert(insertId)===false||epoch!==selectionEpoch)return;
+     armedId=targetId;
+     if(commandGallery){close();CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'));return}
+    }catch(err){if(epoch===selectionEpoch)CORE.toast(String(err?.message||err));return}
+    el.querySelectorAll('.card').forEach(x=>x.classList.toggle('armed',x.dataset.id===armedId));
+    CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'));
+   }
   });
   // Mover desde la barra de título.
   const hd=el.querySelector('.hd');let drag=null;
@@ -367,7 +389,7 @@
   paint();loadOlimpiadas();q.focus();
  }
  function close(){commandGallery=false;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
- document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'&&document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
