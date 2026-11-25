@@ -1536,6 +1536,9 @@ css+=`
 #cad3dLab .cad3dMaterialActions {position:sticky;bottom:0;z-index:2;display:grid;gap:5px;padding:6px 0;background:var(--cad-ui-base,#1e3443);}
 #cad3dLab .cad3dMaterialActions [data-mat-create] {width:100%;min-height:36px!important;background:#226b58!important;color:#fff!important;border:1px solid #78b9a6!important;font-weight:700!important;}
 #cad3dLab .cad3dMaterialActions [data-mat-save][hidden] {display:none!important;}
+#cad3dLab .cad3dMaterialTile {display:grid;gap:4px;min-width:0;align-content:start;}
+#cad3dLab .cad3dMaterialTile .cad3dMaterialCard {width:100%;box-sizing:border-box;}
+#cad3dLab .cad3dMaterialTile [data-mat-edit] {width:100%;min-height:29px;border:1px solid #789db2;border-radius:5px;background:var(--cad-ui-raised,#263f50);color:var(--cad-ui-text,#eaf4fc);cursor:pointer;font-size:11px;font-weight:600;}
 #cad3dLab .cad3dMaterialActions [data-mat-editor-status] {white-space:normal;width:100%;overflow-wrap:anywhere;}
 #cad3dLab .cad3dMaterialColorPicker [data-mat-color-draft] {height:32px;border:1px solid #8995a0;border-radius:4px;}
 #cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow {display:grid!important;grid-template-columns:14px minmax(0,1fr) 40px;gap:5px;align-items:center;margin:0;}
@@ -6955,8 +6958,11 @@ function cad3dMaterialRender(){
  all=all.filter(function(m){return cad3dMaterialCategory==='Todos'||m[2]===cad3dMaterialCategory;});
  panel.querySelector('[data-mat-category]').value=cad3dMaterialCategory;
  panel.querySelector('[data-mat-save]').textContent=cad3dCustomMaterials[cad3dMaterialId]?'Guardar cambios':'Guardar como material propio';
+ var editor=panel.querySelector('.cad3dMaterialEditor'),editing=editor.dataset.editId===cad3dMaterialId&&cad3dCustomMaterials[cad3dMaterialId];
+ editor.querySelector('summary').textContent=editing?'✎ Editar material · '+editing.name:'＋ Crear material · Mezclar color y relieve';
  panel.querySelector('.cad3dMaterialsGrid').innerHTML=all.map(function(m){
-  return '<button type="button" class="cad3dMaterialCard" aria-pressed="'+(m[0]===cad3dMaterialId)+'" data-mat-id="'+escapeHtml(m[0])+'"><canvas width="150" height="60" data-mat-preview="'+escapeHtml(m[0])+'"></canvas>'+escapeHtml(m[1])+'</button>';
+  return '<div class="cad3dMaterialTile"><button type="button" class="cad3dMaterialCard" aria-pressed="'+(m[0]===cad3dMaterialId)+'" data-mat-id="'+escapeHtml(m[0])+'"><canvas width="150" height="60" data-mat-preview="'+escapeHtml(m[0])+'"></canvas>'+escapeHtml(m[1])+'</button>'+
+   (cad3dCustomMaterials[m[0]]?'<button type="button" data-mat-edit="'+escapeHtml(m[0])+'" title="Editar '+escapeHtml(m[1])+'">✎ Editar material</button>':'')+'</div>';
  }).join('');
  panel.querySelectorAll('[data-mat-preview]').forEach(function(canvas){
   var src=cad3dMaterialCanvas(canvas.dataset.matPreview);
@@ -7096,6 +7102,10 @@ function cad3dCommitMaterial(p,update){
   var id=cad3dMaterialId;
   if(custom){
    Object.assign(custom,brush);if(name)custom.name=name;name=custom.name;
+   // A saved library material is shared by all faces using its ID; retain per-face UV settings.
+   var affected=false;
+   records.forEach(function(record){Object.values(record.faceMaterials||{}).forEach(function(face){if(face&&face.id===id){Object.assign(face,brush);affected=true;}});});
+   if(affected)redraw();
   }else{
    if(Object.keys(cad3dCustomMaterials).length>=24){cad3dMaterialMsg('Límite de 24 materiales propios por archivo');return false;}
    var source=cad3dMaterialCanvas(cad3dMaterialId);
@@ -7113,7 +7123,7 @@ function cad3dCommitMaterial(p,update){
   Object.assign(cad3dMaterialBrush,brush);
   cad3dMaterialId=id;cad3dMaterialCategory='Propios';field.value='';
   cad3dMaterialRender();cad3dHistoryCapture();
-  p.querySelector('.cad3dMaterialEditor').open=false;
+  var editor=p.querySelector('.cad3dMaterialEditor');delete editor.dataset.editId;editor.open=false;
   cad3dMaterialMsg('Material «'+name+'» '+(custom?'actualizado':'creado')+' · disponible en Materiales creados');
   var card=p.querySelector('[data-mat-id="'+id+'"]');
   if(card)card.scrollIntoView({block:'nearest',inline:'nearest'});
@@ -7124,6 +7134,27 @@ function cad3dCommitMaterial(p,update){
  }catch(error){
   console.error('CAD3D material save',error);cad3dMaterialMsg('Error al guardar el material: '+String(error.message||error));return false;
  }
+}
+function cad3dLoadMaterialBrush(id){
+ cad3dMaterialId=id;
+  var saved=cad3dCustomMaterials[cad3dMaterialId];
+  if(!saved){cad3dMaterialBrush.tint=CAD3D_SOLID_COLORS[cad3dMaterialId]||'#ffffff';cad3dMaterialBrush.mix=0;cad3dMaterialBrush.bumpMode='auto';cad3dMaterialBrush.bump=1;cad3dMaterialBrush.roughness=85;}
+  if(saved){
+   cad3dMaterialBrush.tint=/^#[a-f0-9]{6}$/i.test(saved.tint||'')?saved.tint:'#ffffff';
+   cad3dMaterialBrush.mix=clamp(finite(saved.mix,0),0,100);
+   cad3dMaterialBrush.bump=clamp(finite(saved.bump,1),0,8);cad3dMaterialBrush.bumpMode=cad3dBumpMode(saved.bumpMode);
+   cad3dMaterialBrush.roughness=clamp(finite(saved.roughness,85),5,100);
+  }
+
+}
+function cad3dBeginMaterialEdit(p,id){
+ var saved=cad3dCustomMaterials[id];if(!saved)return false;
+ cad3dCloseMaterialColor(p);cad3dLoadMaterialBrush(id);cad3dMaterialPaint=false;
+ var editor=p.querySelector('.cad3dMaterialEditor');
+ editor.dataset.editId=id;p.querySelector('[data-mat-newname]').value=saved.name;
+ editor.open=true;cad3dMaterialRender();cad3dMaterialMsg('Editando «'+saved.name+'». Guardá los cambios para actualizarlo.');
+ editor.scrollIntoView({block:'nearest',inline:'nearest'});
+ return true;
 }
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
@@ -7156,20 +7187,19 @@ function cad3dMaterialSetup(){
   cad3dMaterialCategory=this.value;cad3dMaterialRender();
  });
  p.querySelector('.cad3dMaterialsGrid').addEventListener('click',function(e){
+  var edit=e.target.closest('[data-mat-edit]');
+  if(edit){e.preventDefault();e.stopPropagation();cad3dBeginMaterialEdit(p,edit.dataset.matEdit);return;}
   var button=e.target.closest('[data-mat-id]');if(!button)return;
-  cad3dMaterialId=button.dataset.matId;cad3dMaterialPaint=true;cad3dEndZoom();
+  var editor=p.querySelector('.cad3dMaterialEditor');delete editor.dataset.editId;
+  p.querySelector('[data-mat-newname]').value='';
+  cad3dCloseMaterialColor(p);cad3dLoadMaterialBrush(button.dataset.matId);cad3dMaterialPaint=true;cad3dEndZoom();
   root.querySelector('.view')?.classList.remove('cad3dPanning');
-  var saved=cad3dCustomMaterials[cad3dMaterialId];
-  if(!saved){cad3dMaterialBrush.tint=CAD3D_SOLID_COLORS[cad3dMaterialId]||'#ffffff';cad3dMaterialBrush.mix=0;cad3dMaterialBrush.bumpMode='auto';cad3dMaterialBrush.bump=1;cad3dMaterialBrush.roughness=85;}
-  if(saved){
-   cad3dMaterialBrush.tint=/^#[a-f0-9]{6}$/i.test(saved.tint||'')?saved.tint:'#ffffff';
-   cad3dMaterialBrush.mix=clamp(finite(saved.mix,0),0,100);
-   cad3dMaterialBrush.bump=clamp(finite(saved.bump,1),0,8);cad3dMaterialBrush.bumpMode=cad3dBumpMode(saved.bumpMode);
-   cad3dMaterialBrush.roughness=clamp(finite(saved.roughness,85),5,100);
-  }
   if(placing)setPlacement(null);
   cad3dNavigationTool='select';cad3dSyncCompactBars();
   cad3dMaterialRender();cad3dMaterialMsg('Pincel listo: clic sobre muro, piso o losa para aplicar '+button.textContent.trim());
+ });
+ p.querySelector('.cad3dMaterialEditor').addEventListener('toggle',function(){
+  if(!this.open&&this.dataset.editId){var id=this.dataset.editId;delete this.dataset.editId;cad3dCloseMaterialColor(p);if(cad3dCustomMaterials[id])cad3dLoadMaterialBrush(id);p.querySelector('[data-mat-newname]').value='';cad3dMaterialRender();}
  });
  p.querySelector('[data-mat-create]').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();cad3dCommitMaterial(p,false);});
  p.querySelector('[data-mat-save]').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();cad3dCommitMaterial(p,true);});
@@ -7182,7 +7212,7 @@ function cad3dMaterialSetup(){
    cad3dMaterialBrush.roughness=clamp(finite(p.querySelector('[data-mat-roughness]').value,85),5,100);
    var sel=cad3dLastPaintFace,rec=records.find(function(r){return r.id===sel?.id;});
    var face=rec?.faceMaterials?.[sel?.face];
-   if(face&&face.id===cad3dMaterialId){
+   if(face&&face.id===cad3dMaterialId&&!p.querySelector('.cad3dMaterialEditor').dataset.editId){
     Object.assign(face,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
      bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode});
     redraw();
