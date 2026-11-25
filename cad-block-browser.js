@@ -165,8 +165,8 @@
 #cadBlockBrowser.web-reference .tools{padding:6px 9px}
 #cadBlockBrowser.house-gallery .web-links{display:none}
 #cadBlockBrowser.house-gallery .area-links button[aria-pressed=true]{background:#85683e;color:#fff}
-#cadBlockBrowser.house-gallery .grid{grid-template-rows:repeat(2,minmax(120px,1fr));overflow:auto}
-#cadBlockBrowser.house-gallery .web-card img{min-height:70px;object-fit:contain}
+#cadBlockBrowser.house-gallery .grid{grid-template-rows:repeat(2,minmax(170px,1fr));overflow:auto;gap:10px;padding:10px}
+#cadBlockBrowser.house-gallery .web-card img{height:0;flex:1 1 0;min-height:100px;width:100%;object-fit:contain;display:block;background:#fff}
 #cadBlockBrowser.compact-search .rz.se{display:block;touch-action:none;z-index:10}
 #cadBlockBrowser.web-reference .web-card img{height:0;flex:1 1 70px;min-height:48px;max-height:none}
 #cadBlockBrowser.web-reference .area-links{display:flex;flex-wrap:wrap;gap:4px;padding:4px 9px;background:#ede2cc}
@@ -379,8 +379,8 @@
   Object.assign(el.style,{left:st.x+'px',top:st.y+'px',width:st.w+'px',height:st.h+'px'});
  }
  function open(){
-  loadStaticPreviews();
-  if(el){el.classList.remove('min');el.style.display='flex';place();paint();loadOlimpiadas();el.querySelector('input').focus();return}
+  if(!webMode)loadStaticPreviews();
+  if(el){el.classList.remove('min');el.style.display='flex';place();paint();if(!webMode)loadOlimpiadas();el.querySelector('input').focus();return}
   el=document.createElement('div');el.id='cadBlockBrowser';el.setAttribute('role','dialog');el.setAttribute('aria-label','Block browser');
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
@@ -431,7 +431,7 @@
   const hd=el.querySelector('.hd');let drag=null;
   hd.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;const p=commandGallery?compactRect:st;drag={dx:e.clientX-p.x,dy:e.clientY-p.y};hd.setPointerCapture(e.pointerId)});
   hd.addEventListener('pointermove',e=>{if(!drag)return;const p=commandGallery?compactRect:st;p.x=e.clientX-drag.dx;p.y=e.clientY-drag.dy;place()});
-  hd.addEventListener('pointerup',()=>{if(drag){drag=null;save()}});
+  hd.addEventListener('pointerup',()=>{if(drag){drag=null;if(houseMode)rememberHouseRect();else save()}});
   hd.addEventListener('dblclick',e=>{if(!e.target.closest('button'))el.querySelector('[data-a=max]').click()});
   // Agrandar desde bordes y esquina.
   el.querySelectorAll('.rz').forEach(h=>{
@@ -441,12 +441,12 @@
     const p=commandGallery?compactRect:st;if(r.k.includes('e'))p.w=r.w+dx;if(r.k.includes('s'))p.h=r.h+dy;
     if(r.k==='w'){st.w=Math.max(420,r.w-dx);st.x=r.x+(r.w-st.w)}if(r.k==='n'){st.h=Math.max(300,r.h-dy);st.y=r.y+(r.h-st.h)}
     place()});
-   h.addEventListener('pointerup',()=>{if(r){r=null;save()}});
+   h.addEventListener('pointerup',()=>{if(r){r=null;if(houseMode)rememberHouseRect();else save()}});
   });
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
-  paint();loadOlimpiadas();q.focus();
+  paint();if(!webMode)loadOlimpiadas();q.focus();
  }
- function close(){houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){rememberHouseRect();houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -568,10 +568,17 @@
    paintWeb();
   }catch(e){if(epoch===webEpoch&&houseMode){webStatus=T('House library unavailable. Retry.','Biblioteca no disponible. Volvé a buscar.');paintWeb();}}
  }
+ function loadHouseRect(bar){
+  const w=Math.min(760,innerWidth-16),h=Math.min(690,innerHeight-16);
+  let saved;try{saved=JSON.parse(localStorage.getItem('cad2d.houseGallery.rect.v2')||'null')}catch(e){}
+  if(saved&&['x','y','w','h'].every(k=>Number.isFinite(saved[k])))return {...saved};
+  return {x:Math.max(8,Math.min(innerWidth-w-8,bar?bar.left:40)),y:Math.max(8,Math.min(innerHeight-h-8,bar?bar.bottom+8:80)),w,h};
+ }
+ function rememberHouseRect(){if(!houseMode||!compactRect)return;try{localStorage.setItem('cad2d.houseGallery.rect.v2',JSON.stringify(compactRect))}catch(e){}}
  function openHouses(term='Casas'){
   webController?.abort();houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
   const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
-  compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:460,h:560};open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
+  compactRect=loadHouseRect(bar);open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
  }
  function openWeb(term){houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:370,h:420};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
