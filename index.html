@@ -2080,6 +2080,10 @@ function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLib
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
 var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false;
+// Only these tools draw their transient previews after the static scene. No model edits
+// occur during passive mouse movement; all commits and other events still invalidate it.
+const cadPassiveSceneTools=new Set(['select','line','polyline','rect','circle','arc','ellipse','polygon','wall2d','distance','area','dimension']);
+function cadPassiveSceneEligible(){return cadPassiveSceneTools.has(state.tool)&&!state.drag&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;}
 function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
@@ -2205,7 +2209,7 @@ function cadVectorBatch(selectedIds){
  return {add,flush};
 }
 function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let painted=0;
- const idle=state.entities.length>=500&&state.tool==='select'&&!state.drag&&!state.stage.length&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;
+ const idle=state.entities.length>=500&&cadPassiveSceneEligible();
  const frameKey=idle?[cadDrawEpoch,canvas.width,canvas.height,dpr,state.view.scale,state.view.ox,state.view.oy,state.gridOn,state.grid,displayColors.background,displayColors.grid,displayColors.axes].join('|'):'';
  const reuse=idle&&cadIdleFrameValid&&cadIdleFrame?.key===frameKey;
  if(!reuse&&state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
@@ -6248,7 +6252,7 @@ canvas.addEventListener('pointermove',ev=>{
   $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
   schedule();return;
  }
- cadPointerQueryActive=!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement;
+ cadPointerQueryActive=(!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement)||cadPassiveSceneEligible();
  try{state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));}finally{cadPointerQueryActive=false;}$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
@@ -6279,7 +6283,7 @@ canvas.addEventListener('pointermove',ev=>{
   }
  }else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
- }schedule(!d&&state.tool==='select'&&!state.selected.length&&!state.stage.length)});
+ }schedule(cadPassiveSceneEligible());});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
