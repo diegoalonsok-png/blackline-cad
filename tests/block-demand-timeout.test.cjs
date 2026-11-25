@@ -9,6 +9,7 @@ function boot(file,fetch,library){
  return {window,timers,expire(){for(const fn of [...timers.values()])fn()}};
 }
 function stalled(signal){return new Promise((resolve,reject)=>{
+ if(signal.aborted)return reject(Error('aborted'));
  signal.addEventListener('abort',()=>reject(Error('aborted')),{once:true});
 })}
 const response=doc=>({ok:true,json:async()=>doc});
@@ -22,7 +23,7 @@ test('Blackline: no preload, coalesces stalled requests, clears timeout and retr
  });
  const api=h.window.CAD2D_DK_DEMAND;
  assert.equal(calls,0);const a=api.prepare(data.id),b=api.prepare(data.id);
- const failed=Promise.allSettled([a,b]);await Promise.resolve();h.expire();
+ const failed=Promise.allSettled([a,b]);await new Promise(setImmediate);h.expire();
  const result=await failed;assert.equal(calls,1);
  for(const x of result){assert.equal(x.status,'rejected');assert.match(x.reason.message,/Tiempo de espera/)}
  assert.equal(h.timers.size,0);assert.equal(api.isReady(data.id),false);
@@ -47,7 +48,7 @@ test('Olimpiadas: stalled catalog can be retried, stalled geometry does not regi
  await api.loadCatalog();assert.equal(catalogCalls,2);assert.equal(h.timers.size,0);
  failure=assert.rejects(api.ensureBlock(blocks[0].id),/Tiempo de espera/);
  // Allow loadCatalog's already-resolved async promise to settle first.
- for(let i=0;i<8&&geometryCalls===0;i++)await Promise.resolve();
+ await new Promise(setImmediate);
  assert.equal(geometryCalls,1);h.expire();await failure;
  assert.equal(library.library.length,0);assert.equal(h.timers.size,0);
  assert.equal(await api.ensureBlock(blocks[0].id),blocks[0].id);
