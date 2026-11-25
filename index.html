@@ -11940,47 +11940,7 @@ initCadExportPopover();
 initCadQuickProperties();setTimeout(initCadHatchPalette,0);setTimeout(initCadDimStylePalette,0);
 initCadColorPopover();
 /* CAD2D extension bridge (Nov 2026). Narrow, documented surface for add-on modules
-   (cad-arq-pro.js?v=20261125-web-references-v1). Extensions register commands, context-menu items and canvas overlays;
-   they never replace core functions. */
-window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};
-/* Cinta extensible: los módulos agregan grupos con id, rótulo, icono SVG y acción. */
-function cad2dAddRibbonGroup(tab,group,items){
- if(!ribbonTabs[tab])ribbonTabs[tab]=[];
- const reg=window.CAD2D_EXTENSIONS.ribbon=window.CAD2D_EXTENSIONS.ribbon||{};
- const ids=[];
- for(const it of items){if(!it?.id)continue;toolDefs[it.id]=[it.label||it.id,it.id];if(it.icon)icons[it.id]=it.icon;reg[it.id]=it.run;ids.push(it.id)}
- const existing=ribbonTabs[tab].find(g=>g[0]===group);
- if(existing){for(const id of ids)if(!existing.includes(id))existing.push(id)}else ribbonTabs[tab].push([group,...ids]);
-}
-
-/* CALIBRAR: escala una imagen o PDF de fondo (o lo seleccionado) a tamaño real.
-   1) DIST entre dos puntos de medida conocida sobre la imagen · 2) CALIBRAR <medida real>, p. ej. CALIBRAR 4.50 */
-let cadLastMeasure=null;
-function cadCalibrate(raw){
- const m=cadLastMeasure,real=Number(String(raw||'').replace(/^[^\d.,-]*/,'').replace(',','.').match(/-?\d+(\.\d+)?/)?.[0]);
- if(!m){setTool('distance');return toast('CALIBRAR: primero medí con DIST dos puntos de largo conocido sobre la imagen; después escribí CALIBRAR y la medida real (ej. CALIBRAR 4.50)')}
- const d=dist(m.a,m.b);if(!(d>1e-9))return toast('CALIBRAR: la medición es nula, medí de nuevo con DIST');
- if(!(real>0))return toast('CALIBRAR: escribí la medida real, por ejemplo CALIBRAR 4.50 (en '+state.unit+'); medido ahora: '+units(d));
- let ids=state.selected.filter(id=>state.entities.some(e=>e.id===id&&!layerFor(e).locked));
- if(!ids.length){const img=[...state.entities].reverse().find(e=>e.type==='image'&&!layerFor(e).locked);if(img)ids=[img.id]}
- if(!ids.length)return toast('CALIBRAR: seleccioná la imagen o los objetos a escalar');
- const f=real/d,set=new Set(ids);saveHistory();
- state.entities=state.entities.map(e=>set.has(e.id)?BlacklineScaleMath.scaleEntity(e,m.a,f):e);
- state.selected=ids;cadLastMeasure=null;updateAll();log('CALIBRAR x'+f.toFixed(5));
- toast('Calibrado: '+units(d)+' → '+units(real)+' (x'+f.toFixed(4)+'). Ya podés dibujar encima a escala real.');
-}
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CALIBRAR','CALIBRATE','IMAGESCALE','ESCALAREAL'])X.commands[k]=raw=>cadCalibrate(raw)}
-function cad2dRunExtensionCommand(cmd,raw){
- const reg=window.CAD2D_EXTENSIONS,key=String(cmd||'').toUpperCase(),fn=reg?.commands?.[key];
- if(typeof fn!=='function')return false;
- try{fn(raw,key)}catch(error){console.error('[CAD2D ext]',key,error);toast(key+': '+(error?.message||error))}
- return true;
-}
-function cad2dExtendContextMenu(actions,info){
- for(const provider of window.CAD2D_EXTENSIONS?.context||[]){
-  try{
-   const extra=provider(info);
-   // Array → al final. {top,bottom} → 'top' va después de "Enter", 'bottom' al final.
+   (cad-arq-pro.js?v=20261125-no-transfer-v3"Enter", 'bottom' al final.
    const top=Array.isArray(extra)?[]:(extra?.top||[]),bottom=Array.isArray(extra)?extra:(extra?.bottom||[]);
    if(top.length){const at=actions[1]===null?2:1;actions.splice(at,0,...top,null)}
    if(bottom.length)actions.push(null,...bottom);
