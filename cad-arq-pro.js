@@ -1059,7 +1059,15 @@ function arqObjectSearch(raw){
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/,'').replace(/^(?:un|una|el|la|a|an|the)\s+/,'').trim();
  const groups=[['anafe',/^(?:anafes?|cooktops?|hobs?|placa de coccion)$/],['horno',/^(?:hornos?|ovens?)$/],['cocina a gas',/^(?:cocina a gas|gas stove|stove|estufa)$/],['microondas',/^(?:microondas|microwaves?)$/],['inodoro',/^(?:inodoros?|wc|toilets?|retretes?)$/],['arbol',/^(?:arbol(?:es)?|trees?)$/],['auto',/^(?:autos?|automovil(?:es)?|coches?|cars?|vehiculos?)$/],['bidet',/^(?:bidets?|bides?)$/],['lavatorio',/^(?:lavatorios?|lavabos?|bachas?|sinks?|basins?)$/],['ducha',/^(?:duchas?|showers?)$/],['banera',/^(?:baneras?|banaderas?|bathtubs?)$/],['puerta',/^(?:puertas?|doors?)$/],['ventana',/^(?:ventanas?|windows?)$/],['cama',/^(?:camas?|beds?)$/],['mesa',/^(?:mesas?|tables?)$/],['silla',/^(?:sillas?|chairs?)$/],['sofa',/^(?:sofas?|sillones?|couches?)$/],['heladera',/^(?:heladeras?|frigorificos?|refrigeradores?|refrigerators?|fridges?)$/],['persona',/^(?:personas?|people|person)$/],['palmera',/^(?:palmeras?|palm trees?)$/],['camion',/^(?:camion(?:es)?|trucks?)$/],['bicicleta',/^(?:bicicletas?|bicycles?)$/],['moto',/^(?:motos?|motocicletas?|motorcycles?)$/]];
  for(const [term,re] of groups)if(re.test(q))return term;
- return /^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/i.test(raw.trim())&&q.length>=2&&q.length<=60&&!/\d/.test(q)?q:null;
+ // Explicit object searches accept every catalogue name, including model numbers.
+ const explicit=/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/i.test(raw.trim());
+ if(!q||q.length>160)return null;
+ if(explicit)return q;
+ // Keep room generation and dimensioned architectural instructions separate.
+ if(arqCatalogueCategory(raw)||/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(q))return null;
+ if(/\d\s*(?:[x×*]|por|by)\s*\d|\b(?:dibujar|generar|crear|disenar|draw|generate|create|design)\b/.test(q))return null;
+ if(/\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|banos?|bathrooms?|cocinas?|kitchens?)\b/.test(q)&&/\d|\b(?:con|with|suite|vestidor|fila|tandem)\b/.test(q))return null;
+ return q;
 }
 function arqOpenObjectSearch(term){
  const browser=window.CAD2D_BLOCK_BROWSER;
