@@ -4253,6 +4253,8 @@ function build(){
  '<button type="button" class="btn" data-solid-command="extrude" title="Extrude · E + Enter" aria-label="Extrude">'+ico('extrude')+'<span>Extrude</span></button>'+
  '<button type="button" class="btn" data-solid-command="extrudeface" title="Extrude Face · empujar o tirar una cara" aria-label="Extrude Face">'+ico('extrudeface')+'<span>Extrude Face</span></button>'+
  '<button type="button" class="btn" data-solid-command="revolve" title="Revolve · perfil cerrado alrededor de un eje" aria-label="Revolve">'+ico('revolve')+'<span>Revolve</span></button>'+
+ '<button type="button" class="btn" data-solid-command="loft" title="LOFT · perfiles convexos a distintas alturas" aria-label="Loft"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 17l9-3 9 3-9 4zM7 6l5-2 5 2-5 2zM3 17L7 6M21 17L17 6M12 21V8"/></svg><span>Loft</span></button>'+
+ '<button type="button" class="btn" data-solid-command="sweep" title="SWEEP · perfil sobre trayectoria recta" aria-label="Sweep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 14l5-4 5 4-5 4zM13 6l5-4 5 4-5 4zM3 14L13 6M13 14L23 6M8 18L18 10"/></svg><span>Sweep</span></button>'+
  '<button type="button" class="btn" data-solid-command="voidextrude" title="Void Extrude · vaciado a partir de un perfil" aria-label="Void Extrude">'+ico('voidextrude')+'<span>Void Extrude</span></button>'+
  '<button type="button" class="btn" data-solid-command="slice" title="Slice · corte real en dos sólidos" aria-label="Slice">'+ico('slice')+'<span>Slice</span></button>'+
  '<button type="button" class="btn" data-solid-command="union" title="Union of two unrotated box solids">'+ico('union')+'<span>Union</span></button>'+
@@ -4461,7 +4463,7 @@ function build(){
   var command=button.dataset.solidCommand;
   if(command==='extrude')cad3dExtrudeSelection();
   else if(command==='extrudeface')action('extrudeface');
-  else if(['union','subtract','intersect','revolve','voidextrude','slice'].includes(command))action(command);
+  else if(['union','subtract','intersect','revolve','voidextrude','slice','loft','sweep'].includes(command))action(command);
  });
  root.querySelector('.cad3dOBJInput').addEventListener('change',async function(e){
   var file=e.target.files&&e.target.files[0];if(!file)return;
@@ -8355,6 +8357,34 @@ function cad3dRevolveSelection(){
   return cad3dCommitSolids([r.id],[cad3dMakeSolid(t,r,'Revolve '+ang+'°')],'REVOLVE · sólido generado');
  }catch(e){text(e.message);return false}
 }
+function cad3dAdvancedProfileWorld(r){
+ var a=(r.rot||0)*Math.PI/180,c=Math.cos(a),si=Math.sin(a);
+ return r.profilePoints.map(p=>[(r.x||0)+p[0]*c-p[1]*si,(r.y||0)+p[0]*si+p[1]*c]);
+}
+function cad3dLoftSelection(){
+ try{
+  var k=cad3dSolidKernel(),rs=selected.map(id=>records.find(r=>r.id===id&&editableRecord(r)));
+  if(rs.length<2||rs.length>32||rs.some(r=>!r||r.type!=='profile2d'||!r.profileClosed||r.extrudedHeight||!cad3dProfileSimple(r.profilePoints)))throw Error('LOFT: seleccioná 2 a 32 perfiles cerrados sin extruir (Shift + clic).');
+  var zs=rs.map(r=>r.z||0);
+  if(new Set(zs).size!==zs.length)zs=zs.map((z,i)=>i);
+  var raw=window.prompt('LOFT: alturas en metros, separadas por punto y coma, en orden de selección:',zs.join('; '));
+  if(raw===null)return false;
+  var parts=raw.split(';').map(x=>x.trim().replace(',','.'));
+  if(parts.length!==rs.length||parts.some(x=>!x||!Number.isFinite(Number(x))||Math.abs(Number(x))>1000))throw Error('Ingresá una altura válida por perfil.');
+  var t=k.loft(rs.map((r,i)=>({p:cad3dAdvancedProfileWorld(r),z:Number(parts[i])})));
+  return cad3dCommitSolids([], [cad3dMakeSolid(t,rs[0],'Loft')],'LOFT · sólido generado; perfiles originales conservados');
+ }catch(e){text(e.message);return false}
+}
+function cad3dSweepSelection(){
+ try{
+  var k=cad3dSolidKernel(),rs=selected.map(id=>records.find(r=>r.id===id&&editableRecord(r)));
+  if(rs.length!==2||rs.some(r=>!r||r.type!=='profile2d'||r.extrudedHeight))throw Error('SWEEP: seleccioná un perfil cerrado y una línea horizontal (Shift + clic).');
+  var p=rs.find(r=>r.profileClosed),path=rs.find(r=>!r.profileClosed);
+  if(!p||!path||!cad3dProfileSimple(p.profilePoints)||path.profilePoints.length!==2)throw Error('SWEEP inicial: perfil convexo cerrado y trayectoria recta.');
+  var t=k.sweep(p.profilePoints,cad3dAdvancedProfileWorld(path).map(v=>[v[0],v[1],path.z||0]));
+  return cad3dCommitSolids([], [cad3dMakeSolid(t,p,'Sweep')],'SWEEP · sólido generado; sección local perpendicular a la trayectoria');
+ }catch(e){text(e.message);return false}
+}
 function cad3dMeshBoolean(kind,a,b,remove){
  try{
   var k=cad3dSolidKernel(),A=cad3dSolidTriangles(a),B=cad3dSolidTriangles(b),t=k.boolean(A,B,kind);
@@ -9192,6 +9222,8 @@ function action(a,presetId){
  if(a==='select'){cad3dMaterialPaint=false;cad3dMaterialRender();cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
  if(['revolve','revolucion'].includes(a)){cad3dRevolveSelection();return true;}
+ if(a==='loft'){cad3dLoftSelection();return true;}
+ if(a==='sweep'||a==='barrido'){cad3dSweepSelection();return true;}
  if(['voidextrude','extrusionvacia','vacio'].includes(a)){cad3dVoidSelection();return true;}
  if(['slice','cortesolido'].includes(a)){cad3dSliceSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
