@@ -1526,6 +1526,20 @@ css+=`
 #cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked>.cad3dMaterialsHeader button {margin:0!important;min-width:24px!important;flex:none!important;padding:2px 4px!important;}
 #cad3dLab .head {flex-shrink:0;touch-action:none;}
 `;
+/* CAD3D inline material color selector; no browser-native popover. */
+css+=`
+#cad3dLab .cad3dMaterialColorField {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:center;min-width:0;}
+#cad3dLab .cad3dMaterialColorField [data-mat-color-toggle] {display:flex;align-items:center;gap:6px;min-height:29px;padding:4px 6px;background:var(--cad-ui-raised);color:var(--cad-ui-text);border-color:var(--cad-ui-edge);font-size:11px;}
+#cad3dLab .cad3dMaterialColorField [data-mat-color-swatch] {display:inline-block;width:26px;height:18px;border:1px solid #8995a0;border-radius:3px;}
+#cad3dLab .cad3dMaterialColorPicker {grid-column:1/-1;min-width:0;display:grid;gap:7px;padding:7px;border:1px solid var(--cad-ui-edge);border-radius:6px;background:var(--cad-ui-base);color:var(--cad-ui-text);}
+#cad3dLab .cad3dMaterialColorPicker[hidden] {display:none!important;}
+#cad3dLab .cad3dMaterialColorPicker [data-mat-color-draft] {height:32px;border:1px solid #8995a0;border-radius:4px;}
+#cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow {display:grid!important;grid-template-columns:14px minmax(0,1fr) 40px;gap:5px;align-items:center;margin:0;}
+#cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow input {width:100%!important;max-width:100%!important;min-width:0!important;}
+#cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow output {width:auto;text-align:right;color:inherit;}
+#cad3dLab .cad3dMaterialColorPicker .cad3dColorActions {display:flex;gap:6px;flex-wrap:wrap;}
+#cad3dLab .cad3dMaterialColorPicker input[data-mat-hex] {width:100%!important;max-width:100%!important;min-width:0!important;}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -5648,6 +5662,7 @@ function close(){
  if(!root)return;
  var launcher=document.getElementById('cad3dOpen');
  var focused=root.contains(document.activeElement);
+ cad3dCloseMaterialColor(root.querySelector('.cad3dMaterialsPanel'));
  hideObjectContextMenu();root.hidden=true;launcher.setAttribute('aria-pressed','false');dragging=null;
  if(focused)launcher.focus({preventScroll:true});
  if(frame)cancelAnimationFrame(frame);frame=0;
@@ -6726,7 +6741,12 @@ function cad3dMaterialMarkup(){
  '<div class="cad3dMaterialEditorBody">'+
  '<canvas class="cad3dMaterialLivePreview" data-mat-livepreview width="320" height="78" aria-label="Vista previa de color y textura"></canvas>'+
  '<label>Nombre <input type="text" maxlength="70" data-mat-newname placeholder="Mi material nuevo"></label>'+
- '<label>Color de mezcla <input type="color" data-mat-color value="#ffffff"></label>'+
+ '<div class="cad3dMaterialColorField"><span>Color de mezcla</span><input type="hidden" data-mat-color value="#ffffff">'+
+ '<button type="button" data-mat-color-toggle aria-expanded="false"><span data-mat-color-swatch></span><span data-mat-color-value>#FFFFFF</span></button>'+
+ '<div class="cad3dMaterialColorPicker" hidden><div data-mat-color-draft></div>'+
+ ['R','G','B'].map(function(ch,i){return '<label class="cad3dRgbRow">'+ch+'<input type="range" min="0" max="255" step="1" data-mat-rgb="'+i+'" aria-label="'+ch+'"><output data-mat-rgb-value="'+i+'">255</output></label>';}).join('')+
+ '<label>HEX <input type="text" data-mat-hex maxlength="7" aria-label="Color hexadecimal" value="#ffffff"></label>'+
+ '<div class="cad3dColorActions"><button type="button" data-mat-color-apply>Aplicar color</button><button type="button" data-mat-color-cancel>Cancelar</button></div></div></div>'+
  '<label>Mezclar color <input type="range" data-mat-mix min="0" max="100" step="5" value="0"><output data-mat-mix-value>0%</output></label>'+
  '<label>Tipo de relieve <select data-mat-bump-mode><option value="auto">Automático</option><option value="fine">Grano fino</option><option value="coarse">Revoque rugoso</option><option value="smooth">Liso</option></select></label>'+
  '<label>Relieve suave <input type="range" data-mat-bump min="0" max="8" step=".5" value="1"><output data-mat-bump-value>1 mm</output></label>'+
@@ -6762,6 +6782,7 @@ function cad3dRevealMaterialDock(panel){
 function cad3dShowMaterials(open){
  var panel=root?.querySelector('.cad3dMaterialsPanel');if(!panel)return;
  open=typeof open==='boolean'?open:panel.hidden;
+ if(!open)cad3dCloseMaterialColor(panel);
  panel.hidden=!open;
  root.querySelector('.cad3dMaterialLaunch')?.setAttribute('aria-expanded',String(open));
  cad3dSyncCompactBars();
@@ -6937,6 +6958,8 @@ function cad3dMaterialRender(){
  panel.querySelector('[data-mat-angle]').value=cad3dMaterialBrush.rotation;
  panel.querySelector('[data-mat-repeat]').checked=cad3dMaterialBrush.repeat;
  panel.querySelector('[data-mat-color]').value=cad3dMaterialBrush.tint;
+ panel.querySelector('[data-mat-color-swatch]').style.backgroundColor=cad3dMaterialBrush.tint;
+ panel.querySelector('[data-mat-color-value]').textContent=cad3dMaterialBrush.tint.toUpperCase();
  panel.querySelector('[data-mat-mix]').value=cad3dMaterialBrush.mix;
  panel.querySelector('[data-mat-bump]').value=cad3dMaterialBrush.bump;
  panel.querySelector('[data-mat-bump-mode]').value=cad3dBumpMode(cad3dMaterialBrush.bumpMode);
@@ -7019,9 +7042,39 @@ function cad3dApplyMaterialClick(e){
  redraw();renderProps();cad3dMaterialMsg('Textura aplicada: '+face+' de '+(record.type==='slab'?'losa':'muro')+' '+record.id);
  text('Textura aplicada · '+face+' · '+(record.type==='slab'?'losa':'muro')+' '+record.id);
 }
+function cad3dCloseMaterialColor(panel){
+ var picker=panel?.querySelector('.cad3dMaterialColorPicker');
+ if(!picker||picker.hidden)return false;
+ picker.hidden=true;panel.querySelector('[data-mat-color-toggle]').setAttribute('aria-expanded','false');return true;
+}
+function cad3dSetupMaterialColor(panel){
+ var picker=panel.querySelector('.cad3dMaterialColorPicker'),toggle=panel.querySelector('[data-mat-color-toggle]'),hex=picker.querySelector('[data-mat-hex]'),value=panel.querySelector('[data-mat-color]'),rgb=Array.from(picker.querySelectorAll('[data-mat-rgb]'));
+ function paintDraft(color){
+  if(!/^#[0-9a-f]{6}$/i.test(color))return false;
+  hex.value=color.toUpperCase();picker.querySelector('[data-mat-color-draft]').style.backgroundColor=color;
+  rgb.forEach(function(el,i){el.value=parseInt(color.slice(1+2*i,3+2*i),16);picker.querySelector('[data-mat-rgb-value="'+i+'"]').textContent=el.value;});
+  return true;
+ }
+ toggle.addEventListener('click',function(){
+  if(cad3dCloseMaterialColor(panel))return;
+  paintDraft(value.value);picker.hidden=false;toggle.setAttribute('aria-expanded','true');
+ });
+ rgb.forEach(function(el){el.addEventListener('input',function(){paintDraft('#'+rgb.map(function(x){return Number(x.value).toString(16).padStart(2,'0');}).join(''));});});
+ hex.addEventListener('input',function(){if(/^#?[0-9a-f]{6}$/i.test(hex.value))paintDraft('#'+hex.value.replace(/^#/,''));});
+ function apply(){
+  var color='#'+hex.value.trim().replace(/^#/,'');
+  if(!/^#[0-9a-f]{6}$/i.test(color)){cad3dMaterialMsg('Ingresá seis dígitos hexadecimales válidos.');return;}
+  cad3dCloseMaterialColor(panel);value.value=color.toLowerCase();value.dispatchEvent(new Event('change',{bubbles:true}));toggle.focus({preventScroll:true});
+ }
+ picker.querySelector('[data-mat-color-apply]').addEventListener('click',apply);
+ picker.querySelector('[data-mat-color-cancel]').addEventListener('click',function(){cad3dCloseMaterialColor(panel);toggle.focus({preventScroll:true});});
+ hex.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();apply();}});
+ root.addEventListener('pointerdown',function(e){if(!picker.hidden&&!e.target.closest('.cad3dMaterialColorField'))cad3dCloseMaterialColor(panel);},true);
+}
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
  if(!p)return;
+ cad3dSetupMaterialColor(p);
  var dockButton=p.querySelector('[data-mat-dock]');
  dockButton?.addEventListener('click',function(e){e.stopPropagation();cad3dMaterialsSetDocked(!p.classList.contains('cad3dMaterialsDocked'));});
  // The seventh cube and the M shortcut use cad3dShowMaterials; delegated click handler above.
@@ -9708,6 +9761,7 @@ async function readJSON(e){
 }
 window.addEventListener('keydown',function(ev){
  if(!root||root.hidden)return;
+ if(ev.key==='Escape'&&cad3dCloseMaterialColor(root.querySelector('.cad3dMaterialsPanel'))){ev.preventDefault();ev.stopImmediatePropagation();return;}
  // The CAD3D model owns its own shortcuts, never editable form inputs or CAD2D.
  var editing=ev.target?.closest?.('input,textarea,select,[contenteditable],[role="textbox"]');
  // Undo/redo the model also from an empty CAD3D Command field, but never
