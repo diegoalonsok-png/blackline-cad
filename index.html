@@ -11306,6 +11306,11 @@ function cadQuickHatchArea(e){
  const holes=Array.isArray(e.holes)?e.holes:[];
  return Math.max(0,Math.abs(areaOfPolygon(e.pts||[]))-holes.reduce((n,h)=>n+(Array.isArray(h)&&h.length>=3?Math.abs(areaOfPolygon(h)):0),0));
 }
+function cadQuickPropertyTargets(editable=false){
+ const ids=new Set(state.selected),items=state.entities.filter(e=>ids.has(e.id));
+ const sel=$('cadPropsObject'),current=items.find(e=>String(e.id)===sel?.value)||items[0];
+ return current&&(!editable||(!current.cadHidden&&layerFor(current).visible&&!layerFor(current).locked))?[current]:[];
+}
 function cadQuickWidthEntity(e){return e.type==='polyline'||e.type==='rect'}
 function cadQuickCanResize(e){return !e.wall2d&&e.autoOpeningRef==null&&layerFor(e).visible&&!layerFor(e).locked&&!e.cadHidden}
 function cadRenderQuickGeometry(selected){
@@ -11376,17 +11381,6 @@ function cadRenderQuickGeometry(selected){
  }else if(e?.type==='image'){bounds();point('start','Esquina',e.a,false)}
  else if(e){bounds()}
  if(rect&&e?.type==='polyline')calc('Número de lados',4);
- if(selected.length>1){
-  let totalArea=0,areas=0,totalLength=0,lengths=0;
-  for(const v of selected){
-   const area=v.type==='hatch'?cadQuickHatchArea(v):cadEntityArea(v);
-   if(Number.isFinite(area)){totalArea+=area;areas++}
-   let length=v.type==='line'?dist(v.a,v.b):v.type==='circle'?TAU*v.r:v.type==='arc'?v.r*arcSweep(v.a0,v.a1):v.type==='ellipse'?cadQuickEllipsePerimeter(v.rx,v.ry):v.type==='rect'?2*(Math.abs(v.b.x-v.a.x)+Math.abs(v.b.y-v.a.y)):v.type==='polyline'?cadQuickPathInfo(v).length:null;
-   if(Number.isFinite(length)){totalLength+=length;lengths++}
-  }
-  if(areas)calc('Suma de áreas'+areaUnit,totalArea);
-  if(lengths)calc('Suma de longitudes'+unit,totalLength);
- }
  const widthEntities=selected.filter(cadQuickWidthEntity);
  if(widthEntities.length){
   const width=widthEntities[0].pwidth||0,mixed=widthEntities.some(item=>(item.pwidth||0)!==width);
@@ -11397,10 +11391,10 @@ function cadRenderQuickGeometry(selected){
 }
 function cadApplyQuickGeometry(input){
  const key=input.dataset.cadGeometry,value=input.valueAsNumber;
- const selected=validEditSelection().filter(e=>!e.cadHidden);
+ const selected=cadQuickPropertyTargets(true);
  const rejected=message=>{refreshCadQuickProperties();if(message)toast(message)};
  if(key==='textFont'){
-  if(state.selected.length!==1||selected.length!==1||selected[0].type!=='text'||!cadQuickCanResize(selected[0]))return;
+  if(selected.length!==1||selected[0].type!=='text'||!cadQuickCanResize(selected[0]))return;
   const e=selected[0],font=input.value;
   if(!CAD_FONT_NAMES.has(font))return rejected('Seleccioná una fuente válida');
   if(safeCADFont(e.fontFamily)===font)return;
@@ -11413,7 +11407,7 @@ function cadApplyQuickGeometry(input){
   saveHistory();
   for(const e of changed){if(value===0)delete e.pwidth;else e.pwidth=value}
  }else{
-  if(state.selected.length!==1||selected.length!==1||!cadQuickCanResize(selected[0]))return;
+  if(selected.length!==1||!cadQuickCanResize(selected[0]))return;
   const e=selected[0],angular=['arcStart','arcEnd','arcSweep','lineAngle','ellipseAngle','textAngle'].includes(key),coordinate=/^(origin|center|start|end|insertion)[XY]$/.test(key);
   if(!Number.isFinite(value)||Math.abs(value)>1e12||(!angular&&!coordinate&&value<=0))return rejected('Ingresá una medida válida');
   let patch;
@@ -11474,9 +11468,12 @@ function cadApplyQuickGeometry(input){
 function openCadQuickProperties(){const panel=$('cadQuickProperties');panel.hidden=false;panel.classList.remove('collapsed');const toggle=panel.querySelector('[data-palette-act="collapse"]');if(toggle)toggle.textContent='−';if(!panel.classList.contains('floating')){const side=panel.closest('.sidebar');if(side){cadWsSection(side.classList.contains('rightside')?'right':'left',true);if(getComputedStyle(side).display==='none'){panel.querySelector('[data-palette-act="float"]')?.click()}else panel.scrollIntoView({block:'nearest'})}}refreshCadQuickProperties();$('cadPropertiesButton').setAttribute('aria-expanded','true');return panel}
 function refreshCadQuickProperties(){
  const panel=$('cadQuickProperties');if(!panel)return;
- const selected=state.entities.filter(e=>state.selected.includes(e.id));
- const count=$('cadPropsCount');if(count)count.textContent=selected.length?selected.length+' objeto(s) seleccionados':'Seleccioná un objeto para editarlo';
- const first=selected[0];
+ const ids=new Set(state.selected),all=state.entities.filter(e=>ids.has(e.id));
+ const count=$('cadPropsCount'),picker=$('cadPropsObject'),row=$('cadPropsObjectRow');
+ const es=cad2dAliasLanguage==='es',labels=es?{circle:'Círculo',arc:'Arco',line:'Línea',polyline:'Polilínea',rect:'Rectángulo',ellipse:'Elipse',hatch:'Sombreado',blockRef:'Bloque',text:'Texto',dimension:'Cota',image:'Imagen'}:{circle:'Circle',arc:'Arc',line:'Line',polyline:'Polyline',rect:'Rectangle',ellipse:'Ellipse',hatch:'Hatch',blockRef:'Block',text:'Text',dimension:'Dimension',image:'Image'};
+ if(count)count.textContent=all.length?all.length+(es?' objeto(s) seleccionados':' selected object(s)'):(es?'Seleccioná un objeto para editarlo':'Select an object to edit');
+ if(picker){const old=picker.value,signature=JSON.stringify(all.map(e=>[e.id,e.type,e.blockName,e.cadHidden,layerFor(e).locked]));if(picker.dataset.signature!==signature){picker.dataset.signature=signature;picker.replaceChildren();all.forEach((e,i)=>{const option=document.createElement('option');option.value=String(e.id);option.textContent=(i+1)+' / '+all.length+' · '+(labels[e.type]||e.type)+(e.blockName?' · '+e.blockName:'')+(layerFor(e).locked?' 🔒':'');picker.append(option)});if(all.some(e=>String(e.id)===old))picker.value=old}row.hidden=all.length<2;row.firstChild.textContent=es?'Editar objeto ':'Edit object '}
+ const selected=cadQuickPropertyTargets(),first=selected[0];
  if(first){
   $('cadPropsColor').value=first.color||layerFor(first).color||'#ffffff';
   {const w=Number(first.width??layerFor(first).width??.25),opts=[...$('cadPropsWeight').options].map(o=>Number(o.value));$('cadPropsWeight').value=String(opts.reduce((a,b)=>Math.abs(b-w)<Math.abs(a-w)?b:a))}
@@ -11722,10 +11719,11 @@ function initCadHatchPalette(){
 }
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
- panel.innerHTML='<div class="panel-title">PROPIEDADES / PROPERTIES <button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></div><div class="panel-content"><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Layer changes apply immediately without altering color or lineweight. Apply saves other properties. Ctrl+Z undoes.</div></div>';
+ panel.innerHTML='<div class="panel-title">PROPIEDADES / PROPERTIES <button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></div><div class="panel-content"><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><label id="cadPropsObjectRow" hidden>Editar objeto <select id="cadPropsObject" aria-label="Objeto / Object"></select></label><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Only the chosen object is edited. Layer changes apply immediately. Ctrl+Z undoes.</div></div>';
  panel.classList.add('panel');document.querySelector('.workspace>.sidebar.rightside')?.append(panel);
  const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false');resize()};
  $('cadPropsClose').onclick=close;
+ $('cadPropsObject').addEventListener('change',refreshCadQuickProperties);
  const geometry=$('cadPropsGeometry');
  geometry.addEventListener('change',ev=>{if(ev.target.matches('[data-cad-geometry]'))cadApplyQuickGeometry(ev.target)});
  geometry.addEventListener('keydown',ev=>{
@@ -11736,7 +11734,7 @@ function initCadQuickProperties(){
  button.setAttribute('aria-expanded','false');
  button.onclick=()=>panel.hidden?openCadQuickProperties():close();
  $('cadPropsApply').onclick=()=>{
-  const selected=validEditSelection();if(!selected.length)return toast('Seleccioná líneas u objetos primero');
+  const selected=cadQuickPropertyTargets(true);if(!selected.length)return toast('Seleccioná líneas u objetos primero');
   const color=$('cadPropsColor').value,weight=Number($('cadPropsWeight').value),linetype=$('cadPropsLinetype').value,layer=$('cadPropsLayer').value;
   const ltscale=Number($('cadPropsLtscale').value)||1;
   if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<0||!state.layers.some(l=>l.id===layer))return toast('Propiedades inválidas');
@@ -11748,7 +11746,7 @@ function initCadQuickProperties(){
  $('cadPropsHatchPattern').addEventListener('change',()=>{$('cadPropsHatchC2Row').style.display=/^gradient/.test($('cadPropsHatchPattern').value)?'':'none';$('cadPropsApply').click()});
  for(const id of ['cadPropsHatchScale','cadPropsHatchAngle','cadPropsHatchColor2'])$(id).addEventListener('change',()=>$('cadPropsApply').click());
  $('cadPropsByLayer').onclick=()=>{
-  const selected=validEditSelection();if(!selected.length)return toast('Seleccioná objetos primero');
+  const selected=cadQuickPropertyTargets(true);if(!selected.length)return toast('Seleccioná objetos primero');
   saveHistory();for(const e of selected){delete e.color;delete e.width;e.linetype='BYLAYER'}
   updateAll();toast('Propiedades Por capa / ByLayer');
  };
@@ -11756,7 +11754,7 @@ function initCadQuickProperties(){
  const layerSelect=$('cadPropsLayer');
  // Apply a layer change to the whole editable selection without resetting mixed properties.
  layerSelect.addEventListener('change',()=>{
-  const selected=validEditSelection();
+  const selected=cadQuickPropertyTargets(true);
   if(!selected.length)return toast('Select one or more editable objects first');
   const target=state.layers.find(l=>l.id===layerSelect.value);
   if(!target||target.locked){
