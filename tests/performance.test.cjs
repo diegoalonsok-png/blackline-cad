@@ -42,3 +42,17 @@ test('static frame reuse permits basic drawing previews but not mutable interact
  assert.equal(check({}, {cadSelectionAnchor:{}}),false);
  assert.equal(check({mtextBox:{}}),false);
 });
+
+
+test('cached spatial query preserves reverse picking priority and conservative fallback',()=>{
+ const perf=require('../cad-performance.js');
+ const entities=Array.from({length:1000},(_,i)=>({id:i,type:'line',a:{x:i*2,y:0},b:{x:i*2+2,y:0}}));
+ entities.push({id:1000,type:'line',a:{x:20,y:0},b:{x:22,y:0}});
+ entities.push({id:1001,type:'unknown'});
+ const query=perf.spatialIndex(entities,perf.basicBounds);
+ const found=query({minX:19.9,maxX:20.1,minY:-.1,maxY:.1});
+ assert.deepEqual(found.map(e=>e.id),[9,10,1000,1001]);
+ assert.equal(found.filter(e=>e.type==='line').at(-1).id,1000);
+ assert.deepEqual(query(null),entities);
+ assert.equal(entities.length,1002);
+});
