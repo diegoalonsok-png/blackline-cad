@@ -9,12 +9,25 @@
  let catalogPromise=null;
  const catalogRows=new Map(),pendingBlocks=new Map();
  const API={total:TOTAL,loaded:0,added:0,errors:[],loading:false,load,refresh,loadCatalog,ensureBlock,get catalog(){return Array.from(catalogRows.values())},get catalogReady(){return catalogRows.size>1000}};
+
+ // Limit the whole request, including response body, so a stalled CDN cannot
+ // permanently occupy an in-flight entry. No automatic retry or prefetch.
+ async function demandJSON(url,options,errorMessage){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  try{
+   const response=await fetch(url,{...options,signal:controller.signal});
+   if(!response.ok)throw Error(errorMessage);
+   return await response.json();
+  }catch(error){
+   if(controller.signal.aborted)throw Error('Tiempo de espera agotado. Volvé a intentar.');
+   throw error;
+  }finally{clearTimeout(timeout)}
+ }
  async function loadCatalog(){
   if(catalogPromise)return catalogPromise;
   catalogPromise=(async()=>{
-   const response=await fetch('/assets/block-library/v1/catalog.json');
-   if(!response.ok)throw Error('Catálogo CDN no disponible');
-   const doc=await response.json();
+   const doc=await demandJSON('/assets/block-library/v1/catalog.json',{},'Catálogo CDN no disponible');
    if(doc.version!==1||doc.parts!==TOTAL||!Array.isArray(doc.blocks)||doc.blocks.length<=1000||doc.blocks.length>20000)throw Error('Catálogo incompleto');
    const validated=new Map();
    for(const x of doc.blocks){
@@ -34,9 +47,7 @@
   const job=(async()=>{
    await loadCatalog();
    const meta=catalogRows.get(id);if(!meta)throw Error('Bloque no encontrado');
-   const response=await fetch('/assets/block-library/v1/'+encodeURIComponent(id)+'.json',{cache:'no-store'});
-   if(!response.ok)throw Error('No se pudo descargar el bloque');
-   const x=await response.json();
+   const x=await demandJSON('/assets/block-library/v1/'+encodeURIComponent(id)+'.json',{cache:'no-store'},'No se pudo descargar el bloque');
    if(x.id!==id||x.source!==meta.source||x.sourceHash!==meta.sourceHash||typeof x.data!=='string'||x.data.length>1100000)throw Error('Geometría incompatible');
    const raw=atob(x.data);if(raw.length!==meta.segments*8)throw Error('Geometría incompleta');
    const again=L.library.find(b=>b.id===id||String(b.source||'').toLowerCase()===meta.source.toLowerCase());

@@ -35,14 +35,28 @@
      }
      else if(k==='T')b.push({type:'text',p:b.tp(X(e[1]),Y(e[2])),h:e[3]*sy,rotation:e[4]||0,text:e[5],fontFamily:'Arial'});
     }}}).gen}
+
+ // Limit the whole request, including response body, so a stalled CDN cannot
+ // permanently occupy an in-flight entry. No automatic retry or prefetch.
+ async function demandJSON(url,options,errorMessage){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  try{
+   const response=await fetch(url,{...options,signal:controller.signal});
+   if(!response.ok)throw Error(errorMessage);
+   return await response.json();
+  }catch(error){
+   if(controller.signal.aborted)throw Error('Tiempo de espera agotado. Volvé a intentar.');
+   throw error;
+  }finally{clearTimeout(timeout)}
+ }
  async function prepare(id){
   const m=byId.get(id);if(!m)throw Error('Bloque Blackline desconocido');
   if(ready.has(id))return ready.get(id);
   if(pending.has(id))return pending.get(id);
   const job=(async()=>{
-   const res=await fetch('assets/blackline-dk-demand-v1/'+m.file,{cache:'no-store'});
-   if(!res.ok)throw Error('No se pudo descargar '+m.name);
-   const gen=makeGenerator(validate(await res.json(),m));
+   const data=await demandJSON('assets/blackline-dk-demand-v1/'+m.file,{cache:'no-store'},'No se pudo descargar '+m.name);
+   const gen=makeGenerator(validate(data,m));
    ready.set(id,gen);return gen;
   })();
   pending.set(id,job);try{return await job}finally{pending.delete(id)}
