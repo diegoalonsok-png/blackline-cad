@@ -236,7 +236,7 @@ async function handle(req,env){
     if(!price)return cors(env,req,json({error:'plan inválido'},400));
     const user=await env.DB.prepare('SELECT email,stripe_customer_id,trial_ends_at FROM users WHERE id=?').bind(userId).first();
     // Compra durante la prueba: Stripe empieza a cobrar recién al terminar los días gratis (mínimo 48 h, regla de Stripe).
-    const trialEnd=Number(user.trial_ends_at)||0,keepTrial=trialEnd>now()+2*86400+300;
+    const trialEnd=Math.min(Number(user.trial_ends_at)||0,now()+720*86400),keepTrial=trialEnd>now()+2*86400+300;
     // Métodos de pago dinámicos: tarjeta, PayPal, SEPA, Apple/Google Pay… se activan desde el Dashboard
     // (Configuración → Métodos de pago) sin tocar este código (a propósito no se fija una lista de métodos).
     const tax=env.STRIPE_TAX==='1';
@@ -349,7 +349,7 @@ async function handle(req,env){
    }
    return cors(env,req,json({error:'no encontrado'},404));
   }catch(error){
-   console.error(error);return cors(env,req,json({error:'error interno'},500));
+   console.error('cad2d-billing:',error&&error.message,error);return cors(env,req,json({error:'error interno'},500));
   }
  }
 }
