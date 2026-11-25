@@ -48,8 +48,10 @@
   pending.set(id,job);try{return await job}finally{pending.delete(id)}
  }
  const plans={'dk-planta-baja':'examples/plantas/vivienda-planta-baja.dxf','dk-planta-alta':'examples/plantas/vivienda-planta-alta.dxf'};
- function register(LIB){
+ function register(LIB,ids=null){
+  const only=ids?new Set(ids):null;
   for(const m of META){
+   if(only&&!only.has(m.id))continue;
    if(LIB.library.some(x=>x.id===m.id))continue;
    LIB.library.push({id:m.id,name:m.name,cat:m.c,family:m.id,...(plans[m.id]?{dxfPlan:plans[m.id]}:{}),w:m.w,d:m.d,wMin:m.w*.25,wMax:m.w*6,dMin:m.d*.25,dMax:m.d*6,author:'Blackline',
     ...(m.c==='Carpinterías'?{lockAspect:true,wMin:m.w*.5,wMax:m.w*2.5}:{}),

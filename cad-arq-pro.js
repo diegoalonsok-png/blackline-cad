@@ -77,8 +77,22 @@ function scaleEntity(e,k){
 const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 
 /* ---------- Inserción ---------- */
-let pendingInsert=null,lastItem=null;
+let pendingInsert=null,lastItem=null,dkInsertIntent=0;
+const dkNeeds=item=>item?.remoteDK&&!window.CAD2D_DK_DEMAND.isReady(item.id);
+async function dkPrepare(item){if(dkNeeds(item))await window.CAD2D_DK_DEMAND.prepare(item.id)}
 function armInsert(item,W,D){
+ const intent=++dkInsertIntent;
+ if(dkNeeds(item)&&allowed(item)){
+  const st=S(),entities=st.entities,blocks=st.blocks,tool=st.tool;
+  CORE.toast('Descargando '+item.name+'…');
+  return dkPrepare(item).then(()=>{
+   if(intent!==dkInsertIntent||S().entities!==entities||S().blocks!==blocks||S().tool!==tool)return false;
+   return armInsertReady(item,W,D);
+  }).catch(e=>{CORE.toast(e.message);return false});
+ }
+ return armInsertReady(item,W,D);
+}
+function armInsertReady(item,W,D){
  if(!allowed(item)){
   if(plan()?.upsell)plan().upsell(item.paidOnly?'Blackline Select requiere membresía PRO o Estudio confirmada':'Bloque Pro: '+item.name);
   else CORE.toast('Requiere membresía PRO o Estudio');
@@ -210,7 +224,7 @@ function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
  b.title=arqSimpleName(item)+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
  b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
- b.onclick=()=>{if(armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
+ b.onclick=async()=>{if(await armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
 function chips(container,onPick){
@@ -365,7 +379,7 @@ function worldToLocal(ref,q){
  if(ref.flipBlockX)lx=-lx;return P(lx/k,ly/k);
 }
 function extOf(a){
- if(!a.ext){const bb=LIB.bounds(LIB.build(a.id,a.w,a.d).entities);a.ext=bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:{x0:0,y0:0,x1:a.w,y1:a.d}}
+ if(!a.ext){const bb=dkNeeds(byId(a.id))?null:LIB.bounds(LIB.build(a.id,a.w,a.d).entities);a.ext=bb?{x0:bb.minX,y0:bb.minY,x1:bb.maxX,y1:bb.maxY}:{x0:0,y0:0,x1:a.w,y1:a.d}}
  const e=a.ext;return {x0:Math.min(0,e.x0),y0:Math.min(0,e.y0),x1:Math.max(a.w,e.x1),y1:Math.max(a.d,e.y1)};
 }
 function gripsFor(ref){
@@ -417,6 +431,7 @@ function hitGrip(raw){
 function snapMeters(v,fine){const step=fine?.01:.05;return Math.round(v/step)*step}
 function resizeRef(ref,W,D){
  const a=arqOf(ref),item=a&&byId(a.id);if(!item)return;
+ if(dkNeeds(item)&&allowed(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)resizeRef(ref,W,D)}).catch(e=>CORE.toast(e.message))}
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
  let requestedW=W;
  if(item.lockAspect&&item.dynamicAxis==='d'&&Math.abs(D-a.d)>1e-6)
@@ -431,6 +446,7 @@ function resizeRef(ref,W,D){
 }
 function swapVariant(ref,id){
  const a=arqOf(ref),item=byId(id);if(!a||!item)return;
+ if(dkNeeds(item)&&allowed(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)swapVariant(ref,id)}).catch(e=>CORE.toast(e.message))}
  if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
  CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d);delete ref.dynamic;
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
@@ -522,6 +538,7 @@ function drawPickPreview(ctx){
 }
 document.addEventListener('keydown',ev=>{
  if(ev.key==='Escape'){
+  dkInsertIntent++;
   if(pick.active){pick.active=false;pick.points=[];CORE.toast('Comando cancelado');CORE.schedule()}
   if(gripDrag){gripDrag=null;CORE.schedule()}
   closeVariantMenu();setTimeout(finishPendingInsert,0);
@@ -1012,7 +1029,7 @@ async function openArqPlanCatalogue(category,query=''){
   for(const item of LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa')){
    const card=document.createElement('button');card.type='button';card.className='btn arq-card';card.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
    const preview=document.createElement('div');preview.style.cssText='background:#f4efe3;color:#343e40;border-radius:4px;width:100%';preview.innerHTML=svgFor(item,item.w,item.d,{height:142});const label=document.createElement('span');label.textContent=item.name;const size=document.createElement('small');size.textContent=fmt(item.w)+' × '+fmt(item.d)+' · '+(item.id.startsWith('rail-elev-')?'alzado':'planta')+' preliminar';card.append(preview,label,size);
-   card.onclick=()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(armInsert(item)!==false)dlg.close();};grid.append(card);
+   card.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(await armInsert(item)!==false)dlg.close();};grid.append(card);
   }
   return;
  }
@@ -1150,7 +1167,7 @@ function openArchitectureAssistant(category){
   q('[data-command]').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();drawInstruction()}});
   q('[data-interpret]').onclick=drawInstruction;
   q('[data-voice]').onclick=()=>{const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Recognition)return say('Dictado no disponible en este navegador. Usá el teclado.');try{const rec=new Recognition();rec.lang='es-AR';rec.onresult=e=>{q('[data-command]').value=e.results[0][0].transcript;drawInstruction()};rec.onerror=()=>say('No se pudo reconocer la voz. Usá el teclado.');rec.start()}catch(e){say(e.message)}};
-  q('[data-insert]').onclick=()=>{try{const {it,W,D}=valid();if(armInsert(it,W,D))say('Clic en el plano para insertar.')}catch(e){say(e.message)}};
+  q('[data-insert]').onclick=async()=>{try{const {it,W,D}=valid();if(await armInsert(it,W,D))say('Clic en el plano para insertar.')}catch(e){say(e.message)}};
   q('[data-close]').onclick=()=>{const body=q('[data-body]');body.hidden=!body.hidden;q('[data-close]').textContent=body.hidden?'+':'−'};
   panel.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Escape')panel.hidden=true});
   panel.setCategory=value=>{cat.value=value==='Cocinas completas'?'kitchen':'bath';refresh()};
