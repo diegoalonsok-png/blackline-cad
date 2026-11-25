@@ -10923,10 +10923,8 @@ function initBlocks(){
   if(!/^[\w .\-]+$/.test(key)||key in Object.prototype)return toast(es?'Nombre de bloque inválido':'Invalid block name');
   if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast(es?'El bloque está en uso. Elegí otro nombre.':'Block is in use. Choose another name.');
   if(state.blocks[key]&&!window.confirm(es?'¿Reemplazar bloque '+key+'?':'Replace block '+key+'?'))return;
-  const bounds=getBounds(selected),fallback=P(bounds.minX,bounds.minY);
-  const base=window.prompt(es?'Punto base X,Y (Enter: esquina inferior izquierda):':'Base point X,Y (Enter: lower-left corner):','');
-  if(base===null)return;
-  const origin=base.trim()?parseCoordinate(base.trim()):fallback;
+  // Automatically use the lower-left bounds as the block base, without another dialog.
+  const bounds=getBounds(selected),origin=P(bounds.minX,bounds.minY);
   if(!origin||!Number.isFinite(origin.x)||!Number.isFinite(origin.y))return toast(es?'Punto base inválido':'Invalid base point');
   let def;
   try{
