@@ -80,13 +80,15 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 let pendingInsert=null,lastItem=null,dkInsertIntent=0;
 const dkNeeds=item=>item?.remoteDK&&!window.CAD2D_DK_DEMAND.isReady(item.id);
 async function dkPrepare(item){if(dkNeeds(item))await window.CAD2D_DK_DEMAND.prepare(item.id)}
-function armInsert(item,W,D){
+function armInsert(item,W,D,isCurrent){
  const intent=++dkInsertIntent;
+ // Full DXF plans already contain their original geometry; never prefetch the JSON copy.
+ if(item.dxfPlan&&window.cadInsertDxfPlan&&allowed(item))return window.cadInsertDxfPlan(item.dxfPlan,item.name,{isCurrent:()=>intent===dkInsertIntent&&(!isCurrent||isCurrent())});
  if(dkNeeds(item)&&allowed(item)){
   const st=S(),entities=st.entities,blocks=st.blocks,tool=st.tool;
   CORE.toast('Descargando '+item.name+'…');
   return dkPrepare(item).then(()=>{
-   if(intent!==dkInsertIntent||S().entities!==entities||S().blocks!==blocks||S().tool!==tool)return false;
+   if(intent!==dkInsertIntent||S().entities!==entities||S().blocks!==blocks||S().tool!==tool||(isCurrent&&!isCurrent()))return false;
    return armInsertReady(item,W,D);
   }).catch(e=>{CORE.toast(e.message);return false});
  }
@@ -98,7 +100,7 @@ function armInsertReady(item,W,D){
   else CORE.toast('Requiere membresía PRO o Estudio');
   return false;
  }
- if(item.dxfPlan&&window.cadInsertDxfPlan){window.cadInsertDxfPlan(item.dxfPlan,item.name);return true}
+ if(item.dxfPlan&&window.cadInsertDxfPlan)return window.cadInsertDxfPlan(item.dxfPlan,item.name);
  const name=ensureDefinition(item,W??item.w,D??item.d),st=S();
  const layer=ensureLayer(item.cat);
  if(!pendingInsert)pendingInsert={prevLayer:st.layerId};
@@ -1233,5 +1235,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D,isCurrent)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D,isCurrent)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
