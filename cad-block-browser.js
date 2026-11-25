@@ -205,6 +205,15 @@
  const groupOf=it=>VIEWS[st.view]?.family?modeOf(it):familyOf(it);
  const cm=v=>Math.round(v*100);
  const blockTerms=[
+ ['anafe anafes cooktop cooktops hob hobs placa',/\b(?:anafes?|cooktops?|hobs?|placa de coccion)\b/],
+ ['horno hornos oven ovens',/\b(?:hornos?|ovens?)\b/],
+ ['cocina a gas|gas stove|stove|estufa',/\b(?:cocina a gas|gas stove|stoves?|ranges?|cocina con horno)\b/],
+ ['microondas microwave microwaves',/\b(?:microondas|microwaves?)\b/],
+ ['palmera palmeras palm',/\b(?:palmeras?|palm)\b/],
+ ['persona personas person people',/\b(?:personas?|person|people|human)\b/],
+ ['camion camiones truck trucks',/\b(?:camion(?:es)?|trucks?)\b/],
+ ['bicicleta bicicletas bicycle bicycles',/\b(?:bicicletas?|bicycles?|bikes?)\b/],
+ ['moto motos motorcycle motorcycles',/\b(?:motos?|motocicletas?|motorcycles?)\b/],
  ['inodoro toilet toilets inodoros wc retrete retretes',/\b(?:inodoros?|toilets?|wc|retretes?|water closet)\b/],
  ['bidet bidets bidé bidés',/\b(?:bidet|bide)s?\b/],
  ['lavabo lavatorio bacha sink washbasin',/\b(?:lavabos?|lavatorios?|bachas?|sinks?|washbasins?|vanitory)\b/],
@@ -222,10 +231,10 @@
  ['arbol árbol tree trees arboles árboles',/\b(?:arbol(?:es)?|trees?)\b/]
  ];
  const normalizeTerm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
- const termIndex=new Map(blockTerms.flatMap(([keys,re])=>keys.split(' ').map(k=>[normalizeTerm(k),re])));
+ const termIndex=new Map(blockTerms.flatMap(([keys,re])=>(keys.includes('|')?keys.split('|'):keys.split(' ')).map(k=>[normalizeTerm(k),re])));
  function filtered(pool=items().filter(inView)){
   const q=normalizeTerm(st.q),syn=termIndex.get(q);
-  return pool.filter(it=>{if(st.cat&&groupOf(it)!==st.cat)return false;if(!q)return true;const name=normalizeTerm(it.name+' '+tr(it.name)+' '+it.id);return syn?syn.test(name):normalizeTerm(name+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)).includes(q)});
+  return pool.filter(it=>{if(st.cat&&groupOf(it)!==st.cat)return false;if(!q)return true;const name=normalizeTerm(it.name+' '+tr(it.name)+' '+it.id.replace(/[_-]/g,' '));return syn?syn.test(name):normalizeTerm(name+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)).includes(q)});
  }
  // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
  function simpleBlockNames(){
@@ -289,8 +298,8 @@
   resetPreviews();
   const allItems=items(),pool=allItems.filter(inView),names=simpleBlockNames(),counts=new Map();
   for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
-  const visual=st.view==='visual'||st.view==='olymp3'||st.view==='imported';
-  const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
+  const visual=commandGallery||st.view==='visual'||st.view==='olymp3'||st.view==='imported';
+  const paper=PAPERS.find(p=>p.id===(commandGallery?'cream':st.paper))||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
