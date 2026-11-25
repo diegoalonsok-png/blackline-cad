@@ -1512,6 +1512,20 @@ css+=`
 #cad3dLab .cad3dMaterialsGrid {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
 #cad3dLab .cad3dMaterialCard canvas {min-width:0!important;max-width:100%!important;width:100%!important;}
 `;
+/* Keep the docked material title and its detach/close actions accessible. */
+css+=`
+#cad3dLab .body {min-height:0;}
+#cad3dLab .side.sidebar {min-height:0;overflow-y:auto;overflow-x:hidden;}
+#cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked {
+ height:min(410px,calc(100% - 8px))!important;min-height:min(180px,calc(100% - 8px))!important;max-height:calc(100% - 8px)!important;
+}
+#cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked>.cad3dMaterialsHeader {
+ position:sticky!important;top:-8px!important;z-index:3!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto auto!important;gap:4px!important;align-items:center!important;
+}
+#cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked>.cad3dMaterialsHeader strong {min-width:0!important;white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.25;}
+#cad3dLab .side.sidebar>.cad3dMaterialsPanel.cad3dMaterialsDocked>.cad3dMaterialsHeader button {margin:0!important;min-width:24px!important;flex:none!important;padding:2px 4px!important;}
+#cad3dLab .head {flex-shrink:0;touch-action:none;}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
@@ -3338,6 +3352,7 @@ function cad3dMaterialsSetDocked(want,options){
   panel.style.left='';panel.style.top='';panel.style.right='';panel.style.bottom='';
   panel.style.width='';panel.style.height='';
   panel.dataset.userPositioned='false';
+  if(!panel.hidden)requestAnimationFrame(function(){cad3dRevealMaterialDock(panel);});
  }else{
   panel.classList.remove('cad3dMaterialsDocked');
   root.appendChild(panel);
@@ -4756,10 +4771,11 @@ function build(){
 function moveWindow(e){
  if(e.button!==0||e.target.closest('button'))return;
  e.preventDefault();var head=root.querySelector('.head'),r=root.getBoundingClientRect();
+ if(restoredWindow){var fraction=clamp((e.clientX-r.left)/Math.max(1,r.width),0,1);toggleMaximize();r=root.getBoundingClientRect();root.style.left=clamp(e.clientX-fraction*r.width,0,Math.max(0,window.innerWidth-r.width))+'px';root.style.top=clamp(e.clientY-16,0,Math.max(0,window.innerHeight-r.height))+'px';r=root.getBoundingClientRect();}
  winDrag={id:e.pointerId,dx:e.clientX-r.left,dy:e.clientY-r.top};head.setPointerCapture(e.pointerId);
  function move(ev){if(!winDrag||ev.pointerId!==winDrag.id)return;root.style.left=clamp(ev.clientX-winDrag.dx,0,window.innerWidth-80)+'px';root.style.top=clamp(ev.clientY-winDrag.dy,0,window.innerHeight-50)+'px';}
- function done(ev){if(!winDrag||ev.pointerId!==winDrag.id)return;winDrag=null;head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',done);head.removeEventListener('pointercancel',done);}
- head.addEventListener('pointermove',move);head.addEventListener('pointerup',done);head.addEventListener('pointercancel',done);
+ function done(ev){if(!winDrag||ev.pointerId!==winDrag.id)return;winDrag=null;head.removeEventListener('pointermove',move);head.removeEventListener('pointerup',done);head.removeEventListener('pointercancel',done);head.removeEventListener('lostpointercapture',done);}
+ head.addEventListener('pointermove',move);head.addEventListener('pointerup',done);head.addEventListener('pointercancel',done);head.addEventListener('lostpointercapture',done);
 }
 
 function toggleMaximize(){
@@ -6736,13 +6752,20 @@ function cad3dHasMaterial(id){
 function cad3dMaterialMsg(value){
  var el=root?.querySelector('.cad3dMaterialStatus');if(el)el.textContent=value;
 }
+function cad3dRevealMaterialDock(panel){
+ var side=panel?.closest('.side.sidebar');
+ if(!side||panel.hidden||!panel.classList.contains('cad3dMaterialsDocked'))return;
+ var p=panel.getBoundingClientRect(),b=side.getBoundingClientRect();
+ side.scrollTop+=p.top-b.top-side.clientTop-4;
+ panel.scrollTop=0;
+}
 function cad3dShowMaterials(open){
  var panel=root?.querySelector('.cad3dMaterialsPanel');if(!panel)return;
  open=typeof open==='boolean'?open:panel.hidden;
  panel.hidden=!open;
  root.querySelector('.cad3dMaterialLaunch')?.setAttribute('aria-expanded',String(open));
  cad3dSyncCompactBars();
- if(open){cad3dMaterialRender();if(!panel.classList.contains('cad3dMaterialsDocked')){cad3dPaletteConstrain(panel);cad3dBringPaletteFront(panel);}else panel.scrollIntoView({block:'nearest'});}
+ if(open){cad3dMaterialRender();if(!panel.classList.contains('cad3dMaterialsDocked')){cad3dPaletteConstrain(panel);cad3dBringPaletteFront(panel);}else requestAnimationFrame(function(){cad3dRevealMaterialDock(panel);});}
 }
 function cad3dMaterialCanvas(id){
  if(cad3dTextureCanvases[id])return cad3dTextureCanvases[id];
