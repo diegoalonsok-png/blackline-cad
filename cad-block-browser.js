@@ -163,6 +163,11 @@
 #cadBlockBrowser .web-links{display:none}
 #cadBlockBrowser.web-reference .web-links{display:flex;gap:4px;flex-wrap:wrap;padding:5px 9px;background:#ede2cc}
 #cadBlockBrowser.web-reference .tools{padding:6px 9px}
+#cadBlockBrowser.compact-search .rz.se{display:block;touch-action:none;z-index:10}
+#cadBlockBrowser.web-reference .web-card img{height:100%;max-height:100%}
+#cadBlockBrowser.web-reference .area-links{display:flex;flex-wrap:wrap;gap:4px;padding:4px 9px;background:#ede2cc}
+#cadBlockBrowser.web-reference .area-links button{border:1px solid #b8a17a;background:#fffaf0;color:#51432e;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:11px}
+#cadBlockBrowser:not(.web-reference) .area-links,#cadBlockBrowser.min .area-links{display:none}
 #cadBlockBrowser.web-reference .tools input{min-width:0}
 #cadBlockBrowser.web-reference .grid{grid-template-rows:repeat(2,minmax(0,1fr))}
 #cadBlockBrowser.web-reference .web-card{display:flex;flex-direction:column;min-height:0;padding:5px;gap:3px;border:1px solid #cbb796;border-radius:8px;background:#fffaf0;color:#293238;overflow:hidden}
@@ -364,7 +369,7 @@
   if(pkg&&!pkg.catalogReady&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
  function place(){
-  const W=innerWidth,H=innerHeight;if(commandGallery&&compactRect){const c=compactRect;c.w=Math.min(370,W-16);c.h=Math.min(420,H-16);c.x=Math.max(8,Math.min(W-c.w-8,c.x));c.y=Math.max(8,Math.min(H-c.h-8,c.y));Object.assign(el.style,{left:c.x+'px',top:c.y+'px',width:c.w+'px',height:c.h+'px'});return;}st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
+  const W=innerWidth,H=innerHeight;if(commandGallery&&compactRect){const c=compactRect;c.w=Math.min(Math.max(300,c.w||370),W-16);c.h=Math.min(Math.max(320,c.h||420),H-16);c.x=Math.max(8,Math.min(W-c.w-8,c.x));c.y=Math.max(8,Math.min(H-c.h-8,c.y));Object.assign(el.style,{left:c.x+'px',top:c.y+'px',width:c.w+'px',height:c.h+'px'});return;}st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
   if(st.x===null){st.x=Math.round((W-st.w)/2);st.y=Math.round(Math.max(60,(H-st.h)/2))}
   st.x=Math.max(8-st.w+120,Math.min(W-120,st.x));st.y=Math.max(4,Math.min(H-44,st.y));
   Object.assign(el.style,{left:st.x+'px',top:st.y+'px',width:st.w+'px',height:st.h+'px'});
@@ -376,7 +381,7 @@
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar ZIP completos, DWG, DXF o paquete JSON local">${T("Import ZIP / DWG / DXF","Importar ZIP / DWG / DXF")}</button></div>
-<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
+<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links">${[45,60,90,120,200].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
@@ -427,9 +432,9 @@
   // Agrandar desde bordes y esquina.
   el.querySelectorAll('.rz').forEach(h=>{
    let r=null;
-   h.addEventListener('pointerdown',e=>{r={mx:e.clientX,my:e.clientY,x:st.x,y:st.y,w:st.w,h:st.h,k:h.dataset.r};h.setPointerCapture(e.pointerId);e.preventDefault()});
+   h.addEventListener('pointerdown',e=>{const p=commandGallery?compactRect:st;r={mx:e.clientX,my:e.clientY,x:p.x,y:p.y,w:p.w,h:p.h,k:h.dataset.r};h.setPointerCapture(e.pointerId);e.preventDefault()});
    h.addEventListener('pointermove',e=>{if(!r)return;const dx=e.clientX-r.mx,dy=e.clientY-r.my;
-    if(r.k.includes('e'))st.w=r.w+dx;if(r.k.includes('s'))st.h=r.h+dy;
+    const p=commandGallery?compactRect:st;if(r.k.includes('e'))p.w=r.w+dx;if(r.k.includes('s'))p.h=r.h+dy;
     if(r.k==='w'){st.w=Math.max(420,r.w-dx);st.x=r.x+(r.w-st.w)}if(r.k==='n'){st.h=Math.max(300,r.h-dy);st.y=r.y+(r.h-st.h)}
     place()});
    h.addEventListener('pointerup',()=>{if(r){r=null;save()}});
@@ -458,26 +463,44 @@
  function cleanMeta(value){return String(value||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,500)}
  function parseArea(value){const m=String(value).match(/(\d+(?:[.,]\d+)?)\s*(?:m(?:ts?)?\s*(?:²|2|\^2)|sqm|square metres|square meters|metros cuadrados)/i);return m?Number(m[1].replace(',','.')):null}
  function webQuery(raw){const area=parseArea(raw),q=String(raw).trim();if(area&&/casa|vivienda|house|home/i.test(q))return 'house floor plan '+area+' square meters';return q.replace(/^(?:web|referencias?|reference|buscar web)\s*:?\s*/i,'')}
+
+ let localGalleryPromise=null;
+ function localGallery(){
+  if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
+  return localGalleryPromise;
+ }
+ async function localHousePreviews(raw){
+  if(!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
+  const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
+  return rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true}));
+ }
+ async function insertLocalPreview(item){
+  const im=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('No se pudo cargar la planta'));i.src=item.url;});
+  const w=im.naturalWidth||800,h=im.naturalHeight||800,k=1800/Math.max(w,h),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
+  const blob=await new Promise(resolve=>cv.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo crear imagen');await importReference(new File([blob],item.title+'.png',{type:'image/png'}));
+ }
  async function searchWeb(raw){
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
+  try{const own=await localHousePreviews(raw);if(epoch!==webEpoch||!webMode)return;webItems=own;paintWeb();}catch(e){}
   const api=new URL('https://commons.wikimedia.org/w/api.php');
   const args={action:'query',generator:'search',gsrsearch:query+' filetype:bitmap',gsrnamespace:'6',gsrlimit:'40',prop:'imageinfo',iiprop:'url|mime|extmetadata',iiurlwidth:'360',format:'json',origin:'*'};
   for(const [k,v] of Object.entries(args))api.searchParams.set(k,v);
   try{
    const res=await fetch(api,{signal:ctrl.signal,credentials:'omit'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();
    if(epoch!==webEpoch||!webMode)return;
-   webItems=Object.values(data.query?.pages||{}).flatMap(p=>{
+   const remoteItems=Object.values(data.query?.pages||{}).flatMap(p=>{
     const i=p.imageinfo?.[0],m=i?.extmetadata||{},license=cleanMeta(m.LicenseShortName?.value),title=cleanMeta(p.title?.replace(/^File:/,''));
     const thumb=safeHttps(i?.thumburl),url=safeHttps(i?.url),source=safeHttps(i?.descriptionurl);
     if(!thumb||!url||!source||!(/^(?:CC BY|CC0|Public domain|PD|CC-BY)/i.test(license)))return [];
     const area=parseArea(title+' '+cleanMeta(m.ImageDescription?.value));
     return [{title,thumb,url,source,license,area}];
    });
-   if(webArea)webItems.sort((a,b)=>(a.area===null?1e9:Math.abs(a.area-webArea))-(b.area===null?1e9:Math.abs(b.area-webArea)));
+   webItems=webItems.concat(remoteItems.filter(i=>!webItems.some(j=>j.url===i.url)));
+   if(webArea)webItems.sort((a,b)=>(a.area===null?1e9:Math.abs(a.area-webArea))-(b.area===null?1e9:Math.abs(b.area-webArea))||Number(!!b.local)-Number(!!a.local));
    webStatus=webItems.length?'':T('No open previews found. Try Google or Pinterest.','Sin miniaturas libres encontradas. Probá Google o Pinterest.');paintWeb();
-  }catch(e){if(epoch!==webEpoch||ctrl.signal.aborted)return;webStatus=T('Search unavailable. Use external links or import a file.','Búsqueda no disponible. Usá los enlaces o importá un archivo.');paintWeb();}
+  }catch(e){if(epoch!==webEpoch||ctrl.signal.aborted)return;webStatus=webItems.length?'':T('Search unavailable. Use external links or import a file.','Búsqueda no disponible. Usá los enlaces o importá un archivo.');paintWeb();}
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
@@ -505,10 +528,12 @@
  }
  async function handleWebAction(button){
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
+  if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
   const item=a==='insert'?webItems[Number(button.dataset.index)]:null;
+  if(item?.local){button.disabled=true;try{await insertLocalPreview(item)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   const url=item?.url||(a==='url'?prompt('URL directa de archivo autorizado / Direct file URL'):null);if(!url)return;
   button.disabled=true;try{await importWebUrl(url)}catch(e){CORE.toast(e.message+' · Descargá el archivo desde su fuente e importalo con Archivo.');}finally{button.disabled=false}
  }
