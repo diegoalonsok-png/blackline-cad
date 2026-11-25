@@ -212,7 +212,7 @@
  const archivedView=it=>Boolean(it.hideFromGallery||/^views26-/.test(it.id));
  const archiveTabs=new Set(['section','archive','doorElev','windowElev','fridgeElev']);
  const items=()=>galleryItems().filter(it=>(commandGallery&&String(st.q||'').trim())||(!/^views26-/.test(it.id)&&
-   (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view)))));
+   (!it.hideFromGallery||(archiveTabs.has(st.view)&&it.hideFromGallery&&/^(?:cv-|vm-|alz-)/.test(it.id))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view)))));
  const familyOf=it=>{
   const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
   // Explicit botanical names and source IDs take precedence over generic keyword matches.
