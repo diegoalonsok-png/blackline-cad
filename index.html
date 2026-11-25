@@ -1449,7 +1449,9 @@ function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
 function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}var cadScopedLayerLookup=null;
 function cadWithLayerLookup(fn){
- const previous=cadScopedLayerLookup,layers=state.layers,map=new Map();
+ const previous=cadScopedLayerLookup,layers=state.layers;
+ if(previous&&previous.layers===layers&&previous.length===layers.length)return fn();
+ const map=new Map();
  for(const l of layers)if(!map.has(l.id))map.set(l.id,l);
  cadScopedLayerLookup={layers,length:layers.length,map};
  try{return fn()}finally{cadScopedLayerLookup=previous}
@@ -2079,8 +2081,30 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
-var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false;
-function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false,cadPanPaintIndex=null,cadPaintNavigation=null;
+var cadLastInteractiveMotion=-Infinity;
+function cadInteractionBusy(now=performance.now()){return !!state.drag||now-cadLastInteractiveMotion<250;}
+// Only these tools draw their transient previews after the static scene. No model edits
+// occur during passive mouse movement; all commits and other events still invalidate it.
+const cadPassiveSceneTools=new Set(['select','line','polyline','rect','circle','arc','ellipse','polygon','wall2d','distance','area','dimension']);
+function cadPassiveSceneEligible(){return cadPassiveSceneTools.has(state.tool)&&!state.drag&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;}
+function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(pointerOnly==='pan'||pointerOnly==='zoom'){cadPaintNavigation=pointerOnly;}else{cadPanPaintIndex=null;cadPaintNavigation=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+// Navigation never edits geometry. Reuse one conservative index during pan/zoom,
+// but discard it on other redraws (including geometry/style changes).
+function cadPanPaintCandidates(view){
+ const entities=state.entities,drag=state.drag,perf=window.BlacklinePerformance;
+ const nav=drag?.type==='pan'?drag:!drag&&cadPaintNavigation==='zoom'?'zoom':null;
+ if(!nav||entities.length<500||!view||!perf?.spatialIndex)return entities;
+ try{
+  if(!cadPanPaintIndex||cadPanPaintIndex.drag!==nav||cadPanPaintIndex.entities!==entities||cadPanPaintIndex.length!==entities.length||cadPanPaintIndex.epoch!==cadDrawEpoch){
+   // Only known conservative primitive bounds are indexed. Complex shapes
+   // stay in the always-checked list, preserving the original paint rules.
+   const query=perf.spatialIndex(entities,e=>perf.basicBounds(e));
+   cadPanPaintIndex={drag:nav,entities,length:entities.length,epoch:cadDrawEpoch,query};
+  }
+  return cadPanPaintIndex.query(view);
+ }catch(err){cadPanPaintIndex=null;return entities}
+}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
  const b=boundsEntity(e);if(!b)return false;
@@ -2168,15 +2192,15 @@ function cadArqWallPochePolygons(entities,visible=()=>true){
 let cadArqPocheEnabled=true;
 try{cadArqPocheEnabled=localStorage.getItem('cad-arq-poche')!=='0'}catch(e){}
 window.CAD2D_ARQ_POCHE=()=>{cadArqPocheEnabled=!cadArqPocheEnabled;try{localStorage.setItem('cad-arq-poche',cadArqPocheEnabled?'1':'0')}catch(e){}schedule();toast('ARQ · relleno gráfico '+(cadArqPocheEnabled?'ON':'OFF'));return cadArqPocheEnabled;};
-function cadDrawArqPoche(visibleForPaint){
+function cadDrawArqPoche(visibleForPaint,entities=state.entities){
  if(!cadArqPocheEnabled)return;
  const light=(cadHexLum(displayColors.background)?.l||0)>.5;
- const polygons=cadArqWallPochePolygons(state.entities,e=>layerFor(e).visible&&visibleForPaint(e));
+ const polygons=cadArqWallPochePolygons(entities,e=>layerFor(e).visible&&visibleForPaint(e));
  ctx.save();ctx.fillStyle=light?'#b9bdbe':'#666b70';ctx.setLineDash([]);
  for(const poly of polygons){ctx.beginPath();poly.forEach((p,i)=>{const q=screen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();}
  // Wet areas use the actual regenerated block size and transformation.
  ctx.fillStyle=light?'#e0e4e4':'#41494d';
- for(const e of state.entities){
+ for(const e of entities){
   if(e.type!=='blockRef'||!e.arqBatch||!['shower','shower75'].includes(e.arqRole)||e.cadHidden||!layerFor(e).visible||!visibleForPaint(e))continue;
   const m=state.blocks[e.blockName]?.arq;if(!m||m.unit!==state.unit||!(m.w>0&&m.d>0&&e.scale>0))continue;
   const k=1000/U[state.unit]*e.scale,a=e.rotation*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
@@ -2205,24 +2229,24 @@ function cadVectorBatch(selectedIds){
  return {add,flush};
 }
 function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let painted=0;
- const idle=state.entities.length>=500&&state.tool==='select'&&!state.drag&&!state.stage.length&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;
+ const idle=state.entities.length>=500&&cadPassiveSceneEligible();
  const frameKey=idle?[cadDrawEpoch,canvas.width,canvas.height,dpr,state.view.scale,state.view.ox,state.view.oy,state.gridOn,state.grid,displayColors.background,displayColors.grid,displayColors.axes].join('|'):'';
  const reuse=idle&&cadIdleFrameValid&&cadIdleFrame?.key===frameKey;
  if(!reuse&&state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);updateCadSnapLive();
  if(reuse){ctx.drawImage(cadIdleFrame.canvas,0,0,w,h);painted=cadIdleFrame.painted;}else{
  ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
- const selectedIds=new Set(state.selected);
+ const selectedIds=new Set(state.selected),paintCandidates=cadPanPaintCandidates(fastView);
  // Both paint passes use conservative viewport culling; selection membership is O(1).
  const visibleForPaint=e=>fastView
   ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
   : inViewport(e,w,h);
- for(const e of state.entities){
+ for(const e of paintCandidates){
   if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e,undefined,selectedIds);painted++;}
  }
- cadDrawArqPoche(visibleForPaint);
+ cadDrawArqPoche(visibleForPaint,paintCandidates);
  const batch=state.entities.length>=300?cadVectorBatch(selectedIds):null;
- for(const e of state.entities){
+ for(const e of paintCandidates){
   const lay=layerFor(e);
   if((e.type==='hatch'&&!e.onTop)||!lay.visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
@@ -3052,7 +3076,7 @@ function gripHitRadius(){return Math.max(10,Math.ceil(gripSettings.size/2)+4)}
 // WALL flip grip: flip LEFT/RIGHT justification around the original guide.
 function cadWallFlipCandidates(){
  if(!state.selected.length)return [];
- const groups=new Map();
+ const groups=new Map(),selectedIds=new Set(state.selected);
  for(const e of state.entities){
   if(e.type!=='line'||!e.wall2d||e.autoOpeningRef!==undefined)continue;
   const layer=layerFor(e);
@@ -3064,7 +3088,7 @@ function cadWallFlipCandidates(){
  const output=[];
  for(const [group,faces] of groups){
   if(faces.length!==2||!faces.some(e=>e.wall2d.face===0)||!faces.some(e=>e.wall2d.face===1))continue;
-  if(!faces.some(e=>state.selected.includes(e.id)))continue;
+  if(!faces.some(e=>selectedIds.has(e.id)))continue;
   const meta=faces[0].wall2d,v=sub(meta.guideB,meta.guideA),length=Math.hypot(v.x,v.y);
   if(!(length>1e-8))continue;
   const mid=mul(add(meta.guideA,meta.guideB),.5);
@@ -3632,7 +3656,7 @@ function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selec
   }
   ctx.restore();return;
  }if(e.type==='text'){if(e.attdef){ctx.restore();const t={...e,text:String(e.attdef.tag||'ATRIBUTO'),italic:true};delete t.attdef;drawEntity(t,forceColor,selectedIds);return}if(cadIsMText(e)){ctx.restore();for(const line of cadMTextLines(e))drawEntity(line,forceColor,selectedIds);return}if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor,selectedIds);return}
- const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=ctx.measureText(label).width;
+ const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=e.highlight||e.underline?ctx.measureText(label).width:0;
  if(e.highlight){
   const size=Math.max(7,e.h*state.view.scale),pad=Math.max(3,size*.14);
   ctx.save();ctx.setLineDash([]);ctx.globalAlpha=1;
@@ -3839,7 +3863,7 @@ function cadZoomShortcut(ev){
  $(button).click();
  return true;
 }
-function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
+function centerZoom(f,at){cadLastInteractiveMotion=performance.now();cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule('zoom')}
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension'||e.type==='image')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
@@ -4074,7 +4098,19 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
  return constrain(q);
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
-function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
+// Read-only hit testing inside dense blocks. The key is the regenerated child
+// array, so editing a dynamic block cannot reuse a stale spatial index.
+const cadBlockHitIndices=new WeakMap();
+function cadBlockHitCandidates(children,p,tol){
+ const perf=window.BlacklinePerformance;
+ if(children.length<64||!perf?.spatialIndex||!Number.isFinite(tol)||tol<0)return children;
+ try{
+  let query=cadBlockHitIndices.get(children);
+  if(!query){query=perf.spatialIndex(children,e=>perf.basicBounds(e));cadBlockHitIndices.set(children,query)}
+  return query({minX:p.x-tol,maxX:p.x+tol,minY:p.y-tol,maxY:p.y+tol});
+ }catch(err){return children}
+}
+function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return dist(e.p,p)<=tol||cadBlockHitCandidates(cadBlockChildrenCached(e),p,tol).some(part=>hit(part,p));switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
 function pick(p){return cadWithLayerLookup(()=>cadPickIndexed(p))}
 function cadPickIndexed(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
@@ -4174,7 +4210,7 @@ function closeDrawing(){
  finishStage(true);
 }
 function transformEntity(e,fn){const c=clone(e);if(c.type==='blockRef'){c.p=fn(c.p);return c;}if(c.a)c.a=fn(c.a);if(c.b)c.b=fn(c.b);if(c.c)c.c=fn(c.c);if(c.p)c.p=fn(c.p);if(c.pts)c.pts=c.pts.map(fn);return c}
-function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[];for(const id of [...state.selected]){const ix=state.entities.findIndex(e=>e.id===id);if(ix<0)continue;const original=state.entities[ix];const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();state.entities=state.entities.map(e=>state.selected.includes(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
+function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[],indexById=new Map();for(let i=0;i<state.entities.length;i++){const id=state.entities[i].id;if(!indexById.has(id))indexById.set(id,i)}for(const id of [...state.selected]){const ix=indexById.get(id);if(ix===undefined)continue;const original=state.entities[ix];const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();const selectedIds=new Set(state.selected);state.entities=state.entities.map(e=>selectedIds.has(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
   if(!s.length){
    s.push(P(p.x,p.y));state.scaleReference=BlacklineScaleMath.referenceRadius(
     state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked),p,boundsEntity);
@@ -4194,9 +4230,9 @@ function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hit
   log('SCALE '+factor.toFixed(4));toast('ESCALAR aplicado · x'+factor.toFixed(3));
   return;
  }
- if(t==='rotate'){if(!s.length){s.push(p);prompt();return}let pivot=s[0],d=dist(pivot,p);let v=cad2dTypedValue!==null?cad2dTypedValue:ang(pivot,p)*180/Math.PI;cad2dTypedValue=null;if(!Number.isFinite(v)){s.length=0;return}saveHistory();let rad=v*Math.PI/180;state.entities=state.entities.map(e=>{if(!state.selected.includes(e.id))return e;let c=transformEntity(e,q=>{let z=sub(q,pivot);return t==='rotate'?add(pivot,P(z.x*Math.cos(rad)-z.y*Math.sin(rad),z.x*Math.sin(rad)+z.y*Math.cos(rad))):add(pivot,mul(z,v))});if(e.r)c.r=t==='scale'?e.r*v:e.r;if(e.rx)c.rx=t==='scale'?e.rx*v:e.rx;if(e.ry)c.ry=t==='scale'?e.ry*v:e.ry;if(e.h)c.h=t==='scale'?e.h*v:e.h;if(t==='scale'&&c.type==='dimension'&&c.style){c.style.textHeight*=v;c.style.arrow*=v}if(t==='rotate'&&c.type==='arc'){c.a0+=rad;c.a1+=rad}if(c.type==='blockRef'){if(t==='rotate')c.rotation=(Number(c.rotation)||0)+v;if(t==='scale')c.scale=(Number(c.scale)||1)*v}return c});s.length=0;updateAll();log(t.toUpperCase());return}}
+ if(t==='rotate'){if(!s.length){s.push(p);prompt();return}let pivot=s[0],d=dist(pivot,p);let v=cad2dTypedValue!==null?cad2dTypedValue:ang(pivot,p)*180/Math.PI;cad2dTypedValue=null;if(!Number.isFinite(v)){s.length=0;return}saveHistory();let rad=v*Math.PI/180;const selectedIds=new Set(state.selected);state.entities=state.entities.map(e=>{if(!selectedIds.has(e.id))return e;let c=transformEntity(e,q=>{let z=sub(q,pivot);return t==='rotate'?add(pivot,P(z.x*Math.cos(rad)-z.y*Math.sin(rad),z.x*Math.sin(rad)+z.y*Math.cos(rad))):add(pivot,mul(z,v))});if(e.r)c.r=t==='scale'?e.r*v:e.r;if(e.rx)c.rx=t==='scale'?e.rx*v:e.rx;if(e.ry)c.ry=t==='scale'?e.ry*v:e.ry;if(e.h)c.h=t==='scale'?e.h*v:e.h;if(t==='scale'&&c.type==='dimension'&&c.style){c.style.textHeight*=v;c.style.arrow*=v}if(t==='rotate'&&c.type==='arc'){c.a0+=rad;c.a1+=rad}if(c.type==='blockRef'){if(t==='rotate')c.rotation=(Number(c.rotation)||0)+v;if(t==='scale')c.scale=(Number(c.scale)||1)*v}return c});s.length=0;updateAll();log(t.toUpperCase());return}}
 function eraseSelected(){if(!state.selected.length)return toast('Seleccioná un objeto / Select an object to erase');saveHistory();const ids=new Set(state.selected);state.entities=state.entities.filter(e=>!ids.has(e.id));state.selected=[];updateAll();log('ERASE')}
-function duplicateSelected(){if(!state.selected.length)return;saveHistory();for(const id of [...state.selected]){const e=state.entities.find(x=>x.id===id);if(e){let c=transformEntity(e,p=>add(p,P(state.grid*.5,-state.grid*.5)));newEntity({...c,id:undefined})}}state.selected=[];updateAll()}
+function duplicateSelected(){if(!state.selected.length)return;saveHistory();const lookup=cadSelectedLookup();for(const id of [...state.selected]){const e=lookup(id);if(e){let c=transformEntity(e,p=>add(p,P(state.grid*.5,-state.grid*.5)));newEntity({...c,id:undefined})}}state.selected=[];updateAll()}
 function offsetSelected(){if(!state.selected.length)return toast('Select line or circle, then Offset');let amount=Number(window.prompt(`Offset distance (${state.unit}):`,String(state.grid)));if(!Number.isFinite(amount)||amount===0)return;saveHistory();for(const id of state.selected){const e=state.entities.find(x=>x.id===id);if(!e)continue;if(e.type==='line'){let v=sub(e.b,e.a),len=Math.hypot(v.x,v.y)||1,delta=P(-v.y*amount/len,v.x*amount/len);newEntity({...clone(e),id:undefined,a:add(e.a,delta),b:add(e.b,delta)})}else if(e.type==='circle'&&e.r+amount>0)newEntity({...clone(e),id:undefined,r:e.r+amount})}updateAll();log('OFFSET')}
 /* Trim a LINE against the nearest real crossing from another LINE.
    Refuse to alter the drawing if no valid finite-segment intersection exists. */
@@ -5818,7 +5854,7 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
 // Desktop-CAD two-click blue/green selection plus freehand crossing/window lasso.
 let cadSelectionAnchor=null,cadSelectionAnchorShift=false,cadLastWindowSelectionAt=0;
 function cadSelectionBox(e){
- const bb=boundsEntity(e);if(!bb)return null;
+ const bb=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e);if(!bb)return null;
  return {l:screen(P(bb.minX,0)).x,r:screen(P(bb.maxX,0)).x,t:screen(P(0,bb.maxY)).y,b:screen(P(0,bb.minY)).y};
 }
 function cadSegIntersect(a,b,c,d){
@@ -5844,7 +5880,8 @@ function cadLassoHitsBox(poly,bb,crossing){
   if(cadSegIntersect(poly[i],poly[(i+1)%poly.length],corners[k],corners[(k+1)%4]))return true;
  return false;
 }
-function cadApplyWindowSelection(start,end,shift,path){
+function cadApplyWindowSelection(start,end,shift,path){return cadWithLayerLookup(()=>cadApplyWindowSelectionIndexed(start,end,shift,path))}
+function cadApplyWindowSelectionIndexed(start,end,shift,path){
  const crossing=end.x<start.x;
  const useLasso=Array.isArray(path)&&path.length>=2;
  const poly=useLasso?[start,...path]:null;
@@ -6241,14 +6278,14 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   const e=pick(world(raw));if(!e)state.drag.type='selectionStart';
  } });
 canvas.addEventListener('pointermove',ev=>{
- const raw=P(ev.offsetX,ev.offsetY),d=state.drag;pointer=raw;
+ const raw=P(ev.offsetX,ev.offsetY),d=state.drag;pointer=raw;cadLastInteractiveMotion=performance.now();
  if(d?.type==='pan'){
   state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y;
   state.mouse=world(raw);
   $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
-  schedule();return;
+  schedule('pan');return;
  }
- cadPointerQueryActive=!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement;
+ cadPointerQueryActive=(!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement)||cadPassiveSceneEligible();
  try{state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));}finally{cadPointerQueryActive=false;}$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
@@ -6279,7 +6316,7 @@ canvas.addEventListener('pointermove',ev=>{
   }
  }else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
- }schedule(!d&&state.tool==='select'&&!state.selected.length&&!state.stage.length)});
+ }schedule(cadPassiveSceneEligible());});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
@@ -6718,7 +6755,8 @@ function cadUpdateImagePropertiesEditor(e){
   props.addEventListener('change',ev=>cadApplyImageProperty(props,ev));
  }
 }
-function updateProps(){const ids=state.selected,selectedIds=new Set(ids),items=state.entities.filter(e=>selectedIds.has(e.id));
+function updateProps(){return cadWithLayerLookup(cadUpdatePropsIndexed)}
+function cadUpdatePropsIndexed(){const ids=state.selected,selectedIds=new Set(ids),items=state.entities.filter(e=>selectedIds.has(e.id));
  cadUpdateImageBar(items.length===1&&items[0].type==='image'?items[0]:null);
  const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
  const blockUI=$('blSelectedBlockEditor');
@@ -7922,7 +7960,14 @@ async function cad2dAutoSave(force=false){
  }catch(err){console.warn('[CAD2D AUTOSAVE]',err)}
  finally{cadAutoSaveBusy=false}
 }
-setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
+// Do not start the periodic DXF export in the middle of a gesture if avoidable.
+// At most one 30-second interval can be deferred; explicit saves remain immediate.
+let cadAutoSaveDeferred=false;
+setInterval(()=>{
+ if(!(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)){cadAutoSaveDeferred=false;return}
+ if(!cadAutoSaveDeferred&&cadInteractionBusy()){cadAutoSaveDeferred=true;return}
+ cadAutoSaveDeferred=false;cad2dAutoSave();
+},30000);
 /* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
    Cada autoguardado deja una copia DXF completa (con el proyecto CAD2D adentro) en el navegador; se guardan las
    últimas 10 por dibujo. Si se eligió una carpeta de copias, además se escribe <nombre>.bak ahí.
@@ -9288,6 +9333,7 @@ $('printBackdrop').addEventListener('click',e=>{if(e.target===$('printBackdrop')
 /* Non-network IndexedDB backups: one recoverable snapshot per browser origin. */
 const CAD2D_BACKUP_DB='cad2d-local-recovery-v1';
 let backupTimer=null,backupAvailable=false,backupEnabled=true,backupDb=null;
+let cadBackupQueuedAt=null;
 function openBackupDatabase(){
  return new Promise(resolve=>{
   if(!('indexedDB' in window)){resolve(null);return}
@@ -9325,6 +9371,7 @@ function backupStatus(message){const el=$('backupStatus');if(el)el.textContent=m
 var cadLocalBackupJob=null,cadLocalBackupPending=false;
 function persistLocalBackup(){
  if(!backupDb||!backupEnabled)return Promise.resolve(false);
+ cadBackupQueuedAt=null;
  cadLocalBackupPending=true;
  if(cadLocalBackupJob)return cadLocalBackupJob;
  cadLocalBackupJob=Promise.resolve().then(async()=>{
@@ -9342,10 +9389,22 @@ function persistLocalBackup(){
  }).finally(()=>{cadLocalBackupJob=null;cadLocalBackupPending=false});
  return cadLocalBackupJob;
 }
+// Save after a quiet interval, but bound the delay even during continuous editing.
+function cadBackupDelay(now,queuedAt,busy){
+ const remaining=Math.max(0,10000-(now-queuedAt));
+ return remaining===0||!busy?0:Math.min(350,remaining);
+}
 function queueLocalBackup(){
  if(!backupDb||!backupEnabled)return;
+ const now=performance.now();if(cadBackupQueuedAt===null)cadBackupQueuedAt=now;
  clearTimeout(backupTimer);
- backupTimer=setTimeout(()=>{backupTimer=null;persistLocalBackup()},1800);
+ function attempt(){
+  backupTimer=null;if(!backupDb||!backupEnabled){cadBackupQueuedAt=null;return}
+  const time=performance.now(),delay=cadBackupDelay(time,cadBackupQueuedAt??time,cadInteractionBusy(time));
+  if(delay>0){backupTimer=setTimeout(attempt,delay);return}
+  persistLocalBackup();
+ }
+ backupTimer=setTimeout(attempt,Math.min(1800,Math.max(0,10000-(now-cadBackupQueuedAt))));
 }
 async function initializeLocalBackup(){
  await openBackupDatabase();
@@ -9368,7 +9427,7 @@ async function restoreLocalBackup(silent){
   if(!snap||!Array.isArray(snap.entities)||!Array.isArray(snap.layers))return toast('No valid backup found');
   if(silent!==true&&!window.confirm('Restore local drawing from '+new Date(snap.savedAt).toLocaleString()+'? This replaces the current model. Save your open drawing first if needed.'))return;
   if(cadBlockEdit)return toast('Close the block editor before restoring a drawing');
-  clearTimeout(backupTimer);backupEnabled=false;cadLocalBackupPending=false;
+  clearTimeout(backupTimer);cadBackupQueuedAt=null;backupEnabled=false;cadLocalBackupPending=false;
   cadProjectSaveHandle=null;cadDwgLastSaved=null;
   state.entities=snap.entities;state.layers=snap.layers;state.layerStates=cadLayerStatesValidate(snap.layerStates);state.blocks=snap.blocks||{};state.dimStyles=snap.dimStyles||{};state.activeDimStyle=snap.activeDimStyle||'';renderDimStyles();if(state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);
   state.unit=U[snap.unit]?snap.unit:'m';state.grid=Number(snap.grid)||1;
@@ -9384,7 +9443,7 @@ async function restoreLocalBackup(silent){
 async function deleteLocalBackup(){
  if(!backupDb)return toast('Local storage unavailable');
  if(!window.confirm('Permanently delete the CAD2D local backup in this browser?'))return;
- clearTimeout(backupTimer);backupEnabled=false;cadLocalBackupPending=false;
+ clearTimeout(backupTimer);cadBackupQueuedAt=null;backupEnabled=false;cadLocalBackupPending=false;
  try{if(cadLocalBackupJob)await cadLocalBackupJob;await backupTransaction('readwrite',store=>store.delete('current'));backupAvailable=false;backupStatus('No backup saved in this browser.');toast('Local backup deleted')}catch(ex){alert('Could not delete backup: '+ex.message)}
  backupEnabled=true;
 }
