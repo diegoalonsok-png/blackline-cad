@@ -1,0 +1,20 @@
+name: DXF plan insertion
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'tests/dxf-plan-worker.test.cjs'
+      - '.github/workflows/dxf-plan-worker.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  insertion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/dxf-plan-worker.test.cjs

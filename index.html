@@ -8236,10 +8236,21 @@ async function cadOpenDXFAsync(text,name,options={}){
 /* Plano típico (DXF) insertado dentro del dibujo actual: muros y líneas sueltos, pero el mobiliario,
    los sanitarios, los árboles y el auto siguen siendo BLOQUES, con sus capas y propiedades.
    Se ubica con un clic (esquina inferior izquierda del plano) y respeta las unidades del dibujo. */
+var cadPlanInsertSequence=0,cadPlanInsertCleanup=null;
 async function cadInsertDxfPlan(url,label,opts={}){
+ const job=++cadPlanInsertSequence,epoch=cadDrawEpoch,original=state.entities,unit=state.unit;
+ cadPlanInsertCleanup?.();
+ const current=()=>job===cadPlanInsertSequence&&epoch===cadDrawEpoch&&original===state.entities&&unit===state.unit;
  let parsed;
- try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=importDXF(await cadDxfDecode(await r.arrayBuffer()),label||'plano',{parseOnly:true})}
- catch(e){return toast('No se pudo cargar el plano: '+e.message)}
+ try{
+  const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
+  const text=await cadDxfDecode(await r.arrayBuffer());
+  if(!current())return;
+  if(cadDxfActiveJob)throw Error('Ya hay una importación en curso');
+  if(typeof Worker==='undefined')throw Error('El navegador no admite lectura DXF en segundo plano');
+  parsed=await cadParseDXFWorker(text,readDimensionStyle());
+  if(!current())return;
+ }catch(e){if(current())return toast('No se pudo cargar el plano: '+e.message);return}
  const fromUnit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
  let minX=Infinity,minY=Infinity;
  for(const e of parsed.entities){const pts=e.type==='blockRef'?[e.p]:(e.pts||[e.a,e.b,e.c,e.p].filter(Boolean));for(const p of pts){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y}}
@@ -8247,13 +8258,14 @@ async function cadInsertDxfPlan(url,label,opts={}){
  setTool('select');
  if(!opts.base)toast((label||'Plano')+' · clic en el dibujo para ubicar la esquina inferior izquierda · Esc cancela');
  const onKey=ev=>{if(ev.key==='Escape'){cleanup();toast('Inserción cancelada')}};
- const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor=''};
+ const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor='';if(cadPlanInsertCleanup===cleanup)cadPlanInsertCleanup=null};
  const onDown=ev=>{
-  if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();cleanup();
+  if(ev.button!==0)return;if(!current()){cleanup();return toast('El dibujo cambió; inserción cancelada')}ev.preventDefault();ev.stopImmediatePropagation();cleanup();
   const r=canvas.getBoundingClientRect(),raw=world(P(ev.clientX-r.left,ev.clientY-r.top));
   place((snapPoint?snapPoint(raw):null)||raw);
  };
  const place=base=>{
+  if(!current())return;
   saveHistory();
   // Capas: se agregan las que faltan (por nombre).
   const layerIdByName={};
@@ -8279,7 +8291,7 @@ async function cadInsertDxfPlan(url,label,opts={}){
   return added;
  };
  if(opts.base)return place(opts.base);
- canvas.style.cursor='copy';
+ canvas.style.cursor='copy';cadPlanInsertCleanup=cleanup;
  canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);
 }
 window.cadInsertDxfPlan=cadInsertDxfPlan;
