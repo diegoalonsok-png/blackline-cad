@@ -1126,6 +1126,13 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .app:not(.bl-light) #blCards button img {filter:brightness(0) invert(.9)!important;}
 .app:not(.bl-light) #blCards button > span {color:#e7eef5!important;}
 </style>
+<style id="cad-gallery-ink-v3">
+#blacklineBlockGallery { --cad-gallery-ink:#edf3fa; }
+.bl-light #blacklineBlockGallery { --cad-gallery-ink:#243746; }
+#blacklineBlockGallery #blCards button svg { color:var(--cad-gallery-ink)!important; }
+#blacklineBlockGallery #blCards button svg g[stroke] { stroke:var(--cad-gallery-ink)!important; }
+#blacklineBlockGallery #blCards button svg :is(path,line,rect,polyline,polygon,circle,ellipse) { stroke:var(--cad-gallery-ink)!important; }
+</style>
 </head>
 <body>
 <div class="app">
@@ -10558,7 +10565,7 @@ function initPermanentBlockGallery(){
   const x0=Math.min(...pts.map(p=>p.x)),x1=Math.max(...pts.map(p=>p.x));
   const y0=Math.min(...pts.map(p=>p.y)),y1=Math.max(...pts.map(p=>p.y));
   const width=Math.max(.0001,x1-x0),height=Math.max(.0001,y1-y0),pad=Math.max(width,height)*.10;
-  const stroke=Math.max(.0001,Math.max(width,height)/140);
+  const stroke=Math.max(.0001,Math.max(width,height)/85);
   const shape=geometry.map(e=>{
    if(e.type==='line')return '<line x1="'+e.a.x+'" y1="'+e.a.y+'" x2="'+e.b.x+'" y2="'+e.b.y+'"/>';
    if(e.type==='rect')return '<rect x="'+Math.min(e.a.x,e.b.x)+'" y="'+Math.min(e.a.y,e.b.y)+'" width="'+Math.abs(e.b.x-e.a.x)+'" height="'+Math.abs(e.b.y-e.a.y)+'"/>';
@@ -10572,7 +10579,7 @@ function initPermanentBlockGallery(){
    }
    return '';
   }).join('');
-  return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="#ecf4fc" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
+  return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="var(--cad-gallery-ink, #243746)" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
  }
  window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);return x?install(x)!==false:false};
  function install(x){
@@ -12119,7 +12126,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261125-gallery-contrast-v2"></script>
+<script src="blackline-modern.js?v=20261125-gallery-contrast-v3"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
