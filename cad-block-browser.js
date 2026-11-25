@@ -472,7 +472,7 @@
  async function localHousePreviews(raw){
   if(!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
   const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
-  return rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true}));
+  return rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id}));
  }
  async function insertLocalPreview(item){
   const im=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('No se pudo cargar la planta'));i.src=item.url;});
@@ -512,7 +512,7 @@
    const img=document.createElement('img');img.src=item.thumb;img.alt=item.title;img.loading='lazy';img.referrerPolicy='no-referrer';
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');card.append(img,name,info,button);grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';actions.append(button);card.append(img,name,info,actions);if(item.planId){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=webItems.length;label.textContent=webItems.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
@@ -532,7 +532,8 @@
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
-  const item=a==='insert'?webItems[Number(button.dataset.index)]:null;
+  const item=(a==='insert'||a==='cad')?webItems[Number(button.dataset.index)]:null;
+  if(a==='cad'&&item?.planId){const epoch=webEpoch;button.disabled=true;try{if(!window.CAD2D_INSERT_CATALOGUE_PLAN)throw Error('Importador CAD no disponible');const ok=await window.CAD2D_INSERT_CATALOGUE_PLAN(item.planId,()=>webMode&&epoch===webEpoch);if(ok)close();}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(item?.local){button.disabled=true;try{await insertLocalPreview(item)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   const url=item?.url||(a==='url'?prompt('URL directa de archivo autorizado / Direct file URL'):null);if(!url)return;
   button.disabled=true;try{await importWebUrl(url)}catch(e){CORE.toast(e.message+' · Descargá el archivo desde su fuente e importalo con Archivo.');}finally{button.disabled=false}
