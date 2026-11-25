@@ -18,8 +18,24 @@ function reply(error,status){
    (about 2,200 neurons) stay far inside the free allocation. Never raise this cap
    without checking the account's total Workers AI usage. */
 const DAILY_CAP=20;
+const PER_VISITOR_CAP=3; // public mode: share the free daily budget between users
 const MODEL='@cf/black-forest-labs/flux-2-klein-4b';
 const POLICY_VERSION='private-pilot-v1';
+/* Public mode (CROQUIS_PUBLIC=true) needs no key, but every request still passes
+   the global zero-cost cap and a per-visitor cap keyed by a salted IP hash. */
+function publicMode(env){return env.CROQUIS_PUBLIC==='true';}
+async function visitorKey(request,env){
+ var ip=request.headers.get('CF-Connecting-IP')||'unknown',day=new Date().toISOString().slice(0,10);
+ var salt=String(env.CROQUIS_PILOT_KEY||'blackline');
+ var h=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'|'+day+'|'+ip)));
+ return Array.from(h.slice(0,12)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
+async function reserveVisitor(env,key){
+ var day=new Date().toISOString().slice(0,10);
+ return await env.CROQUIS_QUOTA.prepare(
+ 'INSERT INTO croquis_visitor(day,visitor,attempts) VALUES(?,?,1) ON CONFLICT(day,visitor) DO UPDATE SET attempts=attempts+1 WHERE attempts<? RETURNING attempts'
+ ).bind(day,key,PER_VISITOR_CAP).first();
+}
 function secretConfigured(env){return typeof env.CROQUIS_PILOT_KEY==='string'&&env.CROQUIS_PILOT_KEY.length>=32;}
 function quotaConfigured(env){return !!env.CROQUIS_QUOTA&&typeof env.CROQUIS_QUOTA.prepare==='function';}
 async function authorized(request,env){
@@ -48,7 +64,7 @@ export async function onRequestPost({request,env}){
   if(!env.AI)return reply('Falta agregar el binding Workers AI con el nombre AI en Cloudflare Pages, entorno Production, y volver a desplegar.',503);
   if(env.CROQUIS_ENABLED!=='true')return reply('Generación IA desactivada por protección de consumo.',503);
   if(!secretConfigured(env)||!quotaConfigured(env))return reply('Piloto bloqueado: faltan la autorización privada o el contador persistente de consumo.',503);
-  if(!await authorized(request,env))return reply('Acceso privado: ingresá la clave del piloto de croquis.',401);
+  if(!publicMode(env)&&!await authorized(request,env))return reply('Acceso privado: ingresá la clave del piloto de croquis.',401);
   if(env.CROQUIS_RATE_LIMIT){
    var allowed=await env.CROQUIS_RATE_LIMIT.limit({key:request.headers.get('CF-Connecting-IP')||'unknown'});
    if(!allowed.success)return reply('Límite de renders alcanzado.',429);
@@ -80,7 +96,13 @@ export async function onRequestPost({request,env}){
   form.append('width',String(width));form.append('height',String(height));
   // No premium model, additional reference, repeated inference or automatic retry.
   var reservation;
-  try{reservation=await reserve(env);}catch(e){
+  try{
+   if(publicMode(env)){
+    var mine=await reserveVisitor(env,await visitorKey(request,env));
+    if(!mine)return reply('Ya usaste tus '+PER_VISITOR_CAP+' retoques gratuitos de hoy. Volvé mañana.',429);
+   }
+   reservation=await reserve(env);
+  }catch(e){
    console.error('Croquis quota unavailable',e&&e.message);
    return reply('Contador de consumo no disponible. No se ejecutó la IA.',503);
   }
@@ -109,7 +131,7 @@ export async function onRequestGet({env}){
   :!enabled
    ?'Generación temporalmente desactivada por protección de consumo.'
    :!quota||!auth?'Piloto bloqueado: falta configurar el contador persistente y la clave privada.':null;
- return new Response(JSON.stringify({ready:ready,aiBinding:bound,enabled:enabled,quotaConfigured:quota,privateAccessConfigured:auth,dailyAttemptCap:DAILY_CAP,maxOutputSide:768,policy:POLICY_VERSION,error:error}),{
+ return new Response(JSON.stringify({ready:ready,public:publicMode(env),perVisitorCap:PER_VISITOR_CAP,aiBinding:bound,enabled:enabled,quotaConfigured:quota,privateAccessConfigured:auth,dailyAttemptCap:DAILY_CAP,maxOutputSide:768,policy:POLICY_VERSION,error:error}),{
   status:200,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}
  });
 }

@@ -45,7 +45,7 @@ function init(){
   var pic=box.querySelector('[data-original]'),art=box.querySelector('[data-result]'),save=box.querySelector('[data-save]'),
       create=box.querySelector('[data-create]'),status=box.querySelector('[data-status]');
   var exportPhoto=box.querySelector('[data-export-photo]'),check=box.querySelector('[data-check]');
-  var state={source:null,photoURL:null,resultURL:null,busy:false,ready:false};
+  var state={source:null,photoURL:null,resultURL:null,busy:false,ready:false,isPublic:false};
   function tell(s){status.textContent=s;}
   function saveURL(url,name){if(!url)return;var a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}
   async function checkBackend(){
@@ -56,7 +56,7 @@ function init(){
     var type=res.headers.get('content-type')||'';
     if(!res.ok||!type.includes('application/json'))throw Error('El servicio de Cloudflare no responde en esta publicación. Abrí CAD2D3D desde Cloudflare Pages y comprobá el despliegue.');
     var body=await res.json();
-    if(body.ready===true&&body.policy==='private-pilot-v1'&&body.quotaConfigured===true&&body.privateAccessConfigured===true){state.ready=true;create.disabled=false;tell('IA lista: máximo '+(body.dailyAttemptCap||20)+' retoques diarios dentro de la cuota gratuita de Cloudflare. Solo FLUX.2 Klein 4B.');}
+    if(body.ready===true&&body.policy==='private-pilot-v1'&&body.quotaConfigured===true&&body.privateAccessConfigured===true){state.ready=true;state.isPublic=body.public===true;create.disabled=false;tell(state.isPublic?'IA lista: hasta '+(body.perVisitorCap||3)+' retoques gratuitos por día para vos.':'IA lista: máximo '+(body.dailyAttemptCap||20)+' retoques diarios dentro de la cuota gratuita de Cloudflare. Solo FLUX.2 Klein 4B.');}
     else{tell('Cloudflare pendiente: '+(body.error||'La protección del piloto todavía no está publicada. No se enviarán imágenes a IA.'));}
    }catch(e){tell('Sin conexión con el motor IA: '+(e.message||String(e))+' Podés guardar la foto y convertirla en ChatGPT.');}
    finally{check.disabled=false;}
@@ -98,8 +98,8 @@ function init(){
   async function generate(){
    if(state.busy)return;
    if(!state.ready){await checkBackend();if(!state.ready)return;}
-   var key=window.prompt('Clave privada del piloto de croquis (no se guarda):');
-   if(!key){tell('Generación cancelada. No se llamó a la IA.');return;}
+   var key=state.isPublic?'':window.prompt('Clave privada del piloto de croquis (no se guarda):');
+   if(!state.isPublic&&!key){tell('Generación cancelada. No se llamó a la IA.');return;}
    state.busy=true;create.disabled=true;save.disabled=true;
    try{
     var size=await photo(),style=box.querySelector('[data-style]').value,quality=box.querySelector('[data-quality]').value;
@@ -110,7 +110,7 @@ function init(){
     form.append('style',style);form.append('quality',quality);
     form.append('width',String(w));form.append('height',String(h));
     tell('Generando el croquis en Cloudflare Workers AI…');
-    var res=await fetch('/croquis/render',{method:'POST',body:form,headers:{Authorization:'Bearer '+key},credentials:'same-origin',cache:'no-store',redirect:'error'});
+    var res=await fetch('/croquis/render',{method:'POST',body:form,headers:key?{Authorization:'Bearer '+key}:{},credentials:'same-origin',cache:'no-store',redirect:'error'});
     if(!res.ok){
      var error='HTTP '+res.status;try{var data=await res.json();error=data.error||error;}catch(_e){}
      throw Error(error);

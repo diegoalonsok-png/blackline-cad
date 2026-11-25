@@ -33,3 +33,14 @@ Precios y cuotas: https://developers.cloudflare.com/workers-ai/platform/pricing/
 
 ## Retoque del render artístico (nov 2026)
 El panel de IA usa por defecto como entrada el **render artístico local** (botón ✦ Retocar con IA en RENDER ARTÍSTICO) y el estilo «Retocar el render artístico»: la IA solo afina un dibujo que ya coincide con el modelo. Tope de 20 por día pensado para no salir nunca de la cuota gratuita; revisar el consumo total de Workers AI de la cuenta antes de subirlo.
+
+## Modo público de costo cero
+Con `CROQUIS_PUBLIC=true` no se pide clave: cada visitante tiene 3 retoques por día (IP cifrada con sal diaria, nunca se guarda la IP) y el total de la cuenta sigue topeado en 20 por día. Requiere esta tabla adicional en la misma base D1:
+```sql
+CREATE TABLE IF NOT EXISTS croquis_visitor (
+ day TEXT NOT NULL,
+ visitor TEXT NOT NULL,
+ attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 3),
+ PRIMARY KEY (day, visitor)
+);
+```
