@@ -66,9 +66,12 @@ test('Gallery fetches only metadata initially and individual no-store geometry o
  }
  const container=element('root');
  const api={hasBlock:k=>added.has(k),addBlock:(k,g)=>added.set(k,g),unit:()=> 'mm',selectBlock:k=>selected.push(k)};
- let fail=false;
+ let fail=false,stall=false;
+ const timers=new Map();let timerId=0;
  const ctx={window:{BlacklineBlockAPI:api},document:{readyState:'complete',getElementById:id=>id==='blBody'?container:null,createElement:element},
+  AbortController,setTimeout:fn=>{const id=++timerId;timers.set(id,fn);return id},clearTimeout:id=>timers.delete(id),
   fetch:async(url,opts)=>{calls.push({url,cache:opts.cache});
+   if(stall)return {ok:true,json:()=>new Promise((resolve,reject)=>opts.signal.addEventListener('abort',()=>reject(new Error('aborted')),{once:true}))};
    if(fail)return {ok:false,status:503};
    const json=JSON.parse(fs.readFileSync(path.join(root,url),'utf8'));
    return {ok:true,json:async()=>json};
@@ -76,7 +79,7 @@ test('Gallery fetches only metadata initially and individual no-store geometry o
  vm.runInNewContext(loader,ctx);
  await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(calls.map(c=>c.url),['assets/architecture-demand-v1/catalog.json']);
- assert.equal(added.size,0);assert.equal(selected.length,0);
+ assert.equal(added.size,0);assert.equal(selected.length,0);assert.equal(timers.size,0);
  const buttons=elements.filter(e=>e.tag==='button'&&e.textContent==='Insertar bloque');
  assert.equal(buttons.length,28);
  fail=true;await buttons[0].listeners.click();assert.equal(added.size,0);assert.equal(selected.length,0);assert.equal(buttons[0].disabled,false);
@@ -86,4 +89,10 @@ test('Gallery fetches only metadata initially and individual no-store geometry o
  assert.equal(added.size,1);assert.equal(selected.length,1);
  const geometry=[...added.values()][0];assert.equal(geometry[0].b.x,catalog.blocks[0].width*1000);
  await buttons[0].listeners.click();assert.equal(calls.length,3);assert.equal(added.size,1);assert.equal(selected.length,2);
+ stall=true;const pending=buttons[1].listeners.click();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(timers.size,1);assert.equal(buttons[1].disabled,true);
+ for(const timeout of timers.values())timeout();
+ await pending;assert.equal(timers.size,0);assert.equal(buttons[1].disabled,false);assert.equal(added.size,1);
+ stall=false;await buttons[1].listeners.click();assert.equal(added.size,2);assert.equal(selected.length,3);
+ assert.equal(calls.length,5);assert.equal(timers.size,0);
 });
