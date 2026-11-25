@@ -56,3 +56,27 @@ test('cached spatial query preserves reverse picking priority and conservative f
  assert.deepEqual(query(null),entities);
  assert.equal(entities.length,1002);
 });
+
+
+test('pan viewport index is reused across frames and invalidated by drawing revision',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+ const perf=require('../cad-performance.js');
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const start=html.indexOf('function cadPanPaintCandidates(box){');
+ const end=html.indexOf('function cadDrawFrame(){',start);
+ assert.ok(start>=0&&end>start);
+ const entities=Array.from({length:1000},(_,i)=>({id:i,type:'line',a:{x:i*2,y:0},b:{x:i*2+1,y:0}}));
+ let builds=0;
+ const state={entities,drag:{type:'pan'}};
+ const env=vm.createContext({state,cadDrawEpoch:1,window:{BlacklinePerformance:{...perf,spatialIndex:(...args)=>{builds++;return perf.spatialIndex(...args)}}},boundsEntity:()=>null});
+ vm.runInContext(html.slice(start,end),env);
+ const query=env.cadPanPaintCandidates;
+ assert.equal(query({minX:10,maxX:13,minY:-1,maxY:1}).map(e=>e.id).join(','),'5,6');
+ assert.equal(query({minX:20,maxX:23,minY:-1,maxY:1}).map(e=>e.id).join(','),'10,11');
+ assert.equal(builds,1);
+ env.cadDrawEpoch++;
+ query({minX:20,maxX:23,minY:-1,maxY:1});
+ assert.equal(builds,2);
+ state.drag=null;
+ assert.equal(query({minX:20,maxX:23,minY:-1,maxY:1}),entities);
+});
