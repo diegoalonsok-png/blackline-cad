@@ -209,10 +209,10 @@
  // backward compatibility, but is not advertised as production CAD drafting.
  // Quality review hid older schematic views, not their editable geometry.
  // Recover access only in view-specific tabs, retaining curated main gallery.
- const archivedView=it=>Boolean(it.hideFromGallery&&/^(?:cv-|vm-|alz-)/.test(it.id));
+ const archivedView=it=>Boolean(it.hideFromGallery||/^views26-/.test(it.id));
  const archiveTabs=new Set(['section','archive','doorElev','windowElev','fridgeElev']);
- const items=()=>galleryItems().filter(it=>!/^views26-/.test(it.id)&&
-   (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view))));
+ const items=()=>galleryItems().filter(it=>(commandGallery&&String(st.q||'').trim())||(!/^views26-/.test(it.id)&&
+   (!it.hideFromGallery||(archiveTabs.has(st.view)&&archivedView(it))||(stairOriginal(it)&&['all','visual','olymp3','stairs','plan','section'].includes(st.view)))));
  const familyOf=it=>{
   const id=String(it.id||'').toLowerCase(),c=String(it.cat||'').toLowerCase(),n=String(it.name||'').toLowerCase();
   // Explicit botanical names and source IDs take precedence over generic keyword matches.
@@ -257,7 +257,7 @@
  ['bicicleta bicicletas bicycle bicycles',/\b(?:bicicletas?|bicycles?|bikes?)\b/],
  ['moto motos motorcycle motorcycles',/\b(?:motos?|motocicletas?|motorcycles?)\b/],
  ['inodoro toilet toilets inodoros wc retrete retretes',/\b(?:inodoros?|toilets?|wc|retretes?|water closet)\b/],
- ['bidet bidets bidé bidés',/\b(?:bidet|bide)s?\b/],
+ ['bidet bidets bidé bidés bides',/\b(?:bidet|bide)s?\b/],
  ['lavabo lavatorio bacha sink washbasin',/\b(?:lavabos?|lavatorios?|bachas?|sinks?|washbasins?|vanitory)\b/],
  ['ducha shower showers duchas',/\b(?:duchas?|showers?)\b/],
  ['bañadera bañera bathtub bathtubs banadera banera',/\b(?:banaderas?|baneras?|bathtubs?)\b/],
@@ -274,16 +274,32 @@
  ];
  const normalizeTerm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
  const termIndex=new Map(blockTerms.flatMap(([keys,re])=>(keys.includes('|')?keys.split('|'):keys.split(' ')).map(k=>[normalizeTerm(k),re])));
+ function blockQuery(raw){
+  const q=normalizeTerm(raw);
+  const mode=/\b(?:cortes?|secciones?|seccion|sections?|sectional|cross.section)\b/.test(q)?'Corte':/\b(?:vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear)\b/.test(q)?'Alzado':/\b(?:plantas?|top|plan)\b/.test(q)?'Planta':null;
+  const direction=/\b(?:laterales?|perfil|side)\b/.test(q)?'side':/\b(?:frontal|front)\b/.test(q)?'front':/\b(?:posterior|rear)\b/.test(q)?'rear':null;
+  const text=q.replace(/\b(?:en|de|del|la|el|los|las|un|una|in|of|the|cortes?|secciones?|seccion|sections?|sectional|cross.section|vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|plantas?|top|plan)\b/g,' ').replace(/\s+/g,' ').trim();
+  return {q,mode,direction,text};
+ }
+ function blockMatchRank(it,query){
+  const {q,mode,direction,text}=query;if(!q)return 0;
+  const name=normalizeTerm([it.name,tr(it.name),String(it.id||'').replace(/[_-]/g,' '),String(it.source||'').replace(/[_-]/g,' ')].filter(Boolean).join(' '));
+  const all=normalizeTerm([name,it.cat,tr(it.cat),familyOf(it),...(Array.isArray(it.tags)?it.tags:[])].filter(Boolean).join(' '));
+  const syn=termIndex.get(text);
+  const tokens=text.split(/[\s_-]+/).filter(Boolean);
+  const matched=!text||(syn?syn.test(name):tokens.every(t=>{const alias=termIndex.get(t);return alias?alias.test(name):all.includes(t)}));
+  if(!matched)return -1;
+  const actual=modeOf(it);
+  if(direction&&!(direction==='side'?/lateral|perfil|side|\blat\b/:direction==='front'?/frontal|front|\bfre\b/:/posterior|rear/).test(name))return -1;
+  if(!mode||actual===mode)return 0;
+  // Furniture shown in a building section may be an elevation rather than a cut through the object.
+  // Label these alternatives explicitly, after true section blocks.
+  if(mode==='Corte'&&actual==='Alzado'&&text&&!direction)return 1;
+  return -1;
+ }
  function filtered(pool=items().filter(inView)){
-  const q=normalizeTerm(st.q),syn=termIndex.get(q),tokens=q.split(/[\s_-]+/).filter(Boolean);
-  return pool.filter(it=>{
-   if(st.cat&&groupOf(it)!==st.cat)return false;
-   if(!q)return true;
-   const name=normalizeTerm([it.name,tr(it.name),String(it.id||'').replace(/[_-]/g,' '),it.source].filter(Boolean).join(' '));
-   const all=normalizeTerm([name,it.cat,tr(it.cat),familyOf(it),...(Array.isArray(it.tags)?it.tags:[])].filter(Boolean).join(' '));
-   if(syn&&syn.test(name))return true;
-   return all.includes(q)||tokens.every(t=>{const alias=termIndex.get(t);return alias?alias.test(name)||all.includes(t):all.includes(t)});
-  });
+  const query=blockQuery(st.q);
+  return pool.filter(it=>(!st.cat||groupOf(it)===st.cat)&&blockMatchRank(it,query)>=0);
  }
  // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
  function simpleBlockNames(){
@@ -364,13 +380,14 @@
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
   const list=filtered(pool),grid=el.querySelector('.grid');
+  const searchQuery=blockQuery(st.q);
   if(visual)list.sort((a,b)=>{
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
-   return rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
+   return blockMatchRank(a,searchQuery)-blockMatchRank(b,searchQuery)||Number(archivedView(a))-Number(archivedView(b))||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
   });
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=commandGallery?100:visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it,names)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   mountPreviews(grid);
   if(!commandGallery&&list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
