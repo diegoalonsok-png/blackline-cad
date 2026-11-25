@@ -938,6 +938,7 @@ EXT.cancelArchitectureCommand=()=>{
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
 EXT.drawArchitectureCommand=async raw=>{
+ const object=!arqCatalogueCategory(raw)&&arqObjectSearch(raw);if(object){arqOpenObjectSearch(object);return;}
  const epoch=++arqCommandEpoch;
  CORE.toast('ARQASSIST · Calculando / Calculating…');
  try{
@@ -1087,7 +1088,7 @@ function openArchitectureBar(focus=true){
 #cadArqInstructionBar.arq-min textarea,#cadArqInstructionBar.arq-min button[aria-label="Abrir catálogo de plantas"],#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .qb-sep{display:none}
 `;document.head.append(css);
   bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
-  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><textarea rows="1" wrap="soft" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitación de 4 x 5 / Bedroom 4 x 5"></textarea><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><textarea rows="1" wrap="soft" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Inodoro / Toilet · Árbol / Tree · Habitación / Bedroom"></textarea><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
