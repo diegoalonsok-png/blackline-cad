@@ -4365,7 +4365,7 @@ function build(){
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
- '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button> <button type="button" class="btn" data-layer-toggle="isolate">Aislar</button> <button type="button" class="btn" data-layer-toggle="unisolate">Restaurar</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
  '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
@@ -4782,6 +4782,7 @@ function renderLayerPanel(){
  panel.querySelector('[data-layer-toggle=visible]').textContent=layer.visible?'Hide':'Show';
  panel.querySelector('[data-layer-toggle=locked]').textContent=layer.locked?'Unlock':'Lock';
  panel.querySelector('[data-layer-toggle=freeze]').textContent=layer.frozen?'Descongelar':'Congelar';
+ panel.querySelector('[data-layer-toggle=unisolate]').disabled=!layers.some(l=>typeof l.isoVisible==='boolean');
  var list=panel.querySelector('.cad3dLayerList'),counts=new Map();for(const r of records){const id=r.layerId||'0';counts.set(id,(counts.get(id)||0)+1);}
  const query=(panel.querySelector('[data-layer-search]')?.value||'').trim().toLocaleLowerCase();
  if(list)list.innerHTML=layers.filter(l=>!query||l.name.toLocaleLowerCase().includes(query)).map(function(l){
@@ -4793,7 +4794,30 @@ function renderLayerPanel(){
    '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+(l.frozen?'❄ ':'')+escapeHtml(l.name)+' · '+(counts.get(l.id)||0)+'</button></div>';
  }).join('');
 }
+// Isolation changes visibility only, preserving each layer's original state.
+function cad3dIsolationPlan(list,keep,restore){
+ const saved=list.some(l=>typeof l.isoVisible==='boolean');
+ if(restore&&!saved)return null;
+ return list.map(l=>{
+  const n={...l};
+  if(restore){if(typeof n.isoVisible==='boolean')n.visible=n.isoVisible;delete n.isoVisible;}
+  else{if(typeof n.isoVisible!=='boolean')n.isoVisible=n.visible!==false;n.visible=keep.has(n.id)&&n.isoVisible;}
+  return n;
+ });
+}
+function cad3dIsolateLayers(restore=false){
+ const ids=new Set(selected),keep=new Set(records.filter(r=>ids.has(r.id)&&visibleRecord(r)).map(r=>r.layerId||'0'));
+ if(!restore&&!keep.size)return text('LAYISO · Seleccioná objetos en las capas a aislar');
+ const next=cad3dIsolationPlan(layers,keep,restore);
+ if(!next)return text('LAYUNISO · No hay capas aisladas');
+ layers=next;
+ if(!restore&&!keep.has(currentLayer))currentLayer=next.find(l=>keep.has(l.id)&&l.visible&&!l.locked&&!l.frozen)?.id||currentLayer;
+ const editable=new Set(records.filter(editableRecord).map(r=>r.id));selected=selected.filter(id=>editable.has(id));
+ renderLayerPanel();redraw();renderProps();
+ text(restore?'LAYUNISO · Visibilidad anterior restaurada':'LAYISO · '+keep.size+' capa(s) aislada(s)');
+}
 function changeLayer(kind){
+ if(kind==='isolate'||kind==='unisolate')return cad3dIsolateLayers(kind==='unisolate');
  const active=layerForRecord({layerId:currentLayer});
  if(kind==='freeze'){
   active.frozen=!active.frozen;
@@ -9141,6 +9165,10 @@ function cad3dPropertyDetails(r,p){
  if(p.reason)add('Alcance del cálculo',p.reason);
  return rows;
 }
+function cad3dReportCSV(rows){
+ const esc=v=>{let s=String(v??'');if(/^\s*[=+@-]/.test(s)&&!/^[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[-+]?\d+)?$/i.test(s.trim()))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+ return '\uFEFF'+rows.map(row=>row.map(esc).join(';')).join('\r\n');
+}
 function cad3dMassReport(){
  if(!root)return;
  const ids=new Set(selected),chosen=records.filter(r=>ids.has(r.id)&&visibleRecord(r));
@@ -9148,11 +9176,15 @@ function cad3dMassReport(){
  root.querySelector('[data-mass-report]')?.remove();
  const d=document.createElement('dialog');d.setAttribute('data-mass-report','');d.setAttribute('aria-label','Propiedades físicas 3D');
  d.style.cssText='width:min(590px,92vw);max-height:80vh;overflow:auto;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:6px;padding:14px';
- d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">MASSPROP / LIST · PROPIEDADES 3D</strong><button type="button" class="btn" data-export>TXT</button><button type="button" class="btn" data-close>×</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">MASSPROP / LIST · PROPIEDADES 3D</strong><button type="button" class="btn" data-export>TXT</button><button type="button" class="btn" data-export-csv>CSV</button><button type="button" class="btn" data-close>×</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
  const fmt=n=>Number.isFinite(n)?n.toFixed(4):'No calculable';
  let solid=0,nominal=0,solidCount=0,nominalCount=0,unsupportedCount=0,area=0,areaCount=0;
+ const csvRows=[['ID','Tipo','Capa','X (m)','Y (m)','Z (m)','Rotación (°)','Ancho (m)','Profundidad (m)','Altura (m)','Radio (m)','Volumen sólido (m³)','Volumen nominal (m³)','Superficie exterior (m²)','Centroide X (m)','Centroide Y (m)','Centroide Z (m)','Alcance del cálculo']];
  const lines=chosen.map(r=>{
-  const p=cad3dMassProperties(r),layer=layerForRecord(r),out=['#'+r.id+' · '+r.type.toUpperCase()+' · Capa: '+(layer?.name||'0'),'Posición XYZ (m): '+[r.x,r.y,r.z].map(fmt).join(' · '),'Rotación: '+fmt(r.rot||0)+'°'];
+  const p=cad3dMassProperties(r),layer=layerForRecord(r);const num=n=>Number.isFinite(n)?n:'';
+  const boxDims=['box','wall','slab','stair','railing','block3d','imported3d'].includes(r.type),radial=['sphere','cylinder','cone'].includes(r.type);
+  csvRows.push([r.id,r.type,layer.name,num(r.x),num(r.y),num(r.z),num(r.rot??0),boxDims?num(r.w):'',boxDims?num(r.d):'',r.type==='sphere'?num(2*r.radius):r.type==='profile2d'?num(r.extrudedHeight):r.type==='boolean'?'':num(r.h),radial?num(r.radius):'',p.kind==='solid'?num(p.volume):'',p.kind==='nominal'?num(p.volume):'',num(p.surface),...(p.center||['','','']),p.reason||p.kind]);
+  const out=['#'+r.id+' · '+r.type.toUpperCase()+' · Capa: '+(layer?.name||'0'),'Posición XYZ (m): '+[r.x,r.y,r.z].map(fmt).join(' · '),'Rotación: '+fmt(r.rot||0)+'°'];
   if(r.type==='sphere')out.push('Radio (m): '+fmt(r.radius));
   else if(['cylinder','cone'].includes(r.type))out.push('Radio / altura (m): '+fmt(r.radius)+' / '+fmt(r.h));
   else out.push('Dimensiones de registro (m): '+[r.w,r.d,r.h].map(fmt).join(' × '));
@@ -9165,6 +9197,7 @@ function cad3dMassReport(){
  const report=['Objetos seleccionados: '+chosen.length,'Suma de volúmenes de sólidos ('+solidCount+'): '+fmt(solid)+' m³','Suma de superficies exteriores ('+areaCount+'): '+fmt(area)+' m²','Volumen arquitectónico nominal ('+nominalCount+'): '+fmt(nominal)+' m³','Sin cálculo fiable: '+unsupportedCount,'Las sumas no descuentan intersecciones entre objetos. No se calcula masa sin densidad. Los sólidos analíticos usan dimensiones de diseño, no la discretización gráfica.','',...lines.map(s=>s+'\n──────────────────────────────')].join('\n');
  d.querySelector('pre').textContent=report;
  d.querySelector('[data-export]').onclick=()=>download('CAD2D3D-MASSPROP.txt',report,'text/plain;charset=utf-8');
+ d.querySelector('[data-export-csv]').onclick=()=>download('CAD2D3D-MASSPROP.csv',cad3dReportCSV(csvRows),'text/csv;charset=utf-8');
  d.querySelector('[data-close]').onclick=()=>d.close();
  d.addEventListener('close',()=>d.remove());root.append(d);d.showModal();text('MASSPROP · '+chosen.length+' objetos consultados');
 }
@@ -9219,6 +9252,7 @@ function run3DCommand(){
  if(Object.prototype.hasOwnProperty.call(draftModes,command)){toggleDraftMode(command);return;}
  if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
  if(['massprop','list','li','propiedades3d','list3d'].includes(command)){cad3dMassReport();return;}
+ if(command==='layiso'||command==='layuniso'){cad3dIsolateLayers(command==='layuniso');return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
@@ -9463,7 +9497,7 @@ async function readJSON(e){
   var importedLayers=[{id:'0',name:'0',visible:true,locked:false}];
   if(Array.isArray(data.layers))data.layers.slice(0,100).forEach(function(l){
    if(!l||typeof l.id!=='string'||!l.id||l.id.length>60)return;
-   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true,frozen:l.frozen===true,...(/^#[0-9a-f]{6}$/i.test(l.color||'')?{color:l.color}:{})};
+   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true,frozen:l.frozen===true,...(typeof l.isoVisible==='boolean'?{isoVisible:l.isoVisible}:{}),...(/^#[0-9a-f]{6}$/i.test(l.color||'')?{color:l.color}:{})};
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
