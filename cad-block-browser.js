@@ -145,6 +145,20 @@
 .bl-light #cadBlockBrowser.visual .card .nm{color:#35362e}
 .bl-light #cadBlockBrowser.visual .card .mt{color:#725b39}
 .bl-light #cadBlockBrowser.visual input[type=search]{background:#fffaf0;color:#29302b;border-color:#c7b28c}`;
+ css.textContent+=`
+#cadBlockBrowser.compact-search{min-width:0;min-height:0;border-radius:18px}
+#cadBlockBrowser.compact-search .tabs,#cadBlockBrowser.compact-search .cats,#cadBlockBrowser.compact-search .tools label,#cadBlockBrowser.compact-search .paper-palette,#cadBlockBrowser.compact-search [data-a=local-pack],#cadBlockBrowser.compact-search [data-a=max],#cadBlockBrowser.compact-search .rz{display:none}
+#cadBlockBrowser.compact-search .main{grid-template-columns:minmax(0,1fr)}
+#cadBlockBrowser.compact-search .grid{gap:8px;padding:8px;grid-auto-rows:minmax(0,1fr);align-content:start}
+#cadBlockBrowser.compact-search .card{min-height:0;padding:6px;gap:3px;overflow:hidden}
+#cadBlockBrowser.compact-search .card .preview{min-height:0!important;flex:1;height:76px;padding:3px;overflow:hidden}
+#cadBlockBrowser.compact-search .card .preview svg,#cadBlockBrowser.compact-search .card .preview img{height:100%!important;max-height:76px!important;width:100%}
+#cadBlockBrowser.compact-search .card .nm,#cadBlockBrowser.compact-search .card .mt{font-size:11px;line-height:1.2}
+#cadBlockBrowser.compact-search .ft{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:7px 10px}
+#cadBlockBrowser.compact-search .ft button{border:1px solid #b8a17a;border-radius:7px;background:#fffaf0;color:#51432e;padding:4px 9px;cursor:pointer}
+#cadBlockBrowser.compact-search .ft button:disabled{opacity:.35;cursor:default}
+#cadBlockBrowser.compact-search.min .ft{display:none}
+`;
  document.head.append(css);
 
  let el=null,armedId=null,visibleCount=st.view==='olymp3'?18:72;
@@ -311,7 +325,7 @@
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
-  el.classList.toggle('visual',visual);
+  el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
   el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+allItems.filter(it=>/^userdx4-/.test(it.id)).length;});
@@ -325,19 +339,20 @@
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
    return rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
   });
-  const shown=list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
-  grid.style.gridTemplateColumns=`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
+  searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=commandGallery?100:visual?Math.max(170,st.size):st.size;
+  grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
   grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Vista histórica conservada; verificar detalle y escala">VISTA HISTÓRICA</span>':''}<span class="nm">${simpleName(it,names)}</span><span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   mountPreviews(grid);
-  if(list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
+  if(!commandGallery&&list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
    ?T(`${list.length} detailed blocks · Click the preview, then click the drawing to place it · Esc cancels`,`${list.length} bloques detallados · Clic en la imagen y después en el plano para colocarlo · Esc cancela`)
    :T(`${list.length} of ${allItems.length} blocks · click a block, then click in the drawing · ↔ = resizable with grips`,`${list.length} de ${allItems.length} bloques · clic en un bloque y luego en el dibujo · ↔ = se ajusta con pinzas`);
+  if(commandGallery){const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.setAttribute('aria-label',T('Previous four','Cuatro anteriores'));next.setAttribute('aria-label',T('Next four','Cuatro siguientes'));prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=list.length;label.textContent=list.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,list.length)+' / '+list.length):'0';ft.append(prev,label,next);return;}
   const pkg=window.CAD2D_OLYMPIADAS3;
   if(pkg&&!pkg.catalogReady&&(pkg.loading||pkg.loaded<pkg.total))el.querySelector('.ft').textContent+=' · Bloques '+pkg.loaded+'/'+pkg.total+(pkg.loading?' · cargando…':'');
  }
  function place(){
-  const W=innerWidth,H=innerHeight;st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
+  const W=innerWidth,H=innerHeight;if(commandGallery&&compactRect){const c=compactRect;c.w=Math.min(370,W-16);c.h=Math.min(420,H-16);c.x=Math.max(8,Math.min(W-c.w-8,c.x));c.y=Math.max(8,Math.min(H-c.h-8,c.y));Object.assign(el.style,{left:c.x+'px',top:c.y+'px',width:c.w+'px',height:c.h+'px'});return;}st.w=Math.min(Math.max(420,st.w),W-16);st.h=Math.min(Math.max(300,st.h),H-16);
   if(st.x===null){st.x=Math.round((W-st.w)/2);st.y=Math.round(Math.max(60,(H-st.h)/2))}
   st.x=Math.max(8-st.w+120,Math.min(W-120,st.x));st.y=Math.max(4,Math.min(H-44,st.y));
   Object.assign(el.style,{left:st.x+'px',top:st.y+'px',width:st.w+'px',height:st.h+'px'});
@@ -354,14 +369,14 @@
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
   let repaintFrame=0;const schedulePaint=()=>{if(!repaintFrame)repaintFrame=requestAnimationFrame(()=>{repaintFrame=0;paint()})};
-  q.addEventListener('input',()=>{selectionEpoch++;st.q=q.value;visibleCount=pageSize();schedulePaint()});
+  q.addEventListener('input',()=>{selectionEpoch++;st.q=q.value;searchPage=0;visibleCount=pageSize();schedulePaint()});
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();schedulePaint()});
   el.addEventListener('click',async e=>{
-   const a=e.target.closest('[data-a]')?.dataset.a;
+   const page=e.target.closest('[data-page]');if(page){selectionEpoch++;searchPage=Math.max(0,searchPage+Number(page.dataset.page));paint();return;}const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
    if(a==='min'){selectionEpoch++;el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
-   if(a==='max'){const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
+   if(a==='max'){if(commandGallery)return;const full=st.w>=innerWidth-30&&st.h>=innerHeight-30;if(full){Object.assign(st,st.prev||{w:980,h:640,x:null,y:null})}else{st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16})}place();save();return}
    const paperButton=e.target.closest('[data-paper]');if(paperButton){st.paper=paperButton.dataset.paper;save();paint();return}
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){selectionEpoch++;st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
    const c=e.target.closest('[data-c]');if(c){selectionEpoch++;st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
@@ -392,8 +407,8 @@
   });
   // Mover desde la barra de título.
   const hd=el.querySelector('.hd');let drag=null;
-  hd.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;drag={dx:e.clientX-st.x,dy:e.clientY-st.y};hd.setPointerCapture(e.pointerId)});
-  hd.addEventListener('pointermove',e=>{if(!drag)return;st.x=e.clientX-drag.dx;st.y=e.clientY-drag.dy;place()});
+  hd.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;const p=commandGallery?compactRect:st;drag={dx:e.clientX-p.x,dy:e.clientY-p.y};hd.setPointerCapture(e.pointerId)});
+  hd.addEventListener('pointermove',e=>{if(!drag)return;const p=commandGallery?compactRect:st;p.x=e.clientX-drag.dx;p.y=e.clientY-drag.dy;place()});
   hd.addEventListener('pointerup',()=>{if(drag){drag=null;save()}});
   hd.addEventListener('dblclick',e=>{if(!e.target.closest('button'))el.querySelector('[data-a=max]').click()});
   // Agrandar desde bordes y esquina.
@@ -409,7 +424,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){commandGallery=false;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -422,8 +437,8 @@
   const q=el?.querySelector('input[type=search]');if(q)q.value='';paint();
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
- let commandGallery=false;
- function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=36;if(st.w<innerWidth-30||st.h<innerHeight-30)st.prev={x:st.x,y:st.y,w:st.w,h:st.h};Object.assign(st,{x:8,y:8,w:innerWidth-16,h:innerHeight-16});commandGallery=true;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ let commandGallery=false,searchPage=0,compactRect=null;
+ function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
