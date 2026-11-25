@@ -3913,10 +3913,11 @@ function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=
 function snapPoint(p,gripBase=null){return cadWithLayerLookup(()=>cadSnapPointIndexed(p,gripBase))}
 const cadSnapChildIndices=new WeakMap();
 // Reuse a conservative spatial index only for read-only cursor inspection.
-function cadPointerNearby(point,tol){
+function cadPointerNearby(point,tol,readOnly=false,reuseOnly=false){
  const entities=state.entities,perf=window.BlacklinePerformance;
- if(!cadPointerQueryActive||entities.length<300||!perf?.spatialIndex)return entities;
+ if((!cadPointerQueryActive&&!readOnly)||entities.length<300||!perf?.spatialIndex)return entities;
  if(!cadPointerIndex||cadPointerIndex.entities!==entities||cadPointerIndex.length!==entities.length||cadPointerIndex.epoch!==cadDrawEpoch){
+  if(reuseOnly)return entities;
   try{const query=perf.spatialIndex(entities,e=>{
    const b=(!e.p&&perf.basicBounds(e))||boundsEntity(e);
    if(e.type==='blockRef'&&b&&e.p)return {minX:Math.min(b.minX,e.p.x),minY:Math.min(b.minY,e.p.y),maxX:Math.max(b.maxX,e.p.x),maxY:Math.max(b.maxY,e.p.y)};
@@ -4067,7 +4068,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
 function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
 function pick(p){return cadWithLayerLookup(()=>cadPickIndexed(p))}
-function cadPickIndexed(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
+function cadPickIndexed(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;const candidates=cadPointerNearby(p,tol,cadReadOnlyDraftPreview(),true);for(let i=candidates.length-1;i>=0;i--){const e=candidates[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
  if(t==='wall2d'){
   if(!s.length){s.push(P(p.x,p.y));prompt();schedule();return}
@@ -6032,8 +6033,9 @@ function cadHoverDimensionTarget(){
  const radius=gripHitRadius(),point=world(pointer),tol=radius/state.view.scale;
  const selected=new Set(state.selected);
  let nearest=null;
- for(let i=state.entities.length-1;i>=0;i--){
-  const entity=state.entities[i],isSelected=selected.has(entity.id);
+ const candidates=cadPointerNearby(point,tol,cadReadOnlyDraftPreview());
+ for(let i=candidates.length-1;i>=0;i--){
+  const entity=candidates[i],isSelected=selected.has(entity.id);
   if(entity.cadHidden||(nearest?.isSelected&&!isSelected)||
    !['line','rect','polyline','arc','circle'].includes(entity.type)||(entity.type==='circle'&&!isSelected))continue;
   const box=window.BlacklinePerformance?.basicBounds(entity)||boundsEntity(entity);
