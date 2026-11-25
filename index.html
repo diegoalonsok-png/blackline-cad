@@ -8236,23 +8236,32 @@ async function cadOpenDXFAsync(text,name,options={}){
 /* Plano típico (DXF) insertado dentro del dibujo actual: muros y líneas sueltos, pero el mobiliario,
    los sanitarios, los árboles y el auto siguen siendo BLOQUES, con sus capas y propiedades.
    Se ubica con un clic (esquina inferior izquierda del plano) y respeta las unidades del dibujo. */
+let cadPendingPlanCancel=null;
 async function cadInsertDxfPlan(url,label,opts={}){
- let parsed;
- try{const r=await fetch(url,{cache:'force-cache'});if(!r.ok)throw Error('HTTP '+r.status);parsed=importDXF(await cadDxfDecode(await r.arrayBuffer()),label||'plano',{parseOnly:true})}
- catch(e){return toast('No se pudo cargar el plano: '+e.message)}
- const fromUnit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
- let minX=Infinity,minY=Infinity;
- for(const e of parsed.entities){const pts=e.type==='blockRef'?[e.p]:(e.pts||[e.a,e.b,e.c,e.p].filter(Boolean));for(const p of pts){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y}}
- if(!Number.isFinite(minX))return toast('El plano está vacío');
- setTool('select');
- if(!opts.base)toast((label||'Plano')+' · clic en el dibujo para ubicar la esquina inferior izquierda · Esc cancela');
+ cadPendingPlanCancel?.();
+ const original=state.entities,blocks=state.blocks,unit=state.unit,epoch=cadDrawEpoch;
+ const initialTool=state.tool,initialStage=state.stage;
+ let cancelled=false,armed=false;
+ const valid=()=>!cancelled&&state.entities===original&&state.blocks===blocks&&state.unit===unit&&cadDrawEpoch===epoch&&(armed?state.tool==='select':state.tool===initialTool&&state.stage===initialStage&&(!opts.isCurrent||opts.isCurrent()));
+ const cleanup=()=>{cancelled=true;canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);if(armed&&canvas.style.cursor==='copy')canvas.style.cursor='';if(cadPendingPlanCancel===cleanup)cadPendingPlanCancel=null};
  const onKey=ev=>{if(ev.key==='Escape'){cleanup();toast('Inserción cancelada')}};
- const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor=''};
  const onDown=ev=>{
+  if(!valid()){cleanup();return}
   if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();cleanup();
   const r=canvas.getBoundingClientRect(),raw=world(P(ev.clientX-r.left,ev.clientY-r.top));
   place((snapPoint?snapPoint(raw):null)||raw);
  };
+ cadPendingPlanCancel=cleanup;document.addEventListener('keydown',onKey,true);
+ let parsed;
+ try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);if(!valid()){cleanup();return false}const text=await cadDxfDecode(await r.arrayBuffer());if(!valid()){cleanup();return false}parsed=importDXF(text,label||'plano',{parseOnly:true})}
+ catch(e){const report=valid();cleanup();if(report)toast('No se pudo cargar el plano: '+e.message);return false}
+ if(!valid()){cleanup();return false}
+ const fromUnit={1:'in',2:'ft',4:'mm',5:'cm',6:'m'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
+ let minX=Infinity,minY=Infinity;
+ for(const e of parsed.entities){const pts=e.type==='blockRef'?[e.p]:(e.pts||[e.a,e.b,e.c,e.p].filter(Boolean));for(const p of pts){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y}}
+ if(!Number.isFinite(minX)){cleanup();toast('El plano está vacío');return false}
+ setTool('select');armed=true;
+ if(!opts.base)toast((label||'Plano')+' · clic en el dibujo para ubicar la esquina inferior izquierda · Esc cancela');
  const place=base=>{
   saveHistory();
   // Capas: se agregan las que faltan (por nombre).
@@ -8278,9 +8287,10 @@ async function cadInsertDxfPlan(url,label,opts={}){
   if(!opts.quiet)toast((label||'Plano')+' insertado: muebles, sanitarios, árboles y auto como bloques');
   return added;
  };
- if(opts.base)return place(opts.base);
+ if(opts.base){cleanup();return place(opts.base)}
  canvas.style.cursor='copy';
- canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);
+ canvas.addEventListener('pointerdown',onDown,true);
+ return true;
 }
 window.cadInsertDxfPlan=cadInsertDxfPlan;
 /* MTEXT: dos esquinas definen la caja (el ancho corta los renglones); luego se escribe en el editor. */
