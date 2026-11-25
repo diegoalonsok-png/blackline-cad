@@ -385,7 +385,7 @@
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar ZIP completos, DWG, DXF o paquete JSON local">${T("Import ZIP / DWG / DXF","Importar ZIP / DWG / DXF")}</button></div>
-<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links"><button data-web="all-houses">${T('All','Todas')}</button>${[30,45,60,70,75,90,100,120,150,180,200,250].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
+<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links"><button data-web="all-houses">${T('All','Todas')}</button><button data-web="house-references">${T('References','Referencias')}</button>${[30,45,60,70,75,90,100,120,150,180,200,250].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
@@ -467,7 +467,7 @@
  async function refreshHouseGallery(){
   const epoch=webEpoch;if(!houseMode)return;
   try{if(!el||el.style.display==='none'||el.classList.contains('min')||document.hidden||el.querySelector('.grid button:disabled'))return;
-   const next=(await archivedReferences(houseQuery)).filter(x=>!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5);
+   const refsOnly=/referencias|references/i.test(houseQuery)&&!webArea;const next=(await archivedReferences(houseQuery)).filter(x=>(!refsOnly||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5));
    if(epoch!==webEpoch||!houseMode)return;
    const seen=new Set(webItems.map(x=>x.url||x.cadUrl||x.thumb));const added=next.filter(x=>!seen.has(x.url||x.cadUrl||x.thumb));
    if(added.length){webItems=webItems.concat(added);webStatus='';paintWeb();}
@@ -500,13 +500,13 @@
  async function archivedReferences(raw){
   const base=new URL('assets/architecture-references/',document.baseURI);
   const read=async name=>{try{const r=await fetch(new URL(name,base),{cache:'no-cache'});if(!r.ok)return [];const rows=await r.json();return Array.isArray(rows)?rows:[]}catch(e){return []}};
-  const [archive,uploads]=await Promise.all([read('index.json'),read('user-house-plans.json')]);
-  const rows=archive.concat(uploads.filter(x=>x.category==='house'&&x.license==='User supplied'));
+  const [archive,uploads,driveRefs]=await Promise.all([read('index.json'),read('user-house-plans.json'),read('drive-house-references.json')]);
+  const rows=[...new Map(archive.concat(uploads,driveRefs).filter(x=>x&&typeof x.original==='string').map(x=>[x.original,x])).values()];
   const area=parseArea(raw),house=/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw);
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
-  return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&x.category==='house'&&/^house\/\d+\/user-[\w-]+\.(?:png|jpe?g)$/i.test(x.original||''))&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
+  return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&x.category==='house'&&/^house\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g)$/i.test(x.original||''))&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
    const original=file(x.original),image=file(x.image)||(/\.(?:png|jpe?g|webp|pdf)$/i.test(original||'')?original:null),cad=file(x.cad)||(/\.(?:dxf|dwg)$/i.test(original||'')?original:null);
-   return {title:x.title,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada'):x.license+' · '+(x.author||'')};
+   return {title:x.title,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
   }).filter(x=>x.thumb&&(x.url||x.cadUrl)&&x.source);
  }
  async function searchWeb(raw){
@@ -560,6 +560,7 @@
  async function handleWebAction(button){
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
   if(a==='all-houses'){const raw='Casas';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
+  if(a==='house-references'){const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
@@ -575,10 +576,10 @@
  async function searchHouseGallery(raw){
   stopHouseRefresh();webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
   try{
-   const query=webArea?'Casas de '+webArea+' m²':'Casas';houseQuery=query;
-   const [own,archive]=await Promise.all([localHousePreviews(query),archivedReferences(query).catch(()=>[])]);
+   const refsOnly=/referencias|references/i.test(raw)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refsOnly?'Casas referencias':'Casas';houseQuery=query;
+   const [own,archive]=await Promise.all([refsOnly?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
    if(epoch!==webEpoch||!houseMode)return;
-   webItems=own.concat(archive).filter(x=>!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5).sort((a,b)=>(a.area??Infinity)-(b.area??Infinity));
+   webItems=own.concat(archive).filter(x=>(!refsOnly||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
    webStatus=webItems.length?'':T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
   }catch(e){if(epoch===webEpoch&&houseMode){webStatus=T('House library unavailable. Retry.','Biblioteca no disponible. Volvé a buscar.');paintWeb();}}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
