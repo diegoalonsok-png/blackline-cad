@@ -5293,48 +5293,46 @@ function cadBreakAtPoint(p){
  state.selected=[a.id,b.id];state.tool='select';state.stage=[];updateAll();
  toast('BREAKATPOINT: línea dividida en dos · Ctrl+Z para deshacer');
 }
+function cadDetailedProperties(e){
+ const layer=layerFor(e),fmt=n=>Number.isFinite(n)?n.toFixed(state.precision):'—',len=n=>fmt(n)+' '+state.unit,area=n=>fmt(n)+' '+state.unit+'²',pt=p=>p?'('+fmt(p.x)+', '+fmt(p.y)+')':'—',rows=[];
+ const add=(label,value)=>rows.push([label,String(value)]);
+ add('Tipo',e.type.toUpperCase());add('ID',e.id);add('Capa',layer.name);
+ add('Color',e.color||layer.color||'—');add('Origen del color',e.color?'Objeto':'Por capa');
+ add('Tipo de línea',e.linetype||'BYLAYER');add('Tipo efectivo',!e.linetype||['BYLAYER','BYBLOCK'].includes(String(e.linetype).toUpperCase())?(layer.linetype||'CONTINUOUS'):e.linetype);
+ add('Grosor de línea',fmt(e.width??layer.width??.25)+' mm');add('Escala de línea',fmt(e.ltscale??1));
+ add('Estado de capa',layer.frozen?'Congelada':!layer.visible?'Oculta':layer.locked?'Bloqueada':'Visible / editable');
+ const rect=cadRectangleGeometry(e);
+ if(rect){add('Ancho',len(rect.w));add('Largo',len(rect.h));add('Perímetro',len(2*(rect.w+rect.h)));add('Vértice inicial',pt(rect.a));add('Ángulo',fmt(Math.atan2(rect.u.y,rect.u.x)*180/Math.PI)+'°');}
+ else if(e.type==='line'){add('Inicio',pt(e.a));add('Fin',pt(e.b));add('Longitud',len(dist(e.a,e.b)));add('Delta X',len(e.b.x-e.a.x));add('Delta Y',len(e.b.y-e.a.y));add('Ángulo',fmt(Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x)*180/Math.PI)+'°');}
+ else if(e.type==='circle'||e.type==='arc'){add('Centro',pt(e.c));add('Radio',len(e.r));add('Diámetro',len(2*e.r));if(e.type==='circle')add('Circunferencia',len(TAU*e.r));else{const sweep=arcSweep(e.a0,e.a1);add('Longitud de arco',len(e.r*sweep));add('Ángulo inicial',fmt(e.a0*180/Math.PI)+'°');add('Ángulo final',fmt(e.a1*180/Math.PI)+'°');add('Ángulo incluido',fmt(sweep*180/Math.PI)+'°');}}
+ else if(e.type==='polyline'){const path=cadQuickPathInfo(e);add('Cerrada',e.closed?'Sí':'No');add('Vértices',e.pts.length);add(e.closed?'Perímetro':'Longitud',len(path.length));}
+ else if(e.type==='ellipse'){add('Centro',pt(e.c));add('Semieje X',len(e.rx));add('Semieje Y',len(e.ry));add('Perímetro aproximado',len(cadQuickEllipsePerimeter(e.rx,e.ry)));add('Rotación',fmt((e.rotation||0)*180/Math.PI)+'°');}
+ else if(e.type==='blockRef'){const def=state.blocks?.[e.blockName];add('Bloque',e.blockName);add('Inserción',pt(e.p));add('Escala X',fmt(e.scale??1));add('Escala Y',fmt(e.scaleY??e.scale??1));add('Rotación',fmt(e.rotation||0)+'°');add('Entidades de definición',def?.entities?.length??0);add('Paramétrico',def?.parametric||def?.arq||def?.dynamic2d?'Sí':'No');}
+ else if(e.type==='hatch'){add('Patrón',e.hatchStyle||'solid');add('Contornos interiores',e.holes?.length||0);add('Área neta',area(cadQuickHatchArea(e)));}
+ else if(e.type==='text'){add('Texto',String(e.text||'').slice(0,2000));add('Fuente',safeCADFont(e.fontFamily));add('Altura',len(e.h));add('Inserción',pt(e.p));add('Rotación',fmt(e.rotation||0)+'°');}
+ else if(e.type==='image'){add('Ancho',len(Math.abs(e.b.x-e.a.x)));add('Alto',len(Math.abs(e.b.y-e.a.y)));add('Opacidad',fmt((e.opacity??1)*100)+'%');}
+ if(cadQuickWidthEntity(e))add('Ancho global',len(e.pwidth||0));
+ const ar=cadEntityArea(e);if(Number.isFinite(ar))add('Área',area(ar));
+ if(e.wall2d){add('Muro paramétrico','Sí');if(Number.isFinite(e.wall2d.thickness))add('Espesor',len(e.wall2d.thickness));}
+ if(e.type==='blockRef'||e.type==='dimension'||e.type==='image'){const b=boundsEntity(e);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)){add('Extensión X',len(b.maxX-b.minX));add('Extensión Y',len(b.maxY-b.minY));}}
+ return rows;
+}
 function cadListEntities(){
  const chosen=selectedCadEntities();
  if(!chosen.length)return toast('LIST: seleccioná objetos para consultar sus propiedades');
- const format=n=>Number(n).toFixed(state.precision),point=p=>'('+format(p.x)+', '+format(p.y)+')';
- const measure=(title,n)=>title+': '+format(n)+' '+state.unit;
- const rows=chosen.map(e=>{
-  const layer=layerFor(e),rect=cadRectangleGeometry(e);
-  const data=['#'+e.id+' · '+(rect?'RECTÁNGULO':e.type.toUpperCase()),
-   'Capa: '+layer.name+' · '+format(e.width??layer.width??.25)+' mm'];
-  if(rect){
-   data.push(measure('Ancho',rect.w),measure('Largo',rect.h),measure('Perímetro',2*(rect.w+rect.h)));
-  }else if(e.type==='line'){
-   data.push('Inicio: '+point(e.a),'Fin: '+point(e.b),measure('Longitud',dist(e.a,e.b)));
-  }else if(e.type==='circle'||e.type==='arc'){
-   data.push('Centro: '+point(e.c),measure('Radio',e.r),measure('Diámetro',2*e.r));
-   if(e.type==='circle')data.push(measure('Perímetro',TAU*e.r));
-   else data.push(measure('Longitud',e.r*arcSweep(e.a0,e.a1)),'Ángulo incluido: '+format(arcSweep(e.a0,e.a1)*180/Math.PI)+'°');
-  }else if(e.type==='polyline'){
-   const path=cadQuickPathInfo(e);
-   data.push(e.closed?'Cerrada · '+path.sides+' lados':'Abierta · '+e.pts.length+' vértices',
-    measure(e.closed?'Perímetro':'Longitud',path.length));
-  }else if(e.type==='ellipse'){
-   data.push('Centro: '+point(e.c),measure('Semieje X',e.rx),measure('Semieje Y',e.ry));
-  }else if(e.type==='blockRef')data.push('Bloque: '+e.blockName,'Inserción: '+point(e.p));
-  else if(e.type==='hatch')data.push('Patrón: '+(e.hatchStyle||'solid'));
-  else if(e.type==='text')data.push('Texto: '+e.text,measure('Altura',e.h));
-  if(cadQuickWidthEntity(e))data.push(measure('Grosor global',e.pwidth||0));
-  const area=cadEntityArea(e);
-  if(Number.isFinite(area))data.push('Área: '+format(area)+' '+state.unit+'²');
-  return data.join('\n');
- });
- const content=chosen.length+(chosen.length===1?' objeto seleccionado':' objetos seleccionados')+' · '+state.unit+
-  '\n\n'+rows.join('\n\n──────────────────────────────\n\n');
+ const rows=chosen.map(e=>cadDetailedProperties(e).map(([k,v])=>k+': '+v).join('\n'));
+ const content=chosen.length+' objeto(s) · '+state.unit+'\n\n'+rows.join('\n\n──────────────────────────────\n\n');
  log('LIST · '+chosen.length+' objeto(s)\n'+rows.slice(0,15).join('\n\n'));
  $('cadListResult')?.remove();
  const box=document.createElement('section');box.id='cadListResult';box.setAttribute('role','dialog');
  box.setAttribute('aria-label','LIST · Objetos seleccionados');
- box.innerHTML='<header><strong>LIST · OBJETOS</strong><button type="button">Cerrar</button></header><pre></pre>';
+ box.innerHTML='<header><strong>LIST · OBJETOS</strong><div><button type="button" data-copy>Copiar</button> <button type="button" data-txt>TXT</button> <button type="button" data-close>Cerrar</button></div></header><pre></pre>';
  box.querySelector('pre').textContent=content;
- const close=box.querySelector('button');
+ const close=box.querySelector('[data-close]');
  function dismiss(){box.remove();canvas.focus({preventScroll:true})}
  close.onclick=dismiss;
+ box.querySelector('[data-copy]').onclick=async()=>{try{await navigator.clipboard.writeText(content);toast('LIST copiado')}catch(e){toast('No se pudo copiar; usá TXT')}};
+ box.querySelector('[data-txt]').onclick=()=>download('LIST.txt',content,'text/plain;charset=utf-8');
  box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
  document.body.append(box);close.focus({preventScroll:true});
 }
@@ -6428,7 +6426,7 @@ function cadLayerViewportControl(){
   cadLayerVpIndex=vps.length-1;cadLayoutsPersist();renderLayers();renderLayoutWorkspace();queueLocalBackup();
  };
 }
-function renderLayers(){cadLayerViewportControl();$('layerCount').textContent=state.layers.length;$('layers').innerHTML=state.layers.map(l=>`<div class="layer-row ${l.id===state.layerId?'current':''}"><button data-layer="${escapeHTML(l.id)}" data-act="visible" title="Toggle visibility">${l.visible?'◉':'◌'}</button><button data-layer="${escapeHTML(l.id)}" data-act="lock" title="Toggle lock">${l.locked?'🔒':'◇'}</button><input type="color" data-layer="${escapeHTML(l.id)}" data-act="color" value="${escapeHTML(/^#[0-9a-f]{6}$/i.test(l.color)?l.color:"#c6cbd1")}"><button type="button" class="layer-name cad-current-layer-button" data-layer="${escapeHTML(l.id)}" data-act="select" aria-pressed="${l.id===state.layerId}" title="Establecer capa actual / Set current layer" style="display:flex;align-items:center;gap:5px;min-width:0;text-align:left;color:inherit"><span aria-hidden="true" style="color:${l.id===state.layerId?'#31db7a':'#63737d'};font-weight:bold;flex:none">${l.id===state.layerId?'✓':'○'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(l.name)}</span></button><select class="layer-weight" data-layer="${escapeHTML(l.id)}" data-act="weight" title="Layer lineweight in millimeters · 0.00 = línea fina visible">${[0,.05,.09,.13,.18,.25,.35,.50,.70,1.0,1.4,2].map(w=>`<option value="${w}" ${Math.abs((l.width??.25)-w)<.001?'selected':''}>${w.toFixed(2)}</option>`).join('')}</select><button data-layer="${escapeHTML(l.id)}" data-act="rename" title="Rename layer">✎</button><div style="grid-column:1/-1;display:flex;gap:5px;justify-content:flex-end;padding:3px 0"><button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="freeze" title="Congelar capa en modelo y todas las vistas" aria-pressed="${!!l.frozen}" style="color:${l.frozen?'#87d8ff':'#bbcbd4'}">❄ ${l.frozen?'Congelada':'Congelar'}</button>${cadSelectedLayerViewport()?`<button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="vpfreeze" aria-pressed="${!!cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)}" title="Congelar solo en la ventana seleccionada">VP ❄ ${cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)?'Sí':'No'}</button>`:''}</div></div>`).join('');$('layers').querySelectorAll('[data-act]').forEach(el=>{const handler=()=>{let l=state.layers.find(x=>x.id===el.dataset.layer),a=el.dataset.act;if(!l)return;if(a==='select'){if(l.frozen)return toast('Descongelá esta capa antes de convertirla en actual');state.layerId=l.id}else if(a==='color'){saveHistory();l.color=el.value}else if(a==='weight'){saveHistory();const previous=l.width??.25;const next=Number(el.value);l.width=next;for(const ent of state.entities){if(ent.layer===l.id&&(ent.width===undefined||Math.abs(ent.width-previous)<.00001))ent.width=next}state.lineWidth=next;$('lineWidth').value=next}else if(a==='visible'){saveHistory();l.visible=!l.visible}else if(a==='freeze'){if(l.id===state.layerId&&!l.frozen)return toast('No se puede congelar la capa actual');saveHistory();l.frozen=!l.frozen;cadRefStyle.epoch=-1;state.selected=state.selected.filter(id=>{const e=state.entities.find(e=>e.id===id);return e&&!state.layers.find(x=>x.id===e.layer)?.frozen})}else if(a==='lock'){saveHistory();l.locked=!l.locked}else if(a==='vpfreeze'){const vp=cadSelectedLayerViewport();if(!vp)return;const frozen=new Set(Array.isArray(vp.frozenLayers)?vp.frozenLayers:[]);if(frozen.has(l.id))frozen.delete(l.id);else frozen.add(l.id);vp.frozenLayers=[...frozen];cadLayoutsPersist();renderLayoutWorkspace()}else if(a==='rename'){let name=window.prompt('New layer name:',l.name);if(name?.trim()){saveHistory();l.name=name.trim()}}renderLayers();schedule();queueLocalBackup()};el.addEventListener(el.tagName==='INPUT'?'change':el.tagName==='SELECT'?'change':'click',handler)})}
+function renderLayers(){cadLayerViewportControl();$('layerCount').textContent=state.layers.length;$('layers').innerHTML=state.layers.map(l=>`<div class="layer-row ${l.id===state.layerId?'current':''}"><button data-layer="${escapeHTML(l.id)}" data-act="visible" title="Toggle visibility">${l.visible?'◉':'◌'}</button><button data-layer="${escapeHTML(l.id)}" data-act="lock" title="Toggle lock">${l.locked?'🔒':'◇'}</button><input type="color" data-layer="${escapeHTML(l.id)}" data-act="color" value="${escapeHTML(/^#[0-9a-f]{6}$/i.test(l.color)?l.color:"#c6cbd1")}"><button type="button" class="layer-name cad-current-layer-button" data-layer="${escapeHTML(l.id)}" data-act="select" aria-pressed="${l.id===state.layerId}" title="Establecer capa actual / Set current layer" style="display:flex;align-items:center;gap:5px;min-width:0;text-align:left;color:inherit"><span aria-hidden="true" style="color:${l.id===state.layerId?'#31db7a':'#63737d'};font-weight:bold;flex:none">${l.id===state.layerId?'✓':'○'}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(l.name)}</span></button><select class="layer-weight" data-layer="${escapeHTML(l.id)}" data-act="weight" title="Layer lineweight in millimeters · 0.00 = línea fina visible">${[0,.05,.09,.13,.18,.25,.35,.50,.70,1.0,1.4,2].map(w=>`<option value="${w}" ${Math.abs((l.width??.25)-w)<.001?'selected':''}>${w.toFixed(2)}</option>`).join('')}</select><button data-layer="${escapeHTML(l.id)}" data-act="rename" title="Rename layer">✎</button><div style="grid-column:1/-1;display:flex;gap:5px;justify-content:flex-end;padding:3px 0"><select class="layer-weight" style="width:92px" data-layer="${escapeHTML(l.id)}" data-act="linetype" aria-label="Tipo de línea de capa">${[...new Set(['CONTINUOUS','DASHED','HIDDEN','CENTER','DOTTED','DASHDOT','PHANTOM',l.linetype||'CONTINUOUS'])].map(t=>`<option value="${escapeHTML(t)}" ${t===(l.linetype||'CONTINUOUS')?'selected':''}>${escapeHTML(t)}</option>`).join('')}</select><button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="freeze" title="Congelar capa en modelo y todas las vistas" aria-pressed="${!!l.frozen}" style="color:${l.frozen?'#87d8ff':'#bbcbd4'}">❄ ${l.frozen?'Congelada':'Congelar'}</button>${cadSelectedLayerViewport()?`<button class="btn slim" data-layer="${escapeHTML(l.id)}" data-act="vpfreeze" aria-pressed="${!!cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)}" title="Congelar solo en la ventana seleccionada">VP ❄ ${cadSelectedLayerViewport()?.frozenLayers?.includes(l.id)?'Sí':'No'}</button>`:''}</div></div>`).join('');$('layers').querySelectorAll('[data-act]').forEach(el=>{const handler=()=>{let l=state.layers.find(x=>x.id===el.dataset.layer),a=el.dataset.act;if(!l)return;if(a==='select'){if(l.frozen)return toast('Descongelá esta capa antes de convertirla en actual');state.layerId=l.id}else if(a==='color'){saveHistory();l.color=el.value}else if(a==='linetype'){saveHistory();l.linetype=el.value;cadRefStyle.epoch=-1}else if(a==='weight'){saveHistory();const previous=l.width??.25;const next=Number(el.value);l.width=next;for(const ent of state.entities){if(ent.layer===l.id&&(ent.width===undefined||Math.abs(ent.width-previous)<.00001))ent.width=next}state.lineWidth=next;$('lineWidth').value=next}else if(a==='visible'){saveHistory();l.visible=!l.visible}else if(a==='freeze'){if(l.id===state.layerId&&!l.frozen)return toast('No se puede congelar la capa actual');saveHistory();l.frozen=!l.frozen;cadRefStyle.epoch=-1;state.selected=state.selected.filter(id=>{const e=state.entities.find(e=>e.id===id);return e&&!state.layers.find(x=>x.id===e.layer)?.frozen})}else if(a==='lock'){saveHistory();l.locked=!l.locked}else if(a==='vpfreeze'){const vp=cadSelectedLayerViewport();if(!vp)return;const frozen=new Set(Array.isArray(vp.frozenLayers)?vp.frozenLayers:[]);if(frozen.has(l.id))frozen.delete(l.id);else frozen.add(l.id);vp.frozenLayers=[...frozen];cadLayoutsPersist();renderLayoutWorkspace()}else if(a==='rename'){let name=window.prompt('New layer name:',l.name);if(name?.trim()){saveHistory();l.name=name.trim()}}renderLayers();schedule();queueLocalBackup()};el.addEventListener(el.tagName==='INPUT'?'change':el.tagName==='SELECT'?'change':'click',handler)})}
 /* Compact floating contextual image palette; only shown for selected images. */
 let cadImageBar=null;
 function cadUpdateImageBar(image){
@@ -6582,7 +6580,7 @@ function updateProps(){const ids=state.selected,selectedIds=new Set(ids),items=s
    }
   }
  }}
-$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?[['Type',items[0].type],['Layer',layerFor(items[0]).name],['Object ID',items[0].id],['Line width',`${items[0].width||layerFor(items[0]).width||.25} mm`],['Length',items[0].type==='line'?`${units(dist(items[0].a,items[0].b))} ${state.unit}`:'—'],...(items[0].type==='text'?[['Font',safeCADFont(items[0].fontFamily)],['Text height',`${items[0].h} ${state.unit}`],['Rotation',`${items[0].rotation||0}°`]]:[])]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',`${state.grid} ${state.unit}`],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');cadUpdateImagePropertiesEditor(items.length===1&&items[0].type==='image'?items[0]:null);$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
+$('selectionSummary').textContent=items.length?`${items.length} selected ${items.length===1?'entity':'entities'}`:'No objects selected';const values=items.length===1?cadDetailedProperties(items[0]):items.length>1?[['Objetos seleccionados',items.length],['Tipos',[...new Set(items.map(e=>e.type))].join(', ')],['Capas',[...new Set(items.map(e=>layerFor(e).name))].join(', ')],['Área acumulada',units(items.reduce((sum,e)=>sum+(cadEntityArea(e)||0),0))+' '+state.unit+'² (sin descontar solapes)']]:[['Active layer',curLayer().name],['Units',state.unit],['Grid',state.grid+' '+state.unit],['Objects',state.entities.length]];$('properties').innerHTML=values.map(([a,b])=>`<div>${escapeHTML(a)}</div><div>${escapeHTML(b)}</div>`).join('');cadUpdateImagePropertiesEditor(items.length===1&&items[0].type==='image'?items[0]:null);$('deleteBtn').disabled=!ids.length;$('duplicateBtn').disabled=!ids.length}
 function updateStats(){const count={};state.entities.forEach(e=>count[e.type]=(count[e.type]||0)+1);$('statistics').innerHTML=Object.entries(count).map(([k,n])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #243039"><span>${escapeHTML(k.toUpperCase())}</span><strong>${n}</strong></div>`).join('')||'<span class="help">No geometry yet.</span>'}
 function cadScaleLengthFields(obj,keys,ratio){
  if(!obj)return obj;
