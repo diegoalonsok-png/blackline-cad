@@ -21,3 +21,24 @@ test('10000 sample lines can be culled without mutation',()=>{
  assert.equal(visible,27);assert.deepEqual(entities[0].a,{x:0,y:0});
 });
 test('invalid view is rejected',()=>assert.equal(viewport({scale:0,ox:0,oy:0},100,100),null));
+
+
+test('static frame reuse permits basic drawing previews but not mutable interactions',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const snippet=html.match(/const cadReadOnlyDraftTools=new Set\([^\n]+\);\nfunction cadReadOnlyDraftPreview\(\)\{[^\n]+\}/);
+ assert.ok(snippet,'preview eligibility helper exists');
+ const base={state:{tool:'line',drag:null,selected:[],stage:[{x:1,y:2}],mtextBox:null},cadPrimitiveGripPlacement:null,cadVertexPlacement:null,cadSelectionAnchor:null};
+ const check=(overrides={},globals={})=>vm.runInNewContext(snippet[0]+'\ncadReadOnlyDraftPreview()', {...base,...globals,state:{...base.state,...overrides}});
+ for(const tool of ['line','polyline','rect','circle','arc','ellipse'])assert.equal(check({tool}),true);
+ assert.equal(check({tool:'select',stage:[]}),true);
+ assert.equal(check({tool:'select'}),false);
+ assert.equal(check({tool:'trim'}),false);
+ assert.equal(check({tool:'wall2d'}),false);
+ assert.equal(check({drag:{type:'pan'}}),false);
+ assert.equal(check({selected:[1]}),false);
+ assert.equal(check({}, {cadPrimitiveGripPlacement:{}}),false);
+ assert.equal(check({}, {cadVertexPlacement:{}}),false);
+ assert.equal(check({}, {cadSelectionAnchor:{}}),false);
+ assert.equal(check({mtextBox:{}}),false);
+});
