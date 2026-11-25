@@ -2224,10 +2224,11 @@ function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let 
    ctx.strokeRect(a.x,a.y,c.x-a.x,c.y-a.y);ctx.restore();
    if(job.phase==='target'&&job.base){
     const delta=sub(state.mouse,job.base);
+    const stretchIds=new Set(job.ids);
     for(const e of state.entities){
-     if(!job.ids.includes(e.id))continue;
+     if(!stretchIds.has(e.id))continue;
      const preview=cadStretchApplyEntity(e,job.box,delta);
-     if(preview)drawEntity(preview,'#73f5ad');
+     if(preview)drawEntity(preview,'#73f5ad',selectedIds);
     }
    }
   }
@@ -2251,7 +2252,7 @@ function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let 
    const selected=new Set(placement.ids||[]);
    for(const entity of state.entities){
     if(!selected.has(entity.id))continue;
-    drawEntity(transformEntity(entity,p=>add(p,delta)),'#ffcf70');
+    drawEntity(transformEntity(entity,p=>add(p,delta)),'#ffcf70',selectedIds);
    }
   }
  }
@@ -2640,8 +2641,9 @@ function cadGenericBlockGrips(ref){
  ];
 }
 function cadGenericGripHit(raw){
+ const lookup=cadSelectedLookup();
  for(const id of state.selected){
-  const ref=state.entities.find(e=>e.id===id);
+  const ref=lookup(id);
   if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
   for(const grip of cadGenericBlockGrips(ref))
    if(Math.hypot(raw.x-grip.x,raw.y-grip.y)<12)return {id,action:grip.action};
@@ -2703,8 +2705,9 @@ function cadOpeningQuickGrips(ref){
   ...(def.parametric.kind==='framed-window'?[{action:'depth',x:p.x+58,y:p.y-35}]:[])];
 }
 function cadOpeningQuickHit(raw){
+ const lookup=cadSelectedLookup();
  for(const id of state.selected){
-  const ref=state.entities.find(e=>e.id===id);
+  const ref=lookup(id);
   if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
   for(const grip of cadOpeningQuickGrips(ref))
    if(Math.hypot(grip.x-raw.x,grip.y-raw.y)<12)return {id,action:grip.action};
@@ -3068,8 +3071,9 @@ function cadWallFlipJustification(grip){
 function findWallMiddleGrip(raw){
  if(!window.BlacklineWallGrip)return null;
  let best=null,limit=gripHitRadius();
+ const lookup=cadSelectedLookup();
  for(const id of state.selected){
-  const e=state.entities.find(x=>x.id===id);
+  const e=lookup(id);
   if(!isEditableWall(e))continue;
   const midpoint=BlacklineWallGrip.midpoint(e),screenPoint=screen(midpoint),gap=dist(screenPoint,raw);
   if(gap<limit){limit=gap;best={id,midpoint}}
@@ -3319,8 +3323,9 @@ function drawWallDragMeasurement(){
 }
 function findSelectedBlockGrip(raw){
  let best=null,limit=gripHitRadius();
+ const lookup=cadSelectedLookup();
  for(const id of state.selected){
-  const e=state.entities.find(entity=>entity.id===id);
+  const e=lookup(id);
   if(!e||e.type!=='blockRef'||!layerFor(e).visible||layerFor(e).locked)continue;
   const d=dist(raw,screen(e.p));
   if(d<limit){limit=d;best={id,vertex:e.p}}
@@ -3752,7 +3757,15 @@ function drawInteractiveScalePreview(){
  ctx.fillStyle='#ffcf70';ctx.fillText(label,px+8,py+17);
  ctx.restore();
 }
-function drawTransformPreview(){const d=state.drag;if(!d.base||!d.lastWorld)return;const delta=sub(d.lastWorld,d.base);state.selected.forEach(id=>{const src=state.entities.find(e=>e.id===id);if(src){const cp=transformEntity(src,p=>add(p,delta));drawEntity(cp,'#eccb79')}})}
+// Operation-local lookup: preserves first-match semantics and selection order.
+ // Small selections keep direct lookup; large selections scan the model once.
+function cadSelectedLookup(ids=state.selected,entities=state.entities){
+ if(ids.length<8)return id=>entities.find(e=>e.id===id);
+ const wanted=new Set(ids),found=new Map();
+ for(const e of entities){if(wanted.has(e.id)&&!found.has(e.id)){found.set(e.id,e);if(found.size===wanted.size)break;}}
+ return id=>found.get(id);
+}
+function drawTransformPreview(){const d=state.drag;if(!d.base||!d.lastWorld)return;const delta=sub(d.lastWorld,d.base),lookup=cadSelectedLookup(),selectedIds=new Set(state.selected);state.selected.forEach(id=>{const src=lookup(id);if(src){const cp=transformEntity(src,p=>add(p,delta));drawEntity(cp,'#eccb79',selectedIds)}})}
 const cadViewHistory=[];
 function cadRememberView(){
  const v={scale:state.view.scale,ox:state.view.ox,oy:state.view.oy};
@@ -5758,8 +5771,9 @@ function cadPrimitiveGrips(e){
 }
 function cadPrimitiveGripHit(raw){
  let found=null,limit=Math.max(7,gripSettings.size*.8);
+ const lookup=cadSelectedLookup();
  for(const id of state.selected){
-  const e=state.entities.find(obj=>obj.id===id);
+  const e=lookup(id);
   if(!e||!layerFor(e).visible||layerFor(e).locked)continue;
   for(const grip of cadPrimitiveGrips(e)){
    const d=dist(screen(grip.p),raw);
@@ -6065,7 +6079,7 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   const hit=cadMoveVertexAt(raw);
   if(hit){
    state.drag={type:'vertexMoveStart',start:raw,last:raw,vertex:hit.vertex,
-    ids:state.selected.filter(id=>{const e=state.entities.find(x=>x.id===id);return e&&layerFor(e).visible&&!layerFor(e).locked})};
+    ids:(()=>{const lookup=cadSelectedLookup();return state.selected.filter(id=>{const e=lookup(id);return e&&layerFor(e).visible&&!layerFor(e).locked})})()};
    canvas.style.cursor='grabbing';return;
   }
  }
