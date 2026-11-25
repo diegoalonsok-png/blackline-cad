@@ -354,14 +354,14 @@
      let insertId=targetId;
      const item=LIB.library.find(x=>x.id===targetId),dk=window.CAD2D_DK_DEMAND;
      const olymp=!item&&/^olymp3-/.test(targetId);
-     const remote=item?.remoteDK&&dk&&!dk.isReady(targetId)&&ARQ.canEdit(targetId);
+     const remote=item?.remoteDK&&!(item.dxfPlan&&window.cadInsertDxfPlan)&&dk&&!dk.isReady(targetId)&&ARQ.canEdit(targetId);
      if(olymp||remote){
       card.setAttribute('aria-busy','true');CORE.toast(T('Downloading block…','Descargando bloque…'));
       try{if(olymp)insertId=await window.CAD2D_OLYMPIADAS3.ensureBlock(targetId);else await dk.prepare(targetId)}
       finally{card.removeAttribute('aria-busy')}
      }
      if(!current())return;
-     if(await ARQ.insert(insertId)===false||epoch!==selectionEpoch)return;
+     if(await ARQ.insert(insertId,undefined,undefined,current)===false||epoch!==selectionEpoch)return;
      armedId=targetId;
      if(commandGallery){close();CORE.toast(T('Click in the drawing to place it · Esc cancels','Hacé clic en el dibujo para ubicarlo · Esc cancela'));return}
     }catch(err){if(epoch===selectionEpoch)CORE.toast(String(err?.message||err));return}
