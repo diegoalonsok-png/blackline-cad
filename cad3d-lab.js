@@ -4365,7 +4365,7 @@ function build(){
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
- '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button> <button type="button" class="btn" data-layer-toggle="isolate">Aislar</button> <button type="button" class="btn" data-layer-toggle="unisolate">Restaurar</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button> <button type="button" class="btn" data-layer-toggle="isolate">Aislar</button> <button type="button" class="btn" data-layer-toggle="unisolate">Restaurar</button> <button type="button" class="btn" data-layer-toggle="merge">Fusionar</button> <button type="button" class="btn" data-layer-toggle="selectobjects">Seleccionar objetos</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
  '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
@@ -4816,7 +4816,33 @@ function cad3dIsolateLayers(restore=false){
  renderLayerPanel();redraw();renderProps();
  text(restore?'LAYUNISO · Visibilidad anterior restaurada':'LAYISO · '+keep.size+' capa(s) aislada(s)');
 }
+function cad3dMergeLayerPlan(list,objects,sourceId,targetId){
+ const source=list.find(l=>l.id===sourceId),target=list.find(l=>l.id===targetId);
+ if(!source||!target||source===target||source.id==='0'||source.locked||source.frozen||target.locked||target.frozen||!target.visible)return null;
+ if(list.some(l=>typeof l.isoVisible==='boolean'))return null;
+ return {layers:list.filter(l=>l!==source),moved:objects.filter(r=>(r.layerId||'0')===sourceId),target};
+}
+function cad3dMergeLayer(){
+ const source=layers.find(l=>l.id===currentLayer);
+ if(!source||source.id==='0')return text('LAYMRG · Elegí una capa de origen distinta de 0');
+ const name=window.prompt('Fusionar '+source.name+' en la capa de destino:',layers.find(l=>l!==source&&l.visible&&!l.locked&&!l.frozen)?.name||'0');
+ if(name===null)return;
+ const target=layers.find(l=>l.name.toLowerCase()===name.trim().toLowerCase());
+ const plan=cad3dMergeLayerPlan(layers,records,source.id,target?.id);
+ if(!plan)return text('LAYMRG · Capas inválidas, protegidas o aislamiento activo');
+ if(!window.confirm('Mover '+plan.moved.length+' objeto(s) a '+plan.target.name+' y eliminar '+source.name+'? Ctrl+Z deshace.'))return;
+ cad3dHistoryStart();
+ for(const r of plan.moved)r.layerId=plan.target.id;
+ layers=plan.layers;currentLayer=plan.target.id;renderLayerPanel();redraw();renderProps();
+ text('LAYMRG · '+plan.moved.length+' objeto(s) reasignados');
+}
+function cad3dSelectLayer(){
+ const ids=records.filter(r=>(r.layerId||'0')===currentLayer&&editableRecord(r)).map(r=>r.id);
+ selected=ids;selectedOpeningId=null;highlight();renderProps();text('LAYSELECT · '+ids.length+' objeto(s)');
+}
 function changeLayer(kind){
+ if(kind==='merge')return cad3dMergeLayer();
+ if(kind==='selectobjects')return cad3dSelectLayer();
  if(kind==='isolate'||kind==='unisolate')return cad3dIsolateLayers(kind==='unisolate');
  const active=layerForRecord({layerId:currentLayer});
  if(kind==='freeze'){
@@ -9253,6 +9279,7 @@ function run3DCommand(){
  if(['losacorte','slabcut','cortelosa'].includes(command)){cad3dCutSlabPolyline();return;}
  if(['massprop','list','li','propiedades3d','list3d'].includes(command)){cad3dMassReport();return;}
  if(command==='layiso'||command==='layuniso'){cad3dIsolateLayers(command==='layuniso');return;}
+ if(command==='laymrg'){cad3dMergeLayer();return;}if(command==='layselect'){cad3dSelectLayer();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
