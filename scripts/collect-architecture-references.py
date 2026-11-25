@@ -42,5 +42,57 @@ for ident,title,area,category,slug,url in SEEDS:
   byid[ident]={"id":ident,"title":title,"area":area,"category":category,"source":source,"license":"CC0","author":"Innerscene","original":str(dxf.relative_to(ROOT)),"image":str(png.relative_to(ROOT)),"thumb":str(thumb.relative_to(ROOT)),"sha256":hashlib.sha256(data).hexdigest()}
   print("verified",ident)
  except Exception as e: print("failed",ident,str(e))
+# Reviewed Wikimedia Commons raster references. Preserve original bytes and a
+# small, separately generated preview; do not claim unverified floor areas.
+from urllib.parse import urlencode, quote, urlparse
+from html import unescape
+import re, io
+from PIL import Image, ImageOps
+
+RASTER_SEEDS=[
+ ("commons-bungalow-01","Bungalow · dos dormitorios","Floor plan01.jpg"),
+ ("commons-bungalow-02","Bungalow · dos dormitorios, variante","2 bhk Bungalow floor plan.jpg"),
+ ("commons-fitzgerald","Casa Fitzgerald · planta baja","GROUND FLOOR PLAN - FITZGERALD HOUSE.jpg"),
+ ("commons-same-house","SAME House · planta primera","Clifford O, Reid Architect SAME House Design 2011 19.jpg"),
+ ("commons-radlett","Casa en Radlett · planta baja","House at Radlett (ground floor plan).jpg"),
+ ("commons-geldart-bungalow","Bungalow de Ernest Geldart · planta","Bungalow drawing -- Floor Plan MET DP804276.jpg"),
+ ("commons-hall-parlor","Vivienda americana · hall and parlor","Hall and parlor house floor plan.png"),
+ ("commons-fallingwater","Casa de la Cascada · planta","Fallingwaterfloorplan.jpg"),
+]
+def commons_get(url,limit):
+ if urlparse(url).hostname not in {"commons.wikimedia.org","upload.wikimedia.org"}:
+  raise ValueError("unexpected source host")
+ req=urllib.request.Request(url,headers={"User-Agent":"BlacklineCADReferenceLibrary/1.0 (https://blackline-cad.org/)"})
+ with urllib.request.urlopen(req,timeout=30) as response:
+  if urlparse(response.geturl()).hostname not in {"commons.wikimedia.org","upload.wikimedia.org"}: raise ValueError("unexpected redirect")
+  data=response.read(limit+1)
+ if len(data)>limit: raise ValueError("file too large")
+ return data
+def plain(value):
+ return unescape(re.sub(r"<[^>]*>"," ",value)).strip()
+for ident,title,filename in RASTER_SEEDS:
+ try:
+  old=byid.get(ident)
+  if old and all((ROOT/old[k]).is_file() for k in ("original","thumb")): continue
+  query=urlencode({"action":"query","titles":"File:"+filename,"prop":"imageinfo","iiprop":"url|mime|extmetadata","format":"json","formatversion":2})
+  result=json.loads(commons_get("https://commons.wikimedia.org/w/api.php?"+query,2_000_000))
+  info=result["query"]["pages"][0]["imageinfo"][0]; meta=info["extmetadata"]
+  license=plain(meta["LicenseShortName"]["value"])
+  if not re.fullmatch(r"CC0(?: 1\.0)?|CC BY(?:-SA)? [\d.]+|Public domain",license,re.I): raise ValueError("license not accepted: "+license)
+  if license.startswith("CC0"): license="CC0"
+  author=plain(meta.get("Artist",{}).get("value","")) or "Unknown author"
+  license_url=meta.get("LicenseUrl",{}).get("value","")
+  mime=info["mime"]; ext={"image/jpeg":".jpg","image/png":".png"}.get(mime)
+  if not ext: raise ValueError("not JPG or PNG")
+  data=commons_get(info["url"],10_000_000)
+  folder=ROOT/"house"/"unverified";folder.mkdir(parents=True,exist_ok=True)
+  original=folder/(ident+ext); thumb=folder/(ident+"-thumb.png")
+  with Image.open(io.BytesIO(data)) as im:
+   if im.format not in ("JPEG","PNG") or im.width*im.height>25_000_000: raise ValueError("invalid image dimensions or format")
+   im.load();preview=ImageOps.exif_transpose(im).convert("RGB");preview.thumbnail((480,480),Image.Resampling.LANCZOS);preview.save(thumb,optimize=True)
+  original.write_bytes(data)
+  byid[ident]={"id":ident,"title":title,"area":None,"category":"house","source":info["descriptionurl"],"license":license,"licenseUrl":license_url,"author":author,"original":str(original.relative_to(ROOT)),"thumb":str(thumb.relative_to(ROOT)),"sha256":hashlib.sha256(data).hexdigest(),"previewChanges":"Resized preview only; original unchanged"}
+  print("verified raster",ident)
+ except Exception as e: print("failed raster",ident,str(e))
 index.write_text(json.dumps(list(byid.values()),ensure_ascii=False,indent=2)+"\n")
 if not byid: raise SystemExit("No verified external references could be archived")
