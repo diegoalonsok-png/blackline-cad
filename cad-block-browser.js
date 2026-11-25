@@ -173,7 +173,15 @@
 #cadBlockBrowser.web-reference .area-links button{border:1px solid #b8a17a;background:#fffaf0;color:#51432e;border-radius:6px;padding:3px 7px;cursor:pointer;font-size:11px}
 #cadBlockBrowser:not(.web-reference) .area-links,#cadBlockBrowser.min .area-links{display:none}
 #cadBlockBrowser.web-reference .tools input{min-width:0}
-#cadBlockBrowser.web-reference .grid{grid-template-rows:repeat(2,minmax(0,1fr))}
+#cadBlockBrowser.web-reference .grid{grid-template-rows:none;grid-auto-rows:minmax(230px,auto);align-content:start;overflow-y:auto;min-height:0}
+#cadBlockBrowser.web-reference .main{min-height:0;overflow:hidden}
+#cadBlockBrowser.web-reference .web-card .plan-preview{height:160px;min-height:160px;flex:none;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:5px;overflow:hidden}
+#cadBlockBrowser.web-reference .web-card .plan-preview img{display:block;width:100%;height:100%;min-height:0;object-fit:contain;flex:none}
+#cadBlockBrowser.web-reference .web-card .plan-preview span{padding:10px;text-align:center;color:#75674f;font-size:12px}
+#cadBlockBrowser.web-reference .web-card a{flex:none;min-height:14px}
+#cadBlockBrowser.web-reference .web-card>span{flex:none}
+#cadBlockBrowser.web-reference .web-card button{min-height:29px}
+#cadBlockBrowser.web-reference .web-links,#cadBlockBrowser.web-reference .area-links,#cadBlockBrowser.web-reference .tools{flex-shrink:0}
 #cadBlockBrowser.web-reference .web-card{display:flex;flex-direction:column;min-height:0;padding:5px;gap:3px;border:1px solid #cbb796;border-radius:8px;background:#fffaf0;color:#293238;overflow:hidden}
 #cadBlockBrowser.web-reference .web-card img{width:100%;min-height:0;flex:1;object-fit:contain;background:#fff}
 #cadBlockBrowser.web-reference .web-card a{color:#59482d;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -540,10 +548,13 @@
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/4)-1));
   for(const [offset,item] of webItems.slice(searchPage*4,searchPage*4+4).entries()){
    const card=document.createElement('div');card.className='web-card';
-   const img=document.createElement('img');img.src=item.thumb;img.alt=item.title;img.loading='lazy';img.referrerPolicy='no-referrer';
+   const preview=document.createElement('div');preview.className='plan-preview';
+   const img=document.createElement('img');img.alt=item.title||'Planta';img.loading='eager';img.decoding='async';img.referrerPolicy='no-referrer';
+   let retried=false;img.onerror=()=>{if(!retried&&item.url&&item.url!==item.thumb&&/\.(?:png|jpe?g|webp|svg)(?:\?|$)/i.test(item.url)){retried=true;img.src=item.url;return;}const notice=document.createElement('span');notice.textContent=T('Preview unavailable','Miniatura no disponible');preview.replaceChildren(notice);};
+   preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);card.append(img,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=webItems.length;label.textContent=webItems.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
@@ -559,9 +570,9 @@
  }
  async function handleWebAction(button){
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
-  if(a==='all-houses'){const raw='Casas';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
-  if(a==='house-references'){const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
-  if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
+  if(a==='all-houses')return openHouses('Casas')
+  if(a==='house-references'){if(!houseMode)return openHouses('Casas referencias');const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
+  if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
@@ -596,7 +607,7 @@
   const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
   compactRect=loadHouseRect(bar);open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
  }
- function openWeb(term){stopHouseRefresh();houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:370,h:420};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
+ function openWeb(term){stopHouseRefresh();houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
  window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
