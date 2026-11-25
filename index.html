@@ -2079,23 +2079,24 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
-var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false,cadPanPaintIndex=null;
+var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false,cadPanPaintIndex=null,cadPaintNavigation=null;
 // Only these tools draw their transient previews after the static scene. No model edits
 // occur during passive mouse movement; all commits and other events still invalidate it.
 const cadPassiveSceneTools=new Set(['select','line','polyline','rect','circle','arc','ellipse','polygon','wall2d','distance','area','dimension']);
 function cadPassiveSceneEligible(){return cadPassiveSceneTools.has(state.tool)&&!state.drag&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;}
-function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(pointerOnly!=='pan')cadPanPaintIndex=null;if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
-// PAN never edits geometry. Reuse one conservative index during a drag, but
-// discard it on every non-pan redraw (including geometry/style changes).
+function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(pointerOnly==='pan'||pointerOnly==='zoom'){cadPaintNavigation=pointerOnly;}else{cadPanPaintIndex=null;cadPaintNavigation=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+// Navigation never edits geometry. Reuse one conservative index during pan/zoom,
+// but discard it on other redraws (including geometry/style changes).
 function cadPanPaintCandidates(view){
  const entities=state.entities,drag=state.drag,perf=window.BlacklinePerformance;
- if(drag?.type!=='pan'||entities.length<500||!view||!perf?.spatialIndex)return entities;
+ const nav=drag?.type==='pan'?drag:!drag&&cadPaintNavigation==='zoom'?'zoom':null;
+ if(!nav||entities.length<500||!view||!perf?.spatialIndex)return entities;
  try{
-  if(!cadPanPaintIndex||cadPanPaintIndex.drag!==drag||cadPanPaintIndex.entities!==entities||cadPanPaintIndex.length!==entities.length||cadPanPaintIndex.epoch!==cadDrawEpoch){
+  if(!cadPanPaintIndex||cadPanPaintIndex.drag!==nav||cadPanPaintIndex.entities!==entities||cadPanPaintIndex.length!==entities.length||cadPanPaintIndex.epoch!==cadDrawEpoch){
    // Only known conservative primitive bounds are indexed. Complex shapes
    // stay in the always-checked list, preserving the original paint rules.
    const query=perf.spatialIndex(entities,e=>perf.basicBounds(e));
-   cadPanPaintIndex={drag,entities,length:entities.length,epoch:cadDrawEpoch,query};
+   cadPanPaintIndex={drag:nav,entities,length:entities.length,epoch:cadDrawEpoch,query};
   }
   return cadPanPaintIndex.query(view);
  }catch(err){cadPanPaintIndex=null;return entities}
@@ -3858,7 +3859,7 @@ function cadZoomShortcut(ev){
  $(button).click();
  return true;
 }
-function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule()}
+function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule('zoom')}
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension'||e.type==='image')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
@@ -4193,7 +4194,7 @@ function closeDrawing(){
  finishStage(true);
 }
 function transformEntity(e,fn){const c=clone(e);if(c.type==='blockRef'){c.p=fn(c.p);return c;}if(c.a)c.a=fn(c.a);if(c.b)c.b=fn(c.b);if(c.c)c.c=fn(c.c);if(c.p)c.p=fn(c.p);if(c.pts)c.pts=c.pts.map(fn);return c}
-function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[];for(const id of [...state.selected]){const ix=state.entities.findIndex(e=>e.id===id);if(ix<0)continue;const original=state.entities[ix];const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();state.entities=state.entities.map(e=>state.selected.includes(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
+function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[],indexById=new Map();for(let i=0;i<state.entities.length;i++){const id=state.entities[i].id;if(!indexById.has(id))indexById.set(id,i)}for(const id of [...state.selected]){const ix=indexById.get(id);if(ix===undefined)continue;const original=state.entities[ix];const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();const selectedIds=new Set(state.selected);state.entities=state.entities.map(e=>selectedIds.has(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
   if(!s.length){
    s.push(P(p.x,p.y));state.scaleReference=BlacklineScaleMath.referenceRadius(
     state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked),p,boundsEntity);
@@ -4213,9 +4214,9 @@ function doTransform(t,p){const s=state.stage;if(!state.selected.length){let hit
   log('SCALE '+factor.toFixed(4));toast('ESCALAR aplicado · x'+factor.toFixed(3));
   return;
  }
- if(t==='rotate'){if(!s.length){s.push(p);prompt();return}let pivot=s[0],d=dist(pivot,p);let v=cad2dTypedValue!==null?cad2dTypedValue:ang(pivot,p)*180/Math.PI;cad2dTypedValue=null;if(!Number.isFinite(v)){s.length=0;return}saveHistory();let rad=v*Math.PI/180;state.entities=state.entities.map(e=>{if(!state.selected.includes(e.id))return e;let c=transformEntity(e,q=>{let z=sub(q,pivot);return t==='rotate'?add(pivot,P(z.x*Math.cos(rad)-z.y*Math.sin(rad),z.x*Math.sin(rad)+z.y*Math.cos(rad))):add(pivot,mul(z,v))});if(e.r)c.r=t==='scale'?e.r*v:e.r;if(e.rx)c.rx=t==='scale'?e.rx*v:e.rx;if(e.ry)c.ry=t==='scale'?e.ry*v:e.ry;if(e.h)c.h=t==='scale'?e.h*v:e.h;if(t==='scale'&&c.type==='dimension'&&c.style){c.style.textHeight*=v;c.style.arrow*=v}if(t==='rotate'&&c.type==='arc'){c.a0+=rad;c.a1+=rad}if(c.type==='blockRef'){if(t==='rotate')c.rotation=(Number(c.rotation)||0)+v;if(t==='scale')c.scale=(Number(c.scale)||1)*v}return c});s.length=0;updateAll();log(t.toUpperCase());return}}
+ if(t==='rotate'){if(!s.length){s.push(p);prompt();return}let pivot=s[0],d=dist(pivot,p);let v=cad2dTypedValue!==null?cad2dTypedValue:ang(pivot,p)*180/Math.PI;cad2dTypedValue=null;if(!Number.isFinite(v)){s.length=0;return}saveHistory();let rad=v*Math.PI/180;const selectedIds=new Set(state.selected);state.entities=state.entities.map(e=>{if(!selectedIds.has(e.id))return e;let c=transformEntity(e,q=>{let z=sub(q,pivot);return t==='rotate'?add(pivot,P(z.x*Math.cos(rad)-z.y*Math.sin(rad),z.x*Math.sin(rad)+z.y*Math.cos(rad))):add(pivot,mul(z,v))});if(e.r)c.r=t==='scale'?e.r*v:e.r;if(e.rx)c.rx=t==='scale'?e.rx*v:e.rx;if(e.ry)c.ry=t==='scale'?e.ry*v:e.ry;if(e.h)c.h=t==='scale'?e.h*v:e.h;if(t==='scale'&&c.type==='dimension'&&c.style){c.style.textHeight*=v;c.style.arrow*=v}if(t==='rotate'&&c.type==='arc'){c.a0+=rad;c.a1+=rad}if(c.type==='blockRef'){if(t==='rotate')c.rotation=(Number(c.rotation)||0)+v;if(t==='scale')c.scale=(Number(c.scale)||1)*v}return c});s.length=0;updateAll();log(t.toUpperCase());return}}
 function eraseSelected(){if(!state.selected.length)return toast('Seleccioná un objeto / Select an object to erase');saveHistory();const ids=new Set(state.selected);state.entities=state.entities.filter(e=>!ids.has(e.id));state.selected=[];updateAll();log('ERASE')}
-function duplicateSelected(){if(!state.selected.length)return;saveHistory();for(const id of [...state.selected]){const e=state.entities.find(x=>x.id===id);if(e){let c=transformEntity(e,p=>add(p,P(state.grid*.5,-state.grid*.5)));newEntity({...c,id:undefined})}}state.selected=[];updateAll()}
+function duplicateSelected(){if(!state.selected.length)return;saveHistory();const lookup=cadSelectedLookup();for(const id of [...state.selected]){const e=lookup(id);if(e){let c=transformEntity(e,p=>add(p,P(state.grid*.5,-state.grid*.5)));newEntity({...c,id:undefined})}}state.selected=[];updateAll()}
 function offsetSelected(){if(!state.selected.length)return toast('Select line or circle, then Offset');let amount=Number(window.prompt(`Offset distance (${state.unit}):`,String(state.grid)));if(!Number.isFinite(amount)||amount===0)return;saveHistory();for(const id of state.selected){const e=state.entities.find(x=>x.id===id);if(!e)continue;if(e.type==='line'){let v=sub(e.b,e.a),len=Math.hypot(v.x,v.y)||1,delta=P(-v.y*amount/len,v.x*amount/len);newEntity({...clone(e),id:undefined,a:add(e.a,delta),b:add(e.b,delta)})}else if(e.type==='circle'&&e.r+amount>0)newEntity({...clone(e),id:undefined,r:e.r+amount})}updateAll();log('OFFSET')}
 /* Trim a LINE against the nearest real crossing from another LINE.
    Refuse to alter the drawing if no valid finite-segment intersection exists. */
@@ -5863,7 +5864,8 @@ function cadLassoHitsBox(poly,bb,crossing){
   if(cadSegIntersect(poly[i],poly[(i+1)%poly.length],corners[k],corners[(k+1)%4]))return true;
  return false;
 }
-function cadApplyWindowSelection(start,end,shift,path){
+function cadApplyWindowSelection(start,end,shift,path){return cadWithLayerLookup(()=>cadApplyWindowSelectionIndexed(start,end,shift,path))}
+function cadApplyWindowSelectionIndexed(start,end,shift,path){
  const crossing=end.x<start.x;
  const useLasso=Array.isArray(path)&&path.length>=2;
  const poly=useLasso?[start,...path]:null;
@@ -6737,7 +6739,8 @@ function cadUpdateImagePropertiesEditor(e){
   props.addEventListener('change',ev=>cadApplyImageProperty(props,ev));
  }
 }
-function updateProps(){const ids=state.selected,selectedIds=new Set(ids),items=state.entities.filter(e=>selectedIds.has(e.id));
+function updateProps(){return cadWithLayerLookup(cadUpdatePropsIndexed)}
+function cadUpdatePropsIndexed(){const ids=state.selected,selectedIds=new Set(ids),items=state.entities.filter(e=>selectedIds.has(e.id));
  cadUpdateImageBar(items.length===1&&items[0].type==='image'?items[0]:null);
  const block=items.length===1&&items[0].type==='blockRef'?items[0]:null;
  const blockUI=$('blSelectedBlockEditor');
