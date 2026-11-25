@@ -2408,12 +2408,38 @@ function cad3dCutoutTexture(kind,id){
 }
 
 
-var activeCAD3DBlock='chair';
+var activeCAD3DBlock='chair',cad3dRemoteMesh=null,cad3dRemoteCatalogue=null,cad3dRemoteEpoch=0;
+var CAD3D_LIBRARY_ROOT=new URL('assets/3d-object-library/v1/',document.baseURI);
+function cad3dSafeLibraryFile(name,ext){return typeof name==='string'&&/^[a-z0-9-]+\.[a-z0-9]+$/i.test(name)&&name.toLowerCase().endsWith('.'+ext);}
+async function cad3dLoadRemoteCatalogue(){
+ if(cad3dRemoteCatalogue)return cad3dRemoteCatalogue;
+ cad3dRemoteCatalogue=(async()=>{
+  var response=await fetch(new URL('catalog.json',CAD3D_LIBRARY_ROOT),{cache:'no-cache'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  var data=await response.json();if(data.version!==1||!Array.isArray(data.items))throw Error('Catálogo 3D inválido');
+  data.items.slice(0,10000).forEach(function(v){
+   if(!v||!/^cloud-[a-z0-9-]{1,80}$/.test(v.id)||!cad3dSafeLibraryFile(v.model,'json')||!['svg','png','webp','jpg'].some(ext=>cad3dSafeLibraryFile(v.thumb,ext))||![v.w,v.d,v.h].every(n=>Number.isFinite(n)&&n>=.001&&n<=1000))return;
+   CAD3D_COMPONENTS[v.id]={name:String(v.name||v.id).slice(0,100),group:String(v.group||'Objetos').slice(0,60),w:v.w,d:v.d,h:v.h,parts:[],remote:true,model:v.model,thumb:v.thumb};
+  });
+  return true;
+ })().catch(err=>{cad3dRemoteCatalogue=null;return false});
+ return cad3dRemoteCatalogue;
+}
+async function cad3dFetchRemoteModel(spec){
+ var res=await fetch(new URL(spec.model,CAD3D_LIBRARY_ROOT),{cache:'no-store',signal:AbortSignal.timeout(20000)});
+ if(!res.ok)throw Error('Modelo no disponible · HTTP '+res.status);
+ if(Number(res.headers.get('content-length'))>18000000)throw Error('Modelo mayor a 18 MB');
+ var raw=await res.text();if(raw.length>18000000)throw Error('Modelo mayor a 18 MB');
+ var data=JSON.parse(raw),p=data.meshVertices;
+ if(data.version!==1||!Array.isArray(p)||!p.length||p.length%9||p.length>1080000||!p.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Geometría 3D inválida');
+ return {meshVertices:p,materialColor:/^#[0-9a-f]{6}$/i.test(data.materialColor||'')?data.materialColor:'#b6bdc0'};
+}
 var cad3dBlockView='3d',cad3dBlockCategory='all';
 function cad3dBlockKind(spec){return spec.cutout?'2.5d':'3d';}
 var cad3dPreviewCache={};
 function cad3dBlockPreview(spec,id){
  // Preview is derived from the actual block definition, not a category icon.
+ if(spec.remote)return '<img alt="" loading="lazy" decoding="async" draggable="false" src="'+escapeHtml(new URL(spec.thumb,CAD3D_LIBRARY_ROOT).href)+'">';
  if(cad3dPreviewCache[id])return cad3dPreviewCache[id];
  var canvas=document.createElement('canvas');canvas.width=280;canvas.height=160;
  var c=canvas.getContext('2d');c.clearRect(0,0,280,160);
@@ -4585,6 +4611,7 @@ function build(){
   }
   cad3dPaletteConstrain(objectPanel);cad3dBringPaletteFront(objectPanel);
   cad3dRefreshBlockCatalog();objectPanel.querySelector('.cad3dBlockSearch').focus({preventScroll:true});
+  cad3dLoadRemoteCatalogue().then(function(ok){if(ok&&objectMenu.open)cad3dRefreshBlockCatalog();});
  });
  objectPanel.querySelector('[data-object-gallery-close]').addEventListener('click',function(){objectMenu.open=false;objectPanel.hidden=true;});
  objectPanel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(objectPanel);});
@@ -4597,15 +4624,22 @@ function build(){
   header.addEventListener('pointermove',move);header.addEventListener('pointerup',end);header.addEventListener('pointercancel',end);
  });
  root.querySelector('.cad3dBlockSearch').addEventListener('input',cad3dBlockCatalogItems);
- root.querySelector('.block3DPanel').addEventListener('click',function(e){
+ root.querySelector('.block3DPanel').addEventListener('click',async function(e){
   var tab=e.target.closest('[data-block-kind]');
   if(tab){cad3dBlockView=tab.dataset.blockKind;cad3dBlockCategory='all';cad3dRefreshBlockCatalog();return;}
   var category=e.target.closest('[data-block-category]');
   if(category){cad3dBlockCategory=category.dataset.blockCategory;cad3dRefreshBlockCatalog();return;}
   var button=e.target.closest('[data-3d-block]');if(!button)return;
   var id=button.dataset['3dBlock'];if(!CAD3D_COMPONENTS[id])return;
-  activeCAD3DBlock=id;setPlacement('block3d');root.querySelector('.block3DMenu').open=false;
-  text('Bloque '+CAD3D_COMPONENTS[id].name+' · clic para colocarlo');
+  var spec=CAD3D_COMPONENTS[id],epoch=++cad3dRemoteEpoch;cad3dRemoteMesh=null;
+  if(spec.remote){
+   button.disabled=true;text('Descargando '+spec.name+'…');
+   try{var mesh=await cad3dFetchRemoteModel(spec);if(epoch!==cad3dRemoteEpoch||!objectMenu.open)return;cad3dRemoteMesh=mesh;}
+   catch(err){if(epoch===cad3dRemoteEpoch)text('Error: '+err.message);return;}
+   finally{button.disabled=false;}
+  }
+  activeCAD3DBlock=id;setPlacement('block3d');objectMenu.open=false;
+  text('Bloque '+spec.name+' · clic para colocarlo');
  });
  // The gallery renders previews only when opened, not on 3D startup.
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
@@ -6391,8 +6425,14 @@ function placePoint(pt){
   if(kind==='stair'&&cad3dStairRadial(rec)){rec.x=firstPoint.x;rec.y=firstPoint.y;rec.innerRadius=clamp(len-rec.d,.06,20);}
  }else if(kind==='block3d'){
   var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
-  rec=newRecord('block3d');
-  Object.assign(rec,{blockId:activeCAD3DBlock,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
+  if(spec.remote){
+   if(!cad3dRemoteMesh)return text('Seleccioná el modelo desde Gallery 3D');
+   rec=newRecord('imported3d');
+   Object.assign(rec,{name:spec.name,meshVertices:cad3dRemoteMesh.meshVertices,materialColor:cad3dRemoteMesh.materialColor,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
+  }else{
+   rec=newRecord('block3d');
+   Object.assign(rec,{blockId:activeCAD3DBlock,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
+  }
  }else if(['box','sphere','cylinder','cone'].includes(kind)){
   rec=newRecord(kind);rec.x=pt.x;rec.y=pt.y;
  }
