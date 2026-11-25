@@ -1152,6 +1152,19 @@ css+=`
 }
 `;
 css+=`
+#cad3dLab.cad3dCompactMode .tools > .block3DMenu > summary.btn{width:130px!important;min-width:130px!important;max-width:130px!important;gap:5px!important;font-size:11px!important;line-height:1.1!important;padding:4px 6px!important}
+#cad3dLab.cad3dCompactMode .tools > .block3DMenu > summary.btn > span{display:inline!important;font:700 10px/1.1 Arial,sans-serif!important}
+#cad3dLab.cad3dCompactMode .tools > .block3DMenu[open] > summary.btn{background:#23495f!important;border-color:#88c4df!important}
+#cad3dLab.cad3dCompactMode .tools > button.btn.archLaunch{flex:0 0 36px!important;width:36px!important;min-width:36px!important;max-width:36px!important}
+#cad3dLab.cad3dCompactMode .tools > button.btn.archLaunch > span{display:none!important}
+#cad3dLab > .block3DPanel{position:absolute;top:55px;left:8px;width:min(560px,calc(100% - 16px));height:min(580px,calc(100% - 16px));min-width:min(280px,calc(100% - 16px));min-height:210px;max-width:calc(100% - 16px);max-height:calc(100% - 16px);resize:both;z-index:92;right:auto}
+#cad3dLab > .block3DPanel[hidden]{display:none!important}
+#cad3dLab .cad3dObjectTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:move;touch-action:none;flex:none}
+#cad3dLab .cad3dObjectTitle strong{font-size:13px}
+#cad3dLab .block3DPanel .cad3dBlockGrid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+#cad3dLab .block3DPanel .cad3dBlockPreview{height:105px;min-height:105px;background:#f1eee7}
+#cad3dLab .block3DPanel .cad3dBlockPreview img{width:100%;height:100%;object-fit:contain}
+#cad3dLab .block3DPanel .cad3dBlockTabs{grid-template-columns:repeat(2,minmax(0,1fr))}
 #cad3dLab .side.sidebar.cad3dArchDockCandidate{
  background:rgba(74,134,166,.12)!important;
  box-shadow:inset 0 0 0 3px #90c7e5!important;
@@ -2355,6 +2368,20 @@ var CAD3D_COMPONENTS={
  ['lamp1','Farola 1','Exterior',.4,.4,3.5,[b(0,0,0,.1,.1,3.2,dark),b(0,0,3.2,.4,.4,.3,white)]],
  ['pergola1','Pérgola 1','Exterior',4,3,2.8,[...[-1.85,1.85].flatMap(x=>[-1.35,1.35].map(y=>b(x,y,0,.13,.13,2.7,wood))),...[-1.2,-.6,0,.6,1.2].map(y=>b(0,y,2.7,4,.1,.1,wood))]]
  ];
+ A.push(
+ ['bedSingle','Cama individual','Dormitorios',1,2.05,.92,[b(0,0,.08,1,2.05,.26,wood),b(0,-.04,.34,.96,1.9,.2,white),b(0,.96,.14,1,.12,.78,wood),b(0,.62,.54,.74,.36,.12,white)]],
+ ['nightstand','Mesa de luz','Dormitorios',.5,.42,.56,[...cabinet(.5,.42,.52),b(0,-.23,.27,.18,.04,.03,steel),b(0,0,.52,.5,.42,.04,wood)]],
+ ['dresser','Cómoda','Dormitorios',1.2,.5,.9,[...cabinet(1.2,.5,.9),... [.23,.46,.69].map(z=>b(0,-.28,z,.55,.05,.035,steel))]],
+ ['tvConsole','Rack de TV','Living',1.8,.42,.48,[b(0,0,.06,1.8,.42,.42,wood),b(-.45,-.23,.14,.84,.035,.25,white),b(.45,-.23,.14,.84,.035,.25,white)]],
+ ['television','Televisor 55 pulgadas','Living',1.24,.27,.8,[b(0,0,.07,1.24,.065,.73,dark),b(0,-.036,.09,1.18,.015,.66,glass),b(0,0,0,.6,.27,.07,steel)]],
+ ['washingMachine','Lavarropas','Electrodomésticos',.6,.65,.85,[b(0,0,0,.6,.65,.85,white),b(0,-.34,.19,.4,.025,.4,glass),b(.17,-.34,.7,.16,.025,.08,dark)]],
+ ['oven','Horno eléctrico','Electrodomésticos',.6,.56,.6,[b(0,0,0,.6,.56,.6,steel),b(0,-.29,.06,.55,.035,.39,dark),b(0,-.32,.43,.46,.045,.035,white)]],
+ ['cooktop','Anafe cuatro hornallas','Electrodomésticos',.6,.52,.06,[b(0,0,0,.6,.52,.04,dark),...[-.14,.14].flatMap(x=>[-.12,.12].map(y=>b(x,y,.04,.17,.17,.02,steel)))]],
+ ['shower','Ducha con mampara','Baños',.9,.9,2.05,[b(0,0,0,.9,.9,.08,white),b(-.43,0,.08,.035,.9,1.97,glass),b(0,.43,.08,.9,.035,1.97,glass),b(.31,.31,.9,.04,.04,1.02,steel)]],
+ ['floorLamp','Lámpara de pie','Iluminación',.48,.48,1.65,[b(0,0,0,.34,.34,.04,dark),b(0,0,.04,.045,.045,1.32,steel),b(0,0,1.36,.48,.48,.29,white)]],
+ ['pendantLamp','Lámpara colgante','Iluminación',.55,.55,.65,[b(0,0,0,.55,.55,.23,white),b(0,0,.23,.025,.025,.38,steel),b(0,0,.61,.12,.12,.04,dark)]],
+ ['outdoorLounge','Reposera exterior','Exterior',.72,1.95,.66,[b(0,-.26,.18,.72,1.33,.16,white),b(0,.66,.18,.72,.63,.48,white),...legs(.72,1.72,.18)]]
+ );
  A.forEach(a=>C[a[0]]={name:a[1],group:a[2],w:a[3],d:a[4],h:a[5],parts:a[6]});
  [['tree',3.2,6],['tree',4,8],['tree',2.5,4.5],['palm',3.8,7],['palm',3,5.5],['bush',2.1,1.6],['bush',2.8,2],['person',.6,1.75],['person',.55,1.65],['person',.6,1.82]].forEach((a,i)=>{
   C['cutout'+(i+1)]={name:(a[0]==='person'?'Persona':a[0]==='palm'?'Palmera':a[0]==='bush'?'Arbusto':'Árbol')+' 2.5D '+(i+1),group:a[0]==='person'?'2.5D Personas':'2.5D Vegetación',w:a[1],d:.05,h:a[2],parts:[],cutout:a[0]};
@@ -2430,8 +2457,10 @@ function cad3dBlockCatalogItems(){
   return cad3dBlockKind(spec)===cad3dBlockView&&
     (cad3dBlockCategory==='all'||spec.group===cad3dBlockCategory);
  });
- var search=root.querySelector('.cad3dBlockSearch').value.toLocaleLowerCase().trim();
- ids=ids.filter(function(id){var d=CAD3D_COMPONENTS[id];return (d.name+' '+d.group).toLocaleLowerCase().includes(search);});
+ var norm=v=>String(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase();
+ var search=norm(root.querySelector('.cad3dBlockSearch').value).trim();
+ var synonyms={sofa:'sofa couch living',silla:'chair seat',mesa:'table',cama:'bed',sillon:'armchair chair',inodoro:'toilet wc',lavatorio:'sink basin',auto:'car vehicle',arbol:'tree plant',heladera:'fridge refrigerator',escritorio:'desk office',banera:'bath bathtub',lampara:'lamp light',televisor:'tv television'};
+ ids=ids.filter(function(id){var d=CAD3D_COMPONENTS[id],label=norm(d.name+' '+d.group+' '+id);var words=Object.keys(synonyms).filter(k=>label.includes(k)).map(k=>synonyms[k]).join(' ');return search.split(/\s+/).every(w=>(label+' '+words).includes(w));});
  var holder=root.querySelector('.cad3dBlockResults');
  if(!ids.length){holder.innerHTML='<div class="cad3dBlockEmpty">'+(cad3dBlockView==='photo'?'': 'No hay resultados para estos filtros.')+'</div>';return;}
  holder.innerHTML='<div class="cad3dBlockGrid">'+ids.map(function(id){
@@ -2439,7 +2468,7 @@ function cad3dBlockCatalogItems(){
   return '<button type="button" class="cad3dBlockCard" data-3d-block="'+id+'" title="Insertar '+escapeHtml(spec.name)+'">'+
     '<span class="cad3dBlockPreview">'+cad3dBlockPreview(spec,id)+'</span>'+
     '<span class="cad3dBlockName">'+escapeHtml(spec.name)+'</span>'+
-    '<span class="cad3dBlockMeta">'+escapeHtml(spec.group)+' · '+(spec.cutout?'2.5D':'3D')+'</span></button>';
+    '<span class="cad3dBlockMeta">'+escapeHtml(spec.group)+' · '+(spec.cutout?'2.5D':'3D')+' · '+[spec.w,spec.d,spec.h].map(n=>Number(n.toFixed(2))).join(' × ')+' m</span></button>';
  }).join('')+'</div>';
 }
 function cad3dRefreshBlockCatalog(){
@@ -2463,12 +2492,12 @@ function cad3dRefreshBlockCatalog(){
  if(cad3dBlockView!=='photo')cad3dBlockCatalogItems();
 }
 function cad3DBlockCatalog(){
- return '<details class="block3DMenu"><summary class="btn" aria-label="3D Blocks" title="3D Blocks">'+ico('cube')+'<span>3D Blocks</span></summary><div class="block3DPanel">'+
- '<strong>COMPONENT LIBRARY</strong><small>Elegí el tipo de objeto y después la categoría</small>'+
+ return '<details class="block3DMenu"><summary class="btn" aria-label="Galería 3D de objetos" title="Galería 3D · Mobiliario, sanitarios, vehículos, vegetación y objetos">'+ico('cube')+'<span>GALLERY 3D</span></summary><div class="block3DPanel">'+
+ '<header class="cad3dObjectTitle"><strong>GALLERY 3D · OBJETOS</strong><button type="button" class="btn" data-object-gallery-close aria-label="Cerrar galería">×</button></header><small>Elegí un objeto y hacé clic en el modelo para colocarlo.</small>'+
  '<div class="cad3dBlockTabs" role="tablist" aria-label="Tipo de componente">'+
  '<button type="button" class="cad3dBlockTab" role="tab" data-block-kind="3d" aria-selected="true">3D Models</button>'+
  '<button type="button" class="cad3dBlockTab" role="tab" data-block-kind="2.5d" aria-selected="false">2.5D Cutouts</button>'+
- '<button type="button" class="cad3dBlockTab" role="tab" data-block-kind="photo" aria-selected="false">Photo Cutouts</button></div>'+
+ '</div>'+
  '<input class="cad3dBlockSearch" type="search" placeholder="Search components..." aria-label="Buscar componentes">'+
  '<div class="cad3dBlockFilters" role="group" aria-label="Categorías"></div>'+
  '<div class="cad3dBlockResults"></div>'+
@@ -4334,7 +4363,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label><button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Abrir o cerrar Galería 3D paramétrica" aria-label="Galería 3D paramétrica">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>GALERÍA 3D</span></button>'+cad3DBlockCatalog()+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label>'+cad3DBlockCatalog()+'<button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Architecture · Muros, puertas, ventanas, escaleras y vanos paramétricos" aria-label="Herramientas paramétricas de arquitectura">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>ARQ 3D</span></button>'+
  
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
@@ -4543,6 +4572,30 @@ function build(){
   try{this.disabled=true;await cad3dImportMeshFile(file);}catch(err){text('Error al importar 3D: '+err.message);}finally{this.disabled=false;}
   this.value='';
  });
+ var objectMenu=root.querySelector('.block3DMenu'),objectPanel=root.querySelector('.block3DPanel');
+ // Float outside dockable toolbars; their overflow must never clip object previews.
+ root.appendChild(objectPanel);objectPanel.hidden=true;
+ objectMenu.addEventListener('toggle',function(){
+  objectPanel.hidden=!objectMenu.open;
+  if(!objectMenu.open)return;
+  var host=root.getBoundingClientRect(),anchor=objectMenu.getBoundingClientRect();
+  if(!objectPanel.style.left){
+   objectPanel.style.left=Math.max(8,Math.min(anchor.left-host.left,host.width-Math.min(560,host.width-16)-8))+'px';
+   objectPanel.style.top=Math.max(8,Math.min(anchor.bottom-host.top+6,host.height-Math.min(580,host.height-16)-8))+'px';
+  }
+  cad3dPaletteConstrain(objectPanel);cad3dBringPaletteFront(objectPanel);
+  cad3dRefreshBlockCatalog();objectPanel.querySelector('.cad3dBlockSearch').focus({preventScroll:true});
+ });
+ objectPanel.querySelector('[data-object-gallery-close]').addEventListener('click',function(){objectMenu.open=false;objectPanel.hidden=true;});
+ objectPanel.addEventListener('pointerdown',function(){cad3dBringPaletteFront(objectPanel);});
+ objectPanel.querySelector('.cad3dObjectTitle').addEventListener('pointerdown',function(e){
+  if(e.button!==0||e.target.closest('button'))return;
+  var x=e.clientX,y=e.clientY,left=objectPanel.offsetLeft,top=objectPanel.offsetTop,id=e.pointerId,header=e.currentTarget;
+  header.setPointerCapture(id);e.preventDefault();
+  function move(ev){if(ev.pointerId!==id)return;objectPanel.style.left=left+ev.clientX-x+'px';objectPanel.style.top=top+ev.clientY-y+'px';cad3dPaletteConstrain(objectPanel);}
+  function end(ev){if(ev.pointerId!==id)return;header.removeEventListener('pointermove',move);header.removeEventListener('pointerup',end);header.removeEventListener('pointercancel',end);}
+  header.addEventListener('pointermove',move);header.addEventListener('pointerup',end);header.addEventListener('pointercancel',end);
+ });
  root.querySelector('.cad3dBlockSearch').addEventListener('input',cad3dBlockCatalogItems);
  root.querySelector('.block3DPanel').addEventListener('click',function(e){
   var tab=e.target.closest('[data-block-kind]');
@@ -4554,7 +4607,7 @@ function build(){
   activeCAD3DBlock=id;setPlacement('block3d');root.querySelector('.block3DMenu').open=false;
   text('Bloque '+CAD3D_COMPONENTS[id].name+' · clic para colocarlo');
  });
- cad3dRefreshBlockCatalog();
+ // The gallery renders previews only when opened, not on 3D startup.
  root.querySelector('[data-verify-solids]').addEventListener('click',verify3DSolids);
  // Keep the complete Visual Style gallery alongside the six quick-access cube buttons.
  // Float the gallery above dockable toolbars so it is not clipped by their overflow.
@@ -4784,7 +4837,7 @@ function build(){
  }
  palette.addEventListener('pointerdown',function(){cad3dBringPaletteFront(palette);});
 
- root.querySelector('.archLaunch').addEventListener('click',function(){showArchPalette(palette.hidden);});
+ root.querySelector('.archLaunch').addEventListener('click',function(){objectMenu.open=false;showArchPalette(palette.hidden);});
  renderArchPalette();
  cad3dBindSidebarPalettes();
  cad3dArchRestoreDocking();
