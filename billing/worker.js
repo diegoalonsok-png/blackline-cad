@@ -57,7 +57,7 @@ const cookie=(env,value,maxAge)=>`cad2d_session=${encodeURIComponent(value)}; Pa
 const SEC_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY',
  'strict-transport-security':'max-age=31536000; includeSubDomains','cache-control':'no-store','cross-origin-opener-policy':'same-origin',
  'permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()'};
-const PAGE_CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
+const PAGE_CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self' https://blackline-cad.org https://www.blackline-cad.org; frame-ancestors 'none'; base-uri 'none'";
 function secure(res){
  const r=new Response(res.body,res);
  for(const [k,v] of Object.entries(SEC_HEADERS))if(!r.headers.has(k))r.headers.set(k,v);
