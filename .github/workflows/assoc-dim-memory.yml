@@ -1,0 +1,20 @@
+name: Associative dimensions memory
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'tests/assoc-dim-memory.test.cjs'
+      - '.github/workflows/assoc-dim-memory.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dimensions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/assoc-dim-memory.test.cjs
