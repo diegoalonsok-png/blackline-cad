@@ -9490,28 +9490,39 @@ function cadEditBlockDefinition(name){
  state.entities=clone(def.entities).map(e=>({...e,id:state.nextId++}));
  state.history=[];state.future=[];state.selected=[];setTool('select');
  const bar=document.createElement('div');bar.id='cadBlockEditBar';
- bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
+ bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn" data-a="base">'+(cad2dAliasLanguage==='es'?'Punto base':'Base point')+'</button><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
  bar.querySelector('b').textContent=name;bar.querySelector('i').textContent=copies===1?'1 copy in the drawing':copies+' copies in the drawing';
  bar.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:45;display:flex;gap:10px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;background:#2a2112;border:1.5px solid #d4a748;color:#f3e3bf;box-shadow:0 10px 26px #0009;font:13px system-ui,sans-serif;white-space:nowrap';
- bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
+ bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='base')cadBlockEditPickBase();if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
  for(const ev of ['pointerdown','wheel'])bar.addEventListener(ev,e=>e.stopPropagation());
  wrap.append(bar);wrap.classList.add('cad-block-editing');
  zoomExtents();updateAll();log('BEDIT '+name);
  toast('Block editor: edit with any tool, then “Save block” (or type BSAVE). Esc does not close it.');
 }
+function cadBlockEditPickBase(){
+ const job=cadBlockEdit;if(!job)return;
+ job.cancelBasePick?.();setTool('select');
+ const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor='';delete job.cancelBasePick};
+ const onDown=ev=>{if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();const p=snapPoint(world(P(ev.offsetX,ev.offsetY)));if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;job.newBase=P(p.x,p.y);cleanup();toast('Punto base definido / Base point set · X '+p.x.toFixed(3)+' Y '+p.y.toFixed(3));schedule()};
+ const onKey=ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();cleanup();toast('Punto base cancelado / Base point cancelled')}};
+ job.cancelBasePick=cleanup;canvas.style.cursor='crosshair';canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);toast('Elegí el punto base del bloque / Pick block base point');
+}
 function cadBlockEditClose(save){
  const job=cadBlockEdit;if(!job)return;
+ job.cancelBasePick?.();
  let entities=null,dropped=0;
  if(save){
   const usable=state.entities.filter(e=>['line','polyline','rect','circle','arc','ellipse','text','dimension'].includes(e.type));
   dropped=state.entities.length-usable.length;
   if(!usable.length)return toast('The block cannot be empty: draw something or close without saving');
-  try{entities=normalizeBlockEntities(clone(usable).map(e=>{delete e.id;return e}))}catch(err){return toast('Block not saved: '+err.message)}
+  try{entities=normalizeBlockEntities(clone(usable).map(e=>{delete e.id;return job.newBase?transformEntity(e,p=>sub(p,job.newBase)):e}))}catch(err){return toast('Block not saved: '+err.message)}
  }
  state.entities=job.entities;state.history=job.history;state.future=job.future;Object.assign(state.view,job.view);state.selected=job.selected;
  cadBlockEdit=null;document.getElementById('cadBlockEditBar')?.remove();wrap.classList.remove('cad-block-editing');
  if(save){
-  const def=state.blocks[job.name];saveHistory();def.entities=entities;
+  const def=state.blocks[job.name];saveHistory();
+  if(job.newBase){const b=job.newBase;for(const ref of state.entities){if(ref.type!=='blockRef'||ref.blockName!==job.name)continue;const x=b.x*(ref.flipBlockX?-1:1),y=b.y*(ref.flipOpeningSide?-1:1),k=Number(ref.scale)||1,a=(Number(ref.rotation)||0)*Math.PI/180;ref.p=add(ref.p,P(k*(x*Math.cos(a)-y*Math.sin(a)),k*(x*Math.sin(a)+y*Math.cos(a))))}}
+  def.entities=entities;
   // Un bloque dinámico editado a mano pasa a ser propio: ya no se regenera al estirarlo.
   if(def.arq){delete def.arq;def.custom=true}
   renderBlockLibrary();queueLocalBackup();
