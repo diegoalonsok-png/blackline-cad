@@ -1442,6 +1442,7 @@ function cadUpdateCommandContext(message){
 // Opciones de comando por teclado (estilo AutoCAD): se reinician al cambiar de comando.
 var cad2dCmdOpt={};
 function setTool(t){
+ state.blockCreatePending=false;
  if(t!=='select')window.CAD2D_EXTENSIONS?.cancelArchitectureCommand?.();
  if(t!=='select')cad2dLastCommand=cadCommandName(t);
  cad2dCmdOpt={};
@@ -1465,7 +1466,7 @@ function setTool(t){
  document.getElementById('cadStretchConfirmEnter')?.remove();
  state.tool=t;document.querySelector('.app')?.classList.toggle('cad-text-active',t==='text');cadWallOptionPending=null;$('command').value='';if(t==='wall2d')$('cadWallJustification').value='left';state.stage=[];state.drag=null;state.modifyCandidate=null;state.measurement=null;if(t==='offset'&&state.selected.length===1){const source=state.entities.find(e=>e.id===state.selected[0]);if(source&&['line','circle','polyline','rect'].includes(source.type)&&!layerFor(source).locked)state.modifyCandidate={id:source.id}}
  if(!['align2p','stretch','move','copy','rotate','scale','mirror','erase','offset','trim','trimScissor','extend','breakLine','lengthen','peditMove','peditInsert','chamfer','fillet','matchprop'].includes(t))state.selected=[];buildRibbon(document.querySelector('.tab.active')?.dataset.tab||'home');prompt();updateProps();schedule();if(t!=='select')log('Command: '+cadCommandName(t))}
-function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'LINE · Specify next point or [Undo/Close] · type a length + Enter':'LINE · Specify first point',polyline:state.stage.length?'PLINE · Specify next point or [Undo/Close] · type a length + Enter':'PLINE · Specify start point',polygon:state.stage.length?'POLYGON · Specify radius (type a value or click)':'POLYGON · Enter number of sides <'+$('polygonSides').value+'> or specify center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'RECTANG · Specify other corner or [Dimensions] · @length,width':'RECTANG · Specify first corner point',circle:state.stage.length?'CIRCLE · Specify radius or [Diameter]':'CIRCLE · Specify center point',arc:cad2dArcCenter?`ARC · Specify ${['center','start','end'][state.stage.length]||'end'} point`:`ARC · ${['Specify start point or [Center]','Specify second point','Specify end point'][state.stage.length]||'Specify end point'}`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'MEDIR · segundo punto':(state.measureResult?'DIST = '+cadMeasureInfo(state.measureResult.a,state.measureResult.b).main+' · clic para medir otra':'MEDIR · primer punto'),move:state.stage.length?'MOVE · Specify second point or type a distance':'MOVE · Select objects, then specify base point',copy:state.stage.length?'COPY · Specify second point or type a distance':'COPY · Select objects, then specify base point',rotate:state.stage.length?'ROTATE · Specify rotation angle (type degrees or click)':'ROTATE · Select objects, then specify base point',scale:state.stage.length?'SCALE · Specify scale factor (type a value or click)':'SCALE · Select objects, then specify base point',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready');try{cadRenderOptionChips()}catch(e){}}
+function prompt(){const messages={wall2d:state.stage.length?'MURO: siguiente punto · Enter finaliza':'MURO: primer punto · espesor '+(cadWallThickness()*U[state.unit]/1000).toFixed(2)+' m',select:state.blockCreatePending?(cad2dAliasLanguage==='es'?'BL · Seleccioná objetos y presioná Enter':'BLOCK · Select objects and press Enter'):'Select: drag → window, ← crossing · Shift adds',line:state.stage.length?'LINE · Specify next point or [Undo/Close] · type a length + Enter':'LINE · Specify first point',polyline:state.stage.length?'PLINE · Specify next point or [Undo/Close] · type a length + Enter':'PLINE · Specify start point',polygon:state.stage.length?'POLYGON · Specify radius (type a value or click)':'POLYGON · Enter number of sides <'+$('polygonSides').value+'> or specify center',id:'ID: click to inspect exact XY coordinate',matchprop:state.modifyCandidate?'MATCHPROP: click target objects · Enter to finish':'MATCHPROP: select source object',area:state.stage.length?'AREA: next vertex · Enter to calculate':'AREA: first vertex',table:'Choose table insertion point',hatch:'HATCH: clic dentro de área cerrada · Esc cancela',rect:state.stage.length?'RECTANG · Specify other corner or [Dimensions] · @length,width':'RECTANG · Specify first corner point',circle:state.stage.length?'CIRCLE · Specify radius or [Diameter]':'CIRCLE · Specify center point',arc:cad2dArcCenter?`ARC · Specify ${['center','start','end'][state.stage.length]||'end'} point`:`ARC · ${['Specify start point or [Center]','Specify second point','Specify end point'][state.stage.length]||'Specify end point'}`,ellipse:`Specify ${['center','horizontal radius','vertical radius'][state.stage.length]||'radius'} point`,text:'Click text insertion point',dimension:['radius','diameter'].includes($('dimMode').value)?state.modifyCandidate?'Specify dimension text point':'Select circle to dimension':state.stage.length===0?'Dimension: first reference point':state.stage.length===1?'Dimension: second reference point':'Dimension: line position / third angular point',distance:state.stage.length?'MEDIR · segundo punto':(state.measureResult?'DIST = '+cadMeasureInfo(state.measureResult.a,state.measureResult.b).main+' · clic para medir otra':'MEDIR · primer punto'),move:state.stage.length?'MOVE · Specify second point or type a distance':'MOVE · Select objects, then specify base point',copy:state.stage.length?'COPY · Specify second point or type a distance':'COPY · Select objects, then specify base point',rotate:state.stage.length?'ROTATE · Specify rotation angle (type degrees or click)':'ROTATE · Select objects, then specify base point',scale:state.stage.length?'SCALE · Specify scale factor (type a value or click)':'SCALE · Select objects, then specify base point',mirror:state.stage.length?'Specify second mirror axis point':'Select objects, then first axis point',offset:state.modifyCandidate?'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Clic del lado de la paralela / Click target side':'OFFSET · Escribí distancia + Enter; elegí línea o círculo',zoomWindow:state.stage.length?'ZOOM: elegí la esquina opuesta de la ventana azul o verde':'ZOOM: clic en primera esquina y segunda, o arrastrá una ventana',trim:state.modifyCandidate?.mode==='trimFence'?(state.modifyCandidate.first?'TRIM CERCA: hacé segundo clic para recortar las líneas atravesadas':'TRIM CERCA: elegí primer punto'):'TRIM: clic borra tramo · Shift+clic inicia barrido de dos puntos · TF para modo cerca',trimScissor:state.modifyCandidate?'TIJERA: segundo clic sobre la misma línea para borrar el tramo intermedio':'TIJERA: primer clic sobre una LINE que quieras cortar',align2p:['ALIGN: primer punto de origen','ALIGN: primer punto destino','ALIGN: segundo punto de origen','ALIGN: segundo punto destino'][state.stage.length]||'ALIGN: segundo punto destino',breakAtPoint:'BREAKATPOINT: clic interior sobre línea común',stretch:state.modifyCandidate?.phase==='target'?'STRETCH: clic destino o distancia + Enter':state.modifyCandidate?.phase==='base'?'STRETCH: elegí un vértice como punto base':state.modifyCandidate?.phase==='confirm'?'STRETCH: Enter confirma la zona verde':state.modifyCandidate?.phase==='window'?'STRETCH: segunda esquina de la ventana verde':'STRETCH: primer clic para ventana verde',extend:'Click LINE near the endpoint to extend to crossing boundary',breakLine:state.modifyCandidate?'BREAK: click second point on same LINE':'BREAK: click first point on LINE',lengthen:'LENGTHEN: click LINE near endpoint to change length',peditMove:'PEDIT: specify new vertex coordinate',peditInsert:'PEDIT: specify new vertex coordinate after index',chamfer:state.modifyCandidate?'CHAMFER: tocá la segunda línea':'CHAMFER: tocá dos líneas · distancia 0 = esquina recta',fillet:state.modifyCandidate?'FILLET: tocá segunda línea · radio '+$('filletRadius').value:'FILLET: dos líneas · radio '+$('filletRadius').value+' · escribí radio + Enter',insertBlock:'Specify insertion point (or type exact X,Y)',pan:'Drag to pan view',erase:'Click entity to erase'};$('toolPrompt').textContent=messages[state.tool]||'Select point';$('statusHint').textContent=`${messages[state.tool]||'Ready'} · ${state.entities.length} entities`;updateBlacklineToolStatus();cadWallQuickSync();cadUpdateCommandContext(messages[state.tool]||'Ready');try{cadRenderOptionChips()}catch(e){}}
 function log(s){state.logs.push(s);state.logs=state.logs.slice(-300);try{window.dispatchEvent(new CustomEvent('cad2d-log'))}catch(e){};$('log').innerHTML=state.logs.slice(-2).map(x=>`<span>${escapeHTML(x)}</span>`).join('')}
 function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
@@ -3008,7 +3009,7 @@ let cadDrawEpoch=0;const cadChildCache=new WeakMap();
 const cadDefSigCache=new WeakMap();
 function cadDefSig(def){
  if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
- let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.arq,state.unit])}catch(e){sig=String(Math.random())}
+ let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.preserveLayers,def.arq,state.unit])}catch(e){sig=String(Math.random())}
  cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
 }
 function cadBlockChildrenCached(ref){
@@ -3023,7 +3024,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -5191,7 +5192,7 @@ function explodeSelected(){
  for(const e of supported){
   // Explicit EXPLODE converts a reference to editable primitives. Normal insertion remains grouped.
   if(e.type==='blockRef'){
-   for(const part of blockChildren(e))added.push({...part,layer:e.layer});
+   for(const part of blockChildren(e))added.push({...part,layer:state.blocks?.[e.blockName]?.preserveLayers?part.layer:e.layer});
    continue;
   }
   const corners=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;
@@ -6927,7 +6928,7 @@ const CAD2D_LANGUAGE_ALIASES={
  es:{
   B:'ERASE',BOR:'ERASE',D:'MOVE',DESPL:'MOVE',LI:'LINE',AR:'ARC',ES:'SCALE',GI:'ROTATE',
   RR:'TRIM',REC:'RECTANGLE',AL:'EXTEND',DF:'OFFSET',SI:'MIRROR',DP:'EXPLODE',
-  IG:'MATCHPROP',CA:'LAYER',ACO:'DIM',SB:'HATCH',SOM:'HATCH',BQ:'BLOCK',
+  IG:'MATCHPROP',CA:'LAYER',ACO:'DIM',SB:'HATCH',SOM:'HATCH',BQ:'BLOCK',BL:'BLOCK',
   L:'LINE',PL:'PLINE',C:'CIRCLE',A:'ARC',EL:'ELLIPSE',M:'MOVE',CO:'COPY',
   RO:'ROTATE',SC:'SCALE',MI:'MIRROR',O:'OFFSET',TR:'TRIM',EX:'EXTEND',
   F:'FILLET',CHA:'CHAMFER',S:'STRETCH',X:'EXPLODE',J:'JOIN',H:'HATCH',
@@ -7433,6 +7434,7 @@ function cadDispatchNamed(value){
  return CAD_COMMAND_UNMATCHED;
 }
 function runCommand(){let value=$('command').value.trim();$('command').value='';
+ if(state.blockCreatePending){if(!value)return $('createBlockBtn').click();state.blockCreatePending=false;prompt()}
  if(value)window.CAD2D_EXTENSIONS?.cancelArchitectureCommand?.();
  if(cad2dLtscalePending){cad2dLtscalePending=false;if(value){const v=Number(value.replace(',','.'));if(v>0){state.ltscale=v;updateAll();toast('LTSCALE = '+v);log('LTSCALE '+v)}else toast('LTSCALE: valor inválido')}return}
  if(cad2dSavetimePending){cad2dSavetimePending=false;if(value){const v=Math.round(Number(value.replace(',','.')));if(v>=0&&v<=120){cad2dSaveMinutes=v;try{localStorage.setItem('cad2d-savetime',String(v))}catch(e){}toast(v?'SAVETIME = '+v+' min':'Autosave off')}else toast('SAVETIME: 0–120')}return}
@@ -7638,6 +7640,7 @@ document.addEventListener('keydown',ev=>{
  if(!cmd||a===cmd||a&&(['INPUT','TEXTAREA','SELECT'].includes(a.tagName)||a.isContentEditable))return;
  if(document.querySelector('.modal-backdrop.show,#cadPlanDlg,[role="dialog"][aria-modal="true"]:not([hidden])'))return;
  if(ev.key==='Enter'){
+  if(state.blockCreatePending){ev.preventDefault();cmd.value='';runCommand();return}
   if(state.tool==='select'&&!state.stage.length&&cad2dLastCommand){ev.preventDefault();cmd.value=cad2dLastCommand;runCommand()}
   return;
  }
@@ -7761,7 +7764,7 @@ document.addEventListener('keydown',ev=>{
   if(ev.key==='F12'){ev.preventDefault();cadToggleDyn()}
  if(ev.key==='F9'){ev.preventDefault();toggle('snapOn','snapToggle')}
 });
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){if(ev.defaultPrevented)return;ev.preventDefault();cancelCadCommand();return}if(ev.code==='Space'&&!ev.repeat){if(!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length){finishStage();return}spaceDown=true}}if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==='z'){ev.preventDefault();if(['line','polyline','wall2d'].includes(state.tool)&&state.stage.length)undoDrawingVertex();else undo();return}if((ev.ctrlKey||ev.metaKey)&&(ev.key.toLowerCase()==='y'||(ev.shiftKey&&ev.key.toLowerCase()==='z'))){ev.preventDefault();redo();return}if((ev.key==='Delete'||ev.key==='Backspace')&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){ev.preventDefault();eraseSelected();return}if(ev.key==='Enter'&&!ev.defaultPrevented&&document.activeElement!==$('command')&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;runCommand()}else finishStage()}});document.addEventListener('keyup',e=>{if(e.code==='Space')spaceDown=false});
 /* A user-initiated save should open the computer's native file chooser when supported.
  * All bytes stay local; legacy browsers use the standard download fallback.
  * Never claim a completed save after the user cancels or an I/O error occurs. */
@@ -9487,28 +9490,39 @@ function cadEditBlockDefinition(name){
  state.entities=clone(def.entities).map(e=>({...e,id:state.nextId++}));
  state.history=[];state.future=[];state.selected=[];setTool('select');
  const bar=document.createElement('div');bar.id='cadBlockEditBar';
- bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
+ bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn" data-a="base">'+(cad2dAliasLanguage==='es'?'Punto base':'Base point')+'</button><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
  bar.querySelector('b').textContent=name;bar.querySelector('i').textContent=copies===1?'1 copy in the drawing':copies+' copies in the drawing';
  bar.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:45;display:flex;gap:10px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;background:#2a2112;border:1.5px solid #d4a748;color:#f3e3bf;box-shadow:0 10px 26px #0009;font:13px system-ui,sans-serif;white-space:nowrap';
- bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
+ bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='base')cadBlockEditPickBase();if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
  for(const ev of ['pointerdown','wheel'])bar.addEventListener(ev,e=>e.stopPropagation());
  wrap.append(bar);wrap.classList.add('cad-block-editing');
  zoomExtents();updateAll();log('BEDIT '+name);
  toast('Block editor: edit with any tool, then “Save block” (or type BSAVE). Esc does not close it.');
 }
+function cadBlockEditPickBase(){
+ const job=cadBlockEdit;if(!job)return;
+ job.cancelBasePick?.();setTool('select');
+ const cleanup=()=>{canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);canvas.style.cursor='';delete job.cancelBasePick};
+ const onDown=ev=>{if(ev.button!==0)return;ev.preventDefault();ev.stopImmediatePropagation();const p=snapPoint(world(P(ev.offsetX,ev.offsetY)));if(!Number.isFinite(p.x)||!Number.isFinite(p.y))return;job.newBase=P(p.x,p.y);cleanup();toast('Punto base definido / Base point set · X '+p.x.toFixed(3)+' Y '+p.y.toFixed(3));schedule()};
+ const onKey=ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();cleanup();toast('Punto base cancelado / Base point cancelled')}};
+ job.cancelBasePick=cleanup;canvas.style.cursor='crosshair';canvas.addEventListener('pointerdown',onDown,true);document.addEventListener('keydown',onKey,true);toast('Elegí el punto base del bloque / Pick block base point');
+}
 function cadBlockEditClose(save){
  const job=cadBlockEdit;if(!job)return;
+ job.cancelBasePick?.();
  let entities=null,dropped=0;
  if(save){
   const usable=state.entities.filter(e=>['line','polyline','rect','circle','arc','ellipse','text','dimension'].includes(e.type));
   dropped=state.entities.length-usable.length;
   if(!usable.length)return toast('The block cannot be empty: draw something or close without saving');
-  try{entities=normalizeBlockEntities(clone(usable).map(e=>{delete e.id;return e}))}catch(err){return toast('Block not saved: '+err.message)}
+  try{entities=normalizeBlockEntities(clone(usable).map(e=>{delete e.id;return job.newBase?transformEntity(e,p=>sub(p,job.newBase)):e}))}catch(err){return toast('Block not saved: '+err.message)}
  }
  state.entities=job.entities;state.history=job.history;state.future=job.future;Object.assign(state.view,job.view);state.selected=job.selected;
  cadBlockEdit=null;document.getElementById('cadBlockEditBar')?.remove();wrap.classList.remove('cad-block-editing');
  if(save){
-  const def=state.blocks[job.name];saveHistory();def.entities=entities;
+  const def=state.blocks[job.name];saveHistory();
+  if(job.newBase){const b=job.newBase;for(const ref of state.entities){if(ref.type!=='blockRef'||ref.blockName!==job.name)continue;const x=b.x*(ref.flipBlockX?-1:1),y=b.y*(ref.flipOpeningSide?-1:1),k=Number(ref.scale)||1,a=(Number(ref.rotation)||0)*Math.PI/180;ref.p=add(ref.p,P(k*(x*Math.cos(a)-y*Math.sin(a)),k*(x*Math.sin(a)+y*Math.cos(a))))}}
+  def.entities=entities;
   // Un bloque dinámico editado a mano pasa a ser propio: ya no se regenera al estirarlo.
   if(def.arq){delete def.arq;def.custom=true}
   renderBlockLibrary();queueLocalBackup();
@@ -10904,22 +10918,47 @@ function initBlocks(){
  if(upgraded)queueLocalBackup();
  renderBlockLibrary();
  $('createBlockBtn').onclick=()=>{
-  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
-  if(!selected.length)return toast('Select drawable objects before creating a block');
-  if(selected.some(e=>e.type==='blockRef'))return toast('Para crear un bloque nuevo seleccioná geometría base, no referencias de otros bloques');
-  const name=window.prompt('Block name:', 'BLOCK_'+(Object.keys(state.blocks).length+1));
+  const es=cad2dAliasLanguage==='es';
+  if(cadBlockEdit)return toast(es?'Cerrá el editor de bloques antes de crear otro':'Close the block editor before creating another block');
+  const ids=new Set(state.selected);
+  const selected=state.entities.filter(e=>ids.has(e.id)&&layerFor(e).visible&&!layerFor(e).locked&&!e.cadHidden);
+  if(!selected.length){
+   if(!state.blockCreatePending){setTool('select');state.blockCreatePending=true;cad2dLastCommand='BLOCK';prompt()}
+   return toast(es?'Seleccioná objetos y presioná Enter para crear el bloque':'Select objects and press Enter to create the block');
+  }
+  state.blockCreatePending=false;prompt();
+  if(selected.some(e=>e.type==='blockRef'))return toast(es?'Seleccioná geometría base, no referencias de otros bloques':'Select base geometry, not other block references');
+  const name=window.prompt(es?'Nombre del bloque:':'Block name:', 'BLOCK_'+(Object.keys(state.blocks).length+1));
   if(!name?.trim())return;
   const key=name.trim().slice(0,100);
-  if(!/^[\w .\-]+$/.test(key))return toast('Block name: letters, digits, spaces, - and _');
-  if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast('No se puede reemplazar una definición que está en uso. Creá un bloque con otro nombre.');
-  if(state.blocks[key]&&!window.confirm('Replace block '+key+'?'))return;
+  if(!/^[\w .\-]+$/.test(key)||key in Object.prototype)return toast(es?'Nombre de bloque inválido':'Invalid block name');
+  if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast(es?'El bloque está en uso. Elegí otro nombre.':'Block is in use. Choose another name.');
+  if(state.blocks[key]&&!window.confirm(es?'¿Reemplazar bloque '+key+'?':'Replace block '+key+'?'))return;
+  // Automatically use the lower-left bounds as the block base, without another dialog.
   const bounds=getBounds(selected),origin=P(bounds.minX,bounds.minY);
-  const entries=normalizeBlockEntities(selected.map(e=>{
-   const item=transformEntity(e,p=>sub(p,origin));delete item.id;return item;
-  }));
-  saveHistory();state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:entries});
-  renderBlockLibrary();$('blockLibrary').value=key;queueLocalBackup();
-  toast('Block created: '+key+' · '+entries.length+' entities');
+  if(!origin||!Number.isFinite(origin.x)||!Number.isFinite(origin.y))return toast(es?'Punto base inválido':'Invalid base point');
+  let def;
+  try{
+   const entries=normalizeBlockEntities(selected.map(e=>{
+    const item=transformEntity(e,p=>sub(p,origin));delete item.id;return item;
+   }));
+   def=cadPrepareDynamicBlock({name:key,entities:entries,preserveLayers:true});
+  }catch(err){return toast((es?'No se creó el bloque: ':'Block not created: ')+(err.message||err))}
+  const selectedIds=new Set(selected.map(e=>e.id));
+  const layer=state.layers.find(l=>l.id===state.layerId&&l.visible&&!l.locked&&!l.frozen)?.id||selected[0].layer;
+  const ref={id:state.nextId,type:'blockRef',blockName:key,p:P(origin.x,origin.y),scale:1,rotation:0,layer};
+  if(def.dynamic2d){const b=blDynBounds(def);if(b)ref.dynamic={width:b.width,height:b.height}}
+  // One undo transaction: definition and replacement at the original location.
+  saveHistory();
+  state.blocks[key]=def;state.nextId++;
+  let inserted=false;const entities=[];
+  for(const e of state.entities){
+   if(!selectedIds.has(e.id))entities.push(e);
+   else if(!inserted){entities.push(ref);inserted=true}
+  }
+  state.entities=entities;state.selected=[ref.id];
+  updateAll();$('blockLibrary').value=key;
+  toast((es?'Bloque creado: ':'Block created: ')+key+' · '+def.entities.length+(es?' entidades':' entities'));
  };
  $('insertBlockBtn').onclick=()=>{
   state.galleryRepeatedInsert=false;
