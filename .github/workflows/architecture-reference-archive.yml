@@ -6,28 +6,70 @@ on:
       - scripts/collect-architecture-references.py
       - .github/workflows/architecture-reference-archive.yml
 permissions:
-  contents: write
+  contents: read
 concurrency:
-  group: architecture-reference-archive
+  group: architecture-r2-sync
   cancel-in-progress: false
 jobs:
   archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.ARCHITECTURE_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.ARCHITECTURE_R2_SECRET_ACCESS_KEY }}
+      R2_ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.ARCHITECTURE_R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+      - name: Verify R2 access before downloading anything
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY R2_ACCOUNT R2_BUCKET; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing R2 configuration: $name"
+              exit 1
+            fi
+          done
+          aws --endpoint-url "https://${R2_ACCOUNT}.r2.cloudflarestorage.com" s3api head-bucket --bucket "$R2_BUCKET"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install 'ezdxf>=1.3,<2' 'matplotlib>=3.8,<4'
-      - run: python scripts/collect-architecture-references.py
-      - name: Preserve verified originals and previews
+      - run: pip install 'ezdxf>=1.3,<2' 'matplotlib>=3.8,<4' Pillow
+      - name: Restore R2-only catalogue and collect references in temporary checkout
+        shell: bash
         run: |
-          git config user.name 'blackline-architecture[bot]'
-          git config user.email 'blackline-architecture[bot]@users.noreply.github.com'
-          git add assets/architecture-references
-          if ! git diff --cached --quiet; then
-            git commit -m "Archive licensed architectural references"
-            git pull --rebase
-            git push
+          set -euo pipefail
+          endpoint="https://${R2_ACCOUNT}.r2.cloudflarestorage.com"
+          dir=assets/architecture-references
+          if aws --endpoint-url "$endpoint" s3api head-object --bucket "$R2_BUCKET" --key "$dir/r2-house-plans.json" >/dev/null 2>r2-head-error; then
+            aws --endpoint-url "$endpoint" s3 cp "s3://$R2_BUCKET/$dir/r2-house-plans.json" "$dir/r2-existing.json" --only-show-errors
+          elif grep -Eq '404|Not Found|NoSuchKey' r2-head-error; then
+            echo '[]' > "$dir/r2-existing.json"
+          else
+            cat r2-head-error; exit 1
           fi
+          python scripts/collect-architecture-references.py
+      - name: Upload originals and thumbnails directly to R2 then publish catalogue
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="https://${R2_ACCOUNT}.r2.cloudflarestorage.com"
+          dir=assets/architecture-references
+          aws --endpoint-url "$endpoint" s3 sync "$dir/house/" "s3://$R2_BUCKET/$dir/house/" --only-show-errors
+          python - <<'PY'
+          import json,pathlib
+          root=pathlib.Path("assets/architecture-references")
+          combined={}
+          for name in ("r2-existing.json","index.json","drive-house-references.json","user-house-plans.json"):
+              p=root/name
+              if p.is_file():
+                  for row in json.loads(p.read_text()):
+                      combined.setdefault(row["original"],row)
+          (root/"r2-house-plans.json").write_text(json.dumps(list(combined.values()),ensure_ascii=False))
+          print("Manifest entries:",len(combined))
+          PY
+          aws --endpoint-url "$endpoint" s3 cp "$dir/r2-house-plans.json" "s3://$R2_BUCKET/$dir/r2-house-plans.json" --content-type application/json --cache-control no-cache --only-show-errors
+          aws --endpoint-url "$endpoint" s3api head-object --bucket "$R2_BUCKET" --key "$dir/r2-house-plans.json" --query ContentLength
+          echo "R2-only archive completed; no Git commits or binary uploads to GitHub."
