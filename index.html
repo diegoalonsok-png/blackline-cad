@@ -3949,7 +3949,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
   for(const e of cadPointerNearby(osnapProbe,11/state.view.scale)){
-   const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
+   const lay=layerFor(e);if(!lay.visible||lay.locked||e.cadHidden)continue;
    const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
@@ -4651,7 +4651,7 @@ function setupModifyPanel(){
 
 /* A small set of production-oriented 2D editing primitives. */
 function validEditSelection(){
- return state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
+ return state.entities.filter(e=>!e.cadHidden&&state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
 }
 
 function initFloatingCadToolbar(){
@@ -5582,7 +5582,7 @@ function cadAlignTwoPoints(p){
 function cadSelectSimilar(){
  const sample=state.entities.find(e=>state.selected.includes(e.id));
  if(!sample)return toast('SELECTSIMILAR: select a reference object first');
- state.selected=state.entities.filter(e=>e.type===sample.type&&e.layer===sample.layer&&layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);
+ state.selected=state.entities.filter(e=>!e.cadHidden&&e.type===sample.type&&e.layer===sample.layer&&layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);
  updateProps();schedule();toast('SELECTSIMILAR: '+state.selected.length+' matching objects');
 }
 function cadTransferLayer(copyOnly){
@@ -5838,7 +5838,7 @@ function cadApplyWindowSelection(start,end,shift,path){
  const poly=useLasso?[start,...path]:null;
  const l=Math.min(start.x,end.x),r=Math.max(start.x,end.x),t=Math.min(start.y,end.y),b=Math.max(start.y,end.y);
  const ids=state.entities.filter(e=>{
-  const layer=layerFor(e);if(!layer.visible||layer.locked)return false;
+  const layer=layerFor(e);if(!layer.visible||layer.locked||e.cadHidden)return false;
   const bb=cadSelectionBox(e);if(!bb)return false;
   if(poly)return cadLassoHitsBox(poly,bb,crossing);
   return crossing?(bb.r>=l&&bb.l<=r&&bb.b>=t&&bb.t<=b):(bb.l>=l&&bb.r<=r&&bb.t>=t&&bb.b<=b);
@@ -6452,7 +6452,7 @@ canvas.addEventListener('contextmenu',ev=>{
  const pendingInput=Boolean($('command').value.trim()||cad2dLtscalePending||cad2dSavetimePending);
  const hasSelection=state.selected.some(id=>state.entities.some(e=>e.id===id));
  const selectionMenu=hasSelection&&(state.tool==='select'||state.tool==='pan'||state.stage.length===0);
- if(ev.ctrlKey||(!pendingInput&&(selectionMenu||(state.tool==='select'&&pick(point))))){
+ if(ev.ctrlKey||(!pendingInput&&(selectionMenu||(state.tool==='select'&&(pick(point)||state.entities.some(e=>e.cadUserHidden)))))){
   openCadContextMenu(ev.clientX,ev.clientY,point);return;
  }
  cadRightClickEnter();
@@ -6481,7 +6481,7 @@ function boundsEntity(e){if(cadIsMText(e)){return cadBoundsUnion(cadMTextLines(e
   if(hit&&hit.out===kids)hit.box=box;return {...box};
  }if(e.type==='dimension'){return cadBoundsUnion(dimensionPrimitives(e))}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse'){const a=Number(e.rotation)||0,co=Math.cos(a),si=Math.sin(a),dx=Math.hypot(e.rx*co,e.ry*si),dy=Math.hypot(e.rx*si,e.ry*co);pts.push(P(e.c.x-dx,e.c.y-dy),P(e.c.x+dx,e.c.y+dy));}if(e.type==='hatch')pts=e.pts||[];if(e.type==='text'){if(e.textPath==='circle'){const r=Number(e.textRadius)||0;pts.push(P(e.p.x-r-e.h,e.p.y-r-e.h),P(e.p.x+r+e.h,e.p.y+r+e.h))}else pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));}if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
 function getBounds(entities=state.entities){return cadWithLayerLookup(()=>cadGetBoundsIndexed(entities))}
-function cadGetBoundsIndexed(entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
+function cadGetBoundsIndexed(entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible||e.cadHidden)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
 function zoomWindowToPixels(a,b){
  const w=wrap.clientWidth,h=wrap.clientHeight,x0=Math.min(a.x,b.x),x1=Math.max(a.x,b.x),y0=Math.min(a.y,b.y),y1=Math.max(a.y,b.y);
  const dx=x1-x0,dy=y1-y0;if(dx<8||dy<8)return false;
@@ -6918,7 +6918,7 @@ const CAD_COMMANDS=[
  ['TRIM','TR / RR / RECORTAR','Recortar con clic o barrido de dos puntos'],['BREAK','BR','Remove part of a straight line between two points'],['LENGTHEN','LEN','Change a LINE length at chosen end'],['PEDIT','PE','Edit polyline vertex geometry'],['EXTEND','EX','Extend to line boundary'],
  ['FILLET','F','Radius fillet'],['CHAMFER','CHA','Equal-distance bevel'],
  ['ARRAY','AR','Rectangular duplicates'],['JOIN','J','Join connected lines'],
- ['EXPLODE','X','Separate polyline into lines'],['ERASE','B (ES) / E / BOR','Erase entity'],['SELECTALL','','Seleccionar todos los objetos visibles'],['SELECTINVERT','','Invertir selección'],['DESELECT','','Quitar la selección'],
+ ['EXPLODE','X','Separate polyline into lines'],['ERASE','B (ES) / E / BOR','Erase entity'],['SELECTALL','','Seleccionar todos los objetos visibles'],['HIDEOBJECTS','OCULTAR','Hide selected objects'],['UNISOLATEOBJECTS','DESOCULTAR','Restore hidden objects'],['SELECTINVERT','','Invertir selección'],['DESELECT','','Quitar la selección'],
  ['DIMALIGNED','DAL','Aligned dimension'],
  ['DEDIT','DED','Editar texto de una cota seleccionada (<> = medida)'],['DIMSTYLE','D (EN)','Open dimension styling controls'],['STYLE','ST','Open text and font styling'],['TEDIT','ED','Edit selected single-line text'],['DIMLINEAR','DLI','Linear dimension'],
  ['DIMANGULAR','','Angular dimension'],['DIMRADIUS','','Circle radius'],
@@ -7060,16 +7060,27 @@ function finishCadArea(){
  state.stage=[];state.tool='select';prompt();schedule();
  log('AREA: '+value+' '+state.unit+'²');toast('Enclosed area: '+value+' '+state.unit+'²');
 }
+// User visibility is separate from internal architectural hiding and layer state.
+function cadHideObjects(restore=false){
+ const ids=new Set(state.selected);
+ const targets=state.entities.filter(e=>restore?e.cadUserHidden===true:ids.has(e.id)&&!e.cadHidden&&layerFor(e).visible&&!layerFor(e).locked);
+ if(!targets.length)return toast(restore?'No hay objetos ocultos / No hidden objects':'Seleccioná objetos para ocultar / Select objects to hide');
+ saveHistory();
+ for(const e of targets){if(restore){delete e.cadUserHidden;delete e.cadHidden}else{e.cadUserHidden=true;e.cadHidden=true}}
+ state.selected=[];clearOtrackAnchors(false);updateAll();
+ log(restore?'UNISOLATEOBJECTS':'HIDEOBJECTS');
+ toast(targets.length+(restore?' objetos desocultados / restored':' objetos ocultos / hidden'));
+}
 function cadInvertSelection(){
  const current=new Set(state.selected);
- state.selected=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked&&!current.has(e.id)).map(e=>e.id);
+ state.selected=state.entities.filter(e=>!e.cadHidden&&layerFor(e).visible&&!layerFor(e).locked&&!current.has(e.id)).map(e=>e.id);
  updateProps();schedule();toast('Invert selection · '+state.selected.length+' objetos');
 }
 function cadDeselectAll(){
  state.selected=[];state.modifyCandidate=null;updateProps();prompt();schedule();toast('Selección limpia');
 }
 function selectAllCad(){
- state.selected=state.entities.filter(e=>layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);
+ state.selected=state.entities.filter(e=>!e.cadHidden&&layerFor(e).visible&&!layerFor(e).locked).map(e=>e.id);
  updateProps();schedule();toast('Selected '+state.selected.length+' visible unlocked entities');
 }
 function openCadPaletteByTitle(text){
@@ -7285,6 +7296,8 @@ function cadDispatchImmediate(upper){
  if(['DWGCOMPARE','COMPARE','COMPARARPLANOS'].includes(upper))return cadComparePicker();
  if(['LAYERSTATE','LAYERSTATES','LAYSTATE','ESTADOSCAPAS'].includes(upper))return cadLayerStatesDialog();
  if(upper==='OVERKILL'||upper==='LIMPIARDUPLICADOS')return cadOverkill();
+ if(['HIDEOBJECTS','OCULTAR','OCULTAROBJETOS'].includes(upper))return cadHideObjects(false);
+ if(['UNISOLATEOBJECTS','UNHIDEOBJECTS','DESOCULTAR','DESOCULTARTODO'].includes(upper))return cadHideObjects(true);
  if(upper==='SELECTSIMILAR'||upper==='SELECCIONARSIMILARES')return cadSelectSimilar();
  if(['SELECTINVERT','INVERTSELECTION','INVERTIRSELECCION','INVERTIR'].includes(upper))return cadInvertSelection();
  if(['DESELECT','DESELECTALL','DESELECCIONAR','NINGUNO'].includes(upper))return cadDeselectAll();
@@ -9471,6 +9484,7 @@ function openCadContextMenu(x,y,worldPoint){
    item('Zoom extensión · ZE',()=>zoomExtents()),
  ]:count?[
    item('Propiedades · Ctrl+1',()=>openCadQuickProperties()),
+   item(cad2dAliasLanguage==='es'?'Ocultar objetos · HIDEOBJECTS':'Hide objects · HIDEOBJECTS',()=>cadHideObjects(false)),
    ...(selectedImage?[item('Propiedades de imagen',()=>openCadQuickProperties())]:[]),
    null,
    command('Mover · M','MOVE'),command('Copiar · CO','COPY'),
@@ -9505,6 +9519,7 @@ function openCadContextMenu(x,y,worldPoint){
    command('Rectángulo · REC','RECTANGLE'),command('Círculo · C','CIRCLE'),
    command('Desfase · O','OFFSET'),command('Recortar · TR','TRIM'),
    null,
+   item(cad2dAliasLanguage==='es'?'Desocultar todos · UNISOLATEOBJECTS':'Unhide all · UNISOLATEOBJECTS',()=>cadHideObjects(true),!state.entities.some(e=>e.cadUserHidden)),
    item('Pegar objetos · Ctrl+V',()=>pasteCadObjects(),!cadClipboard.length),
     command('Seleccionar todo · Ctrl+A','SELECTALL'),
     command('Agregar texto · T','TEXT'),
