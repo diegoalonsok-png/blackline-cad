@@ -2066,7 +2066,7 @@ document.querySelector('.brandbar>.right')?.addEventListener('click',event=>{
 $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
-function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));schedule()}
+function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
 var cadIdleFrame=null,cadIdleFrameValid=false;
 function schedule(pointerOnly=false){if(pointerOnly!==true)cadIdleFrameValid=false;if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
@@ -3019,6 +3019,7 @@ function cadSetGripSettings(next){
 function gripHitRadius(){return Math.max(10,Math.ceil(gripSettings.size/2)+4)}
 // WALL flip grip: flip LEFT/RIGHT justification around the original guide.
 function cadWallFlipCandidates(){
+ if(!state.selected.length)return [];
  const groups=new Map();
  for(const e of state.entities){
   if(e.type!=='line'||!e.wall2d||e.autoOpeningRef!==undefined)continue;
@@ -3592,10 +3593,9 @@ function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selec
   else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill('evenodd')}
   else{
    ctx.save();ctx.clip('evenodd');ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
-   for(const segment of cadHatchPatternPrimitives(e,6000)){
-    ctx.beginPath();const a=screen(segment.a),b=screen(segment.b);
-    ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
-   }
+   // Stroke independent hatch segments in batches, preserving their exact endpoints.
+   const segments=cadHatchPatternPrimitives(e,6000);
+   for(let i=0;i<segments.length;i+=512){ctx.beginPath();for(let j=i;j<Math.min(i+512,segments.length);j++){const segment=segments[j],a=screen(segment.a),b=screen(segment.b);ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y)}ctx.stroke()}
    ctx.restore();
   }
   ctx.restore();return;
@@ -3885,7 +3885,7 @@ try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if
 let cadOneShotOsnap=null; // Shift+right-click, for only the next drawing point
 function cadOsnapEnabled(kind){return cadOneShotOsnap?kind===cadOneShotOsnap:cadActiveOsnaps.has(kind)}
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
-function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
+function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;const label=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';if(el.textContent!==label)el.textContent=label;const title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ');if(el.title!==title)el.title=title}
 
 function snapPoint(p,gripBase=null){return cadWithLayerLookup(()=>cadSnapPointIndexed(p,gripBase))}
 const cadSnapChildIndices=new WeakMap();
