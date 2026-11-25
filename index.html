@@ -1449,7 +1449,9 @@ function escapeHTML(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 function toast(s){const t=$('toast');t.textContent=s;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),2700)}
 function P(x,y){return {x,y}}function add(a,b){return P(a.x+b.x,a.y+b.y)}function sub(a,b){return P(a.x-b.x,a.y-b.y)}function mul(a,k){return P(a.x*k,a.y*k)}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function clone(o){return JSON.parse(JSON.stringify(o))}var cadScopedLayerLookup=null;
 function cadWithLayerLookup(fn){
- const previous=cadScopedLayerLookup,layers=state.layers,map=new Map();
+ const previous=cadScopedLayerLookup,layers=state.layers;
+ if(previous&&previous.layers===layers&&previous.length===layers.length)return fn();
+ const map=new Map();
  for(const l of layers)if(!map.has(l.id))map.set(l.id,l);
  cadScopedLayerLookup={layers,length:layers.length,map};
  try{return fn()}finally{cadScopedLayerLookup=previous}
@@ -4096,7 +4098,19 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
  return constrain(q);
 }
 function segmentDist(p,a,b){let vx=b.x-a.x,vy=b.y-a.y,l=vx*vx+vy*vy;if(l===0)return dist(p,a);let t=Math.max(0,Math.min(1,((p.x-a.x)*vx+(p.y-a.y)*vy)/l));return dist(p,P(a.x+t*vx,a.y+t*vy))}
-function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return cadBlockChildrenCached(e).some(part=>hit(part,p))||dist(e.p,p)<=tol;switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
+// Read-only hit testing inside dense blocks. The key is the regenerated child
+// array, so editing a dynamic block cannot reuse a stale spatial index.
+const cadBlockHitIndices=new WeakMap();
+function cadBlockHitCandidates(children,p,tol){
+ const perf=window.BlacklinePerformance;
+ if(children.length<64||!perf?.spatialIndex||!Number.isFinite(tol)||tol<0)return children;
+ try{
+  let query=cadBlockHitIndices.get(children);
+  if(!query){query=perf.spatialIndex(children,e=>perf.basicBounds(e));cadBlockHitIndices.set(children,query)}
+  return query({minX:p.x-tol,maxX:p.x+tol,minY:p.y-tol,maxY:p.y+tol});
+ }catch(err){return children}
+}
+function hit(e,p){const tol=8/state.view.scale;if(e.type==='blockRef')return dist(e.p,p)<=tol||cadBlockHitCandidates(cadBlockChildrenCached(e),p,tol).some(part=>hit(part,p));switch(e.type){case 'image':return p.x>=Math.min(e.a.x,e.b.x)-tol&&p.x<=Math.max(e.a.x,e.b.x)+tol&&p.y>=Math.min(e.a.y,e.b.y)-tol&&p.y<=Math.max(e.a.y,e.b.y)+tol;case 'hatch':return cadHatchPointInPolygon(p,e.pts);case 'line':return segmentDist(p,e.a,e.b)<=tol;case 'polyline':return e.pts.slice(1).some((a,i)=>segmentDist(p,e.pts[i],a)<=tol)||(e.closed&&segmentDist(p,e.pts.at(-1),e.pts[0])<=tol);case 'rect':{const corners=[P(e.a.x,e.a.y),P(e.a.x,e.b.y),P(e.b.x,e.b.y),P(e.b.x,e.a.y)];return corners.some((a,i)=>segmentDist(p,a,corners[(i+1)%4])<=tol)}case 'circle':return Math.abs(dist(p,e.c)-e.r)<tol;case 'arc':{let a=ang(e.c,p),delta=arcSweep(e.a0,e.a1);return Math.abs(dist(p,e.c)-e.r)<tol&&(((a-e.a0)%TAU+TAU)%TAU)<=delta}case 'ellipse':return Math.abs(((p.x-e.c.x)/e.rx)**2+((p.y-e.c.y)/e.ry)**2-1)<tol*5;case 'text':if(cadIsMText(e))return cadMTextLines(e).some(g=>hit(g,p));if(e.textPath==='circle')return cadCircularTextGlyphs(e).some(g=>dist(p,g.p)<=Math.max(tol,g.h*1.1));return Math.abs(p.y-e.p.y)<e.h&&p.x>=e.p.x&&p.x<=e.p.x+(e.text?.length||1)*e.h*.7;case 'dimension':return dimensionPrimitives(e).some(part=>hit(part,p))}return false}
 function pick(p){return cadWithLayerLookup(()=>cadPickIndexed(p))}
 function cadPickIndexed(p){const tol=(window.BlacklineCursorMode?.selectorMode(state.tool,state.modifyCandidate)?(window.BlacklineCursorMode.hitRadius(displayColors.pickboxSize||9)):9)/state.view.scale;for(let i=state.entities.length-1;i>=0;i--){const e=state.entities[i],l=layerFor(e);if(!l.visible||l.locked||e.cadHidden)continue;const b=boundsEntity(e);if(!b||p.x<b.minX-tol||p.x>b.maxX+tol||p.y<b.minY-tol||p.y>b.maxY+tol)continue;if(hit(e,p))return e}return null}
 function createAt(p){const t=state.tool,s=state.stage;
@@ -5840,7 +5854,7 @@ if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){l
 // Desktop-CAD two-click blue/green selection plus freehand crossing/window lasso.
 let cadSelectionAnchor=null,cadSelectionAnchorShift=false,cadLastWindowSelectionAt=0;
 function cadSelectionBox(e){
- const bb=boundsEntity(e);if(!bb)return null;
+ const bb=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e);if(!bb)return null;
  return {l:screen(P(bb.minX,0)).x,r:screen(P(bb.maxX,0)).x,t:screen(P(0,bb.maxY)).y,b:screen(P(0,bb.minY)).y};
 }
 function cadSegIntersect(a,b,c,d){
