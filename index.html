@@ -2079,12 +2079,27 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
-var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false;
+var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false,cadPanPaintIndex=null;
 // Only these tools draw their transient previews after the static scene. No model edits
 // occur during passive mouse movement; all commits and other events still invalidate it.
 const cadPassiveSceneTools=new Set(['select','line','polyline','rect','circle','arc','ellipse','polygon','wall2d','distance','area','dimension']);
 function cadPassiveSceneEligible(){return cadPassiveSceneTools.has(state.tool)&&!state.drag&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;}
-function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(pointerOnly!=='pan')cadPanPaintIndex=null;if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+// PAN never edits geometry. Reuse one conservative index during a drag, but
+// discard it on every non-pan redraw (including geometry/style changes).
+function cadPanPaintCandidates(view){
+ const entities=state.entities,drag=state.drag,perf=window.BlacklinePerformance;
+ if(drag?.type!=='pan'||entities.length<500||!view||!perf?.spatialIndex)return entities;
+ try{
+  if(!cadPanPaintIndex||cadPanPaintIndex.drag!==drag||cadPanPaintIndex.entities!==entities||cadPanPaintIndex.length!==entities.length||cadPanPaintIndex.epoch!==cadDrawEpoch){
+   // Only known conservative primitive bounds are indexed. Complex shapes
+   // stay in the always-checked list, preserving the original paint rules.
+   const query=perf.spatialIndex(entities,e=>perf.basicBounds(e));
+   cadPanPaintIndex={drag,entities,length:entities.length,epoch:cadDrawEpoch,query};
+  }
+  return cadPanPaintIndex.query(view);
+ }catch(err){cadPanPaintIndex=null;return entities}
+}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
  const b=boundsEntity(e);if(!b)return false;
@@ -2172,15 +2187,15 @@ function cadArqWallPochePolygons(entities,visible=()=>true){
 let cadArqPocheEnabled=true;
 try{cadArqPocheEnabled=localStorage.getItem('cad-arq-poche')!=='0'}catch(e){}
 window.CAD2D_ARQ_POCHE=()=>{cadArqPocheEnabled=!cadArqPocheEnabled;try{localStorage.setItem('cad-arq-poche',cadArqPocheEnabled?'1':'0')}catch(e){}schedule();toast('ARQ · relleno gráfico '+(cadArqPocheEnabled?'ON':'OFF'));return cadArqPocheEnabled;};
-function cadDrawArqPoche(visibleForPaint){
+function cadDrawArqPoche(visibleForPaint,entities=state.entities){
  if(!cadArqPocheEnabled)return;
  const light=(cadHexLum(displayColors.background)?.l||0)>.5;
- const polygons=cadArqWallPochePolygons(state.entities,e=>layerFor(e).visible&&visibleForPaint(e));
+ const polygons=cadArqWallPochePolygons(entities,e=>layerFor(e).visible&&visibleForPaint(e));
  ctx.save();ctx.fillStyle=light?'#b9bdbe':'#666b70';ctx.setLineDash([]);
  for(const poly of polygons){ctx.beginPath();poly.forEach((p,i)=>{const q=screen(p);if(i)ctx.lineTo(q.x,q.y);else ctx.moveTo(q.x,q.y)});ctx.closePath();ctx.fill();}
  // Wet areas use the actual regenerated block size and transformation.
  ctx.fillStyle=light?'#e0e4e4':'#41494d';
- for(const e of state.entities){
+ for(const e of entities){
   if(e.type!=='blockRef'||!e.arqBatch||!['shower','shower75'].includes(e.arqRole)||e.cadHidden||!layerFor(e).visible||!visibleForPaint(e))continue;
   const m=state.blocks[e.blockName]?.arq;if(!m||m.unit!==state.unit||!(m.w>0&&m.d>0&&e.scale>0))continue;
   const k=1000/U[state.unit]*e.scale,a=e.rotation*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
@@ -2216,17 +2231,17 @@ function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let 
  let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);updateCadSnapLive();
  if(reuse){ctx.drawImage(cadIdleFrame.canvas,0,0,w,h);painted=cadIdleFrame.painted;}else{
  ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
- const selectedIds=new Set(state.selected);
+ const selectedIds=new Set(state.selected),paintCandidates=cadPanPaintCandidates(fastView);
  // Both paint passes use conservative viewport culling; selection membership is O(1).
  const visibleForPaint=e=>fastView
   ? BlacklinePerformance.inViewport(e,fastView,entity=>inViewport(entity,w,h))
   : inViewport(e,w,h);
- for(const e of state.entities){
+ for(const e of paintCandidates){
   if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e,undefined,selectedIds);painted++;}
  }
- cadDrawArqPoche(visibleForPaint);
+ cadDrawArqPoche(visibleForPaint,paintCandidates);
  const batch=state.entities.length>=300?cadVectorBatch(selectedIds):null;
- for(const e of state.entities){
+ for(const e of paintCandidates){
   const lay=layerFor(e);
   if((e.type==='hatch'&&!e.onTop)||!lay.visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
@@ -3056,7 +3071,7 @@ function gripHitRadius(){return Math.max(10,Math.ceil(gripSettings.size/2)+4)}
 // WALL flip grip: flip LEFT/RIGHT justification around the original guide.
 function cadWallFlipCandidates(){
  if(!state.selected.length)return [];
- const groups=new Map();
+ const groups=new Map(),selectedIds=new Set(state.selected);
  for(const e of state.entities){
   if(e.type!=='line'||!e.wall2d||e.autoOpeningRef!==undefined)continue;
   const layer=layerFor(e);
@@ -3068,7 +3083,7 @@ function cadWallFlipCandidates(){
  const output=[];
  for(const [group,faces] of groups){
   if(faces.length!==2||!faces.some(e=>e.wall2d.face===0)||!faces.some(e=>e.wall2d.face===1))continue;
-  if(!faces.some(e=>state.selected.includes(e.id)))continue;
+  if(!faces.some(e=>selectedIds.has(e.id)))continue;
   const meta=faces[0].wall2d,v=sub(meta.guideB,meta.guideA),length=Math.hypot(v.x,v.y);
   if(!(length>1e-8))continue;
   const mid=mul(add(meta.guideA,meta.guideB),.5);
@@ -6250,7 +6265,7 @@ canvas.addEventListener('pointermove',ev=>{
   state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y;
   state.mouse=world(raw);
   $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
-  schedule();return;
+  schedule('pan');return;
  }
  cadPointerQueryActive=(!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement)||cadPassiveSceneEligible();
  try{state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));}finally{cadPointerQueryActive=false;}$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
