@@ -2175,6 +2175,23 @@ function cadDrawArqPoche(visibleForPaint){
 }
 
 function draw(){return cadWithLayerLookup(cadDrawFrame)}
+// Batch adjacent, compatible continuous strokes without reordering drawing entities.
+function cadVectorBatch(selectedIds){
+ let color=null,width=0,count=0;
+ function flush(){
+  if(!count)return;
+  ctx.stroke();ctx.restore();count=0;
+ }
+ function add(e,lay){
+  if(!['line','polyline','rect'].includes(e.type)||selectedIds.has(e.id)||e.pwidth>0||cadTGapCache?.has(e.id)||cadRefHasLinetype(e,lay))return false;
+  const c=cadScreenColor(e.color||lay.color),w=Math.max(.75,(e.width??lay.width??.25)*3);
+  // Keep each batch bounded and preserve the order of unlike strokes.
+  if(count&&(color!==c||width!==w||count>=256))flush();
+  if(!count){color=c;width=w;ctx.save();ctx.strokeStyle=c;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);ctx.beginPath()}
+  tracePath(e);count++;return true;
+ }
+ return {add,flush};
+}
 function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let painted=0;
  const idle=state.entities.length>=500&&state.tool==='select'&&!state.drag&&!state.stage.length&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;
  const frameKey=idle?[cadDrawEpoch,canvas.width,canvas.height,dpr,state.view.scale,state.view.ox,state.view.oy,state.gridOn,state.grid,displayColors.background,displayColors.grid,displayColors.axes].join('|'):'';
@@ -2192,12 +2209,15 @@ function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let 
   if(e.type==='hatch'&&!e.onTop&&layerFor(e).visible&&!e.cadHidden&&visibleForPaint(e)){drawEntity(e,undefined,selectedIds);painted++;}
  }
  cadDrawArqPoche(visibleForPaint);
+ const batch=state.entities.length>=300?cadVectorBatch(selectedIds):null;
  for(const e of state.entities){
-  if((e.type==='hatch'&&!e.onTop)||!layerFor(e).visible||e.cadHidden)continue;
+  const lay=layerFor(e);
+  if((e.type==='hatch'&&!e.onTop)||!lay.visible||e.cadHidden)continue;
   if(!visibleForPaint(e))continue;
-  drawEntity(e,undefined,selectedIds);painted++;
+  if(batch?.add(e,lay)){painted++;continue;}
+  batch?.flush();drawEntity(e,undefined,selectedIds);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
+ }batch?.flush();if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
  if(idle){try{const buffer=cadIdleFrame?.canvas||document.createElement('canvas');if(buffer.width!==canvas.width)buffer.width=canvas.width;if(buffer.height!==canvas.height)buffer.height=canvas.height;const bctx=buffer.getContext('2d');bctx.clearRect(0,0,buffer.width,buffer.height);bctx.drawImage(canvas,0,0);cadIdleFrame={canvas:buffer,key:frameKey,painted};cadIdleFrameValid=true}catch(e){cadIdleFrameValid=false}}else{cadIdleFrameValid=false;}
  }
  cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
