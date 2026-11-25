@@ -7,7 +7,7 @@ El cliente puede fotografiar y guardar una perspectiva PNG sin IA. El renderizad
 
 ## Política private-pilot-v1
 - Solo FLUX.2 Klein 4B. Entrada PNG con dimensiones máximas de 512 x 512, salida de lado mayor 768, una referencia y una llamada, sin reintentos automáticos.
-- Máximo 5 intentos por día UTC, globales para este piloto, no por navegador/IP. Reserva previa mediante UPSERT atómico en D1. No se devuelven reservas fallidas.
+- Máximo 20 retoques por día UTC (≈110 neuronas cada uno, ≈2.200 de las 10.000 neuronas gratuitas diarias), globales para este piloto, no por navegador/IP. Reserva previa mediante UPSERT atómico en D1. No se devuelven reservas fallidas.
 - Clave privada aleatoria de al menos 32 caracteres en secreto CROQUIS_PILOT_KEY. No incluir en GitHub, ni guardar en navegador. No usar la contraseña de Cloudflare.
 - No ejecutar inferencias si falta el binding AI, el contador, la clave, autorización válida o si CROQUIS_ENABLED no vale true.
 - GET /croquis/render devuelve estados de protección, no claves.
@@ -19,7 +19,7 @@ El cliente puede fotografiar y guardar una perspectiva PNG sin IA. El renderizad
 ```sql
 CREATE TABLE IF NOT EXISTS croquis_daily (
  day TEXT PRIMARY KEY,
- attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 5)
+ attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 20)
 );
 ```
 3. En Settings > Bindings del proyecto blackline-cad (Production) vincular esa base como CROQUIS_QUOTA. Crear el secreto CROQUIS_PILOT_KEY (tipo Secret) con valor aleatorio de >=32 caracteres.
@@ -29,3 +29,7 @@ CREATE TABLE IF NOT EXISTS croquis_daily (
 Precios y cuotas: https://developers.cloudflare.com/workers-ai/platform/pricing/
 
 **Precisión arquitectónica:** la IA puede reinterpretar materiales, aberturas o geometría. No es documentación de obra.
+
+
+## Retoque del render artístico (nov 2026)
+El panel de IA usa por defecto como entrada el **render artístico local** (botón ✦ Retocar con IA en RENDER ARTÍSTICO) y el estilo «Retocar el render artístico»: la IA solo afina un dibujo que ya coincide con el modelo. Tope de 20 por día pensado para no salir nunca de la cuota gratuita; revisar el consumo total de Workers AI de la cuenta antes de subirlo.

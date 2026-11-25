@@ -6,12 +6,18 @@ const STYLES={
  pencil:'High-quality hand-drawn architectural perspective in precise graphite and pencil, light and dark varied line weight, refined crosshatching, tactile sketchbook paper.',
  ink:'Expert architectural technical pen-and-ink illustration, delicate nib strokes, fine spatial hatching, carefully rendered daylight and contrast, warm white paper.',
  marker:'Professional architectural illustrator marker rendering, delicate outlines, tasteful hand-marker blocks of color and shadow, warm architectural presentation paper.',
- pastel:'Sophisticated architectural soft-pastel rendering with fine linework, subtle paper grain, softly colored sunlit facades and rich spatial depth.'
+ pastel:'Sophisticated architectural soft-pastel rendering with fine linework, subtle paper grain, softly colored sunlit facades and rich spatial depth.',
+ refine:'The reference is already a hand-drawn style architectural render. Keep its exact drawing, style, palette and linework; only refine it as a skilled illustrator would: richer watercolor washes, livelier hand strokes, natural light, subtle paper texture, more human atmosphere.'
 };
 function reply(error,status){
  return new Response(JSON.stringify({error:error}),{status:status,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
 }
-const DAILY_CAP=5;
+/* Zero-cost budget. FLUX.2 Klein 4B bills about 5.37 neurons per 512 px input tile
+   and 26.05 per 512 px output tile: one 512 px reference plus a 768 px output is
+   about 110 neurons. Workers AI includes 10,000 free neurons per day, so 20 images
+   (about 2,200 neurons) stay far inside the free allocation. Never raise this cap
+   without checking the account's total Workers AI usage. */
+const DAILY_CAP=20;
 const MODEL='@cf/black-forest-labs/flux-2-klein-4b';
 const POLICY_VERSION='private-pilot-v1';
 function secretConfigured(env){return typeof env.CROQUIS_PILOT_KEY==='string'&&env.CROQUIS_PILOT_KEY.length>=32;}
@@ -64,7 +70,7 @@ export async function onRequestPost({request,env}){
   var width=ratio>=1?768:Math.max(256,Math.round(768*ratio/16)*16);
   var height=ratio>=1?Math.max(256,Math.round(768/ratio/16)*16):768;
   var model=MODEL;
-  var prompt='Reference image 0 is a screenshot of the exact 3D building to preserve. Reinterpret that architectural perspective into a museum-quality croquis. '+
+  var prompt=(style==='refine'?'Reference image 0 is an artistic render of the exact 3D building to preserve. ':'Reference image 0 is a screenshot of the exact 3D building to preserve. Reinterpret that architectural perspective into a museum-quality croquis. ')+
     'Preserve exact massing, number of floors, roof profile, facade composition, window and door counts and locations, building proportions, camera angle, and vanishing points. '+
     'Do not invent or remove major structural parts; this is an illustrated version of the SAME architecture, not a redesign. '+
     STYLES[style]+' Compositionally faithful to the reference, professional architectural competition illustration, high refinement, no lettering, no text, no watermark.';
@@ -78,7 +84,7 @@ export async function onRequestPost({request,env}){
    console.error('Croquis quota unavailable',e&&e.message);
    return reply('Contador de consumo no disponible. No se ejecutó la IA.',503);
   }
-  if(!reservation)return reply('Cupo privado agotado: máximo 5 intentos diarios (UTC).',429);
+  if(!reservation)return reply('Cupo gratuito del día agotado: máximo '+DAILY_CAP+' retoques diarios (UTC). Volvé a intentar mañana.',429);
   var transport=new Response(form);
   var result=await env.AI.run(model,{multipart:{
    body:transport.body,contentType:transport.headers.get('content-type')
