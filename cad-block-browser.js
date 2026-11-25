@@ -159,7 +159,18 @@
 #cadBlockBrowser.compact-search .ft button:disabled{opacity:.35;cursor:default}
 #cadBlockBrowser.compact-search.min .ft{display:none}
 `;
- document.head.append(css);
+ css.textContent+=`
+#cadBlockBrowser .web-links{display:none}
+#cadBlockBrowser.web-reference .web-links{display:flex;gap:4px;flex-wrap:wrap;padding:5px 9px;background:#ede2cc}
+#cadBlockBrowser.web-reference .tools{padding:6px 9px}
+#cadBlockBrowser.web-reference .tools input{min-width:0}
+#cadBlockBrowser.web-reference .grid{grid-template-rows:repeat(2,minmax(0,1fr))}
+#cadBlockBrowser.web-reference .web-card{display:flex;flex-direction:column;min-height:0;padding:5px;gap:3px;border:1px solid #cbb796;border-radius:8px;background:#fffaf0;color:#293238;overflow:hidden}
+#cadBlockBrowser.web-reference .web-card img{width:100%;min-height:0;flex:1;object-fit:contain;background:#fff}
+#cadBlockBrowser.web-reference .web-card a{color:#59482d;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cadBlockBrowser.web-reference .web-card button,#cadBlockBrowser.web-reference .web-links button{border:1px solid #b8a17a;background:#fffaf0;color:#51432e;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
+#cadBlockBrowser.web-reference.min .web-links{display:none}
+`;document.head.append(css);
 
  let el=null,armedId=null,visibleCount=st.view==='olymp3'?18:72;
  const pageSize=()=>st.view==='visual'?12:st.view==='olymp3'?18:72;
@@ -316,6 +327,7 @@
  }
  function paint(){
   if(!el||el.style.display==='none'||el.classList.contains('min'))return;
+  if(webMode){paintWeb();return;}
   resetPreviews();
   const allItems=items(),pool=allItems.filter(inView),names=simpleBlockNames(),counts=new Map();
   for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
@@ -325,7 +337,7 @@
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
-  el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
+  el.classList.remove('web-reference');el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
   el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+allItems.filter(it=>/^userdx4-/.test(it.id)).length;});
@@ -364,15 +376,16 @@
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar ZIP completos, DWG, DXF o paquete JSON local">${T("Import ZIP / DWG / DXF","Importar ZIP / DWG / DXF")}</button></div>
-<div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
+<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
   let repaintFrame=0;const schedulePaint=()=>{if(!repaintFrame)repaintFrame=requestAnimationFrame(()=>{repaintFrame=0;paint()})};
-  q.addEventListener('input',()=>{selectionEpoch++;st.q=q.value;searchPage=0;visibleCount=pageSize();schedulePaint()});
+  q.addEventListener('keydown',e=>{if(webMode&&e.key==='Enter'){e.preventDefault();e.stopPropagation();searchWeb(q.value);}});
+  q.addEventListener('input',()=>{selectionEpoch++;st.q=q.value;searchPage=0;visibleCount=pageSize();if(webMode){webEpoch++;webController?.abort();webItems=[];webStatus=T('Press Enter to search','Presioná Enter para buscar');}schedulePaint()});
   el.querySelector('input[type=range]').addEventListener('input',e=>{st.size=Number(e.target.value);save();schedulePaint()});
   el.addEventListener('click',async e=>{
-   const page=e.target.closest('[data-page]');if(page){selectionEpoch++;searchPage=Math.max(0,searchPage+Number(page.dataset.page));paint();return;}const a=e.target.closest('[data-a]')?.dataset.a;
+   const action=e.target.closest('[data-web]');if(action){handleWebAction(action);return;}const page=e.target.closest('[data-page]');if(page){selectionEpoch++;searchPage=Math.max(0,searchPage+Number(page.dataset.page));paint();return;}const a=e.target.closest('[data-a]')?.dataset.a;
    if(a==='local-pack'){if(window.CAD2D_LOCAL_VECTOR_PACKS)window.CAD2D_LOCAL_VECTOR_PACKS.choose();else CORE.toast('Importador DXF todavía no disponible');return;}
    if(a==='close')return close();
    if(a==='min'){selectionEpoch++;el.classList.toggle('min');if(!el.classList.contains('min'))paint();else{resetPreviews();el.querySelector('.grid')?.replaceChildren()}return}
@@ -424,7 +437,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -438,8 +451,70 @@
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
  let commandGallery=false,searchPage=0,compactRect=null;
- function openSearch(term){st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
+ let webMode=false,webItems=[],webStatus='',webEpoch=0,webController=null,webArea=null;
+ function openSearch(term){webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ 
+ function safeHttps(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null}catch(e){return null}}
+ function cleanMeta(value){return String(value||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,500)}
+ function parseArea(value){const m=String(value).match(/(\d+(?:[.,]\d+)?)\s*(?:m(?:ts?)?\s*(?:²|2|\^2)|sqm|square metres|square meters|metros cuadrados)/i);return m?Number(m[1].replace(',','.')):null}
+ function webQuery(raw){const area=parseArea(raw),q=String(raw).trim();if(area&&/casa|vivienda|house|home/i.test(q))return 'house floor plan '+area+' square meters';return q.replace(/^(?:web|referencias?|reference|buscar web)\s*:?\s*/i,'')}
+ async function searchWeb(raw){
+  const query=webQuery(raw);if(!query)return;
+  webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
+  webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
+  const api=new URL('https://commons.wikimedia.org/w/api.php');
+  const args={action:'query',generator:'search',gsrsearch:query+' filetype:bitmap',gsrnamespace:'6',gsrlimit:'40',prop:'imageinfo',iiprop:'url|mime|extmetadata',iiurlwidth:'360',format:'json',origin:'*'};
+  for(const [k,v] of Object.entries(args))api.searchParams.set(k,v);
+  try{
+   const res=await fetch(api,{signal:ctrl.signal,credentials:'omit'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();
+   if(epoch!==webEpoch||!webMode)return;
+   webItems=Object.values(data.query?.pages||{}).flatMap(p=>{
+    const i=p.imageinfo?.[0],m=i?.extmetadata||{},license=cleanMeta(m.LicenseShortName?.value),title=cleanMeta(p.title?.replace(/^File:/,''));
+    const thumb=safeHttps(i?.thumburl),url=safeHttps(i?.url),source=safeHttps(i?.descriptionurl);
+    if(!thumb||!url||!source||!(/^(?:CC BY|CC0|Public domain|PD|CC-BY)/i.test(license)))return [];
+    const area=parseArea(title+' '+cleanMeta(m.ImageDescription?.value));
+    return [{title,thumb,url,source,license,area}];
+   });
+   if(webArea)webItems.sort((a,b)=>(a.area===null?1e9:Math.abs(a.area-webArea))-(b.area===null?1e9:Math.abs(b.area-webArea)));
+   webStatus=webItems.length?'':T('No open previews found. Try Google or Pinterest.','Sin miniaturas libres encontradas. Probá Google o Pinterest.');paintWeb();
+  }catch(e){if(epoch!==webEpoch||ctrl.signal.aborted)return;webStatus=T('Search unavailable. Use external links or import a file.','Búsqueda no disponible. Usá los enlaces o importá un archivo.');paintWeb();}
+ }
+ function paintWeb(){
+  if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.querySelector('.hd b').textContent='ARQASSIST · '+T('WEB REFERENCES','REFERENCIAS WEB');
+  const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();
+  searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/4)-1));
+  for(const [offset,item] of webItems.slice(searchPage*4,searchPage*4+4).entries()){
+   const card=document.createElement('div');card.className='web-card';
+   const img=document.createElement('img');img.src=item.thumb;img.alt=item.title;img.loading='lazy';img.referrerPolicy='no-referrer';
+   const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
+   const info=document.createElement('span');info.style.fontSize='10px';info.textContent=(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');card.append(img,name,info,button);grid.append(card);
+  }
+  if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
+  const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=webItems.length;label.textContent=webItems.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
+ }
+ async function importReference(f){if(!window.CAD2D_IMPORT_REFERENCE)throw Error('Importador no disponible');const ok=await window.CAD2D_IMPORT_REFERENCE(f);if(ok!==false)close()}
+ async function importWebUrl(url){
+  const u=safeHttps(url);if(!u)throw Error('URL HTTPS inválida');const ext=new URL(u).pathname.match(/\.(pdf|png|jpe?g|webp|dxf|dwg)$/i)?.[1];if(!ext)throw Error('Usá un enlace directo PDF, PNG, JPG, DXF o DWG');
+  const res=await fetch(u,{credentials:'omit',signal:AbortSignal.timeout(20000)});if(!res.ok)throw Error('HTTP '+res.status);
+  if(/text\/html/i.test(res.headers.get('content-type')||''))throw Error('El enlace es una página, no un archivo');
+  const max=30*1024*1024;if(Number(res.headers.get('content-length'))>max)throw Error('Máximo 30 MB');
+  const reader=res.body.getReader(),parts=[];let size=0;try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max)throw Error('Máximo 30 MB');parts.push(value)}}finally{await reader.cancel().catch(()=>{})}
+  await importReference(new File(parts,'referencia.'+ext.toLowerCase(),{type:res.headers.get('content-type')||''}));
+ }
+ async function handleWebAction(button){
+  const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
+  if(a==='search')return searchWeb(q);
+  if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
+  if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
+  const item=a==='insert'?webItems[Number(button.dataset.index)]:null;
+  const url=item?.url||(a==='url'?prompt('URL directa de archivo autorizado / Direct file URL'):null);if(!url)return;
+  button.disabled=true;try{await importWebUrl(url)}catch(e){CORE.toast(e.message+' · Descargá el archivo desde su fuente e importalo con Archivo.');}finally{button.disabled=false}
+ }
+ function openWeb(term){webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:370,h:420};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
+
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}
