@@ -1055,7 +1055,7 @@ async function openArqPlanCatalogue(category,query=''){
 function arqHouseGallery(raw){
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q))return false;
- return /^(?:casas?|viviendas?|houses?|homes?|galeria de casas|house gallery)$/.test(q)||(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&(/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q)||/\b(?:plantas?|planos?|floor plans?|galeria|gallery)\b/.test(q)));
+ return /^(?:casas?|viviendas?|houses?|homes?|plantas?|planos? de viviendas?|floor plans?|galeria de (?:casas|plantas)|house gallery)$/.test(q)||/^(?:plantas?|floor plans?)\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)$/.test(q)||(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&(/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q)||/\b(?:plantas?|planos?|floor plans?|galeria|gallery)\b/.test(q)));
 }
 function arqOpenHouseGallery(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openHouses)return CORE.toast('Galería de viviendas no disponible');EXT.cancelArchitectureCommand();b.openHouses(raw);}
 function arqWebReference(raw){
