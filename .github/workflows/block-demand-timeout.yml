@@ -1,0 +1,22 @@
+name: Block demand recovery
+on:
+  pull_request:
+    paths:
+      - 'cad-dk-demand.js'
+      - 'cad2d-olimpiadas3-loader.js'
+      - 'tests/block-demand-timeout.test.cjs'
+      - '.github/workflows/block-demand-timeout.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  block-demand:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check cad-dk-demand.js && node --check cad2d-olimpiadas3-loader.js
+      - run: node --test tests/block-demand-timeout.test.cjs
