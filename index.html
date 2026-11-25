@@ -11241,7 +11241,11 @@ function cadRenderQuickGeometry(selected){
   addField('blockScale','Escala',e.scale||1,false);calc('Rotación (°)',e.rotation||0);bounds();
  }else if(e?.type==='text'){
   addField('textHeight','Altura de texto'+unit,e.h);addField('textAngle','Rotación (°)',e.rotation||0);
-  point('insertion','Inserción',e.p);info('Fuente',e.fontFamily||'Arial');
+  point('insertion','Inserción',e.p);
+  if(editable){
+   const font=safeCADFont(e.fontFamily);
+   fields.push('<label>Fuente <select data-cad-geometry="textFont" aria-label="Fuente">'+Array.from(CAD_FONT_NAMES,f=>'<option value="'+escapeHTML(f)+'"'+(f===font?' selected':'')+'>'+escapeHTML(f)+'</option>').join('')+'</select></label>');
+  }else info('Fuente',safeCADFont(e.fontFamily));
  }else if(e?.type==='dimension'){
   calc('Distancia entre puntos'+unit,dist(e.a,e.b));point('start','Inicio',e.a,false);point('end','Fin',e.b,false);info('Tipo',e.mode||'aligned');
  }else if(e?.type==='image'){bounds();point('start','Esquina',e.a,false)}
@@ -11270,6 +11274,13 @@ function cadApplyQuickGeometry(input){
  const key=input.dataset.cadGeometry,value=input.valueAsNumber;
  const selected=validEditSelection().filter(e=>!e.cadHidden);
  const rejected=message=>{refreshCadQuickProperties();if(message)toast(message)};
+ if(key==='textFont'){
+  if(state.selected.length!==1||selected.length!==1||selected[0].type!=='text'||!cadQuickCanResize(selected[0]))return;
+  const e=selected[0],font=input.value;
+  if(!CAD_FONT_NAMES.has(font))return rejected('Seleccioná una fuente válida');
+  if(safeCADFont(e.fontFamily)===font)return;
+  saveHistory();e.fontFamily=font;updateAll();toast('Fuente actualizada · Ctrl+Z deshace');return;
+ }
  if(key==='globalWidth'){
   if(!Number.isFinite(value)||value<0||value>1e12)return rejected('Grosor global: ingresá un valor entre 0 y 10¹²');
   const changed=selected.filter(e=>cadQuickWidthEntity(e)&&(e.pwidth||0)!==value);
@@ -11592,7 +11603,7 @@ function initCadQuickProperties(){
  const geometry=$('cadPropsGeometry');
  geometry.addEventListener('change',ev=>{if(ev.target.matches('[data-cad-geometry]'))cadApplyQuickGeometry(ev.target)});
  geometry.addEventListener('keydown',ev=>{
-  if(ev.key==='Enter'&&ev.target.matches('[data-cad-geometry]')){
+  if(ev.key==='Enter'&&ev.target.matches('input[data-cad-geometry]')){
    ev.preventDefault();ev.stopPropagation();cadApplyQuickGeometry(ev.target);
   }
  });
