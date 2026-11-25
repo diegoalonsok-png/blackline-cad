@@ -7,7 +7,7 @@ const root=path.join(__dirname,'..');
 const get=p=>fs.readFileSync(path.join(root,p),'utf8');
 const context=vm.createContext({window:{},atob:s=>Buffer.from(s,'base64').toString('latin1')});
 const scripts=['assets/cad2d-arq-generators.js',
- 'assets/cad2d-dk-blocks.js',
+ 'cad-dk-demand.js','assets/cad2d-dk-blocks.js',
  'assets/cad2d-views-cuts-20261123.js',
  'assets/cad2d-elevations-curated-20261123.js',
  'assets/cad2d-dynamic-openings-20261123.js',
