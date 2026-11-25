@@ -1,7 +1,7 @@
 /* Blackline CAD · service worker: permite instalar la app y abrirla sin conexión.
  * Estrategia «red primero»: siempre se usa la versión publicada más nueva; la copia guardada
  * solo se usa si no hay conexión. Nunca guarda llamadas a la API, pagos ni analítica. */
-const CACHE='blackline-cad-v5';
+const CACHE='blackline-cad-v6';
 const SCOPE=new URL(self.registration.scope).pathname;
 const CORE=['./','./index.html','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'];
 self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}));self.skipWaiting()});
@@ -17,7 +17,7 @@ self.addEventListener('fetch',ev=>{
  }
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
  // The converter must never run with a stale or mixed JS/WASM runtime.
- if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|cad-(?:block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
+ if(/\/(?:cad-dwg-(?:batch|local-worker)\.js|cad-(?:arq-pro|block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
   ev.respondWith(fetch(req,{cache:'reload'}));return;
  }
  const relative=url.pathname.startsWith(SCOPE)?url.pathname.slice(SCOPE.length):null;
