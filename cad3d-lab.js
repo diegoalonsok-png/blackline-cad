@@ -4365,7 +4365,7 @@ function build(){
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
- '<button type="button" class="btn" data-layer-toggle="locked"></button><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
  '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
@@ -4649,6 +4649,7 @@ function build(){
   var input=e.target.closest('[data-cad3d-layer-action="color"]');if(!input)return;
   var l=layers.find(function(item){return item.id===input.dataset.layerId;});if(l)l.color=input.value;
  });
+ root.querySelector('.layerPanel').addEventListener('change',function(e){if(e.target.matches('[data-cad3d-layer-action="color"]'))cad3dHistoryCapture();});
  renderDraftModes();renderLayerPanel();
  root.addEventListener('click',function(e){
   // Root delegation survives dragging MODIFY to a different dock or floating slot.
@@ -4779,18 +4780,34 @@ function renderLayerPanel(){
  panel.querySelector('select').innerHTML=layerOptions(layer.id);
  panel.querySelector('[data-layer-toggle=visible]').textContent=layer.visible?'Hide':'Show';
  panel.querySelector('[data-layer-toggle=locked]').textContent=layer.locked?'Unlock':'Lock';
- var list=panel.querySelector('.cad3dLayerList');
+ var list=panel.querySelector('.cad3dLayerList'),counts=new Map();for(const r of records){const id=r.layerId||'0';counts.set(id,(counts.get(id)||0)+1);}
  if(list)list.innerHTML=layers.map(function(l){
   var color=/^#[0-9a-f]{6}$/i.test(l.color||'')?l.color:'#92b3c8';
   return '<div class="cad3dLayerRow'+(l.id===currentLayer?' cad3dLayerCurrent':'')+'">'+
    '<button type="button" data-cad3d-layer-action="visible" data-layer-id="'+escapeHtml(l.id)+'" title="Mostrar u ocultar">'+(l.visible?'◉':'○')+'</button>'+
    '<button type="button" data-cad3d-layer-action="locked" data-layer-id="'+escapeHtml(l.id)+'" title="Bloquear o desbloquear">'+(l.locked?'🔒':'♢')+'</button>'+
    '<input type="color" data-cad3d-layer-action="color" data-layer-id="'+escapeHtml(l.id)+'" aria-label="Color de capa" value="'+color+'">'+
-   '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+escapeHtml(l.name)+'</button></div>';
+   '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+escapeHtml(l.name)+' · '+(counts.get(l.id)||0)+'</button></div>';
  }).join('');
 }
 function changeLayer(kind){
- if(kind==='add'){
+ const active=layerForRecord({layerId:currentLayer});
+ if(kind==='rename'){
+  if(active.id==='0')return text('No se puede renombrar la capa 0');
+  const name=window.prompt('Nuevo nombre de capa 3D',active.name)?.trim().slice(0,60);
+  if(!name||name===active.name)return;
+  if(layers.some(l=>l!==active&&l.name.toLowerCase()===name.toLowerCase()))return text('Ya existe una capa con ese nombre');
+  active.name=name;
+ }else if(kind==='assign'){
+  if(!active.visible||active.locked)return text('La capa de destino debe estar visible y desbloqueada');
+  const ids=new Set(selected),items=records.filter(r=>ids.has(r.id)&&editableRecord(r));
+  if(!items.length)return text('Seleccioná objetos 3D editables');
+  for(const r of items)r.layerId=active.id;
+ }else if(kind==='delete'){
+  if(active.id==='0')return text('La capa 0 no se elimina');
+  if(records.some(r=>(r.layerId||'0')===active.id))return text('La capa contiene objetos; reasignalos primero');
+  layers=layers.filter(l=>l!==active);currentLayer='0';
+ }else if(kind==='add'){
   var name=window.prompt('Nombre de la capa 3D','Capa '+layers.length)?.trim();
   if(!name)return;
   if(layers.length>=100||layers.some(function(l){return l.name.toLowerCase()===name.toLowerCase();}))return text('Usá un nombre de capa único · máximo 100 capas');
@@ -8019,6 +8036,7 @@ function renderProps(){
  if(!focus)html+='<div class="detail"><button class="btn" type="button" data-focus-object="'+r.id+'">Zoom to object</button> '+
  '<button class="btn" type="button" data-duplicate-object="'+r.id+'">Duplicate</button> '+
  '<button class="btn" type="button" data-remove-object="'+r.id+'">Delete object</button></div>';
+ if(!focus){const metrics=cad3dPropertyDetails(r,cad3dMassProperties(r));html+='<div class="detail"><strong>PROPIEDADES GEOMÉTRICAS</strong>'+metrics.map(([k,v])=>'<p>'+escapeHtml(k)+': '+escapeHtml(v)+'</p>').join('')+'</div>';}
  p.innerHTML=html;
 }
 function cad3dRailPartsHTML(r){
@@ -9099,6 +9117,24 @@ function cad3dMassProperties(r){
  if(center){const a=(r.rot||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),[x,y,z]=center;center=[(r.x||0)+x*c-y*s,(r.y||0)+x*s+y*c,(r.z||0)+z]}
  return {volume,surface,center,kind,reason};
 }
+function cad3dPropertyDetails(r,p){
+ const layer=layerForRecord(r),fmt=n=>Number.isFinite(n)?n.toFixed(4):'—',rows=[];
+ const add=(k,v)=>rows.push([k,String(v)]);
+ add('Estado de capa',!layer.visible?'Oculta':layer.locked?'Bloqueada':'Visible / editable');
+ if(layer.color)add('Color de capa (indicador)',layer.color);
+ if(r.materialColor)add('Color de objeto',r.materialColor);
+ if(r.materialId)add('Material',r.materialId);
+ if(r.styleId)add('Estilo',r.styleId);
+ if(r.type==='sphere'||r.type==='cylinder'||r.type==='cone')add('Diámetro',fmt(2*r.radius)+' m');
+ if(r.type==='wall'||r.type==='slab')add('Vanos',r.openings?.length||0);
+ if(r.type==='profile2d')add('Vértices de perfil',r.profilePoints?.length||0);
+ if(r.type==='imported3d')add('Triángulos',Math.floor((r.meshVertices?.length||0)/9));
+ if(p.volume!==null)add(p.kind==='nominal'?'Volumen nominal':'Volumen',fmt(p.volume)+' m³');
+ if(p.surface!==null)add('Superficie exterior',fmt(p.surface)+' m²');
+ if(p.center)add('Centroide XYZ',p.center.map(fmt).join(' · ')+' m');
+ if(p.reason)add('Alcance del cálculo',p.reason);
+ return rows;
+}
 function cad3dMassReport(){
  if(!root)return;
  const ids=new Set(selected),chosen=records.filter(r=>ids.has(r.id)&&visibleRecord(r));
@@ -9117,10 +9153,7 @@ function cad3dMassReport(){
   if(p.kind==='solid'){solid+=p.volume;solidCount++;if(Number.isFinite(p.surface)){area+=p.surface;areaCount++}}
   else if(p.kind==='nominal'){nominal+=p.volume;nominalCount++}
   else unsupportedCount++;
-  if(p.volume!==null)out.push((p.kind==='nominal'?'Volumen nominal: ':'Volumen: ')+fmt(p.volume)+' m³');
-  if(p.surface!==null)out.push('Superficie exterior: '+fmt(p.surface)+' m²');
-  if(p.center)out.push('Centroide XYZ (m): '+p.center.map(fmt).join(' · '));
-  if(p.reason)out.push(p.reason);
+  for(const [key,value] of cad3dPropertyDetails(r,p))out.push(key+': '+value);
   return out.join('\n');
  });
  const report=['Objetos seleccionados: '+chosen.length,'Suma de volúmenes de sólidos ('+solidCount+'): '+fmt(solid)+' m³','Suma de superficies exteriores ('+areaCount+'): '+fmt(area)+' m²','Volumen arquitectónico nominal ('+nominalCount+'): '+fmt(nominal)+' m³','Sin cálculo fiable: '+unsupportedCount,'Las sumas no descuentan intersecciones entre objetos. No se calcula masa sin densidad. Los sólidos analíticos usan dimensiones de diseño, no la discretización gráfica.','',...lines.map(s=>s+'\n──────────────────────────────')].join('\n');
@@ -9424,7 +9457,7 @@ async function readJSON(e){
   var importedLayers=[{id:'0',name:'0',visible:true,locked:false}];
   if(Array.isArray(data.layers))data.layers.slice(0,100).forEach(function(l){
    if(!l||typeof l.id!=='string'||!l.id||l.id.length>60)return;
-   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true};
+   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true,...(/^#[0-9a-f]{6}$/i.test(l.color||'')?{color:l.color}:{})};
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
