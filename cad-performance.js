@@ -11,7 +11,7 @@
  function viewport(view,w,h,pad=30){
   const s=view?.scale,ox=view?.ox,oy=view?.oy;
   if(!(s>0)||w<0||h<0||pad<0)return null;
-  if(![s,ox,oy,w,h,pad].every(Number.isFinite))return null;
+  if(!Number.isFinite(s)||!Number.isFinite(ox)||!Number.isFinite(oy)||!Number.isFinite(w)||!Number.isFinite(h)||!Number.isFinite(pad))return null;
   return {minX:(-pad-ox)/s,maxX:(w+pad-ox)/s,
    minY:(oy-h-pad)/s,maxY:(oy+pad)/s};
  }
@@ -53,8 +53,8 @@
  // Read-only bounding-volume hierarchy. Built for a single calculation,
  // never retained across geometry edits. Unknown bounds are always included.
  function spatialIndex(items,bounds){
-  const entries=[],unknown=[];
-  items.forEach((value,i)=>{const b=bounds(value);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX<=b.maxX&&b.minY<=b.maxY)entries.push({b,i,value});else unknown.push({i,value});});
+  const entries=[],unknown=[],source=items.slice();
+  source.forEach((value,i)=>{const b=bounds(value);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX<=b.maxX&&b.minY<=b.maxY)entries.push({b,i,value});else unknown.push({i,value});});
   function build(list){
    if(!list.length)return null;
    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
@@ -66,7 +66,7 @@
   }
   const tree=build(entries);
   return function query(box){
-   if(!box||![box.minX,box.maxX,box.minY,box.maxY].every(Number.isFinite)||box.minX>box.maxX||box.minY>box.maxY)return items.slice();
+   if(!box||!Number.isFinite(box.minX)||!Number.isFinite(box.maxX)||!Number.isFinite(box.minY)||!Number.isFinite(box.maxY)||box.minX>box.maxX||box.minY>box.maxY)return source.slice();
    const result=unknown.slice();
    function visit(n){if(!n||!overlap(n.b,box))return;if(n.list){for(const e of n.list)if(overlap(e.b,box))result.push(e);}else{visit(n.left);visit(n.right);}}
    visit(tree);return result.sort((a,b)=>a.i-b.i).map(e=>e.value);
