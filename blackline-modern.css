@@ -331,3 +331,33 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app .ribbon-shell,.app .ribbon{margin-top:1px}
 /* Ctrl+9: línea de comandos oculta; el área de dibujo ocupa su lugar. */
 .app.cad-hide-cmd .cmd{visibility:hidden!important;pointer-events:none!important;overflow:hidden!important;min-height:0!important;height:0!important;padding:0!important;margin:0!important;border:0!important}
+
+/* Light theme: satin metallic gray */
+.app.blackline-modern.bl-light {
+ --bl-surface:#dce1e5;--bl-surface2:#cbd2d8;--bl-line:#aeb8c1;
+ --bl-ink:#202c35;--bl-ink2:#40515e;--bl-accent:#1762a6;--bl-accent-soft:#c5d9eb;
+ --bg:#d1d6db;--panel:#d5dbe0;--panel2:#dce1e5;--panel3:#c9d1d8;--border:#acb6bf;--muted:#475967;--text:#202c35;
+}
+.app.blackline-modern.bl-light :is(.brandbar,.tabbar,.ribbon-shell,.ribbon,.status,.sidebar,.cmd,.cad-workspace-controls) {
+ background:#cbd2d8!important;border-color:#aeb8c1!important;
+}
+.app.blackline-modern.bl-light .panel {background:#d5dbe0!important;border-color:#aeb8c1!important}
+.app.blackline-modern.bl-light .panel-title,.app.blackline-modern.bl-light .sidebar .panel .panel-title,.app.blackline-modern.bl-light #blacklineBlockGallery .panel-title {
+ background:#c0c9d1!important;color:#202c35!important;border-color:#aeb8c1!important;
+}
+.app.blackline-modern.bl-light :is(.btn,button.tool,.brandbar .btn,.status button,.sidebar .btn,.panel .btn,.btn.slim,#ribbon button.tool,#blacklineBlockGallery #blCards .btn,#blacklineBlockGallery #blCategories .btn,.arq-card,.arq-chips button) {
+ background:linear-gradient(180deg,#e1e5e8,#cbd2d8)!important;color:#202c35!important;border-color:#aeb8c1!important;
+}
+.app.blackline-modern.bl-light :is(.btn,button.tool,.status button,.sidebar .btn,.panel .btn,#ribbon button.tool,.arq-card):hover {
+ background:#c4ced7!important;border-color:#869baa!important;
+}
+.app.blackline-modern.bl-light :is(button.tool.active,.status button.on,.arq-card[aria-pressed=true],.btn[aria-pressed=true],.tab.active) {
+ background:#bfd4e7!important;border-color:#739dc0!important;color:#174c79!important;
+}
+.app.blackline-modern.bl-light :is(#cadQuickbar,.cad-quickbar,nav.bl-icon-rail,.canvas-overlay,#modelScaleBadge) {
+ background:#d4dbe0!important;border-color:#aeb8c1!important;color:#202c35!important;
+}
+.app.blackline-modern.bl-light :is(.workspace,#canvasWrap) {background:#d9dde1!important}
+.app.blackline-modern.bl-light .cmd .command-row {background:#dce1e5!important;border-color:#aeb8c1!important}
+.app.blackline-modern.bl-light .cmd .command-row input::placeholder {color:#526471!important}
+.app.blackline-modern.bl-light :is(input:not([type=color]),select,.filename) {background:#e0e4e7!important;color:#202c35!important;border-color:#aeb8c1!important}
