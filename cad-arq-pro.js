@@ -80,17 +80,17 @@ const arqOf=ref=>ref&&ref.type==='blockRef'?S().blocks[ref.blockName]?.arq:null;
 let pendingInsert=null,lastItem=null,dkInsertIntent=0;
 const dkNeeds=item=>item?.remoteDK&&!window.CAD2D_DK_DEMAND.isReady(item.id);
 async function dkPrepare(item){if(dkNeeds(item))await window.CAD2D_DK_DEMAND.prepare(item.id)}
-function armInsert(item,W,D){
+function armInsert(item,W,D,isCurrent=()=>true){
  const intent=++dkInsertIntent;
  if(dkNeeds(item)&&allowed(item)){
   const st=S(),entities=st.entities,blocks=st.blocks,tool=st.tool;
   CORE.toast('Descargando '+item.name+'…');
   return dkPrepare(item).then(()=>{
-   if(intent!==dkInsertIntent||S().entities!==entities||S().blocks!==blocks||S().tool!==tool)return false;
+   if(intent!==dkInsertIntent||!isCurrent()||S().entities!==entities||S().blocks!==blocks||S().tool!==tool)return false;
    return armInsertReady(item,W,D);
-  }).catch(e=>{CORE.toast(e.message);return false});
+  }).catch(e=>{if(intent===dkInsertIntent&&isCurrent())CORE.toast(e.message);return false});
  }
- return armInsertReady(item,W,D);
+ return isCurrent()?armInsertReady(item,W,D):false;
 }
 function armInsertReady(item,W,D){
  if(!allowed(item)){
@@ -224,7 +224,7 @@ function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
  b.title=arqSimpleName(item)+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
  b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
- b.onclick=async()=>{if(await armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
+ b.onclick=async()=>{if(await armInsert(item,undefined,undefined,()=>b.isConnected&&!b.closest('[hidden]'))===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
 function chips(container,onPick){
@@ -1233,5 +1233,5 @@ canvas.addEventListener('pointerdown',onPointerDown,true);
 canvas.addEventListener('pointermove',onPointerMove,true);
 canvas.addEventListener('pointerup',onPointerUp,true);
 buildPanel();buildModal();updateIsoBadge();
-window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
+window.CAD2D_ARQ=Object.freeze({openGallery:openModal,thumb:(id,h)=>{const it=byId(id);return it?thumb(it,h||96):''},layerFor:cat=>'0',insert:(id,W,D,isCurrent)=>{const it=byId(id);if(!it)throw Error('Bloque inexistente');return armInsert(it,W,D,isCurrent)},resizeSelected:(W,D)=>{const r=selectedArqRef();if(r)resizeRef(r,W,D)},canEdit:id=>{const item=byId(id);return Boolean(item&&allowed(item))},resizeByRefId:(id,W,D)=>{const ref=S().entities.find(e=>e.id===id),a=ref&&arqOf(ref),item=a&&byId(a.id);if(!item||!allowed(item)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false)return false;resizeRef(ref,W,D);return true},count:LIB.library.filter(x=>!x.hideFromGallery).length,selectedInfo:()=>{const r=selectedArqRef(),a=r&&arqOf(r);return a?{id:a.id,w:a.w,d:a.d}:null},grips:()=>{const r=selectedArqRef();return r?gripsFor(r).map(g=>({kind:g.kind,x:g.screen.x,y:g.screen.y})):[]}});
 })();
