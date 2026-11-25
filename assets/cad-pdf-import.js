@@ -275,5 +275,16 @@ const TRACE_ICON='<path d="M3 4h18v16H3z M6 16V8h7v4h5v4z"/><path d="M6 19h12" s
 window.CAD2D_TRACE_PLAN=traceFile;
 window.CAD2D_CALCO=pickTrace;
 
+window.CAD2D_PDF_IMAGE=async function(file){
+ let doc;
+ try{
+  const L=await pdfjs();doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+  let n=1;if(doc.numPages>1){const raw=prompt('Página del PDF / PDF page (1–'+doc.numPages+')','1');if(raw===null)return false;n=Number(raw);if(!Number.isInteger(n)||n<1||n>doc.numPages)throw Error('Página inválida');}
+  const page=await doc.getPage(n),v=page.getViewport({scale:1}),vp=page.getViewport({scale:Math.min(2,2400/Math.max(v.width,v.height))}),cv=document.createElement('canvas');cv.width=Math.ceil(vp.width);cv.height=Math.ceil(vp.height);
+  await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+  const blob=await new Promise(resolve=>cv.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo rasterizar el PDF');
+  await window.CAD2D_IMPORT_FILE(new File([blob],file.name.replace(/\.pdf$/i,'')+'-p'+n+'.png',{type:'image/png'}));return true;
+ }finally{if(doc)await doc.destroy();}
+};
 window.CAD2D_PDF_IMPORT=importPdf;
 })();
