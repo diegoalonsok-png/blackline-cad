@@ -46,5 +46,51 @@ function revolve(profile,angle,faces){
  if(volume(out)<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
  return out;
 }
-root.CAD3DSolidOps={boolean,revolve,volume};
+function advancedSolidOps(){
+ const eps=1e-8, max=120000;
+ const cross2=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+ function convex(p){
+  if(!Array.isArray(p)||p.length<3||p.length>128||p.some(v=>!Array.isArray(v)||v.length!==2||!v.every(Number.isFinite)))throw Error('Perfil inválido');
+  const q=p.map(v=>v.slice()),area=q.reduce((s,v,i)=>s+v[0]*q[(i+1)%q.length][1]-v[1]*q[(i+1)%q.length][0],0);
+  if(Math.abs(area)<eps)throw Error('Perfil sin área');if(area<0)q.reverse();
+  for(let i=0;i<q.length;i++)for(let j=0;j<q.length;j++)if(j!==i&&j!==(i+1)%q.length&&cross2(q[i],q[(i+1)%q.length],q[j])<=eps)throw Error('Esta versión requiere perfiles estrictamente convexos');
+  return q;
+ }
+ function mesh(rings){
+  const n=rings[0].length,out=[];
+  const tri=(a,b,c)=>{const u=b.map((v,i)=>v-a[i]),v=c.map((x,i)=>x-a[i]);if(Math.hypot(u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0])<eps)throw Error('Cara degenerada');out.push(...a,...b,...c)};
+  for(let k=0;k<rings.length-1;k++)for(let i=0;i<n;i++){const j=(i+1)%n,a=rings[k][i],b=rings[k][j],c=rings[k+1][j],d=rings[k+1][i];tri(a,b,c);tri(a,c,d)}
+  const first=rings[0],last=rings[rings.length-1];for(let i=1;i<n-1;i++){tri(first[0],first[i+1],first[i]);tri(last[0],last[i],last[i+1]);}
+  if(out.length>max||!out.every(Number.isFinite))throw Error('Malla demasiado grande o inválida');
+  let vol=0;const o=first[0];for(let i=0;i<out.length;i+=9){const [a,b,c]=[0,3,6].map(j=>out.slice(i+j,i+j+3).map((v,k)=>v-o[k]));vol+=(a[0]*(b[1]*c[2]-b[2]*c[1])+a[1]*(b[2]*c[0]-b[0]*c[2])+a[2]*(b[0]*c[1]-b[1]*c[0]))/6;}
+  if(Math.abs(vol)<eps)throw Error('Sólido sin volumen');if(vol<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
+  return out;
+ }
+ function loft(sections){
+  if(!Array.isArray(sections)||sections.length<2||sections.length>32)throw Error('LOFT requiere entre 2 y 32 perfiles');
+  const list=sections.map(s=>{if(!Number.isFinite(s.z))throw Error('Elevación inválida');return {z:s.z,p:convex(s.p)}}).sort((a,b)=>a.z-b.z);
+  const n=list[0].p.length;
+  for(let k=1;k<list.length;k++){
+   const a=list[k-1],b=list[k];if(b.z-a.z<eps||b.p.length!==n)throw Error('Perfiles a distintas alturas y con igual cantidad de vértices');
+   let best=Infinity,shift=0;for(let j=0;j<n;j++){let d=0;for(let i=0;i<n;i++)d+=(a.p[i][0]-b.p[(i+j)%n][0])**2+(a.p[i][1]-b.p[(i+j)%n][1])**2;if(d<best){best=d;shift=j}}
+   b.p=b.p.slice(shift).concat(b.p.slice(0,shift));
+   // Each orientation predicate is quadratic in the interpolation parameter.
+   // Check the endpoints and its interior minimum, not just sampled sections.
+   for(let i=0;i<n;i++)for(let j=0;j<n;j++){if(j===i||j===(i+1)%n)continue;const c=t=>{const p=v=>a.p[v].map((x,h)=>x+(b.p[v][h]-x)*t);return cross2(p(i),p((i+1)%n),p(j))};const f0=c(0),f1=c(1),fm=c(.5),A=2*(f0+f1-2*fm),B=f1-f0-A;if(A>0){const t=-B/(2*A);if(t>0&&t<1&&c(t)<=eps)throw Error('Correspondencia de perfiles produce un cruce');}}
+   // Restrict twisted side quads: triangulated faces otherwise change the intended loft.
+   for(let i=0;i<n;i++){const j=(i+1)%n,u=a.p[j].map((v,h)=>v-a.p[i][h]),v=b.p[j].map((x,h)=>x-b.p[i][h]);if(Math.abs(u[0]*v[1]-u[1]*v[0])>1e-7*Math.hypot(...u)*Math.hypot(...v)||u[0]*v[0]+u[1]*v[1]<=0)throw Error('LOFT inicial requiere lados correspondientes paralelos');}
+  }
+  return mesh(list.map(s=>s.p.map(v=>[v[0],v[1],s.z])));
+ }
+ function sweep(profile,path){
+  const p=convex(profile);
+  if(!Array.isArray(path)||path.length!==2||path.some(v=>!Array.isArray(v)||v.length!==3||!v.every(Number.isFinite)))throw Error('SWEEP inicial requiere una trayectoria recta de dos puntos');
+  const a=path[0],b=path[1],dx=b[0]-a[0],dy=b[1]-a[1],dz=b[2]-a[2],len=Math.hypot(dx,dy,dz);
+  if(len<eps||Math.abs(dz)>eps)throw Error('Trayectoria horizontal no nula requerida');
+  const nx=-dy/len,ny=dx/len;
+  return mesh(path.map(o=>p.map(v=>[o[0]+nx*v[0],o[1]+ny*v[0],o[2]+v[1]])));
+ }
+ return {loft,sweep};
+}
+root.CAD3DSolidOps={boolean,revolve,volume,...advancedSolidOps()};
 })(globalThis);
