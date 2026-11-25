@@ -547,6 +547,15 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 
 /* Compact object properties palette, independent of workspace colors. */
 .cad-quick-properties[hidden]{display:none!important}
+#cadQuickProperties.panel{bottom:auto;right:auto;z-index:auto;width:auto;max-width:none;max-height:none;overflow:hidden;padding:0;box-shadow:none;border-radius:8px;font:inherit}
+#cadQuickProperties.panel.floating{width:300px;max-height:85vh;box-shadow:0 15px 45px #0009}
+#cadQuickProperties .panel-title{display:flex;align-items:center;justify-content:space-between}
+#cadQuickProperties .panel-content{padding:9px;min-width:0;scrollbar-width:thin}
+#cadQuickProperties label{gap:6px}
+#cadQuickProperties label select{min-width:0;max-width:55%;width:55%;font:inherit}
+#cadQuickProperties label input[type=number]{width:48%;min-width:0}
+#cadQuickProperties .cad-quick-geometry output{min-width:0;max-width:48%}
+#cadPropsClose{background:transparent;border:0;color:inherit;cursor:pointer}
 .cad-quick-properties{position:fixed;bottom:38px;right:18px;z-index:1007;width:302px;max-width:calc(100vw - 24px);max-height:76vh;overflow:auto;border:1px solid #658390;border-radius:10px;background:#17242c;color:#e7eef2;box-shadow:0 18px 45px #000b;padding:13px;font:12px Inter,Segoe UI,Arial,sans-serif}
 .cad-quick-properties header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #445763;padding-bottom:10px;margin-bottom:8px}
 .cad-quick-properties header strong{font-size:13px}
@@ -11020,7 +11029,7 @@ function initDockablePalettes(){
  }
  palettes.forEach((panel,index)=>{
   panel.classList.add('cad-palette');
-  panel.dataset.palette=String(index);
+  panel.dataset.palette=panel.id==='cadQuickProperties'?'properties':String(index);
   const title=panel.querySelector('.panel-title');
   title.setAttribute('title','Drag to move palette · use arrows to dock left or right');
   const actions=document.createElement('span');
@@ -11062,11 +11071,11 @@ function initDockablePalettes(){
   title.addEventListener('pointerup',finish);
   title.addEventListener('pointercancel',finish);
   // Restore dock side, without floating across sessions (avoids offscreen palettes).
-  try{const saved=localStorage.getItem('cad2d-palette-'+index);if(saved==='left'||saved==='right')dock(panel,saved)}catch(e){}
+  try{const saved=localStorage.getItem('cad2d-palette-'+panel.dataset.palette);if(saved==='left'||saved==='right')dock(panel,saved)}catch(e){}
  });
  const reset=$('resetWorkspace');
  if(reset)reset.onclick=()=>{
-  palettes.forEach((p,i)=>{dock(p,i<2?'left':'right');p.classList.remove('collapsed');const btn=p.querySelector('[data-palette-act="collapse"]');if(btn)btn.textContent='−';try{localStorage.removeItem('cad2d-palette-'+i)}catch(e){}});
+  palettes.forEach((p,i)=>{dock(p,i<2?'left':'right');p.classList.remove('collapsed');const btn=p.querySelector('[data-palette-act="collapse"]');if(btn)btn.textContent='−';try{localStorage.removeItem('cad2d-palette-'+p.dataset.palette)}catch(e){}});
   resize();toast('Default palette layout restored');
  };
  window.addEventListener('resize',()=>{
@@ -11346,7 +11355,7 @@ function cadApplyQuickGeometry(input){
  }
  updateAll();toast('Geometría actualizada · Ctrl+Z deshace');
 }
-function openCadQuickProperties(){const panel=$('cadQuickProperties');panel.hidden=false;refreshCadQuickProperties();$('cadPropertiesButton').setAttribute('aria-expanded','true');return panel}
+function openCadQuickProperties(){const panel=$('cadQuickProperties');panel.hidden=false;panel.classList.remove('collapsed');const toggle=panel.querySelector('[data-palette-act="collapse"]');if(toggle)toggle.textContent='−';if(!panel.classList.contains('floating')){const side=panel.closest('.sidebar');if(side){cadWsSection(side.classList.contains('rightside')?'right':'left',true);if(getComputedStyle(side).display==='none'){panel.querySelector('[data-palette-act="float"]')?.click()}else panel.scrollIntoView({block:'nearest'})}}refreshCadQuickProperties();$('cadPropertiesButton').setAttribute('aria-expanded','true');return panel}
 function refreshCadQuickProperties(){
  const panel=$('cadQuickProperties');if(!panel)return;
  const selected=state.entities.filter(e=>state.selected.includes(e.id));
@@ -11597,8 +11606,9 @@ function initCadHatchPalette(){
 }
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
- panel.innerHTML='<header><strong>▤ Propiedades / Properties</strong><button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></header><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Layer changes apply immediately without altering color or lineweight. Apply saves other properties. Ctrl+Z undoes.</div>';
- const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false')};
+ panel.innerHTML='<div class="panel-title">PROPIEDADES / PROPERTIES <button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></div><div class="panel-content"><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Layer changes apply immediately without altering color or lineweight. Apply saves other properties. Ctrl+Z undoes.</div></div>';
+ panel.classList.add('panel');document.querySelector('.workspace>.sidebar.rightside')?.append(panel);
+ const close=()=>{panel.hidden=true;button.setAttribute('aria-expanded','false');resize()};
  $('cadPropsClose').onclick=close;
  const geometry=$('cadPropsGeometry');
  geometry.addEventListener('change',ev=>{if(ev.target.matches('[data-cad-geometry]'))cadApplyQuickGeometry(ev.target)});
