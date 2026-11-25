@@ -308,3 +308,16 @@ requestAnimationFrame(requestResize);
 })();
 
 
+
+/* Theme-aware monochrome ink for native architectural symbol thumbnails only. */
+(function cadGalleryContrast(){
+ const style=document.createElement('style');style.id='cadGalleryContrast';
+ style.textContent=`
+ .app.bl-light #blCards button svg {color:#243746!important;filter:none!important}
+ .app.bl-light #blCards button svg [stroke]:not([stroke="none"]) {stroke:#243746!important}
+ .app.bl-light #blCards button svg [fill]:not([fill="none"]):not([fill="transparent"]) {fill:#243746!important}
+ .app.bl-light #blCards button > span {color:#35495a!important}
+ .app.bl-light #blCards button img {filter:brightness(0) opacity(.85)!important}
+ `;
+ document.head.appendChild(style);
+})();
