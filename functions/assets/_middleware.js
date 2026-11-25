@@ -8,6 +8,25 @@ export async function onRequest(context) {
  const bucket=env.ARCHITECTURE_LIBRARY;
  const fallback=async()=>{const res=await next();if(!res.ok)return res;const headers=new Headers(res.headers);headers.set('X-CAD-Library-Storage','pages');return new Response(res.body,{status:res.status,headers});};
  if(!bucket)return fallback();
+ // Discover new image pairs even if a contributor has not rebuilt the manifest.
+ // Original and thumbnail must both exist before a new card becomes visible.
+ if(key==='assets/architecture-references/user-house-plans.json'){
+  try{
+   const prefix='assets/architecture-references/',existing=await bucket.get(key);
+   let manifest=[];if(existing){const rows=await existing.json();if(Array.isArray(rows))manifest=rows}
+   else {const response=await next();if(response.ok){try{const rows=await response.json();if(Array.isArray(rows))manifest=rows}catch(e){}}}
+   const byPath=new Map(manifest.filter(x=>x&&typeof x.original==='string').map(x=>[x.original,x]));
+   const keys=new Set();let cursor;
+   do{const page=await bucket.list({prefix:prefix+'house/',limit:1000,...(cursor?{cursor}:{})});for(const item of page.objects)keys.add(item.key.slice(prefix.length));cursor=page.truncated?page.cursor:null;}while(cursor);
+   for(const original of keys){
+    const m=original.match(/^house\/(\d+)\/(user-[\w-]+)\.(png|jpe?g)$/i);if(!m||/-thumb$/i.test(m[2])||byPath.has(original))continue;
+    const [,area,id]=m,base='house/'+area+'/'+id;const thumb=[base+'-thumb.jpg',base+'-thumb.png',base+'-thumb.webp'].find(p=>keys.has(p));if(!thumb)continue;
+    byPath.set(original,{id,title:id.replace(/^user-(?:\d{8}-)?/,'').replace(/-/g,' '),category:'house',area:Number(area),areaType:'approximate_category',license:'User supplied',original,thumb});
+   }
+   const rows=[...byPath.values()];return new Response(request.method==='HEAD'?null:JSON.stringify(rows),{headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-CAD-Library-Storage':'r2','X-Content-Type-Options':'nosniff'}});
+  }catch(e){return fallback()}
+ }
+
  let object;
  try{object=request.method==='HEAD'?await bucket.head(key):await bucket.get(key);}catch(e){return fallback();}
  if(!object)return fallback();
