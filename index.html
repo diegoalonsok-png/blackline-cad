@@ -1829,6 +1829,43 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    const name=resolveBlock(b);if(!state.blocks[name])throw Error('Missing block: '+b.catalogId);
    state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:point(...b.point),scale:1,rotation:b.rotation,layer:layer(b.layer),arqBatch:batch,arqRole:b.role});
   }
+  // Permanent native dimensions for individual architectural rooms; separate
+  // layers permit independent visibility and do not change model geometry.
+  const rooms=(plan.rooms||[]).filter(room=>['bathroom','bath','kitchen','bedroom'].includes(room.kind));
+  if(rooms.length===1&&(plan.rooms||[]).length===1){
+   const [x,y,w,d]=rooms[0].clearBounds||[];
+   if([x,y,w,d].every(Number.isFinite)&&w>0&&d>0){
+    const walls=plan.walls;
+    let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+    for(const wall of walls){
+     const [ax,ay]=wall.a,[bx,by]=wall.b,L=Math.hypot(bx-ax,by-ay);
+     if(!(L>0))continue;
+     const px=Math.abs(by-ay)/L*wall.thickness/2,py=Math.abs(bx-ax)/L*wall.thickness/2;
+     x0=Math.min(x0,ax-px,bx-px);x1=Math.max(x1,ax+px,bx+px);
+     y0=Math.min(y0,ay-py,by-py);y1=Math.max(y1,ay+py,by+py);
+    }
+    const dimLayer=name=>{
+     let l=state.layers.find(v=>v.name.toUpperCase()===name);
+     if(!l){const id='arq-'+name.toLowerCase();if(state.layers.some(v=>v.id===id))throw Error('Dimension layer ID collision');l={id,name,color:'#ffffff',visible:true,locked:false,width:.13,linetype:'CONTINUOUS'};state.layers.push(l);}
+     return l.id;
+    };
+    const inner=dimLayer('COTAS-INTERIORES'),outer=dimLayer('COTAS-EXTERIORES');
+    const style={...readDimensionStyle(),precision:2,textHeight:.10*k,arrow:.055*k,suffix:'',displayUnit:'m',tolerance:0,arrowType:'tick',extOffset:.025*k,extBeyond:.035*k,color:''};
+    const dim=(a,b,p,mode,layerId)=>{
+     const e={id:state.nextId++,type:'dimension',a:point(...a),b:point(...b),p:point(...p),mode,layer:layerId,style:{...style},width:.13,arqBatch:batch};
+     // Match actual wall vertices where possible; the batch is regenerated on room resize.
+     if(!state.layers.find(l=>l.id===layerId)?.locked)cadAssociateDim(e);
+     state.entities.push(e);
+    };
+    const inset=Math.min(.24,w*.17,d*.17);
+    dim([x,y+d],[x+w,y+d],[x,y+d-inset],'horizontal',inner);
+    dim([x,y],[x,y+d],[x+inset,y],'vertical',inner);
+    if([x0,y0,x1,y1].every(Number.isFinite)&&x1>x0&&y1>y0){
+     dim([x0,y1],[x1,y1],[x0,y1+.32],'horizontal',outer);
+     dim([x0,y0],[x0,y1],[x0-.32,y0],'vertical',outer);
+    }
+   }
+  }
   const generated=state.entities;
   for(const e of generated)e.arqBatch=batch;
   if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[],sourcePlan:plan.rooms?.length===1&&plan.walls.length===4?clone(plan):null,origin:clone(origin),unit:state.unit,signature:signature(generated)};
@@ -12126,7 +12163,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261125-gallery-contrast-v3"></script>
+<script src="blackline-modern.js?v=20261125-dark-default-v4"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
