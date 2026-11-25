@@ -6757,9 +6757,10 @@ function cad3dMaterialMarkup(){
  '<label>Rugosidad <input type="range" data-mat-roughness min="5" max="100" step="5" value="85"><output data-mat-roughness-value>85%</output></label>'+
  '<small>El tinte se mezcla con la textura sin reemplazarla. El relieve es visual (bump mapping), no altera muros ni medidas.</small>'+
  '<div class="cad3dMaterialActions"><button type="button" data-mat-create>＋ Crear material</button>'+
- '<button type="button" class="cad3dMatSave" data-mat-save>Actualizar material existente</button>'+
+ '<button type="button" class="cad3dMatSave" data-mat-save>Guardar material</button>'+
  '<output data-mat-editor-status role="status"></output></div>'+
  '</div></details>'+
+ '<output class="cad3dMaterialStatus" role="status"></output>'+
  '<div class="cad3dMaterialsGrid"></div>'+
  '<div class="cad3dMaterialsControls"><button class="btn" type="button" data-mat-upload>＋ Importar JPG / PNG</button>'+
  '<input data-mat-input type="file" hidden accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">'+
@@ -6770,7 +6771,7 @@ function cad3dMaterialMarkup(){
  '<div class="cad3dMaterialsControls"><label><input data-mat-repeat type="checkbox" checked> Repetir JPG</label>'+
  '<button class="btn" type="button" data-mat-clear>Quitar textura de cara</button></div>'+
  '<small>Seleccioná un material y hacé clic en una cara del muro. Con Repetir, el JPG se escala según ancho y alto en metros; sin Repetir se ajusta a toda la cara. Cambiá escala y giro para actualizar la última cara pintada.</small>'+
- '<output class="cad3dMaterialStatus" role="status"></output></aside>';
+ '</aside>';
 }
 function cad3dHasMaterial(id){
  return CAD3D_MATERIALS.some(function(v){return v[0]===id;})||Object.prototype.hasOwnProperty.call(cad3dCustomMaterials,id);
@@ -6953,7 +6954,7 @@ function cad3dMaterialRender(){
  var all=CAD3D_MATERIALS.concat(Object.keys(cad3dCustomMaterials).map(function(id){return [id,cad3dCustomMaterials[id].name,'Propios'];}));
  all=all.filter(function(m){return cad3dMaterialCategory==='Todos'||m[2]===cad3dMaterialCategory;});
  panel.querySelector('[data-mat-category]').value=cad3dMaterialCategory;
- panel.querySelector('[data-mat-save]').hidden=!cad3dCustomMaterials[cad3dMaterialId];
+ panel.querySelector('[data-mat-save]').textContent=cad3dCustomMaterials[cad3dMaterialId]?'Guardar cambios':'Guardar como material propio';
  panel.querySelector('.cad3dMaterialsGrid').innerHTML=all.map(function(m){
   return '<button type="button" class="cad3dMaterialCard" aria-pressed="'+(m[0]===cad3dMaterialId)+'" data-mat-id="'+escapeHtml(m[0])+'"><canvas width="150" height="60" data-mat-preview="'+escapeHtml(m[0])+'"></canvas>'+escapeHtml(m[1])+'</button>';
  }).join('');
@@ -7085,6 +7086,45 @@ function cad3dSetupMaterialColor(panel){
  // Commit a valid open color draft before creating/updating a material.
  panel.addEventListener('click',function(e){if(!picker.hidden&&e.target.closest('[data-mat-create],[data-mat-save]')){if(!apply(false)){e.preventDefault();e.stopPropagation();}}},true);
 }
+function cad3dCommitMaterial(p,update){
+ var field=p.querySelector('[data-mat-newname]'),name=field.value.trim().slice(0,70);
+ var custom=update?cad3dCustomMaterials[cad3dMaterialId]:null;
+ var brush={tint:p.querySelector('[data-mat-color]').value,mix:clamp(finite(p.querySelector('[data-mat-mix]').value,0),0,100),
+  bump:clamp(finite(p.querySelector('[data-mat-bump]').value,1),0,8),roughness:clamp(finite(p.querySelector('[data-mat-roughness]').value,85),5,100),
+  bumpMode:cad3dBumpMode(p.querySelector('[data-mat-bump-mode]').value)};
+ try{
+  var id=cad3dMaterialId;
+  if(custom){
+   Object.assign(custom,brush);if(name)custom.name=name;name=custom.name;
+  }else{
+   if(Object.keys(cad3dCustomMaterials).length>=24){cad3dMaterialMsg('Límite de 24 materiales propios por archivo');return false;}
+   var source=cad3dMaterialCanvas(cad3dMaterialId);
+   if(!source||!source.width||!source.height){cad3dMaterialMsg('La textura todavía no está lista. Seleccioná un material base y volvé a intentar.');return false;}
+   var out=document.createElement('canvas'),ratio=Math.min(1,768/Math.max(source.width,source.height));
+   out.width=Math.max(1,Math.round(source.width*ratio));out.height=Math.max(1,Math.round(source.height*ratio));
+   out.getContext('2d').drawImage(source,0,0,out.width,out.height);
+   var image=out.toDataURL('image/jpeg',.8);
+   if(!image.startsWith('data:image/'))throw new Error('No se pudo generar la textura');
+   do{id='user-'+(++cad3dMaterialCounter);}while(cad3dCustomMaterials[id]);
+   name=name||'Material '+cad3dMaterialCounter;
+   cad3dCustomMaterials[id]=Object.assign({name:name,image:image},brush);
+   cad3dTextureCanvases[id]=out;
+  }
+  Object.assign(cad3dMaterialBrush,brush);
+  cad3dMaterialId=id;cad3dMaterialCategory='Propios';field.value='';
+  cad3dMaterialRender();cad3dHistoryCapture();
+  p.querySelector('.cad3dMaterialEditor').open=false;
+  cad3dMaterialMsg('Material «'+name+'» '+(custom?'actualizado':'creado')+' · disponible en Materiales creados');
+  var card=p.querySelector('[data-mat-id="'+id+'"]');
+  if(card)card.scrollIntoView({block:'nearest',inline:'nearest'});
+  cad3dMaterialPaint=true;cad3dEndZoom();
+  if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
+  cad3dMaterialRender();
+  return true;
+ }catch(error){
+  console.error('CAD3D material save',error);cad3dMaterialMsg('Error al guardar el material: '+String(error.message||error));return false;
+ }
+}
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
  if(!p)return;
@@ -7131,34 +7171,8 @@ function cad3dMaterialSetup(){
   cad3dNavigationTool='select';cad3dSyncCompactBars();
   cad3dMaterialRender();cad3dMaterialMsg('Pincel listo: clic sobre muro, piso o losa para aplicar '+button.textContent.trim());
  });
- p.querySelector('[data-mat-create]').addEventListener('click',function(){
-  var name=p.querySelector('[data-mat-newname]').value.trim().slice(0,70)||'Material '+(cad3dMaterialCounter+1);
-  if(Object.keys(cad3dCustomMaterials).length>=24)return cad3dMaterialMsg('Límite de 24 materiales propios por archivo');
-  var source=cad3dMaterialCanvas(cad3dMaterialId);
-  if(!source)return cad3dMaterialMsg('La imagen del material aún no está lista');
-  var out=document.createElement('canvas'),ratio=Math.min(1,768/Math.max(source.width,source.height));
-  out.width=Math.max(1,Math.round(source.width*ratio));out.height=Math.max(1,Math.round(source.height*ratio));
-  out.getContext('2d').drawImage(source,0,0,out.width,out.height);
-  var id='user-'+(++cad3dMaterialCounter);
-  cad3dCustomMaterials[id]={name:name,image:out.toDataURL('image/jpeg',.8),
-   tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
-   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode};
-  cad3dTextureCanvases[id]=out;
-  cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;cad3dEndZoom();
-  if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
-  p.querySelector('[data-mat-newname]').value='';
-  p.querySelector('.cad3dMaterialEditor').open=false;
-  cad3dMaterialRender();cad3dHistoryCapture();
-  cad3dMaterialMsg('Material «'+name+'» creado · clic sobre un muro o piso para pegar');
-  p.querySelector('[data-mat-id="'+id+'"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
- });
- p.querySelector('[data-mat-save]').addEventListener('click',function(){
-  var custom=cad3dCustomMaterials[cad3dMaterialId];
-  if(!custom)return cad3dMaterialMsg('Para guardar propiedades, primero creá un material propio');
-  Object.assign(custom,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
-   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode});
-  cad3dMaterialRender();cad3dHistoryCapture();cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
- });
+ p.querySelector('[data-mat-create]').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();cad3dCommitMaterial(p,false);});
+ p.querySelector('[data-mat-save]').addEventListener('click',function(e){e.preventDefault();e.stopPropagation();cad3dCommitMaterial(p,true);});
  p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness],[data-mat-bump-mode]').forEach(function(el){
   el.addEventListener('change',function(){
    cad3dMaterialBrush.tint=p.querySelector('[data-mat-color]').value;
