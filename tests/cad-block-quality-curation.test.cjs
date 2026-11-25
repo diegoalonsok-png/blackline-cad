@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const sources=[
  'assets/cad2d-arq-generators.js',
  'assets/cad2d-doc-blocks.js',
- 'assets/cad2d-dk-blocks.js',
+ 'cad-dk-demand.js','assets/cad2d-dk-blocks.js',
  'assets/cad2d-modern-pro-blocks.js',
  'assets/cad2d-olympiadas-pro.js',
  'assets/cad2d-olimpiadas-banos-20261123.js',
