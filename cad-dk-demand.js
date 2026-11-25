@@ -40,10 +40,17 @@
   if(ready.has(id))return ready.get(id);
   if(pending.has(id))return pending.get(id);
   const job=(async()=>{
-   const res=await fetch('assets/blackline-dk-demand-v1/'+m.file,{cache:'no-store'});
-   if(!res.ok)throw Error('No se pudo descargar '+m.name);
-   const gen=makeGenerator(validate(await res.json(),m));
-   ready.set(id,gen);return gen;
+   const controller=new AbortController();
+   const timeout=setTimeout(()=>controller.abort(),20000);
+   try{
+    const res=await fetch('assets/blackline-dk-demand-v1/'+m.file,{cache:'no-store',signal:controller.signal});
+    if(!res.ok)throw Error('No se pudo descargar '+m.name);
+    const gen=makeGenerator(validate(await res.json(),m));
+    ready.set(id,gen);return gen;
+   }catch(e){
+    if(controller.signal.aborted)throw Error('Tiempo de descarga agotado: '+m.name+'. Volvé a intentar.');
+    throw e;
+   }finally{clearTimeout(timeout)}
   })();
   pending.set(id,job);try{return await job}finally{pending.delete(id)}
  }
