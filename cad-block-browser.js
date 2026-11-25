@@ -163,6 +163,10 @@
 #cadBlockBrowser .web-links{display:none}
 #cadBlockBrowser.web-reference .web-links{display:flex;gap:4px;flex-wrap:wrap;padding:5px 9px;background:#ede2cc}
 #cadBlockBrowser.web-reference .tools{padding:6px 9px}
+#cadBlockBrowser.house-gallery .web-links{display:none}
+#cadBlockBrowser.house-gallery .area-links button[aria-pressed=true]{background:#85683e;color:#fff}
+#cadBlockBrowser.house-gallery .grid{grid-template-rows:repeat(2,minmax(120px,1fr));overflow:auto}
+#cadBlockBrowser.house-gallery .web-card img{min-height:70px;object-fit:contain}
 #cadBlockBrowser.compact-search .rz.se{display:block;touch-action:none;z-index:10}
 #cadBlockBrowser.web-reference .web-card img{height:0;flex:1 1 70px;min-height:48px;max-height:none}
 #cadBlockBrowser.web-reference .area-links{display:flex;flex-wrap:wrap;gap:4px;padding:4px 9px;background:#ede2cc}
@@ -342,7 +346,7 @@
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
-  el.classList.remove('web-reference');el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
+  el.classList.remove('web-reference','house-gallery');el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
   el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+allItems.filter(it=>/^userdx4-/.test(it.id)).length;});
@@ -381,7 +385,7 @@
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar ZIP completos, DWG, DXF o paquete JSON local">${T("Import ZIP / DWG / DXF","Importar ZIP / DWG / DXF")}</button></div>
-<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links">${[45,60,90,120,200].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
+<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="google">Google</button><button data-web="pinterest">Pinterest</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links"><button data-web="all-houses">${T('All','Todas')}</button>${[30,45,60,75,90,100,120,150,180,200,250].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
@@ -442,7 +446,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();loadOlimpiadas();q.focus();
  }
- function close(){webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -456,8 +460,8 @@
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
  let commandGallery=false,searchPage=0,compactRect=null;
- let webMode=false,webItems=[],webStatus='',webEpoch=0,webController=null,webArea=null;
- function openSearch(term){webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ let houseMode=false,webMode=false,webItems=[],webStatus='',webEpoch=0,webController=null,webArea=null;
+ function openSearch(term){houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
  function safeHttps(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password?u.href:null}catch(e){return null}}
  function cleanMeta(value){return String(value||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,500)}
@@ -488,6 +492,7 @@
   return rows.filter(x=>x.license==='CC0'&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>({title:x.title,area:x.area??null,thumb:file(x.thumb),url:file(x.image),cadUrl:file(x.original),source:safeHttps(x.source),license:x.license+' · '+(x.author||'')})).filter(x=>x.thumb&&x.url&&x.source);
  }
  async function searchWeb(raw){
+  if(houseMode)return searchHouseGallery(raw);
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
@@ -512,8 +517,8 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.querySelector('.hd b').textContent='ARQASSIST · '+T('WEB REFERENCES','REFERENCIAS WEB');
-  const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(houseMode?T('HOUSE PLANS','PLANTAS DE VIVIENDAS'):T('WEB REFERENCES','REFERENCIAS WEB'));
+  el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/4)-1));
   for(const [offset,item] of webItems.slice(searchPage*4,searchPage*4+4).entries()){
    const card=document.createElement('div');card.className='web-card';
@@ -536,6 +541,7 @@
  }
  async function handleWebAction(button){
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
+  if(a==='all-houses'){const raw='Casas';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';el.querySelector('input[type=search]').value=raw;return searchWeb(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
@@ -547,12 +553,30 @@
   const url=item?.url||(a==='url'?prompt('URL directa de archivo autorizado / Direct file URL'):null);if(!url)return;
   button.disabled=true;try{await importWebUrl(url)}catch(e){CORE.toast(e.message+' · Descargá el archivo desde su fuente e importalo con Archivo.');}finally{button.disabled=false}
  }
- function openWeb(term){webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:370,h:420};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
+ async function searchHouseGallery(raw){
+  webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
+  try{
+   const query=webArea?'Casas de '+webArea+' m²':'Casas';
+   const [own,archive]=await Promise.all([localHousePreviews(query),archivedReferences(query).catch(()=>[])]);
+   if(epoch!==webEpoch||!houseMode)return;
+   webItems=own.concat(archive).filter(x=>!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5).sort((a,b)=>(a.area??Infinity)-(b.area??Infinity));
+   webStatus=webItems.length?'':T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
+   paintWeb();
+  }catch(e){if(epoch===webEpoch&&houseMode){webStatus=T('House library unavailable. Retry.','Biblioteca no disponible. Volvé a buscar.');paintWeb();}}
+ }
+ function openHouses(term='Casas'){
+  webController?.abort();houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
+  const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
+  compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:460,h:560};open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
+ }
+ function openWeb(term){houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:370,h:420};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
+
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}
+  for(const k of ['HOUSEGALLERY','GALERIACASAS','VIVIENDAS'])EXT.commands[k]=()=>openHouses();
   for(const k of ['BLOCKBROWSER','BB','GALERIA','GALLERY','EXPLORADORBLOQUES'])EXT.commands[k]=open;
   for(const k of ['GALERIAVISUAL','BLOQUESVISUALES','VISUALGALLERY','GV'])EXT.commands[k]=openVisual;
   for(const k of ['VISTASRECUPERADAS','VISTASBLOQUES'])EXT.commands[k]=openRecovered;
