@@ -1053,6 +1053,18 @@ async function openArqPlanCatalogue(category,query=''){
 
 /* Free-text architecture bar is separate from the CAD command interpreter. */
 
+// Route object names to the existing lazy-loading block browser.
+function arqObjectSearch(raw){
+ const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/,'').replace(/^(?:un|una|el|la|a|an|the)\s+/,'').trim();
+ const groups=[['inodoro',/^(?:inodoros?|wc|toilets?|retretes?)$/],['arbol',/^(?:arbol(?:es)?|trees?)$/],['auto',/^(?:autos?|automovil(?:es)?|coches?|cars?|vehiculos?)$/],['bidet',/^(?:bidets?|bides?)$/],['lavatorio',/^(?:lavatorios?|lavabos?|bachas?|sinks?)$/],['ducha',/^(?:duchas?|showers?)$/],['banera',/^(?:baneras?|banaderas?|bathtubs?)$/],['puerta',/^(?:puertas?|doors?)$/],['ventana',/^(?:ventanas?|windows?)$/],['cama',/^(?:camas?|beds?)$/],['mesa',/^(?:mesas?|tables?)$/],['silla',/^(?:sillas?|chairs?)$/],['sofa',/^(?:sofas?|sillones?|couches?)$/],['heladera',/^(?:heladeras?|frigorificos?|refrigerators?|fridges?)$/],['persona',/^(?:personas?|people|person)$/],['palmera',/^(?:palmeras?|palm trees?)$/],['camion',/^(?:camion(?:es)?|trucks?)$/],['bicicleta',/^(?:bicicletas?|bicycles?)$/],['moto',/^(?:motos?|motocicletas?|motorcycles?)$/]];
+ for(const [term,re] of groups)if(re.test(q))return term;
+ return /^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/i.test(raw.trim())&&q.length>=2&&q.length<=60&&!/\d/.test(q)?q:null;
+}
+function arqOpenObjectSearch(term){
+ const browser=window.CAD2D_BLOCK_BROWSER;
+ if(!browser?.openSearch){CORE.toast('Explorador de bloques no disponible / Block browser unavailable');return;}
+ EXT.cancelArchitectureCommand();browser.openSearch(term);
+}
 function openArchitectureBar(focus=true){
  let bar=document.getElementById('cadArqInstructionBar');
  if(!bar){
@@ -1079,8 +1091,8 @@ function openArchitectureBar(focus=true){
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
-  const updateCatalogue=()=>{const category=arqCatalogueCategory(input.value);catalogue.hidden=!category;catalogue.style.display=category?'':'none';if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
-  catalogue.onclick=()=>{const cat=arqCatalogueCategory(input.value);if(!cat)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
+  const updateCatalogue=()=>{const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
+  catalogue.onclick=()=>{const cat=arqCatalogueCategory(input.value);const object=!cat&&arqObjectSearch(input.value);if(!cat&&!object)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(object){arqOpenObjectSearch(object);return;}EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
 
   const KEY='cad2d-arqbar-pos';
   const place=(x,y)=>{const w=host.clientWidth,h=host.clientHeight;x=Math.max(4,Math.min(w-bar.offsetWidth-4,x));y=Math.max(4,Math.min(h-bar.offsetHeight-4,y));bar.style.left=x+'px';bar.style.top=y+'px'};
@@ -1099,6 +1111,7 @@ function openArchitectureBar(focus=true){
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw)){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
    const category=arqCatalogueCategory(raw);if(category){EXT.cancelArchitectureCommand();openArqPlanCatalogue(category,raw);return;}
+   const object=arqObjectSearch(raw);if(object){arqOpenObjectSearch(object);return;}
    run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
   };
   input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
