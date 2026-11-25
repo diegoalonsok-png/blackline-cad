@@ -3008,7 +3008,7 @@ let cadDrawEpoch=0;const cadChildCache=new WeakMap();
 const cadDefSigCache=new WeakMap();
 function cadDefSig(def){
  if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
- let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.arq,state.unit])}catch(e){sig=String(Math.random())}
+ let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.preserveLayers,def.arq,state.unit])}catch(e){sig=String(Math.random())}
  cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
 }
 function cadBlockChildrenCached(ref){
@@ -3023,7 +3023,7 @@ function blockChildren(ref){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':ref.xref&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef)return [e];
   if(e.attdef.invisible)return [];
@@ -5191,7 +5191,7 @@ function explodeSelected(){
  for(const e of supported){
   // Explicit EXPLODE converts a reference to editable primitives. Normal insertion remains grouped.
   if(e.type==='blockRef'){
-   for(const part of blockChildren(e))added.push({...part,layer:e.layer});
+   for(const part of blockChildren(e))added.push({...part,layer:state.blocks?.[e.blockName]?.preserveLayers?part.layer:e.layer});
    continue;
   }
   const corners=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;
@@ -10904,22 +10904,45 @@ function initBlocks(){
  if(upgraded)queueLocalBackup();
  renderBlockLibrary();
  $('createBlockBtn').onclick=()=>{
-  const selected=state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked);
-  if(!selected.length)return toast('Select drawable objects before creating a block');
-  if(selected.some(e=>e.type==='blockRef'))return toast('Para crear un bloque nuevo seleccioná geometría base, no referencias de otros bloques');
-  const name=window.prompt('Block name:', 'BLOCK_'+(Object.keys(state.blocks).length+1));
+  const es=cad2dAliasLanguage==='es';
+  if(cadBlockEdit)return toast(es?'Cerrá el editor de bloques antes de crear otro':'Close the block editor before creating another block');
+  const ids=new Set(state.selected);
+  const selected=state.entities.filter(e=>ids.has(e.id)&&layerFor(e).visible&&!layerFor(e).locked&&!e.cadHidden);
+  if(!selected.length)return toast(es?'Seleccioná objetos antes de crear el bloque':'Select drawable objects before creating a block');
+  if(selected.some(e=>e.type==='blockRef'))return toast(es?'Seleccioná geometría base, no referencias de otros bloques':'Select base geometry, not other block references');
+  const name=window.prompt(es?'Nombre del bloque:':'Block name:', 'BLOCK_'+(Object.keys(state.blocks).length+1));
   if(!name?.trim())return;
   const key=name.trim().slice(0,100);
-  if(!/^[\w .\-]+$/.test(key))return toast('Block name: letters, digits, spaces, - and _');
-  if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast('No se puede reemplazar una definición que está en uso. Creá un bloque con otro nombre.');
-  if(state.blocks[key]&&!window.confirm('Replace block '+key+'?'))return;
-  const bounds=getBounds(selected),origin=P(bounds.minX,bounds.minY);
-  const entries=normalizeBlockEntities(selected.map(e=>{
-   const item=transformEntity(e,p=>sub(p,origin));delete item.id;return item;
-  }));
-  saveHistory();state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:entries});
-  renderBlockLibrary();$('blockLibrary').value=key;queueLocalBackup();
-  toast('Block created: '+key+' · '+entries.length+' entities');
+  if(!/^[\w .\-]+$/.test(key)||key in Object.prototype)return toast(es?'Nombre de bloque inválido':'Invalid block name');
+  if(state.blocks[key]&&state.entities.some(e=>e.type==='blockRef'&&e.blockName===key))return toast(es?'El bloque está en uso. Elegí otro nombre.':'Block is in use. Choose another name.');
+  if(state.blocks[key]&&!window.confirm(es?'¿Reemplazar bloque '+key+'?':'Replace block '+key+'?'))return;
+  const bounds=getBounds(selected),fallback=P(bounds.minX,bounds.minY);
+  const base=window.prompt(es?'Punto base X,Y (Enter: esquina inferior izquierda):':'Base point X,Y (Enter: lower-left corner):','');
+  if(base===null)return;
+  const origin=base.trim()?parseCoordinate(base.trim()):fallback;
+  if(!origin||!Number.isFinite(origin.x)||!Number.isFinite(origin.y))return toast(es?'Punto base inválido':'Invalid base point');
+  let def;
+  try{
+   const entries=normalizeBlockEntities(selected.map(e=>{
+    const item=transformEntity(e,p=>sub(p,origin));delete item.id;return item;
+   }));
+   def=cadPrepareDynamicBlock({name:key,entities:entries,preserveLayers:true});
+  }catch(err){return toast((es?'No se creó el bloque: ':'Block not created: ')+(err.message||err))}
+  const selectedIds=new Set(selected.map(e=>e.id));
+  const layer=state.layers.find(l=>l.id===state.layerId&&l.visible&&!l.locked&&!l.frozen)?.id||selected[0].layer;
+  const ref={id:state.nextId,type:'blockRef',blockName:key,p:P(origin.x,origin.y),scale:1,rotation:0,layer};
+  if(def.dynamic2d){const b=blDynBounds(def);if(b)ref.dynamic={width:b.width,height:b.height}}
+  // One undo transaction: definition and replacement at the original location.
+  saveHistory();
+  state.blocks[key]=def;state.nextId++;
+  let inserted=false;const entities=[];
+  for(const e of state.entities){
+   if(!selectedIds.has(e.id))entities.push(e);
+   else if(!inserted){entities.push(ref);inserted=true}
+  }
+  state.entities=entities;state.selected=[ref.id];
+  updateAll();$('blockLibrary').value=key;
+  toast((es?'Bloque creado: ':'Block created: ')+key+' · '+def.entities.length+(es?' entidades':' entities'));
  };
  $('insertBlockBtn').onclick=()=>{
   state.galleryRepeatedInsert=false;
