@@ -1533,6 +1533,10 @@ css+=`
 #cad3dLab .cad3dMaterialColorField [data-mat-color-swatch] {display:inline-block;width:26px;height:18px;border:1px solid #8995a0;border-radius:3px;}
 #cad3dLab .cad3dMaterialColorPicker {grid-column:1/-1;min-width:0;display:grid;gap:7px;padding:7px;border:1px solid var(--cad-ui-edge);border-radius:6px;background:var(--cad-ui-base);color:var(--cad-ui-text);}
 #cad3dLab .cad3dMaterialColorPicker[hidden] {display:none!important;}
+#cad3dLab .cad3dMaterialActions {position:sticky;bottom:0;z-index:2;display:grid;gap:5px;padding:6px 0;background:var(--cad-ui-base,#1e3443);}
+#cad3dLab .cad3dMaterialActions [data-mat-create] {width:100%;min-height:36px!important;background:#226b58!important;color:#fff!important;border:1px solid #78b9a6!important;font-weight:700!important;}
+#cad3dLab .cad3dMaterialActions [data-mat-save][hidden] {display:none!important;}
+#cad3dLab .cad3dMaterialActions [data-mat-editor-status] {white-space:normal;width:100%;overflow-wrap:anywhere;}
 #cad3dLab .cad3dMaterialColorPicker [data-mat-color-draft] {height:32px;border:1px solid #8995a0;border-radius:4px;}
 #cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow {display:grid!important;grid-template-columns:14px minmax(0,1fr) 40px;gap:5px;align-items:center;margin:0;}
 #cad3dLab .cad3dMaterialColorPicker .cad3dRgbRow input {width:100%!important;max-width:100%!important;min-width:0!important;}
@@ -6736,7 +6740,7 @@ function cad3dMaterialMarkup(){
  '<option value="Todos">Todos los materiales</option>'+
  [...new Set(CAD3D_MATERIALS.map(function(m){return m[2];}))].map(function(v){return '<option value="'+escapeHtml(v)+'">'+escapeHtml(v)+'</option>';}).join('')+
  '<option value="Propios">Materiales creados</option></select></label>'+
- '<div class="cad3dMaterialsGrid"></div>'+
+ 
  '<details class="cad3dMaterialEditor"><summary>＋ Crear material · Mezclar color y relieve</summary>'+
  '<div class="cad3dMaterialEditorBody">'+
  '<canvas class="cad3dMaterialLivePreview" data-mat-livepreview width="320" height="78" aria-label="Vista previa de color y textura"></canvas>'+
@@ -6746,15 +6750,17 @@ function cad3dMaterialMarkup(){
  '<div class="cad3dMaterialColorPicker" hidden><div data-mat-color-draft></div>'+
  ['R','G','B'].map(function(ch,i){return '<label class="cad3dRgbRow">'+ch+'<input type="range" min="0" max="255" step="1" data-mat-rgb="'+i+'" aria-label="'+ch+'"><output data-mat-rgb-value="'+i+'">255</output></label>';}).join('')+
  '<label>HEX <input type="text" data-mat-hex maxlength="7" aria-label="Color hexadecimal" value="#ffffff"></label>'+
- '<div class="cad3dColorActions"><button type="button" data-mat-color-apply>Aplicar color</button><button type="button" data-mat-color-cancel>Cancelar</button></div></div></div>'+
+ '<div class="cad3dColorActions"><button type="button" data-mat-color-apply>Elegir color y cerrar</button><button type="button" data-mat-color-cancel>Cancelar</button></div></div></div>'+
  '<label>Mezclar color <input type="range" data-mat-mix min="0" max="100" step="5" value="0"><output data-mat-mix-value>0%</output></label>'+
  '<label>Tipo de relieve <select data-mat-bump-mode><option value="auto">Automático</option><option value="fine">Grano fino</option><option value="coarse">Revoque rugoso</option><option value="smooth">Liso</option></select></label>'+
  '<label>Relieve suave <input type="range" data-mat-bump min="0" max="8" step=".5" value="1"><output data-mat-bump-value>1 mm</output></label>'+
  '<label>Rugosidad <input type="range" data-mat-roughness min="5" max="100" step="5" value="85"><output data-mat-roughness-value>85%</output></label>'+
- '<button type="button" data-mat-create>＋ Crear nuevo material a partir del elegido</button>'+ 
- '<button type="button" class="cad3dMatSave" data-mat-save>Guardar propiedades de mi material</button>'+
  '<small>El tinte se mezcla con la textura sin reemplazarla. El relieve es visual (bump mapping), no altera muros ni medidas.</small>'+
+ '<div class="cad3dMaterialActions"><button type="button" data-mat-create>＋ Crear material</button>'+
+ '<button type="button" class="cad3dMatSave" data-mat-save>Actualizar material existente</button>'+
+ '<output data-mat-editor-status role="status"></output></div>'+
  '</div></details>'+
+ '<div class="cad3dMaterialsGrid"></div>'+
  '<div class="cad3dMaterialsControls"><button class="btn" type="button" data-mat-upload>＋ Importar JPG / PNG</button>'+
  '<input data-mat-input type="file" hidden accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">'+
  '<button class="btn" type="button" data-mat-paint>Pintar: OFF</button></div>'+
@@ -6771,6 +6777,7 @@ function cad3dHasMaterial(id){
 }
 function cad3dMaterialMsg(value){
  var el=root?.querySelector('.cad3dMaterialStatus');if(el)el.textContent=value;
+ var editorStatus=root?.querySelector('[data-mat-editor-status]');if(editorStatus)editorStatus.textContent=value;
 }
 function cad3dRevealMaterialDock(panel){
  var side=panel?.closest('.side.sidebar');
@@ -6946,12 +6953,17 @@ function cad3dMaterialRender(){
  var all=CAD3D_MATERIALS.concat(Object.keys(cad3dCustomMaterials).map(function(id){return [id,cad3dCustomMaterials[id].name,'Propios'];}));
  all=all.filter(function(m){return cad3dMaterialCategory==='Todos'||m[2]===cad3dMaterialCategory;});
  panel.querySelector('[data-mat-category]').value=cad3dMaterialCategory;
+ panel.querySelector('[data-mat-save]').hidden=!cad3dCustomMaterials[cad3dMaterialId];
  panel.querySelector('.cad3dMaterialsGrid').innerHTML=all.map(function(m){
   return '<button type="button" class="cad3dMaterialCard" aria-pressed="'+(m[0]===cad3dMaterialId)+'" data-mat-id="'+escapeHtml(m[0])+'"><canvas width="150" height="60" data-mat-preview="'+escapeHtml(m[0])+'"></canvas>'+escapeHtml(m[1])+'</button>';
  }).join('');
  panel.querySelectorAll('[data-mat-preview]').forEach(function(canvas){
   var src=cad3dMaterialCanvas(canvas.dataset.matPreview);
-  if(src)canvas.getContext('2d').drawImage(src,0,0,canvas.width,canvas.height);
+  if(src){
+   var ctx=canvas.getContext('2d'),saved=cad3dCustomMaterials[canvas.dataset.matPreview];
+   ctx.drawImage(src,0,0,canvas.width,canvas.height);
+   if(saved&&saved.mix&&/^#[0-9a-f]{6}$/i.test(saved.tint||'')){ctx.globalAlpha=clamp(finite(saved.mix,0),0,100)/100;ctx.fillStyle=saved.tint;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalAlpha=1;}
+  }
  });
  panel.querySelector('[data-mat-width]').value=cad3dMaterialBrush.scaleX;
  panel.querySelector('[data-mat-height]').value=cad3dMaterialBrush.scaleY;
@@ -7061,15 +7073,17 @@ function cad3dSetupMaterialColor(panel){
  });
  rgb.forEach(function(el){el.addEventListener('input',function(){paintDraft('#'+rgb.map(function(x){return Number(x.value).toString(16).padStart(2,'0');}).join(''));});});
  hex.addEventListener('input',function(){if(/^#?[0-9a-f]{6}$/i.test(hex.value))paintDraft('#'+hex.value.replace(/^#/,''));});
- function apply(){
+ function apply(refocus){
   var color='#'+hex.value.trim().replace(/^#/,'');
   if(!/^#[0-9a-f]{6}$/i.test(color)){cad3dMaterialMsg('Ingresá seis dígitos hexadecimales válidos.');return;}
-  cad3dCloseMaterialColor(panel);value.value=color.toLowerCase();value.dispatchEvent(new Event('change',{bubbles:true}));toggle.focus({preventScroll:true});
+  cad3dCloseMaterialColor(panel);value.value=color.toLowerCase();value.dispatchEvent(new Event('change',{bubbles:true}));if(refocus!==false)toggle.focus({preventScroll:true});return true;
  }
  picker.querySelector('[data-mat-color-apply]').addEventListener('click',apply);
  picker.querySelector('[data-mat-color-cancel]').addEventListener('click',function(){cad3dCloseMaterialColor(panel);toggle.focus({preventScroll:true});});
  hex.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();e.stopPropagation();apply();}});
- root.addEventListener('pointerdown',function(e){if(!picker.hidden&&!e.target.closest('.cad3dMaterialColorField'))cad3dCloseMaterialColor(panel);},true);
+ root.addEventListener('click',function(e){if(!picker.hidden&&!e.target.closest('.cad3dMaterialColorField')&&!e.target.closest('[data-mat-create],[data-mat-save]'))cad3dCloseMaterialColor(panel);});
+ // Commit a valid open color draft before creating/updating a material.
+ panel.addEventListener('click',function(e){if(!picker.hidden&&e.target.closest('[data-mat-create],[data-mat-save]')){if(!apply(false)){e.preventDefault();e.stopPropagation();}}},true);
 }
 function cad3dMaterialSetup(){
  var p=root.querySelector('.cad3dMaterialsPanel');
@@ -7118,8 +7132,7 @@ function cad3dMaterialSetup(){
   cad3dMaterialRender();cad3dMaterialMsg('Pincel listo: clic sobre muro, piso o losa para aplicar '+button.textContent.trim());
  });
  p.querySelector('[data-mat-create]').addEventListener('click',function(){
-  var name=p.querySelector('[data-mat-newname]').value.trim().slice(0,70);
-  if(!name)return cad3dMaterialMsg('Escribí un nombre para el material nuevo');
+  var name=p.querySelector('[data-mat-newname]').value.trim().slice(0,70)||'Material '+(cad3dMaterialCounter+1);
   if(Object.keys(cad3dCustomMaterials).length>=24)return cad3dMaterialMsg('Límite de 24 materiales propios por archivo');
   var source=cad3dMaterialCanvas(cad3dMaterialId);
   if(!source)return cad3dMaterialMsg('La imagen del material aún no está lista');
@@ -7134,15 +7147,17 @@ function cad3dMaterialSetup(){
   cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;cad3dEndZoom();
   if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
   p.querySelector('[data-mat-newname]').value='';
+  p.querySelector('.cad3dMaterialEditor').open=false;
   cad3dMaterialRender();cad3dHistoryCapture();
   cad3dMaterialMsg('Material «'+name+'» creado · clic sobre un muro o piso para pegar');
+  p.querySelector('[data-mat-id="'+id+'"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
  });
  p.querySelector('[data-mat-save]').addEventListener('click',function(){
   var custom=cad3dCustomMaterials[cad3dMaterialId];
   if(!custom)return cad3dMaterialMsg('Para guardar propiedades, primero creá un material propio');
   Object.assign(custom,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
    bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode});
-  cad3dHistoryCapture();cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
+  cad3dMaterialRender();cad3dHistoryCapture();cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
  });
  p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness],[data-mat-bump-mode]').forEach(function(el){
   el.addEventListener('change',function(){
