@@ -26,16 +26,33 @@ jobs:
       R2_BUCKET: ${{ vars.ARCHITECTURE_R2_BUCKET }}
       AWS_DEFAULT_REGION: auto
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.repository.default_branch }}
       - name: Upload assets and verify manifests
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" || -z "$R2_ACCOUNT" || -z "$R2_BUCKET" ]]; then
-            echo "::warning::R2 credentials or bucket variables not configured. Pages assets remain available."
-            exit 0
+          missing=0
+          if [[ -z "$AWS_ACCESS_KEY_ID" ]]; then
+            echo "::error::Missing repository secret ARCHITECTURE_R2_ACCESS_KEY_ID"
+            missing=1
+          fi
+          if [[ -z "$AWS_SECRET_ACCESS_KEY" ]]; then
+            echo "::error::Missing repository secret ARCHITECTURE_R2_SECRET_ACCESS_KEY"
+            missing=1
+          fi
+          if [[ -z "$R2_ACCOUNT" ]]; then
+            echo "::error::Missing repository variable CLOUDFLARE_ACCOUNT_ID"
+            missing=1
+          fi
+          if [[ -z "$R2_BUCKET" ]]; then
+            echo "::error::Missing repository variable ARCHITECTURE_R2_BUCKET"
+            missing=1
+          fi
+          if [[ "$missing" -ne 0 ]]; then
+            echo "R2 sync was not performed. Pages assets remain available."
+            exit 1
           fi
           endpoint="https://${R2_ACCOUNT}.r2.cloudflarestorage.com"
           for dir in assets/arq-catalogue/v1 assets/architecture-references; do
