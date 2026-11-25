@@ -37,9 +37,13 @@ var CAD3D_MATERIALS=[
  ['soil','Tierra','Terreno'],['sand','Arena','Terreno'],['gravel','Grava','Terreno'],
  ['asphalt','Asfalto','Terreno'],['white','Color liso','Colores']
 ];
+var CAD3D_SOLID_COLORS={"white":"#ffffff","color-ivory":"#f3eee3","color-cream":"#e7d8bd","color-sand":"#c8b394","color-beige":"#bba78d","color-taupe":"#92877e","color-gray-light":"#d0d3d4","color-gray":"#90979b","color-graphite":"#474f56","color-black":"#232629","color-terracotta":"#b56b50","color-red":"#a63d40","color-ochre":"#c59847","color-yellow":"#e6cd67","color-olive":"#777d52","color-sage":"#9cae92","color-green":"#355b4a","color-blue-light":"#a2c6dc","color-blue":"#416a9a","color-navy":"#263e60","color-pink":"#d5a5aa","color-violet":"#8c779e","color-brown":"#775542"};
+CAD3D_MATERIALS.push(...[["color-ivory","Marfil","Colores"],["color-cream","Crema","Colores"],["color-sand","Arena","Colores"],["color-beige","Beige","Colores"],["color-taupe","Topo","Colores"],["color-gray-light","Gris claro","Colores"],["color-gray","Gris medio","Colores"],["color-graphite","Grafito","Colores"],["color-black","Negro","Colores"],["color-terracotta","Terracota","Colores"],["color-red","Rojo","Colores"],["color-ochre","Ocre","Colores"],["color-yellow","Amarillo","Colores"],["color-olive","Oliva","Colores"],["color-sage","Verde salvia","Colores"],["color-green","Verde oscuro","Colores"],["color-blue-light","Celeste","Colores"],["color-blue","Azul","Colores"],["color-navy","Azul marino","Colores"],["color-pink","Rosa","Colores"],["color-violet","Violeta","Colores"],["color-brown","Marrón","Colores"]]);
+function cad3dIsSolidColor(id){return Object.prototype.hasOwnProperty.call(CAD3D_SOLID_COLORS,id);}
+function cad3dBumpMode(mode){return ['auto','fine','coarse','smooth'].includes(mode)?mode:'auto';}
 var cad3dCustomMaterials={},cad3dTextureCanvases={},cad3dTextureCache={},cad3dMaterialCounter=0;
 var cad3dMaterialId='brick',cad3dMaterialPaint=false,cad3dLastPaintFace=null;
-var cad3dMaterialBrush={scaleX:1,scaleY:1,rotation:0,repeat:true,tint:'#ffffff',mix:0,bump:1,roughness:85};
+var cad3dMaterialBrush={scaleX:1,scaleY:1,rotation:0,repeat:true,tint:'#ffffff',mix:0,bump:1,roughness:85,bumpMode:'auto'};
 var cad3dMaterialCategory='Todos';
 var saved3DCameras=[],camera3DSequence=1;
 var viewMode='perspective',activeView='perspective',renderStyle='shaded-edges',perspectiveCamera=null,orthographicCamera=null,gridHelper=null,axesHelper=null;
@@ -6708,6 +6712,7 @@ function cad3dMaterialMarkup(){
  '<label>Nombre <input type="text" maxlength="70" data-mat-newname placeholder="Mi material nuevo"></label>'+
  '<label>Color de mezcla <input type="color" data-mat-color value="#ffffff"></label>'+
  '<label>Mezclar color <input type="range" data-mat-mix min="0" max="100" step="5" value="0"><output data-mat-mix-value>0%</output></label>'+
+ '<label>Tipo de relieve <select data-mat-bump-mode><option value="auto">Automático</option><option value="fine">Grano fino</option><option value="coarse">Revoque rugoso</option><option value="smooth">Liso</option></select></label>'+
  '<label>Relieve suave <input type="range" data-mat-bump min="0" max="8" step=".5" value="1"><output data-mat-bump-value>1 mm</output></label>'+
  '<label>Rugosidad <input type="range" data-mat-roughness min="5" max="100" step="5" value="85"><output data-mat-roughness-value>85%</output></label>'+
  '<button type="button" data-mat-create>＋ Crear nuevo material a partir del elegido</button>'+ 
@@ -6760,7 +6765,8 @@ function cad3dMaterialCanvas(id){
   grass:'#628b42','grass-dry':'#ae9c65',soil:'#745a43',
   sand:'#d5bd8c',gravel:'#92908a',asphalt:'#555b5e',white:'#ffffff'
  };
- g.fillStyle=colors[id]||'#cccccc';g.fillRect(0,0,512,512);
+ g.fillStyle=CAD3D_SOLID_COLORS[id]||colors[id]||'#cccccc';g.fillRect(0,0,512,512);
+ if(cad3dIsSolidColor(id)){cad3dTextureCanvases[id]=c;return c;}
  var seed=17;for(var q=0;q<id.length;q++)seed+=id.charCodeAt(q)*(q+1)*491;
  function rand(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
  function speckles(count,scale,bright,dark){
@@ -6871,6 +6877,25 @@ function cad3dGetMaterialTexture(id,repeat,properties){
  tex.anisotropy=Math.min(8,renderer?.capabilities?.getMaxAnisotropy?.()||4);
  tex.needsUpdate=true;cad3dTextureCache[key]=tex;return tex;
 }
+function cad3dGetBumpTexture(id,repeat,mode){
+ mode=cad3dBumpMode(mode);if(mode==='smooth'||!T)return null;
+ if(mode==='auto'&&!cad3dIsSolidColor(id))return cad3dGetMaterialTexture(id,repeat,null);
+ if(mode==='auto')mode='fine';
+ var key='bump/'+mode+'/'+(repeat?'tile':'cover');
+ if(cad3dTextureCache[key])return cad3dTextureCache[key];
+ var c=document.createElement('canvas');c.width=c.height=256;
+ var ctx=c.getContext('2d'),im=ctx.createImageData(256,256),seed=1739;
+ function rnd(){seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;}
+ var n=mode==='coarse'?32:128,grid=Array.from({length:n*n},rnd);
+ for(var y=0;y<256;y++)for(var x=0;x<256;x++){
+  var u=x*n/256,v=y*n/256,ix=Math.floor(u),iy=Math.floor(v),fx=u-ix,fy=v-iy;
+  fx=fx*fx*(3-2*fx);fy=fy*fy*(3-2*fy);
+  var a=grid[iy*n+ix],b=grid[iy*n+(ix+1)%n],d=grid[((iy+1)%n)*n+ix],e=grid[((iy+1)%n)*n+(ix+1)%n];
+  var z=Math.round(128+(a*(1-fx)*(1-fy)+b*fx*(1-fy)+d*(1-fx)*fy+e*fx*fy-.5)*180),p=(y*256+x)*4;
+  im.data[p]=im.data[p+1]=im.data[p+2]=z;im.data[p+3]=255;
+ }
+ ctx.putImageData(im,0,0);var tex=new T.CanvasTexture(c);tex.wrapS=tex.wrapT=repeat?T.RepeatWrapping:T.ClampToEdgeWrapping;tex.needsUpdate=true;cad3dTextureCache[key]=tex;return tex;
+}
 function cad3dMaterialRender(){
  if(!root)return;
  var panel=root.querySelector('.cad3dMaterialsPanel');if(!panel)return;
@@ -6891,6 +6916,7 @@ function cad3dMaterialRender(){
  panel.querySelector('[data-mat-color]').value=cad3dMaterialBrush.tint;
  panel.querySelector('[data-mat-mix]').value=cad3dMaterialBrush.mix;
  panel.querySelector('[data-mat-bump]').value=cad3dMaterialBrush.bump;
+ panel.querySelector('[data-mat-bump-mode]').value=cad3dBumpMode(cad3dMaterialBrush.bumpMode);
  panel.querySelector('[data-mat-roughness]').value=cad3dMaterialBrush.roughness;
  panel.querySelector('[data-mat-mix-value]').textContent=cad3dMaterialBrush.mix+'%';
  panel.querySelector('[data-mat-bump-value]').textContent=cad3dMaterialBrush.bump+' mm';
@@ -6916,7 +6942,7 @@ function cad3dAddWallTextures(record,base,g,cx,cy,cz){
   if(!value||!cad3dHasMaterial(value.id))return;
   var map=cad3dGetMaterialTexture(value.id,value.repeat!==false,value);if(!map)return;
   var relief=clamp(finite(value.bump,1),0,8)/1000; // virtual millimetres
-  var bumpTexture=relief>0?cad3dGetMaterialTexture(value.id,value.repeat!==false,null):null;
+  var bumpTexture=relief>0?cad3dGetBumpTexture(value.id,value.repeat!==false,value.bumpMode):null;
   var xyz=[],uv=[],angle=finite(value.rotation,0)*Math.PI/180;
   var scX=clamp(finite(value.scaleX,1),.05,100),scY=clamp(finite(value.scaleY,1),.05,100);
   for(var n=group.start;n<group.start+group.count;n++){
@@ -7004,10 +7030,11 @@ function cad3dMaterialSetup(){
   cad3dMaterialId=button.dataset.matId;cad3dMaterialPaint=true;cad3dEndZoom();
   root.querySelector('.view')?.classList.remove('cad3dPanning');
   var saved=cad3dCustomMaterials[cad3dMaterialId];
+  if(!saved){cad3dMaterialBrush.tint=CAD3D_SOLID_COLORS[cad3dMaterialId]||'#ffffff';cad3dMaterialBrush.mix=0;cad3dMaterialBrush.bumpMode='auto';cad3dMaterialBrush.bump=1;cad3dMaterialBrush.roughness=85;}
   if(saved){
    cad3dMaterialBrush.tint=/^#[a-f0-9]{6}$/i.test(saved.tint||'')?saved.tint:'#ffffff';
    cad3dMaterialBrush.mix=clamp(finite(saved.mix,0),0,100);
-   cad3dMaterialBrush.bump=clamp(finite(saved.bump,1),0,8);
+   cad3dMaterialBrush.bump=clamp(finite(saved.bump,1),0,8);cad3dMaterialBrush.bumpMode=cad3dBumpMode(saved.bumpMode);
    cad3dMaterialBrush.roughness=clamp(finite(saved.roughness,85),5,100);
   }
   if(placing)setPlacement(null);
@@ -7026,7 +7053,7 @@ function cad3dMaterialSetup(){
   var id='user-'+(++cad3dMaterialCounter);
   cad3dCustomMaterials[id]={name:name,image:out.toDataURL('image/jpeg',.8),
    tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
-   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness};
+   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode};
   cad3dTextureCanvases[id]=out;
   cad3dMaterialId=id;cad3dMaterialCategory='Propios';cad3dMaterialPaint=true;cad3dEndZoom();
   if(placing)setPlacement(null);cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
@@ -7038,20 +7065,21 @@ function cad3dMaterialSetup(){
   var custom=cad3dCustomMaterials[cad3dMaterialId];
   if(!custom)return cad3dMaterialMsg('Para guardar propiedades, primero creá un material propio');
   Object.assign(custom,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
-   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness});
+   bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode});
   cad3dHistoryCapture();cad3dMaterialMsg('Propiedades de «'+custom.name+'» guardadas en el archivo 3D');
  });
- p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness]').forEach(function(el){
+ p.querySelectorAll('[data-mat-color],[data-mat-mix],[data-mat-bump],[data-mat-roughness],[data-mat-bump-mode]').forEach(function(el){
   el.addEventListener('change',function(){
    cad3dMaterialBrush.tint=p.querySelector('[data-mat-color]').value;
-   cad3dMaterialBrush.mix=clamp(finite(p.querySelector('[data-mat-mix]').value,0),0,100);
+   cad3dMaterialBrush.mix=el.hasAttribute('data-mat-color')&&cad3dIsSolidColor(cad3dMaterialId)?100:clamp(finite(p.querySelector('[data-mat-mix]').value,0),0,100);
+   cad3dMaterialBrush.bumpMode=cad3dBumpMode(p.querySelector('[data-mat-bump-mode]').value);
    cad3dMaterialBrush.bump=clamp(finite(p.querySelector('[data-mat-bump]').value,1),0,8);
    cad3dMaterialBrush.roughness=clamp(finite(p.querySelector('[data-mat-roughness]').value,85),5,100);
    var sel=cad3dLastPaintFace,rec=records.find(function(r){return r.id===sel?.id;});
    var face=rec?.faceMaterials?.[sel?.face];
    if(face&&face.id===cad3dMaterialId){
     Object.assign(face,{tint:cad3dMaterialBrush.tint,mix:cad3dMaterialBrush.mix,
-     bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness});
+     bump:cad3dMaterialBrush.bump,roughness:cad3dMaterialBrush.roughness,bumpMode:cad3dMaterialBrush.bumpMode});
     redraw();
     cad3dMaterialMsg('Color, mezcla y relieve actualizados en la cara pintada');
    }
@@ -9554,7 +9582,7 @@ async function readJSON(e){
      name:String(m.name||'Textura JPG').slice(0,70),image:m.image,
      tint:/^#[0-9a-f]{6}$/i.test(m.tint||'')?m.tint:'#ffffff',
      mix:clamp(finite(m.mix,0),0,100),bump:clamp(finite(m.bump,1),0,8),
-     roughness:clamp(finite(m.roughness,85),5,100)
+     roughness:clamp(finite(m.roughness,85),5,100),bumpMode:cad3dBumpMode(m.bumpMode)
     };
     cad3dMaterialCounter=Math.max(cad3dMaterialCounter,Number(id.slice(5))||0);
    });
@@ -9633,7 +9661,7 @@ async function readJSON(e){
       rotation:clamp(finite(mat.rotation,0),-360,360),repeat:mat.repeat!==false,
       tint:/^#[0-9a-f]{6}$/i.test(mat.tint||'')?mat.tint:'#ffffff',
       mix:clamp(finite(mat.mix,0),0,100),bump:clamp(finite(mat.bump,1),0,8),
-      roughness:clamp(finite(mat.roughness,85),5,100)};
+      roughness:clamp(finite(mat.roughness,85),5,100),bumpMode:cad3dBumpMode(mat.bumpMode)};
     });
     o.faceMaterials=paint;
    }
