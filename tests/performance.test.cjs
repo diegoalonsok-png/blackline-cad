@@ -21,3 +21,62 @@ test('10000 sample lines can be culled without mutation',()=>{
  assert.equal(visible,27);assert.deepEqual(entities[0].a,{x:0,y:0});
 });
 test('invalid view is rejected',()=>assert.equal(viewport({scale:0,ox:0,oy:0},100,100),null));
+
+
+test('static frame reuse permits basic drawing previews but not mutable interactions',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const snippet=html.match(/const cadReadOnlyDraftTools=new Set\([^\n]+\);\nfunction cadReadOnlyDraftPreview\(\)\{[^\n]+\}/);
+ assert.ok(snippet,'preview eligibility helper exists');
+ const base={state:{tool:'line',drag:null,selected:[],stage:[{x:1,y:2}],mtextBox:null},cadPrimitiveGripPlacement:null,cadVertexPlacement:null,cadSelectionAnchor:null};
+ const check=(overrides={},globals={})=>vm.runInNewContext(snippet[0]+'\ncadReadOnlyDraftPreview()', {...base,...globals,state:{...base.state,...overrides}});
+ for(const tool of ['line','polyline','rect','circle','arc','ellipse'])assert.equal(check({tool}),true);
+ assert.equal(check({tool:'select',stage:[]}),true);
+ assert.equal(check({tool:'select'}),false);
+ assert.equal(check({tool:'trim'}),false);
+ assert.equal(check({tool:'wall2d'}),false);
+ assert.equal(check({drag:{type:'pan'}}),false);
+ assert.equal(check({selected:[1]}),false);
+ assert.equal(check({}, {cadPrimitiveGripPlacement:{}}),false);
+ assert.equal(check({}, {cadVertexPlacement:{}}),false);
+ assert.equal(check({}, {cadSelectionAnchor:{}}),false);
+ assert.equal(check({mtextBox:{}}),false);
+});
+
+
+test('cached spatial query preserves reverse picking priority and conservative fallback',()=>{
+ const perf=require('../cad-performance.js');
+ const entities=Array.from({length:1000},(_,i)=>({id:i,type:'line',a:{x:i*2,y:0},b:{x:i*2+2,y:0}}));
+ entities.push({id:1000,type:'line',a:{x:20,y:0},b:{x:22,y:0}});
+ entities.push({id:1001,type:'unknown'});
+ const query=perf.spatialIndex(entities,perf.basicBounds);
+ const found=query({minX:19.9,maxX:20.1,minY:-.1,maxY:.1});
+ assert.deepEqual(found.map(e=>e.id),[9,10,1000,1001]);
+ assert.equal(found.filter(e=>e.type==='line').at(-1).id,1000);
+ assert.deepEqual(query(null),entities);
+ assert.equal(entities.length,1002);
+});
+
+
+test('pan viewport index is reused across frames and invalidated by drawing revision',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
+ const perf=require('../cad-performance.js');
+ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+ const start=html.indexOf('function cadPanPaintCandidates(box){');
+ const end=html.indexOf('function cadDrawFrame(){',start);
+ assert.ok(start>=0&&end>start);
+ const entities=Array.from({length:1000},(_,i)=>({id:i,type:'line',a:{x:i*2,y:0},b:{x:i*2+1,y:0}}));
+ let builds=0;
+ const state={entities,drag:{type:'pan'}};
+ const env=vm.createContext({state,cadDrawEpoch:1,window:{BlacklinePerformance:{...perf,spatialIndex:(...args)=>{builds++;return perf.spatialIndex(...args)}}},boundsEntity:()=>null});
+ vm.runInContext(html.slice(start,end),env);
+ const query=env.cadPanPaintCandidates;
+ assert.equal(query({minX:10,maxX:13,minY:-1,maxY:1}).map(e=>e.id).join(','),'5,6');
+ assert.equal(query({minX:20,maxX:23,minY:-1,maxY:1}).map(e=>e.id).join(','),'10,11');
+ assert.equal(builds,1);
+ env.cadDrawEpoch++;
+ query({minX:20,maxX:23,minY:-1,maxY:1});
+ assert.equal(builds,2);
+ state.drag=null;
+ assert.equal(query({minX:20,maxX:23,minY:-1,maxY:1}),entities);
+});
