@@ -1492,6 +1492,22 @@ body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch span {color:#202c35!impor
 body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch svg [stroke="#e9f2f7"] {stroke:#263b49!important}
 body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch svg [fill="#e9f2f7"] {fill:#263b49!important}
 `;
+/* Materials editor stays inside the palette at every width; vertical scrolling only. */
+css+=`
+#cad3dLab .cad3dMaterialsPanel {overflow-x:hidden!important;overflow-y:auto!important;}
+#cad3dLab .cad3dMaterialsPanel :is(.cad3dMaterialEditor,.cad3dMaterialEditorBody,.cad3dMaterialLivePreview,.cad3dMaterialsGrid,.cad3dMaterialCard,.cad3dMaterialCategory,.cad3dMaterialsControls) {min-width:0!important;max-width:100%!important;box-sizing:border-box!important;}
+#cad3dLab .cad3dMaterialEditor {width:100%;overflow-wrap:anywhere;}
+#cad3dLab .cad3dMaterialEditorBody {grid-template-columns:minmax(0,1fr)!important;}
+#cad3dLab .cad3dMaterialEditorBody>* {min-width:0;max-width:100%;}
+#cad3dLab .cad3dMaterialLivePreview {width:100%!important;height:77px!important;object-fit:cover;}
+#cad3dLab .cad3dMaterialEditorBody label {flex-wrap:wrap!important;gap:5px!important;min-width:0;}
+#cad3dLab .cad3dMaterialEditorBody input[type=text] {flex:1 1 90px!important;width:0;min-width:0!important;max-width:100%!important;}
+#cad3dLab .cad3dMaterialEditorBody input[type=range] {flex:1 1 65px!important;width:0;min-width:0!important;max-width:100%!important;}
+#cad3dLab .cad3dMaterialEditorBody output {flex:0 0 auto;width:auto;white-space:nowrap;}
+#cad3dLab .cad3dMaterialEditorBody button {white-space:normal!important;overflow-wrap:anywhere;}
+#cad3dLab .cad3dMaterialsGrid {grid-template-columns:repeat(2,minmax(0,1fr))!important;}
+#cad3dLab .cad3dMaterialCard canvas {min-width:0!important;max-width:100%!important;width:100%!important;}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
