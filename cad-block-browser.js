@@ -508,8 +508,8 @@
  async function archivedReferences(raw){
   const base=new URL('assets/architecture-references/',document.baseURI);
   const read=async name=>{try{const r=await fetch(new URL(name,base),{cache:'no-cache'});if(!r.ok)return [];const rows=await r.json();return Array.isArray(rows)?rows:[]}catch(e){return []}};
-  const [archive,uploads,driveRefs]=await Promise.all([read('index.json'),read('user-house-plans.json'),read('drive-house-references.json')]);
-  const rows=[...new Map(archive.concat(uploads,driveRefs).filter(x=>x&&typeof x.original==='string').map(x=>[x.original,x])).values()];
+  const [archive,uploads,driveRefs,r2Refs]=await Promise.all([read('index.json'),read('user-house-plans.json'),read('drive-house-references.json'),read('r2-house-plans.json')]);
+  const rows=[...new Map(archive.concat(uploads,driveRefs,r2Refs).filter(x=>x&&typeof x.original==='string').map(x=>[x.original,x])).values()];
   const area=parseArea(raw),house=/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw);
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
   return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&x.category==='house'&&/^house\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g)$/i.test(x.original||''))&&(!house||x.category==='house')&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
