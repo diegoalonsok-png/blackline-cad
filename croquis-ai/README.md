@@ -50,3 +50,5 @@ El propietario tiene un cupo propio de 60 retoques por día (separado de los 20 
 - por IP: secreto `CROQUIS_OWNER_IPS` en Cloudflare (una o varias IP separadas por coma). **Nunca escribir IP en este repositorio, que es público.**
 - por clave: si la IP cambia, al agotarse el cupo de visitante la página ofrece ingresar `CROQUIS_PILOT_KEY` (no se guarda en el navegador).
 La tabla `croquis_daily` admite hasta 60 intentos por fila porque el cupo del propietario se guarda en la fila `owner:AAAA-MM-DD`.
+
+_Activación: 25 nov 2026 — base croquis-quota, binding CROQUIS_QUOTA y secreto CROQUIS_PILOT_KEY configurados en Production._
