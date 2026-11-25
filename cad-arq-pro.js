@@ -222,30 +222,11 @@ function arqSimpleName(item){
  for(const x of LIB.library.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id)))){const type=patterns.find(p=>p[1].test(String(x.name||'')))?.[0];if(!type)continue;const n=(counters.get(type)||0)+1;counters.set(type,n);arqNames.set(x.id,type+' '+n)}
  arqNamesLength=LIB.library.length;return arqNames.get(item.id)||item.name;
 }
-/* Cosmetic transfer only: no CAD state, geometry or input changes. */
-function arqTransferSnapshot(card){
- try{
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||localStorage.getItem('blackline.arqTransfer')==='off')return ()=>{};
-  const source=card.querySelector('svg,img,canvas');if(!source||source.tagName.toLowerCase()==='canvas')return ()=>{};
-  const a=source.getBoundingClientRect(),b=(document.getElementById('canvasWrap')||CORE.canvas).getBoundingClientRect();
-  if(!a.width||!a.height||!b.width||!b.height)return ()=>{};
-  const ghost=source.cloneNode(true);ghost.removeAttribute('id');ghost.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
-  ghost.setAttribute('aria-hidden','true');
-  const scale=Math.min(1,100/Math.max(a.width,a.height));
-  Object.assign(ghost.style,{position:'fixed',left:a.left+'px',top:a.top+'px',width:a.width+'px',height:a.height+'px',margin:'0',pointerEvents:'none',zIndex:'2147483647',background:'#f4efe3',borderRadius:'5px',transformOrigin:'center',maxWidth:'none',maxHeight:'none'});
-  return ()=>{try{
-   document.body.append(ghost);
-   const dx=b.left+b.width/2-a.left-a.width/2,dy=b.top+b.height/2-a.top-a.height/2;
-   const anim=ghost.animate([{transform:'translate(0,0) scale(1)',opacity:.95},{transform:'translate('+dx+'px,'+dy+'px) scale('+scale+')',opacity:.8}],{duration:480,easing:'cubic-bezier(.2,.75,.3,1)'});
-   anim.onfinish=anim.oncancel=()=>ghost.remove();setTimeout(()=>ghost.remove(),700);
-  }catch(e){ghost.remove()}};
- }catch(e){return ()=>{}}
-}
 function makeCard(item,height){
  const b=document.createElement('button');b.type='button';b.className='btn arq-card';b.dataset.arq=item.id;
  b.title=arqSimpleName(item)+' · '+sizeLabel(item)+(isDynamic(item)?' · dinámico: '+cm(item.wMin)+'–'+cm(item.wMax)+' × '+cm(item.dMin)+'–'+cm(item.dMax)+' cm':'')+' · clic para insertar';
  b.innerHTML=thumb(item,height)+`<span class="arq-name">${esc(arqSimpleName(item))}</span><span class="arq-meta">${sizeLabel(item)}${isDynamic(item)?' · ↔ dinámico':''}</span>`+(item.pro?'<span class="arq-pro">PRO</span>':'');
- b.onclick=async()=>{const fly=arqTransferSnapshot(b);if(await armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal();fly()};
+ b.onclick=async()=>{if(await armInsert(item)===false)return;for(const c of document.querySelectorAll('.arq-card'))c.setAttribute('aria-pressed',String(c.dataset.arq===item.id));closeModal()};
  return b;
 }
 function chips(container,onPick){
@@ -1053,7 +1034,7 @@ async function openArqPlanCatalogue(category,query=''){
   for(const item of LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa')){
    const card=document.createElement('button');card.type='button';card.className='btn arq-card';card.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
    const preview=document.createElement('div');preview.style.cssText='background:#f4efe3;color:#343e40;border-radius:4px;width:100%';preview.innerHTML=svgFor(item,item.w,item.d,{height:142});const label=document.createElement('span');label.textContent=item.name;const size=document.createElement('small');size.textContent=fmt(item.w)+' × '+fmt(item.d)+' · '+(item.id.startsWith('rail-elev-')?'alzado':'planta')+' preliminar';card.append(preview,label,size);
-   card.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');const fly=arqTransferSnapshot(card);if(await armInsert(item)!==false){dlg.close();fly();}};grid.append(card);
+   card.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(await armInsert(item)!==false)dlg.close();};grid.append(card);
   }
   return;
  }
