@@ -2067,8 +2067,8 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
-var cadIdleFrame=null,cadIdleFrameValid=false;
-function schedule(pointerOnly=false){if(pointerOnly!==true)cadIdleFrameValid=false;if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false;
+function schedule(pointerOnly=false){if(pointerOnly!==true){cadIdleFrameValid=false;cadPointerIndex=null;}if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
  const b=boundsEntity(e);if(!b)return false;
@@ -3889,6 +3889,20 @@ function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=
 
 function snapPoint(p,gripBase=null){return cadWithLayerLookup(()=>cadSnapPointIndexed(p,gripBase))}
 const cadSnapChildIndices=new WeakMap();
+// Reuse a conservative spatial index only for read-only cursor inspection.
+function cadPointerNearby(point,tol){
+ const entities=state.entities,perf=window.BlacklinePerformance;
+ if(!cadPointerQueryActive||entities.length<300||!perf?.spatialIndex)return entities;
+ if(!cadPointerIndex||cadPointerIndex.entities!==entities||cadPointerIndex.length!==entities.length||cadPointerIndex.epoch!==cadDrawEpoch){
+  try{const query=perf.spatialIndex(entities,e=>{
+   const b=(!e.p&&perf.basicBounds(e))||boundsEntity(e);
+   if(e.type==='blockRef'&&b&&e.p)return {minX:Math.min(b.minX,e.p.x),minY:Math.min(b.minY,e.p.y),maxX:Math.max(b.maxX,e.p.x),maxY:Math.max(b.maxY,e.p.y)};
+   return b;
+  });cadPointerIndex={entities,length:entities.length,epoch:cadDrawEpoch,query}}
+  catch(err){return entities}
+ }
+ return cadPointerIndex.query({minX:point.x-tol,maxX:point.x+tol,minY:point.y-tol,maxY:point.y+tol});
+}
 function cadSnapPointIndexed(p,gripBase){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
 // Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
@@ -3914,7 +3928,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
   const osnapProbe=orthoLocksPointer?rawPointer:q;
   let nearest=null,minPixels=11,type='';
   const nearbyLines=[];
-  for(const e of state.entities){
+  for(const e of cadPointerNearby(osnapProbe,11/state.view.scale)){
    const lay=layerFor(e);if(!lay.visible||lay.locked)continue;
    const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
    const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
@@ -6202,7 +6216,8 @@ canvas.addEventListener('pointermove',ev=>{
   $('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;
   schedule();return;
  }
- state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
+ cadPointerQueryActive=!d&&state.tool==='select'&&!state.stage.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement;
+ try{state.mouse=cadPrimitiveGripPlacement?cadGripTrackingDestination(cadPrimitiveGripPlacement,world(raw)):(state.tool==='scale'&&state.stage.length)?world(raw):snapPoint(world(raw));}finally{cadPointerQueryActive=false;}$('coords').textContent=`X: ${units(state.mouse.x)}  Y: ${units(state.mouse.y)} ${state.unit}`;if(d&&d.type==='primitiveGripStart'&&dist(raw,d.start)>5){cadPrimitiveGripPlacement=d.job;d.type='primitiveGripPlace';cadGripTyped=''}if(d){d.last=raw;if(d.type==='vertexMoveStart'||d.type==='vertexMovePlace'){
   // Preview is drawn below from the source geometry; no entity mutation until confirmation.
  }else if(d.type==='wallMiddleGrip'){
   if(window.BlacklineWallGrip){
