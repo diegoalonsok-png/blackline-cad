@@ -227,7 +227,7 @@ function arqTransferSnapshot(card){
  try{
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||localStorage.getItem('blackline.arqTransfer')==='off')return ()=>{};
   const source=card.querySelector('svg,img,canvas');if(!source||source.tagName.toLowerCase()==='canvas')return ()=>{};
-  const a=source.getBoundingClientRect(),b=CORE.canvas.getBoundingClientRect();
+  const a=source.getBoundingClientRect(),b=(document.getElementById('canvasWrap')||CORE.canvas).getBoundingClientRect();
   if(!a.width||!a.height||!b.width||!b.height)return ()=>{};
   const ghost=source.cloneNode(true);ghost.removeAttribute('id');ghost.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
   ghost.setAttribute('aria-hidden','true');
@@ -236,8 +236,8 @@ function arqTransferSnapshot(card){
   return ()=>{try{
    document.body.append(ghost);
    const dx=b.left+b.width/2-a.left-a.width/2,dy=b.top+b.height/2-a.top-a.height/2;
-   const anim=ghost.animate([{transform:'translate(0,0) scale(1)',opacity:.95},{transform:'translate('+dx+'px,'+dy+'px) scale('+scale*.65+')',opacity:0}],{duration:250,easing:'cubic-bezier(.2,.75,.3,1)'});
-   anim.onfinish=anim.oncancel=()=>ghost.remove();setTimeout(()=>ghost.remove(),400);
+   const anim=ghost.animate([{transform:'translate(0,0) scale(1)',opacity:.95},{transform:'translate('+dx+'px,'+dy+'px) scale('+scale+')',opacity:.8}],{duration:480,easing:'cubic-bezier(.2,.75,.3,1)'});
+   anim.onfinish=anim.oncancel=()=>ghost.remove();setTimeout(()=>ghost.remove(),700);
   }catch(e){ghost.remove()}};
  }catch(e){return ()=>{}}
 }
@@ -1053,7 +1053,7 @@ async function openArqPlanCatalogue(category,query=''){
   for(const item of LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa')){
    const card=document.createElement('button');card.type='button';card.className='btn arq-card';card.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
    const preview=document.createElement('div');preview.style.cssText='background:#f4efe3;color:#343e40;border-radius:4px;width:100%';preview.innerHTML=svgFor(item,item.w,item.d,{height:142});const label=document.createElement('span');label.textContent=item.name;const size=document.createElement('small');size.textContent=fmt(item.w)+' × '+fmt(item.d)+' · '+(item.id.startsWith('rail-elev-')?'alzado':'planta')+' preliminar';card.append(preview,label,size);
-   card.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(await armInsert(item)!==false)dlg.close();};grid.append(card);
+   card.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');const fly=arqTransferSnapshot(card);if(await armInsert(item)!==false){dlg.close();fly();}};grid.append(card);
   }
   return;
  }
