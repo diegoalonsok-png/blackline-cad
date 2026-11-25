@@ -18,7 +18,7 @@ self.addEventListener('fetch',ev=>{
  }
  if(/\.(dxf|dwg)$/i.test(url.pathname)&&url.pathname.includes('/examples/'))return;
  // The converter must never run with a stale or mixed JS/WASM runtime.
- if(/\/(?:cad3d-lab\.js|cad-dwg-(?:batch|local-worker)\.js|cad-(?:arq-pro|block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
+ if(/\/(?:cad3d-lab\.js|cad3d-croquis-studio\.js|cad3d-entourage\.js|cad-dwg-(?:batch|local-worker)\.js|cad-(?:arq-pro|block-browser|local-vector-packs|dxf-parser)\.js|dwg-wasm\/pkg\/[^/]+)$/.test(url.pathname)){
   ev.respondWith(fetch(req,{cache:'reload'}));return;
  }
  const relative=url.pathname.startsWith(SCOPE)?url.pathname.slice(SCOPE.length):null;
