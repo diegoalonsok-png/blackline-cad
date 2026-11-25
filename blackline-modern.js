@@ -213,7 +213,8 @@ requestAnimationFrame(requestResize);
   if(duplicate!==b)duplicate.remove();
  }
  if(b.parentElement!==host)host.prepend(b);
- apply(saved==='light'?'light':'dark');
+ // Always open in dark mode, while allowing a temporary light theme during the session.
+ apply('dark',saved==='light');
 })();
 
 
