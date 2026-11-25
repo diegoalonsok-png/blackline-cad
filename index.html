@@ -2067,7 +2067,8 @@ $('filename')?.addEventListener('click',cadRenameDrawing);
 function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLibrary();renderLayers();renderDimStyles();updateProps();updateStats();prompt();schedule();queueLocalBackup()}
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);canvas.width=Math.max(1,Math.floor(r.width*dpr));canvas.height=Math.max(1,Math.floor(r.height*dpr));schedule()}
-function schedule(){if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
+var cadIdleFrame=null,cadIdleFrameValid=false;
+function schedule(pointerOnly=false){if(pointerOnly!==true)cadIdleFrameValid=false;if(!drawPending){drawPending=true;requestAnimationFrame(draw)}}
 /* Viewport culling keeps offscreen CAD entities out of the rendering loop. */
 function inViewport(e,w,h){
  const b=boundsEntity(e);if(!b)return false;
@@ -2175,8 +2176,13 @@ function cadDrawArqPoche(visibleForPaint){
 
 function draw(){return cadWithLayerLookup(cadDrawFrame)}
 function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let painted=0;
- if(state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
- let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);updateCadSnapLive();const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
+ const idle=state.entities.length>=500&&state.tool==='select'&&!state.drag&&!state.stage.length&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;
+ const frameKey=idle?[cadDrawEpoch,canvas.width,canvas.height,dpr,state.view.scale,state.view.ox,state.view.oy,state.gridOn,state.grid,displayColors.background,displayColors.grid,displayColors.axes].join('|'):'';
+ const reuse=idle&&cadIdleFrameValid&&cadIdleFrame?.key===frameKey;
+ if(!reuse&&state.drag?.type!=='pan'){try{cadSyncAssocDims()}catch(err){console.warn('[CAD2D assoc]',err)}try{const ws=cadWallSignature();if(ws!==cadWallCapSig){cadWallCapSig=ws;cadTGapCache=cadComputeWallTGaps();cadWallCapCache=cadComputeWallCaps()}}catch(err){cadTGapCache=cadComputeWallTGaps();cadWallCapCache=null}}
+ let w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);updateCadSnapLive();
+ if(reuse){ctx.drawImage(cadIdleFrame.canvas,0,0,w,h);painted=cadIdleFrame.painted;}else{
+ ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);if(state.gridOn)drawGrid(w,h);drawAxes(w,h);const fastView=window.BlacklinePerformance?.viewport(state.view,w,h,30);
  const selectedIds=new Set(state.selected);
  // Both paint passes use conservative viewport culling; selection membership is O(1).
  const visibleForPaint=e=>fastView
@@ -2191,7 +2197,10 @@ function cadDrawFrame(){drawPending=false;const perfStart=performance.now();let 
   if(!visibleForPaint(e))continue;
   drawEntity(e,undefined,selectedIds);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
+ }if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
+ if(idle){try{const buffer=cadIdleFrame?.canvas||document.createElement('canvas');if(buffer.width!==canvas.width)buffer.width=canvas.width;if(buffer.height!==canvas.height)buffer.height=canvas.height;const bctx=buffer.getContext('2d');bctx.clearRect(0,0,buffer.width,buffer.height);bctx.drawImage(canvas,0,0);cadIdleFrame={canvas:buffer,key:frameKey,painted};cadIdleFrameValid=true}catch(e){cadIdleFrameValid=false}}else{cadIdleFrameValid=false;}
+ }
+ cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,world(pointer));
   const candidate=cadPrimitiveGripTransform(job.original,job.grip,dest);
@@ -6223,7 +6232,7 @@ canvas.addEventListener('pointermove',ev=>{
   }
  }else if(d.type==='selectionStart'&&Math.hypot(raw.x-d.start.x,raw.y-d.start.y)>5){d.type='selection';d.path=[P(d.start.x,d.start.y),P(raw.x,raw.y)];cadSelectionAnchor=null}
  else if(d.type==='selection'){if(!d.path)d.path=[d.start];if(dist(d.path.at(-1),raw)>3)d.path.push(raw)}
- }schedule()});
+ }schedule(!d&&state.tool==='select'&&!state.selected.length&&!state.stage.length)});
 canvas.addEventListener('pointerup',ev=>{
  const raw=P(ev.offsetX,ev.offsetY),d=state.drag;state.drag=null;
  if(!d)return;
