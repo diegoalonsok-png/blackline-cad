@@ -1111,6 +1111,21 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:1050px){.status .cad-copyright-note{font-size:8px;letter-spacing:0}.status .hint{display:none}}
 @media(max-width:790px){.status .cad-copyright-note{display:none}}
 </style>
+<style id="cad-native-gallery-contrast">
+/* Keep preview ink independent of the drawing canvas and model colors. */
+#blCards button svg { color:#263746!important; filter:none!important; }
+#blCards button svg g[stroke],#blCards button svg [stroke]:not([stroke="none"]) { stroke:currentColor!important; }
+#blCards button svg { background:#fff!important; }
+#blCards button svg [fill]:not([fill="none"]):not([fill="transparent"]) { fill:currentColor!important; }
+#blCards button img { filter:brightness(0) opacity(.85)!important; background:transparent!important; }
+#blCards button { background:#fff!important; color:#263746!important; }
+#blCards button > span { color:#263746!important; }
+#blCards button[aria-pressed="true"] { outline:2px solid #4b90c4!important; outline-offset:-2px; }
+.app:not(.bl-light) #blCards button {background:#17212b!important;color:#e7eef5!important;}
+.app:not(.bl-light) #blCards button svg {background:transparent!important;color:#e7eef5!important;}
+.app:not(.bl-light) #blCards button img {filter:brightness(0) invert(.9)!important;}
+.app:not(.bl-light) #blCards button > span {color:#e7eef5!important;}
+</style>
 </head>
 <body>
 <div class="app">
@@ -12104,7 +12119,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 })();
 </script>
 <script src="workspace-upgrade.js?v=20261120-1850"></script>
-<script src="blackline-modern.js?v=20261123-brand-cad2d3d"></script>
+<script src="blackline-modern.js?v=20261125-gallery-contrast-v2"></script>
 <script defer src="assets/dxf-block-collection.js?v=20261120-1850"></script>
 <script defer src="assets/dxf-featured-blocks.js?v=20261120-1850"></script>
 <script defer src="assets/blackline-parametric-blocks.js?v=20261120-1850"></script>
@@ -12117,7 +12132,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-wall-join.js?v=20261124-join-v2"></script>
 <script src="cad-wall-grip.js?v=20261120-1850"></script>
 <script src="cad-hatch-patterns.js?v=20261120-1850"></script>
-<script src="cad-performance.js?v=20261124-spatial-v3"></script>
+<script src="cad-performance.js?v=20261125-spatial-v4"></script>
 <script src="assets/cad-pdf-import.js?v=20261124-hide-calco"></script><script src="cad-plan.js?v=20261123-quiet-pro-1"></script><script src="cad-cloud.js?v=20261120-1850"></script>
 <script src="assets/cad2d-arq-generators.js?v=20261124-industrial-v1"></script><script src="assets/cad2d-doc-blocks.js?v=20261123-user-dxf-complete"></script><script src="cad-dk-demand.js?v=20261124-demand-complete-v1"></script>
 <script src="assets/cad2d-dk-blocks.js?v=20261124-demand-complete-v1"></script>
