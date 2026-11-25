@@ -11,6 +11,25 @@ const FACTOR={m:1,cm:100,mm:1000,in:39.37007874015748,ft:3.28083989501312};
 const PREFIX="CAD2D Arquitectura 2026 · ";
 const $=id=>document.getElementById(id);
 let catalog=null,selected="Todos",filter="";
+const pending=new Map();
+async function demandJSON(url,cache){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),20000);
+ try{
+  const response=await fetch(url,{cache,signal:controller.signal});
+  if(!response.ok)throw Error("HTTP "+response.status);
+  return await response.json();
+ }catch(err){
+  if(controller.signal.aborted)throw Error("Tiempo de espera agotado. Volvé a intentar.");
+  throw err;
+ }finally{clearTimeout(timer)}
+}
+async function prepare(item){
+ if(pending.has(item.key))return pending.get(item.key);
+ const job=demandJSON(BASE+item.key+".json","no-store").then(data=>safeBlock(data,item));
+ pending.set(item.key,job);
+ try{return await job}finally{pending.delete(item.key)}
+}
 function safePack(pack){
  if(pack?.schema!=="cad2d-architecture-metadata-v1"||pack.units!=="m"||pack.blocks?.length!==28)throw Error("Catálogo inválido");
  const ids=new Set(),keys=new Set();
@@ -94,9 +113,7 @@ function init(){
     const key=PREFIX+item.id;button.disabled=true;
     try{
      if(!api.hasBlock(key)){
-      const response=await fetch(BASE+item.key+".json",{cache:"no-store"});
-      if(!response.ok)throw Error("HTTP "+response.status);
-      const block=safeBlock(await response.json(),item);
+      const block=await prepare(item);
       if(!api.hasBlock(key))api.addBlock(key,geometry(block,api.unit()));
      }
      api.selectBlock(key);
@@ -109,9 +126,16 @@ function init(){
   status.textContent=visible.length+" bloques visibles de "+catalog.blocks.length+" disponibles. La geometría se descarga solamente al elegir un bloque.";
  }
  search.addEventListener("input",()=>{filter=search.value.toLocaleLowerCase().trim();show()});
- fetch(FILE,{cache:"no-cache"}).then(r=>{if(!r.ok)throw Error("HTTP "+r.status);return r.json()})
-  .then(safePack).then(pack=>{catalog=pack;show()})
-  .catch(err=>{status.textContent="No se pudo abrir el catálogo adicional: "+err.message});
+ const retry=document.createElement("button");retry.type="button";retry.className="btn slim";
+ retry.textContent="Reintentar catálogo";retry.hidden=true;pane.append(retry);
+ async function loadCatalog(){
+  retry.hidden=true;retry.disabled=true;status.textContent="Cargando catálogo vectorial…";
+  try{catalog=safePack(await demandJSON(FILE,"no-cache"));show()}
+  catch(err){status.textContent="No se pudo abrir el catálogo adicional: "+err.message;retry.hidden=false}
+  finally{retry.disabled=false}
+ }
+ retry.addEventListener("click",loadCatalog);
+ loadCatalog();
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});
 else init();
