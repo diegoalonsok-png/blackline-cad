@@ -2006,20 +2006,28 @@ function cadAssociateDim(d){
  return false;
 }
 function cadSyncAssocDims(){
- let byId=null;
+ // Index only targets referenced by associative dimensions; a large imported
+ // drawing may contain hundreds of thousands of unrelated primitives.
+ const dims=[],byId=new Map();
  for(const d of state.entities){
   if(d.type!=='dimension'||!d.assoc)continue;
+  dims.push(d);
+  if(d.assoc.owner!==d.id)continue;
+  if(d.assoc.a)byId.set(d.assoc.a.id,undefined);
+  if(d.assoc.b)byId.set(d.assoc.b.id,undefined);
+ }
+ if(byId.size)for(const e of state.entities)if(byId.has(e.id))byId.set(e.id,e);
+ for(const d of dims){
   // Copia de una cota (COPY, MATRIZ, pegar): se reasocia con lo que tenga debajo.
   if(d.assoc.owner!==d.id){cadAssociateDim(d);continue}
-  byId=byId||new Map(state.entities.map(e=>[e.id,e]));
   const at=k=>{const r=d.assoc[k];if(!r)return null;const v=cadAssocVertices(byId.get(r.id))[r.i];if(!v||!Number.isFinite(v.x)||!Number.isFinite(v.y)){delete d.assoc[k];return null}return v};
   const na=at('a'),nb=at('b');
   if(!d.assoc.a&&!d.assoc.b){delete d.assoc;continue}
-  const da=na?P(na.x-d.a.x,na.y-d.a.y):P(0,0),db=nb?P(nb.x-d.b.x,nb.y-d.b.y):P(0,0);
-  if(!da.x&&!da.y&&!db.x&&!db.y)continue;
-  const rigid=!!(na&&nb)&&Math.abs(da.x-db.x)<1e-9&&Math.abs(da.y-db.y)<1e-9;
+  const dax=na?na.x-d.a.x:0,day=na?na.y-d.a.y:0,dbx=nb?nb.x-d.b.x:0,dby=nb?nb.y-d.b.y:0;
+  if(!dax&&!day&&!dbx&&!dby)continue;
+  const rigid=!!(na&&nb)&&Math.abs(dax-dbx)<1e-9&&Math.abs(day-dby)<1e-9;
   if(na)d.a=P(na.x,na.y);if(nb)d.b=P(nb.x,nb.y);
-  if(rigid&&d.p)d.p=P(d.p.x+da.x,d.p.y+da.y);
+  if(rigid&&d.p)d.p=P(d.p.x+dax,d.p.y+day);
  }
 }
 function cadDimAssocCommand(mode){
