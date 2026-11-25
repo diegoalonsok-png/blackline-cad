@@ -3275,6 +3275,7 @@ function cadDrawOpeningDisplacement(){
  const placement=cadVertexPlacement,d=state.drag;
  const drag=d?.type==='blockGrip'&&!d.axis;
  const id=drag?d.id:placement?.ids?.length===1?placement.ids[0]:null;
+ if(id==null)return;
  const ref=state.entities.find(e=>e.id===id&&e.type==='blockRef');
  const type=state.blocks?.[ref?.blockName]?.parametric?.kind;
  if(!ref||!['swing-door','double-door','framed-window'].includes(type))return;
@@ -3878,6 +3879,7 @@ function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.s
 function updateCadSnapLive(){const el=$('cadSnapLive');if(!el)return;const type=state.osnapOn&&snapIndicator? snapIndicator.type:null;el.textContent=state.osnapOn?(type?'OSNAP · '+type:'OSNAP · '+cadActiveOsnaps.size+' tipos'):'OSNAP OFF';el.title=type?'Referencia activa: '+type:'Referencias habilitadas: '+[...cadActiveOsnaps].join(', ')}
 
 function snapPoint(p,gripBase=null){return cadWithLayerLookup(()=>cadSnapPointIndexed(p,gripBase))}
+const cadSnapChildIndices=new WeakMap();
 function cadSnapPointIndexed(p,gripBase){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
 // Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
@@ -3911,8 +3913,16 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    // not just their insertion point. Read-only: never alter block entities.
    if(e.type==='blockRef'){
     const children=cadBlockChildrenCached(e);
+    // Cache an immutable index of transformed children; a regenerated block gets a new array.
+    let localChildren=children;
+    if(children.length>32&&window.BlacklinePerformance?.spatialIndex){
+     let query=cadSnapChildIndices.get(children);
+     if(!query){query=BlacklinePerformance.spatialIndex(children,c=>BlacklinePerformance.basicBounds(c));cadSnapChildIndices.set(children,query)}
+     const r=11/state.view.scale;
+     localChildren=query({minX:osnapProbe.x-r,minY:osnapProbe.y-r,maxX:osnapProbe.x+r,maxY:osnapProbe.y+r});
+    }
     let scanned=0;
-    for(const child of children){
+    for(const child of localChildren){
      if(++scanned>240||candidates.length>600)break;
      if(child.type==='line'||child.type==='polyline'||child.type==='rect'){
       const vertices=(child.type==='rect'?[
@@ -3964,7 +3974,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
-   for(const [v,kind] of candidates){const d=dist(screen(v),screen(osnapProbe));if(d<minPixels){minPixels=d;nearest=v;type=kind}}
+   for(const [v,kind] of candidates){if(!v)continue;const d=Math.hypot(v.x-osnapProbe.x,v.y-osnapProbe.y)*state.view.scale;if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
   if(cadOsnapEnabled('INT'))for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
