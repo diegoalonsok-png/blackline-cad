@@ -797,7 +797,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 @media(max-width:720px){.cad-wall-quick:not([hidden]){left:12px;right:12px;bottom:39px;max-width:none}}
 </style>
 <link rel="stylesheet" href="workspace-upgrade.css?v=20261120-1850">
-<link rel="stylesheet" href="blackline-modern.css?v=20261120-1945">
+<link rel="stylesheet" href="blackline-modern.css?v=20261125-metal-light-v1">
 <style id="cad-text-layout-fix">
 /* The text bar is the fourth explicit grid track, never an implicit auto-sized row. */
 .app:has(> #cadTextToolbar):not(.cad-focus){grid-template-rows:48px 29px var(--ribbon-row-height,var(--ribbon-height,58px)) 39px minmax(0,1fr) 54px 34px!important}
@@ -11007,7 +11007,7 @@ function initDisplayColors(){
  const themes={
   dark:{cursor:'#ffe15a',background:'#292b2f',grid:'#373a3f',axes:'#676c75',selection:'#f0f3f6'},
   black:{cursor:'#ffff00',background:'#050505',grid:'#292929',axes:'#666666',selection:'#ffffff'},
-  light:{cursor:'#1f5fbf',background:'#fbfbfa',grid:'#e6e8ea',axes:'#a9b1b8',selection:'#0b6bcb'},
+  light:{cursor:'#1f5fbf',background:'#d9dde1',grid:'#c7cdd3',axes:'#8a99a5',selection:'#0b6bcb'},
   blueprint:{cursor:'#f7e794',background:'#0d2948',grid:'#214569',axes:'#7396b9',selection:'#ffffff'}
  };
  window.cadApplyCanvasTheme=name=>{const next=themes[name];if(!next)return;displayColors={...displayColors,...next};try{localStorage.setItem('cad2d-display-colors',JSON.stringify(displayColors))}catch(ex){}for(const [id,key] of Object.entries({cursorColor:'cursor',modelBgColor:'background',modelGridColor:'grid',modelAxesColor:'axes',selectionColor:'selection'}))if($(id))$(id).value=displayColors[key];if($('cadThemePreset'))$('cadThemePreset').value=name;schedule()};
