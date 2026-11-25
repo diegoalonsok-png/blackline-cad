@@ -2526,7 +2526,7 @@ function cadDimensionPrimitivesRaw(e){
   if(aType==='dot'){items.push({type:'hatch',pts:Array.from({length:16},(_,i)=>add(p,P(arrow*.22*Math.cos(i*TAU/16),arrow*.22*Math.sin(i*TAU/16)))),layer,width,hatchStyle:'solid'});return}
   if(aType==='open'){line(p,add(p,add(mul(u,arrow),mul(n,arrow*.33))));line(p,add(p,sub(mul(u,arrow),mul(n,arrow*.33))));return}
   const w1=add(p,add(mul(u,arrow),mul(n,arrow*.28))),w2=add(p,sub(mul(u,arrow),mul(n,arrow*.28)));items.push({type:'hatch',pts:[p,w1,w2],layer,width,hatchStyle:'solid'});line(p,w1);line(p,w2)};
- const format=v=>{const target=U[st.displayUnit]?st.displayUnit:state.unit,converted=v*U[state.unit]/U[target],tol=(Number(st.tolerance)||0)*U[state.unit]/U[target],unitLabel=st.displayUnit&&st.displayUnit!=='drawing'?' '+target:'';return converted.toFixed(precision)+(tol>0?' ±'+tol.toFixed(precision):'')+unitLabel+suffix};
+ const format=v=>{const target=U[st.displayUnit]?st.displayUnit:state.unit,converted=v*U[state.unit]/U[target],tol=(Number(st.tolerance)||0)*U[state.unit]/U[target],unitLabel=st.displayUnit&&st.displayUnit!=='drawing'?' '+target:'';const digits=target==='m'?Math.min(2,precision):precision;return converted.toFixed(digits)+(tol>0?' ±'+tol.toFixed(digits):'')+unitLabel+suffix};
  if(!e.a||!e.b||!e.p)return [];
  if(mode==='leader'){
   line(e.a,e.b);tip(e.a,sub(e.b,e.a));
@@ -6734,7 +6734,7 @@ function cadUpdateImageBar(image){
 /* Native editable properties for selected raster images, shared by Properties and Ctrl+1. */
 function cadImagePropertiesMarkup(e){
  if(!e||e.type!=='image')return '';
- const fmt=n=>Number(Number(n).toFixed(5));
+ const fmt=n=>Number(Number(n).toFixed(state.unit==='m'?2:5));
  const x=Math.min(e.a.x,e.b.x),y=Math.min(e.a.y,e.b.y),w=Math.abs(e.b.x-e.a.x),h=Math.abs(e.b.y-e.a.y);
  const field=(label,key,val)=>'<label style="display:flex;align-items:center;justify-content:space-between;gap:9px;margin:5px 0"><span>'+label+'</span><input data-cad-image-prop="'+key+'" type="number" step="any" value="'+fmt(val)+'" style="width:110px;min-width:0;background:#161d25;color:#edf1f6;border:1px solid #586575;padding:5px;border-radius:5px"></label>';
  return '<div data-cad-image-editor="'+e.id+'" style="grid-column:1/-1;border-top:1px solid #586575;padding:10px 3px;margin-top:7px;min-width:210px">'+
@@ -11503,6 +11503,7 @@ function refreshCadQuickProperties(){
  box.innerHTML=selected.length===1&&first?.type==='image'?cadImagePropertiesMarkup(first):'';
  box.hidden=!(selected.length===1&&first?.type==='image');
  if(!panel.dataset.cadImageEditorBound){panel.dataset.cadImageEditorBound='1';panel.addEventListener('change',ev=>cadApplyImageProperty(panel,ev))}
+ panel.cadPropertyBaseline=Object.fromEntries(cadQuickPropertyFields.map(id=>[id,$(id).value]));
 }
 
 /* Export formats with explicit distinction between editable CAD and print formats. */
@@ -11603,7 +11604,7 @@ function initCadDimStylePalette(){
  const precision=Math.max(0,Math.min(4,Math.round(Number(st.precision??2))));
  const unit=st.displayUnit||'drawing';
  const value=2.5*1000/(unit==='drawing'?unitMm:(U[unit]||unitMm));
- const fullLabel=value.toFixed(precision)+String(st.suffix||'');
+ const fullLabel=value.toFixed((unit==='m'||(unit==='drawing'&&state.unit==='m'))?Math.min(2,precision):precision)+String(st.suffix||'');
  const shown=fullLabel.length>12?fullLabel.slice(0,11)+'…':fullLabel;
  const fs=Math.min(fontSize,96/Math.max(1,shown.length*.57));
  const x0=17,x1=103,y=39;
@@ -11729,6 +11730,7 @@ function initCadHatchPalette(){
  style.addEventListener('change',paint);
  paint();
 }
+const cadQuickPropertyFields=['cadPropsColor','cadPropsWeight','cadPropsLinetype','cadPropsLtscale','cadPropsHatchPattern','cadPropsHatchScale','cadPropsHatchAngle','cadPropsHatchColor2'];
 function initCadQuickProperties(){
  const panel=$('cadQuickProperties'),button=$('cadPropertiesButton');
  panel.innerHTML='<div class="panel-title">PROPIEDADES / PROPERTIES <button type="button" id="cadPropsClose" aria-label="Cerrar">×</button></div><div class="panel-content"><div class="cad-quick-summary" id="cadPropsCount">Seleccioná un objeto para editarlo</div><select id="cadPropsObject" aria-label="Objeto a editar" hidden></select><div id="cadPropsGeometry" class="cad-quick-geometry" hidden></div><label>Color <input type="color" id="cadPropsColor" value="#ffffff"></label><label>Espesor / Lineweight <select id="cadPropsWeight">'+[0,.05,.09,.13,.18,.25,.35,.50,.70,1,1.4,2].map(x=>'<option value="'+x+'">'+x.toFixed(2)+' mm</option>').join('')+'</select></label><label>Tipo de línea / Linetype <select id="cadPropsLinetype"><option value="BYLAYER">Por capa / ByLayer</option><option value="CONTINUOUS">Continua / Continuous</option><option value="DASHED">Discontinua / Dashed</option><option value="DOTTED">Punteada / Dotted</option><option value="DASHDOT">Raya punto / Dash dot</option><option value="HIDDEN">Oculta / Hidden</option><option value="CENTER">Eje / Center</option><option value="PHANTOM">Fantasma / Phantom</option></select></label><label>Escala de tipo de línea <input type="number" id="cadPropsLtscale" min="0.01" step="0.1" value="1"></label><div id="cadPropsHatchBox" hidden><label>Patrón de sombreado <select id="cadPropsHatchPattern"></select></label><label>Escala del patrón <input type="number" id="cadPropsHatchScale" min="0.001" step="any" value="0.25"></label><label>Ángulo del patrón ° <input type="number" id="cadPropsHatchAngle" step="any" value="0"></label><label id="cadPropsHatchC2Row">Segundo color <input type="color" id="cadPropsHatchColor2" value="#ffffff"></label></div><label>Capa / Layer <select id="cadPropsLayer"></select></label><div class="cad-quick-actions"><button id="cadPropsApply" type="button">Aplicar</button><button id="cadPropsByLayer" type="button">Por capa</button></div><div class="cad-quick-help">Elegí un objeto de la selección para editarlo individualmente. Cambiar capa no modifica color ni espesor. Ctrl+Z deshace.</div></div>';
@@ -11748,11 +11750,13 @@ function initCadQuickProperties(){
  $('cadPropsApply').onclick=()=>{
   const selected=cadQuickPropertyTargets(true);if(!selected.length)return toast('Seleccioná líneas u objetos primero');
   const color=$('cadPropsColor').value,weight=Number($('cadPropsWeight').value),linetype=$('cadPropsLinetype').value,layer=$('cadPropsLayer').value;
-  const ltscale=Number($('cadPropsLtscale').value)||1;
+  const ltscale=Number($('cadPropsLtscale').value);if(!Number.isFinite(ltscale)||ltscale<=0)return toast('Escala de línea inválida');
   if(!/^#[0-9a-f]{6}$/i.test(color)||!Number.isFinite(weight)||weight<0||!state.layers.some(l=>l.id===layer))return toast('Propiedades inválidas');
   const hp=$('cadPropsHatchPattern').value,hsc=Number($('cadPropsHatchScale').value),han=Number($('cadPropsHatchAngle').value)||0;
   if(!$('cadPropsHatchBox').hidden&&hp!=='solid'&&!/^gradient/.test(hp)&&!(hsc>0))return toast('Hatch: invalid pattern scale');
-  saveHistory();for(const e of selected){e.color=color;e.width=weight;e.linetype=linetype;e.layer=layer;if(e.type==='hatch'&&!$('cadPropsHatchBox').hidden){e.hatchStyle=hp;e.hatchSpacing=hsc>0?hsc:.25;e.hatchAngle=han;if(/^gradient/.test(hp))e.color2=$('cadPropsHatchColor2').value;else delete e.color2}if(ltscale!==1)e.ltscale=ltscale;else delete e.ltscale;}
+  const baseline=panel.cadPropertyBaseline||{},changed=id=>$(id).value!==baseline[id];
+  if(!cadQuickPropertyFields.some(changed))return toast('Sin cambios');
+  saveHistory();for(const e of selected){if(changed('cadPropsColor'))e.color=color;if(changed('cadPropsWeight'))e.width=weight;if(changed('cadPropsLinetype'))e.linetype=linetype;if(e.type==='hatch'&&!$('cadPropsHatchBox').hidden){if(changed('cadPropsHatchPattern')){e.hatchStyle=hp;if(!/^gradient/.test(hp))delete e.color2;else e.color2=$('cadPropsHatchColor2').value}if(changed('cadPropsHatchScale'))e.hatchSpacing=hsc>0?hsc:.25;if(changed('cadPropsHatchAngle'))e.hatchAngle=han;if(changed('cadPropsHatchColor2')&&/^gradient/.test(hp))e.color2=$('cadPropsHatchColor2').value}if(changed('cadPropsLtscale')){if(ltscale!==1)e.ltscale=ltscale;else delete e.ltscale;}}
   updateAll();toast('Propiedades aplicadas a '+selected.length+' objeto(s)');
  };
  $('cadPropsHatchPattern').addEventListener('change',()=>{$('cadPropsHatchC2Row').style.display=/^gradient/.test($('cadPropsHatchPattern').value)?'':'none';$('cadPropsApply').click()});
@@ -11784,7 +11788,7 @@ function initCadQuickProperties(){
  const previousUpdate=updateProps;
  updateProps=function(){previousUpdate();sync();if(!panel.hidden)refreshCadQuickProperties()};
  sync();
- document.addEventListener('pointerdown',e=>{if(!panel.hidden&&!panel.contains(e.target)&&e.target!==button&&!e.target.closest('[data-tool="properties"]'))close()});
+ // Properties is a persistent palette: canvas clicks change selection, not visibility.
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!panel.hidden)close()});
 }
 function initCadLexiconBackgroundPalette(){
