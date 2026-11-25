@@ -1473,6 +1473,25 @@ css+=`
  color:var(--cad-ui-text,#e8eef3)!important;
 }
 `;
+/* Light mode overrides are applied after the native 3D toolbar styles. */
+css+=`
+body:has(.app.bl-light) #cad3dLab#cad3dLab {
+ --cad-ui-base:#d5dbe0;--cad-ui-raised:#c0c9d1;--cad-ui-toolbar:#cbd2d8;--cad-ui-text:#202c35;--cad-ui-muted:#40515e;--cad-ui-edge:#aeb8c1;--cad-ui-input:#e0e4e7;
+}
+body:has(.app.bl-light) #cad3dLab#cad3dLab :is(.head,.cad3dDockZone,.cad3dBasicBars,.cad3dNavToolbar,.cad3dStyleToolbar,.cad3dQuickViews,.camera3DBar,.cad3dModelTools,.cad3dProfileTools,.tools,.cad3dBar,.cad3dDockFloating) {
+ background:#cbd2d8!important;background-image:none!important;color:#202c35!important;border-color:#aeb8c1!important;
+}
+body:has(.app.bl-light) #cad3dLab#cad3dLab .cad3dDockZone>.cad3dDockBar {background:transparent!important;border-right-color:#aeb8c1!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab :is(.cad3dQuickTool,.cad3dToolbarGrip,.cad3dDockBar .btn,.camera3DBar .btn) {
+ background:#dce1e5!important;color:#202c35!important;border-color:#aeb8c1!important;
+}
+body:has(.app.bl-light) #cad3dLab#cad3dLab :is(.cad3dQuickTool,.cad3dDockBar .btn):is(.armed,.active,[aria-pressed=true],[aria-expanded=true]) {background:#bfd4e7!important;color:#174c79!important;border-color:#739dc0!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab :is(.cad3dDockZone,.camera3DBar,.cad3dModelTools) :is(strong,label) {color:#40515e!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab :is(.cad3dExtrudeHeight,.camera3DList) {background:#e0e4e7!important;color:#202c35!important;border-color:#aeb8c1!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch span {color:#202c35!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch svg [stroke="#e9f2f7"] {stroke:#263b49!important}
+body:has(.app.bl-light) #cad3dLab#cad3dLab .archLaunch svg [fill="#e9f2f7"] {fill:#263b49!important}
+`;
 var cssNode=document.createElement('style');cssNode.id='cad3dLabCSS';cssNode.textContent=css;document.head.appendChild(cssNode);
 function escapeHtml(a){return String(a).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function finite(a,f){var n=Number(a);return Number.isFinite(n)?n:f;}
