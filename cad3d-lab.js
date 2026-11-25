@@ -4647,8 +4647,12 @@ function build(){
  root.querySelector('.sunLaunch').addEventListener('click',function(){
   var p=root.querySelector('.sunPanel'),opening=p.hidden;
   p.hidden=!opening;this.setAttribute('aria-expanded',String(opening));
-  if(opening&&!sunSettings.enabled){sunSettings.enabled=true;applySunSettings();}
-  if(opening&&!renderer)text('Sun activo · Las sombras reales requieren WebGL; vista de compatibilidad sin sombras');
+  if(opening){
+   sunSettings.enabled=true;applySunSettings();
+   if(!renderer)text('Sol activo · Las sombras reales requieren WebGL');
+   else if(isCad3DWireframe(renderStyle)||renderStyle==='hidden')text('Sol activo · Elegí un estilo sólido para ver las sombras');
+   else text('Sol activo · ajustá azimut y elevación');
+  }
  });
  root.querySelector('[data-sun-enabled]').addEventListener('change',function(){sunSettings.enabled=this.checked;applySunSettings();});
  root.querySelector('[data-check-shadows]').addEventListener('click',checkVisibleShadows);
@@ -4950,7 +4954,7 @@ function changeLayer(kind){
  selected=selected.filter(function(id){return records.some(function(r){return r.id===id&&editableRecord(r);});});
  renderLayerPanel();redraw();renderProps();
 }
-function cad3dBounds(){
+function cad3dBounds(modelOnly){
  var b={minX:Infinity,minY:Infinity,minZ:Infinity,maxX:-Infinity,maxY:-Infinity,maxZ:-Infinity};
  function add(x,y,z){
   if(!Number.isFinite(x)||!Number.isFinite(y)||!Number.isFinite(z))return;
@@ -4977,7 +4981,7 @@ function cad3dBounds(){
    r.profilePoints.forEach(function(p){add((r.x||0)+p[0]*c-p[1]*sn,(r.y||0)+p[0]*sn+p[1]*c,r.z||0);});
   }
  });
- if(underlay&&Array.isArray(underlay.segments)){
+ if(!modelOnly&&underlay&&Array.isArray(underlay.segments)){
   underlay.segments.forEach(function(p){if(p.length>=4){add(p[0],p[1],0);add(p[2],p[3],0);}});
  }
  if(!Number.isFinite(b.minX))return {x:0,y:0,z:0,span:24,width:24,depth:24,height:4,empty:true};
@@ -5091,12 +5095,12 @@ function apply3DEnvironment(){
 }
 function applySunSettings(){
  if(root){
-  root.querySelector('[data-sun-enabled]').checked=sunSettings.enabled;
-  root.querySelector('[data-sun-ground]').checked=sunSettings.onGround;
-  root.querySelector('[data-sun-faces]').checked=sunSettings.onFaces;
+  [['enabled',sunSettings.enabled],['ground',sunSettings.onGround],['faces',sunSettings.onFaces]].forEach(function(pair){
+   var field=root.querySelector('[data-sun-'+pair[0]+']');if(field)field.checked=pair[1];
+  });
   ['azimuth','elevation'].forEach(function(key){
-   root.querySelector('[data-sun-setting="'+key+'"]').value=String(sunSettings[key]);
-   root.querySelector('[data-sun-'+key+']').textContent=sunSettings[key]+'°';
+   var input=root.querySelector('[data-sun-setting="'+key+'"]'),output=root.querySelector('[data-sun-'+key+']');
+   if(input)input.value=String(sunSettings[key]);if(output)output.textContent=sunSettings[key]+'°';
   });
   root.querySelector('.sunLaunch')?.setAttribute('aria-pressed',String(sunSettings.enabled));
  }
@@ -5106,17 +5110,17 @@ function applySunSettings(){
  if(modelRoot)modelRoot.traverse(function(o){if(o.isMesh){
   o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces&&!['wire2d','wire3d','hidden'].includes(renderStyle);
   o.castShadow=!['wire2d','wire3d','hidden'].includes(renderStyle);
-  // Transparent glass must not block sunlight; all other meshes retain normal shadows.
-  if(o.userData?.cadGlass){o.receiveShadow=false;o.castShadow=false;}
+  // Texture overlays and drafting profiles are presentation surfaces, not new solids.
+  if(o.userData?.cadWallTexture)o.castShadow=false;
+  if(o.userData?.cadGlass||o.userData?.cadProfileFace){o.receiveShadow=false;o.castShadow=false;}
  }});
- apply3DEnvironment();
- if(!sunLight||!T)return;
- var bounds=cad3dBounds(),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
+ if(!sunLight||!T||!scene)return;
+ var bounds=cad3dBounds(true),az=sunSettings.azimuth*Math.PI/180,el=sunSettings.elevation*Math.PI/180;
  var radius=Math.max(45,bounds.span*2),range=Math.max(7,Math.min(280,bounds.span*1.25));
- sunLight.target.position.set(bounds.x,bounds.y,bounds.z);scene.add(sunLight.target);
+ sunLight.target.position.set(bounds.x,bounds.y,bounds.z);if(sunLight.target.parent!==scene)scene.add(sunLight.target);
  sunLight.position.set(bounds.x+radius*Math.cos(el)*Math.cos(az),
   bounds.y+radius*Math.cos(el)*Math.sin(az),bounds.z+radius*Math.sin(el));
- sunLight.target.updateMatrixWorld();
+ sunLight.target.updateMatrixWorld(true);sunLight.updateMatrixWorld(true);
  sunLight.intensity=sunSettings.enabled?2.35:2.1;
  sunLight.castShadow=sunSettings.enabled;
  sunLight.shadow.mapSize.set(2048,2048);
@@ -5126,7 +5130,8 @@ function applySunSettings(){
  shadowCamera.near=.5;shadowCamera.far=radius*3.5;
  sunLight.shadow.bias=-.00012;sunLight.shadow.normalBias=.014;sunLight.shadow.radius=2;
  shadowCamera.updateProjectionMatrix();
- if(renderer)renderer.shadowMap.needsUpdate=true;
+ if(renderer){renderer.shadowMap.enabled=true;renderer.shadowMap.needsUpdate=true;sunLight.shadow.needsUpdate=true;}
+ cad3dSyncCompactBars();
 }
 function renderDraftModes(){
  root.querySelectorAll('[data-draft-mode]').forEach(function(button){
