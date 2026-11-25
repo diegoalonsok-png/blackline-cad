@@ -233,8 +233,15 @@
  const normalizeTerm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
  const termIndex=new Map(blockTerms.flatMap(([keys,re])=>(keys.includes('|')?keys.split('|'):keys.split(' ')).map(k=>[normalizeTerm(k),re])));
  function filtered(pool=items().filter(inView)){
-  const q=normalizeTerm(st.q),syn=termIndex.get(q);
-  return pool.filter(it=>{if(st.cat&&groupOf(it)!==st.cat)return false;if(!q)return true;const name=normalizeTerm(it.name+' '+tr(it.name)+' '+it.id.replace(/[_-]/g,' '));return syn?syn.test(name):normalizeTerm(name+' '+it.cat+' '+tr(it.cat)+' '+familyOf(it)).includes(q)});
+  const q=normalizeTerm(st.q),syn=termIndex.get(q),tokens=q.split(/[\s_-]+/).filter(Boolean);
+  return pool.filter(it=>{
+   if(st.cat&&groupOf(it)!==st.cat)return false;
+   if(!q)return true;
+   const name=normalizeTerm([it.name,tr(it.name),String(it.id||'').replace(/[_-]/g,' '),it.source].filter(Boolean).join(' '));
+   const all=normalizeTerm([name,it.cat,tr(it.cat),familyOf(it),...(Array.isArray(it.tags)?it.tags:[])].filter(Boolean).join(' '));
+   if(syn&&syn.test(name))return true;
+   return all.includes(q)||tokens.every(t=>{const alias=termIndex.get(t);return alias?alias.test(name)||all.includes(t):all.includes(t)});
+  });
  }
  // Nombres visibles simples; identificadores, definiciones y búsqueda original intactos.
  function simpleBlockNames(){
