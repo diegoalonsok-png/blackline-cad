@@ -5149,8 +5149,9 @@ function setPlacement(which){
  }
  if(which)cad3dEndZoom();
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
- if(which&&['line','polyline','rectangle','ellipse','roundrect','circle','arc','wall','slab','floor','dist','stair','railing'].includes(which)){
-  cad3dNavigationTool='select';cad3dSyncCompactBars();
+ if(which){
+  // All placement commands, including hosted doors/windows, own the left click.
+  cad3dNavigationTool='select';root?.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();
  }
  cad3dUpdateDraftPreview();
  if(!root)return;
@@ -5988,19 +5989,17 @@ function bindCanvas(el){
   // Drawing takes precedence over navigation. Commit a point at pointerdown,
   // so a slight mouse movement or a lost pointerup cannot pan/orbit instead.
   // Alt+left, middle and right buttons remain available for navigation.
-  if(e.button===0&&cad3dZoomActive&&cad3dNavigationTool!=='pan'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+  if(e.button===0&&cad3dZoomActive&&!placing&&cad3dNavigationTool!=='pan'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
    dragging={id:e.pointerId,x:e.clientX,y:e.clientY,lastX:e.clientX,lastY:e.clientY,moved:false,zoom:true};
    el.setPointerCapture(e.pointerId);return;
   }
-  // The material brush wins over navigation or an old drawing command.
-  // Paint on pointerdown, like SketchUp's material bucket.
-  if(e.button===0&&cad3dMaterialPaint&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
-   if(placing)setPlacement(null);
+  // The material brush is active only when no placement command is armed.
+  if(e.button===0&&cad3dMaterialPaint&&!placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
    hideObjectContextMenu();
    cad3dApplyMaterialClick(e);
    return;
   }
-  if(e.button===0&&placing&&cad3dNavigationTool==='select'&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
+  if(e.button===0&&placing&&!e.altKey&&!e.ctrlKey&&!e.metaKey){
    hideObjectContextMenu();
    var startRectangle=cad3dIsRectangle(placing)&&!firstPoint;
    placeAt(e);
@@ -6127,15 +6126,21 @@ function fallbackHostHit(e,type){
 }
 function hostHitAt(e,type){
  if(fallbackCanvas)return fallbackHostHit(e,type);
- rayAt(e);var meshes=[];
+ if(!renderer||!modelRoot)return null;
+ rayAt(e);var meshes=[],hosts=new Map();
+ var eligible=new Map(records.filter(function(r){return r.type===type&&editableRecord(r);}).map(function(r){return [r.id,r];}));
+ modelRoot.updateMatrixWorld(true);
  modelRoot.children.forEach(function(group){
-  if(records.some(function(r){return r.id===group.userData.owner&&r.type===type&&editableRecord(r);})){
-   group.traverse(function(o){if(o.isMesh)meshes.push(o);});
-  }
+  var host=eligible.get(group.userData.owner);
+  if(!host||group.visible===false)return;
+  group.traverse(function(o){
+   // Only actual host surfaces, not existing door leaves or window glass.
+   if(o.isMesh&&o.visible!==false&&(o.userData.cadWallPart||o.userData.cadWallTexture)){meshes.push(o);hosts.set(o,host);}
+  });
  });
  var hit=raycaster.intersectObjects(meshes,false)[0];
  if(!hit)return null;
- return {host:records.find(function(r){return r.id===hit.object.userData.owner;}),point:hit.point};
+ return {host:hosts.get(hit.object),point:hit.point};
 }
 /* Validate architectural opening edits before changing the wall geometry. */
 /* Polygonal through-holes in rectangular architectural slabs. Coordinates are slab-local. */
@@ -6234,6 +6239,7 @@ function placeOpening(e){
  if(style.w>rec.w||span>(slab?rec.d:rec.h)){
   text('El vano es más grande que el elemento. Elegí otro estilo o ajustá el tamaño del elemento.');return;
  }
+ if(!Array.isArray(rec.openings))rec.openings=[];
  if(rec.openings.length>=150){text('Este elemento ya alcanzó el límite de 150 vanos');return;}
  var dx=hit.point.x-rec.x,dy=hit.point.y-rec.y,rot=(rec.rot||0)*Math.PI/180,c=Math.cos(rot),s=Math.sin(rot);
  var maxX=(rec.w-style.w)/2;
