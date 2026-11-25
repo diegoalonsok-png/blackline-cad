@@ -361,3 +361,28 @@ body:has(.app.blackline-modern.bl-light) #blFileMenu button:hover,body:has(.app.
 .app.blackline-modern.bl-light .cmd .command-row {background:#dce1e5!important;border-color:#aeb8c1!important}
 .app.blackline-modern.bl-light .cmd .command-row input::placeholder {color:#526471!important}
 .app.blackline-modern.bl-light :is(input:not([type=color]),select,.filename) {background:#e0e4e7!important;color:#202c35!important;border-color:#aeb8c1!important}
+
+/* CAD3D follows the CAD2D metallic light interface */
+.app.blackline-modern.bl-light #cad3dLab {
+ --cad-ui-base:#d5dbe0;--cad-ui-raised:#c0c9d1;--cad-ui-toolbar:#cbd2d8;
+ --cad-ui-text:#202c35;--cad-ui-muted:#40515e;--cad-ui-edge:#aeb8c1;--cad-ui-input:#e0e4e7;
+ background:var(--cad-ui-base)!important;color:var(--cad-ui-text)!important;border-color:var(--cad-ui-edge)!important;
+}
+.app.blackline-modern.bl-light #cad3dLab :is(.head,.cad3dDockZone,.cad3dBasicBars,.cad3dNavToolbar,.cad3dStyleToolbar,.cad3dQuickViews,.camera3DBar,.cad3dModelTools,.cad3dProfileTools,.tools,.cad3dBar,.cad3dDockFloating,footer) {
+ background:#cbd2d8!important;border-color:#aeb8c1!important;color:#202c35!important;
+}
+.app.blackline-modern.bl-light #cad3dLab.cad3dCompactMode .cad3dDockZone>.cad3dDockBar {background:transparent!important;border-right-color:#aeb8c1!important}
+.app.blackline-modern.bl-light #cad3dLab :is(.cad3dDockBar,.camera3DBar,.cad3dModelTools,.cad3dProfileTools,.cad3dBasicBars,.tools,.cad3dQuickViews,.cad3dNavToolbar,.cad3dStyleToolbar) :is(strong,label) {color:#40515e!important}
+.app.blackline-modern.bl-light #cad3dLab :is(button.btn,label.btn,summary.btn,button.cad3dQuickTool,button.cad3dToolbarGrip,.viewNav button,.archTools button) {
+ background:linear-gradient(180deg,#e1e5e8,#cbd2d8)!important;color:#202c35!important;border-color:#aeb8c1!important;
+}
+.app.blackline-modern.bl-light #cad3dLab :is(button.btn,button.cad3dQuickTool,button.cad3dToolbarGrip,.viewNav button):hover {background:#c4ced7!important;border-color:#869baa!important}
+.app.blackline-modern.bl-light #cad3dLab :is(button.btn,button.cad3dQuickTool,.archTools button):is(.armed,.active,[aria-pressed=true],[aria-expanded=true]) {
+ background:#bfd4e7!important;color:#174c79!important;border-color:#739dc0!important;
+}
+.app.blackline-modern.bl-light #cad3dLab :is(.archPalette,.sunPanel,.cad3dMaterialsPanel,.viewSavePanel,.cad3dDetachedPanel,.cad3dGiroPalette,.side,.side>.panel,.cad3dStairsBeta,.cad3dMaterialCard,.cad3dMaterialEditor) {background:#d5dbe0!important;color:#202c35!important;border-color:#aeb8c1!important}
+.app.blackline-modern.bl-light #cad3dLab :is(.archTitle,.sunFloatingHeader,.cad3dMaterialsHeader,.viewSaveHeader,.panel-title) {background:#c0c9d1!important;color:#202c35!important;border-color:#aeb8c1!important}
+.app.blackline-modern.bl-light #cad3dLab .archLaunch span {color:#202c35!important}
+.app.blackline-modern.bl-light #cad3dLab .archLaunch svg [stroke="#e9f2f7"] {stroke:#263b49}
+.app.blackline-modern.bl-light #cad3dLab .archLaunch svg [fill="#e9f2f7"] {fill:#263b49}
+.app.blackline-modern.bl-light #cad3dLab :is(input:not([type=color]):not([type=range]):not([type=checkbox]):not([type=radio]),select) {background:#e0e4e7!important;color:#202c35!important;border-color:#aeb8c1!important}
