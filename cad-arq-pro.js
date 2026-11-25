@@ -1062,6 +1062,18 @@ function arqWebReference(raw){
  if(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q))return true;
  return /\b(?:planos?|plantas?|floor plans?|detalles constructivos|construction details|fachadas?|facades?|architectural references)\b/.test(q)&&!/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q);
 }
+async function insertCataloguePlanById(id,isCurrent=()=>true){
+ if(!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
+ if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
+ const epoch=++arqCommandEpoch;
+ const response=await fetch(new URL(id+'.json',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ const plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
+ if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
+ if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return false;
+ if(S().tool!=='select'||S().stage.length||!isCurrent())return false;
+ startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();return true;
+}
+window.CAD2D_INSERT_CATALOGUE_PLAN=insertCataloguePlanById;
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
 function arqObjectSearch(raw){
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/,'').replace(/^(?:un|una|el|la|a|an|the)\s+/,'').trim();
