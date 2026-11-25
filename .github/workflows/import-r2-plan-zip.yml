@@ -1,6 +1,10 @@
 name: Import classified floor plans from R2 staging
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/import-r2-plan-zip.py
 permissions:
   contents: read
 concurrency:
