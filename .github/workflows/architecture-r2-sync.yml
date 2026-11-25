@@ -1,0 +1,46 @@
+name: Sync architecture library to Cloudflare R2
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - assets/arq-catalogue/v1/**
+      - assets/architecture-references/**
+      - .github/workflows/architecture-r2-sync.yml
+  workflow_run:
+    workflows: ["Archive licensed architecture references"]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: architecture-r2-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.ARCHITECTURE_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.ARCHITECTURE_R2_SECRET_ACCESS_KEY }}
+      R2_ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.ARCHITECTURE_R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Upload assets and verify manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$AWS_ACCESS_KEY_ID" || -z "$AWS_SECRET_ACCESS_KEY" || -z "$R2_ACCOUNT" || -z "$R2_BUCKET" ]]; then
+            echo "::warning::R2 credentials or bucket variables not configured. Pages assets remain available."
+            exit 0
+          fi
+          endpoint="https://${R2_ACCOUNT}.r2.cloudflarestorage.com"
+          for dir in assets/arq-catalogue/v1 assets/architecture-references; do
+            test -s "$dir/index.json"
+            aws --endpoint-url "$endpoint" s3 sync "$dir/" "s3://$R2_BUCKET/$dir/" --exclude index.json --only-show-errors
+            aws --endpoint-url "$endpoint" s3 cp "$dir/index.json" "s3://$R2_BUCKET/$dir/index.json" --content-type application/json --cache-control no-cache --only-show-errors
+            aws --endpoint-url "$endpoint" s3api head-object --bucket "$R2_BUCKET" --key "$dir/index.json" --query ContentLength
+          done
