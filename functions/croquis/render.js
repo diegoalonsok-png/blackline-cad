@@ -19,6 +19,11 @@ function reply(error,status){
    without checking the account's total Workers AI usage. */
 const DAILY_CAP=20;
 const PER_VISITOR_CAP=3; // public mode: share the free daily budget between users
+/* Owner budget, separate from the public one: 60 owner + 20 public images are
+   about 8,800 neurons, still below the 10,000 free daily neurons. The owner is
+   recognised by the private key or by an IP listed in the CROQUIS_OWNER_IPS
+   secret (comma separated). Never commit IP addresses to the public repo. */
+const OWNER_DAILY_CAP=60;
 const MODEL='@cf/black-forest-labs/flux-2-klein-4b';
 const POLICY_VERSION='private-pilot-v1';
 /* Public mode (CROQUIS_PUBLIC=true) needs no key, but every request still passes
@@ -35,6 +40,17 @@ async function reserveVisitor(env,key){
  return await env.CROQUIS_QUOTA.prepare(
  'INSERT INTO croquis_visitor(day,visitor,attempts) VALUES(?,?,1) ON CONFLICT(day,visitor) DO UPDATE SET attempts=attempts+1 WHERE attempts<? RETURNING attempts'
  ).bind(day,key,PER_VISITOR_CAP).first();
+}
+function ownerIP(request,env){
+ var ip=request.headers.get('CF-Connecting-IP')||'';
+ var list=String(env.CROQUIS_OWNER_IPS||'').split(',').map(function(v){return v.trim();}).filter(Boolean);
+ return !!ip&&list.indexOf(ip)>=0;
+}
+async function reserveOwner(env){
+ var day='owner:'+new Date().toISOString().slice(0,10);
+ return await env.CROQUIS_QUOTA.prepare(
+ 'INSERT INTO croquis_daily(day,attempts) VALUES(?,1) ON CONFLICT(day) DO UPDATE SET attempts=attempts+1 WHERE attempts<? RETURNING attempts'
+ ).bind(day,OWNER_DAILY_CAP).first();
 }
 function secretConfigured(env){return typeof env.CROQUIS_PILOT_KEY==='string'&&env.CROQUIS_PILOT_KEY.length>=32;}
 function quotaConfigured(env){return !!env.CROQUIS_QUOTA&&typeof env.CROQUIS_QUOTA.prepare==='function';}
@@ -64,7 +80,11 @@ export async function onRequestPost({request,env}){
   if(!env.AI)return reply('Falta agregar el binding Workers AI con el nombre AI en Cloudflare Pages, entorno Production, y volver a desplegar.',503);
   if(env.CROQUIS_ENABLED!=='true')return reply('Generación IA desactivada por protección de consumo.',503);
   if(!secretConfigured(env)||!quotaConfigured(env))return reply('Piloto bloqueado: faltan la autorización privada o el contador persistente de consumo.',503);
-  if(!publicMode(env)&&!await authorized(request,env))return reply('Acceso privado: ingresá la clave del piloto de croquis.',401);
+  var hasKey=(request.headers.get('Authorization')||'').startsWith('Bearer ');
+  var keyOK=hasKey&&await authorized(request,env);
+  if(hasKey&&!keyOK)return reply('Clave de propietario incorrecta.',401);
+  var owner=keyOK||ownerIP(request,env);
+  if(!publicMode(env)&&!owner)return reply('Acceso privado: ingresá la clave del piloto de croquis.',401);
   if(env.CROQUIS_RATE_LIMIT){
    var allowed=await env.CROQUIS_RATE_LIMIT.limit({key:request.headers.get('CF-Connecting-IP')||'unknown'});
    if(!allowed.success)return reply('Límite de renders alcanzado.',429);
@@ -97,11 +117,14 @@ export async function onRequestPost({request,env}){
   // No premium model, additional reference, repeated inference or automatic retry.
   var reservation;
   try{
-   if(publicMode(env)){
+   if(owner){
+    reservation=await reserveOwner(env);
+    if(!reservation)return reply('Cupo de propietario agotado: '+OWNER_DAILY_CAP+' retoques hoy (UTC), para no salir de la cuota gratuita.',429);
+   }else{
     var mine=await reserveVisitor(env,await visitorKey(request,env));
     if(!mine)return reply('Ya usaste tus '+PER_VISITOR_CAP+' retoques gratuitos de hoy. Volvé mañana.',429);
+    reservation=await reserve(env);
    }
-   reservation=await reserve(env);
   }catch(e){
    console.error('Croquis quota unavailable',e&&e.message);
    return reply('Contador de consumo no disponible. No se ejecutó la IA.',503);

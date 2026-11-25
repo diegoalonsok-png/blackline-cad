@@ -111,6 +111,14 @@ function init(){
     form.append('width',String(w));form.append('height',String(h));
     tell('Generando el croquis en Cloudflare Workers AI…');
     var res=await fetch('/croquis/render',{method:'POST',body:form,headers:key?{Authorization:'Bearer '+key}:{},credentials:'same-origin',cache:'no-store',redirect:'error'});
+    if(res.status===429&&state.isPublic&&!key){
+     /* Owner on a changing home IP: offer the private key once, never stored. */
+     var ownerKey=window.prompt('Cupo gratuito agotado. Si sos el propietario, ingresá tu clave (no se guarda):');
+     if(ownerKey){
+      res=await fetch('/croquis/render',{method:'POST',body:form,headers:{Authorization:'Bearer '+ownerKey},credentials:'same-origin',cache:'no-store',redirect:'error'});
+      ownerKey=null;
+     }
+    }
     if(!res.ok){
      var error='HTTP '+res.status;try{var data=await res.json();error=data.error||error;}catch(_e){}
      throw Error(error);

@@ -19,7 +19,7 @@ El cliente puede fotografiar y guardar una perspectiva PNG sin IA. El renderizad
 ```sql
 CREATE TABLE IF NOT EXISTS croquis_daily (
  day TEXT PRIMARY KEY,
- attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 20)
+ attempts INTEGER NOT NULL CHECK (attempts BETWEEN 1 AND 60)
 );
 ```
 3. En Settings > Bindings del proyecto blackline-cad (Production) vincular esa base como CROQUIS_QUOTA. Crear el secreto CROQUIS_PILOT_KEY (tipo Secret) con valor aleatorio de >=32 caracteres.
@@ -44,3 +44,9 @@ CREATE TABLE IF NOT EXISTS croquis_visitor (
  PRIMARY KEY (day, visitor)
 );
 ```
+
+## Cupo del propietario
+El propietario tiene un cupo propio de 60 retoques por día (separado de los 20 públicos; en total ≈8.800 de las 10.000 neuronas gratuitas). Se lo reconoce de dos maneras:
+- por IP: secreto `CROQUIS_OWNER_IPS` en Cloudflare (una o varias IP separadas por coma). **Nunca escribir IP en este repositorio, que es público.**
+- por clave: si la IP cambia, al agotarse el cupo de visitante la página ofrece ingresar `CROQUIS_PILOT_KEY` (no se guarda en el navegador).
+La tabla `croquis_daily` admite hasta 60 intentos por fila porque el cupo del propietario se guarda en la fila `owner:AAAA-MM-DD`.
