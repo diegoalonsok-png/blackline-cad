@@ -258,12 +258,17 @@
   function render(node){
    if(epoch!==previewEpoch||!node.isConnected)return;
    const id=node.dataset.previewId,h=Number(node.dataset.previewHeight);
-   if(staticIds.has(id)||(/^olymp3-/.test(id)&&window.CAD2D_OLYMPIADAS3?.catalogReady)){
-    const img=document.createElement('img');img.alt='';img.decoding='async';img.loading='lazy';
-    img.style.cssText='display:block;width:100%;height:100%;object-fit:contain';
+   const dk=window.CAD2D_DK_DEMAND?.has(id),olymp=staticIds.has(id)||(/^olymp3-/.test(id)&&window.CAD2D_OLYMPIADAS3?.catalogReady);
+   if(dk||olymp){
+    const img=document.createElement('img');img.alt=T('Block preview','Vista previa del bloque');img.decoding='async';img.loading='eager';
+    img.style.cssText='display:block;width:100%;height:'+Math.max(40,Math.min(400,h||96))+'px;object-fit:contain';
     img.className='static-block-preview';
-    img.onerror=()=>{if(epoch===previewEpoch&&node.isConnected){try{node.innerHTML=ARQ.thumb(id,h)||'—'}catch(e){node.textContent='—'}}};
-    img.src='/assets/block-previews/v1/'+encodeURIComponent(id)+'.svg';node.replaceChildren(img);
+    node.setAttribute('aria-busy','true');
+    img.onload=()=>{if(epoch===previewEpoch&&node.isConnected)node.removeAttribute('aria-busy')};
+    img.onerror=()=>{if(epoch===previewEpoch&&node.isConnected){node.removeAttribute('aria-busy');node.textContent=T('Preview unavailable','Miniatura no disponible')}};
+    // IntersectionObserver already limits requests to visible or nearby cards.
+    // Never generate/download CAD geometry to paint a cloud thumbnail.
+    img.src=(dk?'assets/blackline-dk-demand-v1/':'/assets/block-previews/v1/')+encodeURIComponent(id)+'.svg';node.replaceChildren(img);
    }else{try{node.innerHTML=ARQ.thumb(id,h)}catch(e){node.textContent='—'}}
   }
   function pump(){
