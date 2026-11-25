@@ -580,6 +580,7 @@ const ask=(label,def)=>{const r=window.prompt(label,def);if(r===null)return null
 /* ---------- Comandos ---------- */
 const C={};
 const reg=(names,fn)=>{for(const n of names)C[n]=fn};
+reg(['CALCOPRUEBA','TRACEPYTHONTEST'],openReviewedTrace);
 reg(['GALERIA','GALERIAARQ','ARQ','DESIGNCENTER','ADC','TOOLPALETTES','TP','BIBLIOTECA','BLOQUESARQ'],()=>openModal());
 reg(['BANO','BANOS','BAÑO','BAÑOS','SANITARIOS'],()=>openModal('Baños completos'));
 reg(['COCINA','COCINAS'],()=>openModal('Cocinas completas'));
@@ -841,6 +842,59 @@ function applyArchitectureDetail(plan,origin){
  for(const e of plan.entities)st.entities.push({id:CORE.nextId(),type:'line',a:p(e.a),b:p(e.b),layer:getLayer(e.layer),width:e.layer==='SECTIONS'&&plan.brief?.kind==='bath_section'?.35:e.layer==='SECTION-FINISH'?.09:.18,arqBatch:batch});
  for(const {b,name} of resolved)st.entities.push({id:CORE.nextId(),type:'blockRef',blockName:name,p:p(b.point),scale:1,rotation:0,layer:getLayer(b.layer),arqBatch:batch});
  st.selected=[];CORE.updateAll();return plan.entities.length+fills.length+blocks.length;
+}
+
+/* CALCOPRUEBA: explicit, experimental import of a reviewed Python JSON.
+ * No raster inference, no server calls, no replacement of normal CALCO. */
+function prepareReviewedTrace(raw){
+ if(raw?.schema!=='blackline.architecture.review.v1'||raw.units!=='m'||!Array.isArray(raw.walls)||!Array.isArray(raw.openings)||!Array.isArray(raw.blocks))throw Error('Elegí un JSON revisado por Python.');
+ if(raw.walls.length>500||raw.openings.length>300||raw.blocks.length>500)throw Error('Plano demasiado grande.');
+ if((raw.dimensions||[]).length||(raw.texts||[]).length||(raw.projections||[]).length||(raw.hatches||[]).length)throw Error('Esta prueba aún no admite textos, cotas, proyecciones ni hatch.');
+ const ppm=raw.scale?.pixelsPerUnit;
+ if(!Number.isFinite(ppm)||ppm<=0)throw Error('Escala provisional inválida.');
+ const defs=raw.customBlockDefinitions||{}, custom=new Map();
+ const blocks=raw.blocks.map(b=>{
+  if(!Array.isArray(b.point)||b.point.length!==2||!b.point.every(Number.isFinite)||!Number.isFinite(b.rotation)||b.scale!==1||!Array.isArray(b.sourceFootprintPx)||b.sourceFootprintPx.length!==4||!b.sourceFootprintPx.every(Number.isFinite))throw Error('Bloque inválido.');
+  const [x,y,x1,y1]=b.sourceFootprintPx,sw=(x1-x)/ppm,sd=(y1-y)/ppm;
+  if(!(sw>0&&sd>0))throw Error('Huella inválida.');
+  let bb,item=byId(b.catalogId);
+  if(item&&allowed(item)&&!item.dxfPlan&&!item.remoteDK&&!item.remoteOlym){
+   bb=LIB.bounds(LIB.build(item.id,item.w,item.d).entities);
+  }else if(!item&&Object.prototype.hasOwnProperty.call(defs,b.catalogId)){
+   const def=defs[b.catalogId],pr=def?.primitives;
+   if(!/^[A-Za-z0-9_-]{1,80}$/.test(b.catalogId)||!Array.isArray(pr)||pr.length!==1||pr[0].type!=='rect'||!Array.isArray(pr[0].a)||!Array.isArray(pr[0].b)||pr[0].a.length!==2||pr[0].b.length!==2||![...pr[0].a,...pr[0].b].every(v=>Number.isFinite(v)&&Math.abs(v)<=20))throw Error('Bloque nuevo no admitido: '+b.catalogId);
+   const [ax,ay]=pr[0].a,[bx,by]=pr[0].b;
+   bb={minX:Math.min(ax,bx),maxX:Math.max(ax,bx),minY:Math.min(ay,by),maxY:Math.max(ay,by)};
+   if(!(bb.maxX>bb.minX&&bb.maxY>bb.minY))throw Error('Bloque rectangular vacío.');
+   custom.set(b.catalogId,{a:[ax,ay],b:[bx,by]});
+  }else throw Error('Bloque de catálogo no disponible: '+b.catalogId);
+  if(!bb)throw Error('Bloque sin geometría.');
+  const theta=b.rotation*Math.PI/180,c=Math.cos(theta),s=Math.sin(theta),cx=(bb.minX+bb.maxX)/2,cy=(bb.minY+bb.maxY)/2;
+  return {...b,point:[b.point[0]+sw/2-(cx*c-cy*s),b.point[1]+sd/2-(cx*s+cy*c)],scale:1,...(item?{nominalSize:[item.w,item.d]}:{})};
+ });
+ const openings=raw.openings.map(o=>{
+  if(!o.nativeMarginOK||!['swing-door','double-door','framed-window'].includes(o.kind))throw Error('Abertura pendiente de revisión: '+o.host);
+  if(o.kind!=='framed-window'&&(!o.orientation||typeof o.orientation.mirror!=='boolean'||typeof o.orientation.reverseHostDirection!=='boolean'))throw Error('Sentido de puerta no confirmado.');
+  return {...o};
+ });
+ return {plan:{schema:'blackline.architecture.v1',units:'m',traceReviewed:true,walls:raw.walls,openings,blocks,rooms:[]},custom};
+}
+function insertReviewedTrace(raw){
+ if(S().entities.length)throw Error('Abrí un dibujo vacío para esta prueba.');
+ const {plan,custom}=prepareReviewedTrace(raw);
+ if(!window.confirm('Calco experimental revisado manualmente. Escala provisional, sin cotas. ¿Insertar en el dibujo vacío?'))return;
+ const n=CORE.wall.applyPlan(plan,P(0,0),b=>{
+  if(!custom.has(b.catalogId)){const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true);}
+  const def=custom.get(b.catalogId),k=f(),name='CALCO · '+b.catalogId+' · '+JSON.stringify(def)+' · '+S().unit;
+  if(!S().blocks[name])S().blocks[name]={name,entities:[{type:'rect',a:P(def.a[0]*k,def.a[1]*k),b:P(def.b[0]*k,def.b[1]*k),layer:'0',color:'#ffffff',width:.13}],dynamicActions:true,libraryLayer0:true};
+  return name;
+ });
+ CORE.toast('CALCOPRUEBA: '+n+' entidades nativas. Escala provisional.');
+}
+function openReviewedTrace(){
+ const input=document.createElement('input');input.type='file';input.accept='.json,application/json';
+ input.onchange=async()=>{try{const file=input.files?.[0];if(!file)return;if(file.size>2*1024*1024)throw Error('JSON supera 2 MB.');insertReviewedTrace(JSON.parse(await file.text()));}catch(e){CORE.toast('CALCOPRUEBA: '+e.message);}};
+ input.click();
 }
 
 window.CAD2D_APPLY_TRACE_PLAN=(plan,origin)=>applyArchitecture(plan,origin);
