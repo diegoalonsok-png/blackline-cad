@@ -2080,6 +2080,8 @@ function updateAll(){cadDrawEpoch++;cadSetDrawingName(state.file);renderBlockLib
 function units(v){return Number(v).toFixed(state.precision)}function screen(p){return P(state.view.ox+p.x*state.view.scale,state.view.oy-p.y*state.view.scale)}function world(p){return P((p.x-state.view.ox)/state.view.scale,(state.view.oy-p.y)/state.view.scale)}
 function resize(){dpr=Math.min(devicePixelRatio||1,2);const r=wrap.getBoundingClientRect();const prev=state._size||P(r.width,r.height);if(!state._size){state.view.ox=r.width/2;state.view.oy=r.height/2}else{state.view.ox+=(r.width-prev.x)/2;state.view.oy+=(r.height-prev.y)/2}state._size=P(r.width,r.height);const pw=Math.max(1,Math.floor(r.width*dpr)),ph=Math.max(1,Math.floor(r.height*dpr));if(canvas.width!==pw)canvas.width=pw;if(canvas.height!==ph)canvas.height=ph;schedule()}
 var cadIdleFrame=null,cadIdleFrameValid=false,cadPointerIndex=null,cadPointerQueryActive=false,cadPanPaintIndex=null,cadPaintNavigation=null;
+var cadLastInteractiveMotion=-Infinity;
+function cadInteractionBusy(now=performance.now()){return !!state.drag||now-cadLastInteractiveMotion<250;}
 // Only these tools draw their transient previews after the static scene. No model edits
 // occur during passive mouse movement; all commits and other events still invalidate it.
 const cadPassiveSceneTools=new Set(['select','line','polyline','rect','circle','arc','ellipse','polygon','wall2d','distance','area','dimension']);
@@ -3652,7 +3654,7 @@ function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selec
   }
   ctx.restore();return;
  }if(e.type==='text'){if(e.attdef){ctx.restore();const t={...e,text:String(e.attdef.tag||'ATRIBUTO'),italic:true};delete t.attdef;drawEntity(t,forceColor,selectedIds);return}if(cadIsMText(e)){ctx.restore();for(const line of cadMTextLines(e))drawEntity(line,forceColor,selectedIds);return}if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor,selectedIds);return}
- const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=ctx.measureText(label).width;
+ const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=e.highlight||e.underline?ctx.measureText(label).width:0;
  if(e.highlight){
   const size=Math.max(7,e.h*state.view.scale),pad=Math.max(3,size*.14);
   ctx.save();ctx.setLineDash([]);ctx.globalAlpha=1;
@@ -3859,7 +3861,7 @@ function cadZoomShortcut(ev){
  $(button).click();
  return true;
 }
-function centerZoom(f,at){cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule('zoom')}
+function centerZoom(f,at){cadLastInteractiveMotion=performance.now();cadRememberView();let old=world(at);state.view.scale=Math.min(150000,Math.max(.0001,state.view.scale*f));state.view.ox=at.x-old.x*state.view.scale;state.view.oy=at.y+old.y*state.view.scale;schedule('zoom')}
 function getVertices(e){if(e.type==='blockRef')return [e.p];if(e.type==='line'||e.type==='rect'||e.type==='dimension'||e.type==='image')return [e.a,e.b,...(e.p?[e.p]:[])];if(e.type==='polyline')return e.pts;if(e.type==='circle'||e.type==='arc'||e.type==='ellipse')return [e.c];if(e.type==='text')return [e.p];return []}
 let snapIndicator=null;
 let otrkOn=false,otrkAnchors=[],otrkGuide=null;
@@ -6262,7 +6264,7 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
   const e=pick(world(raw));if(!e)state.drag.type='selectionStart';
  } });
 canvas.addEventListener('pointermove',ev=>{
- const raw=P(ev.offsetX,ev.offsetY),d=state.drag;pointer=raw;
+ const raw=P(ev.offsetX,ev.offsetY),d=state.drag;pointer=raw;cadLastInteractiveMotion=performance.now();
  if(d?.type==='pan'){
   state.view.ox=d.origin.x+raw.x-d.start.x;state.view.oy=d.origin.y+raw.y-d.start.y;
   state.mouse=world(raw);
@@ -7944,7 +7946,14 @@ async function cad2dAutoSave(force=false){
  }catch(err){console.warn('[CAD2D AUTOSAVE]',err)}
  finally{cadAutoSaveBusy=false}
 }
-setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
+// Do not start the periodic DXF export in the middle of a gesture if avoidable.
+// At most one 30-second interval can be deferred; explicit saves remain immediate.
+let cadAutoSaveDeferred=false;
+setInterval(()=>{
+ if(!(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)){cadAutoSaveDeferred=false;return}
+ if(!cadAutoSaveDeferred&&cadInteractionBusy()){cadAutoSaveDeferred=true;return}
+ cadAutoSaveDeferred=false;cad2dAutoSave();
+},30000);
 /* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
    Cada autoguardado deja una copia DXF completa (con el proyecto CAD2D adentro) en el navegador; se guardan las
    últimas 10 por dibujo. Si se eligió una carpeta de copias, además se escribe <nombre>.bak ahí.
@@ -9310,6 +9319,7 @@ $('printBackdrop').addEventListener('click',e=>{if(e.target===$('printBackdrop')
 /* Non-network IndexedDB backups: one recoverable snapshot per browser origin. */
 const CAD2D_BACKUP_DB='cad2d-local-recovery-v1';
 let backupTimer=null,backupAvailable=false,backupEnabled=true,backupDb=null;
+let cadBackupQueuedAt=null;
 function openBackupDatabase(){
  return new Promise(resolve=>{
   if(!('indexedDB' in window)){resolve(null);return}
@@ -9347,6 +9357,7 @@ function backupStatus(message){const el=$('backupStatus');if(el)el.textContent=m
 var cadLocalBackupJob=null,cadLocalBackupPending=false;
 function persistLocalBackup(){
  if(!backupDb||!backupEnabled)return Promise.resolve(false);
+ cadBackupQueuedAt=null;
  cadLocalBackupPending=true;
  if(cadLocalBackupJob)return cadLocalBackupJob;
  cadLocalBackupJob=Promise.resolve().then(async()=>{
@@ -9364,10 +9375,22 @@ function persistLocalBackup(){
  }).finally(()=>{cadLocalBackupJob=null;cadLocalBackupPending=false});
  return cadLocalBackupJob;
 }
+// Save after a quiet interval, but bound the delay even during continuous editing.
+function cadBackupDelay(now,queuedAt,busy){
+ const remaining=Math.max(0,10000-(now-queuedAt));
+ return remaining===0||!busy?0:Math.min(350,remaining);
+}
 function queueLocalBackup(){
  if(!backupDb||!backupEnabled)return;
+ const now=performance.now();if(cadBackupQueuedAt===null)cadBackupQueuedAt=now;
  clearTimeout(backupTimer);
- backupTimer=setTimeout(()=>{backupTimer=null;persistLocalBackup()},1800);
+ function attempt(){
+  backupTimer=null;if(!backupDb||!backupEnabled){cadBackupQueuedAt=null;return}
+  const time=performance.now(),delay=cadBackupDelay(time,cadBackupQueuedAt??time,cadInteractionBusy(time));
+  if(delay>0){backupTimer=setTimeout(attempt,delay);return}
+  persistLocalBackup();
+ }
+ backupTimer=setTimeout(attempt,Math.min(1800,Math.max(0,10000-(now-cadBackupQueuedAt))));
 }
 async function initializeLocalBackup(){
  await openBackupDatabase();
@@ -9390,7 +9413,7 @@ async function restoreLocalBackup(silent){
   if(!snap||!Array.isArray(snap.entities)||!Array.isArray(snap.layers))return toast('No valid backup found');
   if(silent!==true&&!window.confirm('Restore local drawing from '+new Date(snap.savedAt).toLocaleString()+'? This replaces the current model. Save your open drawing first if needed.'))return;
   if(cadBlockEdit)return toast('Close the block editor before restoring a drawing');
-  clearTimeout(backupTimer);backupEnabled=false;cadLocalBackupPending=false;
+  clearTimeout(backupTimer);cadBackupQueuedAt=null;backupEnabled=false;cadLocalBackupPending=false;
   cadProjectSaveHandle=null;cadDwgLastSaved=null;
   state.entities=snap.entities;state.layers=snap.layers;state.layerStates=cadLayerStatesValidate(snap.layerStates);state.blocks=snap.blocks||{};state.dimStyles=snap.dimStyles||{};state.activeDimStyle=snap.activeDimStyle||'';renderDimStyles();if(state.dimStyles[state.activeDimStyle])applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);
   state.unit=U[snap.unit]?snap.unit:'m';state.grid=Number(snap.grid)||1;
@@ -9406,7 +9429,7 @@ async function restoreLocalBackup(silent){
 async function deleteLocalBackup(){
  if(!backupDb)return toast('Local storage unavailable');
  if(!window.confirm('Permanently delete the CAD2D local backup in this browser?'))return;
- clearTimeout(backupTimer);backupEnabled=false;cadLocalBackupPending=false;
+ clearTimeout(backupTimer);cadBackupQueuedAt=null;backupEnabled=false;cadLocalBackupPending=false;
  try{if(cadLocalBackupJob)await cadLocalBackupJob;await backupTransaction('readwrite',store=>store.delete('current'));backupAvailable=false;backupStatus('No backup saved in this browser.');toast('Local backup deleted')}catch(ex){alert('Could not delete backup: '+ex.message)}
  backupEnabled=true;
 }
