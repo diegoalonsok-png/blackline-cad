@@ -11321,10 +11321,10 @@ function cadRenderQuickGeometry(selected){
  const degrees=a=>((a*180/Math.PI)%360+360)%360;
  const addField=(key,title,value,canEdit=editable)=>{
   if(value!==null&&!Number.isFinite(value))return;
-  const shown=value===null?'':String(Number(value.toPrecision(canEdit?12:8)));
+  const shown=value===null?'':state.unit==='m'?value.toFixed(2):String(Number(value.toPrecision(canEdit?12:8)));
   const content=canEdit?
    '<input type="number" step="any" data-cad-geometry="'+key+'"'+(key==='globalWidth'?' id="cadPropsPwidth" placeholder="Varios"':'')+
-    ' value="'+shown+'" aria-label="'+escapeHTML(title)+'">':
+    ' value="'+shown+'" data-cad-shown="'+shown+'" aria-label="'+escapeHTML(title)+'">':
    '<output aria-label="'+escapeHTML(title)+'">'+shown+'</output>';
   fields.push('<label>'+escapeHTML(title)+content+'</label>');
  };
@@ -11391,6 +11391,8 @@ function cadRenderQuickGeometry(selected){
 }
 function cadApplyQuickGeometry(input){
  const key=input.dataset.cadGeometry,value=input.valueAsNumber;
+ // An unchanged rounded display must never quantize the model on Enter.
+ if(input.dataset.cadShown!==undefined&&input.dataset.cadShown!==''&&Number(input.dataset.cadShown)===value)return;
  const selected=cadQuickPropertyTargets(true);
  const rejected=message=>{refreshCadQuickProperties();if(message)toast(message)};
  if(key==='textFont'){
