@@ -4365,7 +4365,7 @@ function build(){
  '<div class="layerPanel panel-content"><select aria-label="Capa activa 3D"></select>'+
  '<button type="button" class="btn" data-layer-toggle="add">+ Layer</button> '+
  '<button type="button" class="btn" data-layer-toggle="visible"></button> '+
- '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
+ '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
  '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
@@ -4646,6 +4646,7 @@ function build(){
   if(button)changeLayer(button.dataset.layerToggle);
  });
  root.querySelector('.layerPanel').addEventListener('input',function(e){
+  if(e.target.matches('[data-layer-search]')){renderLayerPanel();return;}
   var input=e.target.closest('[data-cad3d-layer-action="color"]');if(!input)return;
   var l=layers.find(function(item){return item.id===input.dataset.layerId;});if(l)l.color=input.value;
  });
@@ -4770,8 +4771,8 @@ function beginResize(e){
  grip.addEventListener('pointercancel',end);
 }
 function layerForRecord(r){return layers.find(function(l){return l.id===(r.layerId||'0');})||layers[0];}
-function visibleRecord(r){return layerForRecord(r).visible;}
-function editableRecord(r){var layer=layerForRecord(r);return layer.visible&&!layer.locked;}
+function visibleRecord(r){const layer=layerForRecord(r);return layer.visible&&!layer.frozen;}
+function editableRecord(r){var layer=layerForRecord(r);return layer.visible&&!layer.frozen&&!layer.locked;}
 function layerOptions(id){
  return layers.map(function(l){return '<option value="'+escapeHtml(l.id)+'"'+(l.id===id?' selected':'')+'>'+escapeHtml(l.name)+'</option>';}).join('');
 }
@@ -4780,26 +4781,30 @@ function renderLayerPanel(){
  panel.querySelector('select').innerHTML=layerOptions(layer.id);
  panel.querySelector('[data-layer-toggle=visible]').textContent=layer.visible?'Hide':'Show';
  panel.querySelector('[data-layer-toggle=locked]').textContent=layer.locked?'Unlock':'Lock';
+ panel.querySelector('[data-layer-toggle=freeze]').textContent=layer.frozen?'Descongelar':'Congelar';
  var list=panel.querySelector('.cad3dLayerList'),counts=new Map();for(const r of records){const id=r.layerId||'0';counts.set(id,(counts.get(id)||0)+1);}
- if(list)list.innerHTML=layers.map(function(l){
+ const query=(panel.querySelector('[data-layer-search]')?.value||'').trim().toLocaleLowerCase();
+ if(list)list.innerHTML=layers.filter(l=>!query||l.name.toLocaleLowerCase().includes(query)).map(function(l){
   var color=/^#[0-9a-f]{6}$/i.test(l.color||'')?l.color:'#92b3c8';
   return '<div class="cad3dLayerRow'+(l.id===currentLayer?' cad3dLayerCurrent':'')+'">'+
    '<button type="button" data-cad3d-layer-action="visible" data-layer-id="'+escapeHtml(l.id)+'" title="Mostrar u ocultar">'+(l.visible?'◉':'○')+'</button>'+
    '<button type="button" data-cad3d-layer-action="locked" data-layer-id="'+escapeHtml(l.id)+'" title="Bloquear o desbloquear">'+(l.locked?'🔒':'♢')+'</button>'+
    '<input type="color" data-cad3d-layer-action="color" data-layer-id="'+escapeHtml(l.id)+'" aria-label="Color de capa" value="'+color+'">'+
-   '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+escapeHtml(l.name)+' · '+(counts.get(l.id)||0)+'</button></div>';
+   '<button type="button" class="cad3dLayerName" data-cad3d-layer-action="select" data-layer-id="'+escapeHtml(l.id)+'" aria-pressed="'+(l.id===currentLayer)+'">'+(l.frozen?'❄ ':'')+escapeHtml(l.name)+' · '+(counts.get(l.id)||0)+'</button></div>';
  }).join('');
 }
 function changeLayer(kind){
  const active=layerForRecord({layerId:currentLayer});
- if(kind==='rename'){
+ if(kind==='freeze'){
+  active.frozen=!active.frozen;
+ }else if(kind==='rename'){
   if(active.id==='0')return text('No se puede renombrar la capa 0');
   const name=window.prompt('Nuevo nombre de capa 3D',active.name)?.trim().slice(0,60);
   if(!name||name===active.name)return;
   if(layers.some(l=>l!==active&&l.name.toLowerCase()===name.toLowerCase()))return text('Ya existe una capa con ese nombre');
   active.name=name;
  }else if(kind==='assign'){
-  if(!active.visible||active.locked)return text('La capa de destino debe estar visible y desbloqueada');
+  if(!active.visible||active.locked||active.frozen)return text('La capa de destino debe estar visible, descongelada y desbloqueada');
   const ids=new Set(selected),items=records.filter(r=>ids.has(r.id)&&editableRecord(r));
   if(!items.length)return text('Seleccioná objetos 3D editables');
   for(const r of items)r.layerId=active.id;
@@ -8117,7 +8122,8 @@ function change(e){
   Object.assign(opening,candidate);selectedOpeningId=opening.id;redraw();renderProps();text('Modelo de carpintería actualizado');return;
  }
  if(input.matches('select[data-object-layer]')){
-  if(layers.some(function(l){return l.id===input.value;}))r.layerId=input.value;
+  if(layers.some(function(l){return l.id===input.value&&!l.frozen&&l.visible&&!l.locked;}))r.layerId=input.value;
+  else{renderProps();return text('Capa de destino no editable');}
   if(!editableRecord(r))selected=[];
   redraw();renderProps();text('Capa del objeto actualizada');return;
  }
@@ -9120,7 +9126,7 @@ function cad3dMassProperties(r){
 function cad3dPropertyDetails(r,p){
  const layer=layerForRecord(r),fmt=n=>Number.isFinite(n)?n.toFixed(4):'—',rows=[];
  const add=(k,v)=>rows.push([k,String(v)]);
- add('Estado de capa',!layer.visible?'Oculta':layer.locked?'Bloqueada':'Visible / editable');
+ add('Estado de capa',layer.frozen?'Congelada':!layer.visible?'Oculta':layer.locked?'Bloqueada':'Visible / editable');
  if(layer.color)add('Color de capa (indicador)',layer.color);
  if(r.materialColor)add('Color de objeto',r.materialColor);
  if(r.materialId)add('Material',r.materialId);
@@ -9457,7 +9463,7 @@ async function readJSON(e){
   var importedLayers=[{id:'0',name:'0',visible:true,locked:false}];
   if(Array.isArray(data.layers))data.layers.slice(0,100).forEach(function(l){
    if(!l||typeof l.id!=='string'||!l.id||l.id.length>60)return;
-   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true,...(/^#[0-9a-f]{6}$/i.test(l.color||'')?{color:l.color}:{})};
+   var layer={id:l.id,name:String(l.name||l.id).slice(0,60),visible:l.visible!==false,locked:l.locked===true,frozen:l.frozen===true,...(/^#[0-9a-f]{6}$/i.test(l.color||'')?{color:l.color}:{})};
    if(l.id==='0')importedLayers[0]=layer;
    else if(importedLayers.length<100&&!importedLayers.some(function(x){return x.id===l.id;}))importedLayers.push(layer);
   });
