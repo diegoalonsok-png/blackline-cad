@@ -206,9 +206,24 @@ const authDescription=$('cadAuthDescription'),authStatus=$('cadAuthStatus'),auth
 let locked=false;
 function showAuth(isLocked=false){
  locked=isLocked;authLayer.hidden=false;
- const note=daysLeft>0?'Your 4-month free period has '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining. You can keep drawing without an account.':
-  'Your 4-month free period has elapsed.';
- authDescription.textContent=note+(isLocked?' Registration is now required to continue using the hosted service.':loginUrl?' You may create your account now.':' Account registration will be enabled once the secure service is deployed. Until then, CAD2D remains usable as a public beta.');
+ const es=/^es/i.test((()=>{try{return localStorage.getItem('cad2d-alias-language')||doc.documentElement.lang||''}catch(e){return ''}})());
+ const T=(a,b)=>es?a:b;
+ // Signed in: the server's plan is the real one (not this browser's local count).
+ const plan=window.CAD2D_PLAN?.status;
+ if(plan&&plan.source==='server'&&plan.email){
+  locked=false;authLayer.hidden=false;
+  const pro=plan.plan==='pro'||plan.plan==='studio';
+  const until=plan.trialEndsAt?new Date(plan.trialEndsAt):null,left=until?Math.ceil((until-Date.now())/86400000):0;
+  authDescription.textContent=T('Sesión iniciada como ','Signed in as ')+plan.email+'. '+
+   (pro?T('Plan '+(plan.plan==='studio'?'Estudio':'Pro')+' activo.','Your '+(plan.plan==='studio'?'Studio':'Pro')+' plan is active.'):
+    plan.plan==='trial'&&left>0?(left>730?T('Prueba PRO sin vencimiento.','PRO trial without expiry.'):T('Prueba PRO: quedan '+left+' días de los 90 días gratis.','PRO trial: '+left+' of your 90 free days remaining.')):
+    T('Plan gratuito.','Free plan.'));
+  authRegister.hidden=true;authDismiss.hidden=false;authDismiss.disabled=false;authStatus.textContent='';authDismiss.focus();
+  return;
+ }
+ const note=daysLeft>0?T('Tu período gratuito de 3 meses (90 días) tiene '+daysLeft+' día'+(daysLeft!==1?'s':'')+' restantes. Podés seguir dibujando sin cuenta.','Your 3-month (90-day) free period has '+daysLeft+' day'+(daysLeft!==1?'s':'')+' remaining. You can keep drawing without an account.'):
+  T('Tu período gratuito de 3 meses (90 días) terminó.','Your 3-month (90-day) free period has elapsed.');
+ authDescription.textContent=note+(isLocked?T(' Para seguir usando el servicio hace falta crear una cuenta.',' Registration is now required to continue using the hosted service.'):loginUrl?T(' Podés crear tu cuenta cuando quieras.',' You may create your account now.'):T(' El registro de cuentas se habilitará cuando el servicio seguro esté publicado. Mientras tanto, CAD2D funciona como beta pública.',' Account registration will be enabled once the secure service is deployed. Until then, CAD2D remains usable as a public beta.'));
  authRegister.hidden=!loginUrl;
  authDismiss.hidden=isLocked;
  authStatus.textContent='';
