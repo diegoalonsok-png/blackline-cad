@@ -57,11 +57,27 @@ def validated(z,row):
     digest=hashlib.sha256(data[0]).hexdigest()
     if digest!=row["sha256"] or row["id"]!="user-drive-"+digest[:20]: raise ValueError("Hash mismatch")
     return data,digest
+def find_staging():
+    try:
+        return STAGING,client.head_object(Bucket=bucket,Key=STAGING)["ContentLength"]
+    except ClientError as e:
+        if e.response["Error"]["Code"] not in ("404","NoSuchKey","NotFound"): raise
+    candidates=[]
+    for page in client.get_paginator("list_objects_v2").paginate(Bucket=bucket,Prefix="incoming/"):
+        for obj in page.get("Contents",[]):
+            key=obj["Key"]
+            if re.fullmatch(r"ARQASSIST_plantas_clasificadas_R2(?:[ _-]*\(?\d+\)?)?\.zip",key.rsplit("/",1)[-1],re.I):
+                candidates.append((key,obj["Size"]))
+    if len(candidates)!=1:
+        raise ValueError(f"Expected exactly one matching ARQASSIST ZIP in incoming/; found {len(candidates)}")
+    return candidates[0]
 def main():
-    if client.head_object(Bucket=bucket,Key=STAGING)["ContentLength"]>200*1024*1024: raise ValueError("Staging ZIP too large")
+    staging,size=find_staging()
+    print("Staging ZIP:",staging,"bytes:",size)
+    if size>200*1024*1024: raise ValueError("Staging ZIP too large")
     with tempfile.TemporaryDirectory() as tmp:
         archive=pathlib.Path(tmp)/"plans.zip"
-        client.download_file(bucket,STAGING,str(archive))
+        client.download_file(bucket,staging,str(archive))
         with zipfile.ZipFile(archive) as z:
             manifest_info=z.getinfo("manifest.json")
             if manifest_info.file_size>2_000_000: raise ValueError("Manifest too large")
