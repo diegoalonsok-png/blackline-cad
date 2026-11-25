@@ -5317,22 +5317,31 @@ function cadDetailedProperties(e){
  if(e.type==='blockRef'||e.type==='dimension'||e.type==='image'){const b=boundsEntity(e);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)){add('Extensión X',len(b.maxX-b.minX));add('Extensión Y',len(b.maxY-b.minY));}}
  return rows;
 }
+// Long-form CSV preserves type-specific properties without inventing missing fields.
+function cadPropertiesCSV(objects){
+ const esc=value=>{let s=String(value??'');if(/^\s*[=+@-]/.test(s)&&!/^[-+]?(?:\d+(?:[.,]\d+)?|[.,]\d+)(?:e[-+]?\d+)?$/i.test(s.trim()))s="'"+s;return '"'+s.replace(/"/g,'""')+'"';};
+ const lines=[['ID','Tipo','Capa','Propiedad','Valor']];
+ for(const e of objects){const values=cadDetailedProperties(e);for(const [key,value] of values)lines.push([e.id,e.type,layerFor(e).name,key,value]);}
+ return '\uFEFF'+lines.map(row=>row.map(esc).join(';')).join('\r\n');
+}
 function cadListEntities(){
  const chosen=selectedCadEntities();
  if(!chosen.length)return toast('LIST: seleccioná objetos para consultar sus propiedades');
  const rows=chosen.map(e=>cadDetailedProperties(e).map(([k,v])=>k+': '+v).join('\n'));
+ const csv=cadPropertiesCSV(chosen);
  const content=chosen.length+' objeto(s) · '+state.unit+'\n\n'+rows.join('\n\n──────────────────────────────\n\n');
  log('LIST · '+chosen.length+' objeto(s)\n'+rows.slice(0,15).join('\n\n'));
  $('cadListResult')?.remove();
  const box=document.createElement('section');box.id='cadListResult';box.setAttribute('role','dialog');
  box.setAttribute('aria-label','LIST · Objetos seleccionados');
- box.innerHTML='<header><strong>LIST · OBJETOS</strong><div><button type="button" data-copy>Copiar</button> <button type="button" data-txt>TXT</button> <button type="button" data-close>Cerrar</button></div></header><pre></pre>';
+ box.innerHTML='<header><strong>LIST · OBJETOS</strong><div><button type="button" data-copy>Copiar</button> <button type="button" data-txt>TXT</button> <button type="button" data-csv>CSV</button> <button type="button" data-close>Cerrar</button></div></header><pre></pre>';
  box.querySelector('pre').textContent=content;
  const close=box.querySelector('[data-close]');
  function dismiss(){box.remove();canvas.focus({preventScroll:true})}
  close.onclick=dismiss;
  box.querySelector('[data-copy]').onclick=async()=>{try{await navigator.clipboard.writeText(content);toast('LIST copiado')}catch(e){toast('No se pudo copiar; usá TXT')}};
  box.querySelector('[data-txt]').onclick=()=>download('LIST.txt',content,'text/plain;charset=utf-8');
+ box.querySelector('[data-csv]').onclick=()=>download('LIST.csv',csv,'text/csv;charset=utf-8');
  box.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();dismiss()}});
  document.body.append(box);close.focus({preventScroll:true});
 }
@@ -11897,5 +11906,5 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
 <script defer src="cad3d-solid-ops.js?v=20261124-solid-v1"></script>
-<script defer src="cad3d-lab.js?v=20261124-layers-properties-v2"></script>
+<script defer src="cad3d-lab.js?v=20261124-layer-freeze-v3"></script>
 </body></html>
