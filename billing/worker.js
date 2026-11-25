@@ -54,7 +54,7 @@ async function readSession(env,req){
 const cookie=(env,value,maxAge)=>`cad2d_session=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}${env.COOKIE_DOMAIN?'; Domain='+env.COOKIE_DOMAIN:''}`;
 
 /* ---------- Protecciones ---------- */
-const SEC_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'no-referrer','x-frame-options':'DENY',
+const SEC_HEADERS={'x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY',
  'strict-transport-security':'max-age=31536000; includeSubDomains','cache-control':'no-store','cross-origin-opener-policy':'same-origin',
  'permissions-policy':'camera=(), microphone=(), geolocation=(), payment=()'};
 const PAGE_CSP="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'";
