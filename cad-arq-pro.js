@@ -269,8 +269,7 @@ function buildPanel(){
  panel.innerHTML=`<div class="panel-title"><span>GALERÍA ARQ · BAÑOS · COCINAS · BLOQUES</span><button type="button" id="arqCollapse" class="btn slim" title="Contraer / expandir" aria-label="Contraer galería arquitectónica">−</button></div>
  <div id="arqPanelBody" class="panel-content" style="padding:8px">
   <div style="display:flex;gap:5px"><input type="search" id="arqPanelSearch" placeholder="Buscar: baño, isla, bañera, escalera…" aria-label="Buscar bloque arquitectónico"><button type="button" class="btn slim" id="arqOpenBig" title="Galería grande (GALERIA)">⤢</button></div>
-  <button type="button" class="btn slim" id="arqOpenVisual" title="Galería visual en fondo crema · clic en imagen y luego en plano" style="display:block;width:100%;margin:7px 0 4px;text-align:center;background:#e6d3a9;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ Galería visual · bloques detallados</button>
-  <button type="button" class="btn slim" id="arqOpenOlimpiadas" title="Abrir biblioteca de bloques 2D · más de 1000 bloques en vista y planta" style="display:block;width:100%;margin:3px 0 6px;text-align:center;background:#e4dccb;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ BLOQUES 2D · 1.000+</button>
+  <button type="button" class="btn slim" id="arqOpenVisual" title="Galería visual en fondo crema · clic en imagen y luego en plano" style="display:block;width:100%;margin:7px 0 4px;text-align:center;background:#e6d3a9;color:#3d352b;border:1px solid #bca175;font-weight:600">▦ Galería visual · bloques 2D</button>
   <div id="arqDrawingBlocksSlot"><button type="button" class="btn slim" id="arqDrawingBlocksFallback" style="display:block;width:100%;margin:3px 0 6px;text-align:center;font-weight:600">▦ BLOQUES DEL PLANO</button></div>
   <select id="arqPanelCat" aria-label="Categoría de bloques"></select>
   <div class="arq-grid" id="arqPanelGrid"></div>
@@ -292,10 +291,6 @@ function buildPanel(){
  $('arqOpenVisual').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
   if(browser?.openVisual)return browser.openVisual();
   CORE.toast('La galería visual todavía no está disponible');
- };
- $('arqOpenOlimpiadas').onclick=()=>{const browser=window.CAD2D_BLOCK_BROWSER;
-  if(browser?.openOlimpiadas)return browser.openOlimpiadas();
-  CORE.toast('El explorador de bloques todavía no está disponible');
  };
  $('arqApplySize').onclick=applySizeRow;
  for(const id of ['arqW','arqD'])$(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();applySizeRow()}});
