@@ -4686,13 +4686,15 @@ function offsetAt(e,sidePoint){
  if(!next)return toast('OFFSET: no se pudo crear una paralela válida; verificá distancia y geometría');
  delete next.id;saveHistory();newEntity(next);state.modifyCandidate=null;state.selected=[];updateProps();prompt();schedule();log('OFFSET '+amount+' '+state.unit);toast('Paralela creada / OFFSET '+amount+' '+state.unit+' · Seleccioná otra línea');
 }
-function cornerModification(first,second,firstPick,secondPick,kind){
+function cornerModification(first,second,firstPick,secondPick,kind,sharp=false){
+ const options=cad2dCmdOpt;
  if(first.type!=='line'||second.type!=='line'||first.id===second.id)return {error:'Select two different LINE entities'};
  const intersection=unrestrictedIntersection(first.a,first.b,second.a,second.b);
  if(!intersection)return {error:'Lines are parallel or coincident'};
- const amount=Number($(kind==='chamfer'?'chamferLength':'filletRadius').value);
- if(!Number.isFinite(amount))return {error:'Distance / radius must be a valid number'};
- if(amount<=0){
+ const amount=sharp?0:Number($(kind==='chamfer'?'chamferLength':'filletRadius').value);
+ const secondAmount=kind==='chamfer'&&!sharp?(options.chamferSecond??amount):amount;
+ if(!Number.isFinite(amount)||!Number.isFinite(secondAmount))return {error:'Distance / radius must be a valid number'};
+ if(amount<=0&&secondAmount<=0){
   // Zero or negative values join both clicked lines directly, without bevel or arc.
   const endpointToMove=(e,p)=>{
    const da=dist(e.a,intersection),db=dist(e.b,intersection),len=dist(e.a,e.b);
@@ -4705,26 +4707,31 @@ function cornerModification(first,second,firstPick,secondPick,kind){
   if(dist(one.a,one.b)<=1e-10||dist(two.a,two.b)<=1e-10)return {error:'Zero-length result; choose another line segment'};
   return {one,two,corner:null};
  }
- const c1=chooseCorner(first,intersection),c2=chooseCorner(second,intersection);
- // Refuse crossing geometry inside a segment: these commands are designed for one corner.
- const inInterior=(e)=>{const len=dist(e.a,e.b);return len>1e-10&&dist(e.a,intersection)>len*0.00001&&dist(e.b,intersection)>len*0.00001&&Math.abs(dist(e.a,intersection)+dist(e.b,intersection)-len)<1e-7*Math.max(1,len)};
- if(inInterior(first)||inInterior(second))return {error:'Select lines meeting at endpoints (not crossing interiors)'};
+ const pickedRay=(e,p)=>{
+  const len=dist(e.a,e.b),da=dist(e.a,intersection),db=dist(e.b,intersection);
+  if(da>1e-8&&db>1e-8&&Math.abs(da+db-len)<1e-7*Math.max(1,len)){
+   const axis=sub(e.b,e.a),v=sub(p,intersection),towardB=axis.x*v.x+axis.y*v.y>=0;
+   return towardB?{nearKey:'a',far:e.b}:{nearKey:'b',far:e.a};
+  }
+  return chooseCorner(e,intersection);
+ };
+ const c1=pickedRay(first,firstPick),c2=pickedRay(second,secondPick);
  const v1=sub(c1.far,intersection),v2=sub(c2.far,intersection),len1=Math.hypot(v1.x,v1.y),len2=Math.hypot(v2.x,v2.y);
  if(len1<=1e-10||len2<=1e-10)return {error:'Cannot construct corner from zero-length rays'};
  const u1=mul(v1,1/len1),u2=mul(v2,1/len2);
  const cosine=Math.max(-1,Math.min(1,u1.x*u2.x+u1.y*u2.y));
  const theta=Math.acos(cosine);
  if(theta<1e-5||Math.PI-theta<1e-5)return {error:'Corner must have a nonzero angle'};
- const d=kind==='chamfer'?positiveModifyValue('chamferLength'):positiveModifyValue('filletRadius')/Math.tan(theta/2);
- if(!Number.isFinite(d)||d<=0)return {error:'Invalid distance or radius'};
- if(d>=Math.min(len1,len2)-1e-9)return {error:'Distance/radius too large for these segments'};
- const t1=add(intersection,mul(u1,d)),t2=add(intersection,mul(u2,d));
+ const d=kind==='chamfer'?amount:amount/Math.tan(theta/2),d2=kind==='chamfer'?secondAmount:d;
+ if(!Number.isFinite(d)||!Number.isFinite(d2)||d<0||d2<0||(d===0&&d2===0))return {error:'Invalid distance or radius'};
+ if(d>=len1-1e-9||d2>=len2-1e-9)return {error:'Distance/radius too large for these segments'};
+ const t1=add(intersection,mul(u1,d)),t2=add(intersection,mul(u2,d2));
  const one=clone(first),two=clone(second);
- one[c1.nearKey]=t1;two[c2.nearKey]=t2;
+ if(!options.cornerNoTrim||sharp){one[c1.nearKey]=t1;two[c2.nearKey]=t2;}
  let corner;
  if(kind==='chamfer'){corner={type:'line',a:t1,b:t2,layer:first.layer,width:first.width}}
  else{
-  const radius=positiveModifyValue('filletRadius');
+  const radius=amount;
   const bisector=add(u1,u2),bisLen=Math.hypot(bisector.x,bisector.y);
   if(bisLen<1e-9)return {error:'Cannot calculate fillet center'};
   const center=add(intersection,mul(bisector,radius/(Math.sin(theta/2)*bisLen)));
@@ -4735,12 +4742,13 @@ function cornerModification(first,second,firstPick,secondPick,kind){
  }
  return {one,two,corner};
 }
-function modifyCornerPick(e,p,kind){
+function modifyCornerPick(e,p,kind,sharp=false){
  if(!e||e.type!=='line')return toast((kind==='fillet'?'FILLET':'CHAMFER')+': tocá directamente una LINE (no el espacio vacío)');
- if(!state.modifyCandidate){state.modifyCandidate={id:e.id,p:clone(p)};state.selected=[e.id];updateProps();prompt();schedule();toast('Primera línea marcada · tocá la segunda LINE');return}
+ if(layerFor(e).locked||!layerFor(e).visible)return toast('Capa bloqueada o invisible');
+ if(!state.modifyCandidate){state.modifyCandidate={id:e.id,p:clone(p)};state.selected=[e.id];updateProps();prompt();schedule();toast('Primera línea marcada · tocá la segunda LINE · Shift: esquina recta');return}
  if(e.id===state.modifyCandidate.id)return toast('Elegí una segunda línea distinta');
  const first=state.entities.find(x=>x.id===state.modifyCandidate.id);
- const result=first&&cornerModification(first,e,state.modifyCandidate.p,p,kind);
+ const result=first&&!layerFor(first).locked&&layerFor(first).visible&&cornerModification(first,e,state.modifyCandidate.p,p,kind,sharp);
  if(!result||result.error)return toast((kind==='fillet'?'FILLET':'CHAMFER')+': '+(result?.error||'primera LINE no disponible'));
  saveHistory();
  const ix1=state.entities.findIndex(x=>x.id===first.id),ix2=state.entities.findIndex(x=>x.id===e.id);
@@ -5908,7 +5916,7 @@ function handlePoint(p,shift){const t=state.tool;
  if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
  if(t==='matchprop'){matchCadPropertiesAt(p);return}
  if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
-if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(shift&&!state.modifyCandidate){state.modifyCandidate={mode:'trimFence',first:clone(p)};prompt();schedule();toast('TRIM CERCA: segundo clic para barrido');return}return cadTrimClick(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();schedule();toast(cad2dCmdOpt.offsetThrough?'OFFSET · Indicá el punto de paso':'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Ahora hacé clic del lado interior o exterior')}else toast('OFFSET: seleccioná con el cuadrado amarillo una línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t);return}if(e){/* Como AutoCAD (PICKADD=1): clic suma a la selección, Shift+clic la quita, Esc la limpia. */if(shift)state.selected=state.selected.filter(id=>id!==e.id);else if(!state.selected.includes(e.id))state.selected=[...state.selected,e.id]}updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(shift&&!state.modifyCandidate){state.modifyCandidate={mode:'trimFence',first:clone(p)};prompt();schedule();toast('TRIM CERCA: segundo clic para barrido');return}return cadTrimClick(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();schedule();toast(cad2dCmdOpt.offsetThrough?'OFFSET · Indicá el punto de paso':'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Ahora hacé clic del lado interior o exterior')}else toast('OFFSET: seleccioná con el cuadrado amarillo una línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t,shift);return}if(e){/* Como AutoCAD (PICKADD=1): clic suma a la selección, Shift+clic la quita, Esc la limpia. */if(shift)state.selected=state.selected.filter(id=>id!==e.id);else if(!state.selected.includes(e.id))state.selected=[...state.selected,e.id]}updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
@@ -7345,8 +7353,8 @@ const CAD2D_TOOL_OPTIONS={
  dimension:[{keys:['H','HORIZONTAL'],label:'Horizontal',when:s=>!s.length},{keys:['V','VERTICAL'],label:'Vertical',when:s=>!s.length},{keys:['A','ALIGNED','ALINEADA'],label:'Alineada',when:s=>!s.length},{keys:['AN','ANGULAR'],label:'Angular',when:s=>!s.length},{keys:['R','RADIUS','RADIO'],label:'Radio',when:s=>!s.length},{keys:['D','DIAMETER','DIAMETRO'],label:'Diámetro',when:s=>!s.length}],
  hatch:[{keys:['P','PATTERN','PATRON'],label:'Patrón',when:()=>true},{keys:['S','SCALE','ESCALA'],label:'Escala',when:()=>true},{keys:['A','ANGLE','ANGULO'],label:'Ángulo',when:()=>true}],
  text:[{keys:['H','HEIGHT','ALTURA'],label:'Altura',when:s=>!s.length},{keys:['R','ROTATION','ROTACION'],label:'Rotación',when:s=>!s.length}],
- fillet:[{keys:['R','RADIUS','RADIO'],label:'Radio',when:()=>true}],
- chamfer:[{keys:['D','DISTANCE','DISTANCIA'],label:'Distancia',when:()=>true}],
+ fillet:[{keys:['R','RADIUS','RADIO'],label:'Radio',when:()=>true},{keys:['T','TRIM','RECORTAR'],label:'Recortar',when:()=>true}],
+ chamfer:[{keys:['D','DISTANCE','DISTANCIA'],label:'Distancias',when:()=>true},{keys:['T','TRIM','RECORTAR'],label:'Recortar',when:()=>true}],
  offset:[{keys:['T','THROUGH','PUNTO'],label:'Punto',when:()=>true}],
  trim:[{keys:['F','FENCE','CERCA'],label:'Cerca',when:()=>true}],
  zoomWindow:[{keys:['E','EXTENTS'],label:'Extensión',when:()=>true},{keys:['P','PREVIOUS'],label:'Previo',when:()=>true},{keys:['W','WINDOW'],label:'Ventana',when:()=>true}]
@@ -7507,6 +7515,8 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
   const O=cad2dCmdOpt,is=(...k)=>k.includes(opt);
   // Valor pendiente pedido por una opción (ancho, radio, altura, patrón…)
   if(O.pending){const pd=O.pending;
+   if(pd.k==='cornerTrim'){if(is('T','TRIM','RECORTAR','R','SI','YES')){O.cornerNoTrim=false;O.pending=null;return say('Recortar · seleccioná dos líneas')}if(is('N','NO','NOTRIM','NO RECORTAR')){O.cornerNoTrim=true;O.pending=null;return say('No recortar · seleccioná dos líneas')}return say('Recortar [T] / No recortar [N]')}
+   if(pd.k==='chamferFirst'||pd.k==='chamferSecond'){if(!isNum||!Number.isFinite(n)||n<0)return say('Distancia válida mayor o igual a cero');if(pd.k==='chamferFirst'){$('chamferLength').value=String(n);O.pending={k:'chamferSecond',first:n};return say('CHAMFER · Segunda distancia <'+n+'>:')}O.chamferSecond=n;O.pending=null;return say('CHAMFER · seleccioná dos líneas')}
    if(pd.k==='hatchPattern'){const sel=$('hatchStyle'),want=opt.toLowerCase().replace(/^ar-/,'');const o=[...sel.options].find(x=>x.value.toLowerCase()===want||x.textContent.toLowerCase().startsWith(want));O.pending=null;if(o){sel.value=o.value;sel.dispatchEvent(new Event('change',{bubbles:true}));return say('HATCH · patrón '+o.textContent+' · clic dentro del área')}return say('HATCH · patrón desconocido: '+value)}
    if(pd.k==='moveDisp'){const m=value.replace(/\s/g,'').split(/[;,]/).map(Number);O.pending=null;if(m.length===2&&m.every(Number.isFinite)&&state.selected.length){state.stage=[P(0,0)];doTransform(t,P(m[0],m[1]));schedule();return}return say(t.toUpperCase()+' · desplazamiento inválido (formato dx,dy)')}
    if(isNum){O.pending=null;
@@ -7587,7 +7597,8 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
    state.scaleReference=null;state.stage=[];setTool('select');updateAll();log('SCALE '+n);return}
   // FILLET / CHAMFER: R / D
   if(t==='fillet'&&['R','RADIUS','RADIO'].includes(opt))return say('FILLET · Specify fillet radius <'+$('filletRadius').value+'>:');
-  if(t==='chamfer'&&['D','DISTANCE','DISTANCIA'].includes(opt))return say('CHAMFER · Specify chamfer distance <'+$('chamferLength').value+'>:');
+  if(t==='chamfer'&&['D','DISTANCE','DISTANCIA'].includes(opt)){O.pending={k:'chamferFirst'};return say('CHAMFER · Primera distancia <'+$('chamferLength').value+'>:');}
+  if(['fillet','chamfer'].includes(t)&&is('T','TRIM','RECORTAR')){O.pending={k:'cornerTrim'};return say('Recortar [T] / No recortar [N]');}
   // OFFSET Through: calculate distance and side from the chosen destination point.
   if(t==='offset'&&['T','THROUGH','PUNTO'].includes(opt)){O.offsetThrough=true;prompt();return say(state.modifyCandidate?'OFFSET · Indicá el punto por donde pasará la paralela':'OFFSET · Seleccioná el objeto y luego el punto de paso');}
   }
@@ -7623,7 +7634,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
   if(/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(num)){
    const field=state.tool==='fillet'?'filletRadius':'chamferLength',amount=Number(num);
    if(!Number.isFinite(amount))return toast('FILLET / CHAMFER: valor inválido');
-   $(field).value=String(amount);prompt();
+   $(field).value=String(amount);if(state.tool==='chamfer')delete cad2dCmdOpt.chamferSecond;prompt();
    toast((state.tool==='fillet'?'FILLET R=':'CHAMFER D=')+amount+' · '+(amount<=0?'unión recta':'empalme')+' · clic en dos líneas');
    return;
   }
