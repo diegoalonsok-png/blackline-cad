@@ -1,0 +1,28 @@
+[
+  {
+    "id": "house-100-innerscene",
+    "title": "Vivienda 100 m² · cuatro dormitorios",
+    "area": 100,
+    "category": "house",
+    "source": "https://www.innerscene.com/tools/library/drawings/four-bedroom-house-ground-floor-100-m2-ce86071a",
+    "license": "CC0",
+    "author": "Innerscene",
+    "original": "house/100/house-100-innerscene.dxf",
+    "image": "house/100/house-100-innerscene.png",
+    "thumb": "house/100/house-100-innerscene-thumb.png",
+    "sha256": "e13f78c7629fb69c168b6a0f1080b61edece819f581942d1a905b5e97a2f6029"
+  },
+  {
+    "id": "house-modern-innerscene",
+    "title": "Vivienda moderna · dos plantas 14 × 10 m",
+    "area": null,
+    "category": "house",
+    "source": "https://www.innerscene.com/tools/library/drawings/modern-house-14-x-10-m-ground-and-first-floor-plans-1-100-3a2ca76f",
+    "license": "CC0",
+    "author": "Innerscene",
+    "original": "house/unverified/house-modern-innerscene.dxf",
+    "image": "house/unverified/house-modern-innerscene.png",
+    "thumb": "house/unverified/house-modern-innerscene-thumb.png",
+    "sha256": "595de31b02d566bccd37b8ddd82454148f40a2a34322cb0aa19fa3c0f092adfd"
+  }
+]
