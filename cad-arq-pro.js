@@ -1052,12 +1052,18 @@ async function openArqPlanCatalogue(category,query=''){
 /* Free-text architecture bar is separate from the CAD command interpreter. */
 
 // Route object names to the existing lazy-loading block browser.
+function arqRasterRoomQuery(raw){
+ const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const type='(?:banos?|cocinas?|habitaciones?|dormitorios?|suites?|detalles(?: constructivos)?|bathrooms?|kitchens?|bedrooms?|details?)';
+ const format='(?:jpg|jpeg|png|webp|imagenes?|fotos?|images?|photos?|referencias?|references)';
+ return new RegExp('^(?:'+type+'\\s+(?:en\\s+)?'+format+'|'+format+'\\s+(?:de\\s+)?'+type+')$','i').test(q);
+}
 function arqRasterHouseQuery(raw){
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  return /^(?:plantas?|planos?|casas?|viviendas?|floor plans?|house plans?)\s+(?:(?:en|in)\s+)?(?:jpg|jpeg|png|webp|imagenes?|fotos?|images?|photos?|referencias?|references)$/i.test(q);
 }
 function arqHouseGallery(raw){
- if(arqRasterHouseQuery(raw))return true;
+ if(arqRasterHouseQuery(raw)||arqRasterRoomQuery(raw))return true;
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q))return false;
  return /^(?:casas?|viviendas?|houses?|homes?|plantas?|planos? de viviendas?|floor plans?|galeria de (?:casas|plantas)|house gallery)$/.test(q)||/^(?:plantas?|floor plans?)\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)$/.test(q)||(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&(/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q)||/\b(?:plantas?|planos?|floor plans?|galeria|gallery)\b/.test(q)));
