@@ -97,8 +97,8 @@
   const walker=document.createTreeWalker(rootNode,NodeFilter.SHOW_TEXT);
   const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
   for(const n of nodes){if(skipped(n))continue;const next=translate(n.nodeValue);if(next!==n.nodeValue)n.nodeValue=next}
-  for(const el of [rootNode,...rootNode.querySelectorAll('[title],[aria-label],[placeholder]')]){
-   for(const name of ['title','aria-label','placeholder']){
+  for(const el of [rootNode,...rootNode.querySelectorAll('[title],[aria-label],[placeholder],optgroup[label]')]){
+   for(const name of (el.matches('optgroup')?['title','aria-label','placeholder','label']:['title','aria-label','placeholder'])){
     const old=el.getAttribute(name);
     if(old){const next=translate(old);if(next!==old)el.setAttribute(name,next)}
    }
