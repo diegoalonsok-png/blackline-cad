@@ -5,20 +5,23 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const begin=html.indexOf('function blockGripPoints(ref)'),end=html.indexOf('function flattenCADEntities(entities)',begin);
 assert.ok(begin>=0&&end>begin,'Block grip utilities must exist');
 const source=html.slice(begin,end);
+const lookupStart=html.indexOf('function cadSelectedLookup(');
+const lookupSource=html.slice(lookupStart,html.indexOf('\n}',lookupStart)+2);
 const dynamicGripSource=html.slice(html.indexOf('function blDynBounds(def){'),html.indexOf('function blockInstanceGeometry(definition,ref)'));
 function fixture(){
  const state={entities:[{id:23,type:'blockRef',blockName:'Puerta',p:{x:10,y:20},rotation:90,scale:1.5,params:{width:.9},layer:'openings'}],selected:[23],snapOn:false,grid:.1,view:{scale:100},blocks:{Puerta:{name:'Puerta',entities:[],dynamic2d:false}}};
- const funcs=new Function('state','dynamicGripSource',`
+ const funcs=new Function('state','dynamicGripSource','lookupSource',`
  const document={addEventListener(){},activeElement:null},addEventListener=()=>{};
  const P=(x,y)=>({x,y}),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y),
  screen=p=>P(p.x*state.view.scale,-p.y*state.view.scale),
  world=p=>P(p.x/state.view.scale,-p.y/state.view.scale),
  layerFor=e=>({visible:true,locked:e.layer==='locked'}),
  blockChildren=ref=>[{type:'line',a:{x:10,y:20},b:{x:11,y:20}},{type:'rect',a:{x:10,y:20},b:{x:11,y:21}}];
+ ${lookupSource}
  ${dynamicGripSource}
  ${source}
  return {blockGripPoints,findSelectedBlockGrip,blockGripTargetPoint};
- `)(state,dynamicGripSource);
+ `)(state,dynamicGripSource,lookupSource);
  return {state,...funcs};
 }
 test('grouped block exposes only its insertion-point grip',()=>{const x=fixture();assert.deepEqual(x.blockGripPoints(x.state.entities[0]),[{x:10,y:20}])});

@@ -24,6 +24,7 @@ function fixture(tool='polyline',pts=[{x:0,y:0},{x:5,y:0}]){
  const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
  const buildRibbon=()=>{},prompt=()=>{},schedule=()=>{};
  const document={querySelector:()=>({dataset:{tab:'home'}})};
+ var cad2dCmdOpt={};
  ${code}
  return {cancelCadCommand,finishStage};
  `)(state,events,command);

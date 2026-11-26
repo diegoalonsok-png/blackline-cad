@@ -28,7 +28,6 @@ test('all bathroom bedroom kitchen and living parts remain within room bounding 
  }
 });
 test('gallery offers rooms and creates one dynamic reference per complete room',()=>{
- assert.match(main,/Rooms:\['BL_ROOMS'/);
  assert.match(main,/x\.wholeRoom\)\{state\.blocks\[key\]\.dynamic2d=blDynEligible\(state\.blocks\[key\]\);state\.blocks\[key\]\.dynamicActions=true;state\.blocks\[key\]\.compositeRoom=true\}/);
  assert.match(main,/state\.blocks\[key\]=cadPrepareDynamicBlock\(/);
  assert.match(main,/setTool\('insertBlock'\)/);

@@ -2,6 +2,7 @@
  * Run: node --test tests/mtext.test.cjs */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const dxfParserSrc=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
 const a=html.indexOf('/* MTEXT: texto de varias líneas'),b=html.indexOf('function cadCircularTextGlyphs(e){',a);
 assert.ok(a>=0&&b>a,'MTEXT helpers present');
 const api=new Function(`const P=(x,y)=>({x,y}),fontCSS=()=>'10px Arial';${html.slice(a,b)};return {cadIsMText,cadMTextLines,cadMTextWrap};`)();
@@ -30,5 +31,5 @@ test('rotated text stacks rows along the rotated axis',()=>{
 });
 test('DXF export writes MTEXT and import keeps line breaks',()=>{
  assert.match(html,/head\('MTEXT',e,lay,color\),'100','AcDbMText'/);
- assert.match(html,/const cleanMText=s=>s\.replace\(\/\\\\P\/g,'\\n'\)/);
+ assert.match(html+dxfParserSrc,/const cleanMText=s=>s\.replace\(\/\\\\P\/g,'\\n'\)/);
 });

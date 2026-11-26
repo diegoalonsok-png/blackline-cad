@@ -4,7 +4,7 @@ const R=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
 test('cabeceras de seguridad del sitio (CSP, HSTS, anti-iframe)',()=>{
  const h=R('_headers');
  for(const k of['Content-Security-Policy',"object-src 'none'","frame-ancestors 'self'",'Strict-Transport-Security','X-Frame-Options','Cross-Origin-Opener-Policy'])assert.ok(h.includes(k),k);
- assert.doesNotMatch(h,/unsafe-eval/);
+ assert.doesNotMatch(h,/'unsafe-eval'/,'only the WebAssembly-scoped wasm-unsafe-eval is allowed');
 });
 test('sin eval ni new Function en el código de la app',()=>{
  for(const f of fs.readdirSync(path.join(__dirname,'..')).filter(f=>/\.js$/.test(f)).concat(['index.html']))assert.doesNotMatch(R(f),/new Function\(|[^.\w]eval\(/,f);

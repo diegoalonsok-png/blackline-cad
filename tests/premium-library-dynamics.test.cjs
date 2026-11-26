@@ -12,7 +12,7 @@ test('premium architectural gallery contains 14 editable vector definitions',()=
 });
 test('created, imported, and library definitions are automatically prepared for dynamic editing',()=>{
  for(const phrase of [
- 'state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:entries})',
+ 'state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities',
  'state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(converted)})',
  'state.blocks[name]=cadPrepareDynamicBlock({name,entities:converted,...metadata})',
  'state.blocks[name]=cadPrepareDynamicBlock({name,entities:normalized,'

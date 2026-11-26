@@ -9,7 +9,7 @@ test('Door, window and opening tools remain armed after a successful insertion',
  const section=source.slice(source.indexOf('function placeOpening(e){'),source.indexOf('function placeAt(e){'));
  assert(section.includes('rec.openings.push(op);selected=[rec.id];selectedOpeningId=op.id;redraw();renderProps();'));
  assert(!section.includes('setPlacement(null)'), 'An opening must not reset the active placement command');
- assert(section.includes('if(overlaps)'), 'Prevent overlapping architectural openings');
+ assert(/if\(overlaps(?:\)|\|\|)/.test(section), 'Prevent overlapping architectural openings');
 });
 test('Door and window libraries include multiple sizes and styles',()=>{
  const section=source.slice(source.indexOf('const ARCH_STYLES='),source.indexOf('function archStyle('));

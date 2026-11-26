@@ -2,6 +2,7 @@
  * Run: node --test tests/block-attributes.test.cjs */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const dxfParserSrc=require('node:fs').readFileSync(require('node:path').join(__dirname,'../cad-dxf-parser.js'),'utf8');
 const a=html.indexOf('/* Atributos de bloque (ATTDEF / ATTEDIT). */'),b=html.indexOf('function cadEditBlockAttributes(',a);
 assert.ok(a>=0&&b>a,'attribute helpers present');
 const state={blocks:{TAG:{name:'TAG',entities:[
@@ -28,9 +29,9 @@ test('block children substitute values and hide invisible attributes',()=>{
  assert.match(html,/ref\.attrs&&Object\.prototype\.hasOwnProperty\.call\(ref\.attrs,tag\)/);
 });
 test('DXF import reads ATTDEF and the ATTRIB values after an INSERT',()=>{
- assert.match(html,/type==='ATTDEF'\)\{/);
- assert.match(html,/recs\[j\]\[0\]==='ATTRIB'/);
- assert.ok(!/const silent=new Set\(\[[^\]]*'ATTDEF'/.test(html),'ATTDEF is no longer ignored');
+ assert.match(html+dxfParserSrc,/type==='ATTDEF'/);
+ assert.match(html+dxfParserSrc,/recs\[j\]\[0\]==='ATTRIB'/);
+ assert.ok(!/const silent=new Set\(\[[^\]]*'ATTDEF'/.test(html+dxfParserSrc),'ATTDEF is no longer ignored');
 });
 test('commands are registered',()=>{
  for(const k of ['ATTDEF','ATTEDIT','ATTEXT'])assert.ok(html.includes("'"+k+"'"),k);

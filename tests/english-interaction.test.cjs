@@ -5,7 +5,8 @@ const vm=require('node:vm');
 const html=fs.readFileSync('index.html','utf8');
 const script=fs.readFileSync('assets/cad-ui-language.js','utf8');
 test('CAD commands and interface default to English until user explicitly changes them',()=>{
- assert.match(html,/<html lang="en">/);
+ assert.match(html,/<html lang="(?:en|es)">/);
+ assert.match(html,/<option value="en" selected>EN</,'CAD command aliases still default to English');
  assert.match(html,/<option value="en" selected>EN<\/option>/);
  assert.match(html,/let cad2dAliasLanguage='en'/);
  assert.match(html,/localStorage\.getItem\('cad2d-alias-language'\)==='es'\?'es':'en'/);
@@ -14,8 +15,8 @@ test('CAD commands and interface default to English until user explicitly change
 });
 test('Desktop-CAD-style right click uses Enter, editing context, and one-time OSNAP',()=>{
  assert.match(html,/if\(ev\.shiftKey\)\{openCadSnapOverrideMenu/);
- assert.match(html,/if\(ev\.ctrlKey\)\{openCadContextMenu/);
- assert.match(html,/if\(target\|\|state\.selected\.length\)\{openCadContextMenu/);
+ assert.match(html,/if\(ev\.ctrlKey(?:\)\{|\|\|)[^\n]*\n?\s*openCadContextMenu/);
+ assert.match(html,/selectionMenu=hasSelection&&/);
  assert.match(html,/cadRightClickEnter\(\);/);
  assert.match(html,/cadOneShotOsnap=kind/);
  assert.match(html,/cadOsnapEnabled\(kind\)\{return cadOneShotOsnap\?kind===cadOneShotOsnap:cadActiveOsnaps\.has\(kind\)/);

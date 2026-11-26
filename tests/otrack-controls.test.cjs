@@ -7,7 +7,7 @@ contains(/id="otrackToggle"[^>]*aria-pressed="false"/,'OTRACK toolbar remains to
 contains(/data-status-menu="otrack"/,'OTRACK has a status menu');
 contains(/entry\('Limpiar referencias temporales',[^\n]*clearOtrackAnchors/,'tracking anchors can be cleared from menu');
 contains(/OTRACKCLEAR','LIMPIARREFERENCIAS','TRACKCLEAR'/,'tracking anchors can be cleared by command');
-contains(/Con ORTHO, el punto queda sobre la direcci/,'ORTHO and OTRACK combine: the point stays orthogonal and aligns with the reference');
+contains(/const orthoLocksPointer=state\.orthoOn&&/,'ORTHO and OTRACK combine: the point stays orthogonal and aligns with the reference');
 contains(/if\(ev\.key==='Escape'\).*cancelCadCommand\(\)/,'Esc uses common cancellation');
 contains(/function cancelCadCommand\(\)\{[\s\S]*?clearOtrackAnchors\(false\)/,'cancellation clears transient tracking anchors');
 contains(/function undo\(\)\{clearOtrackAnchors\(false\)/,'Undo invalidates temporary alignment anchors');

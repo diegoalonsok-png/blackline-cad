@@ -23,6 +23,7 @@ function harness(entity){
  const setTool=t=>{state.tool=t;state.stage=[]};
  const window={prompt:()=>{throw Error('SCALE must not open a modal dialog')}},pick=()=>null;
  const transformEntity=(e,fn)=>e;
+ var cad2dCmdOpt={};
  ${dispatcher}
  return doTransform;`);
  return {state,events,invoke:create(state,math,events)};

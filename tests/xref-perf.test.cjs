@@ -5,7 +5,7 @@ const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 test('XREF commands, faded drawing and per-layer children',()=>{
  for(const k of ['XREF','REFX','XRELOAD','XRECARGAR','XDETACH','XBIND','UNIRREFX'])assert.ok(html.includes("'"+k+"'"),k);
  assert.match(html,/ctx\.globalAlpha\*=cadXrefFade/);
- assert.match(html,/layer:ref\.xref&&e\.layer\?e\.layer:ref\.layer/);
+ assert.match(html,/\(ref\.xref(?:\|\|definition\.preserveLayers)?\)?&&e\.layer\?e\.layer:ref\.layer/);
  assert.match(html,/explodeInserts/);
 });
 test('block children are cached per reference and invalidated by edits',()=>{

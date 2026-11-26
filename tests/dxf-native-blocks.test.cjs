@@ -2,6 +2,7 @@
  * Run: node --test tests/dxf-native-blocks.test.cjs */
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+const dxfParserSrc=require('node:fs').readFileSync(require('node:path').join(__dirname,'../cad-dxf-parser.js'),'utf8');
 const i=html.indexOf('function buildDXFText('),f=html.slice(i,html.indexOf('function exportDXF(',i));
 test('block references become INSERT of shared BLOCK definitions',()=>{
  assert.match(f,/'INSERT',r,lay\)(?:,insH=ins\[3\];\s*ents\.push\(\.\.\.ins)?,'100','AcDbBlockReference',(?:\.\.\.\(atts\.length\?\['66','1'\]:\[\]\),)?'2',d\.name/);
@@ -11,7 +12,7 @@ test('block references become INSERT of shared BLOCK definitions',()=>{
 });
 test('non-ASCII characters are written as \\U+XXXX and decoded on import',()=>{
  assert.match(f,/'\\\\U\+'\+c\.charCodeAt\(0\)/);
- assert.match(html,/text=String\(text\|\|''\)\.replace\(\/\\\\U\\\+\(\[0-9A-Fa-f\]\{4\}\)\/g/);
+ assert.match(html+dxfParserSrc,/\\\\U\\\+\(\[0-9A-Fa-f\]\{4\}\)/);
 });
 test('linear and aligned dimensions export as DIMENSION with an anonymous *D block',()=>{
  assert.match(f,/name:'\*D'\+\(\+\+dimN\)/);

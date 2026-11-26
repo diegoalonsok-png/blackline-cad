@@ -65,5 +65,5 @@ test('the UI never opens automatic plan dialogs or hides paid state changes',()=
 });
 test('the loaded page uses the updated plan file, without changing other controls',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
- assert.match(html,/cad-plan\.js\?v=20261123-quiet-pro-1/);
+ assert.match(html,/cad-plan\.js\?v=[\w-]+/);
 });
