@@ -1,0 +1,35 @@
+name: Import CAD blocks from R2 staging
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/import-r2-cad-blocks.yml
+permissions:
+  contents: read
+concurrency:
+  group: architecture-r2-sync
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.ARCHITECTURE_R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.ARCHITECTURE_R2_SECRET_ACCESS_KEY }}
+      R2_ACCOUNT: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      R2_BUCKET: ${{ vars.ARCHITECTURE_R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3 ezdxf matplotlib Pillow
+      - name: Build pinned DWG converter
+        run: |
+          docker build -t blackline-import-dwg dwg-converter
+          docker run --rm -d --name blackline-import-dwg -p 127.0.0.1:8080:8080 blackline-import-dwg
+      - name: Import original files and render actual CAD previews
+        run: python scripts/import-r2-cad-blocks.py
