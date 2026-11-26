@@ -1013,7 +1013,7 @@ EXT.drawArchitectureCommand=async raw=>{
 const arqCatalogueCounts={"bathroom":37,"kitchen":12,"bedroom":11,"laundry":1,"office":1,"dining":1,"closet":1,"house":34};
 const arqCatalogueBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
 let arqCataloguePromise=null;
-function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261126-especiales',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
+function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261126-especiales2',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
 // Natural requests: "quiero un bidé", "poné un auto en corte", "necesito un baño completo".
 function arqRoomCAD(raw){return window.CAD2D_BLOCK_BROWSER?.roomQuery?.(raw)||null;}
 function arqOpenRoomCAD(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Catálogo CAD no disponible / CAD catalogue unavailable');EXT.cancelArchitectureCommand();b.openWeb(raw);}

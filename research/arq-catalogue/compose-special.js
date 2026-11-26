@@ -17,7 +17,7 @@ const LIB = require(path.join(ROOT, 'assets/cad2d-arq-generators.js'));
 const WRITE = process.argv.includes('--write');
 const index = JSON.parse(fs.readFileSync(path.join(DIR, 'index.json'), 'utf8'));
 const byId = Object.fromEntries(LIB.library.map((x) => [x.id, x]));
-const T = 0.15, PT = 0.05; // exterior wall, partition
+const T = 0.15, PT = 0.08; // exterior wall, partition (CAD2D walls: 0,08–0,50 m)
 // Search tags in the same bilingual form as assets/arq-room-cad (matched by cad-block-browser roomTermsMatch).
 const TAG = { accesible: 'accesible accessible discapacitados wheelchair silla de ruedas publico public', publico: 'publico public teatro theatre theater auditorio auditorium cine cinema oficina office', gimnasio: 'gym gimnasio vestuario locker deportivo sports club duchas shower', industrial: 'industrial comercial commercial restaurante restaurant gastronomia catering' };
 const tagText = (t) => Object.keys(TAG).filter((k) => t.includes(k)).map((k) => TAG[k]).join(' ') + (t.includes('damas') ? ' damas women' : '') + (t.includes('caballeros') ? ' caballeros men' : '');
@@ -108,12 +108,12 @@ const add = (name, category, A, extra = {}) => {
   add('Baño accesible 2,40 × 2,60 · inodoro, lavatorio y ducha', 'bathroom', A, { tags: ['accesible', 'discapacitados'], notes: ['Transferencia lateral 0,80 m a la derecha del inodoro; giro Ø 1,50 m.'] }); }
 
 /* ---------- Sanitarios públicos (teatro, auditorio, oficinas) ---------- */
-{ const A = Plan('bathroom', 5.6, 4.0);
+{ const A = Plan('bathroom', 6.0, 4.0);
   cabins(A, A.X0, 6);
   for (let i = 0; i < 4; i++) A.put('san-lav-pie', 'S', A.X1 - 0.15 - (i + 1) * 0.7 + 0.075, A.Y0, 'basin');
   A.door('v0-front0', A.X0 + 0.7, 0.9);
   add('Sanitario público damas · 6 inodoros + 4 lavatorios (teatro)', 'bathroom', A, { tags: ['publico', 'teatro', 'damas'] }); }
-{ const A = Plan('bathroom', 5.6, 4.0);
+{ const A = Plan('bathroom', 6.0, 4.0);
   const xr = cabins(A, A.X0, 3);
   for (let i = 0; i < 4; i++) { const x = xr + 0.25 + i * 0.7; A.put('san-mingitorio', 'N', x, A.Y1, 'urinal'); if (i) A.wall('ming-div' + i, [x - 0.17, A.Y1 - 0.45], [x - 0.17, A.Y1]); }
   for (let i = 0; i < 3; i++) A.put('san-lav-pie', 'S', A.X1 - 0.15 - (i + 1) * 0.7 + 0.075, A.Y0, 'basin');
@@ -132,15 +132,15 @@ const add = (name, category, A, extra = {}) => {
   add('Sanitario público damas grande · 8 inodoros + 6 lavatorios (teatro, estadio)', 'bathroom', A, { tags: ['publico', 'teatro', 'damas'] }); }
 
 /* ---------- Vestuarios de gimnasio ---------- */
-{ const A = Plan('bathroom', 6.0, 5.0);
+{ const A = Plan('bathroom', 6.4, 5.0);
   let x = cabins(A, A.X0, 2);
   x = showers(A, x + 0.3, 4);
   for (let i = 0; i < 3; i++) A.put('san-lav-pie', 'E', A.Y0 + 0.3 + i * 0.7, A.X1, 'basin');
   for (let i = 0; i < 7; i++) A.put('mob-locker', 'W', A.Y0 + 0.2 + i * 0.4, A.X0, 'locker');
   A.put('mob-banco-vest', 'S', A.X0 + 1.4, A.Y0 + 1.4, 'bench'); A.put('mob-banco-vest', 'S', A.X0 + 1.4, A.Y0 + 0.35 + 0.05, 'bench');
   A.door('v0-front0', A.X0 + 4.2, 0.9);
-  add('Vestuario de gimnasio 6,00 × 5,00 · 4 duchas, 2 inodoros, 3 lavatorios, 7 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
-{ const A = Plan('bathroom', 8.0, 6.0);
+  add('Vestuario de gimnasio 6,40 × 5,00 · 4 duchas, 2 inodoros, 3 lavatorios, 7 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
+{ const A = Plan('bathroom', 8.2, 6.0);
   let x = cabins(A, A.X0, 3);
   x = showers(A, x + 0.25, 5);
   A.put('san-mingitorio', 'E', A.Y0 + 3.0, A.X1, 'urinal'); A.put('san-mingitorio', 'E', A.Y0 + 3.7, A.X1, 'urinal');
@@ -149,7 +149,7 @@ const add = (name, category, A, extra = {}) => {
   for (let i = 0; i < 6; i++) A.put('mob-locker', 'S', A.X0 + 0.9 + i * 0.4, A.Y0, 'locker');
   A.put('mob-banco-vest', 'S', A.X0 + 1.6, A.Y0 + 2.0, 'bench'); A.put('mob-banco-vest', 'S', A.X0 + 3.3, A.Y0 + 2.0, 'bench');
   A.door('v0-front0', A.X0 + 4.6, 1.0);
-  add('Vestuario de gimnasio 8,00 × 6,00 · 5 duchas, 3 inodoros, 2 mingitorios, 4 lavatorios, 16 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
+  add('Vestuario de gimnasio 8,20 × 6,00 · 5 duchas, 3 inodoros, 2 mingitorios, 4 lavatorios, 16 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
 
 /* ---------- Cocinas industriales ---------- */
 { const A = Plan('kitchen', 6.0, 4.0);
@@ -187,7 +187,8 @@ for (const o of P) {
   }
   const bl = o.plan.blocks.filter((b) => b.role !== 'wheelchair');
   for (let i = 0; i < bl.length; i++) for (let j = i + 1; j < bl.length; j++) if (overlap(bl[i].envelope, bl[j].envelope)) { bad++; console.log('CHOQUE', o.name, bl[i].catalogId, bl[j].catalogId); }
-  for (const op of o.plan.openings) { const wl = o.plan.walls.find((q) => q.id === op.host), L = Math.hypot(wl.b[0] - wl.a[0], wl.b[1] - wl.a[1]); if (op.offset - op.width / 2 < -1e-6 || op.offset + op.width / 2 > L + 1e-6) { bad++; console.log('ABERTURA', o.name, op); } }
+  for (const w of o.plan.walls) if (w.thickness < 0.08 || Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]) <= 0.1) { bad++; console.log('MURO', o.name, w.id); }
+  for (const op of o.plan.openings) { const wl = o.plan.walls.find((q) => q.id === op.host), L = Math.hypot(wl.b[0] - wl.a[0], wl.b[1] - wl.a[1]); if (op.offset - op.width / 2 <= wl.thickness / 2 || op.offset + op.width / 2 >= L - wl.thickness / 2) { bad++; console.log('ABERTURA', o.name, op); } }
 }
 console.log(P.length, 'plantas ·', bad, 'problemas');
 if (WRITE && !bad) {
