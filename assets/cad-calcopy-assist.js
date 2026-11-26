@@ -212,14 +212,19 @@ function bathroomEnclosure(walls,openings,objects,pxPerM){
   if(!left||!right||!top||!bottom)return {x:o.x,y:o.y,status:'incomplete_boundary',missing:[!left?'left':null,!right?'right':null,!top?'top':null,!bottom?'bottom':null].filter(Boolean)};
   const x0=left.face,x1=right.face,y0=top.face,y1=bottom.face,area=(x1-x0)*(y1-y0)/pxPerM**2;
   const sides=[['left',left,y0,y1],['right',right,y0,y1],['top',top,x0,x1],['bottom',bottom,x0,x1]];
-  const gaps=[];
+  const gaps=[],doors=new Set(),windows=new Set();
   for(const [side,q,a,b] of sides){
    const intervals=live.filter(w=>!!w.v===!!q.w.v&&Math.abs(w.c-q.w.c)<=Math.max(tol,Math.min(w.t,q.w.t)*.3)).map(w=>[w.lo,w.hi]);
    for(const op of openings||[]){
     if(!live.includes(op.w)||!!op.v!==!!q.w.v||Math.abs(op.c-q.w.c)>Math.max(tol,q.w.t*.3)||!Number.isFinite(op.g0)||!Number.isFinite(op.g1))continue;
     // Only explicitly marked doors/windows, not guessed gaps.
     if(!/door|window/.test(op.kind||''))continue;
-    intervals.push([op.g0,op.g1]);
+    const start=Math.min(op.g0,op.g1),end=Math.max(op.g0,op.g1),width=(end-start)/pxPerM;
+    if(start<a-tol||end>b+tol)continue;
+    if(/door/.test(op.kind)&&width>=.5&&width<=1.3)doors.add(op);
+    else if(/window/.test(op.kind)&&width>=.2&&width<=3)windows.add(op);
+    else continue;
+    intervals.push([start,end]);
    }
    let end=a;
    for(const [lo,hi] of intervals.sort((p,q)=>p[0]-q[0])){
@@ -229,7 +234,10 @@ function bathroomEnclosure(walls,openings,objects,pxPerM){
    }
    if(end<b-tol)gaps.push({side,from:end,to:b,length_m:(b-end)/pxPerM});
   }
-  return {x:o.x,y:o.y,bounds:[x0,y0,x1,y1],area_m2:area,gaps,status:gaps.length?'boundary_gaps':area>20?'size_review':'four_sides_supported'};
+  return {x:o.x,y:o.y,bounds:[x0,y0,x1,y1],area_m2:area,gaps,door_count:doors.size,window_count:windows.size,
+   access_status:doors.size?'door_supported':'door_not_recognized',
+   status:gaps.length?'boundary_gaps':area>20?'size_review':'four_sides_supported',
+   privacy_validated:!gaps.length&&area<=20&&doors.size>0};
  });
 }
 const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure};
