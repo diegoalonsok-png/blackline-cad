@@ -501,7 +501,7 @@
   }catch(e){}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
  }
 
- function openSearch(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ function openSearch(term){if(generalPlanQuery(term))return openWeb(term);stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
  function strictRoomCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -593,8 +593,9 @@
   const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,category:cat,drawingType:'floor-plan',area:x.area,thumb:new URL(x.id+'.svg',nativeBase).href,source:new URL(x.id+'.svg',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
   return dxf.concat(native);
  }
+ function generalPlanQuery(raw){const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();return /^(?:(?:plantas?|planos?|(?:floor )?plans?)(?:\s+(?:de\s+)?(?:arquitectura|architectural|architecture|arquitectonic[oa]s?|cad|dwg|dxf))?|architectural (?:floor )?plans?)$/.test(q);}
  async function localHousePreviews(raw){
-  if(!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
+  if(!generalPlanQuery(raw)&&!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
   const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
   return rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id}));
  }
