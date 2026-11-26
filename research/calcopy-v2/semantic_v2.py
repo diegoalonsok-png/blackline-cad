@@ -396,3 +396,69 @@ def detect_door_symbols(ink,segs,pixels_per_m):
                         break
                 if len(out)>=150:return out
     return out
+
+
+def detect_openings(ink, segs, pixels_per_m, doors=None):
+    """Review-only open passages between wall ends; virtual room cuts are not CAD walls.
+    An unsupported gap is not proof of a passage. Require two interior regions
+    after virtual cuts and no visible symbol. Preserve ambiguous gaps for review.
+    """
+    import cv2
+    if not np.isfinite(pixels_per_m) or pixels_per_m <= 0:
+        return []
+    doors = doors if doors is not None else detect_door_symbols(ink, segs, pixels_per_m)
+    mask = black_mask(ink.shape, segs)
+    cuts = mask.copy()
+    candidates = []
+    for v in (False, True):
+        ws = sorted((q for q in segs if bool(q['v']) == v), key=lambda q:q['lo'])
+        for i,a in enumerate(ws):
+            for b in ws[i+1:]:
+                gap = b['lo']-a['hi']
+                if gap > 4*pixels_per_m: break
+                if gap < .55*pixels_per_m: continue
+                t = min(a['t'],b['t'])
+                if abs(a['c']-b['c']) > max(2,.35*t): continue
+                c = (a['c']+b['c'])/2
+                lo,hi = a['hi'],b['lo']
+                if any(q is not a and q is not b and abs(q['c']-c)<t*.5 and
+                       q['lo']<hi-1 and q['hi']>lo+1 for q in ws): continue
+                if any(q['v']==v and abs(q['c']-c)<t*.5 and
+                       min(q['g1'],hi)-max(q['g0'],lo)>.6*gap for q in doors):
+                    kind='door'
+                else:
+                    src=ink.T if v else ink
+                    x0=max(0,int(np.ceil(lo+.12*gap)))
+                    x1=min(src.shape[1],int(np.floor(hi-.12*gap))+1)
+                    y0=max(0,int(np.floor(c-t*.40)))
+                    y1=min(src.shape[0],int(np.ceil(c+t*.40))+1)
+                    patch=src[y0:y1,x0:x1]
+                    if not patch.size: continue
+                    # Continuous thin strokes may be glass, a threshold or a leaf.
+                    kind='blank-gap' if patch.mean()<.025 and (patch.max(axis=0)>0).mean()<.18 else 'unknown-symbol'
+                if any(q['v']==v and abs(q['c']-c)<t*.5 and
+                       min(q['g1'],hi)-max(q['g0'],lo)>.6*gap for q in candidates): continue
+                q=dict(v=v,c=c,g0=lo,g1=hi,width_m=round(gap/pixels_per_m,3),kind=kind,
+                       virtual_only=True,review=True,t=t)
+                candidates.append(q)
+                if len(candidates)>=150: break
+            if len(candidates)>=150: break
+        if len(candidates)>=150: break
+    for q in candidates:
+        src=cuts.T if q['v'] else cuts
+        cv2.line(src if not q['v'] else cuts,
+                 (round(q['c']),round(q['g0'])) if q['v'] else (round(q['g0']),round(q['c'])),
+                 (round(q['c']),round(q['g1'])) if q['v'] else (round(q['g1']),round(q['c'])),1,1)
+    _,labels,_,_=cv2.connectedComponentsWithStats(1-cuts,connectivity=4)
+    outside=set(map(int,np.concatenate((labels[0],labels[-1],labels[:,0],labels[:,-1]))))-{0}
+    for q in candidates:
+        src=labels.T if q['v'] else labels
+        u=int(round((q['g0']+q['g1'])/2))
+        ys=[int(round(q['c']+s*(q['t']/2+3))) for s in (-1,1)]
+        ids=[int(src[y,u]) if 0<=y<src.shape[0] and 0<=u<src.shape[1] else 0 for y in ys]
+        q['partition_labels']=ids
+        interior=all(i>0 and i not in outside for i in ids) and ids[0]!=ids[1]
+        if q['kind']=='blank-gap':
+            q['kind']='open-passage-candidate' if interior else 'unresolved-gap'
+        q.pop('t',None)
+    return candidates
