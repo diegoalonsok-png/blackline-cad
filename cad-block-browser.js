@@ -516,6 +516,11 @@
  function parseArea(value){const m=String(value).match(/(\d+(?:[.,]\d+)?)\s*(?:m(?:ts?)?\s*(?:²|2|\^2)|sqm|square metres|square meters|metros cuadrados)/i);return m?Number(m[1].replace(',','.')):null}
  function webQuery(raw){const area=parseArea(raw),q=String(raw).trim();if(area&&/casa|vivienda|house|home/i.test(q))return 'house floor plan '+area+' square meters';return q.replace(/^(?:web|referencias?|reference|buscar web)\s*:?\s*/i,'')}
 
+ const REF_EN=[[/\bplantas?\b|\bplanos?\b/g,'floor plan'],[/\bcasas?\b|\bviviendas?\b/g,'house'],[/\bpatios?\b/g,'courtyard'],[/\bcortes?\b|\bsecci[oó]n(?:es)?\b/g,'section'],[/\bfachadas?\b|\balzados?\b/g,'facade elevation'],[/\bdepartamentos?\b/g,'apartment'],[/\bedificios?\b/g,'building'],[/\biglesias?\b/g,'church'],[/\bmuseos?\b/g,'museum'],[/\bescuelas?\b/g,'school'],[/\boficinas?\b/g,'office'],[/\bteatros?\b/g,'theatre'],[/\btemplos?\b/g,'temple'],[/\bpalacios?\b/g,'palace'],[/\bvillas?\b/g,'villa'],[/\bjard[ií]n(?:es)?\b/g,'garden'],[/\bescaleras?\b/g,'stair'],[/\bdormitorios?\b/g,'bedroom'],[/\bcocinas?\b/g,'kitchen'],[/\bba[nñ]os?\b/g,'bathroom'],[/\bpiscinas?\b/g,'pool'],[/\b(?:de|del|la|las|el|los|con|y|un|una|en|para)\b/g,' ']];
+ function refQuery(raw){let q=webQuery(raw).toLowerCase();for(const [re,en] of REF_EN)q=q.replace(re,en);q=q.replace(/\s+/g,' ').trim();if(!/\b(?:plan|section|facade|elevation)\b/.test(q))q+=' architecture';return q;}
+ async function appendOpenRefs(raw,epoch,still){
+  try{const r=await fetch('/refs/search?q='+encodeURIComponent(refQuery(raw)),{credentials:'omit'});const d=await r.json();if(epoch!==webEpoch||!still()||!Array.isArray(d.items))return;const img=u=>'/classics/img?u='+encodeURIComponent(u);const extra=d.items.map(x=>({title:x.title,area:parseArea(x.title),local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.license+(x.credit?' · '+x.credit:'')+' · '+x.provider})).filter(x=>!webItems.some(j=>j.source===x.source));if(extra.length){webItems=webItems.concat(extra);webStatus='';paintWeb();}}catch(e){}
+ }
  let localGalleryPromise=null;
  function localGallery(){
   if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
@@ -550,7 +555,7 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const res=await fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=4',{signal:ctrl.signal,credentials:'omit'});
+   const res=await fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=5',{signal:ctrl.signal,credentials:'omit'});
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
@@ -588,7 +593,7 @@
    if(webArea)webItems.sort((a,b)=>(a.area===null?1e9:Math.abs(a.area-webArea))-(b.area===null?1e9:Math.abs(b.area-webArea))||Number(!!b.local)-Number(!!a.local));
    webStatus=webItems.length?'':T('No open previews found. Try Google or Pinterest.','Sin miniaturas libres encontradas. Probá Google o Pinterest.');paintWeb();
   }catch(e){if(epoch!==webEpoch||ctrl.signal.aborted)return;webStatus=webItems.length?'':T('Search unavailable. Use external links or import a file.','Búsqueda no disponible. Usá los enlaces o importá un archivo.');paintWeb();}
-  try{const r=await fetch('/refs/search?q='+encodeURIComponent(query),{signal:ctrl.signal,credentials:'omit'});const d=await r.json();if(epoch!==webEpoch||!webMode||!Array.isArray(d.items))return;const img=u=>'/classics/img?u='+encodeURIComponent(u);const extra=d.items.map(x=>({title:x.title,area:parseArea(x.title),local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.license+(x.credit?' · '+x.credit:'')+' · '+x.provider})).filter(x=>!webItems.some(j=>j.source===x.source));if(extra.length){webItems=webItems.concat(extra);webStatus='';paintWeb();}}catch(e){}
+  await appendOpenRefs(raw,epoch,()=>webMode&&!houseMode&&!classicMode);
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
@@ -645,6 +650,7 @@
    webItems=own.concat(archive).filter(x=>(!refsOnly||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
    webStatus=webItems.length?'':T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
+   appendOpenRefs(raw,epoch,()=>houseMode);
   }catch(e){if(epoch===webEpoch&&houseMode){webStatus=T('House library unavailable. Retry.','Biblioteca no disponible. Volvé a buscar.');paintWeb();}}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
  }
  function loadHouseRect(bar){

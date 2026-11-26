@@ -20,7 +20,7 @@ const AUTHORS = [
   A('filarete', /\bfilarete\b/, 'Filarete (c. 1400–1469)', 'Filarete', 'Filarete trattato', { book: 'Filarete trattato' }),
   A('martini', /\b(?:francesco di giorgio|di giorgio martini)\b/, 'Francesco di Giorgio Martini (1439–1501)', '"Francesco di Giorgio"', '"Francesco di Giorgio" trattato'),
   A('scamozzi', /\bscamozzi\b/, 'Vincenzo Scamozzi (1548–1616)', 'Scamozzi', 'Scamozzi "idea della architettura"', { book: 'Scamozzi "idea della architettura"' }),
-  A('delorme', /\b(?:de l ?orme|delorme)\b/, 'Philibert de l\'Orme (1514–1570)', '"Philibert de l\'Orme"', '"Philibert de l\'Orme" architecture', { book: '"Philibert de l\'Orme" architecture' }),
+  A('delorme', /\b(?:de l ?orme|delorme)\b/, 'Philibert Delorme (1514–1570)', '"Philibert de l\'Orme"', '"Philibert de l\'Orme" architecture', { book: '"Philibert de l\'Orme" architecture' }),
   A('brunelleschi', /\bbrunelleschi\b/, 'Filippo Brunelleschi (1377–1446)', 'Brunelleschi'),
   A('bramante', /\bbramante\b/, 'Donato Bramante (1444–1514)', 'Bramante'),
   A('miguelangel', /\b(?:miguel angel|michelangelo|buonarroti)\b/, 'Miguel Ángel (1475–1564)', 'Michelangelo architecture'),
@@ -138,7 +138,7 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=4', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=5', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
