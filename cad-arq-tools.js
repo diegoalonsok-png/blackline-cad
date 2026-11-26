@@ -100,7 +100,7 @@ add('view','OBJETOS',[['vwAislar','Aislar objetos','aislar',run('AISLAR')],['vwM
 add('output','VENTANAS',[['ouMview','Nueva ventana','mview',run('VENTANA')]]);
 EXT.commands.VANO=EXT.commands.HUECO=EXT.commands.OPENING=()=>{if(!window.CAD2D_INSERT_LIBRARY_BLOCK?.('Vano / hueco en muro'))CORE.toast('Vano no disponible');else CORE.toast('VANO: clic sobre un muro · después estirá desde las pinzas o escribí el ancho')};
 
-/* ANGLE · ÁNGULO como MEASUREGEOM de AutoCAD: lado A (clic en una línea), lado B (clic en otra línea).
+/* ANGLE · ÁNGULO como MEASUREGEOM: lado A (clic en una línea), lado B (clic en otra línea).
    Si el primer clic no toca una línea, se usa el modo vértice: vértice, brazo 1, brazo 2. Esc cancela. */
 (function(){
  let job=null;const cv=CORE.canvas;
@@ -318,7 +318,7 @@ document.addEventListener('pointerup',()=>{
  if(d.mode==='create'){vpCreate=false;const r={x:Math.min(d.x0,d.x),y:Math.min(d.y0,d.y),w:Math.abs(d.x-d.x0),h:Math.abs(d.y-d.y0)};if(r.w>10&&r.h>10)addViewport(r);else renderVpPanel();return}
  saveVp(CORE.layout.viewports.slice());
 },true);
-/* Trabajar DENTRO de una ventana (como MSPACE en AutoCAD): doble clic en la ventana la activa;
+/* Trabajar DENTRO de una ventana (como MSPACE): doble clic en la ventana la activa;
    arrastrar desplaza el dibujo, la rueda hace zoom (cambia la escala 1:N), doble clic afuera sale. */
 let vpActive=null,vpLastDown=null;
 function vpResolve(v){

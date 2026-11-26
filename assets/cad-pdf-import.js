@@ -1,5 +1,5 @@
 /* CAD2D · Importar PDF.
-   PDF vectorial (ploteado desde AutoCAD u otro CAD): convierte los trazos en polilíneas editables y los
+   PDF vectorial (ploteado desde cualquier CAD): convierte los trazos en polilíneas editables y los
    textos en textos, a escala real según la escala de ploteo (1:100, 1:50…). PDF escaneado: entra como imagen
    de fondo (después CALIBRAR). Usa pdf.js (Mozilla, Apache-2.0), cargado solo al importar un PDF. */
 (function(){

@@ -11,7 +11,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const findChrome=()=>['google-chrome','google-chrome-stable','chromium','chromium-browser']
  .map(bin=>spawnSync('which',[bin],{encoding:'utf8'})).find(r=>r.status===0)?.stdout.trim();
 
-test('browser: AutoCAD-style PL, LINE distance 5, WALL options and wall distance 5', {timeout:45000},async t=>{
+test('browser: desktop-CAD-style PL, LINE distance 5, WALL options and wall distance 5', {timeout:45000},async t=>{
  const chrome=findChrome();
  if(!chrome){t.skip('Chrome not installed on the test runner');return;}
  const root=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'cad2d-browser-'));

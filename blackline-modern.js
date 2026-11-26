@@ -257,7 +257,7 @@ requestAnimationFrame(requestResize);
   button.querySelector('span').textContent=label;
   menu.append(button);
  }
- // Guardado automático: cada cuántos minutos (como SAVETIME de AutoCAD).
+ // Guardado automático: cada cuántos minutos (como SAVETIME).
  const auto=document.createElement('label');auto.className='bl-file-autosave';auto.style.cssText='display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid #2c3a44;margin-top:4px;font-size:13px;color:#cfdbe2';
  const cur=(()=>{try{const v=localStorage.getItem('cad2d-savetime');return v===null?5:Number(v)}catch(e){return 5}})();
  auto.innerHTML='<span style="flex:1">Autosave every</span><select aria-label="Autosave interval" style="background:#0f151b;color:#e6eef3;border:1px solid #3b4f5d;border-radius:6px;padding:3px 6px">'+[[0,'Off'],[1,'1 min'],[2,'2 min'],[5,'5 min'],[10,'10 min'],[15,'15 min'],[20,'20 min'],[30,'30 min'],[60,'60 min']].map(([v,l])=>'<option value="'+v+'"'+(v===cur?' selected':'')+'>'+l+'</option>').join('')+'</select>';

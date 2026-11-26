@@ -1575,7 +1575,7 @@ function tool(id,name,shape,title){
  return '<button type="button" class="btn'+(id==='sketch'?' sketchButton':'')+'" data-action="'+id+'" title="'+(title||name)+'" aria-label="'+name+'">'+icon+'<span>'+name+'</span></button>';
 }
 
-/* Independent, original architectural style definitions. No Autodesk assets. */
+/* Independent, original architectural style definitions. No third-party assets. */
 const ARCH_STYLES={
  wall:[
   {id:'exterior-20',name:'Exterior 20 cm',d:.20,h:2.80},
@@ -1698,7 +1698,7 @@ const ARCH_STYLES={
 };
 
 /* Independent parametric leaf specification; dimensions and void remain hosted by a wall.
-   Autocad Architecture / Revit interaction is a reference, not proprietary source code. */
+   Original implementation; no third-party source code. */
 function cad3DOpeningDefaults(kind,styleId){
  var id=String(styleId||'').toLowerCase(),triple=/triple|three|3-leaf/.test(id),
   double=/double|two-leaf|french|terrace/.test(id),leaves=triple?3:double?2:1;

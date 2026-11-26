@@ -27,7 +27,7 @@ const PLANS={
  pro:{label:'Pro',price:'5,99 € / mes · 49,99 € / año (ahorrás 30 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch']},
  studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','team']}
 };
-const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','ai-retouch':'Retoque con IA del render artístico 3D','team':'Equipo: el titular + 4 personas con Pro'};
+const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','ai-retouch':'Retoque con IA del render artístico 3D','team':'Equipo: el titular + 4 personas con Pro'};
 
 /* Prueba por persona: 90 días desde el primer uso en este navegador (sin registrarse).
    Con cuenta, manda la fecha del servidor. Es una indicación local, no un control de pago. */

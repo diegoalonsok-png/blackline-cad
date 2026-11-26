@@ -238,7 +238,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
         const base=dimensionStyle,h=th>0?th:base.textHeight,dec=(cleanMText(txt).match(/[.,](\d+)/)||[,''])[1].length;
         const style={...base,textHeight:h,arrow:h*.8,arrowType:solid?'arrow':'tick',precision:Math.min(4,dec),extOffset:h*.4,extBeyond:h*.5,color:common.color||layer.color||''};
         const ov=str(1,'');const dim={type:'dimension',a,b,p,mode,style,layer:lname,lineweight:common.width,id:entities.length+1};
-        // Estilo de cota del archivo (DIMSTYLE, código 3) → modelo con nombre en la paleta, como en AutoCAD.
+        // Estilo de cota del archivo (DIMSTYLE, código 3) → modelo con nombre en la paleta, como en los CAD de escritorio.
         const dsn=str(3,'').trim().slice(0,70);if(dsn&&/^[\p{L}\p{N} _.()+-]+$/u.test(dsn)){importedDimStyles[dsn]=importedDimStyles[dsn]||style;dim.dimStyleName=dsn}
         if(ov&&ov!=='<>'&&!/<>/.test(ov))dim.label=cleanMText(ov).slice(0,120);
         if(common.color)dim.color=common.color;

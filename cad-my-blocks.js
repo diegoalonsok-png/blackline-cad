@@ -1,4 +1,4 @@
-/* Mis bloques y estilos de cota por arrastre, como las paletas de herramientas de AutoCAD.
+/* Mis bloques y estilos de cota por arrastre, como las paletas de herramientas de los CAD de escritorio.
    · Seleccioná una cota y arrastrala (desde la cota, no desde un grip) hasta la paleta de cotas:
      se crea un estilo de cota con su altura de texto, flechas, precisión, unidades y color.
    · Seleccioná un bloque o un grupo de objetos y arrastralo a la galería o al explorador de bloques:

@@ -1,6 +1,6 @@
 /* Blackline CAD · Barra de comandos redimensionable.
    Un agarre aparece en el borde superior al pasar el mouse; arrastrándolo hacia arriba
-   la barra crece y muestra más historial de comandos (como en AutoCAD). Doble clic: vuelve al tamaño mínimo. */
+   la barra crece y muestra más historial de comandos (como en los CAD de escritorio). Doble clic: vuelve al tamaño mínimo. */
 (function(){
  'use strict';
  const cmd=document.querySelector('.app .cmd');

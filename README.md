@@ -52,7 +52,7 @@ Upload `index.html` to a GitHub Pages repository or Cloudflare Pages. The hosted
 
 ## Intellectual property
 
-Blackline CAD uses original HTML/CSS/JavaScript. It does not redistribute Autodesk or IntelliCAD UI artwork, program code or trademarks.
+Blackline CAD uses original HTML/CSS/JavaScript. It does not redistribute third-party UI artwork, program code or trademarks.
 
 ## CAD2D movable palettes
 
@@ -84,7 +84,7 @@ Remote DWG-to-DXF conversion is currently disabled in `cad2d-config.js`. DXF is 
 - **I + Enter** opens the computer file picker for importing supported `.cadblock` or `.dxf` block libraries; **W + Enter** exports the selected block to a portable `.cadblock` file. **INSERT + Enter** continues to insert a previously chosen library definition.
 - Native `.cadblock` export **version 2** preserves `dynamic2d` and supported parametric definition defaults. The importer accepts older version 1 and new version 2, converts length parameters between model units, validates metadata before mutation, and refuses to overwrite definitions that are already used by placed references.
 - One gallery-thumbnail click selects a symbol and arms its insertion; a second click in the canvas places **one** instance. The older repeat-insert default has been disabled in this gallery workflow.
-- This is **not** an AutoCAD native dynamic DWG editing implementation; unsupported file geometry and proprietary dynamic constraints remain outside scope. Verify graphical behavior in a browser prior to production use.
+- This is **not** a native dynamic DWG editing implementation; unsupported file geometry and proprietary dynamic constraints remain outside scope. Verify graphical behavior in a browser prior to production use.
 
 ## Parametric architectural walls (first 2D stage)
 
@@ -93,7 +93,7 @@ Remote DWG-to-DXF conversion is currently disabled in `cad2d-config.js`. DXF is 
 - Reference-line justification: **left / center / right**, relative to drawing direction. Consecutive clicks create continuous wall runs; Enter ends the operation.
 - New unobstructed wall segments automatically join independently created compatible wall segments at **L corners** (mitred faces), and form conservative **T butt joints** at the near face of an existing wall. Different thicknesses are allowed.
 - Parametric doors and windows placed near these walls auto-align and cut **both wall faces together**, never just one. An unsupported condition leaves the wall untouched instead of attempting a risky partial cut. Existing opening fragments and locked objects are not silently rewritten by auto-join.
-- These operations are a limited Blackline native 2D representation, not yet an AutoCAD Architecture AEC wall entity or a guarantee of comprehensive X / complex junction resolution. Validate real drawings and DXF interchange before production reliance.
+- These operations are a limited Blackline native 2D representation, not yet an AEC wall entity or a guarantee of comprehensive X / complex junction resolution. Validate real drawings and DXF interchange before production reliance.
 
 ## Dynamic 2D blocks — opt-in first stage
 
@@ -101,7 +101,7 @@ Remote DWG-to-DXF conversion is currently disabled in `cad2d-config.js`. DXF is 
 - Supported for blocks built from LINE, RECTANGLE, POLYLINE, and TEXT with nonzero local width and height. Existing parametric door/window/table definitions keep their existing dedicated controls. Unsupported geometries are not silently transformed.
 - Selected dynamic blocks expose two **yellow diamond grips** for independent local X (width) and Y (height) stretching, plus the usual insertion-point grip for moving the block. Dimensions can also be entered numerically in Properties and applied without exploding the block.
 - Each block reference stores independent width/height values in the CADJSON project; changing one instance does not resize other references. The underlying definition remains intact. Undo works via the existing drawing history.
-- Current scope is a Blackline CAD native 2D dynamic-block subset, **not** AutoCAD's complete dynamic-block authoring engine. AutoCAD DWG dynamic constraints, lookup tables, visibility states, stretch actions, and anonymous block records are not imported or round-tripped as native editable dynamic features.
+- Current scope is a Blackline CAD native 2D dynamic-block subset, **not** a complete dynamic-block authoring engine. DWG dynamic constraints, lookup tables, visibility states, stretch actions, and anonymous block records are not imported or round-tripped as native editable dynamic features.
 
 ## Current keyboard shortcuts
 
@@ -150,7 +150,7 @@ A static site is cheap to distribute, but bandwidth, server-side file conversion
 
 **BLOCK (B):** select objects, then create a named reusable definition in the **Blocks / Symbols** palette. By default, its insertion base point is the lower-left corner of the selected geometry's bounding box. **INSERT (I):** choose a block, set insertion scale and rotation, click a point in model space or enter an exact coordinate in the command line. Inserted geometry is editable independent entities annotated with the block name, not a linked native CAD INSERT. Undo/redo preserves block definitions and inserted geometry. Changing drawing units also converts block definitions.
 
-**WBLOCK / EXPORTBLOCK:** download `.cadblock` JSON containing the reusable definition, native drawing units and referenced layer metadata; **IMPORTBLOCK** reads this file locally and converts units to the active model's units. **BLOCKDXF:** download ASCII DXF with the block's expanded geometry at its local origin, readable by compatible CAD applications. **IMPORTANT:** exported standalone DXF is **not** a native DXF `BLOCK` + `INSERT` reference. Native AutoCAD BLOCK/INSERT interoperability, dynamic blocks, nested references, attributes, xrefs and DWG opening remain to be implemented and tested.
+**WBLOCK / EXPORTBLOCK:** download `.cadblock` JSON containing the reusable definition, native drawing units and referenced layer metadata; **IMPORTBLOCK** reads this file locally and converts units to the active model's units. **BLOCKDXF:** download ASCII DXF with the block's expanded geometry at its local origin, readable by compatible CAD applications. **IMPORTANT:** exported standalone DXF is **not** a native DXF `BLOCK` + `INSERT` reference. Native BLOCK/INSERT interoperability, dynamic blocks, nested references, attributes, xrefs and DWG opening remain to be implemented and tested.
 
 These changes passed JavaScript syntax checking and isolated LINE, closed-PLINE and transformed-block math tests. Full interactive/browser end-to-end testing and external CAD roundtrip checks are still required.
 
@@ -159,7 +159,7 @@ These changes passed JavaScript syntax checking and isolated LINE, closed-PLINE 
 **New Modify geometry palette:** configure positive Offset distance, Chamfer distance and Fillet radius in the current model's units (1:1), then choose the command. The Modify ribbon and Quick tools also show CHAMFER/FILLET. CAD command aliases: OFFSET/O, TRIM/TR, CHAMFER/CHA and FILLET/F.
 
 - **OFFSET:** click a straight LINE (or a CIRCLE), then click the desired side. For a line, the new parallel segment is moved to the chosen side by the specified real-world distance. For a circle, click outside to increase radius or inside to reduce it; invalid negative/zero results are rejected. The original entity is kept. Other entity types, joined polylines and corner mitres are not yet supported.
-- **TRIM:** click a LINE near the end to remove it to its next real finite-line crossing; other types are not yet supported. This is not the full AutoCAD boundary/quick-trim algorithm.
+- **TRIM:** click a LINE near the end to remove it to its next real finite-line crossing; other types are not yet supported. This is not a full boundary/quick-trim algorithm.
 - **CHAMFER:** click two different straight LINE entities. The program calculates their geometric corner, shortens each near endpoint by the requested equal distance, and creates a chamfer LINE. It refuses parallel, interior-crossing, degenerate or too-short cases. Separate distance-1 and distance-2, dynamic blocks and polyline corner editing remain future work.
 - **FILLET:** click two different straight LINE entities. The program calculates tangent points and a constant-radius arc at the geometric intersection, shortens the lines, and adds an ARC. It refuses impossible radii and degenerate cases. It currently only handles straight line pairs, not circle/arc/polyline curve blending.
 - **PRINT / PLOT:** button in the Modify geometry palette opens the existing vector plot panel; A0–A4, page orientation, fixed 1:N paper scale, previews and PDF/SVG/PNG outputs remain available. Review warnings when a drawing exceeds the selected printable area. Use **Actual Size / 100%** when physically printing.
@@ -172,7 +172,7 @@ The **Dimensions / Annotation** palette now offers nine experimental methods: **
 
 For linear dimensions, enter two points and then the dimension-line location. For angular dimensions, enter the vertex, first ray, and second ray. For radius and diameter, click an existing CIRCLE followed by an annotation-placement point. For ordinates and leaders, enter two points. Select dimension entities and click **Apply to selected** to update their annotation styles.
 
-These are custom editable CAD2D `dimension` entities, currently **not associative** with source geometry. DXF and SVG/PDF export expand the dimensions into vector lines, arcs/polyline samples and text rather than real native AutoCAD DIMENSION entities. A third-party CAD application may display the resulting geometry but cannot necessarily edit it as a true dimension. The PDF writer uses standard fonts, substituting text such as diameter/degree/tolerance symbols when exact glyph support is missing. No production claim of standards-compliant dimension styles (ISO 129 / ASME Y14.5), annotative scaling, chained/baseline series, geometrical tolerances, per-layout dimension styles, or DWG interoperability is made yet.
+These are custom editable CAD2D `dimension` entities, currently **not associative** with source geometry. DXF and SVG/PDF export expand the dimensions into vector lines, arcs/polyline samples and text rather than real native DIMENSION entities. A third-party CAD application may display the resulting geometry but cannot necessarily edit it as a true dimension. The PDF writer uses standard fonts, substituting text such as diameter/degree/tolerance symbols when exact glyph support is missing. No production claim of standards-compliant dimension styles (ISO 129 / ASME Y14.5), annotative scaling, chained/baseline series, geometrical tolerances, per-layout dimension styles, or DWG interoperability is made yet.
 
 Standalone math smoke tests checked nine geometry/label cases (including 3–4–5 model-unit aligned linear dimensions, 90° angular dimension, 5-unit circle radius and 10-unit diameter, ordinate coordinates, mm conversion from meters and ± tolerance). JavaScript source syntax was validated. Browser-interaction/plot/DXF external roundtrips remain open test tasks.
 
@@ -190,12 +190,10 @@ The Modify ribbon / Advanced Modify palette contains new commands:
 - **ARRAY / AR**: rectangular duplicate array of selected entities, with configurable rows, columns and X/Y spacing in model units. Capped at 20,000 new entities.
 - **COLOR**: scroll to the object color editor for selected entities.
 
-This is a growing experimental 2D CAD, **not a clone containing every AutoCAD feature**. Native DWG editing, associative dimensions, parametric constraints, dynamic blocks, 3D modeling, advanced splines and full external CAD compatibility remain pending. Syntax checking and isolated math/function tests passed; full browser and external CAD roundtrip verification remain necessary.
+This is a growing experimental 2D CAD, **not a clone of any desktop CAD**. Native DWG editing, associative dimensions, parametric constraints, dynamic blocks, 3D modeling, advanced splines and full external CAD compatibility remain pending. Syntax checking and isolated math/function tests passed; full browser and external CAD roundtrip verification remain necessary.
 
 ## CAD 2D command-reference cross-check (November 2026)
 
-Reference used for feature prioritization (not source code): *Herramientas Básicas de Dibujo en AutoCAD*,
-https://es.scribd.com/document/134121555/Herramientas-de-Autocad-2d .
 The material discusses LINE, PLINE, POLYGON, HATCH, drawing/modification commands, object snaps, layers and view controls. CAD2D implements its tools independently.
 
 New additions:
@@ -210,7 +208,7 @@ Checks completed: JavaScript syntax; regular hexagon geometry with radius 5; squ
 
 CAD2D now has **MODEL**, **LAYOUT 1**, and **PLOT / PDF** tabs at the base of model space. MODEL preserves 1:1 world-unit geometry and normal CAD tools. LAYOUT 1 is a separate printable paper-space view with A0/A1/A2/A3/A4, Letter and ARCH D pages; portrait/landscape; Fit or fixed 1:1–1:1000 scale; configurable millimeter margins; monochrome/color; optional basic title block; live SVG sheet preview and direct **vector PDF** export. A warning identifies drawings whose extents could be clipped at the chosen scale. **PLOT / PDF** opens the pre-existing advanced dialog, which also handles custom sheet dimensions, SVG and PNG output.
 
-LAYOUT controls share the existing `plotOptions`, `makeSVG` and `makePDF` machinery so model entities are not copied or scaled in the source model. The physical PDF page size is in millimeters; fixed print scale is computed from model units. Layout settings are saved in `.cadjson` project files and IndexedDB recovery snapshots, and in browser-local preferences. Command aliases: `LAYOUT`, `PSPACE`, `PAPERSPACE`, `MSPACE`. This is the first **single-sheet paper-space workspace**, not yet AutoCAD-style multiple named layouts with movable viewport boundaries, multiple model viewports or full paper-space annotation entities. Preview and PDF are not yet externally verified in an interactive browser or CAD desktop application.
+LAYOUT controls share the existing `plotOptions`, `makeSVG` and `makePDF` machinery so model entities are not copied or scaled in the source model. The physical PDF page size is in millimeters; fixed print scale is computed from model units. Layout settings are saved in `.cadjson` project files and IndexedDB recovery snapshots, and in browser-local preferences. Command aliases: `LAYOUT`, `PSPACE`, `PAPERSPACE`, `MSPACE`. This is the first **single-sheet paper-space workspace**, not yet multiple named layouts with movable viewport boundaries, multiple model viewports or full paper-space annotation entities. Preview and PDF are not yet externally verified in an interactive browser or CAD desktop application.
 
 ## Professional UI and CAD commands (November 2026)
 
@@ -228,7 +226,7 @@ Additional command aliases and working command actions:
 | `PURGE`, `PU` | Confirm removal of unused, unlocked layers only; selected layer and layer 0 are preserved |
 | `LAYER`, `LA`; `LTYPE`, `LT` | Open layer property controls |
 | `PROPERTIES`, `PR`, `CHPROP` | Show selection properties |
-| `STYLE`, `ST` | Show font/typography controls (not a full AutoCAD text-style manager) |
+| `STYLE`, `ST` | Show font/typography controls (not a full text-style manager) |
 | `DIMSTYLE`, `D` | Show dimension styling controls (not native DIMSTYLE objects) |
 | `ED`, `TEDIT` | Load selected text into typography palette and allow edits |
 | `REGEN`, `RE`, `REDRAW` | Redraw model viewport |
@@ -239,17 +237,16 @@ Additional command aliases and working command actions:
 
 Typography palette adds explicit **Copy text** and **Paste text** buttons using the browser Clipboard API on supported HTTPS browsers. Native text-input Ctrl/Cmd+C and Ctrl/Cmd+V are preserved. If system clipboard permissions are denied, users can focus the field and use ordinary keyboard clipboard operations.
 
-Supported geometry commands remain intentionally **limited** compared with desktop AutoCAD and IntelliCAD. Area measurements use idealized model geometry and do not account for holes/islands. MATCHPROP applies basic visual properties, not complete CAD object styles. The in-app CAD clipboard is not a DWG-aware system clipboard and does not exchange objects across third-party CAD desktop applications. No 3D/parametric CAD tools or full DWG import are claimed.
+Supported geometry commands remain intentionally **limited** compared with desktop CAD applications. Area measurements use idealized model geometry and do not account for holes/islands. MATCHPROP applies basic visual properties, not complete CAD object styles. The in-app CAD clipboard is not a DWG-aware system clipboard and does not exchange objects across third-party CAD desktop applications. No 3D/parametric CAD tools or full DWG import are claimed.
 
 Implementation was checked with JavaScript syntax parsing and isolated tests for rectangular/polygon/circle AREA, the clipboard copying a 2-unit red line from (1,2) to (10,20) preserving color and length. Full interactive browser, accessibility, PDF and third-party CAD round-trip tests remain outstanding.
 
-Official reference for desktop aliases and terminology: https://www.autodesk.com/es/shortcuts/autocad (aliases may differ by application language and custom settings).
 
 ## CAD2D dimension styles and BREAK editing (November 2026)
 
-**Named dimension styles:** The Dimensions / Annotation palette now has a style selector and Save style / Delete style controls. A style stores text height, arrow size, precision, drawing/display units, suffix and optional ± tolerance. Save styles under distinct names, choose one as the active preset, draw new dimensions using its values, or use "Apply to selected" to restyle existing dimensions. New annotations record the active style name as metadata, but remain **non-associative** custom CAD2D dimension entities; changing a style definition does not automatically update existing dimensions. Styles and the active style are included in downloadable `.cadjson` files and browser IndexedDB recovery snapshots and participate in undo/redo. Changing drawing units scales stored text height and arrow size in model units. These are **not native AutoCAD DIMSTYLE tables** in DXF or DWG.
+**Named dimension styles:** The Dimensions / Annotation palette now has a style selector and Save style / Delete style controls. A style stores text height, arrow size, precision, drawing/display units, suffix and optional ± tolerance. Save styles under distinct names, choose one as the active preset, draw new dimensions using its values, or use "Apply to selected" to restyle existing dimensions. New annotations record the active style name as metadata, but remain **non-associative** custom CAD2D dimension entities; changing a style definition does not automatically update existing dimensions. Styles and the active style are included in downloadable `.cadjson` files and browser IndexedDB recovery snapshots and participate in undo/redo. Changing drawing units scales stored text height and arrow size in model units. These are **not native DIMSTYLE tables** in DXF or DWG.
 
-**BREAK / BR:** Choose this command from the Modify ribbon, Advanced Modify palette, Quick CAD floating toolbar or command prompt. Click an unlocked straight LINE near the intended first cut point; click a second point on the same LINE. The portion between those projected points is removed and the remaining portions retain the original line's color, layer and lineweight. Segment boundaries and degenerate cuts are checked; coincident points do not change the drawing. Supports straight LINE entities only—not PLINE, ARC, SPLINE or multiple-object break, and not AutoCAD's full BREAKATPOINT functionality.
+**BREAK / BR:** Choose this command from the Modify ribbon, Advanced Modify palette, Quick CAD floating toolbar or command prompt. Click an unlocked straight LINE near the intended first cut point; click a second point on the same LINE. The portion between those projected points is removed and the remaining portions retain the original line's color, layer and lineweight. Segment boundaries and degenerate cuts are checked; coincident points do not change the drawing. Supports straight LINE entities only—not PLINE, ARC, SPLINE or multiple-object break, and not a full BREAKATPOINT implementation.
 
 **Verification:** Complete JavaScript syntax checked. Isolated geometry tests: 10-unit LINE broken at 3 and 7 produced segments 0–3 and 7–10; endpoint break produced the expected remaining segment; coincident break points produced no geometry changes. Full browser mouse-interaction and external DXF/PDF roundtrip tests are still required.
 
@@ -311,13 +308,13 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 
 **Modelo de pago futuro.** `cad-plan.js` muestra el estado (**BETA ABIERTA** mientras no haya servidor) y `billing/` contiene un Worker de Cloudflare + D1 + Stripe, no desplegado, con acceso por enlace al correo, prueba de 90 días, webhooks firmados y portal de facturación. El dibujo, abrir y exportar DXF nunca se bloquean. Ver `billing/README.md`.
 
-**Más órdenes 2D (segunda tanda).** Capas: `CAPAISO`/`LAYISO`, `CAPAUNISO`, `CAPADES`/`LAYOFF`, `CAPAACT`/`LAYON`, `CAPABLOQ`/`LAYLCK`, `CAPADESBLOQ`, `CAPAACTUAL`/`LAYMCUR`, `CAPACAMBIAR`/`LAYMCH`, `CAPAFUSION`/`LAYMRG`, `CAPABORRAR`/`LAYDEL` y `PORCAPA`/`SETBYLAYER`. Cotas en serie: `ACOCONT`/`DIMCONTINUE` y `ACOLINEABASE`/`DIMBASELINE`. Dibujo: `SPLINE` (curva por puntos de ajuste, guardada como polilínea), `ARANDELA`/`DONUT`, `MARCACENTRO`/`CENTERMARK`, `LINEACENTRO`/`CENTERLINE` y `MATRIZCAMINO`/`ARRAYPATH`. Vista y consulta: `ZO`, `CAL` (calculadora con lista blanca de funciones), `BUSCAR`/`FIND` con reemplazo, `ESTADO`/`STATUS` y `AUDITAR`/`AUDIT`. Alias: `MLINE` abre el muro paramétrico. **Shift + clic derecho** abre el menú de referencias a objetos. Todo está en `cad-autocad-plus.js`.
+**Más órdenes 2D (segunda tanda).** Capas: `CAPAISO`/`LAYISO`, `CAPAUNISO`, `CAPADES`/`LAYOFF`, `CAPAACT`/`LAYON`, `CAPABLOQ`/`LAYLCK`, `CAPADESBLOQ`, `CAPAACTUAL`/`LAYMCUR`, `CAPACAMBIAR`/`LAYMCH`, `CAPAFUSION`/`LAYMRG`, `CAPABORRAR`/`LAYDEL` y `PORCAPA`/`SETBYLAYER`. Cotas en serie: `ACOCONT`/`DIMCONTINUE` y `ACOLINEABASE`/`DIMBASELINE`. Dibujo: `SPLINE` (curva por puntos de ajuste, guardada como polilínea), `ARANDELA`/`DONUT`, `MARCACENTRO`/`CENTERMARK`, `LINEACENTRO`/`CENTERLINE` y `MATRIZCAMINO`/`ARRAYPATH`. Vista y consulta: `ZO`, `CAL` (calculadora con lista blanca de funciones), `BUSCAR`/`FIND` con reemplazo, `ESTADO`/`STATUS` y `AUDITAR`/`AUDIT`. Alias: `MLINE` abre el muro paramétrico. **Shift + clic derecho** abre el menú de referencias a objetos. Todo está en `cad-comandos-plus.js`.
 
 **Muros: uniones en T limpias.** Cuando un tabique llega a un muro existente, sus caras topan siempre contra la cara del lado del local, aunque el punto se haya marcado en el eje o en la cara exterior. Antes podía atravesar el muro. La cara del muro anfitrión se interrumpe entre las dos caras del tabique, al dibujar y al exportar (DXF, SVG, PDF). El hueco se recalcula cada vez a partir de la geometría, así que sigue siendo correcto si se mueven los muros.
 
 **Clic derecho con un comando activo.** Abre el menú del comando: Enter, Cancelar, Deshacer vértice, opciones, Entrada reciente y Referencias a objetos. Para volver al comportamiento anterior (clic derecho = Enter) ejecutá `localStorage.setItem('cad2d-rightclick-enter','1')`.
 
-**Propiedad intelectual.** Los textos públicos y los comentarios del código ya no usan "AutoCAD" para describir el producto. La marca aparece solo en el aviso de independencia y en menciones técnicas de compatibilidad. No se usan iconos, código, bloques ni manuales de terceros.
+**Propiedad intelectual.** Los textos públicos y los comentarios del código no mencionan marcas de otros fabricantes de software. La compatibilidad se describe por formato de archivo y en menciones técnicas de compatibilidad. No se usan iconos, código, bloques ni manuales de terceros.
 
 **Muros con cotas virtuales.** Al seleccionar un muro paramétrico aparecen su **largo** y su **espesor** como cotas temporales: se ven solo en pantalla y no se imprimen ni se exportan.
 - Clic en la cota de largo para escribir un nuevo largo (se mantiene el extremo inicial), o en la de espesor para escribir uno nuevo.
@@ -353,7 +350,7 @@ La geometría **se regenera**: los artefactos se reubican contra los muros y no 
 
 ## Independencia, propiedad intelectual y compatibilidad
 
-Blackline CAD es una aplicación independiente; no está afiliada, patrocinada ni respaldada por Autodesk, Inc. Las marcas Autodesk y AutoCAD pertenecen a sus titulares y se mencionan únicamente cuando es necesario describir la interoperabilidad.
+Blackline CAD es una aplicación independiente; no está afiliada, patrocinada ni respaldada por otros fabricantes de software. Las marcas de terceros pertenecen a sus titulares; los formatos de archivo se mencionan sólo para describir la compatibilidad.
 
 **Regla de procedencia:** no incorporar código, iconos, recursos visuales ni componentes extraídos de instalaciones o software propietario de terceros. Cada dependencia externa deberá registrar origen, versión, licencia y compatibilidad con el modo de distribución elegido; antes de comercializar se requiere una auditoría de licencias y propiedad intelectual. La afirmación de autoría propia no equivale a certificación legal completa.
 

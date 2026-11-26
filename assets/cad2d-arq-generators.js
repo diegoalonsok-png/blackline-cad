@@ -1,5 +1,5 @@
 /* CAD2D · Generadores arquitectónicos paramétricos 2D (planta).
- * Geometría original de Blackline CAD / CAD2D: no contiene bloques, código ni dibujos de Autodesk.
+ * Geometría original de Blackline CAD / CAD2D: no contiene bloques, código ni dibujos de terceros.
  * Todas las medidas están en METROS; el módulo de inserción las convierte a la unidad del modelo.
  * Cada generador recibe (b, W, D) y dibuja dentro del rectángulo 0..W × 0..D.
  * Convención: muro "N" es y=D (fondo), "S" es y=0 (acceso), "W" x=0, "E" x=W.

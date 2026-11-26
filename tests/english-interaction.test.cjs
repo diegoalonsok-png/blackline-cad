@@ -12,7 +12,7 @@ test('CAD commands and interface default to English until user explicitly change
  assert.match(html,/BlacklineUILanguage\?\.setLanguage\(cad2dAliasLanguage\)/);
  assert.match(html,/assets\/cad-ui-language\.js/);
 });
-test('AutoCAD-style right click uses Enter, editing context, and one-time OSNAP',()=>{
+test('Desktop-CAD-style right click uses Enter, editing context, and one-time OSNAP',()=>{
  assert.match(html,/if\(ev\.shiftKey\)\{openCadSnapOverrideMenu/);
  assert.match(html,/if\(ev\.ctrlKey\)\{openCadContextMenu/);
  assert.match(html,/if\(target\|\|state\.selected\.length\)\{openCadContextMenu/);

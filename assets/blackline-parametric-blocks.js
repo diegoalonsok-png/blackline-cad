@@ -1,4 +1,4 @@
-/* Blackline CAD parametric-symbol pilot. Original implementation: no Autodesk dynamic-block code.
+/* Blackline CAD parametric-symbol pilot. Original implementation: no third-party dynamic-block code.
  * Creates editable 2D geometry at requested dimensions; inserts through the existing block API.
  * Model coordinates retain the drawing's physical units; source DXF blocks stay unchanged.
  */

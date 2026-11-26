@@ -30,7 +30,7 @@
   next.push({x:point.x,y:point.y});
   return next.slice(-max);
  }
- // Rastreo como AutoCAD: rayos desde cada punto adquirido a 0/90/180/270° (y a los ángulos polares si POLAR está activo).
+ // Rastreo como en los CAD de escritorio: rayos desde cada punto adquirido a 0/90/180/270° (y a los ángulos polares si POLAR está activo).
  // Devuelve el punto sobre el rayo más cercano al cursor, o la intersección de dos rayos de puntos distintos.
  function projectRays(pointer,anchors,scale,tolerancePixels=10,angles=[0,90]){
   if(!valid(pointer)||!Array.isArray(anchors)||!Number.isFinite(scale)||!(scale>0)||!Number.isFinite(tolerancePixels)||tolerancePixels<=0)return null;

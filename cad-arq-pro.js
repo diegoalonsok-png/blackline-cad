@@ -4,7 +4,7 @@
  *   inteligente (los artefactos se reubican, no se deforman) y pinzamiento de variantes ▼.
  * - Menú contextual ampliado y comandos estilo CAD: AISLAR/OCULTAR, ORDEN DE DIBUJO, GRUPO,
  *   CONTARBLOQUES, DIVIDIR, GRADUAR, NUBEREV, LINEACONST, SEMIRRECTA, LOCAL (etiqueta de superficie).
- * Implementación propia. No usa código, iconos ni bloques de Autodesk.
+ * Implementación propia. No usa código, iconos ni bloques de terceros.
  * Depende del puente window.CAD2D_CORE expuesto por index.html.
  */
 (function(){

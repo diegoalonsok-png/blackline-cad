@@ -1203,10 +1203,10 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="ctb">Por color · tabla CTB</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option><option value="arq">Rótulo de arquitectura</option><option value="municipal">Carátula municipal</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
 <div class="modal-backdrop" id="helpBackdrop"><div class="modal"><div class="modal-head"><h2>CAD2D3D — Quick start</h2><button class="btn" id="closeHelp">✕ Close</button></div><div class="shortcuts"><div><h3>Drawing</h3><p>Click Line and click two points; repeat; Enter finishes.</p><p>Polyline connects points; Enter or double click finishes.</p><p>Circle: center then radius point.</p><p>Text: click the insertion point, type text in the prompt.</p><p>Coordinates can be entered in the command line.</p></div><div><h3>Editing and navigation</h3><p>Select with a click or drag left to right for a BLUE enclosed window; drag right to left for a GREEN crossing window. Use Shift to add objects. Borrar / Erase or Delete removes selected entities.</p><p>Hold Shift to select multiple entities.</p><p>Use Move, Copy, Rotate, Scale and Mirror on selected entities.</p><p>Mouse wheel zooms, middle mouse pans.</p><p>Space + left drag pans; Esc cancels.</p></div><div><h3>Output</h3><p>Export DXF R2000 (AC1015).</p><p>Import standard ASCII DXF entities (basic 2D types).</p><p>Save/Open native project JSON to preserve editing state.</p><p>Vector PDF at ISO, US or custom page size.</p></div><div><h3>Accuracy</h3><p>Coordinates are stored numerically, not in pixels.</p><p>Unit selection converts existing geometry to preserve physical size.</p><p>SNAP follows the selected grid spacing.</p><p>OSNAP recognizes endpoints, midpoints and centers.</p></div></div><section aria-label="Acerca de CAD2D3D" style="margin-top:16px;border-top:1px solid #39424b;padding-top:12px">
 <h3 style="margin:0 0 6px">Acerca de CAD2D3D · Independencia y licencias</h3>
-<p class="help">CAD2D3D es un software independiente de dibujo técnico 2D y modelado 3D. No está afiliado, patrocinado ni respaldado por Autodesk, Inc. Autodesk y AutoCAD son marcas de sus respectivos titulares; cualquier referencia a ellas tiene exclusivamente fines descriptivos de compatibilidad.</p>
+<p class="help">CAD2D3D es un software independiente de dibujo técnico 2D y modelado 3D. No está afiliado, patrocinado ni respaldado por otros fabricantes de software. Las marcas de terceros pertenecen a sus respectivos titulares; los formatos de archivo se mencionan sólo para describir la compatibilidad.</p>
 <p class="help">CAD2D utiliza sus propios recursos visuales y un formato de proyecto basado en JSON. La importación y exportación DXF admiten actualmente un subconjunto de entidades 2D; no se garantiza compatibilidad integral.</p>
 <p class="help">Para archivos DWG compatibles, consultá el flujo de conversión local a DXF. El servicio remoto está desactivado. Verificá las unidades, la escala y las entidades antes de usar el archivo convertido. CAD2D3D exporta DXF para intercambio con otros programas CAD.</p>
-<p class="help"><a href="/cad-2d-3d-online" target="_blank" rel="noopener" style="color:#7cc4ff">CAD 2D y 3D online</a> · <a href="/online-2d-3d-cad" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Online 2D and 3D CAD</a> · <a href="/editor-dxf-online" target="_blank" rel="noopener" style="color:#7cc4ff">Editor DXF online</a> · <a href="/online-dxf-editor" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Online DXF editor</a> · <a href="/guias-cad" target="_blank" rel="noopener" style="color:#7cc4ff">Guías CAD</a> · <a href="/cad-guides" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">CAD guides</a> · <a href="/render-arquitectonico-online" target="_blank" rel="noopener" style="color:#7cc4ff">Render arquitectónico</a> · <a href="/online-architectural-rendering" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Architectural rendering</a> · <a href="/acerca" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="/novedades" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="/legal" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio de AutoCAD. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
+<p class="help"><a href="/cad-2d-3d-online" target="_blank" rel="noopener" style="color:#7cc4ff">CAD 2D y 3D online</a> · <a href="/online-2d-3d-cad" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Online 2D and 3D CAD</a> · <a href="/editor-dxf-online" target="_blank" rel="noopener" style="color:#7cc4ff">Editor DXF online</a> · <a href="/online-dxf-editor" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Online DXF editor</a> · <a href="/guias-cad" target="_blank" rel="noopener" style="color:#7cc4ff">Guías CAD</a> · <a href="/cad-guides" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">CAD guides</a> · <a href="/render-arquitectonico-online" target="_blank" rel="noopener" style="color:#7cc4ff">Render arquitectónico</a> · <a href="/online-architectural-rendering" lang="en" target="_blank" rel="noopener" style="color:#7cc4ff">Architectural rendering</a> · <a href="/acerca" target="_blank" rel="noopener" style="color:#7cc4ff">Acerca de y soporte</a> · <a href="/novedades" target="_blank" rel="noopener" style="color:#7cc4ff">Novedades</a> · <a href="/legal" target="_blank" rel="noopener" style="color:#7cc4ff">Aviso legal, términos de uso y privacidad</a> · © 2025-2026 Blackline CAD. Todos los derechos reservados.</p></section><p class="help">CAD2D trabaja en el navegador y guarda en DXF, el formato de intercambio CAD estándar. Como con cualquier programa, revisá la impresión y las cotas antes de emitir documentación de obra.</p></div></div>
 <input id="fileInput" type="file" accept=".dxf,.svg,.dwg,.dwt,.dws,.pdf,.bak,.sv$,.json,.cadjson,.png,.jpg,.jpeg,.webp,.gif,.bmp,.txt,.csv,.tsv,.xlsx,.docx" style="display:none">
 <script src="cad2d-config.js?v=20261123-dwg-disabled"></script>
 <script src="cad-grip-settings.js?v=20261120-1850"></script>
@@ -1439,7 +1439,7 @@ function cadUpdateCommandContext(message){
  node.hidden=false;node.textContent=name+' · '+help;node.title='Active command: '+name+'\n'+help;
  input.placeholder=state.stage.length?'Distance, coordinate or option…':'Command, coordinate or option…';
 }
-// Opciones de comando por teclado (estilo AutoCAD): se reinician al cambiar de comando.
+// Opciones de comando por teclado (estilo CAD de escritorio): se reinician al cambiar de comando.
 var cad2dCmdOpt={};
 function setTool(t){
  state.blockCreatePending=false;
@@ -2675,7 +2675,7 @@ function cadDimensionPrimitivesRaw(e){
  const direction=mul(sub(bb,aa),1/(dist(aa,bb)||1));
  tip(aa,direction);tip(bb,mul(direction,-1));
  const center=mul(add(aa,bb),.5),label=format(measure);
- // Texto alineado con la línea de cota (como AutoCAD): legible de abajo o desde la derecha.
+ // Texto alineado con la línea de cota (como en los CAD de escritorio): legible de abajo o desde la derecha.
  let deg=Math.atan2(direction.y,direction.x)*180/Math.PI;
  if(deg>90.001)deg-=180;else if(deg<=-89.999)deg+=180;
  const r=deg*Math.PI/180,along=P(Math.cos(r),Math.sin(r)),up=P(-Math.sin(r),Math.cos(r));
@@ -2831,7 +2831,7 @@ function cadGenericBlockGrips(ref){
  if(!def||def.dynamicActions===false||cadDetailedArqOpening(ref)||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
  return [
   ...(()=>{
-   // On the block itself, like AutoCAD: rotate dot at the top-right corner, flip arrow under
+   // On the block itself, as in desktop CAD: rotate dot at the top-right corner, flip arrow under
    // the bottom edge, stretch triangle on the right edge.
    const b=boundsEntity(ref);if(!b||![b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite))return [];
    const tl=screen(P(b.minX,b.maxY)),br=screen(P(b.maxX,b.minY));
@@ -2883,7 +2883,7 @@ function cadMirrorGenericBlockGeometry(parts,ref){
   return e;
  });
 }
-/* AutoCAD-style dynamic grips: solid cyan glyphs with a dark outline, sized to read as buttons.
+/* Desktop-CAD-style dynamic grips: solid cyan glyphs with a dark outline, sized to read as buttons.
    dot = rotate · flip arrow = mirror/swing side · triangle = stretch/width · square = base point. */
 function cadDrawAcadGrip(g){
  const S=9,ang=Number(g.ang)||0;
@@ -2894,7 +2894,7 @@ function cadDrawAcadGrip(g){
  const kind=g.kind||'rotate';
  if(kind==='rotate'){ctx.arc(0,0,S*.82,0,Math.PI*2);}
  else if(kind==='flip'){
-  // Double-headed flip arrow (AutoCAD flip parameter).
+  // Double-headed flip arrow (flip parameter).
   const L=S*1.35,H=S*.95,t=S*.38;
   ctx.moveTo(-L,0);ctx.lineTo(-L+H,-H);ctx.lineTo(-L+H,-t);ctx.lineTo(L-H,-t);ctx.lineTo(L-H,-H);ctx.lineTo(L,0);ctx.lineTo(L-H,H);ctx.lineTo(L-H,t);ctx.lineTo(-L+H,t);ctx.lineTo(-L+H,H);ctx.closePath();
  }else if(kind==='stretch'){ctx.moveTo(S*1.05,0);ctx.lineTo(-S*.75,-S*.95);ctx.lineTo(-S*.75,S*.95);ctx.closePath();}
@@ -3748,7 +3748,7 @@ function drawImageEntity(e,forceColor){
  if(im.complete&&im.naturalWidth)ctx.drawImage(im,a.x,a.y,b.x-a.x,b.y-a.y);else{ctx.fillStyle='#22303a';ctx.fillRect(a.x,a.y,b.x-a.x,b.y-a.y)}
  ctx.globalAlpha=1;if(forceColor||state.selected.includes(e.id)){ctx.strokeStyle=forceColor||displayColors.selection;ctx.setLineDash([5,3]);ctx.lineWidth=1.5;ctx.strokeRect(a.x,a.y,b.x-a.x,b.y-a.y)}ctx.restore();
 }
-// Solo pantalla: en fondos claros el blanco/amarillo pálido se ve como en AutoCAD (ACI 7 → negro). La impresión no cambia.
+// Solo pantalla: en fondos claros el blanco/amarillo pálido se ve según la convención ACI 7 → negro. La impresión no cambia.
 const cadScreenColorCache=new Map();
 function cadHexLum(c){const m=/^#?([0-9a-f]{6})$/i.exec(String(c||'').trim());if(!m)return null;const n=parseInt(m[1],16),r=(n>>16)/255,g=(n>>8&255)/255,b=(n&255)/255;return{r,g,b,l:.2126*r+.7152*g+.0722*b}}
 function cadScreenColor(c){
@@ -4043,7 +4043,7 @@ try{otrkOn=localStorage.getItem('cad2d-otrack')==='true'}catch(e){}
 function trackingEligible(){
  if(!otrkOn||!state.osnapOn)return false;
  if(['line','polyline','rect','circle','arc','ellipse','dimension','distance','move','copy','insertBlock','wall2d','polygon','stretch','rotate','scale','mirror','text','table','area'].includes(state.tool))return true;
- // Edición con pinzas (estirar vértices, mover muros/aberturas): también rastrea, como AutoCAD.
+ // Edición con pinzas (estirar vértices, mover muros/aberturas): también rastrea, como en los CAD de escritorio.
  let grip=false;try{grip=!!cadPrimitiveGripPlacement}catch(e){}
  return state.tool==='select'&&(grip||!!(state.drag&&/grip|vertex|wall/i.test(state.drag.type||'')));
 }
@@ -4083,7 +4083,7 @@ function drawOtrackGuides(){
  if(!trackingEligible())return;
  const g=otrkGuide,w=canvas.width/dpr,h=canvas.height/dpr;
  ctx.save();
- // Puntos adquiridos: cruz pequeña (como AutoCAD)
+ // Puntos adquiridos: cruz pequeña (como en los CAD de escritorio)
  for(const a of otrkAnchors){const p=screen(a);ctx.strokeStyle='#7dff9a';ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(p.x-5,p.y);ctx.lineTo(p.x+5,p.y);ctx.moveTo(p.x,p.y-5);ctx.lineTo(p.x,p.y+5);ctx.stroke()}
  if(!g){ctx.restore();return}
  const p=screen(g.point);
@@ -4155,7 +4155,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
  const orthoBase=orthoLocksPointer?(gripBase||state.stage.at(-1)):null;
  const orthoAxis=orthoBase?(Math.abs(rawPointer.x-orthoBase.x)>=Math.abs(rawPointer.y-orthoBase.y)?'h':'v'):null;
  const constrain=pt=>!orthoBase?pt:orthoAxis==='h'?P(pt.x,orthoBase.y):P(orthoBase.x,pt.y);
- // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en AutoCAD).
+ // ORTHO no afecta a herramientas definidas por esquinas, centro o radio (como en los CAD de escritorio).
  if(orthoLocksPointer){q=constrain(q)}
   else if(state.polarOn&&state.stage.length&&['line','polyline','rect','polygon','dimension','move','copy'].includes(state.tool)){
    const a=state.stage[state.stage.length-1],vx=q.x-a.x,vy=q.y-a.y,r=Math.hypot(vx,vy);
@@ -4249,7 +4249,7 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    if(e.type==='polyline'&&e.pts?.length>1&&!e.bulges){const n=e.pts.length,segs=e.closed&&n>2?n:n-1;
     for(let i=0;i<segs;i++){const a=e.pts[i],b=e.pts[(i+1)%n];if(nearbyLines.length<140)nearbyLines.push({a,b});
      if(cadOsnapEnabled('NEAREST')&&window.BlacklineOSNAPMath){const pt=BlacklineOSNAPMath.nearestOnSegment(osnapProbe,a,b);if(pt)candidates.push([pt,'NEAREST'])}}}
-   // CERCANO tiene la prioridad más baja (como en AutoCAD): sólo si no hay otra referencia dentro de la apertura.
+   // CERCANO tiene la prioridad más baja (como en los CAD de escritorio): sólo si no hay otra referencia dentro de la apertura.
    for(const [v,kind] of candidates){if(!v)continue;const d=Math.hypot(v.x-osnapProbe.x,v.y-osnapProbe.y)*state.view.scale;if(kind==='NEAREST'){if(d<nearFallbackD){nearFallbackD=d;nearFallback=v}continue}if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
@@ -6124,7 +6124,7 @@ function handlePoint(p,shift){const t=state.tool;
  if(t==='id'){log('ID X='+p.x.toFixed(6)+' Y='+p.y.toFixed(6)+' '+state.unit);toast('X '+p.x.toFixed(6)+' · Y '+p.y.toFixed(6)+' '+state.unit);state.tool='select';prompt();schedule();return}
  if(t==='matchprop'){matchCadPropertiesAt(p);return}
  if(t==='area'){state.stage.push(P(p.x,p.y));prompt();schedule();return}
-if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(shift&&!state.modifyCandidate){state.modifyCandidate={mode:'trimFence',first:clone(p)};prompt();schedule();toast('TRIM CERCA: segundo clic para barrido');return}return cadTrimClick(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();schedule();toast(cad2dCmdOpt.offsetThrough?'OFFSET · Indicá el punto de paso':'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Ahora hacé clic del lado interior o exterior')}else toast('OFFSET: seleccioná con el cuadrado amarillo una línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t,shift);return}if(e){/* Como AutoCAD (PICKADD=1): clic suma a la selección, Shift+clic la quita, Esc la limpia. */if(shift)state.selected=state.selected.filter(id=>id!==e.id);else if(!state.selected.includes(e.id))state.selected=[...state.selected,e.id]}updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
+if(['select','erase','trim','extend','offset','chamfer','fillet'].includes(t)){let e=pick(p);if(t==='erase'){if(e){state.selected=[e.id];eraseSelected()}return}if(t==='trim'){if(shift&&!state.modifyCandidate){state.modifyCandidate={mode:'trimFence',first:clone(p)};prompt();schedule();toast('TRIM CERCA: segundo clic para barrido');return}return cadTrimClick(p)}if(t==='extend'){if(e)extendLine(e,p);return}if(t==='offset'){if(!state.modifyCandidate){if(e&&['line','circle','polyline','rect'].includes(e.type)){state.modifyCandidate={id:e.id};state.selected=[e.id];updateProps();prompt();schedule();toast(cad2dCmdOpt.offsetThrough?'OFFSET · Indicá el punto de paso':'OFFSET '+$('offsetDistance').value+' '+state.unit+' · Ahora hacé clic del lado interior o exterior')}else toast('OFFSET: seleccioná con el cuadrado amarillo una línea, polilínea, rectángulo o círculo');return}const target=state.entities.find(x=>x.id===state.modifyCandidate.id);if(target){offsetAt(target,p);state.selected=[];updateProps()}else{state.modifyCandidate=null;toast('Objeto no disponible / Object no longer exists')}return}if(t==='chamfer'||t==='fillet'){modifyCornerPick(e,p,t,shift);return}if(e){/* Convención CAD (PICKADD=1): clic suma a la selección, Shift+clic la quita, Esc la limpia. */if(shift)state.selected=state.selected.filter(id=>id!==e.id);else if(!state.selected.includes(e.id))state.selected=[...state.selected,e.id]}updateProps();schedule();if(e)toast('Seleccionado / Selected: '+e.type.toUpperCase());return}if(['move','copy','rotate','scale','mirror'].includes(t)){doTransform(t,p);return}if(t==='pan')return;
  if(t==='dimension'&&['radius','diameter'].includes($('dimMode').value)){
   if(!state.modifyCandidate){const target=pick(p);if(!target||target.type!=='circle'){toast('Select a CIRCLE for radius / diameter');return}state.modifyCandidate={id:target.id};prompt();return}
   const target=state.entities.find(e=>e.id===state.modifyCandidate.id);
@@ -6227,7 +6227,7 @@ function cadPrimitiveGripHit(raw){
  return found;
 }
 
-// Pinzamiento de vértice: muestra la longitud y cuánto se estira (como la entrada dinámica de AutoCAD)
+// Pinzamiento de vértice: muestra la longitud y cuánto se estira (como la entrada dinámica de los CAD de escritorio)
 // y acepta una longitud escrita: 2.5 ⏎ deja la línea en 2,50 m hacia donde apunta el mouse.
 let cadGripTyped='';
 // Grip edits must have their own ORTHO/OTRACK constraint: unlike LINE, SELECT
@@ -7723,7 +7723,7 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
  {const n=Number(value.replace(',','.'));if(/^\d*[.,]?\d+$/.test(value)&&n>0&&!state.orthoOn&&otrkGuide?.rays?.length===1&&!otrkGuide.intersection&&trackingEligible()&&state.tool!=='select'&&!cad2dCmdOpt.transformRef){const r=otrkGuide.rays[0];otrkGuide=null;handlePoint(P(r.anchor.x+r.ux*n,r.anchor.y+r.uy*n),false);schedule();return}}
-/* ---------- Opciones de comando por teclado (estilo AutoCAD) ---------- */
+/* ---------- Opciones de comando por teclado (estilo CAD de escritorio) ---------- */
  {const num=value.replace(',','.'),isNum=/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(num),n=Number(num),t=state.tool,st=state.stage,opt=rawOption;
   const say=m=>{log(m);$('command').placeholder=m;toast(m);cadRenderOptionChips()};
   const O=cad2dCmdOpt,is=(...k)=>k.includes(opt);
@@ -7939,7 +7939,7 @@ document.addEventListener('keydown',ev=>{
  if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cadZoomOptionPending=false;$('command').value='';$('command').blur();cancelCadCommand();toast(cad2dAliasLanguage==='es'?'Comando cancelado':'Command cancelled')}
 });
 
-/* Autocompletado de la línea de comandos (como AutoCAD): al escribir aparecen los comandos que
+/* Autocompletado de la línea de comandos (como en los CAD de escritorio): al escribir aparecen los comandos que
    coinciden por alias, iniciales o nombre completo. ↑/↓ elige, Tab completa, Enter ejecuta, Esc cierra. */
 (function cadCommandLineAutocomplete(){
  const input=$('command'),row=input?.closest('.command-row');if(!input||!row)return;
@@ -8050,7 +8050,7 @@ async function download(name,data,mime='application/octet-stream'){
  const blob=data instanceof Blob?data:new Blob([data],{type:mime});
  const filename=String(name||'Dibujo.cadjson').replace(/[\\/:*?"<>|]/g,'_');
  const ext=(filename.match(/\.[^.]+$/)||['.cadjson'])[0].toLowerCase();
- const descriptions={'.dwg':'Dibujo DWG (AutoCAD)','.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
+ const descriptions={'.dwg':'Dibujo DWG','.dxf':'Dibujo DXF editable','.cadjson':'Proyecto editable Blackline CAD','.svg':'Gráfico vectorial SVG','.pdf':'Documento PDF','.png':'Imagen PNG','.txt':'Archivo de texto'};
  const mimeTypes={'.dwg':'application/acad','.dxf':'application/dxf','.cadjson':'application/json','.svg':'image/svg+xml','.pdf':'application/pdf','.png':'image/png','.txt':'text/plain'};
  if(typeof window.showSaveFilePicker==='function'&&window.isSecureContext){
   try{
@@ -8180,16 +8180,16 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
   if(requestedFormat==='dwg'&&!dwgOnly&&!cadWarnDWG())return false;
   name=cadCleanDrawingName(requested);
  }
- // Por defecto se guarda en DXF (abre en AutoCAD y cualquier CAD). Después del EOF se agrega el
+ // Por defecto se guarda en DXF (abre en cualquier CAD). Después del EOF se agrega el
  // proyecto completo de CAD2D (bloques dinámicos, estilos, layouts); los demás programas lo ignoran.
  const projectText=()=>JSON.stringify(cadProjectSnapshot(name),null,2);
  const dxfText=()=>cadDxfWithProject(name);
  if(canPick){
   try{
    const handle=forceNew||!cadProjectSaveHandle
-    ?await window.showSaveFilePicker({suggestedName:dwgOnly?name+'-editado.dwg':name+'.dxf',types:dwgOnly?[{description:'Dibujo DWG (AutoCAD)',accept:{'application/acad':['.dwg']}}]:[
-      {description:'Dibujo DXF (AutoCAD)',accept:{'application/dxf':['.dxf']}},
-      {description:'Dibujo DWG (AutoCAD)',accept:{'application/acad':['.dwg']}},
+    ?await window.showSaveFilePicker({suggestedName:dwgOnly?name+'-editado.dwg':name+'.dxf',types:dwgOnly?[{description:'Dibujo DWG',accept:{'application/acad':['.dwg']}}]:[
+      {description:'Dibujo DXF',accept:{'application/dxf':['.dxf']}},
+      {description:'Dibujo DWG',accept:{'application/acad':['.dwg']}},
       {description:'Proyecto Blackline CAD',accept:{'application/json':['.cadjson']}}
      ],excludeAcceptAllOption:true})
     :cadProjectSaveHandle;
@@ -8232,7 +8232,7 @@ async function cadSaveDrawing(forceNew=false,preferred=''){
 }
 const CAD2D_DXF_PROJECT_MARK='CAD2D-PROJECT-JSON';
 function cadDxfWithProject(name){return buildDXFText(cadBlockEdit?cadBlockEdit.entities:state.entities,name,state.layers)+CAD2D_DXF_PROJECT_MARK+'\n'+JSON.stringify(cadProjectSnapshot(name))+'\n'}
-// Guardado automático como SAVETIME de AutoCAD: cada N minutos (5 por defecto) si hubo cambios.
+// Guardado automático como SAVETIME: cada N minutos (5 por defecto) si hubo cambios.
 // Si el dibujo ya se guardó en un archivo (Save), se reescribe ese mismo .dxf; si no, copia en el navegador.
 let cad2dSaveMinutes=5,cad2dLastAutoSig='',cad2dLastAutoTime=Date.now();
 try{const m=Number(localStorage.getItem('cad2d-savetime'));if(m>=0&&m<=120)cad2dSaveMinutes=m}catch(e){}
@@ -8263,7 +8263,7 @@ async function cad2dAutoSave(force=false){
  finally{cadAutoSaveBusy=false}
 }
 setInterval(()=>{if(cad2dSaveMinutes>0&&Date.now()-cad2dLastAutoTime>=cad2dSaveMinutes*60000)cad2dAutoSave()},30000);
-/* ---------- Copias de seguridad .bak (como AutoCAD): siempre, tenga o no nombre el dibujo ----------
+/* ---------- Copias de seguridad .bak (como en los CAD de escritorio): siempre, tenga o no nombre el dibujo ----------
    Cada autoguardado deja una copia DXF completa (con el proyecto CAD2D adentro) en el navegador; se guardan las
    últimas 10 por dibujo. Si se eligió una carpeta de copias, además se escribe <nombre>.bak ahí.
    Un .bak se abre directo en CAD2D, o renombrándolo a .dxf en cualquier programa CAD. */
@@ -8341,7 +8341,7 @@ async function inspectDWGHeader(file){
  const code=String.fromCharCode(...head.slice(0,6));
  if(!/^AC10[0-9]{2}$/.test(code))return {valid:false,message:'Unknown DWG header ('+hex(head.slice(0,6))+'); file may be damaged or unsupported.'};
  const release=versionNames[code]||'unrecognized release';
- return {valid:true,code,release,message:'DWG identified: '+code+' (AutoCAD '+release+'), '+(file.size/1048576).toFixed(2)+' MB. Header verified only; entities, blocks, layers and 1:1 scale have NOT been read.'};
+ return {valid:true,code,release,message:'DWG identified: '+code+' (versión '+release+'), '+(file.size/1048576).toFixed(2)+' MB. Header verified only; entities, blocks, layers and 1:1 scale have NOT been read.'};
 }
 
 async function convertDWGAutomatically(file,options={}){
@@ -8353,7 +8353,7 @@ async function convertDWGAutomatically(file,options={}){
  const local=window.CAD2D_DWG_BATCH?.convertLocal;
  if(typeof local!=='function')throw Error('El conversor local todavía no se cargó. Recargá CAD2D3D y volvé a intentar.');
  const started=performance.now();
- log('DWG [1/3] Conversión local · '+info.code+' (AutoCAD '+info.release+') · '+Math.round(file.size/1024)+' KiB');
+ log('DWG [1/3] Conversión local · '+info.code+' (versión '+info.release+') · '+Math.round(file.size/1024)+' KiB');
  toast('DWG 1/3 · convirtiendo '+file.name+'…');
  const bytes=await local(file,'dwg-dxf',{signal});check();
  if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('El conversor no devolvió un archivo válido.');
@@ -8582,7 +8582,7 @@ async function loadDrawingFile(f){if(!f)return;
  if(/\.dwg$/i.test(f.name))return cadOpenDwgCancelable(f);
  // Do not reuse a previous drawing's save destination after opening a different file.
  if(!/\.(pdf|png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name)){cadProjectSaveHandle=null;cadDwgLastSaved=null;}
- // Copias .bak / .sv$ (de CAD2D o de AutoCAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
+ // Copias .bak / .sv$ (de CAD2D o de otros CAD): se reconoce el contenido y se abre como DWG, DXF o proyecto.
  if(/\.(dwt|dws)$/i.test(f.name)){const tpl=/\.dwt$/i.test(f.name);await loadDrawingFile(new File([f],f.name.replace(/\.(dwt|dws)$/i,'.dwg'),{type:f.type}));
   if(tpl){state.file='Dibujo nuevo';try{$('filename').textContent='Dibujo nuevo.dxf'}catch(e){}cadProjectSaveHandle=null;toast('Plantilla '+f.name+' cargada como dibujo nuevo: capas, estilos y bloques listos')}return}
  if(/\.(bak|sv\$|tmp)$/i.test(f.name)){const head=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer()),base=f.name.replace(/\.(bak|sv\$|tmp)$/i,'').replace(/_\d{8}-\d{4}$/,'');
@@ -8600,7 +8600,7 @@ let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfe
 }});
 const dxfNum=n=>Number(n||0).toFixed(9).replace(/0+$/,'').replace(/\.$/,'');function fontToDXFStyle(e){const family=safeCADFont(e.fontFamily||'Arial');return family==='Courier New'||family==='monospace'?'CAD2D_MONO':family==='Georgia'||family==='Times New Roman'?'CAD2D_SERIF':'STANDARD'}
 function buildDXFText(entities=state.entities,filename=state.file,layers=state.layers){
- // DXF R2000 (AC1015) completo: handles, owners y marcadores de subclase, para que AutoCAD y lectores estrictos lo abran.
+ // DXF R2000 (AC1015) completo: handles, owners y marcadores de subclase, para que lo abran los lectores DXF estrictos.
  let next=0x30;const H=()=>(next++).toString(16).toUpperCase();
  const LW=[0,5,9,13,15,18,20,25,30,35,40,50,53,60,70,80,90,100,106,120,140,158,200,211];
  const lw=w=>{const num=w==null?NaN:Number(w);const v=Math.round((Number.isFinite(num)?Math.max(0,num):.25)*100);return String(LW.reduce((a,b)=>Math.abs(b-v)<Math.abs(a-v)?b:a))};
@@ -8614,7 +8614,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const table=(name,entries,extra=[])=>{const th=H();hTables[name]=th;const out=['0','TABLE','2',name,'5',th,'330','0','100','AcDbSymbolTable','70',String(entries.length),...extra];for(const f of entries)out.push(...f(th));out.push('0','ENDTAB');for(const value of out)tables.push(value)};
  const symRec=(type,sub,name,th,body,hc='5')=>['0',type,hc,H(),'330',th,'100','AcDbSymbolTableRecord','100',sub,'2',name,'70','0',...body];
  const msBR=H(),psBR=H(),root='C',grp='D';
- // Bloques nativos: cada referencia se exporta como INSERT de una definición BLOCK (AutoCAD la ve como bloque
+ // Bloques nativos: cada referencia se exporta como INSERT de una definición BLOCK (los demás programas la ven como bloque
  // editable). Las referencias con la misma geometría local comparten definición; las dinámicas o espejadas
  // que difieren generan una variante con nombre propio.
  const dxfBlockName=n=>{let t=String(n||'BLOQUE').replace(/[<>\/\\":;?*|=`,]/g,'_').replace(/^\*+/,'').trim().slice(0,240);return t||'BLOQUE'};
@@ -8630,7 +8630,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   refDef.set(r,d);
  }
  // Cotas lineales / alineadas → entidad DIMENSION con su bloque anónimo *Dn (geometría ya resuelta, en coordenadas
- // del dibujo): AutoCAD las reconoce como cotas (DIMEDIT, propiedades, estilo) y CAD2D las vuelve a leer como cotas nativas.
+ // del dibujo): los programas CAD las reconocen como cotas (DIMEDIT, propiedades, estilo) y CAD2D las vuelve a leer como cotas nativas.
  const dimDefs=new Map();let dimN=0;
  for(const e of entities){
   if(e.type!=='dimension'||!['horizontal','vertical','aligned','radius','diameter','angular','ordinateX','ordinateY'].includes(e.mode||'aligned')||!e.a||!e.b||!e.p||dist(e.a,e.b)<1e-9)continue;
@@ -8658,7 +8658,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const appendPoints=(out,pts)=>{for(const p of pts)out.push('10',dxfNum(p.x),'20',dxfNum(p.y))};const pos=(x,y)=>['10',dxfNum(x),'20',dxfNum(y),'30','0'];
  const head=(type,e,lay,color,extra=[])=>{const b=['0',type,'5',H(),'330',OWN||msBR,'100','AcDbEntity','8',lay.name];const t=ltName(e.linetype||'BYLAYER');b.push('6',t==='CONTINUOUS'?'Continuous':t);const c=color??(e.color?hex(e.color):null);if(c)b.push('420',c);b.push('370',lw(e.width??lay.width??.25),...extra);return b};
  const text=(e,lay,p,color)=>{if(cadIsMText(e)){
-  // MTEXT editable en AutoCAD: inserción arriba a la izquierda, renglones con \P, ancho de caja y interlineado.
+  // MTEXT editable en otros CAD: inserción arriba a la izquierda, renglones con \P, ancho de caja y interlineado.
   const r=(Number(e.rotation)||0)*Math.PI/180,top=P(p.x-e.h*Math.sin(r),p.y+e.h*Math.cos(r));
   const body=String(e.text||'').replace(/\r/g,'').replace(/\\/g,'\\\\').replace(/\n/g,'\\P'),chunks=[];for(let i=0;i<body.length;i+=250)chunks.push(body.slice(i,i+250));
   const last=chunks.pop()||'';
@@ -8668,7 +8668,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  // Contorno exterior + islas (92: 2 polilínea | 1 externa | 16 más exterior).
  const hatchPaths=e=>{const holes=(Array.isArray(e.holes)?e.holes:[]).filter(h=>h?.length>2);OUT.push('91',String(1+holes.length));
   [e.pts,...holes].forEach((pts,i)=>{OUT.push('92',i?'2':'19','72','0','73','1','93',String(pts.length));appendPoints(OUT,pts);OUT.push('97','0')})};
- // Sombreado con patrón como HATCH editable: ANSI31 es idéntico al de AutoCAD (escala = separación/3,175);
+ // Sombreado con patrón como HATCH editable: ANSI31 es el patrón estándar (escala = separación/3,175);
  // los demás se guardan como patrón propio CAD2D_<NOMBRE> con sus familias de líneas escritas en el archivo.
  const patternHatch=e=>{
   const op=e.dxfPattern;
@@ -8750,7 +8750,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  const objects=['0','DICTIONARY','5',root,'330','0','100','AcDbDictionary','281','1','3','ACAD_GROUP','350',grp,'0','DICTIONARY','5',grp,'330',root,'100','AcDbDictionary','281','1'];
  const header=['9','$ACADVER','1','AC1015','9','$DWGCODEPAGE','3','ANSI_1252','9','$INSUNITS','70',String(({mm:4,cm:5,m:6,in:1,ft:2})[state.unit]||6),'9','$MEASUREMENT','70','1','9','$LTSCALE','40',dxfNum(state.ltscale||1),'9','$HANDSEED','5',(next+1).toString(16).toUpperCase()];
  const data=['0','SECTION','2','HEADER',...header,'0','ENDSEC','0','SECTION','2','CLASSES','0','ENDSEC','0','SECTION','2','TABLES',...tables,'0','ENDSEC','0','SECTION','2','BLOCKS',...blocks,'0','ENDSEC','0','SECTION','2','ENTITIES',...ents,'0','ENDSEC','0','SECTION','2','OBJECTS',...objects,'0','ENDSEC','0','EOF'];
- // R2000 + ANSI_1252: los caracteres no ASCII (ñ, á, °, ²…) van como \\U+XXXX, que AutoCAD lee bien.
+ // R2000 + ANSI_1252: los caracteres no ASCII (ñ, á, °, ²…) van como \\U+XXXX, que los lectores DXF leen bien.
  return data.join('\r\n').replace(/[^\x00-\x7f]/g,c=>'\\U+'+c.charCodeAt(0).toString(16).toUpperCase().padStart(4,'0'))+'\r\n';
 }
 function exportDXF(entities=state.entities,filename=state.file,layers=state.layers){return download(`${filename}.dxf`,buildDXFText(entities,filename,layers),'application/dxf')}$('dxfBtn').onclick=()=>exportDXF();
@@ -8969,7 +8969,7 @@ function cadDrawOrder(mode){
  toast(mode==='back'?picked.length+' objeto(s) detrás de todo':mode==='textfront'?'Textos y cotas al frente':picked.length+' objeto(s) delante de todo');
 }
 window.cadDrawOrder=cadDrawOrder;
-/* Paletas y pantalla, como en AutoCAD:
+/* Paletas y pantalla, como en los CAD de escritorio:
    MOSTRARPALETAS/SHOWPALETTES · OCULTARPALETAS/HIDEPALETTES · Ctrl+0 limpiar pantalla · Ctrl+9 línea de comandos ·
    Ctrl+1 propiedades · Ctrl+2 galería de bloques · Ctrl+3 explorador de bloques ·
    RESTABLECERINTERFAZ/RESETUI: vuelve la interfaz a fábrica sin tocar el dibujo. */
@@ -9301,7 +9301,7 @@ function cadCtbDrawingColors(){
 async function cadImportCtbFile(file){
  const buf=new Uint8Array(await file.arrayBuffer());
  const head=new TextDecoder('latin1').decode(buf.slice(0,48));
- if(!/PIAFILEVERSION/.test(head))throw Error('No es un archivo .ctb de AutoCAD');
+ if(!/PIAFILEVERSION/.test(head))throw Error('No es una tabla de estilos .ctb válida');
  const dv=new DataView(buf.buffer),comp=dv.getUint32(56,true);
  const body=buf.slice(60,comp>0&&60+comp<=buf.length?60+comp:buf.length);
  const text=await new Response(new Blob([body]).stream().pipeThrough(new DecompressionStream('deflate'))).text();
@@ -9351,7 +9351,7 @@ function cadEditCtb(){
  };
  const presets=[['Monocromo con grosores','mono'],['Color del objeto','color'],['Gris','gray']];
  for(const [l,k] of presets){const b=mk(l);b.onclick=()=>{state.ctb=cadCtbPreset(k);cadCtbChanged();render()};bar.append(b)}
- const imp=mk('Importar .ctb de AutoCAD…');const file=document.createElement('input');file.type='file';file.accept='.ctb';file.hidden=true;
+ const imp=mk('Importar tabla .ctb…');const file=document.createElement('input');file.type='file';file.accept='.ctb';file.hidden=true;
  imp.onclick=()=>file.click();file.onchange=async()=>{const f=file.files[0];file.value='';if(!f)return;try{state.ctb=await cadImportCtbFile(f);cadCtbChanged();render();toast('Tabla CTB importada: '+state.ctb.name)}catch(err){toast('No se pudo leer el .ctb: '+err.message)}};
  bar.append(imp,file);
  const foot=document.createElement('div');foot.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:#afc2cc;gap:8px';
@@ -9867,7 +9867,7 @@ let cad2dLastCommand='';
 function cad2dExecuteContextCommand(name){
  $('command').value=name;runCommand();canvas.focus({preventScroll:true});
 }
-// Editor de bloques visual (como BEDIT de AutoCAD): el dibujo muestra solo el bloque, se edita con
+// Editor de bloques visual (como BEDIT): el dibujo muestra solo el bloque, se edita con
 // las herramientas normales y "Guardar bloque" actualiza todas sus copias. Sin código.
 let cadBlockEdit=null;
 function cadEditBlockDefinition(name){
@@ -11297,7 +11297,7 @@ function cadExportActiveBlock(){
   if(keys.length===1)$('blockLibrary').value=keys[0];
   else return toast(keys.length?'WBLOCK: seleccioná un bloque en el dibujo o Biblioteca':'WBLOCK: biblioteca vacía');
  }
- // WBLOCK / W exporta el bloque como .dxf (se abre en AutoCAD como dibujo).
+ // WBLOCK / W exporta el bloque como .dxf (se abre en otros CAD como dibujo).
  $('exportBlockDxfBtn').click();
 }
 function initBlocks(){
@@ -11922,7 +11922,7 @@ function initCadExportPopover(){
  const option=(name,detail,fn)=>{const b=document.createElement('button');b.type='button';b.className='cad-export-option';const left=document.createElement('strong');left.textContent=name;const right=document.createElement('small');right.textContent=detail;b.append(left,right);b.onclick=()=>{close();fn()};p.append(b)};
  label('Dibujo editable');
  option('Guardar .DXF','CAD 2D · 1:1',()=>exportDXF());
- option('Guardar .DWG','AutoCAD · conversión local + .bak',()=>saveJSON(true,'dwg'));
+ option('Guardar .DWG','DWG · conversión local + .bak',()=>saveJSON(true,'dwg'));
  option('Carpeta de copias DWG .BAK','Autorizar ubicación una vez',()=>cadDwgChooseBakDir());
  option('Guardar proyecto .CADJSON','Edición en CAD2D',()=>saveJSON());
  option('Exportar notas .TXT','Texto plano de anotaciones, sin geometría',()=>exportCADTextNotes());
@@ -12045,7 +12045,7 @@ function initCadDimStylePalette(){
   writeForm(st);push();paint();
   const sel=state.entities.filter(x=>state.selected.includes(x.id)&&x.type==='dimension');
   if(sel.length){applySel(true);return toast('Estilo de cota: '+current+' · aplicado a '+sel.length+' cota(s)')}
-  // Como la paleta de herramientas de AutoCAD: clic en un estilo = empezar a acotar con él (dos puntos cualesquiera y la posición).
+  // Como las paletas de herramientas de los CAD de escritorio: clic en un estilo = empezar a acotar con él (dos puntos cualesquiera y la posición).
   state.selected=[];setTool('dimension');
   toast('Acotar con «'+current+'»: marcá el primer punto, el segundo y dónde va la línea de cota (en cualquier lugar, no hace falta un objeto) · Esc termina');
  });
@@ -12658,7 +12658,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dxf-parser.js?v=20261126-paper4"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
-<script src="cad-autocad-plus.js?v=20261126-dimarc1"></script>
+<script src="cad-comandos-plus.js?v=20261126-comandos1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261126-usercad4"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>

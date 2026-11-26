@@ -16,7 +16,7 @@ for client-side import. Neither this service nor ODA are currently deployed.
 
 ## Limitations / risks
 
-- This is **not** an AutoCAD engine. The current browser DXF importer supports only a subset of entities, so blocks, hatches, attributes and layouts can be incomplete even after a successful conversion.
+- This is **not** a full native DWG engine. The current browser DXF importer supports only a subset of entities, so blocks, hatches, attributes and layouts can be incomplete even after a successful conversion.
 - Input and output are deleted from the service working directory at the end of the request. Transport to the server is NOT local/private: the DWG leaves the user's device.
 - Use an isolated container, unprivileged OS identity, process limits and malware/abuse controls before serving uploads.
 - Do not claim 1:1 correctness for DWGs until `$INSUNITS`, `$MEASUREMENT`, geometry extents and known reference distances have been checked.

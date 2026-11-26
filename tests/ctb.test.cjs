@@ -25,7 +25,7 @@ test('presets and validation',()=>{
  assert.equal(api.cadValidCtb({map:{'bad':{color:'x'},'#123456':{color:'javascript:',lw:99}}}).map['#123456'].lw,5);
  assert.equal(api.cadValidCtb(null),null);
 });
-test('AutoCAD .ctb import reads colors and lineweights',async()=>{
+test('.ctb plot-style import reads colors and lineweights',async()=>{
  let styles='';for(let i=0;i<255;i++)styles+=` ${i}{\n  name="Color_${i+1}\n  color=${i<3?-16777216:-1006632961}\n  lineweight=${i===0?5:i===1?13:255}\n }\n`;
  const text=`description="\nplot_style{\n${styles}}\ncustom_lineweight_table{\n 0=0.0 5=0.15 13=0.5\n}\n`,comp=zlib.deflateSync(Buffer.from(text,'latin1'));
  const head=Buffer.from('PIAFILEVERSION_2.0,CTBVER1,compress\r\npmzlibcodec','latin1'),sizes=Buffer.alloc(12);sizes.writeUInt32LE(0,0);sizes.writeUInt32LE(text.length,4);sizes.writeUInt32LE(comp.length,8);

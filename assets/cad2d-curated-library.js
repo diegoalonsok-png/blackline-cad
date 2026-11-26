@@ -1,5 +1,5 @@
 /* CAD2D · Importación opcional de bibliotecas históricas en JSON
- * No external API, no Autodesk assets. All thumbnails use the exact entities
+ * No external API, no third-party assets. All thumbnails use the exact entities
  * passed to the CAD block engine, and insertion preserves their relative pivot.
  * Metric dimensions in the pack are provisional normalized display sizes.
  */
