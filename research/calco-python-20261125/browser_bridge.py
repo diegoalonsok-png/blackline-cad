@@ -62,8 +62,10 @@ def analyze_rgba(rgba, w, h, ppm):
         add([lo,c] if q['axis']=='h' else [c,lo],[hi,c] if q['axis']=='h' else [c,hi],.2*ppm,'solid nominal')
     candidates,_=hatch.detect(im,(0,0,w,h),ppm)
     for q in candidates:add(q['a'],q['b'],.2*ppm,'hatch nominal')
-    if len(out)<3:
-        for q in outline_candidates(im,ppm):add(q['a'],q['b'],q['t'],'outline review')
+    # Outline walls can coexist with solid and hatched walls. The common
+    # deduplication gate rejects overlapping candidates from earlier detectors.
+    for q in outline_candidates(im,ppm):
+        add(q['a'],q['b'],q['t'],'outline review')
     if len(out)>250:raise ValueError("Too many candidates; use a cropped plan")
     rows=[(str(i),q['a'],q['b']) for i,q in enumerate(out)]
     if rows:
