@@ -83,3 +83,26 @@ test('Academic resources link to the editor and contain the precision exercise i
   assert(html.includes('href="/"'),path+' missing editor link');
  }
 });
+
+
+test('Spanish and English guide hubs preserve reciprocal hreflang, social metadata and localized technical navigation',()=>{
+ for(const [lang,path,other,editor] of [
+  ['es','guias-cad.html','cad-guides.html','editor-dxf-online'],
+  ['en','cad-guides.html','guias-cad.html','online-dxf-editor']
+ ]){
+  const html=fs.readFileSync(path,'utf8'), head=html.split(/<\/head>/i)[0];
+  const url=base+path.replace(/\.html$/,'');
+  assert(head.includes('<html lang="'+lang+'">'),path+' language');
+  assert(head.includes('hreflang="'+lang+'" href="'+url+'"'),path+' missing self alternate');
+  assert(head.includes('hreflang="'+(lang==='es'?'en':'es')+'" href="'+base+other.replace(/\.html$/,'')+'"'),path+' missing reciprocal alternate');
+  assert(head.includes('<meta property="og:url" content="'+url+'">'),path+' mismatched social URL');
+  assert(head.includes('property="og:title"'),path+' missing social title');
+  assert(head.includes('property="og:description"'),path+' missing social description');
+  const data=JSON.parse(head.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(data['@type'],'CollectionPage');
+  assert.equal(data.inLanguage,lang);
+  assert.equal(data.url,url);
+  assert(html.includes('href="/'+editor+'"'),path+' localized DXF link');
+  for(const term of ['OSNAP','DXF','DWG'])assert(html.includes(term),path+' missing quality guidance: '+term);
+ }
+});
