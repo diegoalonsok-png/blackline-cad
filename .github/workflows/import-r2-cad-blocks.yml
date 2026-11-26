@@ -6,10 +6,6 @@ on:
         description: 'Temporary branch holding package.zip (blackline_ready ZIP). Empty = R2 incoming/blackline_ready_package.zip'
         required: false
         default: ''
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/import-r2-cad-blocks.yml
 permissions:
   contents: read
 concurrency:
@@ -18,7 +14,7 @@ concurrency:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 340
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.ARCHITECTURE_R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.ARCHITECTURE_R2_SECRET_ACCESS_KEY }}
@@ -43,7 +39,9 @@ jobs:
         run: |
           case "$REF" in import/*) ;; *) echo "::error::Import branches must be named import/..."; exit 1;; esac
           git fetch --depth 1 origin "refs/heads/$REF:refs/remotes/origin/package"
-          git show origin/package:package.zip > "$RUNNER_TEMP/package.zip"
-          echo "PACKAGE_FILE=$RUNNER_TEMP/package.zip" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/packages"
+          for f in $(git ls-tree --name-only origin/package | grep -E '^[A-Za-z0-9._-]+\.zip$'); do git show "origin/package:$f" > "$RUNNER_TEMP/packages/$f"; done
+          ls -la "$RUNNER_TEMP/packages"
+          echo "PACKAGE_DIR=$RUNNER_TEMP/packages" >> "$GITHUB_ENV"
       - name: Import original files and render actual CAD previews
         run: python scripts/import-r2-cad-blocks.py
