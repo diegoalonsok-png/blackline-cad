@@ -556,7 +556,7 @@
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9×.]+/g,' ').trim();
   if(!q||/\b(?:jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?|referencias?|references?|web|dibujar|generar|crear|disenar|draw|generate|create|design)\b/.test(q)||/\d/.test(q))return null;
   const clean=q.replace(/\b(?:por favor|please|quiero|necesito|busca|buscar|buscame|mostrame|mostrar|ver|find|search|show|me|i|want|need|insertar|insert|planos?|plantas?|floor|plans?|cad|dwg|dxf|modelos?|models?|de|del|para|en|un|una|el|la|los|las|the|a|an|of|for|complete|completos?|completas?)\b/g,' ').replace(/\s+/g,' ').trim();
-  const categories=[['bathroom',/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilettes?|vestuarios?|locker rooms?)\b/],['kitchen',/\b(?:cocinas?|kitchens?)\b/],['living',/\b(?:livings?|living rooms?|salones?|salas de estar|salas estar|estancias?|lounges?|sitting rooms?)\b/]];
+  const categories=[['bathroom',/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilettes?|vestuarios?|locker rooms?)\b/],['kitchen',/\b(?:cocinas?|kitchens?)\b/],['living',/\b(?:living rooms?|livings?|salones?|salas de estar|salas estar|estancias?|lounges?|sitting rooms?)\b/]];
   const hit=categories.find(([,re])=>re.test(clean));if(!hit)return null;
   const rest=clean.replace(hit[1],' ').replace(/\s+/g,' ').trim();
   const groups=[['gym',/\b(?:gym|gimnasios?|vestuarios?|locker|sports?|deportiv[oa]s?|piscinas?|pools?)\b/],['theatre',/\b(?:teatros?|theatres?|theaters?|cines?|cinemas?|auditorios?|auditoriums?|foyer)\b/],['school',/\b(?:escuelas?|schools?|colegios?|institucional|institutional|canteen|comedor)\b/],['office',/\b(?:oficinas?|offices?|comercio|retail|shopping)\b/],['public',/\b(?:public[oa]s?|collective|colectiv[oa]s?)\b/],['industrial',/\b(?:industriales?|industrial|comercial(?:es)?|commercial)\b/],['restaurant',/\b(?:restaurantes?|restaurants?|gastronomia)\b/],['hotel',/\b(?:hoteles?|hotels?|hospitality)\b/],['catering',/\b(?:catering|produccion|production)\b/],['accessible',/\b(?:accesible|accessible|adaptad[oa]s?)\b/],['compact',/\b(?:compact[oa]s?|compact|small|pequen[oa]s?)\b/],['dining',/\b(?:comedor|dining|integrado|open plan)\b/],['family',/\b(?:familiar|family|lectura|reading)\b/],['reception',/\b(?:recepcion|reception|espera|waiting)\b/],['sectional',/\b(?:sofa en l|sectional)\b/],['formal',/\bformal\b/]];
@@ -701,6 +701,7 @@
  }
 
  async function searchHouseGallery(raw){
+  if(roomQuery(raw))return openWeb(raw);
   stopHouseRefresh();webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
   try{
    const refCategory=houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
