@@ -10,7 +10,7 @@ function extract(start,end){
 }
 function fakeLight(){
  const camera={left:0,right:0,top:0,bottom:0,near:0,far:0,updateProjectionMatrix(){this.updated=true;}};
- return {position:{set(...v){this.xyz=v;}},target:{position:{set(...v){this.xyz=v;}},updateMatrixWorld(){this.updated=true;}},shadow:{mapSize:{set(...v){this.xy=v;}},camera},castShadow:false,intensity:0};
+ return {updateMatrixWorld(){},position:{set(...v){this.xyz=v;}},target:{position:{set(...v){this.xyz=v;}},updateMatrixWorld(){this.updated=true;}},shadow:{mapSize:{set(...v){this.xy=v;}},camera},castShadow:false,intensity:0};
 }
 function setup(){
  const meshes=[{isMesh:true,castShadow:true,receiveShadow:true},{isMesh:true,castShadow:true,receiveShadow:true}];
@@ -19,13 +19,18 @@ function setup(){
  const modelRoot={traverse(fn){meshes.forEach(fn);}};
  const renderer={shadowMap:{enabled:true,needsUpdate:false}};
  const scene={add(obj){this.lastAdded=obj;}};
- const root={querySelector(selector){
+ const root={querySelectorAll(){return [];},querySelector(selector){
   return {checked:false,value:0,textContent:'',setAttribute(){}};
  }};
- const ctx={root,sunSettings,sunGround,sunAmbient,sunFill,modelRoot,sunLight,renderer,scene,T:{},renderStyle:'shaded-edges',
+ const ctx={root,sunSettings,sunGround,sunAmbient,sunFill,modelRoot,sunLight,renderer,scene,T:{Color:class{constructor(c){this.c=c}}},renderStyle:'shaded-edges',
   records:[{id:1,type:'box',x:1,y:2,z:0,w:2,d:2,h:2}],
-  visibleRecord:()=>true,Math,Number,Infinity};
- vm.runInNewContext(extract('function cad3dBounds(){','function renderDraftModes(){'),ctx);
+  visibleRecord:()=>true,Math,Number,Infinity,environmentSettings:{showGround:true,clouds:'none',sky:'#8fb7d9',ground:'#7f8a6f',customSky:false,customGround:false},cloudTexture:null,cloudTextureKey:''};
+ // Sólo las funciones que se prueban (el tramo intermedio del módulo creció con escaleras, cielo, etc.).
+ const fn=name=>{const a=source.indexOf('\nfunction '+name+'(');assert(a>=0,'Missing '+name);const b=source.indexOf('\nfunction ',a+1);return source.slice(a,b)};
+ Object.assign(ctx,{finite:(v,d)=>Number.isFinite(Number(v))?Number(v):d,cad3dStairRadial:()=>false,cad3dStairLayout:()=>'straight',underlay:null,
+  cad3dSkyColor:()=>'#8fb7d9',cad3dGroundColor:()=>'#7f8a6f',cad3dMakeClouds:()=>null,fallbackCanvas:null,fallbackDraw(){},cad3dSyncCompactBars(){}});
+ sunGround.material={color:{set(){}}};
+ vm.runInNewContext(fn('cad3dBounds')+fn('apply3DEnvironment')+fn('applySunSettings'),ctx);
  return {ctx,meshes,sunLight,sunGround,renderer,sunSettings};
 }
 test('Sun actually enables real casting light, face receiving, and ground receiving',()=>{
@@ -45,14 +50,15 @@ test('Sun actually enables real casting light, face receiving, and ground receiv
 test('Ground and face shadow settings are independent',()=>{
  const {ctx,meshes,sunLight,sunGround,sunSettings}=setup();
  sunSettings.onGround=false;sunSettings.onFaces=true;ctx.applySunSettings();
- assert.equal(sunGround.visible,false);assert(meshes.every(m=>m.receiveShadow));assert(sunLight.castShadow);
+ // El piso es parte del entorno (showGround); el sol sólo decide si recibe sombra.
+ assert.equal(sunGround.receiveShadow,false);assert(meshes.every(m=>m.receiveShadow));assert(sunLight.castShadow);
  sunSettings.onGround=true;sunSettings.onFaces=false;ctx.applySunSettings();
- assert.equal(sunGround.visible,true);assert(meshes.every(m=>!m.receiveShadow));assert(sunLight.castShadow);
+ assert.equal(sunGround.receiveShadow,true);assert(meshes.every(m=>!m.receiveShadow));assert(sunLight.castShadow);
 });
 test('Disabling Sun disables casting and receivers without deleting objects',()=>{
  const {ctx,meshes,sunLight,sunGround,sunSettings}=setup();
  sunSettings.enabled=false;ctx.applySunSettings();
- assert.equal(sunLight.castShadow,false);assert.equal(sunGround.visible,false);
+ assert.equal(sunLight.castShadow,false);assert.equal(sunGround.receiveShadow,false);
  assert(meshes.every(m=>m.castShadow&&!m.receiveShadow));
  assert.equal(ctx.records.length,1);
 });

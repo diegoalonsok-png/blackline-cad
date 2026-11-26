@@ -9,7 +9,7 @@ function extract(from,to){
  return source.slice(a,b);
 }
 test('Door and window geometry carries a distinct opening ID',()=>{
- const code=extract('function architectureParts(', '/* Build a true miter');
+ const code=extract('function cad3DGlazingPattern(', '/* Build a true miter');
  const ctx={clamp:(x,a,b)=>Math.min(b,Math.max(a,x))};
  vm.runInNewContext(code,ctx);
  for(const kind of ['door','window']){
@@ -27,8 +27,8 @@ test('Clicking a window selects its Properties even if a wall face is slightly i
  const ctx={
   fallbackCanvas:null,records:[{id:12,type:'wall',d:.2,openings:[{id:91,kind:'window'}]}],
   selected:[],selectedOpeningId:null,renderer:{domElement:{getBoundingClientRect(){return {left:0,top:0,width:200,height:200}}}},
-  raycaster:{setFromCamera(){},intersectObjects(){return [{object:wall,distance:2},{object:glass,distance:2.08}]}},
-  modelRoot:{traverse(fn){fn(wall);fn(glass)}},T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},camera:{},
+  raycaster:{params:{Line:{},Points:{},Mesh:{}},setFromCamera(){},intersectObjects(){return [{object:wall,distance:2},{object:glass,distance:2.08}]}},
+  modelRoot:{updateMatrixWorld(){},traverse(fn){fn(wall);fn(glass)}},T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},camera:{},
   editableRecord:()=>true,renderProps(){},highlight(){},text(){}
  };
  vm.runInNewContext(code,ctx);ctx.selectAt({clientX:100,clientY:100,shiftKey:false});
@@ -40,8 +40,8 @@ test('Ray does not select a window behind a different wall',()=>{
  const ctx={
   fallbackCanvas:null,records:[{id:12,type:'wall',d:.2},{id:13,type:'wall',d:.2,openings:[{id:91,kind:'window'}]}],
   selected:[],selectedOpeningId:null,renderer:{domElement:{getBoundingClientRect(){return {left:0,top:0,width:200,height:200}}}},
-  raycaster:{setFromCamera(){},intersectObjects(){return [{object:wall,distance:2},{object:glass,distance:4}]}},
-  modelRoot:{traverse(fn){fn(wall);fn(glass)}},T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},camera:{},
+  raycaster:{params:{Line:{},Points:{},Mesh:{}},setFromCamera(){},intersectObjects(){return [{object:wall,distance:2},{object:glass,distance:4}]}},
+  modelRoot:{updateMatrixWorld(){},traverse(fn){fn(wall);fn(glass)}},T:{Vector2:class{constructor(x,y){this.x=x;this.y=y}}},camera:{},
   editableRecord:()=>true,renderProps(){},highlight(){},text(){}
  };
  vm.runInNewContext(code,ctx);ctx.selectAt({clientX:100,clientY:100,shiftKey:false});

@@ -14,7 +14,7 @@ function openDrawing() {
     getBoundingClientRect() { return {left: 0, top: 0, right: 800, bottom: 600}; }
   };
   const field = {value: ''};
-  const element = {hidden: true, classList: {toggle() {}}, removeAttribute() {}};
+  const element = {hidden: true, style: {}, dataset: {}, textContent: '', classList: {toggle() {}, add() {}, remove() {}, contains() { return false; }}, removeAttribute() {}, setAttribute() {}, addEventListener() {}};
   const panel = {
     querySelectorAll() { return []; },
     querySelector(selector) { return selector === '#cad3dCommand' ? field : element; }
@@ -29,8 +29,8 @@ function openDrawing() {
     return {tool:action,records:records,submit:run3DCommand};
   })();`;
   const cad = vm.runInNewContext(source.slice(0, source.indexOf('window.BlacklineCAD3D=Object.freeze')) + setup, {
-    canvas, panel, window: {addEventListener() {}},
-    document: {createElement() { return {}; }, head: {appendChild() {}}}
+    canvas, panel, window: {addEventListener() {}}, URL, location: {href: 'https://blackline-cad.org/'},
+    document: {baseURI: 'https://blackline-cad.org/', createElement() { return {}; }, head: {appendChild() {}}}
   });
   function pointer(name, x, y) {
     handlers.get(name)({button: 0, pointerId: 1, clientX: x, clientY: y, preventDefault() {}});
