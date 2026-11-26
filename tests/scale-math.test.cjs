@@ -12,3 +12,21 @@ test('same reference radius means factor 1',()=>assert.ok(eq(g.mouseFactor({x:1,
 test('mouse farther means larger scale',()=>assert.ok(eq(g.mouseFactor({x:0,y:0},{x:10,y:0},5),2)));
 test('reject invalid factor',()=>assert.throws(()=>g.scaleEntity({type:'line'},{x:0,y:0},0)));
 test('dimension annotation sizes preserve ratios',()=>{const d=g.scaleEntity({type:'dimension',a:{x:0,y:0},b:{x:2,y:0},p:{x:1,y:1},style:{textHeight:.2,arrow:.1}},{x:0,y:0},2);assert.equal(d.style.textHeight,.4);assert.equal(d.style.arrow,.2)});
+
+test('scaled hatch preserves island position, pattern spacing and source data',()=>{
+ const h={type:'hatch',pts:[{x:0,y:0},{x:4,y:0},{x:4,y:4}],holes:[[{x:1,y:1},{x:2,y:1},{x:2,y:2}]],hatchSpacing:.25,dxfPattern:{scale:1,spacing:.25,lines:[{a:45,bx:1,by:1,ox:0,oy:.25,d:[.1,-.1]}]}};
+ const out=g.scaleEntity(h,{x:1,y:1},2);
+ assert.deepEqual(out.holes[0],[{x:1,y:1},{x:3,y:1},{x:3,y:3}]);
+ assert.equal(out.hatchSpacing,.5);assert.equal(out.dxfPattern.spacing,.5);assert.equal(out.dxfPattern.lines[0].oy,.5);assert.deepEqual(out.dxfPattern.lines[0].d,[.2,-.2]);assert.equal(h.hatchSpacing,.25);
+});
+test('wide polyline and architectural wall guide scale with geometry',()=>{
+ const e={type:'polyline',pts:[{x:0,y:0},{x:2,y:0}],pwidth:.2,wall2d:{thickness:.2,guideA:{x:0,y:0},guideB:{x:2,y:0}}};
+ const out=g.scaleEntity(e,{x:0,y:0},3);
+ assert.ok(eq(out.pwidth,.6));assert.ok(eq(out.wall2d.thickness,.6));assert.deepEqual(out.wall2d.guideB,{x:6,y:0});assert.equal(e.wall2d.thickness,.2);
+});
+test('dimension extension offsets scale, preserving automatic sentinel',()=>{
+ const e={type:'dimension',style:{extOffset:.1,extBeyond:.2,tolerance:.01,precision:2}};
+ const out=g.scaleEntity(e,{x:0,y:0},2);
+ assert.deepEqual(out.style,{extOffset:.2,extBeyond:.4,tolerance:.02,precision:2});
+ e.style.extBeyond=-1;assert.equal(g.scaleEntity(e,{x:0,y:0},2).style.extBeyond,-1);
+});
