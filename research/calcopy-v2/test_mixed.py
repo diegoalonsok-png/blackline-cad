@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 import numpy as np
-from bridge_v2 import _mixed, analyze_v2
+from bridge_v2 import _mixed, _recover_returns, analyze_v2
 
 def wall(lo, hi, c=20, t=10, v=False):
     return dict(lo=lo, hi=hi, c=c, t=t, v=v)
@@ -26,6 +26,21 @@ class MixedTests(unittest.TestCase):
         self.assertEqual(result['readings']['solid'],[])
         self.assertEqual(result['best'],'lines')
         self.assertEqual(len(result['readings']['mixed']),1)
+    def test_residual_requires_wall_contact(self):
+        im=np.full((100,100,3),255,np.uint8)
+        faces=[dict(c=20,lo=20,hi=65,t=1),dict(c=30,lo=20,hi=65,t=1)]
+        ink=np.zeros((100,100),np.uint8)
+        def fake(im,paper,v):
+            return ([],ink) if v else (faces,ink)
+        with patch('bridge_v2.W.thin_lines',side_effect=fake):
+            self.assertEqual(_recover_returns(im,[wall(0,60,c=90,v=True)],10),[])
+            found=_recover_returns(im,[wall(0,60,c=20,v=True)],10)
+            self.assertEqual(len(found),1)
+            self.assertEqual((found[0]['lo'],found[0]['hi']),(20,65))
+    def test_residual_single_line_is_not_wall(self):
+        im=np.full((100,100,3),255,np.uint8)
+        with patch('bridge_v2.W.thin_lines',return_value=([dict(c=20,lo=20,hi=65,t=1)],np.zeros((100,100),np.uint8))):
+            self.assertEqual(_recover_returns(im,[wall(0,60,c=20,v=True)],10),[])
     def test_blank_image(self):
         pixels=np.full((100,100,4),255,np.uint8).tobytes()
         result=json.loads(analyze_v2(pixels,100,100))
