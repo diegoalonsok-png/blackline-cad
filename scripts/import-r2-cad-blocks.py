@@ -20,9 +20,13 @@ for i in range(30):
     except OSError: pass
     time.sleep(2)
 else: raise RuntimeError("Converter unavailable")
-obj=s3.get_object(Bucket=bucket,Key="incoming/blackline_ready_package.zip")
-assert obj["ContentLength"]<50_000_000
-z=zipfile.ZipFile(io.BytesIO(obj["Body"].read()))
+package=os.environ.get("PACKAGE_FILE","").strip()
+if package:
+    data=open(package,"rb").read()
+else:
+    obj=s3.get_object(Bucket=bucket,Key="incoming/blackline_ready_package.zip"); data=obj["Body"].read()
+assert len(data)<50_000_000
+z=zipfile.ZipFile(io.BytesIO(data))
 assert sum(i.file_size for i in z.infolist())<100_000_000
 root="blackline_ready/"
 # Zip names with accents (BAÑERA1.dwg) may be stored without the UTF-8 flag (decoded as cp437)
@@ -77,7 +81,15 @@ for row in rows:
         item["status"]="conversion_failed"
     items.append(item)
     print(ident,item["status"],flush=True)
-put("catalog.json",json.dumps({"version":1,"items":items},ensure_ascii=False).encode(),"application/json")
+# Merge with the catalogue already published: a new package adds or replaces items by id, never wipes earlier uploads.
+try:
+    previous=json.loads(s3.get_object(Bucket=bucket,Key=prefix+"catalog.json")["Body"].read()).get("items",[])
+except Exception:
+    previous=[]
+new_ids={i["id"] for i in items}
+merged=[i for i in previous if i.get("id") not in new_ids]+items
+put("catalog.json",json.dumps({"version":1,"items":merged},ensure_ascii=False).encode(),"application/json")
+print("Catalogue items:",len(merged))
 ready=sum(1 for i in items if i.get("status")=="ready")
 put("import-report.json",json.dumps({"total":len(rows),"imported":len(items),"ready":ready,"failed":failed},ensure_ascii=False).encode(),"application/json")
 print("Imported originals:",len(items),"of",len(rows),"· rendered:",ready)

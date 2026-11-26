@@ -1,6 +1,11 @@
 name: Import CAD blocks from R2 staging
 on:
   workflow_dispatch:
+    inputs:
+      package_asset:
+        description: 'Release asset API URL of a blackline_ready ZIP (empty = R2 incoming/blackline_ready_package.zip)'
+        required: false
+        default: ''
   push:
     branches: [main]
     paths:
@@ -31,5 +36,14 @@ jobs:
         run: |
           docker build -t blackline-import-dwg dwg-converter
           docker run --rm -d --name blackline-import-dwg -p 127.0.0.1:8080:8080 blackline-import-dwg
+      - name: Download package from a release asset
+        if: ${{ inputs.package_asset != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ inputs.package_asset }}
+        run: |
+          case "$ASSET" in https://api.github.com/repos/${{ github.repository }}/releases/assets/*) ;; *) echo "::error::Asset must belong to this repository"; exit 1;; esac
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$ASSET" -o "$RUNNER_TEMP/package.zip"
+          echo "PACKAGE_FILE=$RUNNER_TEMP/package.zip" >> "$GITHUB_ENV"
       - name: Import original files and render actual CAD previews
         run: python scripts/import-r2-cad-blocks.py
