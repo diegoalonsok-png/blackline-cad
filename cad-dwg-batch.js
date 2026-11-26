@@ -15,7 +15,7 @@ function button(){
  target.appendChild(b);
  if(!$('cadVitruviaLink')){
   const v=document.createElement('a');v.id='cadVitruviaLink';v.className='btn slim';
-  v.href='https://vitruvius-digital-library.org/vitruvia.html';v.target='_blank';v.rel='noopener';
+  v.href='https://vitruvius-digital-library.org/vitruvia';v.target='_blank';v.rel='noopener';
   v.textContent='Vitruvia';v.title='Vitruvia · buscador académico de arquitectura y humanidades (Vitruvius Digital Library)';
   v.style.cssText='margin:4px;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px';
   v.insertAdjacentHTML('afterbegin','<span aria-hidden="true" style="font-family:Georgia,serif;font-weight:700">V</span>');
