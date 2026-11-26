@@ -9,7 +9,7 @@ function button(){
  if($('cadDwgBatchButton'))return;
  const b=document.createElement('button');b.id='cadDwgBatchButton';b.type='button';b.textContent='DWG ↔ DXF · Lotes';
  b.className='btn slim';b.title='Conversor local gratuito DWG ↔ DXF, sin enviar archivos';
- b.style.cssText='margin:4px;white-space:nowrap';
+ b.style.cssText='margin:4px 2px;white-space:nowrap;flex-shrink:0';
  b.onclick=show;
  const target=document.querySelector('.brandbar .right')||document.querySelector('.brandbar')||document.body;
  target.appendChild(b);
@@ -17,9 +17,10 @@ function button(){
   const v=document.createElement('a');v.id='cadVitruviaLink';v.className='btn slim';
   v.href='https://vitruvius-digital-library.org/vitruvia';v.target='_blank';v.rel='noopener';
   v.textContent='Vitruvia';v.title='Vitruvia · buscador académico de arquitectura y humanidades (Vitruvius Digital Library)';
-  v.style.cssText='margin:4px;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;gap:6px';
-  v.insertAdjacentHTML('afterbegin','<span aria-hidden="true" style="font-family:Georgia,serif;font-weight:700">V</span>');
+  v.style.cssText='margin:4px 0 4px 2px;padding:0 9px;white-space:nowrap;text-decoration:none;display:inline-flex;align-items:center;flex-shrink:0;font-family:Georgia,serif;letter-spacing:.02em';
   target.appendChild(v);
+  const fit=()=>{if(target.scrollWidth>target.clientWidth+1)b.textContent='DWG ↔ DXF';else if(target.scrollWidth+60<target.clientWidth)b.textContent='DWG ↔ DXF · Lotes';};
+  requestAnimationFrame(fit);addEventListener('resize',()=>{b.textContent='DWG ↔ DXF · Lotes';requestAnimationFrame(fit)});
  }
 }
 function show(){
