@@ -240,6 +240,42 @@ function bathroomEnclosure(walls,openings,objects,pxPerM){
    privacy_validated:!gaps.length&&area<=20&&doors.size>0};
  });
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure};
+// Check the oriented footprint against the swept leaf and clear passage.
+function convexOverlap(a,b,tol){
+ for(const poly of [a,b])for(let i=0;i<poly.length;i++){
+  const p=poly[i],q=poly[(i+1)%poly.length],dx=q[0]-p[0],dy=q[1]-p[1],len=Math.hypot(dx,dy);if(len<1e-8)continue;
+  const project=pts=>pts.map(v=>(-dy*v[0]+dx*v[1])/len),x=project(a),y=project(b);
+  if(Math.min(Math.max(...x),Math.max(...y))-Math.max(Math.min(...x),Math.min(...y))<=tol)return false;
+ }
+ return true;
+}
+function doorClearance(openings,blocks,sx,sy){
+ if(!Number.isFinite(sx)||!Number.isFinite(sy)||sx<=0||sy<=0)return [];
+ const out=[],ppm=1/Math.sqrt(sx*sy),tol=Math.max(1,.02*ppm);
+ for(const [index,o] of openings.entries()){
+  if(!/door/.test(o.kind||'')||o.w?.skip||![o.c,o.g0,o.g1].every(Number.isFinite)||o.g1<=o.g0)continue;
+  const radius=o.g1-o.g0,sign=o.side===-1?-1:1,point=(u,s)=>o.v?[s,u]:[u,s];
+  const halfT=Number.isFinite(o.t)?o.t/2:0,approach=.30*ppm+halfT;
+  const passage=[point(o.g0,o.c-approach),point(o.g1,o.c-approach),point(o.g1,o.c+approach),point(o.g0,o.c+approach)];
+  const sectors=[];
+  if(o.kind==='swing-door'||o.kind==='double-door'){
+   const hinges=o.kind==='double-door'?[[o.g0,1,radius/2],[o.g1,-1,radius/2]]:[[o.hingeAtLo===false?o.g1:o.g0,o.hingeAtLo===false?-1:1,radius]];
+   for(const [hu,dir,R] of hinges){
+    const face=o.c+sign*halfT,poly=[point(hu,face)];
+    for(let k=0;k<=18;k++){const t=k*Math.PI/36;poly.push(point(hu+dir*R*Math.cos(t),face+sign*R*Math.sin(t)));}
+    sectors.push(poly);
+   }
+  }
+  for(const [blockIndex,b] of blocks.entries()){
+   if(![b.x,b.y,b.w,b.d].every(Number.isFinite)||b.w<=0||b.d<=0)continue;
+   const a=(Number(b.rotation)||0)*Math.PI/180,ca=Math.cos(a),sa=Math.sin(a);
+   const poly=[[0,0],[b.w,0],[b.w,b.d],[0,b.d]].map(([u,v])=>[b.x+(u*ca-v*sa)/sx,b.y-(u*sa+v*ca)/sy]);
+   const sweep=sectors.some(s=>convexOverlap(s,poly,tol)),pass=convexOverlap(passage,poly,tol);
+   if(sweep||pass)out.push({doorIndex:index,blockIndex,id:b.id,reason:sweep&&pass?'swing_and_passage':sweep?'swing':'passage',footprint:poly});
+  }
+ }
+ return out;
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
