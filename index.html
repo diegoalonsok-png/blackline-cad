@@ -8563,6 +8563,15 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   if(!d){const base=dxfBlockName(r.blockName);let name=base,k=2;while(usedNames.has(name.toUpperCase()))name=base+'_'+k++;usedNames.add(name.toUpperCase());d={name,br:H(),ents:local};blockDefs.set(key,d)}
   refDef.set(r,d);
  }
+ // Cotas lineales / alineadas → entidad DIMENSION con su bloque anónimo *Dn (geometría ya resuelta, en coordenadas
+ // del dibujo): AutoCAD las reconoce como cotas (DIMEDIT, propiedades, estilo) y CAD2D las vuelve a leer como cotas nativas.
+ const dimDefs=new Map();let dimN=0;
+ for(const e of entities){
+  if(e.type!=='dimension'||!['horizontal','vertical','aligned'].includes(e.mode||'aligned')||!e.a||!e.b||!e.p||dist(e.a,e.b)<1e-9)continue;
+  let prims=null;try{prims=dimensionPrimitives(e)}catch(err){prims=null}
+  if(!prims||!prims.length)continue;
+  dimDefs.set(e,{name:'*D'+(++dimN),br:H(),ents:prims.map(x=>({...x,layer:x.layer||e.layer}))});
+ }
  table('VPORT',[]);
  table('LTYPE',[
   th=>symRec('LTYPE','AcDbLinetypeTableRecord','ByBlock',th,['3','','72','65','73','0','40','0']),
@@ -8576,7 +8585,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  table('BLOCK_RECORD',[
   th=>['0','BLOCK_RECORD','5',msBR,'330',th,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord','2','*Model_Space'],
   th=>['0','BLOCK_RECORD','5',psBR,'330',th,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord','2','*Paper_Space'],
-  ...[...blockDefs.values()].map(d=>th=>['0','BLOCK_RECORD','5',d.br,'330',th,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord','2',d.name])]);
+  ...[...blockDefs.values(),...dimDefs.values()].map(d=>th=>['0','BLOCK_RECORD','5',d.br,'330',th,'100','AcDbSymbolTableRecord','100','AcDbBlockTableRecord','2',d.name])]);
  const blk=(br,name,ps)=>['0','BLOCK','5',H(),'330',br,'100','AcDbEntity',...(ps?['67','1']:[]),'8','0','100','AcDbBlockBegin','2',name,'70','0','10','0','20','0','30','0','3',name,'1','','0','ENDBLK','5',H(),'330',br,'100','AcDbEntity',...(ps?['67','1']:[]),'8','0','100','AcDbBlockEnd'];
  const blocks=[...blk(msBR,'*Model_Space',false),...blk(psBR,'*Paper_Space',true)];
  const ents=[];let OUT=ents,OWN=null;
@@ -8606,7 +8615,22 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
    text(e,lay,e.p);
   }
  }}};
- OUT=ents;OWN=null;writeList(entities.filter(e=>!refDef.has(e)));
+ OUT=ents;OWN=null;writeList(entities.filter(e=>!refDef.has(e)&&!dimDefs.has(e)));
+ for(const [e,d] of dimDefs){
+  const body=[];OUT=body;OWN=d.br;writeList(d.ents);
+  blocks.push('0','BLOCK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockBegin','2',d.name,'70','1','10','0','20','0','30','0','3',d.name,'1','');for(const value of body)blocks.push(value);blocks.push('0','ENDBLK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
+  OUT=ents;OWN=null;
+  const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))continue;
+  const mode=e.mode||'aligned',a=e.a,b=e.b;let dl,mid,angle=0;
+  if(mode==='horizontal'){dl=P(b.x,e.p.y);mid=P((a.x+b.x)/2,e.p.y)}
+  else if(mode==='vertical'){dl=P(e.p.x,b.y);mid=P(e.p.x,(a.y+b.y)/2);angle=90}
+  else{const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy),n=P(-dy/L,dx/L),off=(e.p.x-a.x)*n.x+(e.p.y-a.y)*n.y;dl=P(b.x+n.x*off,b.y+n.y*off);mid=P((a.x+b.x)/2+n.x*off,(a.y+b.y)/2+n.y*off)}
+  const over=e.textOverride!=null?String(e.textOverride):(e.label?String(e.label):'');
+  ents.push(...head('DIMENSION',e,lay),'100','AcDbDimension','2',d.name,...pos(dl.x,dl.y),'11',dxfNum(mid.x),'21',dxfNum(mid.y),'31','0','70',String((mode==='aligned'?1:0)|32),'1',over.replace(/\r?\n/g,' '),'3','Standard');
+  ents.push('100','AcDbAlignedDimension','13',dxfNum(a.x),'23',dxfNum(a.y),'33','0','14',dxfNum(b.x),'24',dxfNum(b.y),'34','0');
+  if(mode!=='aligned')ents.push('50',dxfNum(angle),'100','AcDbRotatedDimension');
+ }
+ OUT=ents;OWN=null;
  for(const d of blockDefs.values()){
   const body=[];OUT=body;OWN=d.br;writeList(d.ents);
   blocks.push('0','BLOCK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockBegin','2',d.name,'70','0','10','0','20','0','30','0','3',d.name,'1','');for(const value of body)blocks.push(value);blocks.push('0','ENDBLK','5',H(),'330',d.br,'100','AcDbEntity','8','0','100','AcDbBlockEnd');
@@ -12256,6 +12280,7 @@ function cad2dDrawExtensions(){
 }
 window.CAD2D_CORE=Object.freeze({
  get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
+ dxf:Object.freeze({build:(entities,name,layers)=>buildDXFText(entities,name,layers),parse:(text,opts={})=>importDXF(text,'',{...opts,parseOnly:true})}),
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
