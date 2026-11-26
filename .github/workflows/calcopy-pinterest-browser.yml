@@ -7,7 +7,7 @@ permissions:
 jobs:
   browser:
     if: github.head_ref == 'test/calcopy-pinterest-browser-20261125'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -16,6 +16,7 @@ jobs:
           python-version: '3.12'
       - run: pip install playwright==1.56.0
       - run: python -m playwright install --with-deps chromium
+      - run: python -m py_compile research/calco-python-20261125/test_pinterest_browser.py
       - run: python research/calco-python-20261125/test_pinterest_browser.py
       - uses: actions/upload-artifact@v4
         if: always()
