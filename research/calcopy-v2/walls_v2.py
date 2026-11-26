@@ -16,7 +16,7 @@ def solid(im,paper):
     for f in (.62,.82):
         ink,g=_ink(im,paper,f);T=stroke_width(ink)
         if not T:continue
-        k=max(3,int(round(T*.6)))
+        k=max(3,int(round(T*.32)))
         m=cv2.morphologyEx(ink,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_RECT,(k,k)))
         # Remove broad filled areas (shaded rooms, cores): walls are narrow bands.
         K=int(max(3*T,.045*max(m.shape)))|1
@@ -52,7 +52,7 @@ def network(mask,T):
     return mask*keep[lab]
 def runs(mask,T,vertical):
     src=mask.T if vertical else mask
-    L=max(int(T*2.5),6)
+    L=max(int(T*1.5),6)
     m=cv2.morphologyEx(src,cv2.MORPH_OPEN,np.ones((1,L),np.uint8))
     n,lab,st,_=cv2.connectedComponentsWithStats(m,connectivity=4)
     out=[]
@@ -72,12 +72,19 @@ def runs(mask,T,vertical):
                 start=j
     return out
 def merge(segs,T):
-    segs=sorted(segs,key=lambda s:(s['v'],s['c'],s['lo']));res=[]
-    for s in segs:
+    """Merge only overlapping or raster-adjacent runs of comparable width."""
+    res=[]
+    for s in sorted(segs,key=lambda s:(s['v'],s['c'],s['lo'])):
         for r in res:
-            if r['v']==s['v'] and abs(r['c']-s['c'])<=max(2,.3*min(r['t'],s['t'])) and abs(r['t']-s['t'])<=max(2,.3*r['t']) and s['lo']-r['hi']<=max(3,.6*T):
-                tot=(r['hi']-r['lo'])+(s['hi']-s['lo']);r['c']=(r['c']*(r['hi']-r['lo'])+s['c']*(s['hi']-s['lo']))/tot
-                r['hi']=max(r['hi'],s['hi']);break
+            narrow=min(r['t'],s['t'])
+            gap=max(s['lo'],r['lo'])-min(s['hi'],r['hi'])
+            if (r['v']==s['v'] and abs(r['c']-s['c'])<=max(1,.18*narrow)
+                and abs(r['t']-s['t'])<=max(1,.15*narrow) and gap<=1):
+                a=max(1,r['hi']-r['lo']);b=max(1,s['hi']-s['lo'])
+                r['c']=(r['c']*a+s['c']*b)/(a+b)
+                r['t']=(r['t']*a+s['t']*b)/(a+b)
+                r['lo']=min(r['lo'],s['lo']);r['hi']=max(r['hi'],s['hi'])
+                break
         else:res.append(dict(s))
     return res
 def pair_outlines(segs,T):
@@ -104,22 +111,28 @@ def pair_outlines(segs,T):
             used.add(i);out.append(s)
     return out
 def snap(segs,T):
-    """Extend wall ends to meet perpendicular wall axes (L/T joins)."""
-    tol=max(3,1.2*T)
-    for s in segs:
-        for end in ('lo','hi'):
+    """Resolve L/T/X from original axes, with individual half-width tolerances."""
+    original=[dict(s) for s in segs]
+    result=[]
+    for i,s in enumerate(original):
+        q=dict(s)
+        for end,opposite,sign in (('lo','hi',-1),('hi','lo',1)):
             p=s[end];best=None
-            for o in segs:
-                if o['v']==s['v']:continue
-                # o is perpendicular: its axis coordinate o['c'] lies along s's run direction
-                if not(o['lo']-tol<=s['c']<=o['hi']+tol):continue
+            for j,o in enumerate(original):
+                if i==j or o['v']==s['v']:continue
+                eps=max(1.5,.20*min(s['t'],o['t']))
+                # The intersection must lie on, or immediately beside, both wall bodies.
+                if not o['lo']-s['t']/2-eps<=s['c']<=o['hi']+s['t']/2+eps:continue
                 d=abs(o['c']-p)
-                if d<=tol+o['t']/2 and (best is None or d<best[0]):best=(d,o['c'])
-            if best:s[end]=best[1]
-    for s in segs:
-        if s['lo']>s['hi']:s['lo'],s['hi']=s['hi'],s['lo']
-    return segs
-
+                if d>o['t']/2+eps:continue
+                # Never shrink past the opposite end or create a tiny/inverted run.
+                if sign*(o['c']-s[opposite])<max(2,s['t']):continue
+                candidate=(d,o['c'])
+                if best is None or candidate<best:best=candidate
+            if best is not None:q[end]=best[1]
+        if q['hi']-q['lo']<max(2,s['t']):q=dict(s)
+        result.append(q)
+    return result
 def thin_lines(im,paper,vertical):
     hsv=cv2.cvtColor(im,cv2.COLOR_BGR2HSV);g=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     ink=((g<paper-35)&(hsv[...,1]<90)).astype(np.uint8)
@@ -127,12 +140,32 @@ def thin_lines(im,paper,vertical):
     H,W=src.shape;L=max(12,int(.025*max(H,W)))
     m=cv2.morphologyEx(src,cv2.MORPH_CLOSE,np.ones((1,3),np.uint8))
     m=cv2.morphologyEx(m,cv2.MORPH_OPEN,np.ones((1,L),np.uint8))
-    n,lab,st,cen=cv2.connectedComponentsWithStats(m,connectivity=4)
+    # Read horizontal row runs independently: a short perpendicular connector
+    # must not merge two long wall faces into one rejected thick component.
+    groups=[];active=[]
+    for y,row in enumerate(m):
+        edges=np.flatnonzero(np.diff(np.pad(row.astype(np.int16),(1,1))))
+        spans=[(int(x0),int(x1)-1) for x0,x1 in zip(edges[::2],edges[1::2]) if x1-x0>=L]
+        next_active=[];used=set()
+        for lo,hi in spans:
+            matches=[]
+            for j,g in enumerate(active):
+                if j in used:continue
+                a,b=g['spans'][-1];ov=min(b,hi)-max(a,lo)+1
+                if ov>=.82*max(b-a+1,hi-lo+1):matches.append((ov,j))
+            if matches:
+                _,j=max(matches);used.add(j);g=active[j];g['spans'].append((lo,hi));next_active.append(g)
+            else:next_active.append(dict(y=y,spans=[(lo,hi)]))
+        groups.extend(g for j,g in enumerate(active) if j not in used)
+        active=next_active
+    groups.extend(active)
     out=[]
-    for i in range(1,n):
-        x,y,w,h,a=st[i]
-        if w<L or h>max(6,.012*max(H,W)):continue
-        out.append(dict(c=float(cen[i][1]),lo=float(x),hi=float(x+w-1),t=float(a)/w))
+    for g in groups:
+        t=len(g['spans'])
+        if t>max(6,.012*max(H,W)):continue
+        a,b=np.median(g['spans'],axis=0)
+        if b-a+1<L:continue
+        out.append(dict(c=g['y']+(t-1)/2,lo=float(a),hi=float(b),t=float(t)))
     return sorted(out,key=lambda q:q['c']),src
 def line_pairs(im,paper):
     """Double-line walls: two parallel strokes at wall-thickness distance."""
@@ -145,7 +178,6 @@ def line_pairs(im,paper):
                 if d<4:continue
                 if d>.06*max(src.shape):break
                 a,b=max(p['lo'],q['lo']),min(p['hi'],q['hi'])
-                if b-a<max(3*d,.6*min(p['hi']-p['lo'],q['hi']-q['lo'])*0):continue
                 if b-a<3*d:continue
                 y0=int(p['c']+p['t']/2+1);y1=int(q['c']-q['t']/2)
                 core=src[y0:y1,int(a):int(b)]
@@ -164,12 +196,17 @@ def line_pairs(im,paper):
     hist={}
     for r in raw:hist[round(r['gap'])]=hist.get(round(r['gap']),0)+(r['hi']-r['lo'])
     d0=max(hist,key=hist.get)
-    keep=[r for r in raw if .55*d0<=r['gap']<=2.6*d0]
-    # Each stroke pairs once, nearest partner first.
-    keep.sort(key=lambda r:r['gap']);used=set();out=[]
+    keep=[r for r in raw if .40*d0<=r['gap']<=2.6*d0]
+    # One long face can border several non-overlapping runs at T/X junctions.
+    # Reserve only its matched interval, not the entire face. Never merge a gap.
+    keep.sort(key=lambda r:(r['gap'],-(r['hi']-r['lo'])));used={};out=[]
     for r in keep:
-        if r['p'] in used or r['q'] in used:continue
-        used|={r['p'],r['q']};out.append(dict(v=r['v'],c=r['c'],t=r['t'],lo=r['lo'],hi=r['hi']))
+        def conflicts(key):
+            return any(min(r['hi'],hi)-max(r['lo'],lo)>max(1,.10*min(r['hi']-r['lo'],hi-lo))
+                       for lo,hi in used.get(key,[]))
+        if conflicts(r['p']) or conflicts(r['q']):continue
+        for key in (r['p'],r['q']):used.setdefault(key,[]).append((r['lo'],r['hi']))
+        out.append(dict(v=r['v'],c=r['c'],t=r['t'],lo=r['lo'],hi=r['hi']))
     return out,d0+2
 def vectorize(mask,T):
     segs=runs(mask,T,False)+runs(mask,T,True)
@@ -215,7 +252,9 @@ def detect(im,mode='auto'):
         res['solid']=(finish(segs,T),T)
     ps,Tp=line_pairs(im,paper)
     if Tp:res['lines']=(finish(ps,Tp),Tp)
-    if mode in res:return res[mode][0],res[mode][1],mode,None
+    if mode != 'auto':
+        if mode in res:return res[mode][0],res[mode][1],mode,None
+        return [],None,mode,None
     if not res:return [],None,'none',None
     k=max(res,key=lambda k:structure_score(res[k][0],H,W))
     return res[k][0],res[k][1],k,None

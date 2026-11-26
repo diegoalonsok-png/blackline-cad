@@ -1797,7 +1797,7 @@ function cadJoinGeneratedArqFaces(pairs){
 
 function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
  if(plan?.schema!=='blackline.architecture.v1'||plan.units!=='m'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks)||plan.walls.length>500||plan.openings.length>300||plan.blocks.length>500)throw Error('Invalid architecture plan');
- if(!autoOpeningEnabled||!window.BlacklineAutoOpening)throw Error('Enable automatic wall openings.');
+ if(plan.openings.length&&(!autoOpeningEnabled||!window.BlacklineAutoOpening))throw Error('Enable automatic wall openings.');
  const k=1000/U[state.unit],point=(x,y)=>{if(!Number.isFinite(x)||!Number.isFinite(y)||Math.abs(x)>1000||Math.abs(y)>1000)throw Error('Invalid plan coordinate');return P(origin.x+x*k,origin.y+y*k)};
  const before=historySnapshot(),history=state.history.slice(),future=state.future.slice(),original=state.entities;
  const signature=items=>JSON.stringify(items.map(e=>{const {arqPlan,...rest}=e;return rest}));
@@ -1806,7 +1806,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
  function layer(name){let l=state.layers.find(l=>l.name.toUpperCase()===name);if(!l){l={id:'arq-'+name.toLowerCase(),name,color:'#e5e7eb',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'};if(state.layers.some(x=>x.id===l.id))throw Error('Layer ID collision');state.layers.push(l)}if(l.locked||!l.visible)throw Error('Layer unavailable: '+name);return l.id}
  try{
   saveHistory();state.entities=[];
-  const wallLayer=layer('WALLS');
+  const wallLayer=plan.walls.length?layer('WALLS'):null;
   for(const w of plan.walls){
    if(hosts.has(w.id)||!Array.isArray(w.a)||!Array.isArray(w.b)||!(w.thickness>=.08&&w.thickness<=.5))throw Error('Invalid wall');
    const A=point(...w.a),B=point(...w.b),L=dist(A,B)/k;if(!(L>.1))throw Error('Invalid wall length');
@@ -1825,7 +1825,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   }
   // Native junction solver on generated walls only, before cutting openings.
   const arqPairs=[...hosts.values()].flatMap(host=>host.segments);
-  if(!cadJoinGeneratedArqFaces(arqPairs))for(const pair of arqPairs)cadWallJoinNewFaces(pair);
+  if(arqPairs.length&&!cadJoinGeneratedArqFaces(arqPairs))for(const pair of arqPairs)cadWallJoinNewFaces(pair);
   for(const o of plan.openings)if(!hosts.has(o.host))throw Error('Unknown opening host');
   for(const host of hosts.values())for(let i=0;i<host.openings.length;i++){
    const o=host.openings[i],w=host.w,center=host.at(o.offset),reviewed=plan.traceReviewed===true;
@@ -1843,7 +1843,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    if(autoCutWallForOpening(ref,definition)!==2)throw Error('Could not cut both wall faces: '+w.id);
   }
   for(const b of plan.blocks){
-   if(!['FIXTURES','FURNITURE','KITCHEN','EQUIPMENT'].includes(b.layer)||b.scale!==1||!Number.isFinite(b.rotation)||!Array.isArray(b.point))throw Error('Invalid fixture');
+   if(!['FIXTURES','FURNITURE','KITCHEN','EQUIPMENT',...(plan.brief?.kind==='trace'?['STAIRS','VEGETATION','VEHICLES','EXTERIOR','OFFICE','ACCESSIBILITY']:[])].includes(b.layer)||b.scale!==1||!Number.isFinite(b.rotation)||!Array.isArray(b.point))throw Error('Invalid fixture');
    const name=resolveBlock(b);if(!state.blocks[name])throw Error('Missing block: '+b.catalogId);
    state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:point(...b.point),scale:1,rotation:b.rotation,layer:layer(b.layer),arqBatch:batch,arqRole:b.role});
   }
@@ -1881,6 +1881,26 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
     if([x0,y0,x1,y1].every(Number.isFinite)&&x1>x0&&y1>y0){
      dim([x0,y1],[x1,y1],[x0,y1+.32],'horizontal',outer);
      dim([x0,y0],[x0,y1],[x0-.32,y0],'vertical',outer);
+    }
+   }
+  }
+  // CALCOPY: requested dimensions are generated last, after walls, openings and blocks.
+  // Only overall wall envelope dimensions; never invent dimensions from incomplete geometry.
+  if(plan.brief?.kind==='trace'&&plan.brief?.dimensionOverall===true&&plan.walls.length){
+   let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;
+   for(const wall of plan.walls){
+    const [ax,ay]=wall.a,[bx,by]=wall.b,L=Math.hypot(bx-ax,by-ay);
+    if(!(L>0))continue;
+    const px=Math.abs(by-ay)/L*wall.thickness/2,py=Math.abs(bx-ax)/L*wall.thickness/2;
+    x0=Math.min(x0,ax-px,bx-px);x1=Math.max(x1,ax+px,bx+px);
+    y0=Math.min(y0,ay-py,by-py);y1=Math.max(y1,ay+py,by+py);
+   }
+   if([x0,y0,x1,y1].every(Number.isFinite)&&x1>x0&&y1>y0){
+    const dimLayer=layer('COTAS-GENERALES'),offset=.40;
+    const style={...readDimensionStyle(),precision:2,textHeight:.10*k,arrow:.055*k,suffix:'',displayUnit:'m',tolerance:0,arrowType:'tick',extOffset:.025*k,extBeyond:.035*k,color:''};
+    for(const [a,b,p,mode] of [[[x0,y1],[x1,y1],[x0,y1+offset],'horizontal'],[[x0,y0],[x0,y1],[x0-offset,y0],'vertical']]){
+     const e={id:state.nextId++,type:'dimension',a:point(...a),b:point(...b),p:point(...p),mode,layer:dimLayer,style:{...style},width:.13,arqBatch:batch};
+     state.entities.push(e);
     }
    }
   }
