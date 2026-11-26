@@ -3,6 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 import numpy as np
+import walls_v2 as W
 from bridge_v2 import _mixed, _recover_returns, _rectangular_junctions, analyze_v2
 
 def wall(lo, hi, c=20, t=10, v=False):
@@ -56,6 +57,30 @@ class MixedTests(unittest.TestCase):
     def test_no_join_across_opening_or_room(self):
         a,b,c=wall(0,40),wall(80,120),wall(60,100,c=50,v=True)
         self.assertEqual(_rectangular_junctions([a,b,c]),[a,b,c])
+    def test_rectangular_thickness_step(self):
+        # Image scale 100 px/m: 20, 15 and 10 px are distinct walls.
+        mask=np.zeros((100,320),np.uint8)
+        mask[40:60,10:110]=1
+        mask[43:58,110:210]=1
+        mask[45:55,210:310]=1
+        bands=W.runs(mask,10,False)
+        self.assertEqual(sorted(round(q['t']) for q in bands),[10,15,20])
+    def test_merge_keeps_distinct_widths(self):
+        rows=[wall(0,100,t=20),wall(100,200,t=15),wall(200,300,t=10)]
+        self.assertEqual(sorted(q['t'] for q in W.merge(rows,20)),[10,15,20])
+    def test_merge_never_bridges_real_gap(self):
+        rows=[wall(0,100,t=20),wall(108,200,t=20)]
+        self.assertEqual(len(W.merge(rows,20)),2)
+    def test_l_t_x_variable_widths(self):
+        for t in (10,15):
+            with self.subTest(width=t):
+                # 20 cm horizontal, 10 or 15 cm perpendicular.
+                a,b=wall(0,50,c=30,t=20),wall(40,90,c=50,t=t,v=True)
+                self.assertEqual(_rectangular_junctions([a,b]),[a,wall(30,90,c=50,t=t,v=True)])
+                a=wall(0,100,c=30,t=20)
+                self.assertEqual(_rectangular_junctions([a,b]),[a,wall(30,90,c=50,t=t,v=True)])
+                b=wall(0,90,c=50,t=t,v=True)
+                self.assertEqual(_rectangular_junctions([a,b]),[a,b])
     def test_blank_image(self):
         pixels=np.full((100,100,4),255,np.uint8).tobytes()
         result=json.loads(analyze_v2(pixels,100,100))
