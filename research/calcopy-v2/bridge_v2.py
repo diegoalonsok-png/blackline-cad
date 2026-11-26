@@ -13,7 +13,7 @@ def _walls(segs, k):
     for s in segs:
         c, lo, hi, t = s['c'] / k, s['lo'] / k, s['hi'] / k, s['t'] / k
         a, b = ([c, lo], [c, hi]) if s['v'] else ([lo, c], [hi, c])
-        out.append({'a': [round(a[0], 2), round(a[1], 2)], 'b': [round(b[0], 2), round(b[1], 2)], 't': round(t, 2)})
+        out.append({'a': [round(a[0], 2), round(a[1], 2)], 'b': [round(b[0], 2), round(b[1], 2)], 't': round(t, 2), **{key:s[key] for key in ('wall_role','nominal_cm','thickness_cm','width_review') if key in s}})
     return out
 
 
@@ -59,6 +59,9 @@ def analyze_v2(pixels, w, h, real_width_m=None):
     mask=S.black_mask(review_ink.shape,validated)
     regions=S.region_hierarchy(S.enclosed_regions(mask))
     ppm=w*k/real_width_m if real_width_m is not None and real_width_m>0 else 0
+    metric,metric_stats=S.metric_wall_review(review_ink,validated,ppm)
+    readings['metric']=_walls(metric,k)
+    diagnostics['metric']=metric_stats
     for region in regions:
         region['kind']=S.classify_region(region,ppm)
         if ppm:
