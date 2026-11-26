@@ -7,6 +7,37 @@ import walls_v2 as W
 MAX_SIDE = 1600
 
 
+def _rectangular_junctions(segs):
+    """Connect only observed orthogonal wall bands at L/T/X nodes.
+    Never fill collinear gaps (possible openings). Use original evidence,
+    not successively extended endpoints. Keep constant rectangular width.
+    """
+    source = [dict(s) for s in segs]
+    out = []
+    for s in source:
+        wall = dict(s)
+        for end in ('lo', 'hi'):
+            options = []
+            for o in source:
+                if s['v'] == o['v']:
+                    continue
+                # Perpendicular bands must physically touch or be within
+                # a small raster tolerance; do not bridge an empty room.
+                eps = max(1., min(2., .12 * min(s['t'], o['t'])))
+                if not o['lo'] - s['t']/2 - eps <= s['c'] <= o['hi'] + s['t']/2 + eps:
+                    continue
+                d = abs(s[end] - o['c'])
+                if d <= o['t']/2 + eps:
+                    options.append((d, o['c']))
+            if options:
+                wall[end] = min(options)[1]
+        if wall['hi'] > wall['lo']:
+            out.append(wall)
+        else:
+            out.append(dict(s))
+    return out
+
+
 def _walls(segs, k):
     out = []
     for s in segs:
@@ -135,11 +166,12 @@ def analyze_v2(pixels, w, h):
     # Recover missing connected returns after the primary classification.
     if combined and any(thickness.values()):
         combined = _mixed(combined, _recover_returns(im, combined, T))
+    combined = _rectangular_junctions(combined)
     readings['mixed'] = _walls(combined, k)
     mixed_score = _network_score(combined, T)
     # Prefer mixed only if it adds meaningful connected evidence. The
     # user can still review each independent reading.
     best = primary
-    if raw['solid'] and raw['lines'] and mixed_score > 1.12 * scores[primary] and len(combined) <= 250:
+    if combined and mixed_score > 1.12 * scores[primary] and len(combined) <= 250:
         best = 'mixed'
     return json.dumps({'best': best, 'readings': readings})
