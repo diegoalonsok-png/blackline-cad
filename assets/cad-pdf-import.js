@@ -399,7 +399,7 @@ function combineTraceCandidates(groups){
  return result;
 }
 
-function runPythonTrace(ctx,w,h){
+function runPythonTrace(ctx,w,h,realWidth){
  return new Promise((resolve,reject)=>{
   let worker=null,done=false;
   const dialog=document.createElement('dialog');
@@ -412,15 +412,15 @@ function runPythonTrace(ctx,w,h){
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
-   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-mask-review',BASE));
+   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-room-topology',BASE));
    worker.onerror=e=>finish(new Error(e.message||'No se pudo iniciar Python.'));
    worker.onmessage=({data})=>{
     if(data.type==='progress'){status.textContent=data.message;C.log('CALCOPY: '+data.message);}
     else if(data.type==='error')finish(new Error(data.message));
-    else if(data.type==='result')finish(null,{best:data.best,readings:data.readings});
+    else if(data.type==='result')finish(null,{best:data.best,readings:data.readings,regions:data.regions,validation:data.validation});
    };
    const pixels=ctx.getImageData(0,0,w,h).data.buffer;
-   worker.postMessage({pixels,w,h},[pixels]);
+   worker.postMessage({pixels,w,h,realWidth},[pixels]);
   }catch(e){finish(e);}
  });
 }
@@ -449,15 +449,15 @@ async function traceFile(file,source=null,python=false){
   const makeMask=threshold=>{for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<threshold?1:0;};
   let real=source?Math.abs(source.b.x-source.a.x)*C.U[S.unit]/1000:Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
   if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
-  let walls=[],hatched=false,mode='macizos',pyReadings=null;const AS=window.CAD2D_CALCOPY_ASSIST,G=python&&AS?AS.gray(pix,w,h):null,openings=[],history=[],scalePts=[];let scaleF=1;
+  let walls=[],hatched=false,mode='macizos',pyReadings=null,initialRegions=[];const AS=window.CAD2D_CALCOPY_ASSIST,G=python&&AS?AS.gray(pix,w,h):null,openings=[],history=[],scalePts=[];let scaleF=1;
   const assistWalls=list=>list.slice(0,250).map(q=>{const A=AS.axis(q);return syncWall(A);});
   if(python){
    const height=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000:real*h/w;
    if(Math.abs((height/h)/(real/w)-1)>.03)throw Error('CALCOPY: la imagen tiene escalas X/Y distintas. Calibrala antes de continuar.');
    try{
-    const res=await runPythonTrace(ctx,w,h);
+    const res=await runPythonTrace(ctx,w,h,real);
     if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
-    pyReadings=res.readings;mode=res.best;walls=assistWalls(pyReadings[mode]);
+    pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];mode=res.best;walls=assistWalls(pyReadings[mode]);
    }catch(e){
     if(!AS)throw e;
     C.log('CALCOPY: lectura de muros no disponible; continúa el reconocimiento de bloques. '+String(e.message||e));
@@ -495,8 +495,9 @@ async function traceFile(file,source=null,python=false){
    const rotateBlock=(b,angle)=>{const [cx,cy]=blockCenter(b),{sx,sy}=blockScale(),a=angle*Math.PI/180;b.rotation=angle;b.x=cx-(b.w*Math.cos(a)-b.d*Math.sin(a))/2/sx;b.y=cy+(b.w*Math.sin(a)+b.d*Math.cos(a))/2/sy;};
    const rotateBtn=document.createElement('button');rotateBtn.className='btn';rotateBtn.textContent=LX('Girar bloque 90°','Rotate block 90°');rotateBtn.disabled=true;
    rotateBtn.onclick=()=>{if(!selectedBlock||!placements.includes(selectedBlock))return;const b=selectedBlock,old={x:b.x,y:b.y,rotation:b.rotation,uncertain:b.uncertain};rotateBlock(b,(b.rotation+90)%360);b.uncertain=false;if(python)history.push(()=>Object.assign(b,old));redraw();};
+   const topologyInfo=document.createElement('p');topologyInfo.style.cssText='font-size:12px;opacity:.85';
    const maskView=document.createElement('input');maskView.type='checkbox';const maskLabel=document.createElement('label');maskLabel.append(maskView,document.createTextNode(LX(' Ver máscara negra de muros',' Show black wall mask')));maskView.onchange=()=>redraw();
-   const redraw=()=>{rotateBtn.disabled=!selectedBlock||!placements.includes(selectedBlock);pc.clearRect(0,0,w,h);if(maskView.checked){pc.fillStyle='#fff';pc.fillRect(0,0,w,h);pc.fillStyle='#000';for(const wall of walls){if(wall.skip)continue;const [ax,ay]=wall.a,[bx,by]=wall.b,t=wall.t;if(Math.abs(bx-ax)>=Math.abs(by-ay))pc.fillRect(Math.min(ax,bx),(ay+by-t)/2,Math.abs(bx-ax),t);else pc.fillRect((ax+bx-t)/2,Math.min(ay,by),t,Math.abs(by-ay));}}else pc.drawImage(cv,0,0);for(const wall of walls){if(maskView.checked)continue;pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=ai.disabled||(!walls.some(w=>!w.skip)&&!placements.length);onlyBlocks.disabled=ai.disabled||!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin muros candidatos; podés marcar e insertar bloques.','No wall candidates; you can mark and insert blocks.'));
+   const redraw=()=>{const kinds={room_candidate:LX('Recintos rectangulares','Rectangular spaces'),technical_void_candidate:LX('Posibles conductos','Possible shafts'),irregular_space_review:LX('Recintos irregulares','Irregular spaces')};const parts=Object.entries(kinds).map(([k,v])=>v+': '+initialRegions.filter(q=>q.kind===k).length);parts.push(LX('Posibles recintos contenidos: ','Possible nested spaces: ')+initialRegions.filter(q=>q.possible_parent).length);topologyInfo.textContent=initialRegions.length?LX('Diagnóstico inicial de la máscara validada (antes de editar o recalibrar): ','Initial validated-mask diagnostics (before editing or recalibration): ')+parts.join(' · '):'';rotateBtn.disabled=!selectedBlock||!placements.includes(selectedBlock);pc.clearRect(0,0,w,h);if(maskView.checked){pc.fillStyle='#fff';pc.fillRect(0,0,w,h);pc.fillStyle='#000';for(const wall of walls){if(wall.skip)continue;const [ax,ay]=wall.a,[bx,by]=wall.b,t=wall.t;if(Math.abs(bx-ax)>=Math.abs(by-ay))pc.fillRect(Math.min(ax,bx),(ay+by-t)/2,Math.abs(bx-ax),t);else pc.fillRect((ax+bx-t)/2,Math.min(ay,by),t,Math.abs(by-ay));}}else pc.drawImage(cv,0,0);for(const wall of walls){if(maskView.checked)continue;pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=ai.disabled||(!walls.some(w=>!w.skip)&&!placements.length);onlyBlocks.disabled=ai.disabled||!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin muros candidatos; podés marcar e insertar bloques.','No wall candidates; you can mark and insert blocks.'));
     if(python){
      for(const o of openings){const p0=o.v?[o.c,o.g0]:[o.g0,o.c],p1=o.v?[o.c,o.g1]:[o.g1,o.c];pc.strokeStyle=o.kind==='framed-window'?'#2f7de1':'#e8590c';pc.lineWidth=Math.max(3,o.t);pc.beginPath();pc.moveTo(...p0);pc.lineTo(...p1);pc.stroke();
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
@@ -550,7 +551,7 @@ async function traceFile(file,source=null,python=false){
     controls.append(reading,maskLabel,tool,picker,rot,rotateBtn,undo,flip,ai);
    }else controls.append(picker,rot,undo,ai);
    if(!python)controls.append(retry);const hint=document.createElement('p');if(python)hint.style.cssText='min-height:4.6em;margin:6px 0';hint.textContent=python?LX('1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.','1) Pick the reading that best follows the walls. 2) With «+ Wall» click missing walls; with «Remove» click extra ones. 3) With «+ Door» / «+ Window» click the gap. 4) Set the scale with two clicks on a dimension. 5) Mark furniture and fixtures. Undo reverts the last step.'):'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
-   redraw();d.append(title,hint,controls,aiStatus,preview,dimOption,cancel,onlyBlocks,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+   redraw();d.append(title,hint,controls,aiStatus,topologyInfo,preview,dimOption,cancel,onlyBlocks,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
   if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
