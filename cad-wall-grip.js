@@ -24,10 +24,15 @@
    const otherN=normal(other);if(!otherN||Math.abs(n.x*otherN.x+n.y*otherN.y)<.9995)continue;
    const rel=p=>({x:p.x-mid.x,y:p.y-mid.y});
    const a=rel(other.a),b=rel(other.b);
-   const min=Math.min(a.x*axis.x+a.y*axis.y,b.x*axis.x+b.y*axis.y);
-   const max=Math.max(a.x*axis.x+a.y*axis.y,b.x*axis.x+b.y*axis.y);
-   if(max<-half||min>half)continue; // no overlap in the wall's longitudinal projection
-   const clearance=((a.x+b.x)*n.x+(a.y+b.y)*n.y)/2;
+   const alongA=a.x*axis.x+a.y*axis.y,alongB=b.x*axis.x+b.y*axis.y;
+   const min=Math.max(-half,Math.min(alongA,alongB));
+   const max=Math.min(half,Math.max(alongA,alongB));
+   if(max<=min)continue; // no shared longitudinal interval
+   // Measure at the midpoint of the shared interval, not at the midpoint
+   // of a potentially much longer, slightly skewed neighbouring wall.
+   const t=((min+max)/2-alongA)/(alongB-alongA);
+   const clearance=(a.x+(b.x-a.x)*t)*n.x+(a.y+(b.y-a.y)*t)*n.y;
+   if(!Number.isFinite(clearance))continue;
    if(Math.abs(clearance)<1e-7)continue;
    if(!best||Math.abs(clearance)<Math.abs(best.signed))best={signed:clearance,wallId:other.id};
   }
