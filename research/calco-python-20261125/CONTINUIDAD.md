@@ -39,3 +39,6 @@ Próximo paso: integrar y medir las cuatro piezas nuevas como un pipeline opt-in
 5. Verificar todas las fases dentro de CAD2D3D publicado: CALCOPY, selección IMG, inserción nativa, UNDO/REDO, guardado DXF y reapertura, rendimiento y cancelación. No declarar listo hasta verificar producción.
 
 Nueva ronda: refine_caps.py y regression_gate.py. 53 casos de ensayo (51 sin referencia completa y 2 con máscaras manuales aproximadas), 0 errores de ejecución, 0 regresiones de IoU entre las dos referencias, 0 coincidencias exactas. En la última planta anotada la cobertura aumentó de 95,85% a 96,58%; precisión 99,61%. No certificar ni fusionar en producción por ahora. Se necesita ampliar el corpus anotado y validar geometría nativa, no solo máscara raster.
+
+## Verificación por caras paralelas
+`wall_pair_check.py` y `eval_pair_check.py`: 53 casos procesados, 0 errores. Alternativa de poda en planta anotada 2: falsos positivos 2663→1581 píxeles, recall 91,68% sin cambios, precisión 84,38%→90,10%, IoU 78,38%→83,29%. En planta anotada 1 la misma poda baja IoU de 96,22% a 67,11%; no activarla indiscriminadamente. Mantenerla opcional en investigación. Referencias aproximadas, métricas raster, no certificación CAD. Próximo objetivo: selección por evidencia del tipo de muro y más referencias independientes. Sin despliegue nuevo.
