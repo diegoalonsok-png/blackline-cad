@@ -383,6 +383,8 @@ one('mob-sofa3','Sofá 3 cuerpos',MOB,2.30,.92,(b,W,D)=>{b.rrect(0,0,W,D,.06);b.
 one('mob-sillon','Sillón individual',MOB,.85,.85,(b,W,D)=>{b.rrect(0,0,W,D,.06);b.rect(.15,.15,W-.30,D-.33);b.rect(0,D-.18,W,.18)},{family:'sofa'});
 one('mob-ratona','Mesa ratona',MOB,1.10,.60,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.05,.05,W-.10,D-.10)},{wMin:.60,wMax:1.60,dMin:.50,dMax:1.00});
 one('mob-escritorio','Escritorio con silla',MOB,1.40,1.20,(b,W)=>{b.rect(0,.50,W,.70);b.at(W/2,.30,180,bb=>{bb.circle(0,0,.25);bb.rect(-.20,-.30,.40,.08)})},{wMin:1.00,wMax:2.00});
+one('mob-pupitre','Pupitre individual con silla',MOB,.65,.90,(b,W,D)=>{b.rect(0,D-.42,W,.42);b.rrect((W-.38)/2,.05,.38,.34,.035);b.line((W-.38)/2,.08,(W+.38)/2,.08)},{wMin:.60,wMax:.80,dMin:.85,dMax:1.05});
+one('mob-pizarra','Pizarra de aula',MOB,2.40,.08,(b,W,D)=>{b.rect(0,0,W,D);b.line(.03,D/2,W-.03,D/2)},{wMin:1.20,wMax:4,dMin:.05,dMax:.12});
 one('mob-placard','Placard corredizo',MOB,1.80,.62,(b,W,D)=>{b.rect(0,0,W,D);b.line(0,.10,W/2+.05,.10);b.line(W/2-.05,.18,W,.18);b.line(.05,D/2,W-.05,D/2,{dashed:true})},{wMin:.80,wMax:4.00,family:'placard'});
 one('mob-placard-bat','Placard puertas batientes',MOB,1.20,.62,(b,W,D)=>{b.rect(0,0,W,D);const n=Math.max(2,Math.round(W/.45));for(let i=0;i<n;i++){const x=i*W/n,w=W/n;if(i%2)b.arc(x+w,0,w,180,270,{dashed:true});else b.arc(x,0,w,270,360,{dashed:true})}b.line(.05,D/2,W-.05,D/2,{dashed:true})},{wMin:.80,wMax:3.20,family:'placard'});
 one('mob-biblioteca','Biblioteca',MOB,1.60,.35,(b,W,D)=>{b.rect(0,0,W,D);const n=Math.max(2,Math.round(W/.80));for(let i=1;i<n;i++)b.line(i*W/n,0,i*W/n,D)},{wMin:.80,wMax:4.00});
