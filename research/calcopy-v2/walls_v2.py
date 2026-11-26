@@ -72,12 +72,19 @@ def runs(mask,T,vertical):
                 start=j
     return out
 def merge(segs,T):
-    segs=sorted(segs,key=lambda s:(s['v'],s['c'],s['lo']));res=[]
-    for s in segs:
+    """Merge only overlapping or raster-adjacent runs of comparable width."""
+    res=[]
+    for s in sorted(segs,key=lambda s:(s['v'],s['c'],s['lo'])):
         for r in res:
-            if r['v']==s['v'] and abs(r['c']-s['c'])<=max(2,.3*min(r['t'],s['t'])) and abs(r['t']-s['t'])<=max(2,.3*r['t']) and s['lo']-r['hi']<=max(3,.6*T):
-                tot=(r['hi']-r['lo'])+(s['hi']-s['lo']);r['c']=(r['c']*(r['hi']-r['lo'])+s['c']*(s['hi']-s['lo']))/tot
-                r['hi']=max(r['hi'],s['hi']);break
+            narrow=min(r['t'],s['t'])
+            gap=max(s['lo'],r['lo'])-min(s['hi'],r['hi'])
+            if (r['v']==s['v'] and abs(r['c']-s['c'])<=max(1,.18*narrow)
+                and abs(r['t']-s['t'])<=max(1,.15*narrow) and gap<=1):
+                a=max(1,r['hi']-r['lo']);b=max(1,s['hi']-s['lo'])
+                r['c']=(r['c']*a+s['c']*b)/(a+b)
+                r['t']=(r['t']*a+s['t']*b)/(a+b)
+                r['lo']=min(r['lo'],s['lo']);r['hi']=max(r['hi'],s['hi'])
+                break
         else:res.append(dict(s))
     return res
 def pair_outlines(segs,T):
@@ -104,22 +111,28 @@ def pair_outlines(segs,T):
             used.add(i);out.append(s)
     return out
 def snap(segs,T):
-    """Extend wall ends to meet perpendicular wall axes (L/T joins)."""
-    tol=max(3,1.2*T)
-    for s in segs:
-        for end in ('lo','hi'):
+    """Resolve L/T/X from original axes, with individual half-width tolerances."""
+    original=[dict(s) for s in segs]
+    result=[]
+    for i,s in enumerate(original):
+        q=dict(s)
+        for end,opposite,sign in (('lo','hi',-1),('hi','lo',1)):
             p=s[end];best=None
-            for o in segs:
-                if o['v']==s['v']:continue
-                # o is perpendicular: its axis coordinate o['c'] lies along s's run direction
-                if not(o['lo']-tol<=s['c']<=o['hi']+tol):continue
+            for j,o in enumerate(original):
+                if i==j or o['v']==s['v']:continue
+                eps=max(1.5,.20*min(s['t'],o['t']))
+                # The intersection must lie on, or immediately beside, both wall bodies.
+                if not o['lo']-s['t']/2-eps<=s['c']<=o['hi']+s['t']/2+eps:continue
                 d=abs(o['c']-p)
-                if d<=tol+o['t']/2 and (best is None or d<best[0]):best=(d,o['c'])
-            if best:s[end]=best[1]
-    for s in segs:
-        if s['lo']>s['hi']:s['lo'],s['hi']=s['hi'],s['lo']
-    return segs
-
+                if d>o['t']/2+eps:continue
+                # Never shrink past the opposite end or create a tiny/inverted run.
+                if sign*(o['c']-s[opposite])<max(2,s['t']):continue
+                candidate=(d,o['c'])
+                if best is None or candidate<best:best=candidate
+            if best is not None:q[end]=best[1]
+        if q['hi']-q['lo']<max(2,s['t']):q=dict(s)
+        result.append(q)
+    return result
 def thin_lines(im,paper,vertical):
     hsv=cv2.cvtColor(im,cv2.COLOR_BGR2HSV);g=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
     ink=((g<paper-35)&(hsv[...,1]<90)).astype(np.uint8)
@@ -215,7 +228,9 @@ def detect(im,mode='auto'):
         res['solid']=(finish(segs,T),T)
     ps,Tp=line_pairs(im,paper)
     if Tp:res['lines']=(finish(ps,Tp),Tp)
-    if mode in res:return res[mode][0],res[mode][1],mode,None
+    if mode != 'auto':
+        if mode in res:return res[mode][0],res[mode][1],mode,None
+        return [],None,mode,None
     if not res:return [],None,'none',None
     k=max(res,key=lambda k:structure_score(res[k][0],H,W))
     return res[k][0],res[k][1],k,None
