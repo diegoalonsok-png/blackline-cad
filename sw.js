@@ -1,14 +1,17 @@
 /* Blackline CAD · service worker: permite instalar la app y abrirla sin conexión.
  * Estrategia «red primero»: siempre se usa la versión publicada más nueva; la copia guardada
  * solo se usa si no hay conexión. Nunca guarda llamadas a la API, pagos ni analítica. */
-const CACHE='blackline-cad-v7';
+const CACHE='blackline-cad-v8';
 const SCOPE=new URL(self.registration.scope).pathname;
 const CORE=['./','./index.html','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'];
 self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}));self.skipWaiting()});
 self.addEventListener('activate',ev=>{ev.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('blackline-cad-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',ev=>{
  const req=ev.request,url=new URL(req.url);
- if(req.method!=='GET'||url.origin!==self.location.origin||req.headers.has('range')||req.cache==='no-store')return;   // API, Stripe, Google: siempre por red
+ if(req.method!=='GET'||url.origin!==self.location.origin||req.headers.has('range')||req.headers.has('authorization')||req.cache==='no-store')return;   // API, Stripe, Google: siempre por red
+ // User-uploaded assets and account/API endpoints must never use shared app cache,
+ // including images or other resources with a normally cacheable extension.
+ if(/\/assets\/user-cad\/v1(?:\/|$)/i.test(url.pathname)||/\/(?:api|auth|billing)(?:\/|$)/i.test(url.pathname))return;
  // Architecture library is fetched on demand; do not persist its files in the app cache.
  if(/\/assets\/3d-object-library\/v1\/(?!catalog\.json$)[^/]+\.json$/i.test(url.pathname)){ev.respondWith(fetch(req,{cache:'no-store'}));return;}
  if(/\/assets\/(?:arq-catalogue\/v1|architecture-references)\//i.test(url.pathname))return;
