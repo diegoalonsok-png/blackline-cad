@@ -537,7 +537,7 @@
   return ['floor-plan','section'].includes(x.drawingType)&&x.floorPlanVerified===true&&typeof x.url==='string'&&/\.(?:jpe?g|png)(?:[?#]|$)/i.test(x.url);
  }
  function cadFirst(x){return x.cadUrl?0:x.planId?1:2;}
- function onlyArchitecturalDrawings(items){const rank={'floor-plan':0,section:1,elevation:2,'technical-detail':3,portrait:4};return items.filter(approvedArchitecturalDrawing).sort((a,b)=>a.classic&&b.classic?(rank[a.drawingType]-rank[b.drawingType]||cadFirst(a)-cadFirst(b)):cadFirst(a)-cadFirst(b));}
+ function onlyArchitecturalDrawings(items){const rank={'floor-plan':0,section:1,elevation:2,'technical-detail':3,portrait:4};const view=x=>rank[x.drawingType??(x.planId||x.roomCad?'floor-plan':'technical-detail')]??3;return items.filter(approvedArchitecturalDrawing).sort((a,b)=>view(a)-view(b)||cadFirst(a)-cadFirst(b));}
  function houseRefCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!/\b(?:referencias?|references?|jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/.test(q))return null;
@@ -621,7 +621,7 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=8',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
+   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=9',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
@@ -686,7 +686,7 @@
    let retried=false;img.onerror=()=>{if(!retried&&item.url&&item.url!==item.thumb&&/\.(?:png|jpe?g|webp|svg)(?:\?|$)/i.test(item.url)){retried=true;img.src=item.url;return;}const notice=document.createElement('span');notice.textContent=T('Preview unavailable','Miniatura no disponible');preview.replaceChildren(notice);};
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
-   const info=document.createElement('span');info.style.fontSize='10px';info.textContent=item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
+   const info=document.createElement('span');info.style.fontSize='10px';const fileType=item.cadUrl?(/\.dwg(?:[?#]|$)/i.test(item.cadUrl)?'DWG':'DXF'):item.planId?'CAD':item.format?item.format.toUpperCase():/\.png(?:[?#]|$)/i.test(item.url||'')?'PNG':'JPG';info.textContent=fileType+' · '+(item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license);
    const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&item.kind!=='portrait'&&!(item.classic&&item.cadUrl)&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'&&!item.cadUrl){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
