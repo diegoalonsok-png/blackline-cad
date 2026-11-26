@@ -201,3 +201,23 @@ def residual_summary(ink,wall_mask):
     total=int((ink>0).sum())
     return dict(original_ink_px=total,unclassified_ink_px=int(rest.sum()),
                 unclassified_ink_pct=round(100*int(rest.sum())/max(1,total),2))
+
+
+def region_hierarchy(regions):
+    """A smaller room can lie inside the envelope of an L-shaped or ring-shaped
+    room. Record a possible relationship, not a proven suite or room use.
+    Rectangular bounding boxes alone cannot prove containment or access.
+    """
+    for i,q in enumerate(regions):
+        q['id']='region-'+str(i+1)
+    for q in regions:
+        candidates=[]
+        for p in regions:
+            if p is q or p['area']<=q['area'] or p.get('rectangularity',1)>=.85:continue
+            if min(p['main_wall_fraction'],q['main_wall_fraction'])<.5:continue
+            if (p['x']<=q['x'] and p['y']<=q['y'] and
+                q['x']+q['w']<=p['x']+p['w'] and q['y']+q['h']<=p['y']+p['h']):
+                candidates.append(p)
+        if candidates:
+            q['possible_parent']=min(candidates,key=lambda p:p['w']*p['h'])['id']
+    return regions
