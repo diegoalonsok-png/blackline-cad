@@ -389,6 +389,7 @@
   grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
   grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   mountPreviews(grid);
+  if(commandGallery&&list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q||!el)return;const b=document.createElement('button');b.className='card';b.style.cssText='grid-column:1/-1;justify-content:center;align-items:center;min-height:44px;text-align:center;font-weight:600';b.textContent=T('Your DWG/DXF blocks: ','Tus bloques DWG/DXF: ')+items.length+' →';b.onclick=()=>{openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();};grid.prepend(b);}).catch(()=>{});}
   if(commandGallery&&!list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q)return;openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();}).catch(()=>{});}
 
   if(!commandGallery&&list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
@@ -642,15 +643,16 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=9',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
+   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=10',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
    classicIndex=Array.isArray(data.index)?data.index:[];classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=onlyArchitecturalDrawings(data.items.filter(x=>x.kind==='plate'||x.kind==='portrait').map(x=>({title:x.title,area:null,classic:true,kind:x.kind,drawingType:x.drawingType,format:x.format,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:[x.author,x.license,x.credit].filter(Boolean).join(' · ')})));
+   webItems=webItems.concat(data.items.filter(x=>x.kind==='photo').slice(0,6).map(x=>({title:x.title,area:null,classic:true,kind:'photo',drawingType:'photo',local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:T('Photo','Foto')+' · '+[x.license,x.credit].filter(Boolean).join(' · ')})));
    const normalizeAuthor=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\([^)]*\)/g,'').trim();
    const authors=(Array.isArray(data.authors)?data.authors:[]).map(normalizeAuthor);
    const authorCAD=archive.filter(x=>x.cadUrl&&x.architect&&authors.includes(normalizeAuthor(x.architect))).map(x=>({...x,classic:true,kind:'plate',local:true,license:[x.architect,x.license,'CAD'].filter(Boolean).join(' · ')}));
-   webItems=onlyArchitecturalDrawings(authorCAD.concat(webItems));
+   const photos=webItems.filter(x=>x.kind==='photo');webItems=onlyArchitecturalDrawings(authorCAD.concat(webItems.filter(x=>x.kind!=='photo'))).concat(photos);
    webStatus=webItems.length?'':T('Nothing found. Try another work or author: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.','No encontré resultados. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.');
   }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
   if(epoch===webEpoch&&classicMode)paintWeb();
@@ -750,6 +752,7 @@
    const [own,archive]=await Promise.all([refsOnly?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
    if(epoch!==webEpoch||!houseMode)return;
    webItems=own.concat(archive).filter(x=>(!refsOnly||!!refCategory||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
+   {const q=String(raw||'').trim(),mine=await userCadMatches(/\bcasas?\b|\bviviendas?\b|\bhouses?\b/i.test(q)?q:q+' casa').catch(()=>[]);if(epoch!==webEpoch||!houseMode)return;const keep=mine.filter(x=>/casa|vivienda|house|planta|corte/i.test(String(x.category)+' '+x.license));if(keep.length)webItems=keep.concat(webItems.filter(x=>!keep.some(k=>k.cadUrl===x.cadUrl)));}
    webStatus=webItems.length?'':refCategory?T('No files in this category yet.','Todavía no hay archivos en esta categoría.'):T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
    // No generic external photographs are appended.
