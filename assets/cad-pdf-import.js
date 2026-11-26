@@ -474,7 +474,7 @@ async function traceFile(file,source=null,python=false){
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
   for(const wall of walls){pc.beginPath();pc.lineWidth=wall.t;pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
-  const placements=[];let blocksOnly=false;
+  const placements=[];let blocksOnly=false,dimensionOverall=false;
   const accepted=await new Promise(resolve=>{
    const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
    const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos'+(hatched?' (muros rayados)':'')+LX('. Revisá la vista previa. Aberturas aún no reconocidas.','. Check the preview. Openings not recognized yet.');
@@ -482,6 +482,7 @@ async function traceFile(file,source=null,python=false){
    const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent=LX('Insertar muros y bloques marcados','Insert walls and marked blocks');cancel.textContent=LX('Cancelar','Cancel');ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
    const onlyBlocks=document.createElement('button');onlyBlocks.className='btn';onlyBlocks.textContent=LX('Insertar solo bloques','Insert blocks only');onlyBlocks.disabled=true;onlyBlocks.onclick=()=>{blocksOnly=true;d.close('ok');};
    const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
+   const dimOption=document.createElement('label'),dimCheck=document.createElement('input');dimCheck.type='checkbox';dimCheck.checked=false;dimCheck.onchange=()=>{dimensionOverall=dimCheck.checked;};dimOption.append(dimCheck,document.createTextNode(LX(' Acotar al final (medidas generales)',' Dimension at end (overall measurements)')));
    const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button'),retry=document.createElement('button');retry.className='btn';retry.textContent=LX('Probar otro detector','Try another detector');
    const catalog=window.CAD2D_ARQ_LIBRARY?.library||[];
    const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-|mob-|kq-|esc-|ext-|veh-|ofi-|per-)/.test(i.id)&&Number.isFinite(i.w)&&i.w>0&&Number.isFinite(i.d)&&i.d>0);
@@ -548,7 +549,7 @@ async function traceFile(file,source=null,python=false){
     controls.append(reading,tool,picker,rot,rotateBtn,undo,flip,ai);
    }else controls.append(picker,rot,undo,ai);
    if(!python)controls.append(retry);const hint=document.createElement('p');if(python)hint.style.cssText='min-height:4.6em;margin:6px 0';hint.textContent=python?LX('1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.','1) Pick the reading that best follows the walls. 2) With «+ Wall» click missing walls; with «Remove» click extra ones. 3) With «+ Door» / «+ Window» click the gap. 4) Set the scale with two clicks on a dimension. 5) Mark furniture and fixtures. Undo reverts the last step.'):'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
-   redraw();d.append(title,hint,controls,aiStatus,preview,cancel,onlyBlocks,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+   redraw();d.append(title,hint,controls,aiStatus,preview,dimOption,cancel,onlyBlocks,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
   if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
@@ -567,9 +568,9 @@ async function traceFile(file,source=null,python=false){
   if(python){tracePlan=blocksOnly?{walls:[],openings:[]}:AS.buildPlan(walls,openings,local,maxTraceThickness);}
   const native=blocksOnly?[]:python?tracePlan.walls:walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)return null;const edge=local([wall.a[0]-dy/len*wall.t,wall.a[1]+dx/len*wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w&&w.thickness>=.08&&w.thickness<=maxTraceThickness+1e-9&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
   if(!native.length&&!placements.length)throw Error('No hay muros válidos ni bloques para insertar. Revisá la escala o marcá objetos.');
-  const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':b.id.startsWith('kq-')?'KITCHEN':/^(?:esc-|ext-|veh-|per-)/.test(b.id)?'EQUIPMENT':'FURNITURE'}));
+  const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':b.id.startsWith('kq-')?'KITCHEN':b.id.startsWith('esc-')?'STAIRS':b.id.startsWith('veh-')?'VEHICLES':b.id.startsWith('ofi-')?'OFFICE':b.id.startsWith('per-')?'ACCESSIBILITY':/^ext-(?:arbol|conifera|palmera|arbusto|maceta|cesped)/.test(b.id)?'VEGETATION':b.id.startsWith('ext-')?'EXTERIOR':'FURNITURE'}));
   const planOpenings=python&&!blocksOnly&&native.length?tracePlan.openings:[];
-  window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:planOpenings,blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace'},traceReviewed:python},origin);
+  window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:planOpenings,blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace',dimensionOverall:dimensionOverall&&!blocksOnly},traceReviewed:python},origin);
   C.renderBlockLibrary?.();C.queueLocalBackup?.();C.toast('CALCO: '+native.length+' muros, '+planOpenings.length+' aberturas y '+blocks.length+' bloques. Revisá uniones.');
  }catch(e){const msg='CALCO: '+(e?.message||e);C.log(msg);C.toast(msg);window.alert(msg);}finally{calcoBusy=false;bitmap?.close?.();doc?.destroy?.();}
 }
