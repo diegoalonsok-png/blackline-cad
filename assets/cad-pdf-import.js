@@ -518,8 +518,9 @@ async function traceFile(file,source=null,python=false){
   // Use the isolated architecture transaction and its native L/T/+ junction solver.
   if(typeof window.CAD2D_APPLY_TRACE_PLAN!=='function')throw Error('Motor ARQ no disponible; actualizá la página.');
   const origin=Q([0,h]),toM=1000/C.U[S.unit],local=p=>{const q=Q(p);return [(q.x-origin.x)/toM,(q.y-origin.y)/toM]};
-  const native=walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),vertical=wall.a[0]===wall.b[0],edge=local(vertical?[wall.a[0]+wall.t,wall.a[1]]:[wall.a[0],wall.a[1]+wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w.thickness>=.08&&w.thickness<=.5&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
-  if(!native.length)throw Error('Ningún muro tiene espesor válido de 0,08 a 0,50 m. Calibrá la imagen.');
+  const maxTraceThickness=python?1.2:.5;
+  const native=walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)return null;const edge=local([wall.a[0]-dy/len*wall.t,wall.a[1]+dx/len*wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w&&w.thickness>=.08&&w.thickness<=maxTraceThickness+1e-9&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
+  if(!native.length)throw Error('Ningún muro tiene espesor válido de 0,08 a '+maxTraceThickness.toFixed(2)+' m. Calibrá la imagen.');
   const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':'FURNITURE'}));
   window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:[],blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace'}},origin);
   C.renderBlockLibrary?.();C.queueLocalBackup?.();C.toast('CALCO: '+native.length+' muros y '+blocks.length+' bloques marcados. Revisá uniones y aberturas.');
