@@ -66,7 +66,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
  const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
  const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];const own=/^CAD2D_([A-Z0-9]+)$/.exec(n),HP=root.BlacklineHatchPatterns;if(own&&HP?.patterns?.[own[1].toLowerCase()])return own[1].toLowerCase();if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
- const silent=new Set(['POINT','VIEWPORT','SEQEND','VERTEX','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
+ const silent=new Set(['VIEWPORT','SEQEND','VERTEX','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
  const note=t=>unsupported.set(t,(unsupported.get(t)||0)+1);
  // --- Read one record in block-local coordinates ---
  function readRecord(type,record,recs,idx){
@@ -77,6 +77,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
    return recovered.length?recovered:null;
   }
   if(type==='LINE')return{type:'line',a:P(get(10),get(20)),b:P(get(11),get(21))};
+  if(type==='POINT'){const x=get(10),y=get(20);return Number.isFinite(x)&&Number.isFinite(y)?{type:'point',p:P(x,y)}:null}
   if(type==='CIRCLE'&&get(40)>0)return{type:'circle',c:P(get(10),get(20)),r:get(40)};
   if(type==='ARC'&&get(40)>0)return{type:'arc',c:P(get(10),get(20)),r:get(40),a0:get(50)*Math.PI/180,a1:get(51)*Math.PI/180};
   if(type==='TEXT'||type==='MTEXT'||type==='ATTRIB'||type==='ATTDEF'){
@@ -166,6 +167,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const out={...e};
   switch(e.type){
    case 'line':out.a=tp(m,e.a);out.b=tp(m,e.b);return out;
+   case 'point':out.p=tp(m,e.p);return out;
    case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
    case 'circle':if(uni){out.c=tp(m,e.c);out.r=e.r*s;return out}return{...e,type:'polyline',closed:true,pts:arcPts(e.c,e.r,0,Math.PI*2).slice(1).map(p=>tp(m,p))};
    case 'arc':{let sw=e.a1-e.a0;if(!Number.isFinite(sw))throw Error('Arco DXF inválido');sw=((sw%(Math.PI*2))+(Math.PI*2))%(Math.PI*2)||Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}

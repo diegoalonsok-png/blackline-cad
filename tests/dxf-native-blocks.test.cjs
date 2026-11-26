@@ -51,3 +51,11 @@ test('original DXF hatch patterns are kept and written back unchanged; worker lo
  assert.ok(v&&html.includes('cad-dxf-parser.js?v='+v),'worker and page must load the same parser version');
  assert.match(worker,/cad-hatch-patterns\.js/);
 });
+test('DXF POINT is read, drawn, selectable, snappable and written back',()=>{
+ const parser=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
+ assert.match(parser,/if\(type==='POINT'\)/);assert.match(parser,/case 'point':out\.p=tp\(m,e\.p\)/);
+ assert.doesNotMatch(parser,/const silent=new Set\(\['POINT'/);
+ assert.match(f,/head\('POINT',e,lay\),'100','AcDbPoint'/);
+ assert.match(html,/function hit\(e,p\)\{const tol=8\/state\.view\.scale;if\(e\.type==='point'\)/);
+ assert.match(html,/e\.type==='blockRef'\|\|e\.type==='point'\?\[\[e\.p,'POINT'\]\]/);
+});
