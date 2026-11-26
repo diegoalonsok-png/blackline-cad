@@ -152,3 +152,52 @@ def validate_mask(ink,segs,max_passes=3):
     stats.update(mask_before_px=int(before.sum()),mask_after_px=int(after.sum()),
                  source_support_pct=round(100*supported/max(1,total),2))
     return current,stats
+
+
+def enclosed_regions(mask):
+    """Find closed free-space components and identify their surrounding wall network.
+    Open rooms are deliberately not invented by sealing door gaps. The result
+    is diagnostic: a small compartment is not necessarily a shaft.
+    """
+    import cv2
+    mask=(mask>0).astype(np.uint8)
+    H,W=mask.shape
+    n,labels,stats,_=cv2.connectedComponentsWithStats(1-mask,connectivity=4)
+    nw,wall_labels,wall_stats,_=cv2.connectedComponentsWithStats(mask,connectivity=8)
+    main=int(1+np.argmax(wall_stats[1:,4])) if nw>1 else 0
+    out=[]
+    for i in range(1,n):
+        x,y,w,h,a=map(int,stats[i])
+        if x==0 or y==0 or x+w==W or y+h==H or min(w,h)<3 or a<16:continue
+        # Inspect only a local crop around this cavity, not the whole image.
+        x0=max(0,x-1);y0=max(0,y-1);x1=min(W,x+w+1);y1=min(H,y+h+1)
+        part=(labels[y0:y1,x0:x1]==i).astype(np.uint8)
+        border=(cv2.dilate(part,np.ones((3,3),np.uint8))>0)&(part==0)
+        adjacent=wall_labels[y0:y1,x0:x1][border]
+        adjacent=adjacent[adjacent>0]
+        attached=float((adjacent==main).mean()) if adjacent.size else 0.
+        out.append(dict(x=x,y=y,w=w,h=h,area=a,main_wall_fraction=round(attached,3)))
+    return sorted(out,key=lambda q:q['area'],reverse=True)[:250]
+
+
+def classify_region(q,pixels_per_m):
+    """Project heuristic, not building-code compliance or definitive room use."""
+    if not np.isfinite(pixels_per_m) or pixels_per_m<=0:return 'unscaled'
+    w,d=q['w']/pixels_per_m,q['h']/pixels_per_m
+    area=q['area']/pixels_per_m**2
+    if q['main_wall_fraction']<.5:return 'isolated_object_candidate'
+    if min(w,d)<=.60 and max(w,d)<=.90 and area<=.54:return 'technical_void_candidate'
+    if min(w,d)<.75 or area<1:return 'small_space_review'
+    return 'room_candidate'
+
+
+def residual_summary(ink,wall_mask):
+    """Preserve unexplained ink for object/dimension/line review.
+    This is coverage of ink, not the user's estimated 5% of entities.
+    """
+    import cv2
+    near=cv2.dilate(wall_mask,np.ones((3,3),np.uint8))
+    rest=(ink>0)&(near==0)
+    total=int((ink>0).sum())
+    return dict(original_ink_px=total,unclassified_ink_px=int(rest.sum()),
+                unclassified_ink_pct=round(100*int(rest.sum())/max(1,total),2))
