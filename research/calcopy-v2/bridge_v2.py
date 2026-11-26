@@ -26,6 +26,41 @@ def _network_score(segs, T):
     return total
 
 
+def _mixed(solid, lines):
+    """Combine independently observed walls without drawing across gaps.
+    Solid evidence wins over overlapping thin-line hypotheses. Keep only
+    sufficiently long, non-overlapping remainders of double-line walls.
+    """
+    out = [dict(s) for s in solid]
+    for q in sorted(lines, key=lambda s: -(s['hi'] - s['lo'])):
+        intervals = [(q['lo'], q['hi'])]
+        for p in out:
+            if p['v'] != q['v']:
+                continue
+            # Require nearly the same axis and plausible common thickness.
+            if abs(p['c'] - q['c']) > max(2, .4 * min(p['t'], q['t'])):
+                continue
+            if max(p['t'], q['t']) > 2.0 * min(p['t'], q['t']):
+                continue
+            rest = []
+            for lo, hi in intervals:
+                a, b = max(lo, p['lo']), min(hi, p['hi'])
+                if b <= a:
+                    rest.append((lo, hi))
+                else:
+                    if a > lo:
+                        rest.append((lo, a))
+                    if hi > b:
+                        rest.append((b, hi))
+            intervals = rest
+            if not intervals:
+                break
+        for lo, hi in intervals:
+            if hi - lo >= max(6, 2.5 * q['t']):
+                out.append(dict(q, lo=lo, hi=hi))
+    return out
+
+
 def analyze_v2(pixels, w, h):
     rgba = np.frombuffer(bytes(pixels), dtype=np.uint8).reshape(h, w, 4)
     im = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
@@ -33,11 +68,23 @@ def analyze_v2(pixels, w, h):
     if k < 1:
         im = cv2.resize(im, (max(1, round(w * k)), max(1, round(h * k))), interpolation=cv2.INTER_AREA)
     H, W_ = im.shape[:2]
-    readings, scores = {}, {}
+    readings, scores, raw, thickness = {}, {}, {}, {}
     for mode in ('solid', 'lines'):
-        segs, T, _, _ = W.detect(im, mode)
-        segs = segs if T else []
+        segs, T, actual, _ = W.detect(im, mode)
+        # detect() may fall back to another mode. Never mislabel it.
+        segs = segs if T and actual == mode else []
+        raw[mode] = segs
+        thickness[mode] = T if segs else None
         readings[mode] = _walls(segs, k)
-        scores[mode] = _network_score(segs, T or 1)
-    best = max(scores, key=scores.get) if any(scores.values()) else 'solid'
+        scores[mode] = _network_score(segs, thickness[mode] or 1)
+    combined = _mixed(raw['solid'], raw['lines'])
+    readings['mixed'] = _walls(combined, k)
+    primary = max(('solid', 'lines'), key=lambda m: (scores[m], len(raw[m])))
+    T = min((v for v in thickness.values() if v), default=1)
+    mixed_score = _network_score(combined, T)
+    # Prefer mixed only if it adds meaningful connected evidence. The
+    # user can still review each independent reading.
+    best = primary
+    if raw['solid'] and raw['lines'] and mixed_score > 1.12 * scores[primary] and len(combined) <= 250:
+        best = 'mixed'
     return json.dumps({'best': best, 'readings': readings})
