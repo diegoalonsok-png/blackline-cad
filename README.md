@@ -4,17 +4,23 @@
 
 - **CAD 2D y 3D online (ES):** https://blackline-cad.org/cad-2d-3d-online
 - **Online 2D & 3D CAD (EN):** https://blackline-cad.org/online-2d-3d-cad
+- **Editor DXF online (ES):** https://blackline-cad.org/editor-dxf-online
+- **Online DXF editor (EN):** https://blackline-cad.org/online-dxf-editor
+- **Render arquitectónico (ES):** https://blackline-cad.org/render-arquitectonico-online
+- **Architectural rendering (EN):** https://blackline-cad.org/online-architectural-rendering
+- **Guías CAD (ES):** https://blackline-cad.org/guias-cad
+- **CAD guides (EN):** https://blackline-cad.org/cad-guides
 
 - **Official website / aplicación CAD 2D online:** https://blackline-cad.org/
-- **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos.html
-- **CAD 2D online guide / guía de dibujo técnico:** https://blackline-cad.org/guia-cad-2d-online.html
-- **House-plan drawing exercise / plano de casa CAD 2D:** https://blackline-cad.org/plano-casa-cad-2d-online.html
+- **Command reference / manual de comandos:** https://blackline-cad.org/manual-comandos
+- **CAD 2D online guide / guía de dibujo técnico:** https://blackline-cad.org/guia-cad-2d-online
+- **House-plan drawing exercise / plano de casa CAD 2D:** https://blackline-cad.org/plano-casa-cad-2d-online
 - **Features:** 2D drafting, layers, object snaps, associative dimensions and named dimension styles, blocks with attributes, dynamic architectural block library, XREF, layouts and plotting to PDF with CTB, DXF import/export, PDF import (vector, with layers), cloud projects
 - **License:** Proprietary, all rights reserved. Public source visibility does not grant reuse rights; see [LICENSE](LICENSE).
 
 **Español:** Blackline CAD es un editor CAD 2D en el navegador para dibujo técnico, arquitectura y planos. Incluye dibujo 2D, capas, referencias a objetos, cotas asociativas con estilos, bloques con atributos y biblioteca de bloques dinámicos, XREF, presentaciones y ploteo a PDF con CTB, importación y exportación DXF, importación de PDF vectorial con capas y proyectos en la nube.
 
-A self-contained, dependency-free, English-language CAD workspace. Dark ribbon interface inspired by conventional CAD UI patterns and scholarly dark UI design.
+A browser-based CAD workspace with English and Spanish interface options, a command line, 2D drafting and architectural 3D modeling. Core drafting remains free; Pro features are subject to the current plan.
 
 ## Run
 
