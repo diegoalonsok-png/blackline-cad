@@ -9,10 +9,10 @@ ROOT=pathlib.Path(__file__).resolve().parents[2]
 OUT=ROOT/'calcopy-benchmark-output'
 OUT.mkdir(exist_ok=True)
 
-def predict(im):
+def predict(im,real_width_m=None):
     h,w=im.shape[:2]
     t=time.perf_counter()
-    result=json.loads(analyze_v2(cv2.cvtColor(im,cv2.COLOR_BGR2RGBA).tobytes(),w,h))
+    result=json.loads(analyze_v2(cv2.cvtColor(im,cv2.COLOR_BGR2RGBA).tobytes(),w,h,real_width_m))
     return result,round(time.perf_counter()-t,3)
 
 def mask_for(shape,walls):
@@ -79,7 +79,7 @@ def main():
         if im is None:
             rows.append(dict(case=name,status='missing'));continue
         try:
-            result,elapsed=predict(im)
+            result,elapsed=predict(im,real_width_m=8.0 if truth is not None else None)
             modes={}
             for mode,walls in result['readings'].items():
                 m=mask_for(im.shape,walls)
@@ -88,13 +88,13 @@ def main():
                 cv2.imwrite(str(OUT/f'{name}-{mode}.jpg'),vis)
                 if mode in ('mixed','validated'):cv2.imwrite(str(OUT/f'{name}-{mode}-black.png'),255*(1-m))
             row=dict(case=name,status='executed',seconds=elapsed,default=result['best'],modes=modes,
-                     evaluation='annotated synthetic' if truth is not None else 'manual annotation required',validation=result.get('validation'))
+                     evaluation='annotated synthetic' if truth is not None else 'manual annotation required',validation=result.get('validation'),regions=len(result.get('regions',[])),door_candidates=len(result.get('doors',[])),floor_candidates=len(result.get('floor_grids',[])))
             rows.append(row);print(json.dumps(row),flush=True)
         except Exception as exc:
             rows.append(dict(case=name,status='error',message=str(exc)))
     annotated=[r for r in rows if r.get('evaluation')=='annotated synthetic']
     summary={}
-    for mode in ('solid','lines','mixed','validated'):
+    for mode in ('solid','lines','mixed','validated','metric'):
         metrics=[r['modes'][mode] for r in annotated if mode in r['modes']]
         if metrics:
             tp=sum(m['tp'] for m in metrics);fp=sum(m['fp'] for m in metrics);fn=sum(m['fn'] for m in metrics)
