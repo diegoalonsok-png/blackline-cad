@@ -8,6 +8,33 @@ import wall_solid_vision as solid
 import wall_hatch_vision as hatch
 import wall_junctions as joints
 
+def outline_candidates(im,ppm):
+    """Parallel contour faces for unfilled wall drawings; candidates only."""
+    gray=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    ink=(gray<155).astype(np.uint8)
+    minlen=max(12,round(.45*ppm));out=[]
+    for vertical in (False,True):
+        src=ink.T.copy() if vertical else ink
+        mask=cv2.morphologyEx(src,cv2.MORPH_CLOSE,np.ones((1,3),np.uint8))
+        mask=cv2.morphologyEx(mask,cv2.MORPH_OPEN,np.ones((1,minlen),np.uint8))
+        _,_,stats,cent=cv2.connectedComponentsWithStats(mask)
+        lines=sorted((float(c[1]),int(x),int(x+w-1)) for (x,y,w,h,a),c in zip(stats[1:],cent[1:]) if w>=minlen and h<=max(3,round(.045*ppm)))
+        if len(lines)>1500:continue
+        for i,(c,lo,hi) in enumerate(lines):
+            for d,lo2,hi2 in lines[i+1:]:
+                t=d-c
+                if t>.35*ppm:break
+                if t<.10*ppm:continue
+                a,b=max(lo,lo2),min(hi,hi2)
+                if b-a<max(minlen,2.8*t):continue
+                y0=math.ceil(c+t*.2);y1=math.floor(d-t*.2)+1
+                core=src[y0:y1,a:b+1]
+                if not core.size or core.mean()>.23:continue
+                cc=(c+d)/2
+                out.append(dict(a=[cc,a] if vertical else [a,cc],b=[cc,b] if vertical else [b,cc],t=t))
+                if len(out)>1000:return []
+    return sorted(out,key=lambda q:-math.dist(q['a'],q['b']))
+
 def analyze_rgba(rgba, w, h, ppm):
     if not (1 <= w <= 4096 and 1 <= h <= 4096 and w*h <= 8000000):
         raise ValueError("Invalid raster size")
@@ -35,6 +62,8 @@ def analyze_rgba(rgba, w, h, ppm):
         add([lo,c] if q['axis']=='h' else [c,lo],[hi,c] if q['axis']=='h' else [c,hi],.2*ppm,'solid nominal')
     candidates,_=hatch.detect(im,(0,0,w,h),ppm)
     for q in candidates:add(q['a'],q['b'],.2*ppm,'hatch nominal')
+    if len(out)<3:
+        for q in outline_candidates(im,ppm):add(q['a'],q['b'],q['t'],'outline review')
     if len(out)>250:raise ValueError("Too many candidates; use a cropped plan")
     rows=[(str(i),q['a'],q['b']) for i,q in enumerate(out)]
     if rows:
