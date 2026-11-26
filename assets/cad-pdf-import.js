@@ -184,6 +184,64 @@ function traceWallBands(mask,w,h){
  return out;
 }
 
+// Conservative fallback for outlined, diagonally hatched orthogonal walls.
+// Require two sustained parallel edges AND distributed ink between them.
+// This is a candidate detector; the operator can reject any segment in preview.
+function traceHatchedWallBands(mask,w,h){
+ const M=Math.max(w,h),minLen=Math.max(12,Math.round(M*.045)),minT=Math.max(3,Math.round(M*.008)),maxT=Math.max(minT+1,Math.round(M*.035)),out=[];
+ for(const v of [false,true]){
+  const rows=v?w:h,cols=v?h:w,groups=[];
+  const at=(y,x)=>mask[v?x*w+y:y*w+x];
+  let previous=[];
+  for(let y=0;y<rows;y++){
+   let x=0;const current=[];
+   while(x<cols){
+    while(x<cols&&!at(y,x))x++;const a=x;
+    while(x<cols&&at(y,x))x++;const b=x;
+    if(b-a<minLen)continue;
+    let g=previous.find(q=>Math.abs(q.a-a)<=4&&Math.abs(q.b-b)<=4&&!current.includes(q));
+    if(g){g.last=y;g.a=Math.max(g.a,a);g.b=Math.min(g.b,b);}
+    else{g={first:y,last:y,a,b};groups.push(g);}
+    current.push(g);
+   }
+   previous=current;
+  }
+  const lines=groups.filter(g=>g.last-g.first+1<=Math.max(6,M*.006)&&g.b-g.a>=minLen).map(g=>({...g,c:(g.first+g.last)/2})).sort((a,b)=>a.c-b.c);
+  if(lines.length>4000)continue;
+  for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){
+   const A=lines[i],B=lines[j],t=B.c-A.c;if(t>maxT)break;if(t<minT)continue;
+   const lo=Math.max(A.a,B.a),hi=Math.min(A.b,B.b),need=Math.max(minLen,2.2*t);
+   if(hi-lo<need)continue;
+   const y0=Math.ceil(A.c+t*.2),y1=Math.floor(B.c-t*.2)+1,step=Math.max(5,Math.round(t*.75));
+   let start=null;
+   for(let x=lo;x<=hi;x+=step){
+    const end=Math.min(hi,x+step),nx=end-x,ny=y1-y0;let good=false;
+    if(nx>0&&ny>0){
+     const counts=new Uint16Array(nx);let ink=0,coveredRows=0;
+     for(let y=y0;y<y1;y++){let n=0;for(let u=x;u<end;u++)if(at(y,u)){n++;counts[u-x]++;}ink+=n;if(n/nx>.07)coveredRows++;}
+     let coveredCols=0;for(const n of counts)if(n/ny>.07)coveredCols++;
+     const density=ink/(nx*ny);good=density>=.12&&density<=.78&&coveredRows/ny>.65&&coveredCols/nx>.65;
+    }
+    if(good){if(start===null)start=x;}
+    else if(start!==null){if(x-start>=need){const c=(A.c+B.c)/2;out.push({v,c,lo:start,hi:x,t});}start=null;}
+    if(end===hi&&start!==null){if(hi-start>=need){const c=(A.c+B.c)/2;out.push({v,c,lo:start,hi,t});}start=null;}
+   }
+  }
+ }
+ const kept=[];
+ for(const q of out.sort((a,b)=>(b.hi-b.lo)-(a.hi-a.lo))){
+  if(kept.some(p=>p.v===q.v&&Math.abs(p.c-q.c)<Math.max(p.t,q.t)*.7&&Math.min(p.hi,q.hi)-Math.max(p.lo,q.lo)>.25*Math.min(p.hi-p.lo,q.hi-q.lo)))continue;
+  kept.push(q);
+ }
+ const walls=kept.map(q=>({a:q.v?[q.c,q.lo]:[q.lo,q.c],b:q.v?[q.c,q.hi]:[q.hi,q.c],t:q.t}));
+ for(const a of walls)for(const b of walls){if(a===b||a.a[0]===a.b[0]||b.a[1]===b.b[1])continue;
+  const p=[b.a[0],a.a[1]],tol=Math.max(a.t,b.t)*.8;
+  if(p[0]<Math.min(a.a[0],a.b[0])-tol||p[0]>Math.max(a.a[0],a.b[0])+tol||p[1]<Math.min(b.a[1],b.b[1])-tol||p[1]>Math.max(b.a[1],b.b[1])+tol)continue;
+  for(const k of ['a','b']){if(Math.hypot(a[k][0]-p[0],a[k][1]-p[1])<=tol)a[k]=p.slice();if(Math.hypot(b[k][0]-p[0],b[k][1]-p[1])<=tol)b[k]=p.slice();}
+ }
+ return walls;
+}
+
 async function traceFile(file,source=null){
  const S=C.state;if(S.tool!=='select'||S.stage?.length)return C.toast('Terminá el comando actual antes de calcar.');
  let bitmap,doc;
@@ -201,8 +259,9 @@ async function traceFile(file,source=null){
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
   const pix=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
   for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<205?1:0;
-  const walls=traceWallBands(mask,w,h);
-  if(!walls.length||walls.length>250)return C.toast('CALCO: no se detectaron muros sólidos con suficiente confianza. No se insertó geometría.');
+  let walls=traceWallBands(mask,w,h),hatched=false;
+  if(walls.length<3||walls.length>250){const other=traceHatchedWallBands(mask,w,h);if(other.length&&other.length<=250){walls=other;hatched=true;}}
+  if(!walls.length||walls.length>250)return C.toast('CALCO: no se detectaron muros con suficiente evidencia (macizos o rayados). Revisá resolución y contraste. No se insertó geometría.');
   const real=source?Math.abs(source.b.x-source.a.x)*C.U[S.unit]/1000:Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
   if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
@@ -211,7 +270,7 @@ async function traceFile(file,source=null){
   const placements=[];
   const accepted=await new Promise(resolve=>{
    const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
-   const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos. Revisá la vista previa. Aberturas y mobiliario aún no reconocidos.';
+   const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos'+(hatched?' (muros rayados)':'')+'. Revisá la vista previa. Aberturas aún no reconocidas.';
    preview.style.cssText='width:100%;max-height:55vh;object-fit:contain;display:block';
    const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent='Insertar muros y bloques marcados';cancel.textContent='Cancelar';ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
    const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
@@ -221,10 +280,10 @@ async function traceFile(file,source=null){
    picker.add(new Option('Marcar objeto sobre la imagen…',''));for(const i of candidates)picker.add(new Option(i.name,i.id));
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
    undo.textContent='Deshacer marca';undo.className='btn';
-   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);pc.strokeStyle='#008b99';for(const wall of walls){pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
+   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip);title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos'+(hatched?' · rayados':'')+'. Aberturas no reconocidas.';
     pc.fillStyle='#b64912';pc.font=Math.max(12,w/70)+'px sans-serif';for(const [i,b] of placements.entries()){pc.beginPath();pc.arc(b.x,b.y,Math.max(4,w/180),0,2*Math.PI);pc.fill();pc.fillText((i+1)+' '+b.name,b.x+6,b.y-6);if(b.aiBox){const [x0,y0,x1,y1]=b.aiBox;pc.strokeStyle='#b64912';pc.lineWidth=2;pc.strokeRect(x0,y0,x1-x0,y1-y0);}}};
    // Position click is the insertion origin, not the centre; source image is kept.
-   preview.onclick=e=>{const it=candidates.find(i=>i.id===picker.value);if(!it)return;const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h),x=(e.clientX-rect.left-(rect.width-w*scale)/2)/scale,y=(e.clientY-rect.top-(rect.height-h*scale)/2)/scale;if(x<0||x>w||y<0||y>h)return;placements.push({x,y,id:it.id,name:it.name,w:it.w,d:it.d,rotation:Number(rot.value)});redraw();};
+   preview.onclick=e=>{const it=candidates.find(i=>i.id===picker.value);const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h),x=(e.clientX-rect.left-(rect.width-w*scale)/2)/scale,y=(e.clientY-rect.top-(rect.height-h*scale)/2)/scale;if(x<0||x>w||y<0||y>h)return;if(!it){let hit=null,best=Infinity;for(const wall of walls){const dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],l=dx*dx+dy*dy;if(!l)continue;const t=Math.max(0,Math.min(1,((x-wall.a[0])*dx+(y-wall.a[1])*dy)/l)),dist=Math.hypot(x-wall.a[0]-t*dx,y-wall.a[1]-t*dy);if(dist<=Math.max(wall.t*.7,8/scale)&&dist<best){hit=wall;best=dist;}}if(hit){hit.skip=!hit.skip;redraw();}return;}placements.push({x,y,id:it.id,name:it.name,w:it.w,d:it.d,rotation:Number(rot.value)});redraw();};
    undo.onclick=()=>{placements.pop();redraw();};
    const ai=document.createElement('button');ai.className='btn';ai.textContent='Reconocer con IA local (experimental)';
    const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
@@ -250,7 +309,7 @@ async function traceFile(file,source=null){
     }catch(e){if(d.isConnected)aiStatus.textContent='IA local no disponible: '+String(e.message||e).slice(0,180)+'. Podés seguir con el marcado manual.';}
     finally{ai.disabled=false;ok.disabled=false;}
    };
-   controls.append(picker,rot,undo,ai);const hint=document.createElement('p');hint.textContent='Opcional: elegí un bloque y marcá su punto de inserción sobre la imagen. Los objetos aún requieren identificación manual.';
+   controls.append(picker,rot,undo,ai);const hint=document.createElement('p');hint.textContent='Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
    redraw();d.append(title,hint,controls,aiStatus,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
@@ -261,7 +320,7 @@ async function traceFile(file,source=null){
   // Use the isolated architecture transaction and its native L/T/+ junction solver.
   if(typeof window.CAD2D_APPLY_TRACE_PLAN!=='function')throw Error('Motor ARQ no disponible; actualizá la página.');
   const origin=Q([0,h]),toM=1000/C.U[S.unit],local=p=>{const q=Q(p);return [(q.x-origin.x)/toM,(q.y-origin.y)/toM]};
-  const native=walls.map((wall,i)=>{const a=local(wall.a),b=local(wall.b),vertical=wall.a[0]===wall.b[0],edge=local(vertical?[wall.a[0]+wall.t,wall.a[1]]:[wall.a[0],wall.a[1]+wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w.thickness>=.08&&w.thickness<=.5&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
+  const native=walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),vertical=wall.a[0]===wall.b[0],edge=local(vertical?[wall.a[0]+wall.t,wall.a[1]]:[wall.a[0],wall.a[1]+wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w.thickness>=.08&&w.thickness<=.5&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
   if(!native.length)throw Error('Ningún muro tiene espesor válido de 0,08 a 0,50 m. Calibrá la imagen.');
   const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':'FURNITURE'}));
   window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:[],blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace'}},origin);
