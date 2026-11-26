@@ -1127,7 +1127,7 @@ function arqRasterHouseQuery(raw){
 // "palladio", "palladio rotonda", "plantas clásicas", "vitruvio basílica"… → public-domain plates.
 function arqClassicQuery(raw){
  const q=arqCleanRequest(raw);
- return /\b(?:palladio|vitruvi(?:o|us|ius)|serlio|vignola|letarouilly|durand|schinkel|brunelleschi|bramante|borromini|bernini|michelangelo|miguel angel|soane|gaudi|mackintosh|adolf loos|otto wagner|louis sullivan|leon battista alberti|christopher wren|peter behrens)\b/.test(q)||/^(?:plantas?|planos?|laminas?|obras?)\s+(?:clasic[oa]s?|historic[oa]s?|antiguas?)$|^(?:clasicos|plantas clasicas|classic plans|classical plans|tratados(?: de arquitectura)?)$/.test(q);
+ return /\b(?:palladio|vitruvi(?:o|us|ius)|serlio|vignola|letarouilly|durand|schinkel|brunelleschi|bramante|borromini|bernini|michelangelo|miguel angel|soane|gaudi|mackintosh|adolf loos|otto wagner|louis sullivan|leon battista alberti|christopher wren|peter behrens|filarete|francesco di giorgio|scamozzi|philibert de l ?orme|fischer von erlach|piranesi|laugier|boullee|ledoux|semper|labrouste|viollet.?le.?duc|choisy|guadet|horta|berlage|sant ?elia|tony garnier|auguste perret|eliel saarinen|asplund|lutyens|le ?corbusier|mies|frank lloyd wright|gropius|alvar aalto|louis kahn)\b/.test(q)||/^(?:tapas|portadas|tratados|codices)\s+(?:de\s+)?(?:arquitectura|clasic[oa]s)$/.test(q)||/^(?:plantas?|planos?|laminas?|obras?)\s+(?:clasic[oa]s?|historic[oa]s?|antiguas?)$|^(?:clasicos|plantas clasicas|classic plans|classical plans|tratados(?: de arquitectura)?)$/.test(q);
 }
 function arqHouseGallery(raw){
  if(arqRasterHouseQuery(raw)||arqRasterRoomQuery(raw))return true;

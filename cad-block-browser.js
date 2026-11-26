@@ -485,7 +485,7 @@
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
  let commandGallery=false,searchPage=0,compactRect=null;
- let classicMode=false;
+ let classicMode=false,classicLinks=[],classicModern=false;
  let houseMode=false,webMode=false,webItems=[],webStatus='',webEpoch=0,webController=null,webArea=null;
  let houseRefreshTimer=null,houseQuery='';
  function stopHouseRefresh(){clearTimeout(houseRefreshTimer);houseRefreshTimer=null;}
@@ -554,8 +554,8 @@
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
-   webItems=data.items.map(x=>{const photo=x.kind==='photo',credit=photo?T('Photo','Foto')+': '+(x.credit||'Wikimedia Commons')+' · '+x.license:T('Plate','Lámina')+(x.date?' '+x.date:'')+' · '+T('Public domain','Dominio público');return {title:(photo?x.title+' · '+credit:x.title),area:null,classic:true,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.author+' · '+credit};});
-   webStatus=webItems.length?'':T('No plates found. Try another work or author: Palladio, Vitruvio, Serlio, Vignola, Letarouilly, Durand, Schinkel.','No encontré láminas. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Vignola, Letarouilly, Durand, Schinkel.');
+   classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=data.items.map(x=>{const photo=x.kind==='photo',cover=x.kind==='cover',credit=photo?T('Photo','Foto')+': '+(x.credit||'Wikimedia Commons')+' · '+x.license:(cover?T('Cover','Portada'):T('Plate','Lámina'))+(x.date?' '+x.date:'')+' · '+T('Public domain','Dominio público');return {title:(photo?x.title+' · '+credit:x.title),area:null,classic:true,kind:x.kind,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.author+' · '+credit};});
+   webStatus=webItems.length?'':T('Nothing found. Try another work or author: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.','No encontré resultados. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.');
   }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
   if(epoch===webEpoch&&classicMode)paintWeb();
  }
@@ -591,8 +591,8 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO'):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):T('WEB REFERENCES','REFERENCIAS WEB'));
-  el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · FREE PHOTOS','MAESTROS MODERNOS · FOTOS LIBRES'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):T('WEB REFERENCES','REFERENCIAS WEB'));
+  el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();if(classicMode&&(classicLinks.length||classicModern)){const row=document.createElement('div');row.className='classic-links';row.style.cssText='grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#51432e';const lb=document.createElement('b');lb.textContent=T('Codices and sources:','Códices y fuentes:');row.append(lb);for(const l of classicLinks){const a=document.createElement('a');a.href=l.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.t+' ↗';a.title=l.a||'';a.style.cssText='padding:3px 8px;border:1px solid #b7a17a;border-radius:999px;color:#3b2f1c;text-decoration:none;background:#fff8ea';row.append(a);}if(classicModern){const n=document.createElement('span');n.style.cssText='flex-basis:100%;opacity:.8';n.textContent=T('Modern master: their drawings are still under copyright, so only free photos of the works and links are shown.','Maestro moderno: sus dibujos siguen protegidos por derechos de autor; se muestran solo fotos libres de las obras y enlaces.');row.append(n);}grid.append(row);}
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/4)-1));
   for(const [offset,item] of webItems.slice(searchPage*4,searchPage*4+4).entries()){
    const card=document.createElement('div');card.className='web-card';
@@ -602,7 +602,7 @@
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*4>=webItems.length;label.textContent=webItems.length?((searchPage*4+1)+'–'+Math.min((searchPage+1)*4,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
@@ -625,7 +625,8 @@
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
-  const item=(a==='insert'||a==='cad')?webItems[Number(button.dataset.index)]:null;
+  const item=(a==='insert'||a==='cad'||a==='insert-trace')?webItems[Number(button.dataset.index)]:null;
+  if(a==='insert-trace'&&item?.local){button.disabled=true;try{await insertLocalPreview(item);setTimeout(()=>{try{const S=CORE.state,im=S.entities.filter(e=>e.type==='image').at(-1);if(im){S.selected=[im.id];}if(window.CAD2D_CALCO)window.CAD2D_CALCO(true);else CORE.toast('CALCOPY');}catch(e){CORE.toast(e.message)}},400);}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(a==='cad'&&item?.cadUrl){button.disabled=true;try{await importWebUrl(item.cadUrl)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(a==='cad'&&item?.planId){const epoch=webEpoch;button.disabled=true;try{if(!window.CAD2D_INSERT_CATALOGUE_PLAN)throw Error('Importador CAD no disponible');const ok=await window.CAD2D_INSERT_CATALOGUE_PLAN(item.planId,()=>webMode&&epoch===webEpoch);if(ok)close();}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(item?.local){button.disabled=true;try{await insertLocalPreview(item)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
