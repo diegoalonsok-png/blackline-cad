@@ -1,0 +1,111 @@
+name: CALCOPY Python runtime audit
+on:
+  push:
+    branches: ['test/calcopy-python-runtime-20261125']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install numpy opencv-python-headless shapely
+      - run: python research/calco-python-20261125/wall_junctions.py
+      - name: Test original browser bridge on synthetic rasters
+        run: |
+          PYTHONPATH=research/calco-python-20261125 python - <<'PY'
+          import cv2, numpy as np, json, math
+          from browser_bridge import analyze_rgba
+          W,H,ppm=600,400,100
+          cases=['blank','solid','hatched','mixed','outline','door-gap']
+          failures=[]
+          for case in cases:
+              im=np.full((H,W,4),255,np.uint8)
+              expected=[]
+              def wall(x,y,length,style):
+                  if style=='solid':
+                      cv2.rectangle(im,(x,y-10),(x+length,y+9),(0,0,0,255),-1)
+                  else:
+                      cv2.rectangle(im,(x,y-10),(x+length,y+9),(0,0,0,255),1)
+                      if style=='hatched':
+                          for xx in range(x,x+length-20,6):
+                              cv2.line(im,(xx,y+9),(xx+19,y-10),(0,0,0,255),1)
+                  expected.append((x,y,x+length))
+              if case=='solid': wall(50,80,350,'solid')
+              if case=='hatched': wall(50,80,350,'hatched')
+              if case=='mixed':
+                  for y in (50,110,170): wall(50,y,350,'solid')
+                  wall(50,260,350,'hatched')
+                  wall(50,340,350,'outline')
+              if case=='outline': wall(50,80,350,'outline')
+              if case=='door-gap':
+                  wall(50,80,150,'solid');wall(290,80,180,'solid')
+              try:
+                  rows=json.loads(analyze_rgba(im.tobytes(),W,H,ppm))
+                  def covers(x,y,z):
+                      return any(abs(q['a'][1]-y)<12 and abs(q['b'][1]-y)<12 and min(max(q['a'][0],q['b'][0]),z)-max(min(q['a'][0],q['b'][0]),x)>=.70*(z-x) for q in rows)
+                  hits=sum(covers(*e) for e in expected)
+                  bad=any(not math.isfinite(v) for q in rows for v in q['a']+q['b']+[q['t']])
+                  bridge=case=='door-gap' and any(min(q['a'][0],q['b'][0])<200 and max(q['a'][0],q['b'][0])>290 and abs(q['a'][1]-80)<12 for q in rows)
+                  print(case,'expected',len(expected),'matched',hits,'candidates',len(rows),'bridges opening',bridge,flush=True)
+                  print(json.dumps(rows),flush=True)
+                  if hits!=len(expected) or bad or bridge or (case=='blank' and rows): failures.append(case)
+              except Exception as e:
+                  print(case,repr(e),flush=True);failures.append(case)
+          try:
+              analyze_rgba(b'',600,400,0)
+          except ValueError: print('invalid scale rejected')
+          else: failures.append('invalid-scale')
+          assert not failures, failures
+          PY
+  cloudflare-worker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Test deployed Python worker on blackline-cad.org
+        run: |
+          node <<'JS'
+          const {chromium}=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              const page=await browser.newPage({serviceWorkers:'block'});
+              page.on('console',m=>console.log('browser',m.text().slice(0,350)));
+              page.on('pageerror',e=>console.log('page error',e.message));
+              await page.goto('https://blackline-cad.org/',{waitUntil:'domcontentloaded',timeout:90000});
+              const result=await page.evaluate(async()=>{
+                const u=new URL('/assets/cad-calcopy-worker.js',location.href);
+                const response=await fetch(u,{cache:'no-store'});
+                if(!response.ok)throw Error('worker HTTP '+response.status);
+                const src=await response.text();
+                if(!src.includes('loadPyodide'))throw Error('worker does not contain Python loader');
+                const w=600,h=400,ppm=100;
+                const pixels=new Uint8Array(w*h*4);pixels.fill(255);
+                for(let y=70;y<90;y++)for(let x=50;x<400;x++){const i=(y*w+x)*4;pixels[i]=pixels[i+1]=pixels[i+2]=0;}
+                const progress=[];
+                return await new Promise((resolve,reject)=>{
+                  const worker=new Worker(u);
+                  const stop=setTimeout(()=>{worker.terminate();reject(Error('Python worker timeout: '+progress.join(', ')));},180000);
+                  worker.onerror=e=>{clearTimeout(stop);worker.terminate();reject(Error(e.message+' '+progress.join(', ')));};
+                  worker.onmessage=({data})=>{
+                    if(data.type==='progress'){progress.push(data.message);console.log(data.message);return;}
+                    clearTimeout(stop);worker.terminate();resolve({progress,...data});
+                  };
+                  worker.postMessage({pixels:pixels.buffer,w,h,ppm},[pixels.buffer]);
+                });
+              });
+              console.log(JSON.stringify(result));
+              if(result.type!=='result'||!Array.isArray(result.walls)||!result.walls.some(q=>Math.abs(q.a[1]-80)<12&&Math.abs(q.b[1]-80)<12&&Math.abs(q.b[0]-q.a[0])>250))throw Error('Expected wall missing or worker failed');
+            }finally{await browser.close();}
+          })().catch(e=>{console.error(e);process.exit(1);});
+          JS
