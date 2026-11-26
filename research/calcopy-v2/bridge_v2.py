@@ -57,7 +57,7 @@ def analyze_v2(pixels, w, h, real_width_m=None):
     validated,diagnostics=S.validate_mask(review_ink,mixed,max_passes=3)
     readings['validated']=_walls(validated,k)
     mask=S.black_mask(review_ink.shape,validated)
-    regions=S.enclosed_regions(mask)
+    regions=S.region_hierarchy(S.enclosed_regions(mask))
     ppm=w*k/real_width_m if real_width_m is not None and real_width_m>0 else 0
     for region in regions:
         region['kind']=S.classify_region(region,ppm)
