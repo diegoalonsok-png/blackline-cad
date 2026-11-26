@@ -5956,25 +5956,14 @@ function cadAlignTwoPoints(p){
  const a=sub(s2,s1),b=sub(d2,d1),la=Math.hypot(a.x,a.y),lb=Math.hypot(b.x,b.y);
  if(la<1e-8||lb<1e-8){state.stage=[];return toast('ALIGN: puntos de referencia separados requeridos')}
  const angle=Math.atan2(b.y,b.x)-Math.atan2(a.y,a.x);
- const cosine=Math.cos(angle),sine=Math.sin(angle);
  const selected=new Set(chosen.map(e=>e.id));
  // AEC wall faces and host openings require coordinated reconstruction; leave intact.
- if(chosen.some(e=>e.wall2d||e.autoOpeningRef!==undefined||e.autoOpeningJambRef!==undefined))
+ if(chosen.some(e=>e.wall2d||e.autoOpeningRef!==undefined||e.autoOpeningJambRef!==undefined||state.entities.some(f=>f.autoOpeningRef===e.id)))
   {state.stage=[];return toast('ALIGN: seleccioná geometría independiente de muros AEC y vanos')}
- const apply=q=>{
-  const v=sub(q,s1);
-  return P(d1.x+v.x*cosine-v.y*sine,d1.y+v.x*sine+v.y*cosine);
- };
+ const delta=sub(d1,s1);
  saveHistory();
- state.entities=state.entities.map(e=>{
-  if(!selected.has(e.id))return e;
-  const n=transformEntity(e,apply);
-  if(n.type==='blockRef')n.rotation=(Number(n.rotation)||0)+angle*180/Math.PI;
-  if(n.type==='ellipse')n.rotation=(Number(n.rotation)||0)+angle;
-  if(n.type==='arc'){n.a0+=angle;n.a1+=angle}
-  if(n.type==='text')n.rotation=(Number(n.rotation)||0)+angle*180/Math.PI;
-  return n;
- });
+ state.entities=state.entities.map(e=>selected.has(e.id)
+  ?transformEntity(cadRotateExact(e,s1,angle*180/Math.PI),q=>add(q,delta)):e);
  state.stage=[];state.tool='select';updateAll();toast('ALIGN: alineación 2 puntos aplicada · Ctrl+Z');
 }
 function cadSelectSimilar(){
@@ -6115,6 +6104,7 @@ function cadStretchAt(p){
 function cadPolarArray(){
  const sources=validEditSelection();
  if(!sources.length)return toast('POLAR ARRAY: select editable objects first');
+ if(sources.some(e=>e.wall2d||e.autoOpeningRef!=null||e.autoOpeningJambRef!=null||state.entities.some(f=>f.autoOpeningRef===e.id)))return toast('ARRAYPOLAR: seleccioná geometría independiente de muros y vanos vinculados');
  const rawCount=window.prompt('POLAR ARRAY: total number of items (including original, 2–360):','6');
  if(rawCount===null)return;
  const count=Number(rawCount);
@@ -6130,16 +6120,9 @@ function cadPolarArray(){
  if(!Number.isFinite(degrees)||Math.abs(degrees)<1e-9||Math.abs(degrees)>360)return toast('POLAR ARRAY: use an angle between -360 and 360, excluding zero');
  const full=Math.abs(Math.abs(degrees)-360)<1e-9,divisor=full?count:count-1,added=[];
  for(let i=1;i<count;i++){
-  const angle=(degrees*i/divisor)*Math.PI/180,cos=Math.cos(angle),sin=Math.sin(angle);
-  const transform=p=>{const q=sub(p,center);return add(center,P(q.x*cos-q.y*sin,q.x*sin+q.y*cos))};
+  const angle=degrees*i/divisor;
   for(const source of sources){
-   let entity=transformEntity(source,transform);
-   if(entity.type==='rect'&&Math.abs(sin)>1e-10){
-    entity.type='polyline';entity.pts=[P(source.a.x,source.a.y),P(source.b.x,source.a.y),P(source.b.x,source.b.y),P(source.a.x,source.b.y)].map(transform);entity.closed=true;delete entity.a;delete entity.b;
-   }
-   if(entity.type==='arc'){entity.a0+=angle;entity.a1+=angle}
-   if(entity.type==='ellipse')entity.rotation=(entity.rotation||0)+angle;
-   if(entity.type==='text')entity.rotation=(Number(entity.rotation)||0)+angle*180/Math.PI;
+   const entity=cadRotateExact(source,center,angle);
    entity.id=state.nextId+added.length;added.push(entity);
   }
  }
