@@ -27,3 +27,21 @@ test('duplicate acquisition reorders without duplicates',()=>{
  assert.deepEqual(list,[{x:2,y:2},{x:1,y:1}]);
 });
 test('invalid coordinates do not create tracking guides',()=>assert.equal(project({x:NaN,y:0},[{x:1,y:1}],1),null));
+
+
+test('cardinal OTRACK rays preserve exact coordinates even far from origin',()=>{
+ const {projectRays}=require('../cad-object-tracking.js');
+ const anchors=[{x:0,y:0}];
+ for(const angle of [0,90,180,270,-90,450]){
+  const vertical=angle%180!==0;
+  const pointer=vertical?{x:0.01,y:1e8}:{x:1e8,y:0.01};
+  const expected=vertical?{x:0,y:1e8}:{x:1e8,y:0};
+  assert.deepEqual(projectRays(pointer,anchors,10,10,[angle]).point,expected,'angle '+angle);
+ }
+});
+test('exact cardinal rays still support polar tracking at 45 degrees',()=>{
+ const {projectRays}=require('../cad-object-tracking.js');
+ const result=projectRays({x:5.02,y:4.98},[{x:0,y:0}],10,10,[45]);
+ assert.ok(result);
+ assert.ok(Math.abs(result.point.x-result.point.y)<1e-12);
+});
