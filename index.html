@@ -8318,14 +8318,25 @@ async function cad2dAutoSave(force=false){
   const snapshot={name:cadBakName(),text:cadDxfWithProject(name),objects:entities.length,ts:Date.now()};
   try{await cadWriteBak(snapshot)}catch(err){console.warn('[CAD2D BAK]',err)}
   if(!current())return;
-  const ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
+  let diskSaved=false,w=null;
+  try{
+   const ok=h&&/\.dxf$/i.test(h.name)&&(!h.queryPermission||await h.queryPermission({mode:'readwrite'})==='granted');
+   if(!current())return;
+   if(ok){
+    w=await h.createWritable();
+    if(!current()){await w.abort();w=null;return}
+    await w.write(snapshot.text);
+    if(!current()){await w.abort();w=null;return}
+    await w.close();w=null;diskSaved=true;
+   }
+  }catch(err){
+   if(w)try{await w.abort()}catch(ex){}
+   console.warn('[CAD2D AUTOSAVE disk]',err);
+  }
   if(!current())return;
-  if(ok){
-   const w=await h.createWritable();
-   if(!current()){await w.abort();return}
-   await w.write(snapshot.text);await w.close();toast('Autosave · '+h.name+' · '+hh);
-  }else{
-   if(!await persistLocalBackup())return;
+  if(diskSaved)toast('Autosave · '+h.name+' · '+hh);
+  else{
+   if(!await persistLocalBackup()||!current())return;
    toast('Autosave (browser copy) · '+hh);
   }
   cad2dLastAutoSig=sig;cad2dLastAutoTime=Date.now();log('AUTOSAVE '+hh);
