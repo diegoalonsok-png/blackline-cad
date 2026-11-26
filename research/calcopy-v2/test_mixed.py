@@ -3,7 +3,7 @@ import json
 import unittest
 from unittest.mock import patch
 import numpy as np
-from bridge_v2 import _mixed, _recover_returns, analyze_v2
+from bridge_v2 import _mixed, _recover_returns, _rectangular_junctions, analyze_v2
 
 def wall(lo, hi, c=20, t=10, v=False):
     return dict(lo=lo, hi=hi, c=c, t=t, v=v)
@@ -41,6 +41,21 @@ class MixedTests(unittest.TestCase):
         im=np.full((100,100,3),255,np.uint8)
         with patch('bridge_v2.W.thin_lines',return_value=([dict(c=20,lo=20,hi=65,t=1)],np.zeros((100,100),np.uint8))):
             self.assertEqual(_recover_returns(im,[wall(0,60,c=20,v=True)],10),[])
+    def test_l_contact_constant_width(self):
+        a,b=wall(10,45,c=20,t=10),wall(25,90,c=50,t=10,v=True)
+        result=_rectangular_junctions([a,b])
+        self.assertEqual(result,[wall(10,50,c=20,t=10),wall(20,90,c=50,t=10,v=True)])
+        self.assertEqual(a['hi'],45)
+        self.assertEqual(b['lo'],25)
+    def test_t_keeps_through_wall(self):
+        a,b=wall(0,100,c=20,t=10),wall(25,90,c=50,t=12,v=True)
+        self.assertEqual(_rectangular_junctions([a,b]),[a,wall(20,90,c=50,t=12,v=True)])
+    def test_x_preserves_both_through_walls(self):
+        a,b=wall(0,100,c=50),wall(0,100,c=50,v=True)
+        self.assertEqual(_rectangular_junctions([a,b]),[a,b])
+    def test_no_join_across_opening_or_room(self):
+        a,b,c=wall(0,40),wall(80,120),wall(60,100,c=50,v=True)
+        self.assertEqual(_rectangular_junctions([a,b,c]),[a,b,c])
     def test_blank_image(self):
         pixels=np.full((100,100,4),255,np.uint8).tobytes()
         result=json.loads(analyze_v2(pixels,100,100))
