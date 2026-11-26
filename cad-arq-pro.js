@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-parking1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-parking2');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -816,6 +816,15 @@ function solveGeometry(text,brief=null,semantic=false){
 }
 
 function applyArchitectureDetail(plan,origin){
+// A rotated rectangle is valid even if its opposite corners share one coordinate.
+function arqValidRectangle(pts){
+ const v=pts.map((p,i)=>[pts[(i+1)%4][0]-p[0],pts[(i+1)%4][1]-p[1]]);
+ const l=v.map(p=>Math.hypot(...p));
+ if(l.some(x=>x<1e-8))return false;
+ return v.every((p,i)=>Math.abs(p[0]*v[(i+1)%4][0]+p[1]*v[(i+1)%4][1])<=1e-8*l[i]*l[(i+1)%4])&&
+  Math.abs(l[0]-l[2])<=1e-8*Math.max(1,l[0],l[2])&&Math.abs(l[1]-l[3])<=1e-8*Math.max(1,l[1],l[3]);
+}
+
  if(plan.units!=='m'||!Array.isArray(plan.entities)||!plan.entities.length||plan.entities.length>500)throw Error('Detalle inválido.');
  const pool=plan.brief?.kind==='pool_plan',parking=plan.brief?.kind==='parking_plan';
  const st=S(),k=f(),names=new Set(pool?['POOL-WATER','POOL-DECK','POOL-STAIRS']:parking?['PARKING-SPACE','PARKING-AISLE','PARKING-CARS']:['STAIRS','RAILS','SECTIONS','SECTION-CUT','SECTION-FINISH','SECTION-FIXTURES']),layers=new Map(),add=[];
@@ -830,7 +839,7 @@ function applyArchitectureDetail(plan,origin){
    layers.set(name,l);if(!old)add.push(l);
   }return layers.get(name).id;
  };
- for(const e of plan.entities){if((pool||parking)&&e.type==='polyline'){if(!e.closed||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint)||Math.abs(e.pts[2][0]-e.pts[0][0])<1e-8||Math.abs(e.pts[2][1]-e.pts[0][1])<1e-8)throw Error('Contorno rectangular inválido.');}else if(e.type!=='line'||![e.a,e.b].every(validPoint)||Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Geometría de detalle inválida.');getLayer(e.layer);}
+ for(const e of plan.entities){if((pool||parking)&&e.type==='polyline'){if(!e.closed||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint)||!arqValidRectangle(e.pts))throw Error('Contorno rectangular inválido.');}else if(e.type!=='line'||![e.a,e.b].every(validPoint)||Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Geometría de detalle inválida.');getLayer(e.layer);}
  const fills=plan.fills||[],blocks=plan.blocks||[];
  if(!Array.isArray(fills)||fills.length>50||!Array.isArray(blocks)||blocks.length>50)throw Error('Detalle demasiado complejo.');
  for(const e of fills){if(e.layer!=='SECTION-CUT'||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint))throw Error('Relleno inválido.');getLayer(e.layer);}
@@ -1374,7 +1383,7 @@ function arqParkingRequest(raw){
  const head=s.match(/^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)\s+)?(?:(modulos? de\s+))?(?:playa de estacionamiento|plazas? de estacionamiento|estacionamientos?|cocheras?|garajes?|garages?|parking(?: spaces?)?)\b/);
  if(!head||/\b(?:jpg|png|fotos?|references|referencias)\b/.test(s))return false;
  const rest=s.slice(head[0].length).trim();
- return !!(head[1]||head[2]||/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|serie)\b/.test(rest)||/^[x×*]\s*\d+/.test(rest)||(/estacionamiento|parking/.test(head[0])&&/\d/.test(rest)));
+ return !!(head[1]||head[2]||/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|serie|enfrentad[ao]s?|opuestas?|opposed)\b/.test(rest)||/\d+\s*(?:°|grados?|degrees?)/.test(rest)||/^[x×*]\s*\d+/.test(rest)||(/estacionamiento|parking/.test(head[0])&&/\d/.test(rest)));
 }
 function arqPoolRequest(raw){
  const s=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
