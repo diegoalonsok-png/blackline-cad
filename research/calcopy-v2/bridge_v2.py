@@ -62,6 +62,9 @@ def analyze_v2(pixels, w, h, real_width_m=None):
     metric,metric_stats=S.metric_wall_review(review_ink,validated,ppm)
     readings['metric']=_walls(metric,k)
     diagnostics['metric']=metric_stats
+    floor_grids=S.repeated_floor_grid(review_ink,S.black_mask(review_ink.shape,metric),ppm)
+    for grid in floor_grids:
+        for key in ('x','y','w','h'):grid[key]=round(grid[key]/k,2)
     for region in regions:
         region['kind']=S.classify_region(region,ppm)
         if ppm:
@@ -73,4 +76,4 @@ def analyze_v2(pixels, w, h, real_width_m=None):
         for ring in region.get('rings',[]):ring['points']=[[round(x/k,2),round(y/k,2)] for x,y in ring['points']]
     diagnostics['residual']=S.residual_summary(review_ink,mask)
     # Diagnostic room candidates only; do not alter wall geometry or invent doors.
-    return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics,'regions':regions})
+    return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics,'regions':regions,'floor_grids':floor_grids})
