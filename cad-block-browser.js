@@ -530,13 +530,14 @@
  // Strict catalogue admission: only approved floor plans and sections.
  function approvedArchitecturalDrawing(x){
   if(!x||typeof x!=='object')return false;
+  if(x.classic===true&&x.cadUrl)return x.kind==='plate'&&['floor-plan','section','elevation','technical-detail'].includes(x.drawingType)&&x.local===true&&/\.(?:dwg|dxf)(?:[?#]|$)/i.test(x.cadUrl);
   if(x.classic===true)return ((x.kind==='plate'&&['floor-plan','section','elevation','technical-detail'].includes(x.drawingType))||(x.kind==='portrait'&&x.drawingType==='portrait'))&&['jpg','png'].includes(x.format)&&typeof x.url==='string'&&x.url.startsWith('/classics/img?u=')&&/^https:\/\/commons\.wikimedia\.org\//.test(x.source||'');
   if(x.planId&&/^plan-\d+$/.test(x.planId)&&x.local===true)return true;
-  if(x.cadUrl&&/\.(?:dwg|dxf)(?:[?#]|$)/i.test(x.cadUrl))return x.roomCad===true||['floor-plan','section'].includes(x.drawingType);
+  if(x.cadUrl&&/\.(?:dwg|dxf)(?:[?#]|$)/i.test(x.cadUrl))return x.roomCad===true||['floor-plan','section','elevation','technical-detail'].includes(x.drawingType);
   return ['floor-plan','section'].includes(x.drawingType)&&x.floorPlanVerified===true&&typeof x.url==='string'&&/\.(?:jpe?g|png)(?:[?#]|$)/i.test(x.url);
  }
  function cadFirst(x){return x.cadUrl?0:x.planId?1:2;}
- function onlyArchitecturalDrawings(items){const rank={'floor-plan':0,section:1,elevation:2,'technical-detail':3,portrait:4};return items.filter(approvedArchitecturalDrawing).sort((a,b)=>a.classic&&b.classic?(rank[a.drawingType]-rank[b.drawingType]):cadFirst(a)-cadFirst(b));}
+ function onlyArchitecturalDrawings(items){const rank={'floor-plan':0,section:1,elevation:2,'technical-detail':3,portrait:4};return items.filter(approvedArchitecturalDrawing).sort((a,b)=>a.classic&&b.classic?(rank[a.drawingType]-rank[b.drawingType]||cadFirst(a)-cadFirst(b)):cadFirst(a)-cadFirst(b));}
  function houseRefCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!/\b(?:referencias?|references?|jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/.test(q))return null;
@@ -611,7 +612,7 @@
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
   return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&['house','bathroom','kitchen','bedroom','detail'].includes(x.category)&&/^(?:house|bathroom|kitchen|bedroom|detail)\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g|webp)$/i.test(x.original||''))&&(category?x.category===category:(!house||x.category==='house'))&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
    const original=file(x.original),image=file(x.image)||(/\.(?:png|jpe?g|webp|pdf)$/i.test(original||'')?original:null),cad=file(x.cad)||(/\.(?:dxf|dwg)$/i.test(original||'')?original:null);
-   return {title:x.title,category:x.category,floorPlanVerified:x.floorPlanVerified===true,drawingType:x.drawingType,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
+   return {title:x.title,architect:x.architect||null,category:x.category,floorPlanVerified:x.floorPlanVerified===true,drawingType:x.drawingType,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
   }).filter(x=>x.thumb&&x.source&&approvedArchitecturalDrawing(x));
  }
  // Public-domain plates of historical treatises (Palladio, Vitruvio, Serlio…), served by the
@@ -620,11 +621,15 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const res=await fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=8',{signal:ctrl.signal,credentials:'omit'});
+   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=8',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
    classicIndex=Array.isArray(data.index)?data.index:[];classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=onlyArchitecturalDrawings(data.items.filter(x=>x.kind==='plate'||x.kind==='portrait').map(x=>({title:x.title,area:null,classic:true,kind:x.kind,drawingType:x.drawingType,format:x.format,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:[x.author,x.license,x.credit].filter(Boolean).join(' · ')})));
+   const normalizeAuthor=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\([^)]*\)/g,'').trim();
+   const authors=(Array.isArray(data.authors)?data.authors:[]).map(normalizeAuthor);
+   const authorCAD=archive.filter(x=>x.cadUrl&&x.architect&&authors.includes(normalizeAuthor(x.architect))).map(x=>({...x,classic:true,kind:'plate',local:true,license:[x.architect,x.license,'CAD'].filter(Boolean).join(' · ')}));
+   webItems=onlyArchitecturalDrawings(authorCAD.concat(webItems));
    webStatus=webItems.length?'':T('Nothing found. Try another work or author: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.','No encontré resultados. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.');
   }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
   if(epoch===webEpoch&&classicMode)paintWeb();
@@ -679,7 +684,7 @@
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&item.kind!=='portrait'&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&item.kind!=='portrait'&&!(item.classic&&item.cadUrl)&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'&&!item.cadUrl){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*per>=webItems.length;label.textContent=webItems.length?((searchPage*per+1)+'–'+Math.min((searchPage+1)*per,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
