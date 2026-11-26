@@ -291,13 +291,13 @@ function parkingInstruction(raw){
  if(!head)return null;
  let rest=s.slice(head[0].length).trim();
  const parking=/estacionamiento|parking/.test(head[0]);
- const organized=/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|en serie)\b/.test(rest);
+ const organized=/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|en serie|enfrentad[ao]s?|opuestas?|opposed)\b/.test(rest)||/\d+\s*(?:°|grados|degrees)/.test(rest);
  const explicitQuantity=!!head[1]||/^[x×*]\s*\d+/.test(rest);
  // Retain the existing native four-wall generator for a single plain garage.
  if(!parking&&!organized&&!explicitQuantity&&!head[2])return null;
  if(!rest&&!head[1]&&!head[2])return null;
  let count=head[1]?(numberWords[head[1]]??Number(head[1])):null;
- let tandem=false,double=!!head[2],w=2.5,d=5,aisle=0,cars=false;
+ let tandem=false,double=!!head[2],w=2.5,d=5,aisle=0,cars=false,angle=90,opposed=false;
  const used=new Set(),notes=[];
  const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?|ft|feet)?';
  const dims=new RegExp('^(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)');
@@ -306,11 +306,13 @@ function parkingInstruction(raw){
   let m,key;
   if((m=rest.match(/^(?:(?:en|in)\s+)?(?:tandem|en linea longitudinal)\b/))){key='layout';tandem=true;}
   else if((m=rest.match(/^(?:(?:en|in)\s+)?(?:fila|hilera|contigu[ao]s?|row|side by side|set|serie)\b/))){key='layout';tandem=false;}
+  else if((m=rest.match(/^(?:(?:en|in)\s+)?(?:dos filas enfrentadas|filas enfrentadas|filas opuestas|enfrentad[ao]s?|opuestas?|opposed rows|facing rows)\b/))){key='opposed';opposed=true;}
+  else if((m=rest.match(/^(?:a\s+|at\s+)?(\d+)\s*(?:°|grados?|degrees?)(?=\s|$)/))){key='angle';angle=Number(m[1]);}
   else if((m=rest.match(/^(?:dobles?|double)\b/))){key='double';double=true;}
   else if((m=rest.match(/^(?:[x×*]\s*|cantidad\s*[:=]?\s*|de\s+|of\s+)?(\d+)\s+(?:plazas?|modulos?)(?=\s|$)/))){key='count';if(count!==null)throw Error('Indicá una sola cantidad de cocheras.');count=Number(m[1]);if(/modulos?/.test(m[0]))double=true;}
   else if((m=rest.match(/^[x×*]\s*(\d+)(?=\s|$)/))){key='count';if(count!==null)throw Error('Indicá una sola cantidad de cocheras.');count=Number(m[1]);}
   else if((m=rest.match(dims))){key='size';w=num(m[1])*unitScale(m[2]||m[4]);d=num(m[3])*unitScale(m[4]||m[2]);}
-  else if((m=rest.match(new RegExp('^(?:circulacion|calle(?: de maniobra)?|pasillo vehicular|aisle)\\s*(?:(?:de|of)\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
+  else if((m=rest.match(new RegExp('^(?:circulacion|calle(?: de maniobra| central)?|pasillo vehicular|aisle)\\s*(?:(?:de|of)\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
   else if((m=rest.match(/^(?:autos?|vehiculos?|cars?)\b/))){key='cars';cars=true;}
   else if((m=rest.match(/^(?:sin autos?|sin vehiculos?|without cars?)\b/))){key='cars';cars=false;}
   else throw Error('Opción de estacionamiento no soportada: '+rest);
@@ -319,14 +321,46 @@ function parkingInstruction(raw){
  }
  if(count===null)count=tandem?2:1;
  if(double&&!tandem)throw Error('Para módulos dobles indicá expresamente en tándem.');
+ if(![45,60,90].includes(angle))throw Error('Ángulos disponibles: 45°, 60° y 90°.');
+ if(tandem&&(angle!==90||opposed))throw Error('El tándem longitudinal no se combina con plazas inclinadas ni filas enfrentadas.');
+ if(opposed&&(count<2||aisle<=0))throw Error('Filas enfrentadas: indicá al menos dos plazas y ancho de calle central.');
  if(!used.has('size'))notes.push('Medidas iniciales por plaza: 2,50 × 5,00 m.');
- return {kind:'parking_plan',count,width:w,depth:d,tandem,double,aisle,cars,assumptions:notes};
+ return {kind:'parking_plan',count,width:w,depth:d,tandem,double,aisle,cars,angle,opposed,assumptions:notes};
+}
+// Rotated parking bays retain their exact perpendicular width and longitudinal depth.
+function solveAngledParking(spec){
+ const {count,width:w,depth:d,cars}=spec,angle=spec.angle,opposed=spec.opposed,aisle=spec.aisle;
+ const theta=angle*Math.PI/180,s=angle===90?1:Math.sin(theta),c=angle===90?0:Math.cos(theta);
+ const pitch=w/s,cols=opposed?Math.ceil(count/2):count,rowDepth=w*c+d*s,W=(cols-1)*pitch+w*s+d*c;
+ if(W>450||2*rowDepth+aisle>500)throw Error('Conjunto de estacionamientos demasiado extenso.');
+ const entities=[],spaces=[];
+ const line=(a,b,layer)=>entities.push({type:'line',a,b,layer});
+ const polygon=(pts,layer)=>entities.push({type:'polyline',closed:true,pts,layer});
+ for(let row=0;row<(opposed?2:1);row++){
+  const n=row===0?cols:count-cols,sign=row===0?1:-1,offset=row===0?0:-aisle;
+  for(let i=0;i<n;i++){
+   const pt=(x,y)=>[i*pitch+x*s+y*c,offset+sign*(w*c-x*c+y*s)];
+   const corners=[pt(0,0),pt(w,0),pt(w,d),pt(0,d)];
+   polygon(corners,'PARKING-SPACE');
+   spaces.push({id:'parking-'+(spaces.length+1),clearBounds:[Math.min(...corners.map(p=>p[0])),Math.min(...corners.map(p=>p[1])),w,d],corners,angle:row===0?angle:-angle,row:row+1});
+   if(cars){
+    const x=(w-1.8)/2,y=(d-3.8)/2;
+    polygon([pt(x,y),pt(x+1.8,y),pt(x+1.8,y+3.8),pt(x,y+3.8)],'PARKING-CARS');
+    line(pt(x,y+.85),pt(x+1.8,y+.85),'PARKING-CARS');
+    line(pt(x,y+2.95),pt(x+1.8,y+2.95),'PARKING-CARS');
+   }
+  }
+ }
+ if(aisle>0)polygon([[0,0],[W,0],[W,-aisle],[0,-aisle]],'PARKING-AISLE');
+ const assumptions=[...(spec.assumptions||[]),count+' plazas de '+w+' × '+d+' m a '+angle+'°'+(opposed?' · filas enfrentadas':''),'Planta preliminar: comprobar maniobras, circulación y normativa; no constituye dimensionado reglamentario.'];
+ return {schema:'blackline.architecture.detail.v1',units:'m',entities,spaces,brief:spec,assumptions};
 }
 function solveParking(spec){
  const {count,width:w,depth:d,tandem,double,aisle,cars}=spec;
  const cols=tandem?(double?count:1):count,rows=tandem?(double?2:count):1,total=cols*rows,W=cols*w,D=rows*d;
  if(!Number.isInteger(count)||count<1||total>60||![w,d,aisle].every(Number.isFinite)||w<1.8||w>6||d<3||d>15||aisle<0||aisle>15||W>450||D+aisle>500)throw Error('Estacionamiento: hasta 60 plazas, ancho 1,80–6 m y largo 3–15 m por plaza.');
  if(cars&&(w<2||d<4))throw Error('El símbolo de auto necesita una plaza de al menos 2 × 4 m.');
+ if(spec.angle!==90||spec.opposed)return solveAngledParking(spec);
  const entities=[],spaces=[];
  const line=(a,b,layer)=>entities.push({type:'line',a,b,layer});
  const rect=(x,y,a,b,layer)=>entities.push({type:'polyline',closed:true,pts:[[x,y],[x+a,y],[x+a,y+b],[x,y+b]],layer});
