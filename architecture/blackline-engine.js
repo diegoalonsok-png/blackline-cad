@@ -67,7 +67,28 @@ const unitScale=u=>/^(cm|centimet)/.test(u||'')?.01:/^(mm|milimet)/.test(u||'')?
 const N='(\\d+(?:[.,]\\d+)?)',U='(mm|cm|mts?|metros?|meters?|metres?|ft|feet|foot|pies|pie|centimetros?|milimetros?)?';
 function measure(s){const m=s.match(new RegExp('^\\s*'+N+'\\s*'+U+'\\b','i'));return m?num(m[1])*unitScale(m[2]):null}
 function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by|par|mal|per)\\s*'+N+'\\s*'+U,'i'));return m?[num(m[1])*unitScale(m[2]||m[4]),num(m[3])*unitScale(m[4]||m[2])]:null}
+// Count-after-name shorthand is distinct from the two dimensions.
+function normalizeRoomSet(raw){
+ if(typeof raw!=='string'||raw.length>4000)return raw;
+ const s=normalize(raw);
+ const room='(?:habitacion(?:es)?|dormitorios?|cuartos?|banos?|bedrooms?|bathrooms?)';
+ const qty='(\\d+(?:[.,]\\d+)?|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)';
+ const marker='(?:tandem|set|fila|row|conjunto|serie)';
+ const re=new RegExp('\\b('+room+')\\s*(?:(?:en|in|de)\\s+)?(?:'+marker+'\\s*(?:(?:de|of)\\s+)?)?(?:[x×*]\\s*|:\\s*|cantidad\\s*[:=]?\\s*)'+qty+'(?=\\s|$)','i');
+ const alternate=new RegExp('\\b('+room+')\\s+(?:(?:en|in)\\s+)?'+marker+'\\s+(?:(?:de|of)\\s+)?'+qty+'(?=\\s+(?:de|of)\\b|\\s*$)','i');
+ const m=s.match(re)||s.match(alternate);
+ if(m){
+  const tail=s.slice(m.index+m[0].length);
+  if(/^\s*(?:x|×|por|by)\s*\d/.test(tail))throw Error('Indicá cantidad y medidas por separado: habitaciones x 3 de 4 x 5 m.');
+  const n=numberWords[m[2]]??num(m[2]);
+  if(!Number.isInteger(n)||n<1||n>30)throw Error('Cantidad de ambientes: entre 1 y 30.');
+  return s.slice(0,m.index)+n+' '+m[1]+' en tandem'+tail;
+ }
+ return s.replace(new RegExp('\\b(?:set|conjunto|serie)\\s+(?:de\\s+|of\\s+)?(?=\\d+\\s+'+room+'\\b)','g'),'')
+  .replace(new RegExp('(\\b'+room+'\\b)\\s+(?:en\\s+|in\\s+)?(?:set|conjunto|serie)\\b','g'),'$1 en tandem');
+}
 function interpret(raw){
+ raw=normalizeRoomSet(raw);
  if(typeof raw!=='string'||!raw.trim()||raw.length>4000)throw Error('Escribí una instrucción arquitectónica.');
  let s=normalize(raw).replace(/\b(dining|meeting|laundry|storage|reception)\s+rooms?\b/g,'$1').replace(/\blocal comercial\b/g,'local').replace(/\bsala de reuniones\b/g,'reunion').replace(/\b(?:living comedor|living-comedor)\b/g,'living').replace(/\b(?:pileta de lavar|pileta de lavadero)\b/g,'laundry_sink').replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
  if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre(?:r|lo|la|los|las)?|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
@@ -626,7 +647,7 @@ function collectiveCabins(spec){
  p.assumptions.push(p.warning);return p;
 }
 function run(raw){
- const {text,corrections}=correctText(internationalText(raw));
+ const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
  if(industrial){
