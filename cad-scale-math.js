@@ -40,9 +40,18 @@
   if(copy.type==='blockRef')copy.scale=(Number(copy.scale)||1)*factor;
   else{
    for(const prop of ['r','rx','ry','h','pwidth','hatchSpacing','hatchScale'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
-   // Original DXF hatch definitions no longer describe a scaled contour/pattern.
-   // The exporter rebuilds the pattern from the scaled native spacing.
-   if(copy.type==='hatch'&&factor!==1)delete copy.dxfPattern;
+   // Preserve imported DXF line families under uniform scaling.
+   if(copy.type==='hatch'&&copy.dxfPattern&&factor!==1){
+    const op=copy.dxfPattern;
+    for(const key of ['scale','spacing'])if(Number.isFinite(op[key]))op[key]*=factor;
+    for(const line of op.lines||[]){
+     if(Number.isFinite(line.bx)&&Number.isFinite(line.by)){
+      const base=map({x:line.bx,y:line.by});line.bx=base.x;line.by=base.y;
+     }
+     for(const key of ['ox','oy'])if(Number.isFinite(line[key]))line[key]*=factor;
+     if(Array.isArray(line.d))line.d=line.d.map(d=>d*factor);
+    }
+   }
    if(copy.type==='text'){
     // Model-space text box and circular path must scale with glyph height.
     for(const prop of ['mtextWidth','textRadius'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
