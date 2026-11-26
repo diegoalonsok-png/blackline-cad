@@ -412,7 +412,7 @@ function runPythonTrace(ctx,w,h,realWidth){
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
-   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-polygon-topology',BASE));
+   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-metric-review',BASE));
    worker.onerror=e=>finish(new Error(e.message||'No se pudo iniciar Python.'));
    worker.onmessage=({data})=>{
     if(data.type==='progress'){status.textContent=data.message;C.log('CALCOPY: '+data.message);}
@@ -447,10 +447,26 @@ async function traceFile(file,source=null,python=false){
   const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(bitmap,0,0,w,h);
   const pix=ctx.getImageData(0,0,w,h).data,mask=new Uint8Array(w*h);
   const makeMask=threshold=>{for(let i=0;i<mask.length;i++)mask[i]=(.299*pix[i*4]+.587*pix[i*4+1]+.114*pix[i*4+2])<threshold?1:0;};
-  let real=source?Math.abs(source.b.x-source.a.x)*C.U[S.unit]/1000:Number(String(prompt('Ancho REAL de toda la imagen, incluido margen (metros). Verificá después con DIST.','')||'').replace(',','.'));
+  let real=source?Math.abs(source.b.x-source.a.x)*C.U[S.unit]/1000:0,preDetected=null;
+  if(!source){
+   const raw=prompt(python?'Ancho REAL de toda la imagen (m), incluido margen. Si no lo conocés, dejá vacío para estimar con un inodoro.':'Ancho REAL de toda la imagen, incluido margen (metros).','');
+   if(raw===null)return;
+   real=Number(raw.replace(',','.'));
+   if(!raw.trim()&&python&&confirm('Estimar escala por inodoro con IA local. La primera descarga del modelo puede ocupar varios cientos de MB. ¿Continuar?')){
+    try{
+     C.toast('CALCOPY: buscando inodoros para estimar la escala…');
+     const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-wc-scale',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     preDetected=await vision.detect(cv,()=>{});
+     const estimate=vision.toiletScale(preDetected,window.CAD2D_ARQ_LIBRARY?.library||[],w,h);
+     if(estimate){const v=prompt('Escala APROXIMADA por '+estimate.samples+' inodoro(s). Ancho total de imagen (m). Confirmá o corregí; verificá con una medida conocida.',estimate.widthM.toFixed(2));if(v===null)return;real=Number(v.replace(',','.'));}
+     else C.toast('No se encontró un inodoro completo y proporcionado para estimar escala.');
+    }catch(e){C.log('CALCOPY: escala por inodoro no disponible: '+String(e.message||e));}
+   }
+   if(!(real>0&&real<=10000)){const v=prompt('Indicá ancho real de imagen (m) para continuar.','');if(v===null)return;real=Number(v.replace(',','.'));}
+  }
   if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
   let walls=[],hatched=false,mode='macizos',pyReadings=null,initialRegions=[];const AS=window.CAD2D_CALCOPY_ASSIST,G=python&&AS?AS.gray(pix,w,h):null,openings=[],history=[],scalePts=[];let scaleF=1;
-  const assistWalls=list=>list.slice(0,250).map(q=>{const A=AS.axis(q);return syncWall(A);});
+  const assistWalls=list=>list.slice(0,250).map(q=>{const A=AS.axis(q);Object.assign(A,{wall_role:q.wall_role,nominal_cm:q.nominal_cm,thickness_cm:q.thickness_cm,width_review:q.width_review});return syncWall(A);});
   if(python){
    const height=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000:real*h/w;
    if(Math.abs((height/h)/(real/w)-1)>.03)throw Error('CALCOPY: la imagen tiene escalas X/Y distintas. Calibrala antes de continuar.');
@@ -522,8 +538,8 @@ async function traceFile(file,source=null,python=false){
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
     ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
-     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-dynamic-match',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
-     const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
+     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-wc-scale',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const found=preDetected||await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
      let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
      for(const det of found){
@@ -542,7 +558,7 @@ async function traceFile(file,source=null,python=false){
    const tool=document.createElement('select'),reading=document.createElement('select'),flip=document.createElement('button');
    if(python){
     for(const [v,t,e] of [['toggle','Quitar / recuperar muro','Remove / restore wall'],['wall','+ Muro (clic sobre el muro)','+ Wall (click on the wall)'],['door','+ Puerta (clic en el hueco)','+ Door (click in the gap)'],['window','+ Ventana (clic en el hueco)','+ Window (click in the gap)'],['scale','Escala (2 clics sobre una cota)','Scale (2 clicks on a dimension)'],['block','+ Mueble / artefacto','+ Furniture / fixture'],['rotate','Seleccionar bloque para girar','Select block to rotate']])tool.add(new Option(LX(t,e),v));
-    reading.add(new Option(LX('Lectura: muros llenos','Reading: solid walls'),'solid'));reading.add(new Option(LX('Lectura: muros de doble línea','Reading: double-line walls'),'lines'));if(Array.isArray(pyReadings.mixed))reading.add(new Option(LX('Lectura: mixta semántica (experimental)','Reading: semantic mixed (experimental)'),'mixed'));if(Array.isArray(pyReadings.validated))reading.add(new Option(LX('Lectura: máscara negra validada (experimental)','Reading: validated black mask (experimental)'),'validated'));reading.value=mode;
+    reading.add(new Option(LX('Lectura: muros llenos','Reading: solid walls'),'solid'));reading.add(new Option(LX('Lectura: muros de doble línea','Reading: double-line walls'),'lines'));if(Array.isArray(pyReadings.mixed))reading.add(new Option(LX('Lectura: mixta semántica (experimental)','Reading: semantic mixed (experimental)'),'mixed'));if(Array.isArray(pyReadings.validated))reading.add(new Option(LX('Lectura: máscara negra validada (experimental)','Reading: validated black mask (experimental)'),'validated'));if(Array.isArray(pyReadings.metric))reading.add(new Option(LX('Lectura: espesores métricos (experimental)','Reading: metric widths (experimental)'),'metric'));reading.value=mode;
     reading.onchange=()=>{mode=reading.value;maskView.checked=mode==='validated';walls=assistWalls(pyReadings[mode]);openings.length=0;history.length=0;redraw();};
     picker.onchange=()=>{if(picker.value)tool.value='block';};tool.onchange=()=>{if(tool.value!=='block')picker.value='';scalePts.length=0;};
     flip.className='btn';flip.textContent=LX('Invertir última puerta','Flip last door');flip.onclick=()=>{const o=[...openings].reverse().find(q=>q.kind!=='framed-window');if(!o)return;
