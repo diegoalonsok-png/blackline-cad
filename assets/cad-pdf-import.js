@@ -412,7 +412,7 @@ function runPythonTrace(ctx,w,h,realWidth){
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
-   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-door-symbols',BASE));
+   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-fallback1',BASE));
    worker.onerror=e=>finish(new Error(e.message||'No se pudo iniciar Python.'));
    worker.onmessage=({data})=>{
     if(data.type==='progress'){status.textContent=data.message;C.log('CALCOPY: '+data.message);}
@@ -473,11 +473,22 @@ async function traceFile(file,source=null,python=false){
    try{
     const res=await runPythonTrace(ctx,w,h,real);
     if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
-    pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];floorGrids=Array.isArray(res.floor_grids)?res.floor_grids:[];doorCandidates=Array.isArray(res.doors)?res.doors:[];mode=res.best;walls=assistWalls(pyReadings[mode]);
+    pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];floorGrids=Array.isArray(res.floor_grids)?res.floor_grids:[];doorCandidates=Array.isArray(res.doors)?res.doors:[];mode=res.best;
+    if(!Array.isArray(pyReadings[mode])||!pyReadings[mode].length){mode=Object.keys(pyReadings).find(k=>Array.isArray(pyReadings[k])&&pyReadings[k].length>0)||'solid';}
+    walls=assistWalls(pyReadings[mode]);
+    if(!walls.length)throw Error('Python returned no wall candidates');
    }catch(e){
     if(!AS)throw e;
-    C.log('CALCOPY: lectura de muros no disponible; continúa el reconocimiento de bloques. '+String(e.message||e));
-    pyReadings={solid:[],lines:[]};mode='solid';walls=[];
+    C.log('CALCOPY: Python unavailable or empty; using local geometric fallback. '+String(e.message||e));
+    const bounded=list=>Array.isArray(list)&&list.length<=250?list:[];
+    makeMask(155);const solidDark=bounded(traceWallBands(mask,w,h));
+    makeMask(205);const solidLight=bounded(traceWallBands(mask,w,h)),lines=bounded(traceHatchedWallBands(mask,w,h));
+    makeMask(170);const fine=bounded(traceFineWallBands(mask,w,h));
+    pyReadings={solid:solidDark.length>=3?solidDark:solidLight,lines:lines.length?lines:fine};
+    mode=pyReadings.solid.length>=3?'solid':pyReadings.lines.length?'lines':'solid';
+    walls=assistWalls(pyReadings[mode]);
+    initialRegions=[];floorGrids=[];doorCandidates=[];
+    if(!walls.length)C.toast(LX('No se detectaron muros; revisá contraste y escala.','No walls detected; check contrast and scale.'));
    }
   }else{
   makeMask(205);
