@@ -283,3 +283,54 @@ def metric_wall_review(ink,segs,pixels_per_m):
         q['width_review']=abs(cm-nom)>max(3,nom*.20)
         stats['review_width']+=int(q['width_review'])
     return accepted,stats
+
+
+def repeated_floor_grid(ink,wall_mask,pixels_per_m):
+    """Conservative floor-grid candidate from thin, regularly spaced line families.
+    Both axes and actual intersections are required; never remove these pixels
+    from the source or overwrite masonry. Returns a diagnostic bounding region.
+    """
+    import cv2
+    if not np.isfinite(pixels_per_m) or pixels_per_m<=0:return []
+    gap_min=max(4,int(.12*pixels_per_m));gap_max=max(gap_min,int(1.5*pixels_per_m))
+    near=cv2.dilate(wall_mask,np.ones((3,3),np.uint8))
+    residual=((ink>0)&(near==0)).astype(np.uint8)
+    # Long thin single strokes, not broad wall bodies.
+    width=max(2,int(.055*pixels_per_m))
+    length=max(16,int(.65*pixels_per_m))
+    lines=[]
+    for vertical in (False,True):
+        src=residual.T.copy() if vertical else residual
+        m=cv2.morphologyEx(src,cv2.MORPH_OPEN,np.ones((1,length),np.uint8))
+        n,_,st,_=cv2.connectedComponentsWithStats(m,connectivity=4)
+        rows=[]
+        for x,y,w,h,a in st[1:]:
+            if h<=width and w>=length and a>=.65*w*h:rows.append((float(y+(h-1)/2),int(x),int(x+w-1)))
+        lines.append(sorted(rows)[:500])
+    def families(rows):
+        groups=[]
+        for i,(c,a,b) in enumerate(rows):
+            for j in range(i+1,min(len(rows),i+12)):
+                d,aa,bb=rows[j];step=d-c
+                if step>gap_max:break
+                if step<gap_min or min(b,bb)-max(a,aa)<length:continue
+                chosen=[rows[i],rows[j]]
+                for v in rows[j+1:]:
+                    diff=v[0]-chosen[-1][0]
+                    if diff>step*1.15:break
+                    if abs(diff-step)<=max(1.5,.12*step) and min(b,v[2])-max(a,v[1])>=length:chosen.append(v)
+                if len(chosen)>=3:
+                    groups.append((chosen,step))
+                if len(groups)>=60:return groups
+        return groups
+    out=[]
+    for hs,dy in families(lines[0]):
+        for vs,dx in families(lines[1]):
+            x0,x1=vs[0][0],vs[-1][0];y0,y1=hs[0][0],hs[-1][0]
+            if any(a>x0+2 or b<x1-2 for _,a,b in hs):continue
+            if any(a>y0+2 or b<y1-2 for _,a,b in vs):continue
+            if any(r['x']<=x0 and r['y']<=y0 and r['x']+r['w']>=x1 and r['y']+r['h']>=y1 for r in out):continue
+            out.append(dict(x=x0,y=y0,w=x1-x0,h=y1-y0,tile_width_m=round(dx/pixels_per_m,3),
+                            tile_depth_m=round(dy/pixels_per_m,3),kind='floor_grid_candidate'))
+            if len(out)>=20:return out
+    return out
