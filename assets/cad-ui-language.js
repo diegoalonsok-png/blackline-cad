@@ -81,7 +81,7 @@
   // "Baños completos (13)" y similares: traducir sin el contador.
   const count=/^(.+?)(\s*\(\d+\))$/.exec(core);
   if(count&&table.has(count[1]))return a+table.get(count[1])+count[2]+b;
-  if(language!=='es'){const g=/^GALERÍA ARQUITECTÓNICA · (\d+) BLOQUES DINÁMICOS$/.exec(core);if(g)return a+'ARCHITECTURAL GALLERY · '+g[1]+' DYNAMIC BLOCKS'+b;const rs=/^(\d+) resultados$/.exec(core);if(rs)return a+rs[1]+' results'+b}
+  if(language!=='es'){const g=/^GALERÍA ARQUITECTÓNICA · (\d+) BLOQUES DINÁMICOS$/.exec(core);if(g)return a+'ARCHITECTURAL GALLERY · '+g[1]+' DYNAMIC BLOCKS'+b;const rs=/^(\d+) resultados$/.exec(core);if(rs)return a+rs[1]+' results'+b;const bv=/^(\d+) bloques visibles de (\d+) disponibles\. La geometría se descarga solamente al elegir un bloque\.$/.exec(core);if(bv)return a+bv[1]+' of '+bv[2]+' blocks shown. Geometry downloads only when you choose a block.'+b}
   if(language!=='es'){const wrap=/^(Insert |Move )(.+?)( at 1:1| command group)$/.exec(core);if(wrap){const inner=table.get(wrap[2])||wordwise(wrap[2]);if(inner!==wrap[2])return a+wrap[1]+inner+wrap[3]+b}}
   if(language!=='es'){const w=core.split(/(\s·\s)/).map(part=>/^\s·\s$/.test(part)?part:(table.get(part)||wordwise(part))).join('');if(w!==core)return a+w+b}
   return input;
@@ -116,16 +116,22 @@
   try{value=localStorage.getItem('cad2d-alias-language')==='es'?'es':'en'}catch(_){}
   setLanguage(value);
   if(typeof MutationObserver==='function'){
-   let busy=false;
+   // Both directions (EN<->ES). Added subtrees are batched and walked once; a node that keeps
+   // being rewritten by its own component (ping-pong) stops being translated after 3 rounds.
+   let busy=false,timer=0;const queue=new Set(),hits=new WeakMap();
+   const tooMany=(n,k='text')=>{let m=hits.get(n);if(!m)hits.set(n,m={});m[k]=(m[k]||0)+1;return m[k]>4;};
+   const flush=()=>{timer=0;busy=true;
+    try{const roots=[...queue].filter(n=>n.isConnected);queue.clear();
+     for(const n of roots){if(roots.some(o=>o!==n&&o.contains(n)))continue;if(n.nodeType===1)walk(n);else if(n.nodeType===3&&!skipped(n)&&!tooMany(n)){const next=translate(n.nodeValue);if(next!==n.nodeValue)n.nodeValue=next}}
+    }finally{busy=false}};
    const observer=new MutationObserver(changes=>{
-    if(busy||current==='es')return;busy=true;
-    try{
-     for(const change of changes){
-      if(change.type==='characterData'){const n=change.target;if(!skipped(n)){const next=translate(n.nodeValue);if(next!==n.nodeValue)n.nodeValue=next}}
-      else if(change.type==='attributes'){const el=change.target,old=el.getAttribute(change.attributeName);if(old&&!el.closest('[data-no-cad-translate],#cadCanvas')){const next=translate(old);if(next!==old)el.setAttribute(change.attributeName,next)}}
-      else for(const node of change.addedNodes){if(node.nodeType===1)walk(node);else if(node.nodeType===3&&!skipped(node)){const next=translate(node.nodeValue);if(next!==node.nodeValue)node.nodeValue=next}}
-     }
-    }finally{busy=false}
+    if(busy)return;
+    for(const change of changes){
+     if(change.type==='characterData')queue.add(change.target);
+     else if(change.type==='attributes'){const el=change.target;if(tooMany(el,change.attributeName))continue;const old=el.getAttribute(change.attributeName);if(old&&!el.closest('[data-no-cad-translate],#cadCanvas')){const next=translate(old);if(next!==old){busy=true;try{el.setAttribute(change.attributeName,next)}finally{busy=false}}}}
+     else for(const node of change.addedNodes)queue.add(node);
+    }
+    if(queue.size&&!timer)timer=setTimeout(flush,40);
    });
    observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['title','aria-label','placeholder']});
   }
