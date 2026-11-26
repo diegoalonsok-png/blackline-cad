@@ -24,7 +24,7 @@ test('resize is undoable and rolls back unsafe opening changes',()=>{
  assert.match(main,/const snapshot=historySnapshot\(\),hadWall=/);
  assert.match(main,/saveHistory\(\);ref\.params=params/);
  assert.match(main,/result=relocateOpeningWithBlock\(ref,clone\(ref\.p\)\)/);
- assert.match(main,/Object\.assign\(state,snapshot\);state\.history\.pop\(\)/);
+ assert.match(main,/Object\.assign\(state,(?:cadMaterializeSnapshot\(snapshot\)|snapshot)\);state\.history\.pop\(\)/);
 });
 
 test('editable virtual dimension remains only in UI and is never stored or plotted',()=>{

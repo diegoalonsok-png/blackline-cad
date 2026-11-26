@@ -36,6 +36,7 @@ function start(options={}){
  const ensureArchitecturalLayer=()=> 'openings';
  const selectedBlock=()=>door;
  const saveHistory=()=>{state.history.push(copy({entities:state.entities,nextId:state.nextId}));events.push('history')};
+ const cadMaterializeSnapshot=snap=>copy(snap);
  const toast=message=>messages.push(message),units=n=>n.toFixed(2);
  const buildRibbon=()=>{},document={querySelector:()=>({dataset:{tab:'home'}})};
  const updateAll=()=>events.push('update');

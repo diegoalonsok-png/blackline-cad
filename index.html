@@ -1495,10 +1495,22 @@ function suggestWallLayerFromDXF(layers){for(const l of layers){if(explicitWallL
 // Keep the undo/redo budget proportional to drawing size rather than retaining
 // 75 complete copies of a very large imported drawing.
 var cadHistorySizes=new WeakMap(),cadHistoryBudget=96*1024*1024;
-function historySnapshot(){
- const json=JSON.stringify({entities:state.entities,layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId,layerStates:state.layerStates||[],unit:state.unit,grid:state.grid});
- const snap=JSON.parse(json);cadHistorySizes.set(snap,json.length*4);return snap;
+// Snapshots share the frozen copy of every entity that did not change since the previous
+// snapshot (structural sharing): saving history on a 100k-entity drawing only clones what was
+// edited, and the memory budget counts only those new copies. Snapshot entities are never edited
+// in place; restoring one materialises fresh copies first (cadMaterializeSnapshot).
+var cadSnapEntityCache=new WeakMap();
+function cadSnapEntity(e,acc){
+ const s=JSON.stringify(e),c=cadSnapEntityCache.get(e);
+ if(c&&c.s===s)return c.clone;
+ const clone=JSON.parse(s);cadSnapEntityCache.set(e,{s,clone});acc.bytes+=s.length*4;return clone;
 }
+function historySnapshot(){
+ const json=JSON.stringify({layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId,layerStates:state.layerStates||[],unit:state.unit,grid:state.grid});
+ const acc={bytes:json.length*4},snap=JSON.parse(json);snap.entities=state.entities.map(e=>cadSnapEntity(e,acc));
+ cadHistorySizes.set(snap,acc.bytes+snap.entities.length*8);return snap;
+}
+function cadMaterializeSnapshot(snap){return {...snap,entities:snap.entities.map(e=>JSON.parse(JSON.stringify(e)))}}
 function cadHistoryBytes(){
  let bytes=0;for(const stack of [state.history,state.future])for(const item of stack){let size=cadHistorySizes.get(item);if(size===undefined){size=JSON.stringify(item).length*4;cadHistorySizes.set(item,size)}bytes+=size;}return bytes;
 }
@@ -1514,7 +1526,7 @@ function cadTrimHistory(){
 function saveHistory(){state.history.push(historySnapshot());state.future=[];cadTrimHistory();syncCadHeaderHistoryButtons()}
 function cadRestoreHistorySnapshot(snap){
  const previousUnit=state.unit;
- Object.assign(state,snap);
+ Object.assign(state,cadMaterializeSnapshot(snap));
  // Geometry and its declared units must always be restored together.
  if(previousUnit!==state.unit&&U[previousUnit]&&U[state.unit]){
   state.view.scale*=U[state.unit]/U[previousUnit];
@@ -1732,7 +1744,7 @@ function cadGenerateRoomRow(spec,origin){
    makeOpening('framed-window',[cx,D+1.5*T],Math.min(1.2,W-.3),back[i]);
   }
   renderBlockLibrary();updateAll();queueLocalBackup();return count;
- }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
+ }catch(e){Object.assign(state,cadMaterializeSnapshot(before));state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
 }
 
 /* Import geometry computed by the independent architecture solver as native CAD entities.
@@ -1876,7 +1888,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   for(const e of generated)e.arqBatch=batch;
   if(generated.length)generated[0].arqPlan={brief:plan.brief||null,dimensions:plan.virtualDimensions||[],rooms:plan.rooms||[],sourcePlan:plan.rooms?.length===1&&plan.walls.length===4?clone(plan):null,origin:clone(origin),unit:state.unit,signature:signature(generated)};
   state.entities=original.filter(e=>!replaceBatch||e.arqBatch!==replaceBatch).concat(generated);state.selected=[];updateAll();return generated.length;
- }catch(e){Object.assign(state,before);state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
+ }catch(e){Object.assign(state,cadMaterializeSnapshot(before));state.history=history;state.future=future;syncCadHeaderHistoryButtons();updateAll();throw e}
 }
 function cadWallCenterline(meta){
  if(!meta?.guideA||!meta?.guideB)return null;
@@ -2978,7 +2990,7 @@ function cadResizeOpening(ref,meters){
  saveHistory();ref.params=params;
  const result=relocateOpeningWithBlock(ref,clone(ref.p));
  if(!result.ok||(hadWall&&!result.cut)){
-  Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();updateAll();
+  Object.assign(state,cadMaterializeSnapshot(snapshot));state.history.pop();syncCadHeaderHistoryButtons();updateAll();
   return {ok:false,reason:'No se puede actualizar el vano: operación cancelada'};
  }
  updateAll();return {ok:true,width:target,cut:result.cut};
@@ -3386,7 +3398,7 @@ function cadEditOpeningClearance(hit){
   ref.p=add(ref.p,mul(wall.tangent,delta));
   const result=relocateOpeningWithBlock(ref,before);
   if(!result.ok||(state.entities.some(e=>e.autoOpeningRef===ref.id)&&!result.cut)){
-   Object.assign(state,snapshot);state.history.pop();syncCadHeaderHistoryButtons();
+   Object.assign(state,cadMaterializeSnapshot(snapshot));state.history.pop();syncCadHeaderHistoryButtons();
    updateAll();toast(result.reason||'No se pudo reconstruir el vano; movimiento cancelado');close();return;
   }
   updateAll();close();toast('Distancia ajustada: '+wanted.toFixed(state.precision)+' '+state.unit+' · Ctrl+Z para deshacer');
@@ -3439,7 +3451,7 @@ function cadOpeningNumericDrag(firstKey){
   ref.p=target;
   const result=relocateOpeningWithBlock(ref,original);
   if(!result.ok){
-   Object.assign(state,snapshot);
+   Object.assign(state,cadMaterializeSnapshot(snapshot));
    if(!d.moved&&state.history.length)state.history.pop();
    syncCadHeaderHistoryButtons();state.drag=null;close();updateAll();
    toast(result.reason||'No se pudo desplazar el vano');return;
@@ -10295,7 +10307,7 @@ function insertSelectedBlock(point){
  if(aligned&&autoOpeningEnabled&&cutCount<(ref.autoOpeningRectId?1:2)){
   // No door/window should visually cover a solid wall when its opening failed.
   // Roll back the whole insertion (block, partial splits, ID allocation and undo snapshot).
-  Object.assign(state,beforeInsertion);
+  Object.assign(state,cadMaterializeSnapshot(beforeInsertion));
   if(state.history.length)state.history.pop();
   if(typeof syncCadHeaderHistoryButtons==='function')syncCadHeaderHistoryButtons();
   updateAll();
