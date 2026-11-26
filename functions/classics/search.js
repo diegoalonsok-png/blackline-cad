@@ -89,7 +89,7 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString(), { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=2', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
