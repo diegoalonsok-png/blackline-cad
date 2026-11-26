@@ -35,6 +35,28 @@ def outline_candidates(im,ppm):
                 if len(out)>1000:return []
     return sorted(out,key=lambda q:-math.dist(q['a'],q['b']))
 
+def wall_evidence(gray,q,ppm):
+    """Require sustained dark band or two dark faces; reject isolated furniture strokes."""
+    src=gray.T if q['vertical'] else gray
+    lo=max(0,math.ceil(q['lo']));hi=min(src.shape[1],math.floor(q['hi'])+1)
+    c=q['c'];t=q['t'];r=max(1,round(.025*ppm))
+    if hi<=lo:return False
+    def strip(y,radius):
+        a=max(0,round(y)-radius);b=min(src.shape[0],round(y)+radius+1)
+        return src[a:b,lo:hi]
+    core=strip(c,max(1,round(t*.35)))
+    if not core.size:return False
+    dark=(core<110)
+    coverage=float(np.mean(np.mean(dark,axis=0)>.55))
+    if coverage>=.70:return True
+    faces=[strip(c-t/2,r),strip(c+t/2,r)]
+    paired=all(f.size and np.mean(np.min(f,axis=0)<135)>=.65 for f in faces)
+    if paired:return True
+    if q['kind']=='hatch nominal':
+        # Preserve sustained hatch texture, not a single diagonal or chair arc.
+        return hi-lo>=.45*ppm and np.mean(dark)>=.18 and np.mean(np.any(dark,axis=0))>=.75
+    return False
+
 def analyze_rgba(rgba, w, h, ppm):
     if not (1 <= w <= 4096 and 1 <= h <= 4096 and w*h <= 8000000):
         raise ValueError("Invalid raster size")
@@ -65,6 +87,8 @@ def analyze_rgba(rgba, w, h, ppm):
     candidates,_=hatch.detect(im,(0,0,w,h),ppm)
     for q in candidates:add(q['a'],q['b'],.2*ppm,'hatch nominal')
     for q in outline_candidates(im,ppm):add(q['a'],q['b'],q['t'],'outline review')
+    gray=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    out=[q for q in out if wall_evidence(gray,q,ppm)]
     if len(out)>250:raise ValueError("Too many candidates; use a cropped plan")
     rows=[(str(i),q['a'],q['b']) for i,q in enumerate(out)]
     if rows:
