@@ -471,7 +471,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();if(!webMode)loadOlimpiadas();q.focus();
  }
- function close(){stopHouseRefresh();rememberHouseRect();houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){stopHouseRefresh();rememberHouseRect();classicMode=false;houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -485,6 +485,7 @@
  }
  function openImported(){st.view='imported';st.cat='';st.q='';visibleCount=72;save();open();const q=el?.querySelector('input[type=search]');if(q)q.value='';paint()}
  let commandGallery=false,searchPage=0,compactRect=null;
+ let classicMode=false;
  let houseMode=false,webMode=false,webItems=[],webStatus='',webEpoch=0,webController=null,webArea=null;
  let houseRefreshTimer=null,houseQuery='';
  function stopHouseRefresh(){clearTimeout(houseRefreshTimer);houseRefreshTimer=null;}
@@ -499,7 +500,7 @@
   }catch(e){}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
  }
 
- function openSearch(term){stopHouseRefresh();houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ function openSearch(term){stopHouseRefresh();classicMode=false;houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
  function houseRefCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -543,7 +544,28 @@
    return {title:x.title,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
   }).filter(x=>x.thumb&&(x.url||x.cadUrl)&&x.source);
  }
+ // Public-domain plates of historical treatises (Palladio, Vitruvio, Serlio…), served by the
+ // site's own Cloudflare functions: /classics/search (Commons, PD only) and /classics/img (cache).
+ async function searchClassics(raw){
+  webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
+  st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
+  try{
+   const res=await fetch('/classics/search?q='+encodeURIComponent(raw),{signal:ctrl.signal,credentials:'omit'});
+   const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
+   if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
+   const img=u=>'/classics/img?u='+encodeURIComponent(u);
+   webItems=data.items.map(x=>{const photo=x.kind==='photo',credit=photo?T('Photo','Foto')+': '+(x.credit||'Wikimedia Commons')+' · '+x.license:T('Plate','Lámina')+(x.date?' '+x.date:'')+' · '+T('Public domain','Dominio público');return {title:(photo?x.title+' · '+credit:x.title),area:null,classic:true,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.author+' · '+credit};});
+   webStatus=webItems.length?'':T('No plates found. Try another work or author: Palladio, Vitruvio, Serlio, Vignola, Letarouilly, Durand, Schinkel.','No encontré láminas. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Vignola, Letarouilly, Durand, Schinkel.');
+  }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
+  if(epoch===webEpoch&&classicMode)paintWeb();
+ }
+ function openClassics(term='Plantas clásicas'){
+  stopHouseRefresh();webController?.abort();classicMode=true;houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
+  const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
+  compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchClassics(term);
+ }
  async function searchWeb(raw){
+  if(classicMode)return searchClassics(raw);
   if(houseMode)return searchHouseGallery(raw);
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
@@ -569,7 +591,7 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):T('WEB REFERENCES','REFERENCIAS WEB'));
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO'):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):T('WEB REFERENCES','REFERENCIAS WEB'));
   el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');grid.style.gridTemplateColumns='repeat(2,minmax(0,1fr))';grid.replaceChildren();
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/4)-1));
   for(const [offset,item] of webItems.slice(searchPage*4,searchPage*4+4).entries()){
@@ -579,7 +601,7 @@
    let retried=false;img.onerror=()=>{if(!retried&&item.url&&item.url!==item.thumb&&/\.(?:png|jpe?g|webp|svg)(?:\?|$)/i.test(item.url)){retried=true;img.src=item.url;return;}const notice=document.createElement('span');notice.textContent=T('Preview unavailable','Miniatura no disponible');preview.replaceChildren(notice);};
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
-   const info=document.createElement('span');info.style.fontSize='10px';info.textContent=(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
+   const info=document.createElement('span');info.style.fontSize='10px';info.textContent=item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
    const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*4+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*4+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
@@ -630,13 +652,13 @@
  }
  function rememberHouseRect(){if(!houseMode||!compactRect)return;try{localStorage.setItem('cad2d.houseGallery.rect.v2',JSON.stringify(compactRect))}catch(e){}}
  function openHouses(term='Casas'){
-  webController?.abort();houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
+  webController?.abort();classicMode=false;houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
   const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
   compactRect=loadHouseRect(bar);open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
  }
- function openWeb(term){stopHouseRefresh();houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
+ function openWeb(term){stopHouseRefresh();classicMode=false;houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}
