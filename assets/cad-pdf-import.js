@@ -412,12 +412,12 @@ function runPythonTrace(ctx,w,h,realWidth){
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
-   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-metric-review',BASE));
+   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-floor-zones',BASE));
    worker.onerror=e=>finish(new Error(e.message||'No se pudo iniciar Python.'));
    worker.onmessage=({data})=>{
     if(data.type==='progress'){status.textContent=data.message;C.log('CALCOPY: '+data.message);}
     else if(data.type==='error')finish(new Error(data.message));
-    else if(data.type==='result')finish(null,{best:data.best,readings:data.readings,regions:data.regions,validation:data.validation});
+    else if(data.type==='result')finish(null,{best:data.best,readings:data.readings,regions:data.regions,validation:data.validation,floor_grids:data.floor_grids});
    };
    const pixels=ctx.getImageData(0,0,w,h).data.buffer;
    worker.postMessage({pixels,w,h,realWidth},[pixels]);
@@ -455,7 +455,7 @@ async function traceFile(file,source=null,python=false){
    if(!raw.trim()&&python&&confirm('Estimar escala por inodoro con IA local. La primera descarga del modelo puede ocupar varios cientos de MB. ¿Continuar?')){
     try{
      C.toast('CALCOPY: buscando inodoros para estimar la escala…');
-     const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-wc-scale',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-floor-zones',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      preDetected=await vision.detect(cv,()=>{});
      const estimate=vision.toiletScale(preDetected,window.CAD2D_ARQ_LIBRARY?.library||[],w,h);
      if(estimate){const v=prompt('Escala APROXIMADA por '+estimate.samples+' inodoro(s). Ancho total de imagen (m). Confirmá o corregí; verificá con una medida conocida.',estimate.widthM.toFixed(2));if(v===null)return;real=Number(v.replace(',','.'));}
@@ -465,7 +465,7 @@ async function traceFile(file,source=null,python=false){
    if(!(real>0&&real<=10000)){const v=prompt('Indicá ancho real de imagen (m) para continuar.','');if(v===null)return;real=Number(v.replace(',','.'));}
   }
   if(!(real>0&&real<=10000))return C.toast('Calco cancelado: escala inválida.');
-  let walls=[],hatched=false,mode='macizos',pyReadings=null,initialRegions=[];const AS=window.CAD2D_CALCOPY_ASSIST,G=python&&AS?AS.gray(pix,w,h):null,openings=[],history=[],scalePts=[];let scaleF=1;
+  let walls=[],hatched=false,mode='macizos',pyReadings=null,initialRegions=[],floorGrids=[];const AS=window.CAD2D_CALCOPY_ASSIST,G=python&&AS?AS.gray(pix,w,h):null,openings=[],history=[],scalePts=[];let scaleF=1;
   const assistWalls=list=>list.slice(0,250).map(q=>{const A=AS.axis(q);Object.assign(A,{wall_role:q.wall_role,nominal_cm:q.nominal_cm,thickness_cm:q.thickness_cm,width_review:q.width_review});return syncWall(A);});
   if(python){
    const height=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000:real*h/w;
@@ -473,7 +473,7 @@ async function traceFile(file,source=null,python=false){
    try{
     const res=await runPythonTrace(ctx,w,h,real);
     if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
-    pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];mode=res.best;walls=assistWalls(pyReadings[mode]);
+    pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];floorGrids=Array.isArray(res.floor_grids)?res.floor_grids:[];mode=res.best;walls=assistWalls(pyReadings[mode]);
    }catch(e){
     if(!AS)throw e;
     C.log('CALCOPY: lectura de muros no disponible; continúa el reconocimiento de bloques. '+String(e.message||e));
@@ -513,7 +513,7 @@ async function traceFile(file,source=null,python=false){
    rotateBtn.onclick=()=>{if(!selectedBlock||!placements.includes(selectedBlock))return;const b=selectedBlock,old={x:b.x,y:b.y,rotation:b.rotation,uncertain:b.uncertain};rotateBlock(b,(b.rotation+90)%360);b.uncertain=false;if(python)history.push(()=>Object.assign(b,old));redraw();};
    const topologyInfo=document.createElement('p');topologyInfo.style.cssText='font-size:12px;opacity:.85';
    const maskView=document.createElement('input');maskView.type='checkbox';const maskLabel=document.createElement('label');maskLabel.append(maskView,document.createTextNode(LX(' Ver máscara negra de muros',' Show black wall mask')));maskView.onchange=()=>redraw();
-   const redraw=()=>{const kinds={room_candidate:LX('Recintos rectangulares','Rectangular spaces'),technical_void_candidate:LX('Posibles conductos','Possible shafts'),polygonal_room_candidate:LX('Recintos poligonales','Polygonal spaces')};const parts=Object.entries(kinds).map(([k,v])=>v+': '+initialRegions.filter(q=>q.kind===k).length);parts.push(LX('Posibles recintos contenidos: ','Possible nested spaces: ')+initialRegions.filter(q=>q.possible_parent).length);if(AS?.classifyRooms&&placements.length){const rooms=AS.classifyRooms(initialRegions,placements.map(b=>{const [x,y]=blockCenter(b);return {id:b.id,x,y};}));parts.push(LX('Posibles baños: ','Possible bathrooms: ')+rooms.filter(q=>q.use==='bathroom_candidate').length,LX('Posibles suites: ','Possible suites: ')+rooms.filter(q=>q.possible_suite).length,LX('Baños dentro de otros ambientes: ','Bathrooms within other spaces: ')+rooms.filter(q=>q.possible_nested_bath&&!q.possible_suite).length,LX('Posibles toilettes: ','Possible powder rooms: ')+rooms.filter(q=>q.bathroom_type==='toilette_candidate').length,LX('Revisar proporciones: ','Review proportions: ')+rooms.filter(q=>q.area_review).length);}topologyInfo.textContent=initialRegions.length?LX('Diagnóstico inicial de la máscara validada (antes de editar o recalibrar): ','Initial validated-mask diagnostics (before editing or recalibration): ')+parts.join(' · '):'';rotateBtn.disabled=!selectedBlock||!placements.includes(selectedBlock);pc.clearRect(0,0,w,h);if(maskView.checked){pc.fillStyle='#fff';pc.fillRect(0,0,w,h);pc.fillStyle='#000';for(const wall of walls){if(wall.skip)continue;const [ax,ay]=wall.a,[bx,by]=wall.b,t=wall.t;if(Math.abs(bx-ax)>=Math.abs(by-ay))pc.fillRect(Math.min(ax,bx),(ay+by-t)/2,Math.abs(bx-ax),t);else pc.fillRect((ax+bx-t)/2,Math.min(ay,by),t,Math.abs(by-ay));}}else pc.drawImage(cv,0,0);for(const wall of walls){if(maskView.checked)continue;pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=ai.disabled||(!walls.some(w=>!w.skip)&&!placements.length);onlyBlocks.disabled=ai.disabled||!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin muros candidatos; podés marcar e insertar bloques.','No wall candidates; you can mark and insert blocks.'));
+   const redraw=()=>{const kinds={room_candidate:LX('Recintos rectangulares','Rectangular spaces'),technical_void_candidate:LX('Posibles conductos','Possible shafts'),polygonal_room_candidate:LX('Recintos poligonales','Polygonal spaces')};const parts=Object.entries(kinds).map(([k,v])=>v+': '+initialRegions.filter(q=>q.kind===k).length);parts.push(LX('Posibles tramas de piso: ','Possible floor grids: ')+floorGrids.length);parts.push(LX('Posibles recintos contenidos: ','Possible nested spaces: ')+initialRegions.filter(q=>q.possible_parent).length);if(AS?.classifyRooms&&placements.length){const rooms=AS.classifyRooms(initialRegions,placements.map(b=>{const [x,y]=blockCenter(b);return {id:b.id,x,y};}));parts.push(LX('Posibles baños: ','Possible bathrooms: ')+rooms.filter(q=>q.use==='bathroom_candidate').length,LX('Posibles suites: ','Possible suites: ')+rooms.filter(q=>q.possible_suite).length,LX('Baños dentro de otros ambientes: ','Bathrooms within other spaces: ')+rooms.filter(q=>q.possible_nested_bath&&!q.possible_suite).length,LX('Posibles toilettes: ','Possible powder rooms: ')+rooms.filter(q=>q.bathroom_type==='toilette_candidate').length,LX('Revisar proporciones: ','Review proportions: ')+rooms.filter(q=>q.area_review).length);}topologyInfo.textContent=initialRegions.length?LX('Diagnóstico inicial de la máscara validada (antes de editar o recalibrar): ','Initial validated-mask diagnostics (before editing or recalibration): ')+parts.join(' · '):'';rotateBtn.disabled=!selectedBlock||!placements.includes(selectedBlock);pc.clearRect(0,0,w,h);if(maskView.checked){pc.fillStyle='#fff';pc.fillRect(0,0,w,h);pc.fillStyle='#000';for(const wall of walls){if(wall.skip)continue;const [ax,ay]=wall.a,[bx,by]=wall.b,t=wall.t;if(Math.abs(bx-ax)>=Math.abs(by-ay))pc.fillRect(Math.min(ax,bx),(ay+by-t)/2,Math.abs(bx-ax),t);else pc.fillRect((ax+bx-t)/2,Math.min(ay,by),t,Math.abs(by-ay));}}else pc.drawImage(cv,0,0);for(const wall of walls){if(maskView.checked)continue;pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=ai.disabled||(!walls.some(w=>!w.skip)&&!placements.length);onlyBlocks.disabled=ai.disabled||!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin muros candidatos; podés marcar e insertar bloques.','No wall candidates; you can mark and insert blocks.'));
     if(python){
      for(const o of openings){const p0=o.v?[o.c,o.g0]:[o.g0,o.c],p1=o.v?[o.c,o.g1]:[o.g1,o.c];pc.strokeStyle=o.kind==='framed-window'?'#2f7de1':'#e8590c';pc.lineWidth=Math.max(3,o.t);pc.beginPath();pc.moveTo(...p0);pc.lineTo(...p1);pc.stroke();
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
@@ -538,7 +538,7 @@ async function traceFile(file,source=null,python=false){
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
     ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
-     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-wc-scale',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-floor-zones',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      const found=preDetected||await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
      let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
