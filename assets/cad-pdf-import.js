@@ -535,7 +535,7 @@ async function traceFile(file,source=null,python=false){
      const prev=[o.side,o.hingeAtLo];if(o.hingeAtLo)o.hingeAtLo=false;else{o.hingeAtLo=true;o.side=-o.side;}history.push(()=>{[o.side,o.hingeAtLo]=prev;});redraw();};
     controls.append(reading,tool,picker,rot,undo,flip,ai);
    }else controls.append(picker,rot,undo,ai);
-   if(!python)controls.append(retry);const hint=document.createElement('p');hint.textContent=python?'1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.':'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
+   if(!python)controls.append(retry);const hint=document.createElement('p');if(python)hint.style.cssText='min-height:4.6em;margin:6px 0';hint.textContent=python?'1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.':'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
    redraw();d.append(title,hint,controls,aiStatus,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
