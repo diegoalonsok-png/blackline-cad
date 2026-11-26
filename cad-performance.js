@@ -83,6 +83,9 @@
   const tree=build(entries);
   return function query(box){
    if(!box||!Number.isFinite(box.minX)||!Number.isFinite(box.maxX)||!Number.isFinite(box.minY)||!Number.isFinite(box.maxY)||box.minX>box.maxX||box.minY>box.maxY)return source.slice();
+   // Zoom-extents and large selections may cover the entire index.
+   // All known and unknown items are then already in original draw order.
+   if(!tree||(box.minX<=tree.b.minX&&box.maxX>=tree.b.maxX&&box.minY<=tree.b.minY&&box.maxY>=tree.b.maxY))return source.slice();
    const result=unknown.slice();
    function visit(n){if(!n||!overlap(n.b,box))return;if(n.list){for(const e of n.list)if(overlap(e.b,box))result.push(e);}else{visit(n.left);visit(n.right);}}
    visit(tree);return result.sort((a,b)=>a.i-b.i).map(e=>e.value);
