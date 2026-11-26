@@ -194,6 +194,44 @@ function layoutDiagnostics(regions,objects){
  const uncontainedWC=objects.filter(o=>typeof o.id==='string'&&/^san-wc(?:-|$)/.test(o.id)&&Number.isFinite(o.x)&&Number.isFinite(o.y)&&!rooms.some(r=>r.kind!=='technical_void_candidate'&&r.kind!=='isolated_object_candidate'&&roomContains(r,o.x,o.y)));
  return {rooms,conflicts:rooms.filter(r=>r.layout_review),openPlans:rooms.filter(r=>r.open_plan_candidate),uncontainedWC};
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics};
+// Verify the four sides of an orthogonal WC enclosure. A confirmed door can
+// close a gap for topology only; never add masonry over a door or infer a wall
+// solely because a toilet symbol exists. Polygonal rooms use the region test.
+function bathroomEnclosure(walls,openings,objects,pxPerM){
+ if(!Number.isFinite(pxPerM)||pxPerM<=0)return [];
+ const live=walls.filter(w=>!w.skip&&[w.c,w.lo,w.hi,w.t].every(Number.isFinite)&&w.t>0&&w.hi>w.lo);
+ const tol=Math.max(2,.035*pxPerM);
+ return objects.filter(o=>typeof o.id==='string'&&/^san-wc(?:-|$)/.test(o.id)&&Number.isFinite(o.x)&&Number.isFinite(o.y)).map(o=>{
+  const nearest=(v,sign)=>{
+   const pos=v?o.x:o.y,u=v?o.y:o.x;
+   const candidates=live.filter(w=>!!w.v===v&&u>=w.lo-tol&&u<=w.hi+tol).map(w=>({w,face:w.c-sign*w.t/2})).filter(q=>sign*(q.face-pos)>0&&Math.abs(q.face-pos)<=6*pxPerM);
+   candidates.sort((a,b)=>Math.abs(a.face-pos)-Math.abs(b.face-pos));
+   return candidates[0]||null;
+  };
+  const left=nearest(true,-1),right=nearest(true,1),top=nearest(false,-1),bottom=nearest(false,1);
+  if(!left||!right||!top||!bottom)return {x:o.x,y:o.y,status:'incomplete_boundary',missing:[!left?'left':null,!right?'right':null,!top?'top':null,!bottom?'bottom':null].filter(Boolean)};
+  const x0=left.face,x1=right.face,y0=top.face,y1=bottom.face,area=(x1-x0)*(y1-y0)/pxPerM**2;
+  const sides=[['left',left,y0,y1],['right',right,y0,y1],['top',top,x0,x1],['bottom',bottom,x0,x1]];
+  const gaps=[];
+  for(const [side,q,a,b] of sides){
+   const intervals=live.filter(w=>!!w.v===!!q.w.v&&Math.abs(w.c-q.w.c)<=Math.max(tol,Math.min(w.t,q.w.t)*.3)).map(w=>[w.lo,w.hi]);
+   for(const op of openings||[]){
+    if(!live.includes(op.w)||!!op.v!==!!q.w.v||Math.abs(op.c-q.w.c)>Math.max(tol,q.w.t*.3)||!Number.isFinite(op.g0)||!Number.isFinite(op.g1))continue;
+    // Only explicitly marked doors/windows, not guessed gaps.
+    if(!/door|window/.test(op.kind||''))continue;
+    intervals.push([op.g0,op.g1]);
+   }
+   let end=a;
+   for(const [lo,hi] of intervals.sort((p,q)=>p[0]-q[0])){
+    if(hi<=end||lo>=b)continue;
+    if(lo>end+tol)gaps.push({side,from:end,to:Math.min(lo,b),length_m:(Math.min(lo,b)-end)/pxPerM});
+    end=Math.max(end,Math.min(hi,b));
+   }
+   if(end<b-tol)gaps.push({side,from:end,to:b,length_m:(b-end)/pxPerM});
+  }
+  return {x:o.x,y:o.y,bounds:[x0,y0,x1,y1],area_m2:area,gaps,status:gaps.length?'boundary_gaps':area>20?'size_review':'four_sides_supported'};
+ });
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
