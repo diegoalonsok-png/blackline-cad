@@ -36,7 +36,13 @@
   if(!valid(pointer)||!Array.isArray(anchors)||!Number.isFinite(scale)||!(scale>0)||!Number.isFinite(tolerancePixels)||tolerancePixels<=0)return null;
   const limit=tolerancePixels/scale,dirs=[];
   if(!Array.isArray(angles))return null;
-  for(const deg of angles){if(!Number.isFinite(deg))continue;const a=deg*Math.PI/180;dirs.push([Math.cos(a),Math.sin(a)]);}
+  for(const deg of angles){if(!Number.isFinite(deg))continue;const normalized=((deg%360)+360)%360;
+   // Preserve exact axis alignment even for distant survey coordinates.
+   if(normalized===0)dirs.push([1,0]);
+   else if(normalized===90)dirs.push([0,1]);
+   else if(normalized===180)dirs.push([-1,0]);
+   else if(normalized===270)dirs.push([0,-1]);
+   else {const a=normalized*Math.PI/180;dirs.push([Math.cos(a),Math.sin(a)]);}}
   const hits=[];
   for(const anchor of anchors){if(!valid(anchor))continue;
    for(const [ux,uy] of dirs){
