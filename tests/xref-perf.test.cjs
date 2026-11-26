@@ -9,7 +9,7 @@ test('XREF commands, faded drawing and per-layer children',()=>{
  assert.match(html,/explodeInserts/);
 });
 test('block children are cached per reference and invalidated by edits',()=>{
- const a=html.indexOf('let cadDrawEpoch=0;'),b=html.indexOf('function blockChildren(ref){',a);
+ const a=html.indexOf('let cadDrawEpoch=0;'),b=html.indexOf('function blockChildren(ref',a);
  let calls=0;const state={blocks:{B:{entities:[{type:'line'}]}}};
  const api=new Function('state','blockChildren',html.slice(a,b)+';return {get:cadBlockChildrenCached,bump:()=>cadDrawEpoch++}')(state,ref=>{calls++;return [{type:'line',p:ref.p}]});
  const ref={type:'blockRef',blockName:'B',p:{x:0,y:0}};

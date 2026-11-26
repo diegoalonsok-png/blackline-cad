@@ -4,7 +4,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 const i=html.indexOf('function buildDXFText('),f=html.slice(i,html.indexOf('function exportDXF(',i));
 test('block references become INSERT of shared BLOCK definitions',()=>{
- assert.match(f,/'INSERT',r,lay\),'100','AcDbBlockReference','2',d\.name/);
+ assert.match(f,/'INSERT',r,lay\)(?:,insH=ins\[3\];\s*ents\.push\(\.\.\.ins)?,'100','AcDbBlockReference',(?:\.\.\.\(atts\.length\?\['66','1'\]:\[\]\),)?'2',d\.name/);
  assert.match(f,/blocks\.push\('0','BLOCK'/);
  assert.match(f,/BLOCK_RECORD','5',d\.br/);
  assert.match(f,/writeList\(entities\.filter\(e=>!refDef\.has\(e\)(?:&&!dimDefs\.has\(e\))?\)\)/);
@@ -27,4 +27,11 @@ test('pattern hatches export as editable HATCH with islands, and import keeps is
  const parser=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
  assert.match(parser,/g\.holes\.push\(p\.pts\)/);
  assert.match(parser,/\^CAD2D_\(\[A-Z0-9\]\+\)\$/);
+});
+test('block attributes export as ATTDEF in the definition and ATTRIB per insertion',()=>{
+ assert.match(html,/function blockChildren\(ref,keepAttDefs=false\)/);
+ assert.match(f,/head\('ATTDEF',e,lay\)/);
+ assert.match(f,/'100','AcDbAttributeDefinition','3'/);
+ assert.match(f,/head\('ATTRIB',c,al\)/);
+ assert.match(f,/'0','SEQEND','5',H\(\),'330',insH/);
 });
