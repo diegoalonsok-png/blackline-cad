@@ -52,7 +52,9 @@ def analyze_rgba(rgba, w, h, ppm):
         i=int(v);c=a[1-i];lo,hi=sorted([a[i],b[i]])
         for q in out:
             if q['vertical']!=v:continue
-            if abs(c-q['c'])<.6*max(t,q['t']) and min(hi,q['hi'])-max(lo,q['lo'])>.35*min(hi-lo,q['hi']-q['lo']):
+            if abs(c-q['c'])<.35*min(t,q['t']) and min(hi,q['hi'])-max(lo,q['lo'])>.65*min(hi-lo,q['hi']-q['lo']):
+                if kind=='outline review' and hi-lo>1.25*(q['hi']-q['lo']) and lo<=q['lo'] and hi>=q['hi']:
+                    q.update(a=a,b=b,t=t,kind=kind,c=c,lo=lo,hi=hi)
                 return
         out.append(dict(a=a,b=b,t=t,kind=kind,vertical=v,c=c,lo=lo,hi=hi))
     for q in semantic.detect_wall_candidates(im,ppm):
@@ -62,8 +64,7 @@ def analyze_rgba(rgba, w, h, ppm):
         add([lo,c] if q['axis']=='h' else [c,lo],[hi,c] if q['axis']=='h' else [c,hi],.2*ppm,'solid nominal')
     candidates,_=hatch.detect(im,(0,0,w,h),ppm)
     for q in candidates:add(q['a'],q['b'],.2*ppm,'hatch nominal')
-    if len(out)<3:
-        for q in outline_candidates(im,ppm):add(q['a'],q['b'],q['t'],'outline review')
+    for q in outline_candidates(im,ppm):add(q['a'],q['b'],q['t'],'outline review')
     if len(out)>250:raise ValueError("Too many candidates; use a cropped plan")
     rows=[(str(i),q['a'],q['b']) for i,q in enumerate(out)]
     if rows:
