@@ -86,14 +86,15 @@ def main():
                 modes[mode]=dict(walls=len(walls),**(measure(truth,m) if truth is not None else {}))
                 vis=overlay(im,m,truth)
                 cv2.imwrite(str(OUT/f'{name}-{mode}.jpg'),vis)
+                if mode in ('mixed','validated'):cv2.imwrite(str(OUT/f'{name}-{mode}-black.png'),255*(1-m))
             row=dict(case=name,status='executed',seconds=elapsed,default=result['best'],modes=modes,
-                     evaluation='annotated synthetic' if truth is not None else 'manual annotation required')
+                     evaluation='annotated synthetic' if truth is not None else 'manual annotation required',validation=result.get('validation'))
             rows.append(row);print(json.dumps(row),flush=True)
         except Exception as exc:
             rows.append(dict(case=name,status='error',message=str(exc)))
     annotated=[r for r in rows if r.get('evaluation')=='annotated synthetic']
     summary={}
-    for mode in ('solid','lines','mixed'):
+    for mode in ('solid','lines','mixed','validated'):
         metrics=[r['modes'][mode] for r in annotated if mode in r['modes']]
         if metrics:
             tp=sum(m['tp'] for m in metrics);fp=sum(m['fp'] for m in metrics);fn=sum(m['fn'] for m in metrics)
