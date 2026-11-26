@@ -9,7 +9,7 @@ on:
       - 'assets/cad-calco*'
       - '.github/workflows/calcopy-bench25.yml'
   push:
-    branches: ['calcopy/v2-safe-junctions-20261126']
+    branches: ['calcopy/v2-safe-junctions-20261126', 'calcopy/vanos-semantic-20261126']
     paths:
       - 'research/calcopy-v2/**'
       - 'tests/calcopy-*.test.cjs'
