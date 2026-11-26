@@ -24,10 +24,10 @@ const enforce=cfg.enforce===true&&!!urls.status;
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'3,99 € / mes · 29,99 € / año (ahorrás 37 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark']},
- studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','no-watermark','team']}
+ pro:{label:'Pro',price:'3,99 € / mes · 29,99 € / año (ahorrás 37 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark']},
+ studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark','team']}
 };
-const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','team':'Equipo: el titular + 4 personas con Pro'};
+const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','ai-retouch':'Retoque con IA del render artístico 3D','team':'Equipo: el titular + 4 personas con Pro'};
 
 /* Prueba por persona: 90 días desde el primer uso en este navegador (sin registrarse).
    Con cuenta, manda la fecha del servidor. Es una indicación local, no un control de pago. */
