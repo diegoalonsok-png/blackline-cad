@@ -178,7 +178,6 @@ def line_pairs(im,paper):
                 if d<4:continue
                 if d>.06*max(src.shape):break
                 a,b=max(p['lo'],q['lo']),min(p['hi'],q['hi'])
-                if b-a<max(3*d,.6*min(p['hi']-p['lo'],q['hi']-q['lo'])*0):continue
                 if b-a<3*d:continue
                 y0=int(p['c']+p['t']/2+1);y1=int(q['c']-q['t']/2)
                 core=src[y0:y1,int(a):int(b)]
@@ -198,11 +197,16 @@ def line_pairs(im,paper):
     for r in raw:hist[round(r['gap'])]=hist.get(round(r['gap']),0)+(r['hi']-r['lo'])
     d0=max(hist,key=hist.get)
     keep=[r for r in raw if .40*d0<=r['gap']<=2.6*d0]
-    # Each stroke pairs once, nearest partner first.
-    keep.sort(key=lambda r:r['gap']);used=set();out=[]
+    # One long face can border several non-overlapping runs at T/X junctions.
+    # Reserve only its matched interval, not the entire face. Never merge a gap.
+    keep.sort(key=lambda r:(r['gap'],-(r['hi']-r['lo'])));used={};out=[]
     for r in keep:
-        if r['p'] in used or r['q'] in used:continue
-        used|={r['p'],r['q']};out.append(dict(v=r['v'],c=r['c'],t=r['t'],lo=r['lo'],hi=r['hi']))
+        def conflicts(key):
+            return any(min(r['hi'],hi)-max(r['lo'],lo)>max(1,.10*min(r['hi']-r['lo'],hi-lo))
+                       for lo,hi in used.get(key,[]))
+        if conflicts(r['p']) or conflicts(r['q']):continue
+        for key in (r['p'],r['q']):used.setdefault(key,[]).append((r['lo'],r['hi']))
+        out.append(dict(v=r['v'],c=r['c'],t=r['t'],lo=r['lo'],hi=r['hi']))
     return out,d0+2
 def vectorize(mask,T):
     segs=runs(mask,T,False)+runs(mask,T,True)
