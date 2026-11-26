@@ -1,4 +1,4 @@
-name: CALCOPY benchmark 25
+name: CALCOPY benchmark 25 and 50
 on:
   pull_request:
     branches: [main]
@@ -9,7 +9,7 @@ on:
       - 'assets/cad-calco*'
       - '.github/workflows/calcopy-bench25.yml'
   push:
-    branches: ['calcopy/v2-safe-junctions-20261126']
+    branches: ['calcopy/v2-safe-junctions-20261126', 'test/calcopy-bench50-semantic-20261126']
     paths:
       - 'research/calcopy-v2/**'
       - 'tests/calcopy-*.test.cjs'
@@ -34,8 +34,10 @@ jobs:
       - run: python -m unittest discover -s research/calcopy-v2 -p 'test_*v2.py'
       - run: python research/calcopy-v2/bench25.py
         if: always()
+      - run: python research/calcopy-v2/bench50.py
+        if: always()
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: calcopy-benchmark-25
+          name: calcopy-benchmark-25-and-50
           path: calcopy-benchmark-output/
