@@ -24,7 +24,7 @@ const enforce=cfg.enforce===true&&!!urls.status;
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'3,99 € / mes · 29,99 € / año (ahorrás 37 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark']},
+ pro:{label:'Pro',price:'5,99 € / mes · 49,99 € / año (ahorrás 30 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark']},
  studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark','team']}
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','ai-retouch':'Retoque con IA del render artístico 3D','team':'Equipo: el titular + 4 personas con Pro'};
@@ -76,7 +76,7 @@ async function refresh(){
  paintBadge();resumePendingCheckout();return status;
 }
 const PENDING_KEY='cad2d-pending-checkout';
-const PRICE_EUR={pro:3.99,'pro-yearly':29.99,studio:9.99,'studio-yearly':89.99};
+const PRICE_EUR={pro:5.99,'pro-yearly':49.99,studio:9.99,'studio-yearly':89.99};
 const track=(n,p)=>{try{window.cad2dTrack?.(n,p)}catch(e){}};
 async function go(kind,plan='pro'){
  const url=urls[kind];if(!url){toast(L('El cobro todavía no está activado: la beta es gratuita.','Payments are not active yet: the beta is free.'));return}
@@ -152,8 +152,8 @@ function showPlans(reason,notice){
    '<div class="col'+(cur==='free'?' cur':'')+'"><h3>'+L('Gratis','Free')+'</h3><div class="price">0 €</div>'+free+'</div>'+
    '<div class="col pro'+(isPro?' cur':'')+'"><h3>Pro</h3>'+
     '<div class="opts">'+
-     '<button class="opt" data-go="checkout" data-plan="pro"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">3,99 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
-     '<button class="opt best" data-go="checkout" data-plan="pro-yearly"><span class="tag">'+L('Ahorrás 37 %','Save 37 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">29,99 €</span><span class="sub">'+L('por año · ≈ 2,50 € / mes','per year · ≈ €2.50 / month')+'</span></button>'+
+     '<button class="opt" data-go="checkout" data-plan="pro"><span class="per">'+L('Mensual','Monthly')+'</span><span class="amt">5,99 €</span><span class="sub">'+L('por mes','per month')+'</span></button>'+
+     '<button class="opt best" data-go="checkout" data-plan="pro-yearly"><span class="tag">'+L('Ahorrás 30 %','Save 30 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">49,99 €</span><span class="sub">'+L('por año · ≈ 4,17 € / mes','per year · ≈ €4.17 / month')+'</span></button>'+
     '</div>'+pro+'<p class="fine">'+L('IVA incluido · tarjeta, PayPal y otros medios · cancelás cuando quieras','VAT included · card, PayPal and more · cancel anytime')+'</p></div>'+
    '<div class="col studio'+(cur==='studio'?' cur':'')+'"><h3>'+L('Estudio','Studio')+' · '+L('5 personas','5 people')+'</h3>'+
     '<div class="opts">'+
