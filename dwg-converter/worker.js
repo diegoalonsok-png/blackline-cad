@@ -71,7 +71,7 @@ export default {
       .fetch(new Request('http://do/quota?limit=' + Number(env.MAX_PER_MONTH || 1000), { method: 'POST' }))
       .then(r => r.json()).catch(() => ({ ok: true }));
     if (!quota.ok)
-      return cors(env, req, new Response('se alcanzó el límite mensual de conversiones DWG; guardá el plano como DXF desde AutoCAD y abrilo en CAD2D', { status: 429 }));
+      return cors(env, req, new Response('se alcanzó el límite mensual de conversiones DWG; guardá el plano como DXF desde tu programa CAD y abrilo en CAD2D', { status: 429 }));
     const body = await file.arrayBuffer();
     const slot = 'conversor-' + Math.floor(Math.random() * Number(env.CONTAINER_INSTANCES || 2));
     const res = await env.DWG_CONVERTER.getByName(slot).fetch(new Request('http://do/convert', { method: 'POST', body }));

@@ -2,7 +2,7 @@
 # Usa GNU LibreDWG (GPL v3) como PROGRAMA SEPARADO y sin modificar: CAD2D le envía un archivo
 # y recibe otro. LibreDWG no se distribuye a los usuarios ni se enlaza con el código de CAD2D.
 FROM debian:bookworm-slim AS build
-# Versión de desarrollo fijada (commit): la 0.13.3 no lee las entidades de muchos DWG de AutoCAD 2007-2009
+# Versión de desarrollo fijada (commit): la 0.13.3 no lee las entidades de muchos DWG de versión 2007-2009
 # (AC1021/AC1018 con objetos AEC); esta sí. Compilación estática: un único binario dwg2dxf.
 ARG LIBREDWG_COMMIT=b5646570397a3d71063451f1097e04d68dc54137
 RUN apt-get update && apt-get install -y --no-install-recommends \
