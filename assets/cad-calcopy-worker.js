@@ -11,7 +11,7 @@ async function engine(){
  report('Cargando OpenCV y NumPy…');await p.loadPackage(['opencv-python','numpy']);
  p.FS.mkdirTree('/calco');
  for(const name of modules){
-  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-metric-review',self.location.href),{cache:'no-cache'});
+  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-floor-zones',self.location.href),{cache:'no-cache'});
   if(!res.ok)throw Error('Módulo no disponible: '+name);
   p.FS.writeFile('/calco/'+name,await res.text());
  }
@@ -29,7 +29,7 @@ self.onmessage=async({data})=>{
   p.globals.set('calco_w',w);p.globals.set('calco_h',h);p.globals.set('calco_real',Number.isFinite(realWidth)&&realWidth>0?realWidth:0);
   const raw=await p.runPythonAsync("with open('/calco/image.rgba','rb') as f: calco_pixels=f.read()\nanalyze_v2(calco_pixels,calco_w,calco_h,calco_real)");
   const result=JSON.parse(raw);
-  self.postMessage({type:'result',best:result.best,readings:result.readings,regions:result.regions,validation:result.validation});
+  self.postMessage({type:'result',best:result.best,readings:result.readings,regions:result.regions,validation:result.validation,floor_grids:result.floor_grids});
  }catch(e){self.postMessage({type:'error',message:String(e?.message||e).slice(0,1000)});}
  finally{busy=false;}
 };
