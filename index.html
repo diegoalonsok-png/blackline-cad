@@ -8198,6 +8198,7 @@ async function inspectDWGHeader(file){
 }
 
 async function convertDWGAutomatically(file,options={}){
+ if(!cadPlanAllows('dwg')){window.CAD2D_PLAN?.upsell?.('La apertura de archivos .dwg');throw Object.assign(Error('La apertura de archivos .dwg es parte del plan Pro. Podés seguir abriendo archivos .dxf gratis.'),{cadUpsell:true})}
  const signal=options.signal,epoch=cadDrawEpoch,original=state.entities;
  const check=()=>{if(signal?.aborted)throw Error('Apertura cancelada; dibujo anterior conservado')};check();
  const info=await inspectDWGHeader(file);check();
@@ -8409,7 +8410,7 @@ async function cadOpenDwgCancelable(f){
  try{
   toast('Abriendo DWG · Esc para cancelar');await convertDWGAutomatically(f,{signal:controller.signal});
   cadProjectSaveHandle=null;cadDwgLastSaved=null;return true;
- }catch(err){if(!controller.signal.aborted)alert('Unable to open file: '+err.message);return false}
+ }catch(err){if(!controller.signal.aborted&&!err?.cadUpsell)alert('Unable to open file: '+err.message);return false}
  finally{window.removeEventListener('keydown',cancel,true);if(cadDwgOpenController===controller)cadDwgOpenController=null}
 }
 async function loadDrawingFile(f){if(!f)return;
@@ -9002,6 +9003,13 @@ window.cadAttDefCommand=cadAttDefCommand;
  for(const k of['ATTEXT','EATTEXT','EXTRAERATRIB','EXTRAERATRIBUTOS'])X.commands[k]=()=>cadAttExtCommand();X.commands.DATAEXTRACTION=()=>cadDataExtraction();X.commands.COMPUTO=()=>cadDataExtraction();}
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['MTEXT','TEXTOM','TEXTOMULTILINEA','MTEXTO'])X.commands[k]=()=>cadMTextCommand()}
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['NUEVALAMINA','LAYOUTNEW','LAYOUT+','LAMINA'])X.commands[k]=()=>cadAddLayout();for(const k of['ROTULO','TITLEBLOCK','DATOSROTULO'])X.commands[k]=()=>cadEditTitleFields()}
+/* Planes: el gratuito exporta PDF hasta A4/Carta/Oficio; A3–A0 y hojas mayores son Pro. Abrir .dwg es Pro. */
+const cadPlanAllows=f=>!window.CAD2D_PLAN||window.CAD2D_PLAN.can(f);
+function cadPdfPlanGate(sheets){
+ const big=(Array.isArray(sheets)?sheets:[sheets]).some(o=>o&&(Math.max(o.w,o.h)>356.5||Math.min(o.w,o.h)>216.5));
+ if(!big||cadPlanAllows('pdf-all'))return true;
+ window.CAD2D_PLAN?.upsell?.('El ploteo PDF en A3, A2, A1, A0 y hojas grandes');return false;
+}
 const paperSizes={A4:[210,297],A3:[297,420],A2:[420,594],A1:[594,841],A0:[841,1189],LETTER:[215.9,279.4],LEGAL:[215.9,355.6],ARCHD:[609.6,914.4],'ARCH E':[914.4,1219.2]};
 function plotOptions(){let size=$('paper').value,dim=size==='CUSTOM'?[Number($('paperW').value)||420,Number($('paperH').value)||297]:paperSizes[size].slice();if($('orientation').value==='landscape')dim.sort((a,b)=>b-a);else dim.sort((a,b)=>a-b);let w=dim[0],h=dim[1],margin=Math.max(0,Number($('plotMargin').value)||0),b=getBounds(),dx=Math.max(.001,b.maxX-b.minX),dy=Math.max(.001,b.maxY-b.minY),areaW=Math.max(1,w-2*margin),areaH=Math.max(1,h-2*margin),factor=$('plotScale').value==='fit'?Math.min(areaW/dx,areaH/dy)*.92:U[state.unit]/Number($('plotScale').value==='custom'?$('customScale').value:$('plotScale').value);if(!Number.isFinite(factor)||factor<=0)factor=1;let cx=(b.minX+b.maxX)/2,cy=(b.minY+b.maxY)/2;return{w,h,margin,b,factor,cx,cy,style:$('plotStyle').value,title:$('titleBlock').value,paperColor:cadPaperColor()}}
 // Independent print preflight: same printable limits for Layout, SVG, and PDF.
@@ -9345,6 +9353,7 @@ function cadBatchPlot(){
    const sheets=chosen.map(item=>cadBatchSheet(item.state,item.index));
    const warnings=sheets.flatMap((o,i)=>cadPrintPreflight(o).issues.map(w=>chosen[i].name+': '+w));
    if(warnings.length&&!window.confirm('Avisos de preimpresión:\n'+warnings.join('\n')+'\n¿Exportar igualmente?'))return;
+   if(!cadPdfPlanGate(sheets))return;
    const pdf=makePDF(sheets);
    if(pdf.type!=='application/pdf'||pdf.size<300)throw Error('Salida PDF inválida');
    download(String(state.file).replace(/[\\/:*?"<>|]+/g,'_')+'-laminas.pdf',pdf,'application/pdf');
@@ -9371,6 +9380,7 @@ function validateCadPdfExport(options){
 function downloadCadPdf(options,filename){
  try{
   if(!validateCadPdfExport(options))return false;
+  if(!cadPdfPlanGate(options))return false;
   const pdf=makePDF(options);
   if(pdf.type!=='application/pdf'||pdf.size<300)throw Error('PDF output failed validation');
   download(filename.replace(/[\\/:*?"<>|]+/g,'_'),pdf,'application/pdf');
@@ -9390,7 +9400,7 @@ function cadPrintToPrinter(){
   log('PLOT · print dialog');
  }catch(err){console.error(err);toast('No se pudo abrir la impresión: '+(err?.message||err))}
 }
-function openPrint(){$('printBackdrop').classList.add('show');updatePreview()}function updatePreview(){let o=plotOptions(),svg=makeSVG(o),scaleValue=$('plotScale').value,fixed=scaleValue!=='fit',actual=(o.b.maxX-o.b.minX)*o.factor,actualH=(o.b.maxY-o.b.minY)*o.factor,availableW=o.w-2*o.margin,availableH=o.h-2*o.margin,clipped=actual>availableW+.01||actualH>availableH+.01;
+function openPrint(){if(!cadPlanAllows('pdf-all')){const p=$('paper');if(p&&!['A4','LETTER','LEGAL'].includes(p.value))p.value='A4';[...(p?.options||[])].forEach(o=>{if(!['A4','LETTER','LEGAL'].includes(o.value)&&!/ · Pro$/.test(o.text))o.text+=' · Pro'})}$('printBackdrop').classList.add('show');updatePreview()}function updatePreview(){let o=plotOptions(),svg=makeSVG(o),scaleValue=$('plotScale').value,fixed=scaleValue!=='fit',actual=(o.b.maxX-o.b.minX)*o.factor,actualH=(o.b.maxY-o.b.minY)*o.factor,availableW=o.w-2*o.margin,availableH=o.h-2*o.margin,clipped=actual>availableW+.01||actualH>availableH+.01;
 $('printPreview').innerHTML=svg;
 $('plotInfo').textContent='Sheet: '+o.w.toFixed(0)+' × '+o.h.toFixed(0)+' mm · '+$('orientation').value+' · '+(fixed?'1:'+ (scaleValue==='custom'?$('customScale').value:scaleValue):'Fit to paper')+' · '+state.entities.length+' entities';
 const preflight=cadPrintPreflight(o),warning=$('plotWarning');
