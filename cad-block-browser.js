@@ -471,7 +471,7 @@
   for(const ev of ['pointerdown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
   paint();if(!webMode)loadOlimpiadas();q.focus();
  }
- function close(){stopHouseRefresh();rememberHouseRect();classicMode=false;houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
+ function close(){stopHouseRefresh();rememberHouseRect();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();webEpoch++;commandGallery=false;compactRect=null;selectionEpoch++;resetPreviews();if(el){el.style.display='none';el.querySelector('.grid')?.replaceChildren()}armedId=null}
  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&el&&el.style.display!=='none'){selectionEpoch++;if(document.activeElement&&el.contains(document.activeElement)){close();e.stopPropagation()}}},true);
  window.addEventListener('resize',()=>{if(el&&el.style.display!=='none')place()});
  function openOlimpiadas(){st.view='olymp3';st.cat='';st.q='';visibleCount=18;save();open();
@@ -500,7 +500,7 @@
   }catch(e){}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
  }
 
- function openSearch(term){stopHouseRefresh();classicMode=false;houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ function openSearch(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
  function houseRefCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -653,11 +653,11 @@
  }
  function rememberHouseRect(){if(!houseMode||!compactRect)return;try{localStorage.setItem('cad2d.houseGallery.rect.v2',JSON.stringify(compactRect))}catch(e){}}
  function openHouses(term='Casas'){
-  webController?.abort();classicMode=false;houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
+  webController?.abort();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=true;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;
   const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();
   compactRect=loadHouseRect(bar);open();el.querySelector('input[type=search]').value=term;searchHouseGallery(term);
  }
- function openWeb(term){stopHouseRefresh();classicMode=false;houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
+ function openWeb(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
  window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
