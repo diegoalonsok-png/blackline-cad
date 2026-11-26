@@ -898,6 +898,73 @@ function openReviewedTrace(){
 }
 
 window.CAD2D_APPLY_TRACE_PLAN=(plan,origin)=>applyArchitecture(plan,origin);
+
+/* ---------- ARQASSIST · amueblar un ambiente vacío con bloques de la galería ----------
+   «amueblá el living», «colocá un sillón, mesa y sillas», «armá living y comedor para 6».
+   El ambiente sale de una polilínea/rectángulo cerrado seleccionado o de dos clics en esquinas
+   interiores opuestas. Los muebles son bloques dinámicos del catálogo, sin superposiciones. */
+function T(en,es){try{return /^es/i.test(localStorage.getItem('cad2d-alias-language')||'')?es:en}catch(e){return en}}
+function arqFurnishRequest(raw){
+ const s=arqCleanRequest(raw);
+ const verb=/\b(?:amuebl\w*|equip\w*|coloc\w*|pon\w*|arm\w*|distribu\w*|ubic\w*|furnish\w*|place|arrange|put|layout)\b/.test(String(raw).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''));
+ const what=/\b(?:living|estar|sofas?|sillon(?:es)?|butacas?|ratona|mesa ratona|mesa baja|tv|television|tele|comedor|mesa y sillas|mesa con sillas|mesa de comedor|sillas|dining|lounge|sofa)\b/.test(s);
+ return verb&&what;
+}
+function arqFurnishSpec(raw){
+ const s=String(raw).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+ const living=/\b(?:living|estar|lounge|sala)\b/.test(s);
+ const dining=/\b(?:comedor|mesa y sillas|mesa con sillas|mesa de comedor|sillas|dining)\b/.test(s);
+ const sofa=living||/\b(?:sofas?|sillon(?!es)|sofa)\b/.test(s);
+ const n=Number((s.match(/\b(\d+)\s*(?:personas|sillas|lugares|comensales|people|seats)\b/)||s.match(/\bpara\s+(\d+)\b/)||[])[1]||0);
+ return {sofa,coffee:sofa&&!/\bsin (?:mesa )?ratona\b/.test(s),armchairs:living||/\b(?:sillones|butacas|sillon(?:es)? individual(?:es)?)\b/.test(s),tv:living||/\b(?:tv|tele|television)\b/.test(s),dining,seats:n,sofaL:/\b(?:en l|sofa l|esquinero)\b/.test(s)};
+}
+function arqFurnishLayout(W,D,spec){
+ // Local frame: long side along x.
+ const swap=D>W,L=swap?D:W,S=swap?W:D,blocks=[],box=[];
+ const free=(x,y,w,d)=>x>=-1e-6&&y>=-1e-6&&x+w<=L+1e-6&&y+d<=S+1e-6&&!box.some(b=>x<b[0]+b[2]-1e-6&&b[0]<x+w-1e-6&&y<b[1]+b[3]-1e-6&&b[1]<y+d-1e-6);
+ const put=(id,role,x,y,w,d,rot)=>{ // x,y,w,d = footprint in local frame; rot in local frame
+  if(!free(x,y,w,d))return false;box.push([x,y,w,d]);
+  const it=byId(id),nw=rot%180?d:w,nd=rot%180?w:d; // nominal size (block axes)
+  const pt=rot===0?[x,y]:rot===90?[x+w,y]:rot===180?[x+w,y+d]:[x,y+d];
+  blocks.push({catalogId:id,role,point:pt,rotation:rot,scale:1,layer:'FURNITURE',nominalSize:[Math.max(it.wMin,Math.min(it.wMax,nw)),Math.max(it.dMin,Math.min(it.dMax,nd))]});return true;};
+ let table=null;
+ if(spec.dining){
+  const want=spec.seats||(spec.sofa?6:4),opts=[['mob-mesa4',1.2,1.8,4],['mob-mesa6',1.8,1.9,6],['mob-mesa8',2.4,2.0,8]].filter(t=>t[3]>=Math.min(want,8));
+  for(const t of opts.length?opts:[['mob-mesa8',2.4,2.0,8]]){if(t[1]+1.0<=L&&t[2]+0.8<=S){table=t;break}}
+  if(!table)throw Error(T('Room too small for the dining table','El ambiente es chico para la mesa de comedor'));
+ }
+ const diningW=table?table[1]+1.2:0,Lz=table&&spec.sofa?L-diningW:L;
+ if(spec.sofa){
+  if(S<2.6||Lz<2.4)throw Error(T('Not enough space for the living area (min. 2.40 × 2.60 m)','No entra el living: hace falta al menos 2,40 × 2,60 m libres'));
+  const cx=Lz/2,sofa=Lz>=3.4?['mob-sofa3',2.3,.92]:['mob-sofa2',1.7,.9];
+  put(sofa[0],'sofa',cx-sofa[1]/2,.05,sofa[1],sofa[2],180);
+  const ty=.05+sofa[2]+.45;
+  if(spec.coffee&&ty+.6+.9<=S)put('mob-ratona','coffee',cx-.55,ty,1.1,.6,0);
+  if(spec.armchairs&&ty+.3+.85<=S){const y=ty+.3-.425;put('mob-sillon','armchair',cx-.55-.35-.85,y,.85,.85,90);put('mob-sillon','armchair',cx+.55+.35,y,.85,.85,270);}
+  if(spec.tv&&S>=3.2)put('mob-tv','tv',cx-.9,S-.5,1.8,.45,0);
+ }
+ if(table){const x0=spec.sofa?Lz+.6:(L-table[1])/2;put(table[0],'dining',x0,(S-table[2])/2,table[1],table[2],0);}
+ if(!blocks.length)throw Error(T('Nothing could be placed','No se pudo colocar ningún mueble'));
+ // Back to the room frame.
+ if(swap)for(const b of blocks){const [x,y]=b.point;b.point=[S-y,x];b.rotation=(b.rotation+90)%360;}
+ return blocks;
+}
+function arqFurnish(raw){
+ const spec=arqFurnishSpec(raw),k=f(),st=S();
+ const run=(minX,minY,maxX,maxY)=>{
+  const W=(maxX-minX)/k,D=(maxY-minY)/k;
+  if(!(W>1&&D>1&&W<40&&D<40))throw Error(T('Invalid room size','Medidas de ambiente inválidas'));
+  const blocks=arqFurnishLayout(W,D,spec);
+  const plan={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks,rooms:[],virtualDimensions:[],connections:[],variants:[]};
+  const n=applyArchitecture(plan,P(minX,minY));
+  CORE.toast('ARQASSIST · '+blocks.length+T(' furniture blocks placed (',' muebles colocados (')+W.toFixed(2)+' × '+D.toFixed(2)+' m)');return n;
+ };
+ const sel=st.entities.filter(e=>st.selected.includes(e.id));
+ if(sel.length===1&&(sel[0].type==='rect'||sel[0].type==='polyline'&&sel[0].closed)){
+  const b=CORE.boundsEntity(sel[0]);try{run(b.minX,b.minY,b.maxX,b.maxY)}catch(e){CORE.toast(e.message)}return;
+ }
+ startPick(2,T('ARQASSIST · click two opposite INNER corners of the room','ARQASSIST · clic en dos esquinas INTERIORES opuestas del ambiente'),([a,b])=>{try{run(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.max(a.x,b.x),Math.max(a.y,b.y))}catch(e){CORE.toast(e.message);CORE.log?.(e.message)}},'line');
+}
 function applyArchitecture(plan,origin,replaceBatch=null){
  if(plan?.schema==='blackline.architecture.detail.v1'){if(replaceBatch)throw Error('No se puede reemplazar un ambiente por un detalle.');return applyArchitectureDetail(plan,origin);}
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
@@ -1225,6 +1292,7 @@ function openArchitectureBar(focus=true){
    const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw)){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
+   if(arqFurnishRequest(raw)){EXT.cancelArchitectureCommand();arqFurnish(raw);return;}
    {const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs){EXT.cancelArchitectureCommand();window.CAD2D_ARQ_DOCS.open(docs,raw);return;}}
    if(arqClassicQuery(raw)){const b=window.CAD2D_BLOCK_BROWSER;if(b?.openClassics){EXT.cancelArchitectureCommand();b.openClassics(raw);}return;}
    if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
