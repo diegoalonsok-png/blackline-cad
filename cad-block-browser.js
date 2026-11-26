@@ -517,6 +517,15 @@
  function parseArea(value){const m=String(value).match(/(\d+(?:[.,]\d+)?)\s*(?:m(?:ts?)?\s*(?:²|2|\^2)|sqm|square metres|square meters|metros cuadrados)/i);return m?Number(m[1].replace(',','.')):null}
  function webQuery(raw){const area=parseArea(raw),q=String(raw).trim();if(area&&/casa|vivienda|house|home/i.test(q))return 'house floor plan '+area+' square meters';return q.replace(/^(?:web|referencias?|reference|buscar web)\s*:?\s*/i,'')}
 
+ // Order rule: plans → sections → elevations → other drawings → photos / perspectives.
+ function viewRank(it){const t=String((it.title||'')+' '+(it.license||'')+' '+(it._tags||'')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(it.kind==='photo'||/\b(?:photo|foto|fotografia|perspectiva|perspective|render|vista aerea|aerial|interior view|exterior view)\b/.test(t)&&!/\b(?:plan|planta|pianta|grundriss)\b/.test(t))return 5;
+  if(/\b(?:floor ?plans?|floorplan|plan|plans|planta|plantas|pianta|piante|plano|planos|grundriss|plattegrond|ichnographia)\b/.test(t))return 0;
+  if(/\b(?:sections?|seccion|secciones|corte|cortes|sezione|sezioni|coupe|schnitt|cross.section)\b/.test(t))return 1;
+  if(/\b(?:elevations?|alzado|alzados|fachada|fachadas|facade|prospetto|alzato|elevation|aufriss|orthographia|vista|vistas)\b/.test(t))return 2;
+  if(it.kind==='cover')return 4;
+  return 3;}
+ function sortViews(list){return list.map((x,i)=>[viewRank(x),i,x]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]).map(x=>x[2]);}
  const REF_EN=[[/\bdetalles? constructivos?\b/g,'construction detail'],[/\bdetalles?\b/g,'detail'],[/\binodoros?\b|\bwc\b/g,'toilet'],[/\bbid[eé]s?\b/g,'bidet'],[/\blavatorios?\b|\blavabos?\b|\bpiletas?\b/g,'washbasin'],[/\bba[nñ]eras?\b|\bba[nñ]aderas?\b/g,'bathtub'],[/\bduchas?\b/g,'shower'],[/\bmesadas?\b/g,'countertop'],[/\bheladeras?\b/g,'refrigerator'],[/\bpuertas?\b/g,'door'],[/\bventanas?\b/g,'window'],[/\b[aá]rbol(?:es)?\b/g,'tree'],[/\bautos?\b|\bcoches?\b/g,'car'],[/\bcamas?\b/g,'bed'],[/\bsof[aá]s?\b/g,'sofa'],[/\bmesas?\b/g,'table'],[/\bsillas?\b/g,'chair'],[/\bpersonas?\b|\bfiguras? humanas?\b/g,'human figure'],[/\bsimbolos?\b|\bbloques?\b/g,'symbol'],[/\bmuros?\b/g,'wall'],[/\bcubiertas?\b|\btechos?\b/g,'roof'],[/\bfundaci[oó]n(?:es)?\b|\bcimientos?\b/g,'foundation'],[/\bplantas?\b|\bplanos?\b/g,'floor plan'],[/\bcasas?\b|\bviviendas?\b/g,'house'],[/\bpatios?\b/g,'courtyard'],[/\bcortes?\b|\bsecci[oó]n(?:es)?\b/g,'section'],[/\bfachadas?\b|\balzados?\b/g,'facade elevation'],[/\bdepartamentos?\b/g,'apartment'],[/\bedificios?\b/g,'building'],[/\biglesias?\b/g,'church'],[/\bmuseos?\b/g,'museum'],[/\bescuelas?\b/g,'school'],[/\boficinas?\b/g,'office'],[/\bteatros?\b/g,'theatre'],[/\btemplos?\b/g,'temple'],[/\bpalacios?\b/g,'palace'],[/\bvillas?\b/g,'villa'],[/\bjard[ií]n(?:es)?\b/g,'garden'],[/\bescaleras?\b/g,'stair'],[/\bdormitorios?\b/g,'bedroom'],[/\bcocinas?\b/g,'kitchen'],[/\bba[nñ]os?\b/g,'bathroom'],[/\bpiscinas?\b/g,'pool'],[/\b(?:de|del|la|las|el|los|con|y|un|una|en|para)\b/g,' ']];
  function refQuery(raw){let q=webQuery(raw).toLowerCase();for(const [re,en] of REF_EN)q=q.replace(re,en);q=q.replace(/\s+/g,' ').trim();if(/\b(?:toilet|bidet|washbasin|bathtub|shower|countertop|refrigerator|door|window|tree|car|bed|sofa|table|chair|human figure)\b/.test(q)&&!/\b(?:plan|symbol|elevation|section)\b/.test(q))q+=' symbol plan';else if(!/\b(?:plan|section|facade|elevation|detail|symbol)\b/.test(q))q+=' architecture';return q;}
  const MODERN_RE=/\b(?:le ?corbusier|corbu|mies|frank lloyd wright|gropius|aalto|louis kahn|niemeyer|tadao ando|zaha|gehry|koolhaas|siza|barragan|utzon|scarpa|botta|herzog|eisenman|venturi|aldo rossi)\b/i,DRAW_RE=/\b(?:plan|plans|planta|plantas|plano|planos|section|sections|corte|cortes|seccion|elevation|alzado|fachada|drawing|dibujo|sketch|croquis|grundriss|pianta)\b/i;
@@ -533,7 +542,8 @@
     for(const p of Object.values(d2.query?.pages||{})){const i=p.imageinfo?.[0],m=i?.extmetadata||{},lic=cleanMeta(m.LicenseShortName?.value),title=cleanMeta(p.title?.replace(/^File:/,'').replace(/\.[a-z]+$/i,'').replace(/_/g,' '));const thumb=safeHttps(i?.thumburl),url=safeHttps(i?.url),source=safeHttps(i?.descriptionurl);if(!thumb||!url||!source||!/^(?:image\/(?:png|jpeg|webp|svg\+xml|tiff|gif)|application\/pdf)$/.test(i.mime||'')||!/^(?:CC BY|CC0|Public domain|PD|CC-BY)/i.test(lic)||/\bNC\b|\bND\b/i.test(lic))continue;if(modern&&DRAW_RE.test(title))continue;if(wantPlan&&!PLANW.test(title+' '+cleanMeta(m.ImageDescription?.value)))continue;if(webItems.some(j=>j.source===source)||extra.some(j=>j.source===source))continue;const vec=/svg|pdf/.test(i.mime||''),big=(vec||i.width>1800)&&/360px-/.test(thumb)?thumb.replace('360px-','1800px-'):(/^image\/(?:png|jpeg|webp)$/.test(i.mime||'')?url:thumb);extra.push({title,area:parseArea(title),local:true,thumb:img(thumb),url:img(big),source,license:lic+' · Wikimedia Commons'+(/svg/.test(i.mime||'')?' · SVG':/pdf/.test(i.mime||'')?' · PDF':'')});}
    }catch(e){}
    const specific=refQuery(raw).replace(/\b(?:floor|plan|house|architecture|square|meters|\d+)\b/g,'').trim().length>0;
-   if(extra.length){webItems=specific?extra.concat(webItems):webItems.concat(extra);if(specific)searchPage=0;webStatus='';paintWeb();}}catch(e){}
+   extra.splice(0,extra.length,...sortViews(extra));
+   if(extra.length){webItems=!houseMode?sortViews(webItems.concat(extra)):specific?extra.concat(webItems):webItems.concat(extra);if(specific)searchPage=0;webStatus='';paintWeb();}}catch(e){}
  }
  let localGalleryPromise=null;
  function localGallery(){
@@ -573,7 +583,7 @@
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
-   classicIndex=Array.isArray(data.index)?data.index:[];classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=data.items.map(x=>{const photo=x.kind==='photo',cover=x.kind==='cover',credit=photo?T('Photo','Foto')+': '+(x.credit||'Wikimedia Commons')+' · '+x.license:(cover?T('Cover','Portada'):T('Plate','Lámina'))+(x.date?' '+x.date:'')+' · '+T('Public domain','Dominio público');return {title:(photo?x.title+' · '+credit:x.title),area:null,classic:true,kind:x.kind,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.author+' · '+credit};});
+   classicIndex=Array.isArray(data.index)?data.index:[];classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=data.items.map(x=>{const photo=x.kind==='photo',cover=x.kind==='cover',credit=photo?T('Photo','Foto')+': '+(x.credit||'Wikimedia Commons')+' · '+x.license:(cover?T('Cover','Portada'):T('Plate','Lámina'))+(x.date?' '+x.date:'')+' · '+T('Public domain','Dominio público');return {title:(photo?x.title+' · '+credit:x.title),area:null,classic:true,kind:x.kind,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:x.author+' · '+credit};});webItems=sortViews(webItems);
    webStatus=webItems.length?'':T('Nothing found. Try another work or author: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.','No encontré resultados. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.');
   }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
   if(epoch===webEpoch&&classicMode)paintWeb();
@@ -603,7 +613,7 @@
     const area=parseArea(title+' '+cleanMeta(m.ImageDescription?.value));
     return [{title,thumb,url,source,license,area}];
    });
-   webItems=webItems.concat(remoteItems.filter(i=>!webItems.some(j=>j.url===i.url)));
+   webItems=webItems.concat(sortViews(remoteItems.filter(i=>!webItems.some(j=>j.url===i.url))));
    if(webArea)webItems.sort((a,b)=>(a.area===null?1e9:Math.abs(a.area-webArea))-(b.area===null?1e9:Math.abs(b.area-webArea))||Number(!!b.local)-Number(!!a.local));
    webStatus=webItems.length?'':T('No open previews found. Try Google or Pinterest.','Sin miniaturas libres encontradas. Probá Google o Pinterest.');paintWeb();
   }catch(e){if(epoch!==webEpoch||ctrl.signal.aborted)return;webStatus=webItems.length?'':T('Search unavailable. Use external links or import a file.','Búsqueda no disponible. Usá los enlaces o importá un archivo.');paintWeb();}
