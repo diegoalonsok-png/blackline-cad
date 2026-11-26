@@ -16,7 +16,7 @@ def solid(im,paper):
     for f in (.62,.82):
         ink,g=_ink(im,paper,f);T=stroke_width(ink)
         if not T:continue
-        k=max(3,int(round(T*.6)))
+        k=max(3,int(round(T*.32)))
         m=cv2.morphologyEx(ink,cv2.MORPH_OPEN,cv2.getStructuringElement(cv2.MORPH_RECT,(k,k)))
         # Remove broad filled areas (shaded rooms, cores): walls are narrow bands.
         K=int(max(3*T,.045*max(m.shape)))|1
@@ -52,7 +52,7 @@ def network(mask,T):
     return mask*keep[lab]
 def runs(mask,T,vertical):
     src=mask.T if vertical else mask
-    L=max(int(T*2.5),6)
+    L=max(int(T*1.5),6)
     m=cv2.morphologyEx(src,cv2.MORPH_OPEN,np.ones((1,L),np.uint8))
     n,lab,st,_=cv2.connectedComponentsWithStats(m,connectivity=4)
     out=[]
@@ -140,12 +140,32 @@ def thin_lines(im,paper,vertical):
     H,W=src.shape;L=max(12,int(.025*max(H,W)))
     m=cv2.morphologyEx(src,cv2.MORPH_CLOSE,np.ones((1,3),np.uint8))
     m=cv2.morphologyEx(m,cv2.MORPH_OPEN,np.ones((1,L),np.uint8))
-    n,lab,st,cen=cv2.connectedComponentsWithStats(m,connectivity=4)
+    # Read horizontal row runs independently: a short perpendicular connector
+    # must not merge two long wall faces into one rejected thick component.
+    groups=[];active=[]
+    for y,row in enumerate(m):
+        edges=np.flatnonzero(np.diff(np.pad(row.astype(np.int16),(1,1))))
+        spans=[(int(x0),int(x1)-1) for x0,x1 in zip(edges[::2],edges[1::2]) if x1-x0>=L]
+        next_active=[];used=set()
+        for lo,hi in spans:
+            matches=[]
+            for j,g in enumerate(active):
+                if j in used:continue
+                a,b=g['spans'][-1];ov=min(b,hi)-max(a,lo)+1
+                if ov>=.82*max(b-a+1,hi-lo+1):matches.append((ov,j))
+            if matches:
+                _,j=max(matches);used.add(j);g=active[j];g['spans'].append((lo,hi));next_active.append(g)
+            else:next_active.append(dict(y=y,spans=[(lo,hi)]))
+        groups.extend(g for j,g in enumerate(active) if j not in used)
+        active=next_active
+    groups.extend(active)
     out=[]
-    for i in range(1,n):
-        x,y,w,h,a=st[i]
-        if w<L or h>max(6,.012*max(H,W)):continue
-        out.append(dict(c=float(cen[i][1]),lo=float(x),hi=float(x+w-1),t=float(a)/w))
+    for g in groups:
+        t=len(g['spans'])
+        if t>max(6,.012*max(H,W)):continue
+        a,b=np.median(g['spans'],axis=0)
+        if b-a+1<L:continue
+        out.append(dict(c=g['y']+(t-1)/2,lo=float(a),hi=float(b),t=float(t)))
     return sorted(out,key=lambda q:q['c']),src
 def line_pairs(im,paper):
     """Double-line walls: two parallel strokes at wall-thickness distance."""
@@ -177,7 +197,7 @@ def line_pairs(im,paper):
     hist={}
     for r in raw:hist[round(r['gap'])]=hist.get(round(r['gap']),0)+(r['hi']-r['lo'])
     d0=max(hist,key=hist.get)
-    keep=[r for r in raw if .55*d0<=r['gap']<=2.6*d0]
+    keep=[r for r in raw if .40*d0<=r['gap']<=2.6*d0]
     # Each stroke pairs once, nearest partner first.
     keep.sort(key=lambda r:r['gap']);used=set();out=[]
     for r in keep:
