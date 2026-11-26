@@ -124,7 +124,29 @@ def vectorize(mask,T):
     segs=merge(segs,T)
     segs=pair_outlines(segs,T)
     segs=[s for s in segs if s['hi']-s['lo']>=max(2*T,.6*s['t']+T) and s['t']<=3.5*T]
-    return snap(segs,T)
+    return wall_network(snap(segs,T),T)
+def _touch(s,o,tol):
+    """Perpendicular: an end of s reaches o's body. Parallel: collinear continuation."""
+    if s['v']!=o['v']:
+        if not(o['lo']-tol<=s['c']<=o['hi']+tol):return False
+        return min(abs(s['lo']-o['c']),abs(s['hi']-o['c']))<=tol+o['t']/2 or (s['lo']-tol<=o['c']<=s['hi']+tol and o['lo']-tol<=s['c']<=o['hi']+tol)
+    # Collinear, similar thickness, separated by at most an opening width (~14 wall thicknesses).
+    return abs(s['c']-o['c'])<=max(s['t'],o['t'])*.6 and abs(s['t']-o['t'])<=.45*max(s['t'],o['t']) and min(s['hi'],o['hi'])-max(s['lo'],o['lo'])>-max(tol,14*min(s['t'],o['t']))
+def wall_network(segs,T):
+    """Diego's rule: rectangles touching other rectangles form the wall network; loose ones are furniture."""
+    n=len(segs)
+    if n<3:return segs
+    tol=max(3,.8*T);parent=list(range(n))
+    def f(i):
+        while parent[i]!=i:parent[i]=parent[parent[i]];i=parent[i]
+        return i
+    for i in range(n):
+        for j in range(i+1,n):
+            if _touch(segs[i],segs[j],tol) or _touch(segs[j],segs[i],tol):parent[f(i)]=f(j)
+    tot={}
+    for i,s in enumerate(segs):tot[f(i)]=tot.get(f(i),0)+s['hi']-s['lo']
+    big=max(tot.values())
+    return [s for i,s in enumerate(segs) if tot[f(i)]>=.18*big and tot[f(i)]>=6*T]
 def structure_score(segs,H,W):
     m=.12*max(H,W)
     return sum(s['hi']-s['lo'] for s in segs if s['hi']-s['lo']>=m)
