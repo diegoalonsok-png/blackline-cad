@@ -1,5 +1,5 @@
 """Import the user-supplied staged CAD archive without publishing it to GitHub."""
-import io, json, os, re, hashlib, zipfile, tempfile, time, urllib.request
+import io, json, os, re, hashlib, zipfile, tempfile, time, unicodedata, urllib.request
 from pathlib import PurePosixPath
 import boto3, ezdxf
 from ezdxf.addons.drawing import Frontend, RenderContext
@@ -25,16 +25,31 @@ assert obj["ContentLength"]<50_000_000
 z=zipfile.ZipFile(io.BytesIO(obj["Body"].read()))
 assert sum(i.file_size for i in z.infolist())<100_000_000
 root="blackline_ready/"
-rows=json.loads(z.read(root+"manifests/block_catalog.json"))["items"]
-assert len(rows)==207
+# Zip names with accents (BAÑERA1.dwg) may be stored without the UTF-8 flag (decoded as cp437)
+# or in NFD form: index every entry by its NFC, case-insensitive UTF-8 name.
+def _utf8(info):
+    name=info.filename
+    if not info.flag_bits & 0x800:
+        try: name=name.encode("cp437").decode("utf-8")
+        except (UnicodeEncodeError,UnicodeDecodeError): pass
+    return unicodedata.normalize("NFC",name).casefold()
+names={_utf8(i):i for i in z.infolist()}
+def zread(name):
+    info=names.get(unicodedata.normalize("NFC",name).casefold())
+    if info is None: raise KeyError(name)
+    return z.read(info)
+rows=json.loads(zread(root+"manifests/block_catalog.json"))["items"]
 items=[]; failed=[]
 for row in rows:
     ident=row["id"]
     assert re.fullmatch(r"[a-z0-9_-]+",ident)
     path=PurePosixPath(row["dwg"])
     assert path.parts[0]=="dwg" and ".." not in path.parts
-    raw=z.read(root+str(path))
-    assert raw.startswith(b"AC10")
+    try: raw=zread(root+str(path))
+    except KeyError:
+        failed.append({"id":ident,"error":"missing in archive: "+str(path)}); print(ident,"missing"); continue
+    if not raw.startswith(b"AC10"):
+        failed.append({"id":ident,"error":"not a DWG"}); print(ident,"not_dwg"); continue
     key=ident+"-"+hashlib.sha256(raw).hexdigest()[:12]
     dwg=key+".dwg"; put(dwg,raw,"application/octet-stream")
     item={k:row[k] for k in ("id","name","category","category_title","tags")}
@@ -63,6 +78,9 @@ for row in rows:
     items.append(item)
     print(ident,item["status"],flush=True)
 put("catalog.json",json.dumps({"version":1,"items":items},ensure_ascii=False).encode(),"application/json")
-put("import-report.json",json.dumps({"total":len(items),"ready":len(items)-len(failed),"failed":failed},ensure_ascii=False).encode(),"application/json")
-print("Imported originals:",len(items),"rendered:",len(items)-len(failed))
-if failed: raise SystemExit("Some CAD files need review; originals preserved in R2")
+ready=sum(1 for i in items if i.get("status")=="ready")
+put("import-report.json",json.dumps({"total":len(rows),"imported":len(items),"ready":ready,"failed":failed},ensure_ascii=False).encode(),"application/json")
+print("Imported originals:",len(items),"of",len(rows),"· rendered:",ready)
+# Partial failures are reported, not fatal: the ready blocks stay published.
+for f in failed: print("::warning::"+f["id"]+": "+f["error"][:200])
+if not ready: raise SystemExit("No CAD file could be imported")
