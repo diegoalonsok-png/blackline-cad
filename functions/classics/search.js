@@ -92,7 +92,23 @@ const CURATED = {
   ['East Elevation'+price+'12 of 17).tif','elevation','Price Tower · east elevation']
  ]
 };
-const drawingRank = { 'floor-plan':0, section:1, elevation:2, 'technical-detail':3 };
+const drawingRank = { 'floor-plan':0, section:1, elevation:2, 'technical-detail':3, portrait:4 };
+// A single specifically identified portrait, never a generic photograph search.
+const PORTRAITS = {
+ mies:'Hugo Erfurth - Portrait Ludwig Mies van der Rohe, 1934.jpg',
+ lecorbusier:'Le Corbusier (1964).jpg',
+ wright:'Frank Lloyd Wright portrait.jpg'
+};
+async function authorPortrait(author) {
+ const title=PORTRAITS[author.key];if(!title)return [];
+ const u=new URL(API);
+ for(const [k,v] of Object.entries({action:'query',format:'json',formatversion:'2',titles:'File:'+title,prop:'imageinfo',iiprop:'url|size|extmetadata',iiurlwidth:'360',iiextmetadatafilter:'LicenseShortName|LicenseUrl|Artist'}))u.searchParams.set(k,v);
+ const res=await fetch(u,{headers:{'User-Agent':UA,Accept:'application/json'},cf:{cacheTtl:3600,cacheEverything:true}});
+ if(!res.ok)return [];
+ const d=await res.json(),p=d.query?.pages?.[0],i=p?.imageinfo?.[0],m=i?.extmetadata||{},lic=strip(m.LicenseShortName?.value);
+ if(!i||!FREE.test(lic)||NC.test(lic)||!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(i.thumburl||'')||!/\.(?:jpe?g|png)(?:[?#]|$)/i.test(i.thumburl||''))return [];
+ return [{kind:'portrait',drawingType:'portrait',format:/\.png(?:[?#]|$)/i.test(i.thumburl)?'png':'jpg',title:author.label,author:author.label,credit:strip(m.Artist?.value).slice(0,150),license:lic,licenseUrl:strip(m.LicenseUrl?.value),thumb:i.thumburl,image:i.thumburl,page:i.descriptionurl||'https://commons.wikimedia.org/wiki/'+encodeURIComponent('File:'+title)}];
+}
 async function curatedDrawings(author, words) {
  const specs=CURATED[author.key]||[];
  const normalize=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/_/g,' ');
@@ -199,7 +215,7 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=7', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=8', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
@@ -213,6 +229,7 @@ export async function onRequestGet({ request, waitUntil }) {
   const jobs=[];
   for(const a of list){
    if(a.modern)jobs.push(curatedDrawings(a,words));
+   if(chosen.length===1&&PORTRAITS[a.key])jobs.push(authorPortrait(a));
    jobs.push(commons(w+a.name+' '+DRAW,per).then(p=>p.flatMap(x=>{
     const type=historicalDrawingType(x.title);
     if(!type)return [];
@@ -227,7 +244,9 @@ export async function onRequestGet({ request, waitUntil }) {
     const seen = new Set(), items = [];
     for (const g of groups) for (const it of g) if (it && !seen.has(it.page)) { seen.add(it.page); items.push(it); }
     items.sort((p,q)=>drawingRank[p.drawingType]-drawingRank[q.drawingType]);
-    const res = json({ query: raw, authors: list.map((a) => a.label), links: (custom?[custom]:chosen.slice(0,3)).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: list.some((a) => a.modern), index: chosen.length||custom ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: items.slice(0, 60) });
+    const drawings=items.filter(x=>x.kind==='plate'),portrait=items.find(x=>x.kind==='portrait');
+    const ordered=drawings.slice(0,59);if(portrait)ordered.push(portrait);
+    const res = json({ query: raw, authors: list.map((a) => a.label), links: (custom?[custom]:chosen.slice(0,3)).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: list.some((a) => a.modern), index: chosen.length||custom ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: ordered });
     waitUntil(cache.put(key, res.clone()));
     return res;
   } catch (e) {
