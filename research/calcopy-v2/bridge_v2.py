@@ -61,7 +61,12 @@ def analyze_v2(pixels, w, h, real_width_m=None):
     metric,metric_stats=S.metric_wall_review(review_ink,validated,ppm)
     readings['metric']=_walls(metric,k)
     diagnostics['metric']=metric_stats
-    floor_grids=S.repeated_floor_grid(review_ink,S.black_mask(review_ink.shape,metric),ppm)
+    # Use the same accepted wall geometry for floors, doors and room topology.
+    # Thin rejected strokes must not partition the final CAD rooms.
+    diagnostics['validated_wall_mask_px']=int(mask.sum())
+    mask=S.black_mask(review_ink.shape,metric)
+    diagnostics['metric_wall_mask_px']=int(mask.sum())
+    floor_grids=S.repeated_floor_grid(review_ink,mask,ppm)
     doors=S.detect_door_symbols(review_ink,metric,ppm)
     room_mask=S.room_partition_mask(mask,doors)
     regions=S.region_hierarchy(S.enclosed_regions(room_mask))
