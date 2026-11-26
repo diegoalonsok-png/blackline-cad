@@ -1,0 +1,116 @@
+name: CALCOPY benchmark 50
+on:
+  push:
+    branches: ['test/calcopy-benchmark50-20261126']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy opencv-python-headless
+      - name: Run existing semantic regression suite
+        run: python -m unittest discover -s research/calcopy-v2 -p 'test_*v2.py'
+      - name: Benchmark 50 raster inputs
+        if: always()
+        shell: bash
+        run: |
+          python - <<'PY'
+          import sys, json, hashlib, pathlib
+          import cv2, numpy as np
+          sys.path.insert(0, 'research/calcopy-v2')
+          from bench25 import predict, mask_for, measure, overlay, synthetic
+          root=pathlib.Path('assets/architecture-references')
+          out=pathlib.Path('calcopy-benchmark50-output')
+          out.mkdir(exist_ok=True)
+          candidates=[]
+          for item in json.loads((root/'index.json').read_text()):
+              if item.get('drawingType')=='floor-plan':
+                  candidates.append(root/(item.get('image') or item['original']))
+          candidates += sorted((root/'house/unverified').glob('user-drive-20261125-*.jpg'))
+          cases=[]; seen=set()
+          for p in candidates:
+              if not p.is_file(): continue
+              digest=hashlib.sha256(p.read_bytes()).hexdigest()
+              if digest in seen: continue
+              seen.add(digest)
+              cases.append(('real',p.stem,cv2.imread(str(p)),None,None))
+          real_count=len(cases)
+          def generated(i):
+              rng=np.random.default_rng(20261126+i)
+              im=np.full((600,800,3),255,np.uint8)
+              x=int(rng.integers(300,460)); y=int(rng.integers(230,350))
+              gap=int(rng.integers(65,100)); t=[10,15,20]
+              walls=[
+                dict(a=[80,80],b=[720,80],t=20),
+                dict(a=[80,80],b=[80,520],t=20),
+                dict(a=[720,80],b=[720,520],t=20),
+                dict(a=[80,520],b=[720,520],t=20),
+                dict(a=[x,80],b=[x,y-gap//2],t=t[i%3]),
+                dict(a=[x,y+gap//2],b=[x,520],t=t[(i+1)%3]),
+                dict(a=[80,y],b=[x,y],t=t[(i+2)%3]),
+                dict(a=[x,420],b=[720,420],t=t[i%3])]
+              if i%2: walls.append(dict(a=[580,420],b=[580,520],t=10))
+              if i%3==0: walls.append(dict(a=[x,160],b=[720,160],t=15))
+              truth=mask_for(im.shape,walls)
+              for j,w in enumerate(walls):
+                  m=mask_for(im.shape,[w]); ys,xs=np.where(m)
+                  x0,x1,y0,y1=int(xs.min()),int(xs.max()),int(ys.min()),int(ys.max())
+                  style=(i+j)%4 if i%5 else i%4
+                  if style==0: im[m.astype(bool)]=20
+                  elif style==1: im[m.astype(bool)]=100
+                  else:
+                      cv2.rectangle(im,(x0,y0),(x1,y1),(20,20,20),1)
+                      if style==3:
+                          hatch=np.full(im.shape[:2],255,np.uint8)
+                          for a in range(-600,800,7):
+                              cv2.line(hatch,(a,0),(a+600,600),75,1)
+                          q=m.astype(bool)&(hatch<255)
+                          im[q]=75
+              cv2.rectangle(im,(115,115),(205,190),(30,30,30),1)
+              cv2.ellipse(im,(650,370),(18,12),0,0,360,(30,30,30),1)
+              for a in range(340,400,10): cv2.line(im,(105,a),(155,a),(60,60,60),1)
+              if i%4==1:
+                  im=cv2.imdecode(cv2.imencode('.jpg',im,[cv2.IMWRITE_JPEG_QUALITY,50])[1],1)
+              return im,truth
+          for i in range(50-real_count):
+              im,truth=synthetic(i) if i<7 else generated(i)
+              cases.append(('synthetic',f'synthetic-{i+1:02}',im,truth,8.0))
+          rows=[]
+          for kind,name,im,truth,width in cases:
+              row=dict(kind=kind,case=name)
+              try:
+                  if im is None: raise ValueError('Unreadable image')
+                  result,seconds=predict(im,real_width_m=width)
+                  modes={}
+                  for mode,walls in result['readings'].items():
+                      mask=mask_for(im.shape,walls)
+                      modes[mode]=dict(walls=len(walls),**(measure(truth,mask) if truth is not None else {}))
+                      if mode in ('mixed','validated'):
+                          cv2.imwrite(str(out/f'{name}-{mode}.jpg'),overlay(im,mask,truth))
+                  row.update(status='executed',seconds=seconds,modes=modes,best=result['best'],regions=len(result.get('regions',[])),door_candidates=len(result.get('doors',[])),floor_candidates=len(result.get('floor_grids',[])))
+              except Exception as e: row.update(status='error',error=str(e))
+              rows.append(row)
+              print(json.dumps(row),flush=True)
+          summary={}
+          for mode in ('solid','lines','mixed','validated','metric'):
+              ms=[r['modes'][mode] for r in rows if r['kind']=='synthetic' and r['status']=='executed' and mode in r['modes']]
+              if ms:
+                  tp=sum(m['tp'] for m in ms); fp=sum(m['fp'] for m in ms); fn=sum(m['fn'] for m in ms)
+                  summary[mode]=dict(cases=len(ms),error_pct=round(100*(fp+fn)/max(1,tp+fp+fn),2))
+          report=dict(total=len(rows),real_inputs=real_count,synthetic_inputs=len(rows)-real_count,executed=sum(r['status']=='executed' for r in rows),synthetic_wall_summary=summary,real_error_pct=None,limitations='Real inputs are unannotated. Semantic candidate counts are diagnostic, not accuracy. No browser or deployment validation.',cases=rows)
+          (out/'report.json').write_text(json.dumps(report,indent=2))
+          print('BENCH50_SUMMARY',json.dumps({k:v for k,v in report.items() if k!='cases'}),flush=True)
+          if len(rows)!=50 or any(r['status']!='executed' for r in rows): sys.exit(1)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calcopy-benchmark50
+          path: calcopy-benchmark50-output/
