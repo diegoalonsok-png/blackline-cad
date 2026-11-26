@@ -4131,6 +4131,21 @@ function cadPointerNearby(point,tol){
  }
  return cadPointerIndex.query({minX:point.x-tol,maxX:point.x+tol,minY:point.y-tol,maxY:point.y+tol});
 }
+// Intersecciones con círculos y arcos (OSNAP INT): sólo puntos que están dentro del tramo de arco.
+function cadOnCurveAngle(e,ang){if(e.type!=='arc')return true;const sw=arcSweep(e.a0,e.a1),d=((ang-e.a0)%TAU+TAU)%TAU;return d<=sw+1e-9||d>=TAU-1e-9}
+function cadSegCircleInts(a,b,cv){
+ const dx=b.x-a.x,dy=b.y-a.y,fx=a.x-cv.c.x,fy=a.y-cv.c.y,A=dx*dx+dy*dy;if(A<1e-18)return [];
+ const B=2*(fx*dx+fy*dy),Cc=fx*fx+fy*fy-cv.r*cv.r,disc=B*B-4*A*Cc;if(disc<-1e-12)return [];
+ const sq=Math.sqrt(Math.max(0,disc)),out=[];
+ for(const t of disc<=1e-12?[-B/(2*A)]:[(-B-sq)/(2*A),(-B+sq)/(2*A)]){if(t<-1e-9||t>1+1e-9)continue;const pt=P(a.x+t*dx,a.y+t*dy);if(cadOnCurveAngle(cv,Math.atan2(pt.y-cv.c.y,pt.x-cv.c.x)))out.push(pt)}
+ return out;
+}
+function cadCircleCircleInts(c1,c2){
+ const dx=c2.c.x-c1.c.x,dy=c2.c.y-c1.c.y,d=Math.hypot(dx,dy);if(d<1e-12||d>c1.r+c2.r+1e-9||d<Math.abs(c1.r-c2.r)-1e-9)return [];
+ const a=(c1.r*c1.r-c2.r*c2.r+d*d)/(2*d),h=Math.sqrt(Math.max(0,c1.r*c1.r-a*a)),mx=c1.c.x+a*dx/d,my=c1.c.y+a*dy/d;
+ const pts=h<1e-12?[P(mx,my)]:[P(mx-h*dy/d,my+h*dx/d),P(mx+h*dy/d,my-h*dx/d)];
+ return pts.filter(pt=>cadOnCurveAngle(c1,Math.atan2(pt.y-c1.c.y,pt.x-c1.c.x))&&cadOnCurveAngle(c2,Math.atan2(pt.y-c2.c.y,pt.x-c2.c.x)));
+}
 function cadSnapPointIndexed(p,gripBase){
  let q=P(p.x,p.y);snapIndicator=null;otrkGuide=null;const cadPrevHover=cadOtrkHoverPt;
 // Keep the actual pointer position for OTRACK vertex acquisition. ORTHO constrains
@@ -4154,12 +4169,12 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
   // With ORTHO + OTRACK, search OSNAP around the physical cursor, not the
   // axis-constrained endpoint. This allows acquiring a second, off-axis vertex.
   const osnapProbe=orthoLocksPointer?rawPointer:q;
-  let nearest=null,minPixels=11,type='';
-  const nearbyLines=[];
+  let nearest=null,minPixels=11,type='',nearFallback=null,nearFallbackD=11;
+  const nearbyLines=[],nearbyCurves=[];
   for(const e of cadPointerNearby(osnapProbe,11/state.view.scale)){
    const lay=layerFor(e);if(!lay.visible||lay.locked||e.cadHidden)continue;
    const box=(!e.p&&window.BlacklinePerformance?.basicBounds(e))||boundsEntity(e),tol=11/state.view.scale;if(!box||osnapProbe.x<box.minX-tol||osnapProbe.x>box.maxX+tol||osnapProbe.y<box.minY-tol||osnapProbe.y>box.maxY+tol)continue;
-   const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,i===0?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
+   const candidates=(e.type==='blockRef'?[[e.p,'POINT']]:getVertices(e).map((pt,i)=>[pt,(i===0||((e.type==='line'||e.type==='polyline')&&!(e.type==='line'&&i>1)))?'END':'POINT'])).filter(item=>cadOsnapEnabled(item[1]));
    // OSNAP / OTRACK: acquire actual geometry of transformed dynamic blocks,
    // not just their insertion point. Read-only: never alter block entities.
    if(e.type==='blockRef'){
@@ -4225,7 +4240,17 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    if(cadOsnapEnabled('QUAD')&&e.type==='circle'){
     candidates.push([P(e.c.x+e.r,e.c.y),'QUAD'],[P(e.c.x-e.r,e.c.y),'QUAD'],[P(e.c.x,e.c.y+e.r),'QUAD'],[P(e.c.x,e.c.y-e.r),'QUAD']);
    }
-   for(const [v,kind] of candidates){if(!v)continue;const d=Math.hypot(v.x-osnapProbe.x,v.y-osnapProbe.y)*state.view.scale;if(d<minPixels){minPixels=d;nearest=v;type=kind}}
+   if(e.type==='arc'&&e.r>0){const sw=arcSweep(e.a0,e.a1),at=t=>P(e.c.x+e.r*Math.cos(t),e.c.y+e.r*Math.sin(t));
+    if(cadOsnapEnabled('END'))candidates.push([at(e.a0),'END'],[at(e.a0+sw),'END']);if(cadOsnapEnabled('MID'))candidates.push([at(e.a0+sw/2),'MID'])}
+   if((e.type==='circle'||e.type==='arc')&&e.r>0){
+    if(nearbyCurves.length<40)nearbyCurves.push(e);
+    if(cadOsnapEnabled('NEAREST')){const ang=Math.atan2(osnapProbe.y-e.c.y,osnapProbe.x-e.c.x);if(cadOnCurveAngle(e,ang))candidates.push([P(e.c.x+e.r*Math.cos(ang),e.c.y+e.r*Math.sin(ang)),'NEAREST'])}
+   }
+   if(e.type==='polyline'&&e.pts?.length>1&&!e.bulges){const n=e.pts.length,segs=e.closed&&n>2?n:n-1;
+    for(let i=0;i<segs;i++){const a=e.pts[i],b=e.pts[(i+1)%n];if(nearbyLines.length<140)nearbyLines.push({a,b});
+     if(cadOsnapEnabled('NEAREST')&&window.BlacklineOSNAPMath){const pt=BlacklineOSNAPMath.nearestOnSegment(osnapProbe,a,b);if(pt)candidates.push([pt,'NEAREST'])}}}
+   // CERCANO tiene la prioridad más baja (como en AutoCAD): sólo si no hay otra referencia dentro de la apertura.
+   for(const [v,kind] of candidates){if(!v)continue;const d=Math.hypot(v.x-osnapProbe.x,v.y-osnapProbe.y)*state.view.scale;if(kind==='NEAREST'){if(d<nearFallbackD){nearFallbackD=d;nearFallback=v}continue}if(d<minPixels){minPixels=d;nearest=v;type=kind}}
   }
   /* Finite LINE/LINE crossing points, with a hard local pair cap. */
   if(cadOsnapEnabled('INT'))for(let i=0;i<nearbyLines.length;i++)for(let j=i+1;j<nearbyLines.length;j++){
@@ -4237,6 +4262,14 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    const distance=dist(screen(cross),screen(osnapProbe));
    if(distance<=minPixels+1e-8){minPixels=distance;nearest=cross;type='INT'}
   }
+  if(cadOsnapEnabled('INT')&&nearbyCurves.length){
+   const tryInt=pt=>{const d=dist(screen(pt),screen(osnapProbe));if(d<=minPixels+1e-8){minPixels=d;nearest=pt;type='INT'}};
+   for(const cv of nearbyCurves){
+    for(const L of nearbyLines)for(const pt of cadSegCircleInts(L.a,L.b,cv))tryInt(pt);
+   }
+   for(let i=0;i<nearbyCurves.length;i++)for(let j=i+1;j<nearbyCurves.length;j++)for(const pt of cadCircleCircleInts(nearbyCurves[i],nearbyCurves[j]))tryInt(pt);
+  }
+  if(!nearest&&nearFallback){nearest=nearFallback;type='NEAREST'}
   if(nearest){
    snapIndicator={point:P(nearest.x,nearest.y),type};
    if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type))cadOtrackHover(nearest);
