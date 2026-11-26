@@ -27,7 +27,7 @@ def _network_score(segs, T):
     return total
 
 
-def analyze_v2(pixels, w, h):
+def analyze_v2(pixels, w, h, real_width_m=None):
     rgba = np.frombuffer(bytes(pixels), dtype=np.uint8).reshape(h, w, 4)
     im = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
     k = min(1.0, MAX_SIDE / max(w, h))
@@ -56,5 +56,17 @@ def analyze_v2(pixels, w, h):
     review_ink=(gray<min(paper*.90,paper-18)).astype(np.uint8)
     validated,diagnostics=S.validate_mask(review_ink,mixed,max_passes=3)
     readings['validated']=_walls(validated,k)
-    # Keep the original default until the new reading is validated on real plans.
-    return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics})
+    mask=S.black_mask(review_ink.shape,validated)
+    regions=S.enclosed_regions(mask)
+    ppm=w*k/real_width_m if real_width_m is not None and real_width_m>0 else 0
+    for region in regions:
+        region['kind']=S.classify_region(region,ppm)
+        if ppm:
+            region['width_m']=round(region['w']/ppm,3)
+            region['depth_m']=round(region['h']/ppm,3)
+            region['area_m2']=round(region['area']/ppm**2,3)
+        for key in ('x','y','w','h'):region[key]=round(region[key]/k,2)
+        region['area']=round(region['area']/k**2,2)
+    diagnostics['residual']=S.residual_summary(review_ink,mask)
+    # Diagnostic room candidates only; do not alter wall geometry or invent doors.
+    return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics,'regions':regions})
