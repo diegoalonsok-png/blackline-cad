@@ -454,9 +454,15 @@ async function traceFile(file,source=null,python=false){
   if(python){
    const height=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000:real*h/w;
    if(Math.abs((height/h)/(real/w)-1)>.03)throw Error('CALCOPY: la imagen tiene escalas X/Y distintas. Calibrala antes de continuar.');
-   const res=await runPythonTrace(ctx,w,h);
-   if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
-   pyReadings=res.readings;mode=res.best;walls=assistWalls(pyReadings[mode]);
+   try{
+    const res=await runPythonTrace(ctx,w,h);
+    if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
+    pyReadings=res.readings;mode=res.best;walls=assistWalls(pyReadings[mode]);
+   }catch(e){
+    if(!AS)throw e;
+    C.log('CALCOPY: lectura de muros no disponible; continúa el reconocimiento de bloques. '+String(e.message||e));
+    pyReadings={solid:[],lines:[]};mode='solid';walls=[];
+   }
   }else{
   makeMask(205);
   walls=traceWallBands(mask,w,h);
@@ -482,7 +488,7 @@ async function traceFile(file,source=null,python=false){
    picker.add(new Option(LX('Marcar objeto sobre la imagen…','Mark an object on the image…'),''));for(const i of candidates)picker.add(new Option(i.name,i.id));
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
    undo.textContent=LX('Deshacer marca','Undo mark');undo.className='btn';
-   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip)&&!placements.length;onlyBlocks.disabled=!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin candidatos; probá otro detector. No se insertará nada.','No candidates; try another detector. Nothing will be inserted.'));
+   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=ai.disabled||(!walls.some(w=>!w.skip)&&!placements.length);onlyBlocks.disabled=ai.disabled||!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin muros candidatos; podés marcar e insertar bloques.','No wall candidates; you can mark and insert blocks.'));
     if(python){
      for(const o of openings){const p0=o.v?[o.c,o.g0]:[o.g0,o.c],p1=o.v?[o.c,o.g1]:[o.g1,o.c];pc.strokeStyle=o.kind==='framed-window'?'#2f7de1':'#e8590c';pc.lineWidth=Math.max(3,o.t);pc.beginPath();pc.moveTo(...p0);pc.lineTo(...p1);pc.stroke();
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
@@ -504,7 +510,7 @@ async function traceFile(file,source=null,python=false){
    const ai=document.createElement('button');ai.className='btn';ai.textContent=LX('Reconocer con IA local (experimental)','Recognize with local AI (experimental)');
    const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
-    ai.disabled=true;ok.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
+    ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
      const module=await import(new URL('cad-calco-vision.mjs',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
@@ -552,7 +558,7 @@ async function traceFile(file,source=null,python=false){
   // Use the isolated architecture transaction and its native L/T/+ junction solver.
   if(typeof window.CAD2D_APPLY_TRACE_PLAN!=='function')throw Error('Motor ARQ no disponible; actualizá la página.');
   const origin=Q([0,h]),toM=1000/C.U[S.unit],local=p=>{const q=Q(p);return [(q.x-origin.x)/toM,(q.y-origin.y)/toM]};
-  const maxTraceThickness=python?1.2:.5;
+  const maxTraceThickness=.5;
   let tracePlan=null;
   if(python){tracePlan=blocksOnly?{walls:[],openings:[]}:AS.buildPlan(walls,openings,local,maxTraceThickness);}
   const native=blocksOnly?[]:python?tracePlan.walls:walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)return null;const edge=local([wall.a[0]-dy/len*wall.t,wall.a[1]+dx/len*wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w&&w.thickness>=.08&&w.thickness<=maxTraceThickness+1e-9&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
