@@ -35,3 +35,9 @@ test('block attributes export as ATTDEF in the definition and ATTRIB per inserti
  assert.match(f,/head\('ATTRIB',c,al\)/);
  assert.match(f,/'0','SEQEND','5',H\(\),'330',insH/);
 });
+test('radius, diameter, 3-point angular and ordinate dimensions export and import natively',()=>{
+ for(const sub of ['AcDbRadialDimension','AcDbDiametricDimension','AcDb3PointAngularDimension','AcDbOrdinateDimension'])assert.ok(f.includes(sub),sub);
+ const parser=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
+ assert.match(parser,/\[3,4,5,6\]\.includes\(dt\)/);
+ assert.match(parser,/'ordinateX':'ordinateY'/);
+});

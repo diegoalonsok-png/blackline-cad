@@ -8568,7 +8568,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  // del dibujo): AutoCAD las reconoce como cotas (DIMEDIT, propiedades, estilo) y CAD2D las vuelve a leer como cotas nativas.
  const dimDefs=new Map();let dimN=0;
  for(const e of entities){
-  if(e.type!=='dimension'||!['horizontal','vertical','aligned'].includes(e.mode||'aligned')||!e.a||!e.b||!e.p||dist(e.a,e.b)<1e-9)continue;
+  if(e.type!=='dimension'||!['horizontal','vertical','aligned','radius','diameter','angular','ordinateX','ordinateY'].includes(e.mode||'aligned')||!e.a||!e.b||!e.p||dist(e.a,e.b)<1e-9)continue;
   let prims=null;try{prims=dimensionPrimitives(e)}catch(err){prims=null}
   if(!prims||!prims.length)continue;
   dimDefs.set(e,{name:'*D'+(++dimN),br:H(),ents:prims.map(x=>({...x,layer:x.layer||e.layer}))});
@@ -8640,6 +8640,13 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   OUT=ents;OWN=null;
   const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))continue;
   const mode=e.mode||'aligned',a=e.a,b=e.b;let dl,mid,angle=0;
+  const over0=e.textOverride!=null?String(e.textOverride):(e.label?String(e.label):'');
+  const dimHead=(dt,p10,p11)=>ents.push(...head('DIMENSION',e,lay),'100','AcDbDimension','2',d.name,...pos(p10.x,p10.y),'11',dxfNum(p11.x),'21',dxfNum(p11.y),'31','0','70',String(dt|32),'1',over0.replace(/\r?\n/g,' '),'3','Standard');
+  if(mode==='radius'){dimHead(4,a,e.p);ents.push('100','AcDbRadialDimension','15',dxfNum(b.x),'25',dxfNum(b.y),'35','0','40',dxfNum(dist(b,e.p)));continue}
+  if(mode==='diameter'){dimHead(3,P(2*a.x-b.x,2*a.y-b.y),e.p);ents.push('100','AcDbDiametricDimension','15',dxfNum(b.x),'25',dxfNum(b.y),'35','0','40',dxfNum(dist(b,e.p)));continue}
+  if(mode==='angular'){const a1=Math.atan2(b.y-a.y,b.x-a.x),a2=Math.atan2(e.p.y-a.y,e.p.x-a.x);let dl0=((a2-a1)%TAU+TAU)%TAU;const sg=dl0>Math.PI?-1:1;if(sg<0)dl0=TAU-dl0;const r=Math.min(dist(a,b),dist(a,e.p))*.65,m=a1+sg*dl0/2,arcP=P(a.x+r*Math.cos(m),a.y+r*Math.sin(m));
+   dimHead(5,arcP,arcP);ents.push('100','AcDb3PointAngularDimension','13',dxfNum(b.x),'23',dxfNum(b.y),'33','0','14',dxfNum(e.p.x),'24',dxfNum(e.p.y),'34','0','15',dxfNum(a.x),'25',dxfNum(a.y),'35','0');continue}
+  if(mode==='ordinateX'||mode==='ordinateY'){dimHead(6|(mode==='ordinateX'?64:0),P(0,0),b);ents.push('100','AcDbOrdinateDimension','13',dxfNum(a.x),'23',dxfNum(a.y),'33','0','14',dxfNum(b.x),'24',dxfNum(b.y),'34','0');continue}
   if(mode==='horizontal'){dl=P(b.x,e.p.y);mid=P((a.x+b.x)/2,e.p.y)}
   else if(mode==='vertical'){dl=P(e.p.x,b.y);mid=P(e.p.x,(a.y+b.y)/2);angle=90}
   else{const dx=b.x-a.x,dy=b.y-a.y,L=Math.hypot(dx,dy),n=P(-dy/L,dx/L),off=(e.p.x-a.x)*n.x+(e.p.y-a.y)*n.y;dl=P(b.x+n.x*off,b.y+n.y*off);mid=P((a.x+b.x)/2+n.x*off,(a.y+b.y)/2+n.y*off)}
@@ -12574,7 +12581,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
 <script src="cad-arq-pro.js?v=20261126-amueblar2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261126-hatch1"></script>
+<script src="cad-dxf-parser.js?v=20261126-dims2"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-autocad-plus.js?v=20261126-dimarc1"></script>

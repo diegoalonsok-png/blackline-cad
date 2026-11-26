@@ -230,6 +230,21 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
         budgetEntity(dim);entities.push(dim);expanded++;continue;
        }
       }
+      // Radio, diámetro, angular de 3 puntos y por coordenadas → cota nativa (el bloque *D sólo si no se puede).
+      if(depth===0&&!out&&[3,4,5,6].includes(dt)&&!(opts&&opts.explodeInserts)&&isId(m)){
+       const q=(cx,cy)=>P(get(cx),get(cy)),p10=q(10,20),p11=q(11,21),p13=q(13,23),p14=q(14,24),p15=q(15,25);let dim=null;
+       if(dt===4)dim={mode:'radius',a:p10,b:p15,p:p11};
+       else if(dt===3)dim={mode:'diameter',a:P((p10.x+p15.x)/2,(p10.y+p15.y)/2),b:p15,p:p11};
+       else if(dt===5)dim={mode:'angular',a:p15,b:p13,p:p14};
+       else dim={mode:(get(70,0)&64)?'ordinateX':'ordinateY',a:p13,b:p14,p:p14};
+       if([dim.a,dim.b,dim.p].every(v=>Number.isFinite(v.x)&&Number.isFinite(v.y))&&dist(dim.a,dim.b)>1e-9){
+        let th=0;for(const [t2,r2] of def.recs){if((t2==='TEXT'||t2==='MTEXT')){th=fields(r2).get(40,0);break}}
+        const h=th>0?th:dimensionStyle.textHeight;
+        const ent={type:'dimension',...dim,style:{...dimensionStyle,textHeight:h,arrow:h*.8,extOffset:h*.4,extBeyond:h*.5,color:common.color||layer.color||''},layer:lname,lineweight:common.width,id:entities.length+1};
+        const ov=str(1,'');if(ov&&ov!=='<>'&&!/<>/.test(ov))ent.label=cleanMText(ov).slice(0,120);if(common.color)ent.color=common.color;
+        budgetEntity(ent);entities.push(ent);expanded++;continue;
+       }
+      }
       walk(def.recs,m,sub,depth+1,out);expanded++;continue}
      const ix=get(10),iy=get(20),sx=get(41,1)||1,sy=get(42,1)||1,rot=get(50,0)*Math.PI/180,ext=get(230,1);
      if(depth===0&&!out&&!(opts&&opts.explodeInserts)){const ref=cadDxfBlockRef(def,{ix,iy,sx,sy,rot,ext,cols:get(70,1),rows:get(71,1)},lname,common,sub);if(ref){
