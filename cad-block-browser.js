@@ -503,11 +503,24 @@
 
  function openSearch(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
+ function strictRoomCategory(raw){
+  const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilets?|toilettes?|sanitarios?|vestuarios?|locker rooms?)\b/.test(q))return 'bathroom';
+  if(/\b(?:cocinas?|kitchens?)\b/.test(q))return 'kitchen';
+  return null;
+ }
+ function roomImagesOnly(raw){return /\b(?:referencias?|references?|jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
+ // Only editable drawings or explicitly reviewed architectural floor-plan raster images.
+ // A category, title or generic photo-search tag alone is NOT evidence of plan content.
+ function verifiedRoomReference(item,category){
+  if(!item||item.category!==category)return false;
+  if(item.cadUrl&&/\.(?:dxf|dwg)(?:[?#]|$)/i.test(item.cadUrl))return true;
+  return item.floorPlanVerified===true&&typeof item.url==='string'&&/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(item.url);
+ }
  function houseRefCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(!/\b(?:referencias?|references?|jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/.test(q))return null;
-  if(/\b(?:banos?|bathrooms?|toilets?)\b/.test(q))return 'bathroom';
-  if(/\b(?:cocinas?|kitchens?)\b/.test(q))return 'kitchen';
+  const room=strictRoomCategory(q);if(room)return room;
   if(/\b(?:dormitorios?|habitaciones?|suites?|bedrooms?)\b/.test(q))return 'bedroom';
   if(/\b(?:detalles?|details?)\b/.test(q))return 'detail';
   return null;
@@ -531,6 +544,7 @@
  function refQuery(raw){let q=webQuery(raw).toLowerCase();for(const [re,en] of REF_EN)q=q.replace(re,en);q=q.replace(/\s+/g,' ').trim();if(/\b(?:toilet|bidet|washbasin|bathtub|shower|countertop|refrigerator|door|window|tree|car|bed|sofa|table|chair|human figure)\b/.test(q)&&!/\b(?:plan|symbol|elevation|section)\b/.test(q))q+=' symbol plan';else if(!/\b(?:plan|section|facade|elevation|detail|symbol)\b/.test(q))q+=' architecture';return q;}
  const MODERN_RE=/\b(?:le ?corbusier|corbu|mies|frank lloyd wright|gropius|aalto|louis kahn|niemeyer|tadao ando|zaha|gehry|koolhaas|siza|barragan|utzon|scarpa|botta|herzog|eisenman|venturi|aldo rossi)\b/i,DRAW_RE=/\b(?:plan|plans|planta|plantas|plano|planos|section|sections|corte|cortes|seccion|elevation|alzado|fachada|drawing|dibujo|sketch|croquis|grundriss|pianta)\b/i;
  async function appendOpenRefs(raw,epoch,still){
+  if(strictRoomCategory(raw))return; // no unreviewed Openverse/Commons photos for these rooms
   // Openverse is queried from the visitor's browser (anonymous quota per visitor); images go through the site's own proxy.
   try{const api=new URL('https://api.openverse.org/v1/images/');api.searchParams.set('q',refQuery(raw));api.searchParams.set('license','by,by-sa,cc0,pdm');api.searchParams.set('page_size','20');api.searchParams.set('mature','false');
    const r=await fetch(api,{credentials:'omit',signal:AbortSignal.timeout(15000)});if(!r.ok)return;const d=await r.json();if(epoch!==webEpoch||!still()||!Array.isArray(d.results))return;
@@ -594,8 +608,8 @@
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
   return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&['house','bathroom','kitchen','bedroom','detail'].includes(x.category)&&/^(?:house|bathroom|kitchen|bedroom|detail)\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g|webp)$/i.test(x.original||''))&&(category?x.category===category:(!house||x.category==='house'))&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
    const original=file(x.original),image=file(x.image)||(/\.(?:png|jpe?g|webp|pdf)$/i.test(original||'')?original:null),cad=file(x.cad)||(/\.(?:dxf|dwg)$/i.test(original||'')?original:null);
-   return {title:x.title,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
-  }).filter(x=>x.thumb&&(x.url||x.cadUrl)&&x.source);
+   return {title:x.title,category:x.category,floorPlanVerified:x.floorPlanVerified===true,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
+  }).filter(x=>x.thumb&&(x.url||x.cadUrl)&&x.source&&(!['bathroom','kitchen'].includes(x.category)||verifiedRoomReference(x,x.category)));
  }
  // Public-domain plates of historical treatises (Palladio, Vitruvio, Serlio…), served by the
  // site's own Cloudflare functions: /classics/search (Commons, PD only) and /classics/img (cache).
@@ -623,13 +637,14 @@
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
-  const room=roomQuery(raw);
+  const strictCategory=strictRoomCategory(raw),imagesOnly=!!strictCategory&&roomImagesOnly(raw);
+  const room=roomQuery(raw)||(strictCategory?{category:strictCategory,terms:[]}:null);
   if(room){
    try{
-    const [own,archive]=await Promise.all([localRoomPreviews(room),room.category==='living'?Promise.resolve([]):archivedReferences('References '+room.category).catch(()=>[])]);
+    const [own,archive]=await Promise.all([imagesOnly?Promise.resolve([]):localRoomPreviews(room),room.category==='living'?Promise.resolve([]):archivedReferences('References '+room.category).catch(()=>[])]);
     if(epoch!==webEpoch||!webMode||ctrl.signal.aborted)return;
-    const refs=room.terms.length?archive.filter(x=>roomTermsMatch({name:x.title},room.terms)):archive;
-    webItems=own.filter(x=>x.cadUrl).concat(refs.filter(x=>x.cadUrl),own.filter(x=>!x.cadUrl),refs.filter(x=>!x.cadUrl));webStatus=webItems.length?'':T('No matching editable plans yet. Try the room name alone.','Todavía no hay plantas editables para esa búsqueda. Probá el nombre del ambiente solo.');paintWeb();
+    const refs=archive.filter(x=>(!strictCategory||verifiedRoomReference(x,strictCategory))&&(!room.terms.length||roomTermsMatch({name:x.title},room.terms)));
+    webItems=imagesOnly?refs.filter(x=>!x.cadUrl):own.filter(x=>x.cadUrl).concat(refs.filter(x=>x.cadUrl),own.filter(x=>!x.cadUrl),refs.filter(x=>!x.cadUrl));webStatus=webItems.length?'':imagesOnly?T('No reviewed floor-plan images yet. Use the room name to see editable CAD plans.','Todavía no hay imágenes de plantas verificadas. Buscá el nombre del ambiente para ver planos CAD editables.'):T('No matching editable plans yet. Try the room name alone.','Todavía no hay plantas editables para esa búsqueda. Probá el nombre del ambiente solo.');paintWeb();
    }catch(e){if(epoch===webEpoch){webStatus=T('Room catalogue unavailable. Retry.','Catálogo de ambientes no disponible. Volvé a buscar.');paintWeb();}}
    return;
   }
@@ -656,7 +671,7 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · FREE PHOTOS','MAESTROS MODERNOS · FOTOS LIBRES'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):(roomQuery(st.q)?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('WEB REFERENCES','REFERENCIAS WEB')));
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · FREE PHOTOS','MAESTROS MODERNOS · FOTOS LIBRES'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):((roomQuery(st.q)||strictRoomCategory(st.q))?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('WEB REFERENCES','REFERENCIAS WEB')));
   el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');const per=houseMode?4:9,cols=houseMode?2:3;grid.style.gridTemplateColumns='repeat('+cols+',minmax(0,1fr))';grid.replaceChildren();grid.parentNode.querySelectorAll(':scope>.classic-links').forEach(n=>n.remove());if(classicMode&&classicIndex.length){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:11px;color:#51432e;max-height:118px;overflow:auto';const lb=document.createElement('b');lb.textContent=T('Authors:','Autores:');row.append(lb);for(const x of classicIndex){const b=document.createElement('button');b.type='button';b.textContent=x.label;b.title=x.modern?T('Modern master · free photos and links','Maestro moderno · fotos libres y enlaces'):T('Plates, covers and photos','Láminas, portadas y fotos');b.style.cssText='padding:2px 8px;border:1px solid #b7a17a;border-radius:999px;background:'+(x.modern?'#efe6d4':'#fff8ea')+';color:#3b2f1c;font-size:11px;cursor:pointer';b.onclick=()=>{const inp=el.querySelector('input[type=search]');inp.value=x.q;searchClassics(x.q);};row.append(b);}grid.parentNode.insertBefore(row,grid);}
   if(classicMode&&(classicLinks.length||classicModern)){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#51432e';const lb=document.createElement('b');lb.textContent=T('Codices and sources:','Códices y fuentes:');row.append(lb);for(const l of classicLinks){const a=document.createElement('a');a.href=l.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.t+' ↗';a.title=l.a||'';a.style.cssText='padding:3px 8px;border:1px solid #b7a17a;border-radius:999px;color:#3b2f1c;text-decoration:none;background:#fff8ea';row.append(a);}if(classicModern){const n=document.createElement('span');n.style.cssText='flex-basis:100%;opacity:.8';n.textContent=T('Modern master: their drawings are still under copyright, so only free photos of the works and links are shown.','Maestro moderno: sus dibujos siguen protegidos por derechos de autor; se muestran solo fotos libres de las obras y enlaces.');row.append(n);}grid.parentNode.insertBefore(row,grid);}
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/per)-1));
@@ -686,7 +701,7 @@
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
   if(a==='all-houses')return openHouses('Casas')
   if(a==='house-references'){if(!houseMode)return openHouses('Casas referencias');const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
-  if(a==='ref-type'){const raw='Referencias '+button.dataset.refType;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
+  if(a==='ref-type'){const kind=button.dataset.refType;if(strictRoomCategory(kind))return openWeb(T(kind==='Baños'?'Bathrooms':'Kitchens',kind));const raw='Referencias '+kind;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
@@ -701,7 +716,7 @@
  }
 
  async function searchHouseGallery(raw){
-  if(roomQuery(raw))return openWeb(raw);
+  if(roomQuery(raw)||strictRoomCategory(raw))return openWeb(raw);
   stopHouseRefresh();webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
   try{
    const refCategory=houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
