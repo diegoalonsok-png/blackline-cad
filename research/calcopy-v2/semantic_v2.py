@@ -176,7 +176,7 @@ def enclosed_regions(mask):
         adjacent=wall_labels[y0:y1,x0:x1][border]
         adjacent=adjacent[adjacent>0]
         attached=float((adjacent==main).mean()) if adjacent.size else 0.
-        out.append(dict(x=x,y=y,w=w,h=h,area=a,main_wall_fraction=round(attached,3)))
+        out.append(dict(x=x,y=y,w=w,h=h,area=a,rectangularity=round(a/(w*h),3),main_wall_fraction=round(attached,3)))
     return sorted(out,key=lambda q:q['area'],reverse=True)[:250]
 
 
@@ -188,7 +188,7 @@ def classify_region(q,pixels_per_m):
     if q['main_wall_fraction']<.5:return 'isolated_object_candidate'
     if min(w,d)<=.60 and max(w,d)<=.90 and area<=.54:return 'technical_void_candidate'
     if min(w,d)<.75 or area<1:return 'small_space_review'
-    return 'room_candidate'
+    return 'room_candidate' if q.get('rectangularity',0)>=.85 else 'irregular_space_review'
 
 
 def residual_summary(ink,wall_mask):
