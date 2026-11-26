@@ -775,6 +775,56 @@ function doubleSuiteCorridor(plan,passage){
 }
 // Individual rear cubicles; one clear common aisle, independent native doors.
 // Public sanitary batteries: explicit quantities and independent private cabins.
+// Classroom seating is a counted grid of native library blocks, not a raster.
+function classroomInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:(\d+)\s+)?(?:aulas?|classrooms?|salones de clase)\b/);
+ if(!head||!/\b(?:alumnos?|estudiantes?|pupitres?|students?|desks?)\b/.test(s))return null;
+ let tail=s.slice(head[0].length).trim();
+ const countMatch=tail.match(/^(?:(?:en\s+)?(?:set|tandem|fila)\s+)?[x×*]\s*(\d+)\s+(?:de|of)\s+/);
+ if(countMatch&&head[1])throw Error('Indicá una sola cantidad de aulas.');
+ const count=Number(countMatch?.[1]||head[1]||1);if(countMatch)tail=tail.slice(countMatch[0].length);
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?)?';
+ const dm=tail.match(new RegExp('^(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)'));
+ if(!dm)throw Error('Indicá ancho × profundidad del aula y cantidad de alumnos.');
+ const width=num(dm[1])*unitScale(dm[2]||dm[4]),depth=num(dm[3])*unitScale(dm[4]||dm[2]);
+ tail=tail.slice(dm[0].length).trim();
+ let students=null,aisle=1.2,rows=null;const seen=new Set();
+ while(tail){
+  tail=tail.replace(/^(?:con|para|y|with|for|and)\s+/,'');
+  let m,key;
+  if((m=tail.match(/^(\d+)\s+(?:alumnos?|estudiantes?|pupitres?|students?|desks?)(?=\s|$)/))){key='students';students=Number(m[1]);}
+  else if((m=tail.match(new RegExp('^(?:pasillo(?: central)?|circulacion|aisle)\\s*(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(/^(\d+)\s+(?:filas?|rows?)(?=\s|$)/))){key='rows';rows=Number(m[1]);}
+  else throw Error('Opción de aula no soportada: '+tail);
+  if(seen.has(key))throw Error('Opción de aula repetida: '+key);seen.add(key);tail=tail.slice(m[0].length).trim();
+ }
+ if(!Number.isInteger(students)||students<1||students>60||!Number.isInteger(count)||count<1||count>10||count*(students+2)>300||aisle<.9||aisle>3||rows!==null&&(!Number.isInteger(rows)||rows<1||rows>20))throw Error('Aulas: 1–60 alumnos por aula, hasta 300 bloques por conjunto; pasillo de 0,90–3 m.');
+ return {kind:'classroom',count,width,depth,wall:.15,door:.9,window:1.2,fixtures:[],students,aisle,rows,assumptions:[]};
+}
+function solveClassroom(spec){
+ const {width:w,depth:d,count:n,students,aisle}=spec;
+ const dw=.65,dd=.90,pitchX=.75,pitchY=1.2,side=.6,front=2.0,rear=1.2;
+ const half=(w-aisle)/2,cols=Math.max(0,Math.floor((half-side-dw+1e-8)/pitchX)+1),rowMax=Math.max(0,Math.floor((d-front-rear-dd+1e-8)/pitchY)+1);
+ const rows=spec.rows??Math.ceil(students/(2*cols));
+ if(!cols||rows>rowMax||rows*cols*2<students)throw Error('No entran todos los pupitres con los pasillos indicados. Aumentá las medidas o reducí la cantidad.');
+ const plan=solve(spec);plan.brief={...spec,classroomGrid:true};plan.virtualDimensions.forEach(v=>v.editable=false);
+ const put=(id,role,x,y,bw,bd,rot=0)=>{plan.blocks.push({catalogId:id,role,point:rot===180?[x+bw,y+bd]:[x,y],rotation:rot,scale:1,layer:'FURNITURE',envelope:[x,y,bw,bd],nominalSize:[bw,bd]});};
+ for(const room of plan.rooms){
+  const [X,Y]=room.clearBounds;
+  put('mob-pizarra','blackboard',X+(w-2.4)/2,Y+d-.08,2.4,.08);
+  put('mob-escritorio','teacherDesk',X+side,Y+d-1.45,1.4,1.2,180);
+  let placed=0;
+  for(let j=0;j<rows&&placed<students;j++)for(let k=0;k<2*cols&&placed<students;k++){
+   const x=k<cols?half-dw-k*pitchX:w/2+aisle/2+(k-cols)*pitchX;
+   const y=d-front-dd-j*pitchY;
+   put('mob-pupitre','studentDesk',X+x,Y+y,dw,dd);placed++;
+  }
+  room.studentCount=students;room.centralAisle=aisle;
+ }
+ plan.assumptions.push(students+' pupitres individuales por aula, pasillo central '+aisle+' m.','Distribución escolar preliminar: verificar evacuación, accesibilidad, iluminación y normativa.');
+ return plan;
+}
 function sanitaryBatteryInstruction(raw){
  const s=normalize(raw).trim().replace(/[.!]$/,'');
  const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:(\d+)\s+)?(?:banos? (?:publicos?|colectivos?|en bateria)|bateria de (?:banos?|sanitarios?)|sanitarios? en bateria|vestuarios? deportivos?|public bathrooms?|public restrooms?)\b/);
@@ -844,6 +894,7 @@ function run(raw){
  const pool=poolInstruction(raw);if(pool)return solvePool(pool);
  const parking=parkingInstruction(raw);if(parking)return solveParking(parking);
  const battery=sanitaryBatteryInstruction(raw);if(battery)return collectiveCabins(battery);
+ const classroom=classroomInstruction(raw);if(classroom)return solveClassroom(classroom);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
