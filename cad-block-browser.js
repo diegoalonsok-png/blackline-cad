@@ -509,7 +509,7 @@
   if(/\b(?:cocinas?|kitchens?)\b/.test(q))return 'kitchen';
   return null;
  }
- function roomImagesOnly(raw){return /\b(?:referencias?|references?|jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
+ function roomImagesOnly(raw){return /\b(?:jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
  // Only editable drawings or explicitly reviewed architectural floor-plan raster images.
  // A category, title or generic photo-search tag alone is NOT evidence of plan content.
  function verifiedRoomReference(item,category){
