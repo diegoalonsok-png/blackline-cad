@@ -13,6 +13,8 @@ window.CAD2D_UI_GLOSSARY={
  ["CALCOPY: Reconociendo muros (macizos y de doble línea)…","CALCOPY: Recognizing walls (solid and double-line)…"],
  ["Insertar y vectorizar","Insert + vectorize"],
  ["Códices y fuentes:","Codices and sources:"],
+ ["Plantas y cortes · Google","Plans & sections · Google"],
+ ["Autores:","Authors:"],
  ["Ver web","View web"],
  ["Viviendas","Houses"],
  ["Galería de viviendas por superficie","House gallery by floor area"],

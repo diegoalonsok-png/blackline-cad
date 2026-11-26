@@ -65,17 +65,23 @@ const AUTHORS = [
   M('kahn', /\b(?:louis )?kahn\b/, 'Louis Kahn (1901–1974)', '"Louis Kahn"'),
 ];
 const COVER = '(frontispiece OR "title page" OR frontespizio OR frontispice OR portada OR Titelblatt OR Titelseite)';
-function linksFor(a) {
+function linksFor(a, words = '') {
   const q = encodeURIComponent(a.name.replace(/"/g, '').replace(/\s+architecture$/, ''));
   const out = (a.links || []).map(([t, u]) => ({ t, u }));
   out.push({ t: 'Wikipedia', u: 'https://es.wikipedia.org/w/index.php?search=' + q });
+  if (a.modern) {
+    // Their plans are not free: the user searches them outside and imports their own copy (File / URL), then CALCOPY.
+    const pq = encodeURIComponent((a.name.replace(/"/g, '') + ' ' + words + ' planta corte plan section').replace(/\s+/g, ' ').trim());
+    out.unshift({ t: 'Plantas y cortes · Google', u: 'https://www.google.com/search?tbm=isch&q=' + pq });
+    out.splice(1, 0, { t: 'Pinterest', u: 'https://www.pinterest.com/search/pins/?q=' + pq });
+  }
   if (!a.modern) {
     out.push({ t: 'Internet Archive', u: 'https://archive.org/search?query=' + q + '&sin=TXT' });
     out.push({ t: 'Gallica', u: 'https://gallica.bnf.fr/services/engine/search/sru?operation=searchRetrieve&version=1.2&query=' + encodeURIComponent('(gallica all "' + a.name.replace(/"/g, '').replace(/\s+architecture$/, '') + '")') });
   }
   return out;
 }
-const DROP = /\b(?:tapas?|portadas?|covers?|libros?|tratados?|plantas?|planos?|clasic[oa]s?|classic(?:al|s)?|plans?|fotos?|photos?|laminas?|de|del|la|el|los|las|en|y|of|the|and|ver|mostrar|quiero|arquitectura|arquitectos?|obras?|historic[oa]s?|antiguas?)\b/g;
+const DROP = /\b(?:autor(?:es)?|authors?|maestros?|masters?|modernos?|modern|tratadistas?|portadas?|covers?|libros?|tratados?|plantas?|planos?|clasic[oa]s?|classic(?:al|s)?|plans?|fotos?|photos?|laminas?|de|del|la|el|los|las|en|y|of|the|and|ver|mostrar|quiero|arquitectura|arquitectos?|obras?|historic[oa]s?|antiguas?)\b/g;
 const FREE = /public\s*domain|^pd\b|^pd-|cc0|dominio p[uú]blico|^cc[ -]by(?:[ -]sa)?(?:[ -]\d(?:\.\d)?)?\b/i;
 const NC = /\bnc\b|\bnd\b|non.?commercial|no.?deriv/i;
 
@@ -132,7 +138,7 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=3', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=4', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
@@ -157,7 +163,7 @@ export async function onRequestGet({ request, waitUntil }) {
     for (const g of groups) for (const it of g) if (it && !seen.has(it.page)) { seen.add(it.page); items.push(it); }
     const rank = { plate: 0, cover: 1, photo: 2 };
     items.sort((p, q) => rank[p.kind] - rank[q.kind]);
-    const res = json({ query: raw, authors: list.map((a) => a.label), links: chosen.slice(0, 3).flatMap((a) => linksFor(a).map((l) => ({ ...l, a: a.label }))), modern: chosen.some((a) => a.modern), items: items.slice(0, 60) });
+    const res = json({ query: raw, authors: list.map((a) => a.label), links: chosen.slice(0, 3).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: chosen.some((a) => a.modern), index: chosen.length ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: items.slice(0, 60) });
     waitUntil(cache.put(key, res.clone()));
     return res;
   } catch (e) {
