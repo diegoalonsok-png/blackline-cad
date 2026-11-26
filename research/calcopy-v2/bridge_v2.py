@@ -3,6 +3,7 @@ import json
 import cv2
 import numpy as np
 import walls_v2 as W
+import semantic_v2 as S
 
 MAX_SIDE = 1600
 
@@ -33,11 +34,22 @@ def analyze_v2(pixels, w, h):
     if k < 1:
         im = cv2.resize(im, (max(1, round(w * k)), max(1, round(h * k))), interpolation=cv2.INTER_AREA)
     H, W_ = im.shape[:2]
-    readings, scores = {}, {}
+    readings, scores, axes = {}, {}, {}
     for mode in ('solid', 'lines'):
         segs, T, _, _ = W.detect(im, mode)
         segs = segs if T else []
+        axes[mode] = segs
         readings[mode] = _walls(segs, k)
         scores[mode] = _network_score(segs, T or 1)
     best = max(scores, key=scores.get) if any(scores.values()) else 'solid'
+    other = 'lines' if best == 'solid' else 'solid'
+    gray = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    paper = float(np.percentile(gray, 90))
+    ink, _ = W._ink(im, paper, .82)
+    # Recover outline candidates before their separate network filter discards them.
+    raw_lines, _ = W.line_pairs(im, paper)
+    secondary = axes[other] + raw_lines
+    mixed = S.fuse(ink, axes[best], secondary)
+    readings['mixed'] = _walls(mixed, k)
+    # Keep the original default reading; mixed is opt-in until real-plan validation.
     return json.dumps({'best': best, 'readings': readings})
