@@ -1,0 +1,33 @@
+name: CALCOPY benchmark 25
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/calcopy-v2/**'
+      - 'assets/cad-calco*'
+      - '.github/workflows/calcopy-bench25.yml'
+  push:
+    branches: ['calcopy/v2-safe-junctions-20261126']
+    paths:
+      - 'research/calcopy-v2/**'
+      - '.github/workflows/calcopy-bench25.yml'
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy opencv-python-headless
+      - run: python -m unittest discover -s research/calcopy-v2 -p 'test_*v2.py'
+      - run: python research/calcopy-v2/bench25.py
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calcopy-benchmark-25
+          path: calcopy-benchmark-output/
