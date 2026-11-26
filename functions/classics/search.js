@@ -77,7 +77,7 @@ function toItem(page, author, kind) {
     title: (desc || page.title.replace(/^File:/, '').replace(/\.[a-z]+$/i, '').replace(/_/g, ' ')).slice(0, 140),
     author: author.label,
     credit: pd ? '' : strip(m.Artist?.value).slice(0, 80),
-    date: strip(m.DateTimeOriginal?.value).slice(0, 40),
+    date: strip(m.DateTimeOriginal?.value).replace(/\s*(?:date\s+)?QS:\S*/gi, '').replace(/\s+/g, ' ').trim().slice(0, 40),
     license: lic,
     thumb: info.thumburl,
     image: big,
