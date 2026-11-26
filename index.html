@@ -2318,20 +2318,55 @@ function cadDrawArqPoche(visibleForPaint){
 function draw(){return cadWithLayerLookup(cadDrawFrame)}
 // Batch adjacent, compatible continuous strokes without reordering drawing entities.
 function cadVectorBatch(selectedIds){
- let color=null,width=0,count=0;
+ let color=null,width=0,count=0,textOn=false,textFont='',textColor='';
+ // Sin save/restore por tanda: se fija el estado necesario y end() devuelve el lienzo tal como se recibió.
+ const saved={font:ctx.font,fillStyle:ctx.fillStyle,strokeStyle:ctx.strokeStyle,lineWidth:ctx.lineWidth,lineCap:ctx.lineCap,lineJoin:ctx.lineJoin,textAlign:ctx.textAlign,textBaseline:ctx.textBaseline,dash:ctx.getLineDash()};
+ let strokeState='';
+ function flushText(){if(!textOn)return;textOn=false}
  function flush(){
+  flushText();
   if(!count)return;
-  ctx.stroke();ctx.restore();count=0;
+  ctx.stroke();count=0;
+ }
+ function end(){flush();ctx.font=saved.font;ctx.fillStyle=saved.fillStyle;ctx.strokeStyle=saved.strokeStyle;ctx.lineWidth=saved.lineWidth;ctx.lineCap=saved.lineCap;ctx.lineJoin=saved.lineJoin;ctx.textAlign=saved.textAlign;ctx.textBaseline=saved.textBaseline;ctx.setLineDash(saved.dash);textFont='';textColor='';strokeState='';fillColor=''}
+ // Textos simples en tanda: misma posición, giro, tipografía y color que drawEntity, sin guardar/restaurar por texto.
+ function addText(e,lay){
+  if(e.type!=='text'||selectedIds.has(e.id)||e.attdef||e.highlight||e.underline||e.textShadow||e.textPath||cadIsMText(e)||!e.p)return false;
+  if(count){ctx.stroke();count=0}
+  if(!textOn){ctx.textAlign='start';ctx.textBaseline='alphabetic';textOn=true}
+  const font=fontCSS(e,Math.max(7,e.h*state.view.scale)),col=cadScreenColor(e.color||lay.color);
+  if(font!==textFont){ctx.font=font;textFont=font}if(col!==textColor){ctx.fillStyle=col;textColor=col;fillColor=''}
+  const p=screen(e.p),r=-(Number(e.rotation)||0)*Math.PI/180;
+  if(r){const c=Math.cos(r),sn=Math.sin(r);ctx.setTransform(dpr*c,dpr*sn,-dpr*sn,dpr*c,dpr*p.x,dpr*p.y);ctx.fillText(e.text||'',0,0);ctx.setTransform(dpr,0,0,dpr,0,0)}
+  else ctx.fillText(e.text||'',p.x,p.y);
+  return true;
  }
  function add(e,lay){
-  if(!['line','polyline','rect'].includes(e.type)||selectedIds.has(e.id)||e.pwidth>0||cadTGapCache?.has(e.id)||cadRefHasLinetype(e,lay))return false;
+  if(!['line','polyline','rect','circle','arc','ellipse'].includes(e.type)||selectedIds.has(e.id)||e.pwidth>0||cadTGapCache?.has(e.id)||cadRefHasLinetype(e,lay))return false;
   const c=cadScreenColor(e.color||lay.color),w=Math.max(.75,(e.width??lay.width??.25)*3);
   // Keep each batch bounded and preserve the order of unlike strokes.
   if(count&&(color!==c||width!==w||count>=256))flush();
-  if(!count){color=c;width=w;ctx.save();ctx.strokeStyle=c;ctx.lineWidth=w;ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);ctx.beginPath()}
+  flushText();
+  if(!count){color=c;width=w;const st=c+'|'+w;if(st!==strokeState){ctx.strokeStyle=c;ctx.lineWidth=w;strokeState=st}ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);ctx.beginPath()}
   tracePath(e);count++;return true;
  }
- return {add,flush};
+ // Rellenos sólidos chicos (flechas de cota): mismo color y forma que drawEntity, sin guardar/restaurar.
+ let fillColor='';
+ function addFill(e,lay){
+  if(e.type!=='hatch'||selectedIds.has(e.id)||(e.hatchStyle&&e.hatchStyle!=='solid')||(e.holes&&e.holes.length)||!(e.pts?.length>2)||e.color2)return false;
+  if(count){ctx.stroke();count=0}flushText();
+  const col=cadScreenColor(e.color||lay.color);if(col!==fillColor){ctx.fillStyle=col;fillColor=col}
+  ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();ctx.fill('evenodd');textColor='';
+  return true;
+ }
+ // Cotas: sus líneas entran al lote de trazos; flechas y texto se dibujan como antes.
+ function addDimension(e){
+  if(e.type!=='dimension'||selectedIds.has(e.id))return false;
+  let parts;try{parts=dimensionPrimitives(e)}catch(err){return false}
+  for(const part of parts){const pl=layerFor(part);if(!pl.visible)continue;if(add(part,pl)||addText(part,pl)||addFill(part,pl))continue;flush();drawEntity(part,null,selectedIds)}
+  return true;
+ }
+ return {add:(e,lay)=>add(e,lay)||addText(e,lay)||addDimension(e),flush:()=>{flush();strokeState='';textFont='';textColor='';fillColor=''},end};
 }
 // Heavy drawings: while the wheel zoom or a pan is in progress, the last full frame is redrawn
 // scaled and shifted (a bitmap move, < 2 ms) and the full vector repaint runs once the motion stops.
@@ -2377,7 +2412,7 @@ function cadDrawFrame(){drawPending=false;if(cadFastInteractiveFrame())return;co
   if(batch?.add(e,lay)){painted++;continue;}
   batch?.flush();drawEntity(e,undefined,selectedIds);painted++;
   if(selectedIds.has(e.id)&&e.type!=='blockRef')cadDrawPrimitiveGrips(e);
- }batch?.flush();if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
+ }batch?.end();if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
  if(idle){try{const buffer=cadIdleFrame?.canvas||document.createElement('canvas');if(buffer.width!==canvas.width)buffer.width=canvas.width;if(buffer.height!==canvas.height)buffer.height=canvas.height;const bctx=buffer.getContext('2d');bctx.clearRect(0,0,buffer.width,buffer.height);bctx.drawImage(canvas,0,0);cadIdleFrame={canvas:buffer,key:frameKey,painted};cadIdleFrameValid=true}catch(e){cadIdleFrameValid=false}}else{cadIdleFrameValid=false;}
  }
  if(!reuse){cadLastFullCost=performance.now()-perfStart;
@@ -2536,7 +2571,7 @@ function tracePath(e,c=ctx){const s=screen;let a,b,d;switch(e.type){case 'line':
  // Sólo en pantalla: vértices a menos de medio píxel del último trazado se omiten (la geometría no cambia).
  if(n>6){let lx=a.x,ly=a.y;for(let i=1;i<n;i++){b=s(pts[i]);const dx=b.x-lx,dy=b.y-ly;if(i===n-1||dx*dx+dy*dy>=.25){c.lineTo(b.x,b.y);lx=b.x;ly=b.y}}}
  else for(let i=1;i<n;i++){b=s(pts[i]);c.lineTo(b.x,b.y)}
- if(e.closed)c.closePath();break;}case 'rect':a=s(e.a);b=s(e.b);c.rect(a.x,a.y,b.x-a.x,b.y-a.y);break;case 'circle':a=s(e.c);c.moveTo(a.x+e.r*state.view.scale,a.y);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),0,TAU);break;case 'ellipse':a=s(e.c);c.ellipse(a.x,a.y,Math.abs(e.rx*state.view.scale),Math.abs(e.ry*state.view.scale),-(e.rotation||0),0,TAU);break;case 'arc':a=s(e.c);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),-e.a0,-(e.a0+arcSweep(e.a0,e.a1)),true);break;case 'dimension':a=s(e.a);b=s(e.b);d=s(e.p);let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1;let nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny;let p1=s(add(e.a,P(nx*off,ny*off))),p2=s(add(e.b,P(nx*off,ny*off)));c.moveTo(a.x,a.y);c.lineTo(p1.x,p1.y);c.moveTo(b.x,b.y);c.lineTo(p2.x,p2.y);c.moveTo(p1.x,p1.y);c.lineTo(p2.x,p2.y);break;}}
+ if(e.closed)c.closePath();break;}case 'rect':a=s(e.a);b=s(e.b);c.rect(a.x,a.y,b.x-a.x,b.y-a.y);break;case 'circle':a=s(e.c);c.moveTo(a.x+e.r*state.view.scale,a.y);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),0,TAU);break;case 'ellipse':{a=s(e.c);const rx=Math.abs(e.rx*state.view.scale),rr=-(e.rotation||0);c.moveTo(a.x+rx*Math.cos(rr),a.y+rx*Math.sin(rr));c.ellipse(a.x,a.y,rx,Math.abs(e.ry*state.view.scale),rr,0,TAU);break;}case 'arc':{a=s(e.c);const R=Math.abs(e.r*state.view.scale);c.moveTo(a.x+R*Math.cos(-e.a0),a.y+R*Math.sin(-e.a0));c.arc(a.x,a.y,R,-e.a0,-(e.a0+arcSweep(e.a0,e.a1)),true);break;}case 'dimension':a=s(e.a);b=s(e.b);d=s(e.p);let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1;let nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny;let p1=s(add(e.a,P(nx*off,ny*off))),p2=s(add(e.b,P(nx*off,ny*off)));c.moveTo(a.x,a.y);c.lineTo(p1.x,p1.y);c.moveTo(b.x,b.y);c.lineTo(p2.x,p2.y);c.moveTo(p1.x,p1.y);c.lineTo(p2.x,p2.y);break;}}
 
 let cadDimExtra={arrowType:'tick',color:'',extOffset:0,extBeyond:-1};
 function readDimensionStyle(){
@@ -3709,7 +3744,9 @@ function flattenCADEntities(entities){const opts=arguments[1]||{},tGaps=cadCompu
 // multiplicados por la escala del objeto (ltscale) y la global (LTSCALE).
 const CAD2D_LT_PATTERNS={DASHED:[.12,.06],HIDDEN:[.06,.03],CENTER:[.24,.04,.04,.04],DOTTED:[0,.05],DOT:[0,.05],DASHDOT:[.12,.04,0,.04],PHANTOM:[.24,.04,.04,.04,.04,.04]};
 // Nombres DXF/ISO habituales (ACAD_ISO10W100, CENTER2, DASHEDX2…) → patrón CAD2D.
-function cadLinetypeAlias(lt){
+var cadLinetypeAliasMemo=new Map();
+function cadLinetypeAlias(lt){const k=String(lt||'');if(cadLinetypeAliasMemo.has(k))return cadLinetypeAliasMemo.get(k);if(cadLinetypeAliasMemo.size>1024)cadLinetypeAliasMemo.clear();const v=cadLinetypeAliasRaw(lt);cadLinetypeAliasMemo.set(k,v);return v}
+function cadLinetypeAliasRaw(lt){
  lt=String(lt||'').toUpperCase();const iso=lt.match(/ISO0?(\d+)W/);
  if(iso){const n=+iso[1];return n===2||n===3||n===6?'DASHED':n===7?'DOTTED':n===8||n===9?'PHANTOM':'DASHDOT'}
  const base=lt.replace(/(X2|2)$/,'');
@@ -3750,7 +3787,10 @@ function drawImageEntity(e,forceColor){
 }
 // Solo pantalla: en fondos claros el blanco/amarillo pálido se ve según la convención ACI 7 → negro. La impresión no cambia.
 const cadScreenColorCache=new Map();
-function cadHexLum(c){const m=/^#?([0-9a-f]{6})$/i.exec(String(c||'').trim());if(!m)return null;const n=parseInt(m[1],16),r=(n>>16)/255,g=(n>>8&255)/255,b=(n&255)/255;return{r,g,b,l:.2126*r+.7152*g+.0722*b}}
+// Memorizado: se consulta por entidad en cada cuadro con un puñado de colores distintos.
+var cadHexLumMemo=new Map();
+function cadHexLum(c){const k=String(c||'');if(cadHexLumMemo.has(k))return cadHexLumMemo.get(k);if(cadHexLumMemo.size>4096)cadHexLumMemo.clear();const v=cadHexLumRaw(c);cadHexLumMemo.set(k,v);return v}
+function cadHexLumRaw(c){const m=/^#?([0-9a-f]{6})$/i.exec(String(c||'').trim());if(!m)return null;const n=parseInt(m[1],16),r=(n>>16)/255,g=(n>>8&255)/255,b=(n&255)/255;return{r,g,b,l:.2126*r+.7152*g+.0722*b}}
 function cadScreenColor(c){
  const bg=cadHexLum(displayColors?.background);if(!bg||bg.l<.5||!c)return c;
  const key=c+'|'+displayColors.background;if(cadScreenColorCache.has(key))return cadScreenColorCache.get(key);
@@ -3828,7 +3868,7 @@ function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selec
   }
   ctx.restore();return;
  }if(e.type==='text'){if(e.attdef){ctx.restore();const t={...e,text:String(e.attdef.tag||'ATRIBUTO'),italic:true};delete t.attdef;drawEntity(t,forceColor,selectedIds);return}if(cadIsMText(e)){ctx.restore();for(const line of cadMTextLines(e))drawEntity(line,forceColor,selectedIds);return}if(e.textPath==='circle'){ctx.restore();for(const glyph of cadCircularTextGlyphs(e))drawEntity(glyph,forceColor,selectedIds);return}
- const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=ctx.measureText(label).width;
+ const p=screen(e.p);ctx.font=fontCSS(e,Math.max(7,e.h*state.view.scale));ctx.translate(p.x,p.y);ctx.rotate(-(Number(e.rotation)||0)*Math.PI/180);const label=e.text||'',width=(e.highlight||e.underline)?ctx.measureText(label).width:0;
  if(e.highlight){
   const size=Math.max(7,e.h*state.view.scale),pad=Math.max(3,size*.14);
   ctx.save();ctx.setLineDash([]);ctx.globalAlpha=1;
