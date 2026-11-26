@@ -551,6 +551,29 @@
   if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
   return localGalleryPromise;
  }
+ // Bilingual room search. Explicit raster requests keep the reference route.
+ function roomQuery(raw){
+  const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9×.]+/g,' ').trim();
+  if(!q||/\b(?:jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?|referencias?|references?|web|dibujar|generar|crear|disenar|draw|generate|create|design)\b/.test(q)||/\d/.test(q))return null;
+  const clean=q.replace(/\b(?:por favor|please|quiero|necesito|busca|buscar|buscame|mostrame|mostrar|ver|find|search|show|me|i|want|need|insertar|insert|planos?|plantas?|floor|plans?|cad|dwg|dxf|modelos?|models?|de|del|para|en|un|una|el|la|los|las|the|a|an|of|for|complete|completos?|completas?)\b/g,' ').replace(/\s+/g,' ').trim();
+  const categories=[['bathroom',/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilettes?|vestuarios?|locker rooms?)\b/],['kitchen',/\b(?:cocinas?|kitchens?)\b/],['living',/\b(?:livings?|living rooms?|salones?|salas de estar|salas estar|estancias?|lounges?|sitting rooms?)\b/]];
+  const hit=categories.find(([,re])=>re.test(clean));if(!hit)return null;
+  const rest=clean.replace(hit[1],' ').replace(/\s+/g,' ').trim();
+  const groups=[['gym',/\b(?:gym|gimnasios?|vestuarios?|locker|sports?|deportiv[oa]s?|piscinas?|pools?)\b/],['theatre',/\b(?:teatros?|theatres?|theaters?|cines?|cinemas?|auditorios?|auditoriums?|foyer)\b/],['school',/\b(?:escuelas?|schools?|colegios?|institucional|institutional|canteen|comedor)\b/],['office',/\b(?:oficinas?|offices?|comercio|retail|shopping)\b/],['public',/\b(?:public[oa]s?|collective|colectiv[oa]s?)\b/],['industrial',/\b(?:industriales?|industrial|comercial(?:es)?|commercial)\b/],['restaurant',/\b(?:restaurantes?|restaurants?|gastronomia)\b/],['hotel',/\b(?:hoteles?|hotels?|hospitality)\b/],['catering',/\b(?:catering|produccion|production)\b/],['accessible',/\b(?:accesible|accessible|adaptad[oa]s?)\b/],['compact',/\b(?:compact[oa]s?|compact|small|pequen[oa]s?)\b/],['dining',/\b(?:comedor|dining|integrado|open plan)\b/],['family',/\b(?:familiar|family|lectura|reading)\b/],['reception',/\b(?:recepcion|reception|espera|waiting)\b/],['sectional',/\b(?:sofa en l|sectional)\b/],['formal',/\bformal\b/]];
+  const matches=groups.filter(([k,re])=>re.test(clean)&&!(hit[0]==='living'&&k==='school')&&!(hit[0]!=='living'&&['dining','family','reception','sectional','formal'].includes(k))).map(([k])=>k);
+  if(rest&&!matches.length&&!/^(?:con ducha|con banera|with shower|with bathtub|ensuite|en suite|residencial|residential)$/.test(rest))return null;
+  return {category:hit[0],terms:matches};
+ }
+ let roomCADPromise=null;
+ function roomCADIndex(){if(!roomCADPromise)roomCADPromise=fetch(new URL('assets/arq-room-cad/v1/index.json?v=20261126-rooms-v2',document.baseURI)).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(d=>{if(d.schema!=='blackline-room-cad-v1'||d.units!=='m'||!Array.isArray(d.items))throw Error('Invalid CAD catalogue');return d.items}).catch(e=>{roomCADPromise=null;throw e});return roomCADPromise}
+ function roomTermsMatch(it,terms){if(!terms.length)return true;const t=(it.tags||'')+' '+(it.es||'')+' '+(it.en||'')+' '+(it.name||'');const q=t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return terms.some(k=>q.includes(k)||k==='accessible'&&/accesible|accessible/.test(q)||k==='compact'&&/compact/.test(q)||k==='sectional'&&/sofa en l/.test(q)||k==='public'&&/public|colectiv/.test(q));}
+ async function localRoomPreviews(query){
+  const cat=query.category,terms=query.terms,base=new URL('assets/arq-room-cad/v1/',document.baseURI),nativeBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
+  const [newRows,nativeRows]=await Promise.all([roomCADIndex().catch(()=>[]),cat==='living'?Promise.resolve([]):localGallery().catch(()=>[])]);
+  const dxf=newRows.filter(x=>x.category===cat&&roomTermsMatch(x,terms)&&/^[a-z0-9-]+$/.test(x.id)&&typeof x.preview==='string'&&x.preview.startsWith('<svg ')).map(x=>{const u=new URL(x.id+'.dxf',base).href;return {title:T(x.en,x.es),area:x.area,thumb:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.preview),cadUrl:u,source:u,license:T('DXF · editable · concept plan','DXF · editable · anteproyecto'),roomCad:true,local:true};});
+  const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',nativeBase).href,source:new URL(x.id+'.svg',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
+  return dxf.concat(native);
+ }
  async function localHousePreviews(raw){
   if(!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
   const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
@@ -600,6 +623,16 @@
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
+  const room=roomQuery(raw);
+  if(room){
+   try{
+    const [own,archive]=await Promise.all([localRoomPreviews(room),room.category==='living'?Promise.resolve([]):archivedReferences('References '+room.category).catch(()=>[])]);
+    if(epoch!==webEpoch||!webMode||ctrl.signal.aborted)return;
+    const refs=room.terms.length?archive.filter(x=>roomTermsMatch({name:x.title},room.terms)):archive;
+    webItems=own.concat(refs.filter(x=>x.cadUrl),refs.filter(x=>!x.cadUrl));webStatus=webItems.length?'':T('No matching editable plans yet. Try the room name alone.','Todavía no hay plantas editables para esa búsqueda. Probá el nombre del ambiente solo.');paintWeb();
+   }catch(e){if(epoch===webEpoch){webStatus=T('Room catalogue unavailable. Retry.','Catálogo de ambientes no disponible. Volvé a buscar.');paintWeb();}}
+   return;
+  }
   const objectQ=/\b(?:symbol plan|detail|construction detail|symbol)\b/.test(refQuery(raw));
   if(!objectQ)try{const [own,archived]=await Promise.all([localHousePreviews(raw).catch(()=>[]),archivedReferences(raw).catch(()=>[])]);if(epoch!==webEpoch||!webMode)return;webItems=own.concat(archived);paintWeb();}catch(e){}
   const api=new URL('https://commons.wikimedia.org/w/api.php');
@@ -623,7 +656,7 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · FREE PHOTOS','MAESTROS MODERNOS · FOTOS LIBRES'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):T('WEB REFERENCES','REFERENCIAS WEB'));
+  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · FREE PHOTOS','MAESTROS MODERNOS · FOTOS LIBRES'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL REFERENCES','REFERENCIAS DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):(roomQuery(st.q)?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('WEB REFERENCES','REFERENCIAS WEB')));
   el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');const per=houseMode?4:9,cols=houseMode?2:3;grid.style.gridTemplateColumns='repeat('+cols+',minmax(0,1fr))';grid.replaceChildren();grid.parentNode.querySelectorAll(':scope>.classic-links').forEach(n=>n.remove());if(classicMode&&classicIndex.length){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:11px;color:#51432e;max-height:118px;overflow:auto';const lb=document.createElement('b');lb.textContent=T('Authors:','Autores:');row.append(lb);for(const x of classicIndex){const b=document.createElement('button');b.type='button';b.textContent=x.label;b.title=x.modern?T('Modern master · free photos and links','Maestro moderno · fotos libres y enlaces'):T('Plates, covers and photos','Láminas, portadas y fotos');b.style.cssText='padding:2px 8px;border:1px solid #b7a17a;border-radius:999px;background:'+(x.modern?'#efe6d4':'#fff8ea')+';color:#3b2f1c;font-size:11px;cursor:pointer';b.onclick=()=>{const inp=el.querySelector('input[type=search]');inp.value=x.q;searchClassics(x.q);};row.append(b);}grid.parentNode.insertBefore(row,grid);}
   if(classicMode&&(classicLinks.length||classicModern)){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#51432e';const lb=document.createElement('b');lb.textContent=T('Codices and sources:','Códices y fuentes:');row.append(lb);for(const l of classicLinks){const a=document.createElement('a');a.href=l.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.t+' ↗';a.title=l.a||'';a.style.cssText='padding:3px 8px;border:1px solid #b7a17a;border-radius:999px;color:#3b2f1c;text-decoration:none;background:#fff8ea';row.append(a);}if(classicModern){const n=document.createElement('span');n.style.cssText='flex-basis:100%;opacity:.8';n.textContent=T('Modern master: their drawings are still under copyright, so only free photos of the works and links are shown.','Maestro moderno: sus dibujos siguen protegidos por derechos de autor; se muestran solo fotos libres de las obras y enlaces.');row.append(n);}grid.parentNode.insertBefore(row,grid);}
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(webItems.length/per)-1));
@@ -635,7 +668,7 @@
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';info.textContent=item.classic?item.license:(item.area!==null?item.area+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license;
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!houseMode||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}grid.append(card);
   }
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*per>=webItems.length;label.textContent=webItems.length?((searchPage*per+1)+'–'+Math.min((searchPage+1)*per,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
@@ -660,7 +693,7 @@
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
   const item=(a==='insert'||a==='cad'||a==='insert-trace')?webItems[Number(button.dataset.index)]:null;
   if(a==='insert-trace'&&item?.local){button.disabled=true;try{await insertLocalPreview(item);setTimeout(()=>{try{const S=CORE.state,im=S.entities.filter(e=>e.type==='image').at(-1);if(im){S.selected=[im.id];}if(window.CAD2D_CALCO)window.CAD2D_CALCO(true);else CORE.toast('CALCOPY');}catch(e){CORE.toast(e.message)}},400);}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
-  if(a==='cad'&&item?.cadUrl){button.disabled=true;try{await importWebUrl(item.cadUrl)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
+  if(a==='cad'&&item?.cadUrl){button.disabled=true;const epoch=webEpoch;try{if(item.roomCad&&window.cadInsertDxfPlan){const ok=await window.cadInsertDxfPlan(item.cadUrl,item.title,{isCurrent:()=>webMode&&epoch===webEpoch});if(ok)close();}else await importWebUrl(item.cadUrl)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(a==='cad'&&item?.planId){const epoch=webEpoch;button.disabled=true;try{if(!window.CAD2D_INSERT_CATALOGUE_PLAN)throw Error('Importador CAD no disponible');const ok=await window.CAD2D_INSERT_CATALOGUE_PLAN(item.planId,()=>webMode&&epoch===webEpoch);if(ok)close();}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(item?.local){button.disabled=true;try{await insertLocalPreview(item)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   const url=item?.url||(a==='url'?prompt('URL directa de archivo autorizado / Direct file URL'):null);if(!url)return;
@@ -693,7 +726,7 @@
  }
  function openWeb(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,close,refresh:paint});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,roomQuery,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}
