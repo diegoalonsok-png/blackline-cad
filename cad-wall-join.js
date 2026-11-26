@@ -33,6 +33,9 @@
        !valid(wall.a)||!valid(wall.b)||dist(wall.a,wall.b)<=1e-8)continue;
     const crossing=intersection(candidate.a,candidate.b,wall.a,wall.b);
     if(!crossing)continue;
+    // A join may trim or extend an endpoint, but must not cross the opposite
+    // endpoint and reverse the incoming wall's orientation.
+    if((end==='a'&&crossing.t>=1)||(end==='b'&&crossing.t<=0))continue;
     const p=crossing.point;
     const gap=dist(candidate[end],p);
     if(gap>tolerance)continue;
