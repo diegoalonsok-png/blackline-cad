@@ -1,7 +1,7 @@
 /* CALCOPY: Python/OpenCV in a dedicated, cancellable worker (v2 wall reader). */
 'use strict';
 const runtime='https://cdn.jsdelivr.net/pyodide/v0.28.3/full/';
-const modules=['walls_v2.py','bridge_v2.py'];
+const modules=['walls_v2.py','semantic_v2.py','bridge_v2.py'];
 let busy=false,py=null;
 const report=message=>self.postMessage({type:'progress',message});
 async function engine(){
@@ -11,7 +11,7 @@ async function engine(){
  report('Cargando OpenCV y NumPy…');await p.loadPackage(['opencv-python','numpy']);
  p.FS.mkdirTree('/calco');
  for(const name of modules){
-  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-v2',self.location.href),{cache:'no-cache'});
+  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-semantic-v2',self.location.href),{cache:'no-cache'});
   if(!res.ok)throw Error('Módulo no disponible: '+name);
   p.FS.writeFile('/calco/'+name,await res.text());
  }
