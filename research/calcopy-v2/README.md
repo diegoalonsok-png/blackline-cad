@@ -9,3 +9,8 @@ Solo Python + OpenCV + NumPy (lo mismo que carga Pyodide en el navegador).
 
 Estado 26/11/2026: lectura "llena" buena en 04, 05, 09, 11, 13, 14, 16, 18; parcial en 10;
 falla en 01, 02, 03, 06, 07, 08, 12, 15, 17 (doble línea fina, grises, planos girados, capturas con interfaz).
+
+## Calco asistido (26/11/2026, conectado a CALCOPY)
+- `bridge_v2.py` (Pyodide): dos lecturas, muros llenos y doble línea; elige la de más encuentros.
+- `assets/cad-calcopy-assist.js`: clic → muro medido en la imagen; clic en hueco → puerta (lado y bisagra) o ventana;
+  escala con dos clics; arma el plan nativo (WALL 2D + aberturas que cortan el muro + bloques).
