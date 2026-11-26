@@ -171,19 +171,29 @@ function classifyRooms(regions,objects){
   r.use=wc?'bathroom_candidate':bed?'bedroom_candidate':kitchen?'kitchen_candidate':living?'living_candidate':dining?'dining_candidate':shower||otherSanitary?'sanitary_space_review':null;
   r.zones=[...(wc?['bathroom']:[]),...(bed?['bedroom']:[]),...(kitchen?['kitchen']:[]),...(living?['living']:[]),...(dining?['dining']:[])];
   r.kitchen_dining=kitchen&&dining;
+  r.open_plan_candidate=kitchen&&(living||dining)&&!wc&&!bed;
+  r.requires_enclosure=wc||bed;
+  r.layout_review=wc&&(bed||living||dining||kitchen)?'bathroom_shared_with_other_use':bed&&kitchen?'kitchen_shared_with_bedroom':null;
+  // A semantic conflict is a reason to inspect missing partitions or erroneous blocks, not to invent a wall.
+  r.needs_partition_review=!!r.layout_review;
   r.bathroom_type=wc?(shower?'full_bath_candidate':'toilette_candidate'):null;
   r.evidence=wc?'wc':r.use==='sanitary_space_review'?'sanitary_without_wc':null;
  }
  for(const r of out){
   const parent=out.find(p=>p.id===r.possible_parent);
-  r.possible_suite=r.use==='bathroom_candidate'&&parent?.use==='bedroom_candidate';
-  r.possible_nested_bath=r.use==='bathroom_candidate'&&!!parent&&parent.use!=='bathroom_candidate';
+  r.possible_suite=r.use==='bathroom_candidate'&&!r.layout_review&&parent?.use==='bedroom_candidate';
+  r.possible_nested_bath=r.use==='bathroom_candidate'&&!r.layout_review&&!!parent&&parent.use!=='bathroom_candidate';
   r.parent_use=r.possible_nested_bath?parent.use:null;
   r.area_review=r.use==='bathroom_candidate'&&parent&&r.area>=parent.area?'bathroom_not_smaller_than_parent':null;
  }
  for(const r of out){if(r.use!=='bathroom_candidate'||r.area_review)continue;const primary=out.filter(p=>['bedroom_candidate','living_candidate','dining_candidate'].includes(p.use));if(primary.length&&primary.every(p=>r.area>=p.area))r.area_review='bathroom_larger_than_primary_rooms';}
  return out;
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview};
+function layoutDiagnostics(regions,objects){
+ const rooms=classifyRooms(regions,objects);
+ const uncontainedWC=objects.filter(o=>typeof o.id==='string'&&/^san-wc(?:-|$)/.test(o.id)&&Number.isFinite(o.x)&&Number.isFinite(o.y)&&!rooms.some(r=>r.kind!=='technical_void_candidate'&&r.kind!=='isolated_object_candidate'&&roomContains(r,o.x,o.y)));
+ return {rooms,conflicts:rooms.filter(r=>r.layout_review),openPlans:rooms.filter(r=>r.open_plan_candidate),uncontainedWC};
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
