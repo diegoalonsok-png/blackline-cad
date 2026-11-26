@@ -509,7 +509,7 @@
   if(/\b(?:cocinas?|kitchens?)\b/.test(q))return 'kitchen';
   return null;
  }
- function roomImagesOnly(raw){return /\b(?:jpg|jpeg|png|webp|imagenes?|images?|fotos?|photos?)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
+ function roomImagesOnly(raw){return /\b(?:jpg|jpeg|png)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
  // Only editable drawings or explicitly reviewed architectural floor-plan raster images.
  // A category, title or generic photo-search tag alone is NOT evidence of plan content.
  function verifiedRoomReference(item,category){
@@ -588,8 +588,8 @@
  async function localRoomPreviews(query){
   const cat=query.category,terms=query.terms,base=new URL('assets/arq-room-cad/v1/',document.baseURI),nativeBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
   const [newRows,nativeRows]=await Promise.all([roomCADIndex().catch(()=>[]),cat==='living'?Promise.resolve([]):localGallery().catch(()=>[])]);
-  const dxf=newRows.filter(x=>x.category===cat&&roomTermsMatch(x,terms)&&/^[a-z0-9-]+$/.test(x.id)&&typeof x.preview==='string'&&x.preview.startsWith('<svg ')).map(x=>{const u=new URL(x.id+'.dxf',base).href;return {title:T(x.en,x.es),area:x.area,thumb:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.preview),cadUrl:u,source:u,license:T('DXF · editable · concept plan','DXF · editable · anteproyecto'),roomCad:true,local:true};});
-  const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',nativeBase).href,source:new URL(x.id+'.svg',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
+  const dxf=newRows.filter(x=>x.category===cat&&roomTermsMatch(x,terms)&&/^[a-z0-9-]+$/.test(x.id)&&typeof x.preview==='string'&&x.preview.startsWith('<svg ')).map(x=>{const u=new URL(x.id+'.dxf',base).href;return {title:T(x.en,x.es),category:cat,drawingType:'floor-plan',area:x.area,thumb:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.preview),cadUrl:u,source:u,license:T('DXF · editable · concept plan','DXF · editable · anteproyecto'),roomCad:true,local:true};});
+  const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,category:cat,drawingType:'floor-plan',area:x.area,thumb:new URL(x.id+'.svg',nativeBase).href,source:new URL(x.id+'.svg',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
   return dxf.concat(native);
  }
  async function localHousePreviews(raw){
@@ -640,6 +640,7 @@
   compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchClassics(term);
  }
  async function searchWeb(raw){
+  if(classicMode&&(strictRoomCategory(raw)||roomQuery(raw)))return openWeb(raw);
   if(classicMode)return searchClassics(raw);
   if(houseMode)return searchHouseGallery(raw);
   const query=webQuery(raw);if(!query)return;
@@ -672,6 +673,8 @@
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
   webItems=onlyArchitecturalDrawings(webItems);
+  const roomCat=strictRoomCategory(st.q)||roomQuery(st.q)?.category;
+  if(roomCat&&!classicMode)webItems=webItems.filter(x=>x.category===roomCat&&x.drawingType==='floor-plan'&&(x.roomCad===true||verifiedRoomReference(x,roomCat)));
   resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · TECHNICAL DRAWINGS','MAESTROS MODERNOS · DIBUJOS TÉCNICOS'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):((roomQuery(st.q)||strictRoomCategory(st.q))?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA')));
   el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');const per=houseMode?4:9,cols=houseMode?2:3;grid.style.gridTemplateColumns='repeat('+cols+',minmax(0,1fr))';grid.replaceChildren();grid.parentNode.querySelectorAll(':scope>.classic-links').forEach(n=>n.remove());if(classicMode&&classicIndex.length){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:11px;color:#51432e;max-height:118px;overflow:auto';const lb=document.createElement('b');lb.textContent=T('Authors:','Autores:');row.append(lb);for(const x of classicIndex){const b=document.createElement('button');b.type='button';b.textContent=x.label;b.title=x.modern?T('Modern master · source links','Maestro moderno · enlaces a fuentes'):T('Plans and sections','Plantas y cortes');b.style.cssText='padding:2px 8px;border:1px solid #b7a17a;border-radius:999px;background:'+(x.modern?'#efe6d4':'#fff8ea')+';color:#3b2f1c;font-size:11px;cursor:pointer';b.onclick=()=>{const inp=el.querySelector('input[type=search]');inp.value=x.q;searchClassics(x.q);};row.append(b);}grid.parentNode.insertBefore(row,grid);}
   if(classicMode&&(classicLinks.length||classicModern)){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#51432e';const lb=document.createElement('b');lb.textContent=T('Codices and sources:','Códices y fuentes:');row.append(lb);for(const l of classicLinks){const a=document.createElement('a');a.href=l.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.t+' ↗';a.title=l.a||'';a.style.cssText='padding:3px 8px;border:1px solid #b7a17a;border-radius:999px;color:#3b2f1c;text-decoration:none;background:#fff8ea';row.append(a);}if(classicModern){const n=document.createElement('span');n.style.cssText='flex-basis:100%;opacity:.8';n.textContent=T('Plans first, followed by sections, elevations and technical details. Licensed portraits may appear last.','Primero plantas, luego cortes, alzados y detalles técnicos. Los retratos autorizados aparecen al final.');row.append(n);}grid.parentNode.insertBefore(row,grid);}
