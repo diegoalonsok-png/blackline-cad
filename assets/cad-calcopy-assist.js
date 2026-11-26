@@ -110,6 +110,25 @@ function buildPlan(walls,openings,local,maxT){
  const parent=new Map(),find=w=>{while(parent.has(w))w=parent.get(w);return w;};
  const work=new Map();for(const w of walls)if(!w.skip)work.set(w,{...w});
  const host=w=>work.get(find(w));
+ // Join only nearly collinear, same-width wall bands. Keep distinct thicknesses
+ // for the native WALL junction solver; never bridge a doorway-sized gap.
+ const protectedWalls=new Set(openings.flatMap(o=>[o.w,o.partner,o.perp]).filter(Boolean));
+ let merged=true;
+ while(merged){
+  merged=false;
+  outer:for(const [a,A] of work)for(const [b,B] of work){
+   if(a===b||A.v!==B.v||protectedWalls.has(a)||protectedWalls.has(b))continue;
+   const t=Math.min(A.t,B.t);
+   if(!(t>0)||Math.abs(A.t-B.t)>Math.max(1,t*.15)||Math.abs(A.c-B.c)>Math.max(1,t*.15))continue;
+   const gap=Math.max(A.lo,B.lo)-Math.min(A.hi,B.hi);
+   // Only close digitization seams, at most 3 cm in drawing units.
+   const p=local(A.v?[A.c,A.lo]:[A.lo,A.c]),q=local(A.v?[A.c,A.lo+1]:[A.lo+1,A.c]);
+   const mpp=Math.hypot(q[0]-p[0],q[1]-p[1]);
+   if(!(mpp>0)||gap>Math.min(t*.25,.03/mpp))continue;
+   A.lo=Math.min(A.lo,B.lo);A.hi=Math.max(A.hi,B.hi);
+   work.delete(b);parent.set(b,a);merged=true;break outer;
+  }
+ }
  const ops=[];
  for(const op of openings){
   const w=find(op.w);if(!work.has(w))continue;const H=work.get(w);
