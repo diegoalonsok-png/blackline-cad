@@ -5,6 +5,14 @@ window.CAD2D_UI_GLOSSARY={
  phrases:[
  // Auditoría de idioma 26/11/2026: textos que quedaban en castellano con la interfaz en inglés.
  ["Ver bloques","View blocks"],
+ ["Cargando Python…","Loading Python…"],
+ ["Cargando OpenCV y NumPy…","Loading OpenCV and NumPy…"],
+ ["Reconociendo muros (macizos y de doble línea)…","Recognizing walls (solid and double-line)…"],
+ ["CALCOPY: Cargando Python…","CALCOPY: Loading Python…"],
+ ["CALCOPY: Cargando OpenCV y NumPy…","CALCOPY: Loading OpenCV and NumPy…"],
+ ["CALCOPY: Reconociendo muros (macizos y de doble línea)…","CALCOPY: Recognizing walls (solid and double-line)…"],
+ ["Insertar y vectorizar","Insert + vectorize"],
+ ["Códices y fuentes:","Codices and sources:"],
  ["Ver web","View web"],
  ["Viviendas","Houses"],
  ["Galería de viviendas por superficie","House gallery by floor area"],

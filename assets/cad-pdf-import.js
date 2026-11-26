@@ -346,7 +346,7 @@ async function editCalcoImage(entity,action){
   const cv=document.createElement('canvas');cv.style.cssText='width:100%;max-height:48vh;object-fit:contain;background:white';
   for(const [label,el] of [['Antes',original],['Procesada',cv]]){const col=document.createElement('div'),caption=document.createElement('p');caption.textContent=label;col.append(caption,el);previews.append(col);}
   const use=document.createElement('input');use.type='checkbox';use.checked=entity.calcoUseProcessed!==false;const label=document.createElement('label');label.append(use,document.createTextNode(' Usar imagen procesada para CALCO'));
-  const apply=document.createElement('button'),cancel=document.createElement('button');apply.className=cancel.className='btn';apply.textContent='Aplicar';cancel.textContent='Cancelar';apply.disabled=true;
+  const apply=document.createElement('button'),cancel=document.createElement('button');apply.className=cancel.className='btn';apply.textContent='Aplicar';cancel.textContent=LX('Cancelar','Cancel');apply.disabled=true;
   const render=async()=>{run.disabled=true;apply.disabled=true;msg.textContent='Procesando localmente…';await new Promise(r=>setTimeout(r,25));
    try{
     const mode=select.value,factor=mode==='up4'?4:mode==='up2'?2:1;
@@ -406,7 +406,7 @@ function runPythonTrace(ctx,w,h){
   dialog.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:20px;width:min(420px,90vw)';
   const title=document.createElement('h3');title.textContent='CALCOPY · Python';
   const status=document.createElement('p');status.textContent='Preparando el motor…';
-  const cancel=document.createElement('button');cancel.className='btn';cancel.textContent='Cancelar';
+  const cancel=document.createElement('button');cancel.className='btn';cancel.textContent=LX('Cancelar','Cancel');
   const finish=(err,walls)=>{if(done)return;done=true;worker?.terminate();dialog.remove();if(err)reject(err);else resolve(walls);};
   cancel.onclick=()=>finish(new Error('Procesamiento cancelado.'));
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
@@ -464,24 +464,24 @@ async function traceFile(file,source=null,python=false){
   if(walls.length<3||walls.length>250){makeMask(170);const fine=traceFineWallBands(mask,w,h);if(fine.length&&fine.length<=250){walls=fine;hatched=true;mode='rayado fino';}}
   if(walls.length>250)walls=[];
   }
-  C.log('CALCO: '+walls.length+' candidatos · '+mode+'. Revisar antes de insertar.');
+  C.log('CALCO: '+walls.length+LX(' candidatos · ',' candidates · ')+mode+LX('. Revisar antes de insertar.','. Review before inserting.'));
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
   for(const wall of walls){pc.beginPath();pc.lineWidth=wall.t;pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
   const placements=[];
   const accepted=await new Promise(resolve=>{
    const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
-   const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos'+(hatched?' (muros rayados)':'')+'. Revisá la vista previa. Aberturas aún no reconocidas.';
+   const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos'+(hatched?' (muros rayados)':'')+LX('. Revisá la vista previa. Aberturas aún no reconocidas.','. Check the preview. Openings not recognized yet.');
    preview.style.cssText='width:100%;max-height:55vh;object-fit:contain;display:block';
-   const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent='Insertar muros y bloques marcados';cancel.textContent='Cancelar';ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
+   const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent=LX('Insertar muros y bloques marcados','Insert walls and marked blocks');cancel.textContent=LX('Cancelar','Cancel');ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
    const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
-   const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button'),retry=document.createElement('button');retry.className='btn';retry.textContent='Probar otro detector';
+   const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button'),retry=document.createElement('button');retry.className='btn';retry.textContent=LX('Probar otro detector','Try another detector');
    const catalog=window.CAD2D_ARQ_LIBRARY?.library||[];
    const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-cama|dor-queen|dor-king|mob-placard|mob-escritorio|mob-sillon)/.test(i.id));
-   picker.add(new Option('Marcar objeto sobre la imagen…',''));for(const i of candidates)picker.add(new Option(i.name,i.id));
+   picker.add(new Option(LX('Marcar objeto sobre la imagen…','Mark an object on the image…'),''));for(const i of candidates)picker.add(new Option(i.name,i.id));
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
-   undo.textContent='Deshacer marca';undo.className='btn';
-   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip);title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?'Aberturas no reconocidas.':'Sin candidatos; probá otro detector. No se insertará nada.');
+   undo.textContent=LX('Deshacer marca','Undo mark');undo.className='btn';
+   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip);title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin candidatos; probá otro detector. No se insertará nada.','No candidates; try another detector. Nothing will be inserted.'));
     if(python){
      for(const o of openings){const p0=o.v?[o.c,o.g0]:[o.g0,o.c],p1=o.v?[o.c,o.g1]:[o.g1,o.c];pc.strokeStyle=o.kind==='framed-window'?'#2f7de1':'#e8590c';pc.lineWidth=Math.max(3,o.t);pc.beginPath();pc.moveTo(...p0);pc.lineTo(...p1);pc.stroke();
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
@@ -500,13 +500,13 @@ async function traceFile(file,source=null,python=false){
      redraw();return;
     }if(!it){let hit=null,best=Infinity;for(const wall of walls){const dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],l=dx*dx+dy*dy;if(!l)continue;const t=Math.max(0,Math.min(1,((x-wall.a[0])*dx+(y-wall.a[1])*dy)/l)),dist=Math.hypot(x-wall.a[0]-t*dx,y-wall.a[1]-t*dy);if(dist<=Math.max(wall.t*.7,8/scale)&&dist<best){hit=wall;best=dist;}}if(hit){hit.skip=!hit.skip;if(python)history.push(()=>{hit.skip=!hit.skip;});redraw();}return;}const pl={x,y,id:it.id,name:it.name,w:it.w,d:it.d,rotation:Number(rot.value)};placements.push(pl);if(python)history.push(()=>placements.splice(placements.indexOf(pl),1));redraw();};
    undo.onclick=()=>{if(python){const f=history.pop();if(f)f();}else placements.pop();redraw();};
-   const ai=document.createElement('button');ai.className='btn';ai.textContent='Reconocer con IA local (experimental)';
+   const ai=document.createElement('button');ai.className='btn';ai.textContent=LX('Reconocer con IA local (experimental)','Recognize with local AI (experimental)');
    const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
-   ai.onclick=async()=>{if(!confirm('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?'))return;
-    ai.disabled=true;ok.disabled=true;aiStatus.textContent='Cargando modelo local…';
+   ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
+    ai.disabled=true;ok.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
      const module=await import(new URL('cad-calco-vision.mjs',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
-     const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?'Descargando '+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':'Preparando IA local…';});
+     const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
      let n=0;const sx=real/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h:sx;
      for(const det of found){const id=module.catalogId(det.label),it=candidates.find(x=>x.id===id);if(!it)continue;
@@ -520,11 +520,11 @@ async function traceFile(file,source=null,python=false){
       const angle=turn?90:0,x=cx+(turn?it.d:-it.w)/2/sx,y=cy+(turn?it.w:it.d)/2/sy;
       placements.push({x,y,id:it.id,name:it.name+' (IA)',w:it.w,d:it.d,rotation:angle,aiBox:[x0,y0,x1,y1]});n++;
      }
-     redraw();aiStatus.textContent=n+' candidatos añadidos de '+found.length+' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.';
-    }catch(e){if(d.isConnected)aiStatus.textContent='IA local no disponible: '+String(e.message||e).slice(0,180)+'. Podés seguir con el marcado manual.';}
+     redraw();aiStatus.textContent=n+LX(' candidatos añadidos de ',' candidates added out of ')+found.length+LX(' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.',' detections. Check position and rotation; use Undo mark to reject.');
+    }catch(e){if(d.isConnected)aiStatus.textContent=LX('IA local no disponible: ','Local AI unavailable: ')+String(e.message||e).slice(0,180)+LX('. Podés seguir con el marcado manual.','. You can continue marking manually.');}
     finally{ai.disabled=false;ok.disabled=false;}
    };
-   retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent='CALCO: buscando otra interpretación…';await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro','mixto experimental'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);if(mode==='mixto experimental'){makeMask(205);const solid=traceWallBands(mask,w,h),hatch=traceHatchedWallBands(mask,w,h),fineLight=traceFineWallBands(mask,w,h);makeMask(170);const fine=traceFineWallBands(mask,w,h);walls=combineTraceCandidates([solid,hatch,fineLight,fine]);}else{walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);}if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+' candidatos · '+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
+   retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent=LX('CALCO: buscando otra interpretación…','CALCO: trying another reading…');await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro','mixto experimental'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);if(mode==='mixto experimental'){makeMask(205);const solid=traceWallBands(mask,w,h),hatch=traceHatchedWallBands(mask,w,h),fineLight=traceFineWallBands(mask,w,h);makeMask(170);const fine=traceFineWallBands(mask,w,h);walls=combineTraceCandidates([solid,hatch,fineLight,fine]);}else{walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);}if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+LX(' candidatos · ',' candidates · ')+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
    const tool=document.createElement('select'),reading=document.createElement('select'),flip=document.createElement('button');
    if(python){
     for(const [v,t,e] of [['toggle','Quitar / recuperar muro','Remove / restore wall'],['wall','+ Muro (clic sobre el muro)','+ Wall (click on the wall)'],['door','+ Puerta (clic en el hueco)','+ Door (click in the gap)'],['window','+ Ventana (clic en el hueco)','+ Window (click in the gap)'],['scale','Escala (2 clics sobre una cota)','Scale (2 clicks on a dimension)'],['block','+ Mueble / artefacto','+ Furniture / fixture']])tool.add(new Option(LX(t,e),v));
