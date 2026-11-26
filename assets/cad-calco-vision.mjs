@@ -23,11 +23,49 @@ export async function detect(canvas,progress){
  return result.bboxes.map((box,i)=>({box,label:String(result.labels[i]||'')})).filter(x=>Array.isArray(x.box)&&x.box.length===4&&x.box.every(Number.isFinite));
 }
 export function catalogId(label){
- const s=label.toLowerCase().trim();
- if(/\b(?:bidet)\b/.test(s))return 'san-bidet';
- if(/\b(?:toilet|toilet bowl|wc)\b/.test(s))return 'san-wc';
- if(/\b(?:bathtub|bath tub|bath-tub)\b/.test(s))return 'san-banera';
- if(/\b(?:sink|washbasin|wash basin|basin|vanity)\b/.test(s))return 'san-lav';
- if(/\b(?:bed|double bed)\b/.test(s)&&!/bedroom|bedside|bunk|single/.test(s))return 'dor-queen';
- return null;
+ const s=String(label||'').toLowerCase().trim();
+ // Specific objects first; unknown labels remain unclassified rather than guessed.
+ const rules=[
+ [/\b(?:bidet)\b/,'san-bidet'],
+ [/\b(?:urinal)\b/,'san-mingitorio'],
+ [/\b(?:toilet|toilet bowl|wc)\b/,'san-wc'],
+ [/\b(?:bathtub|bath tub|bath-tub)\b/,'san-banera'],
+ [/\b(?:shower tray|shower stall|shower enclosure)\b/,'san-ducha'],
+ [/\b(?:kitchen sink|double sink)\b/,'kq-bacha'],
+ [/\b(?:sink|washbasin|wash basin|vanity)\b/,'san-lav'],
+ [/\b(?:refrigerator|fridge|freezer)\b/,'kq-heladera'],
+ [/\b(?:washing machine|washer|laundry machine)\b/,'kq-lavarropas'],
+ [/\b(?:dishwasher)\b/,'kq-lv'],
+ [/\b(?:cooktop|hob|burner)\b/,'kq-anafe4'],
+ [/\b(?:stove|range cooker)\b/,'kq-cocina'],
+ [/\b(?:oven)\b/,'kq-horno'],
+ [/\b(?:bunk bed)\b/,'dor-cucheta'],
+ [/\b(?:crib|cot)\b/,'dor-cuna'],
+ [/\b(?:single bed|twin bed)\b/,'dor-cama1'],
+ [/\b(?:king bed|king size bed)\b/,'dor-king'],
+ [/\b(?:bed)\b/,'dor-queen'],
+ [/\b(?:nightstand|bedside table)\b/,'dor-mesa-luz'],
+ [/\b(?:wardrobe|closet)\b/,'mob-placard'],
+ [/\b(?:dresser|chest of drawers)\b/,'dor-comoda'],
+ [/\b(?:bookshelf|bookcase)\b/,'mob-biblioteca'],
+ [/\b(?:desk|writing table)\b/,'mob-escritorio'],
+ [/\b(?:coffee table)\b/,'mob-ratona'],
+ [/\b(?:round dining table)\b/,'mob-mesa-red'],
+ [/\b(?:dining table|dining set)\b/,'mob-mesa6'],
+ [/\b(?:sectional sofa)\b/,'mob-sofa-L'],
+ [/\b(?:armchair)\b/,'mob-sillon'],
+ [/\b(?:sofa|couch)\b/,'mob-sofa3'],
+ [/\b(?:spiral staircase|spiral stairs)\b/,'esc-caracol'],
+ [/\b(?:staircase|stairs)\b/,'esc-recta'],
+ [/\b(?:pickup truck|pickup)\b/,'veh-pickup'],
+ [/\b(?:car|automobile)\b/,'veh-auto'],
+ [/\b(?:motorcycle)\b/,'veh-moto'],
+ [/\b(?:bicycle)\b/,'veh-bici'],
+ [/\b(?:potted plant|plant pot)\b/,'ext-maceta'],
+ [/\b(?:palm tree)\b/,'ext-palmera'],
+ [/\b(?:tree)\b/,'ext-arbol'],
+ [/\b(?:shrub|bush)\b/,'ext-arbusto']
+ ];
+ if(/bedroom|bedside/.test(s)&&!/(?:bedside table)/.test(s))return null;
+ return rules.find(([re])=>re.test(s))?.[1]||null;
 }
