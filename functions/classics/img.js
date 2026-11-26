@@ -1,5 +1,5 @@
 /* GET /classics/img?u=https://upload.wikimedia.org/...
-   Same-origin image proxy for the classic plans gallery: only upload/thumb.wikimedia.org,
+   Same-origin image proxy for the ARQASSIST galleries: Wikimedia Commons, Openverse thumbnails and Flickr originals,
    only images, cached at the edge for 30 days. Keeps the app's CSP at img-src 'self'. */
 const UA = 'BlacklineCAD/1.0 (https://blackline-cad.org; classic plans gallery)';
 const MAX = 25 * 1024 * 1024;
@@ -8,7 +8,11 @@ export async function onRequestGet({ request, waitUntil }) {
   const raw = new URL(request.url).searchParams.get('u') || '';
   let target;
   try { target = new URL(raw); } catch (e) { return new Response('Bad URL', { status: 400 }); }
-  if (target.protocol !== 'https:' || !['upload.wikimedia.org','thumb.wikimedia.org'].includes(target.hostname) || !/\/wikipedia\/commons\//.test(target.pathname)) {
+  const h = target.hostname, path = target.pathname;
+  const ok = (['upload.wikimedia.org', 'thumb.wikimedia.org'].includes(h) && /\/wikipedia\/commons\//.test(path))
+    || (h === 'api.openverse.org' && /^\/v1\/images\/[0-9a-f-]{36}\/thumb\/$/.test(path))
+    || (/^(?:live|farm\d+)\.staticflickr\.com$/.test(h) && /^\/[\w/.-]+\.(?:jpe?g|png)$/i.test(path));
+  if (target.protocol !== 'https:' || !ok) {
     return new Response('Forbidden', { status: 403 });
   }
   const cache = caches.default, key = new Request(target.toString(), { method: 'GET' });
