@@ -136,6 +136,25 @@ function buildPlan(walls,openings,local,maxT){
  const openingsOut=[];for(const o of res){const prev=openingsOut[openingsOut.length-1];if(prev&&prev.host===o.host&&prev.offset+prev.width/2>=o.offset-o.width/2)continue;openingsOut.push(o);}
  return {walls:out,openings:openingsOut};
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan};
+// Room use is inferred only from recognized objects, never from size alone.
+// Bounding boxes provide a provisional assignment; actual access requires a door.
+function classifyRooms(regions,objects){
+ const out=regions.map(r=>({...r,objects:[]}));
+ for(const o of objects){
+  if(!Number.isFinite(o.x)||!Number.isFinite(o.y))continue;
+  const candidates=out.filter(r=>r.kind!=='technical_void_candidate'&&r.kind!=='isolated_object_candidate'&&o.x>=r.x&&o.x<=r.x+r.w&&o.y>=r.y&&o.y<=r.y+r.h).sort((a,b)=>a.area-b.area);
+  if(candidates.length)candidates[0].objects.push(o.id);
+ }
+ for(const r of out){
+  const wc=r.objects.some(id=>/^san-wc(?:-|$)/.test(id)),bath=r.objects.some(id=>/^san-(?:bidet|lav|ducha|banera|mingitorio)/.test(id)),bed=r.objects.some(id=>/^dor-(?:cama|queen|king|cucheta)/.test(id));
+  r.use=wc||bath?'bathroom_candidate':bed?'bedroom_candidate':null;
+ }
+ for(const r of out){
+  const parent=out.find(p=>p.id===r.possible_parent);
+  r.possible_suite=r.use==='bathroom_candidate'&&parent?.use==='bedroom_candidate';
+ }
+ return out;
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
