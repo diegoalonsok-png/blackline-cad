@@ -276,6 +276,30 @@ function doorClearance(openings,blocks,sx,sy){
  }
  return out;
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance};
+// A basin facing a bathroom entrance is positive layout evidence, provided
+// it is beyond the clear passage and swept leaf and inside the same enclosure.
+function bathroomBasinAlignment(openings,blocks,sx,sy){
+ if(![sx,sy].every(x=>Number.isFinite(x)&&x>0))return [];
+ const center=b=>{const a=(Number(b.rotation)||0)*Math.PI/180;return {id:b.id,x:b.x+(b.w*Math.cos(a)-b.d*Math.sin(a))/2/sx,y:b.y-(b.w*Math.sin(a)+b.d*Math.cos(a))/2/sy};};
+ const valid=b=>[b.x,b.y,b.w,b.d].every(Number.isFinite)&&b.w>0&&b.d>0;
+ const blocked=doorClearance(openings,blocks,sx,sy),out=[];
+ for(const [doorIndex,o] of openings.entries()){
+  if(o.w?.skip||!/door/.test(o.kind||'')||![o.c,o.g0,o.g1].every(Number.isFinite)||o.g1<=o.g0)continue;
+  const mid=(o.g0+o.g1)/2,along=o.v?sy:sx,across=o.v?sx:sy;
+  for(const [blockIndex,b] of blocks.entries()){
+   if(!valid(b)||!/^san-lav/.test(b.id||''))continue;
+   if(blocked.some(q=>q.doorIndex===doorIndex&&q.blockIndex===blockIndex))continue;
+   const p=center(b),u=o.v?p.y:p.x,v=o.v?p.x:p.y;
+   const depth=Math.abs(v-o.c)*across;
+   if(depth<.45||depth>3||Math.abs(u-mid)*along>Math.max(.35,(o.g1-o.g0)*along*.6))continue;
+   // A nearby toilet on the same side is corroboration, not proof of room
+   // membership. Do not let a kitchen sink serve as a bathroom fixture.
+   const wc=blocks.some(q=>{if(!valid(q)||!/^san-wc(?:-|$)/.test(q.id||''))return false;const z=center(q);return ((o.v?z.x:z.y)-o.c)*(v-o.c)>0&&Math.hypot((z.x-p.x)*sx,(z.y-p.y)*sy)<=2.5;});
+   if(wc)out.push({doorIndex,blockIndex,id:b.id,depth_m:depth,reason:'bathroom_basin_facing_entrance_candidate'});
+  }
+ }
+ return out;
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance,bathroomBasinAlignment};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
