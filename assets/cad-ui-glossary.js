@@ -668,6 +668,7 @@ window.CAD2D_UI_GLOSSARY={
  ['Comando cancelado','Command cancelled'],['Seleccionado','Selected'],['Distancia','Distance'],['Área','Area'],['Coordenada','Coordinate']
 ],
 words:{
+ 'trasera':'rear','trasero':'rear','motocicleta':'motorcycle','vehículo':'vehicle','especial':'special',
  'bañadera':'bathtub','dinámico':'dynamic','dinámica':'dynamic','llenos':'solid','lectura':'reading','marcados':'marked','candidatos':'candidates','típico':'typical','agregado':'added','muros':'walls',
  'abajo':'down','abatible':'swing','accesible':'accessible','activar':'enable','activo':'active','acotar':'dimension','aire':'air','acondicionado':'conditioning','aislar':'isolate','alacena':'wall cabinet','alto':'height',
  'altura':'height','alzado':'elevation','alzados':'elevations','anafe':'cooktop','ancho':'width','andamio':'scaffold','apagar':'turn off','aplicar':'apply','arbusto':'shrub','archivero':'file cabinet','archivo':'file',

@@ -1013,8 +1013,16 @@ const arqCatalogueCounts={"bathroom":37,"kitchen":12,"bedroom":11,"laundry":1,"o
 const arqCatalogueBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
 let arqCataloguePromise=null;
 function arqCatalogueIndex(){if(!arqCataloguePromise)arqCataloguePromise=fetch(new URL('index.json?v=20261124-house-v8',arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).then(x=>{if(!Array.isArray(x)||x.length>10000||x.some(i=>!/^plan-\d+$/.test(i.id)||!Array.isArray(i.dimensions)||!Array.isArray(i.roles)))throw Error('Índice inválido');return x}).catch(e=>{arqCataloguePromise=null;throw e});return arqCataloguePromise;}
+// Natural requests: "quiero un bidé", "poné un auto en corte", "necesito un baño completo".
+function arqCleanRequest(raw){
+ let s=String(raw||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[¿?¡!.,;:]+/g,' ').replace(/\s+/g,' ').trim();
+ const lead=/^(?:por favor|porfa|hola|quiero|quisiera|necesito|me gustaria|me falta|busco|buscame|busca|buscar|dame|mostrame|mostra|mostrar|ver|pone|poneme|poner|pon|agrega|agregame|agregar|anadi|anadir|inserta|insertame|insertar|coloca|colocame|colocar|traeme|trae|please|i want|i need|give me|show me|add|put|insert|place|find|search)\s+/;
+ for(let i=0;i<4;i++){const t=s.replace(lead,'').replace(/^(?:un|una|unos|unas|el|la|los|las|a|an|the|some)\s+/,'');if(t===s)break;s=t;}
+ return s.replace(/\s+(?:por favor|porfa|please)$/,'').trim();
+}
 function arqCatalogueCategory(raw){
- const s=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ let s=arqCleanRequest(raw);
+ if(/^(?:bano|banos|bathroom|bathrooms)\s+(?:completo|completos|armado|armados|entero|principal|de servicio|en suite|con banera|con ducha|full|complete|ensuite)$/.test(s))s='bano';
  if(/^(?:casas?|viviendas?|houses?|homes?)(?:\s+(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m\s*(?:2|²|\^2)|mts?\s*(?:2|²)?|sqm|metros?(?:\s+cuadrados?)?)?)?[\s.]*$/.test(s))return 'house';
  if(/^(?:bnao|bno|banio|banios|bnaos|banoo|banoss)$/.test(s))return 'bathroom';
  if(/^(?:bano|banos|toilette|mostrar banos|listado de banos|bathroom|bathrooms|salle de bains|bagno|bagni|banheiro|banheiros|badezimmer|浴室|卫生间|衛生間|ванная|حمام|욕실)$/.test(s))return 'bathroom';
@@ -1126,6 +1134,8 @@ function arqOpenHouseGallery(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.open
 function arqWebReference(raw){
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/^(?:web|referencias?|reference|buscar web)\s*[: ]/.test(q))return true;
+ // "auto en planta", "árbol en planta": a view of an object, not a request for floor-plan references.
+ if(/^(?:quiero |necesito |un |una )*[a-z]+(?:\s+[a-z]+)?\s+(?:en|de|vista en|vista de)\s+planta$/.test(q)&&!/^(?:casa|vivienda|departamento|edificio|oficina|planta)\b/.test(q))return false;
  if(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q))return true;
  return /\b(?:planos?|plantas?|floor plans?|detalles constructivos|construction details|fachadas?|facades?|architectural references)\b/.test(q)&&!/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q);
 }
@@ -1143,7 +1153,7 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
 window.CAD2D_INSERT_CATALOGUE_PLAN=insertCataloguePlanById;
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
 function arqObjectSearch(raw){
- const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/,'').replace(/^(?:un|una|el|la|a|an|the)\s+/,'').trim();
+ const q=arqCleanRequest(String(raw).replace(/^\s*(?:bloques? de)\s+/i,''));
  const groups=[['anafe',/^(?:anafes?|cooktops?|hobs?|placa de coccion)$/],['horno',/^(?:hornos?|ovens?)$/],['cocina a gas',/^(?:cocina a gas|gas stove|stove|estufa)$/],['microondas',/^(?:microondas|microwaves?)$/],['inodoro',/^(?:inodoros?|wc|toilets?|retretes?)$/],['arbol',/^(?:arbol(?:es)?|trees?)$/],['auto',/^(?:autos?|automovil(?:es)?|coches?|cars?|vehiculos?)$/],['bidet',/^(?:bidets?|bides?)$/],['lavatorio',/^(?:lavatorios?|lavabos?|bachas?|sinks?|basins?)$/],['ducha',/^(?:duchas?|showers?)$/],['banera',/^(?:baneras?|banaderas?|bathtubs?)$/],['puerta',/^(?:puertas?|doors?)$/],['ventana',/^(?:ventanas?|windows?)$/],['cama',/^(?:camas?|beds?)$/],['mesa',/^(?:mesas?|tables?)$/],['silla',/^(?:sillas?|chairs?)$/],['sofa',/^(?:sofas?|sillones?|couches?)$/],['heladera',/^(?:heladeras?|frigorificos?|refrigeradores?|refrigerators?|fridges?)$/],['persona',/^(?:personas?|people|person)$/],['palmera',/^(?:palmeras?|palm trees?)$/],['camion',/^(?:camion(?:es)?|trucks?)$/],['bicicleta',/^(?:bicicletas?|bicycles?)$/],['moto',/^(?:motos?|motocicletas?|motorcycles?)$/]];
  for(const [term,re] of groups)if(re.test(q))return term;
  // Explicit object searches accept every catalogue name, including model numbers.

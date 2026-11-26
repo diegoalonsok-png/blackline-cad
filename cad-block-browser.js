@@ -276,9 +276,9 @@
  const termIndex=new Map(blockTerms.flatMap(([keys,re])=>(keys.includes('|')?keys.split('|'):keys.split(' ')).map(k=>[normalizeTerm(k),re])));
  function blockQuery(raw){
   const q=normalizeTerm(raw);
-  const mode=/\b(?:cortes?|secciones?|seccion|sections?|sectional|cross.section)\b/.test(q)?'Corte':/\b(?:vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear)\b/.test(q)?'Alzado':/\b(?:plantas?|top|plan)\b/.test(q)?'Planta':null;
-  const direction=/\b(?:laterales?|perfil|side)\b/.test(q)?'side':/\b(?:frontal|front)\b/.test(q)?'front':/\b(?:posterior|rear)\b/.test(q)?'rear':null;
-  const text=q.replace(/\b(?:en|de|del|la|el|los|las|un|una|in|of|the|cortes?|secciones?|seccion|sections?|sectional|cross.section|vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|plantas?|top|plan)\b/g,' ').replace(/\s+/g,' ').trim();
+  const mode=/\b(?:cortes?|secciones?|seccion|sections?|sectional|cross.section)\b/.test(q)?'Corte':/\b(?:vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|costado|frente|trasera|trasero|atras|detras|back)\b/.test(q)?'Alzado':/\b(?:plantas?|top|plan|arriba|superior)\b/.test(q)?'Planta':null;
+  const direction=/\b(?:laterales?|perfil|side|costado)\b/.test(q)?'side':/\b(?:frontal|front|frente)\b/.test(q)?'front':/\b(?:posterior|rear|trasera|trasero|atras|detras|back)\b/.test(q)?'rear':null;
+  const text=q.replace(/\b(?:en|de|del|la|el|los|las|un|una|desde|visto|vista|in|of|the|from|cortes?|secciones?|seccion|sections?|sectional|cross.section|vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|costado|frente|trasera|trasero|atras|detras|back|plantas?|top|plan|arriba|superior|view)\b/g,' ').replace(/\s+/g,' ').trim();
   return {q,mode,direction,text};
  }
  function blockMatchRank(it,query){
@@ -290,7 +290,7 @@
   const matched=!text||(syn?syn.test(name):tokens.every(t=>{const alias=termIndex.get(t);return alias?alias.test(name):all.includes(t)}));
   if(!matched)return -1;
   const actual=modeOf(it);
-  if(direction&&!(direction==='side'?/lateral|perfil|side|\blat\b/:direction==='front'?/frontal|front|\bfre\b/:/posterior|rear/).test(name))return -1;
+  if(direction&&!(direction==='side'?/lateral|perfil|side|\blat\b/:direction==='front'?/frontal|front|\bfre\b/:/posterior|rear|trasera/).test(name))return -1;
   if(!mode||actual===mode)return 0;
   // Furniture shown in a building section may be an elevation rather than a cut through the object.
   // Label these alternatives explicitly, after true section blocks.
