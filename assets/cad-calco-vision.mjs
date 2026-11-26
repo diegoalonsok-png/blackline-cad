@@ -69,3 +69,20 @@ export function catalogId(label){
  if(/bedroom|bedside/.test(s)&&!/(?:bedside table)/.test(s))return null;
  return rules.find(([re])=>re.test(s))?.[1]||null;
 }
+
+/* Compare both orthogonal axes against the native block's dimensions.
+   CAD rotation is counterclockwise; raster Y points down. */
+export function orthogonalFit(box,item,sx,sy){
+ const [x0,y0,x1,y1]=box,w=item.w,d=item.d;
+ if(![x0,y0,x1,y1,w,d,sx,sy].every(Number.isFinite)||Math.min(x1-x0,y1-y0,w,d,sx,sy)<=0)return null;
+ const bw=(x1-x0)*sx,bd=(y1-y0)*sy;
+ const fits=[0,90].map(angle=>{
+  const aw=angle?bd:bw,ad=angle?bw:bd;
+  return {angle,aw,ad,error:Math.abs(Math.log(aw/w))+Math.abs(Math.log(ad/d)),
+          valid:aw>=w*.45&&aw<=w*2&&ad>=d*.45&&ad<=d*2};
+ }).sort((a,b)=>Number(b.valid)-Number(a.valid)||a.error-b.error||a.angle-b.angle);
+ if(!fits[0].valid)return null;
+ const a=fits[0],cx=(x0+x1)/2,cy=(y0+y1)/2;
+ return {rotation:a.angle,x:cx+(a.angle?d:-w)/2/sx,y:cy+(a.angle?w:d)/2/sy,
+         uncertain:fits[1].valid&&Math.abs(fits[1].error-a.error)<.22};
+}
