@@ -16,7 +16,11 @@
   const t=(((q.x-a.x)*(vx/len))+((q.y-a.y)*(vy/len)))/len;
   if(!Number.isFinite(t))return null;
   const clipped=Math.max(0,Math.min(1,t));
-  return {point:point(a.x+clipped*vx,a.y+clipped*vy),t,within:t>=0&&t<=1};
+  // Return the actual endpoint rather than reconstructing it through a long
+  // subtraction and addition, which can lose the endpoint's coordinates.
+  const result=clipped===0?point(a.x,a.y):clipped===1?point(b.x,b.y):
+   clipped<=.5?point(a.x+clipped*vx,a.y+clipped*vy):point(b.x-(1-clipped)*vx,b.y-(1-clipped)*vy);
+  return finite(result)?{point:result,t,within:t>=0&&t<=1}:null;
  }
  function perpendicular(origin,a,b){
   const foot=segmentFoot(origin,a,b);
