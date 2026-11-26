@@ -550,7 +550,7 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const res=await fetch('/classics/search?q='+encodeURIComponent(raw),{signal:ctrl.signal,credentials:'omit'});
+   const res=await fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=3',{signal:ctrl.signal,credentials:'omit'});
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
