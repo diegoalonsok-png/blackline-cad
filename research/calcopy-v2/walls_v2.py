@@ -62,10 +62,14 @@ def runs(mask,T,vertical):
         sub=(lab[y:y+h,x:x+w]==i)
         cols=sub.sum(0).astype(float)
         top=np.argmax(sub,0);bot=h-1-np.argmax(sub[::-1],0)
-        # split where thickness changes strongly
+        # Preserve distinct wall thicknesses (e.g. 10/15/20 cm).
+        # Use a short median to suppress isolated scan/JPEG noise.
+        smooth=cols.copy()
+        for j in range(w):
+            smooth[j]=np.median(cols[max(0,j-2):min(w,j+3)])
         start=0
         for j in range(1,w+1):
-            if j==w or abs(cols[j]-cols[start])>max(2,.35*cols[start]):
+            if j==w or abs(smooth[j]-smooth[start])>max(1.5,.15*smooth[start]):
                 if j-start>=L:
                     t=float(np.median(cols[start:j]));c=y+float(np.median((top[start:j]+bot[start:j])/2))
                     out.append(dict(v=vertical,c=c,lo=float(x+start),hi=float(x+j-1),t=t))
@@ -75,9 +79,12 @@ def merge(segs,T):
     segs=sorted(segs,key=lambda s:(s['v'],s['c'],s['lo']));res=[]
     for s in segs:
         for r in res:
-            if r['v']==s['v'] and abs(r['c']-s['c'])<=max(2,.3*min(r['t'],s['t'])) and abs(r['t']-s['t'])<=max(2,.3*r['t']) and s['lo']-r['hi']<=max(3,.6*T):
-                tot=(r['hi']-r['lo'])+(s['hi']-s['lo']);r['c']=(r['c']*(r['hi']-r['lo'])+s['c']*(s['hi']-s['lo']))/tot
-                r['hi']=max(r['hi'],s['hi']);break
+            gap=max(s['lo'],r['lo'])-min(s['hi'],r['hi'])
+            same_width=abs(r['t']-s['t'])<=max(1.5,.12*min(r['t'],s['t']))
+            if r['v']==s['v'] and abs(r['c']-s['c'])<=max(2,.3*min(r['t'],s['t'])) and same_width and gap<=max(1,min(2,.15*min(r['t'],s['t']))):
+                tot=(r['hi']-r['lo'])+(s['hi']-s['lo'])
+                if tot>0:r['c']=(r['c']*(r['hi']-r['lo'])+s['c']*(s['hi']-s['lo']))/tot
+                r['lo']=min(r['lo'],s['lo']);r['hi']=max(r['hi'],s['hi']);break
         else:res.append(dict(s))
     return res
 def pair_outlines(segs,T):

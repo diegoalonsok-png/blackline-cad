@@ -11,7 +11,7 @@ async function engine(){
  report('Cargando OpenCV y NumPy…');await p.loadPackage(['opencv-python','numpy']);
  p.FS.mkdirTree('/calco');
  for(const name of modules){
-  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-v2',self.location.href),{cache:'no-cache'});
+  const res=await fetch(new URL('../research/calcopy-v2/'+name+'?v=20261126-v3-mixed',self.location.href),{cache:'no-cache'});
   if(!res.ok)throw Error('Módulo no disponible: '+name);
   p.FS.writeFile('/calco/'+name,await res.text());
  }
