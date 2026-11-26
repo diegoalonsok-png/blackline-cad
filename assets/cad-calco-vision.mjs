@@ -141,3 +141,31 @@ export function bestCatalogMatch(label,box,catalog,sx,sy){
  const best=ranked[0],next=ranked[1];
  return {...best,uncertain:!!next&&next.score-best.score<.12};
 }
+
+
+/* Approximate scale from a whole toilet footprint, never a precision dimension.
+   Use both axes; reject implausible proportions, truncated or duplicate boxes. */
+export function toiletScale(detections,catalog,width,height){
+ const candidates=catalog.filter(q=>/^san-wc(?:-|$)/.test(q.id)&&q.w>0&&q.d>0&&!q.hideFromGallery);
+ const samples=[];
+ for(const det of detections){
+  if(catalogId(det.label)!=='san-wc'||!Array.isArray(det.box)||det.box.length!==4)continue;
+  const [x,y,X,Y]=det.box,a=X-x,b=Y-y;
+  if(!det.box.every(Number.isFinite)||x<=1||y<=1||X>=width-1||Y>=height-1||Math.min(a,b)<10)continue;
+  const fits=candidates.flatMap(q=>[0,90].map(rotation=>{
+   const sx=(rotation?q.d:q.w)/a,sy=(rotation?q.w:q.d)/b;
+   return {scale:Math.sqrt(sx*sy),error:Math.abs(Math.log(sx/sy)),id:q.id,rotation};
+  })).sort((a,b)=>a.error-b.error);
+  if(!fits.length||fits[0].error>.25)continue;
+  const cx=(x+X)/2,cy=(y+Y)/2;
+  if(samples.some(s=>Math.hypot(cx-s.cx,cy-s.cy)<Math.min(a,b)*.5))continue;
+  samples.push({...fits[0],cx,cy});
+ }
+ if(!samples.length)return null;
+ const vals=samples.map(s=>s.scale).sort((a,b)=>a-b),mid=vals.length>>1;
+ const median=vals.length%2?vals[mid]:(vals[mid-1]+vals[mid])/2;
+ const consistent=vals.filter(v=>Math.abs(v/median-1)<=.18);
+ if(consistent.length<Math.ceil(vals.length*.67))return null;
+ const i=consistent.length>>1,scale=consistent.length%2?consistent[i]:(consistent[i-1]+consistent[i])/2;
+ return {metersPerPixel:scale,widthM:width*scale,samples:consistent.length,approximate:true};
+}
