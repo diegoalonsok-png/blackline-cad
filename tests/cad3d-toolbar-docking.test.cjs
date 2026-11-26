@@ -12,7 +12,7 @@ test('CAD3D docking source is valid and keeps toolbar command wiring',()=>{
   'cad3dCompactMode',"data-solid-command=\"extrude\""])
   assert.ok(source.includes(token),token);
 });
-test('real browser: toolbars compact, drag to bottom, re-dock to top and keep commands', {timeout:55000},async t=>{
+test('real browser: toolbars compact, drag to bottom, re-dock to top and keep commands', {timeout:90000},async t=>{
  const chrome=['chromium','google-chrome','chromium-browser'].map(c=>spawnSync('which',[c],{encoding:'utf8'})).find(r=>r.status===0)?.stdout.trim();
  if(!chrome){t.skip('Chromium not installed');return;}
  const cwd=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'cad3d-dock-'));
@@ -28,12 +28,15 @@ test('real browser: toolbars compact, drag to bottom, re-dock to top and keep co
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const port=server.address().port;
  const proc=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
-  '--remote-allow-origins=*','--remote-debugging-port=0','--user-data-dir='+tmp,'about:blank'],{stdio:'ignore'});
+  '--remote-allow-origins=*','--remote-debugging-port=0','--user-data-dir='+tmp,'about:blank'],{stdio:['ignore','ignore','pipe']});
+ let browserErrors='',spawnError=null;
+ proc.stderr.on('data',chunk=>{browserErrors=(browserErrors+chunk.toString()).slice(-4000);});
+ proc.on('error',err=>{spawnError=err;});
  let ws;
  try{
   const active=path.join(tmp,'DevToolsActivePort');
-  for(let i=0;i<160&&!fs.existsSync(active);i++)await sleep(100);
-  assert.ok(fs.existsSync(active),'Chromium opened DevTools');
+  for(let i=0;i<350&&!fs.existsSync(active)&&proc.exitCode===null&&!spawnError;i++)await sleep(100);
+  assert.ok(fs.existsSync(active),'Chromium DevTools unavailable; exit='+proc.exitCode+'; spawn='+String(spawnError||'none')+'; stderr='+browserErrors);
   const devPort=fs.readFileSync(active,'utf8').split('\n')[0];
   const resp=await fetch('http://127.0.0.1:'+devPort+'/json/new?'+encodeURIComponent('http://127.0.0.1:'+port+'/'),{method:'PUT'});
   assert.ok(resp.ok);const tab=await resp.json();
