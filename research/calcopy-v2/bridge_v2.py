@@ -57,13 +57,15 @@ def analyze_v2(pixels, w, h, real_width_m=None):
     validated,diagnostics=S.validate_mask(review_ink,mixed,max_passes=3)
     readings['validated']=_walls(validated,k)
     mask=S.black_mask(review_ink.shape,validated)
-    regions=S.region_hierarchy(S.enclosed_regions(mask))
     ppm=w*k/real_width_m if real_width_m is not None and real_width_m>0 else 0
     metric,metric_stats=S.metric_wall_review(review_ink,validated,ppm)
     readings['metric']=_walls(metric,k)
     diagnostics['metric']=metric_stats
     floor_grids=S.repeated_floor_grid(review_ink,S.black_mask(review_ink.shape,metric),ppm)
     doors=S.detect_door_symbols(review_ink,metric,ppm)
+    room_mask=S.room_partition_mask(mask,doors)
+    regions=S.region_hierarchy(S.enclosed_regions(room_mask))
+    diagnostics['virtual_room_boundary_px']=int((room_mask>mask).sum())
     for door in doors:
         for key in ('c','g0','g1'):door[key]=round(door[key]/k,2)
     for grid in floor_grids:
