@@ -494,7 +494,7 @@
  async function refreshHouseGallery(){
   const epoch=webEpoch;if(!houseMode)return;
   try{if(!el||el.style.display==='none'||el.classList.contains('min')||document.hidden||el.querySelector('.grid button:disabled'))return;
-   const refsOnly=(/referencias|references/i.test(houseQuery)||!!houseRefCategory(houseQuery))&&!webArea;const next=(await archivedReferences(houseQuery)).filter(x=>(!refsOnly||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5));
+   const refsOnly=(/referencias|references/i.test(houseQuery)||!!houseRefCategory(houseQuery))&&!webArea;const next=(await archivedReferences(houseQuery)).filter(x=>(!refsOnly||!!houseRefCategory(houseQuery)||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5));
    if(epoch!==webEpoch||!houseMode)return;
    const seen=new Set(webItems.map(x=>x.url||x.cadUrl||x.thumb));const added=next.filter(x=>!seen.has(x.url||x.cadUrl||x.thumb));
    if(added.length){webItems=webItems.concat(added);webStatus='';paintWeb();}
@@ -727,7 +727,7 @@
    const refCategory=houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
    const [own,archive]=await Promise.all([refsOnly?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
    if(epoch!==webEpoch||!houseMode)return;
-   webItems=own.concat(archive).filter(x=>(!refsOnly||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
+   webItems=own.concat(archive).filter(x=>(!refsOnly||!!refCategory||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
    webStatus=webItems.length?'':T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
    // No generic external photographs are appended.
