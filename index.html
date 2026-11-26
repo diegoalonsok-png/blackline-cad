@@ -1816,12 +1816,17 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   if(!cadJoinGeneratedArqFaces(arqPairs))for(const pair of arqPairs)cadWallJoinNewFaces(pair);
   for(const o of plan.openings)if(!hosts.has(o.host))throw Error('Unknown opening host');
   for(const host of hosts.values())for(let i=0;i<host.openings.length;i++){
-   const o=host.openings[i],w=host.w,center=host.at(o.offset),start=host.at(o.offset-o.width/2);
-   const name='ARQ · '+o.kind+' · '+Math.round(o.width*1000)+' · '+Math.round(w.thickness*1000)+' · '+state.unit;
+   const o=host.openings[i],w=host.w,center=host.at(o.offset),reviewed=plan.traceReviewed===true;
+   const reverse=reviewed&&Boolean(o.orientation?.reverseHostDirection);
+   const start=host.at(o.offset+(reverse?1:-1)*o.width/2);
+   const depth=reviewed?Math.min(.15,w.thickness,o.frameDepth??(o.kind==='framed-window'?.12:.15)):w.thickness;
+   const frame=reviewed?(o.frameWidth??.035):.035;
+   if(!(depth>0&&depth<=.5&&frame>0&&frame<o.width*.2))throw Error('Invalid opening frame');
+   const name='ARQ · '+o.kind+' · '+Math.round(o.width*1000)+' · '+Math.round(w.thickness*1000)+' · '+state.unit+(reviewed?' · CALCO '+Math.round(depth*1000)+'-'+Math.round(frame*1000):'');
    const openingLayer=layer(o.kind==='framed-window'?'WINDOWS':'DOORS');
-   const defaults={width:o.width*k,frameWidth:.035*k,frameDepth:w.thickness*k,mirror:false};
+   const defaults={width:o.width*k,frameWidth:frame*k,frameDepth:depth*k,mirror:reviewed&&Boolean(o.orientation?.mirror)};
    if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(o.width*k,0),layer:'0'}],parametric:{kind:o.kind,defaults}};
-   const definition=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI,layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.segments[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
+   const definition=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI+(reverse?180:0),layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.segments[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
    state.entities.push(ref);
    if(autoCutWallForOpening(ref,definition)!==2)throw Error('Could not cut both wall faces: '+w.id);
   }
@@ -1833,7 +1838,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   // Permanent native dimensions for individual architectural rooms; separate
   // layers permit independent visibility and do not change model geometry.
   const rooms=(plan.rooms||[]).filter(room=>['bathroom','bath','kitchen','bedroom'].includes(room.kind));
-  if(rooms.length===1&&(plan.rooms||[]).length===1){
+  if(plan.traceReviewed!==true&&rooms.length===1&&(plan.rooms||[]).length===1){
    const [x,y,w,d]=rooms[0].clearBounds||[];
    if([x,y,w,d].every(Number.isFinite)&&w>0&&d>0){
     const walls=plan.walls;
@@ -12380,7 +12385,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261125-house-route-v8"></script>
+<script src="cad-arq-pro.js?v=20261125-calco-reviewed-v1"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-affine-v2"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
