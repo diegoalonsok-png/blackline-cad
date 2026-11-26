@@ -46,5 +46,18 @@ function revolve(profile,angle,faces){
  if(volume(out)<0)for(let i=0;i<out.length;i+=9)for(let j=0;j<3;j++)[out[i+3+j],out[i+6+j]]=[out[i+6+j],out[i+3+j]];
  return out;
 }
-root.CAD3DSolidOps={boolean,revolve,volume};
+// Open-top rectangular shell with a solid bottom. Model units are metres.
+function boxShell(w,d,h,t){
+ if(![w,d,h,t].every(Number.isFinite)||Math.min(w,d,h,t)<=EPS||t>=Math.min(w/2,d/2,h))throw Error('Espesor incompatible con las dimensiones de la caja');
+ const ring=(x,y,z)=>[[-x,-y,z],[x,-y,z],[x,y,z],[-x,y,z]];
+ const A=ring(w/2,d/2,0),B=ring(w/2,d/2,h),C=ring(w/2-t,d/2-t,h),D=ring(w/2-t,d/2-t,t),out=[];
+ const tri=(a,b,c)=>out.push(...a,...b,...c);
+ const quad=(a,b,c,d)=>{tri(a,b,c);tri(a,c,d)};
+ quad(A[3],A[2],A[1],A[0]);quad(D[0],D[1],D[2],D[3]);
+ for(let i=0;i<4;i++){const j=(i+1)%4;quad(A[i],A[j],B[j],B[i]);quad(B[i],B[j],C[j],C[i]);quad(D[j],D[i],C[i],C[j]);}
+ const expected=w*d*h-(w-2*t)*(d-2*t)*(h-t);
+ if(Math.abs(volume(out)-expected)>Math.max(1e-9,expected*1e-8))throw Error('Validación de volumen de SHELL fallida');
+ return out;
+}
+root.CAD3DSolidOps={boolean,revolve,volume,boxShell};
 })(globalThis);
