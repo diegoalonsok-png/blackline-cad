@@ -63,3 +63,23 @@ test('CAD editor exposes a heading without changing rendering scripts',()=>{
  assert(heading,'Brand heading must remain a visible, semantic H1');
  assert.equal((html.match(/<h1\b/g)||[]).length,1);
 });
+
+test('Public pages retain unique titles, valid structured data and consistent brand safeguards',()=>{
+ const titles=new Set();
+ for(const path of paths){
+  const html=fs.readFileSync(path,'utf8'),head=html.split(/<\/head>/i)[0];
+  const title=head.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim().toLowerCase();
+  assert(title,path+' missing title');
+  assert(!titles.has(title),path+' duplicate title: '+title);titles.add(title);
+  assert.match(head,/<html\b[^>]*\blang=["'][a-z]{2}(?:-[A-Za-z]+)?["']/i,path+' missing document language');
+  for(const m of head.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi))assert.doesNotThrow(()=>JSON.parse(m[1]),path+' malformed JSON-LD');
+  assert(!/auto[\s_-]*(?:cad|desk)/i.test(html),path+' restricted third-party brand');
+ }
+});
+test('Academic resources link to the editor and contain the precision exercise in both languages',()=>{
+ for(const path of ['cad-2d-educacion.html','cad-2d-education.html']){
+  const html=fs.readFileSync(path,'utf8');
+  for(const term of ['OSNAP','OTRACK','ORTHO','DXF','PDF'])assert(html.includes(term),path+' missing '+term);
+  assert(html.includes('href="/"'),path+' missing editor link');
+ }
+});
