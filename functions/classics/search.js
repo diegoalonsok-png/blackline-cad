@@ -189,6 +189,19 @@ async function commons(search, limit) {
   return (data?.query?.pages || []).sort((a, b) => (a.index || 0) - (b.index || 0));
 }
 
+// Require positive attribution or a known work, not merely a search-engine match.
+function relevantAuthorDrawing(page,author,words=''){
+ const norm=v=>strip(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+ const meta=page.imageinfo?.[0]?.extmetadata||{};
+ const title=norm(page.title),description=norm(meta.ImageDescription?.value),object=norm(meta.ObjectName?.value),artist=norm(meta.Artist?.value);
+ const evidence=[title,description,object,artist].join(' ');
+ const name=norm(author.name.replace(/"/g,'').replace(/\s+architecture$/,''));
+ const matchName=author.key==='custom'?(' '+evidence+' ').includes(' '+name+' '):author.re.test(evidence)||(' '+evidence+' ').includes(' '+name+' ');
+ if(!matchName)return false;
+ const work=norm(words).split(' ').filter(t=>t.length>2&&!/^(?:floor|plan|plans|section|sections|elevation|elevations|corte|cortes|vista|vistas|dibujo|drawing|drawings|architectural|arquitectonico|fachada|fachadas|alzado|alzados)$/.test(t));
+ if(work.length&&!work.every(t=>(' '+evidence+' ').includes(' '+t+' ')))return false;
+ return true;
+}
 function toItem(page, author, kind) {
   const info = page.imageinfo?.[0], m = info?.extmetadata || {};
   const lic = strip(m.LicenseShortName?.value);
@@ -215,13 +228,14 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=8', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=9', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
   const explicitAuthor=raw.match(/^(?:autor(?:a)?|author|arquitect[oa]|architect)\s*:?\s+([a-z][a-z .'-]{2,70})$/i);
   const custom=!chosen.length&&explicitAuthor?A('custom',/$^/,explicitAuthor[1],'"'+explicitAuthor[1].trim()+'"',undefined,{modern:true,links:[]}):null;
-  const list = chosen.length ? chosen.slice(0,3) : custom?[custom]:AUTHORS.filter(a=>a.plates&&!a.modern).slice(0,4);
+  const general=/^(?:clasicos|classic plans|classical plans|plantas clasicas|planos clasicos|autores clasicos|arquitectos clasicos|arquitectos modernos|modern architects|tratados(?: de arquitectura)?|autores de la arquitectura)$/i.test(raw)||!raw;
+  const list = chosen.length ? chosen.slice(0,3) : custom?[custom]:general?AUTHORS.filter(a=>a.plates&&!a.modern).slice(0,4):[];
   const rest = raw.replace(/[^a-z0-9 ]+/g,' ').replace(DROP,' ');
   const words = custom?'':AUTHORS.reduce((s,a)=>s.replace(a.re,' '),rest).replace(/\s+/g,' ').trim();
   const w=words?words+' ':'';
@@ -232,7 +246,7 @@ export async function onRequestGet({ request, waitUntil }) {
    if(chosen.length===1&&PORTRAITS[a.key])jobs.push(authorPortrait(a));
    jobs.push(commons(w+a.name+' '+DRAW,per).then(p=>p.flatMap(x=>{
     const type=historicalDrawingType(x.title);
-    if(!type)return [];
+    if(!type||!relevantAuthorDrawing(x,a,words))return [];
     const it=toItem(x,a,'plate');if(!it)return [];
     const raster=/\.(?:png|jpe?g)(?:[?#]|$)/i.test(it.image)?it.image:it.thumb;
     if(!/\.(?:png|jpe?g)(?:[?#]|$)/i.test(raster||''))return [];
