@@ -56,21 +56,81 @@ const AUTHORS = [
   A('saarinen', /\beliel saarinen\b/, 'Eliel Saarinen (1873–1950)', '"Eliel Saarinen"'),
   A('asplund', /\basplund\b/, 'Gunnar Asplund (1885–1940)', 'Asplund'),
   A('lutyens', /\blutyens\b/, 'Edwin Lutyens (1869–1944)', 'Lutyens'),
-  // Modern masters: drawings are still protected → photographs of the works under free licences and links only.
+  // Modern masters: curated licensed drawings and measured surveys, never generic photographs.
   M('lecorbusier', /\ble ?corbusier\b|\bcorbu\b/, 'Le Corbusier (1887–1965)', '"Le Corbusier"', [['Fondation Le Corbusier', 'https://www.fondationlecorbusier.fr/']]),
   M('mies', /\bmies\b/, 'Ludwig Mies van der Rohe (1886–1969)', '"Mies van der Rohe"', [['MoMA', 'https://www.moma.org/']]),
-  M('wright', /\b(?:frank lloyd )?wright\b/, 'Frank Lloyd Wright (1867–1959)', '"Frank Lloyd Wright"', [['Frank Lloyd Wright Foundation', 'https://franklloydwright.org/']]),
+  M('wright', /\b(?:frank\s+loy?ds?\s+(?:wright|write)|frank\s+lloyd\s+wright|wright)\b/, 'Frank Lloyd Wright (1867–1959)', '"Frank Lloyd Wright"', [['Frank Lloyd Wright Foundation', 'https://franklloydwright.org/']]),
   M('gropius', /\bgropius\b|\bbauhaus\b/, 'Walter Gropius (1883–1969)', '"Walter Gropius"', [['Bauhaus-Archiv', 'https://www.bauhaus.de/']]),
   M('aalto', /\baalto\b/, 'Alvar Aalto (1898–1976)', '"Alvar Aalto"', [['Alvar Aalto Foundation', 'https://www.alvaraalto.fi/']]),
   M('kahn', /\b(?:louis )?kahn\b/, 'Louis Kahn (1901–1974)', '"Louis Kahn"'),
 ];
+
+/* Exact Commons file titles, not full-text matches. These are independently drawn plans
+   or HABS measured sheets; each file's current licence is checked before display. */
+const farn = ' - Edith Farnsworth House, 14520 River Road, Plano, Kendall County, IL HABS ILL,47-PLAN.V,1- (sheet ';
+const price = ' - Price Tower, 510 South Dewey Avenue, Bartlesville, Washington County, OK HABS OK-67 (sheet ';
+const CURATED = {
+ mies: [
+  ['Plan Barcelona Pavillon.png','floor-plan','Barcelona Pavilion · floor plan'],
+  ['Plan'+farn+'3 of 8).tif','floor-plan','Farnsworth House · floor plan'],
+  ['West and East Elevations and Sections'+farn+'5 of 8).tif','section','Farnsworth House · sections and elevations'],
+  ['Plan and North, East and South Elevations of Core, and Section'+farn+'6 of 8).tif','section','Farnsworth House · core plan and section'],
+  ['South and North Elevations'+farn+'4 of 8).tif','elevation','Farnsworth House · north and south elevations']
+ ],
+ lecorbusier: [
+  ['Plan chapelle Notre-Dame-du-Haut.svg','floor-plan','Ronchamp · site plan']
+ ],
+ wright: [
+  ['Fallingwaterfloorplan.jpg','floor-plan','Fallingwater · second floor plan'],
+  ['Wright-Hickox Ground Floor Plan 01.png','floor-plan','Hickox House · ground floor'],
+  ['Wright-Hickox Second Floor Plan.png','floor-plan','Hickox House · second floor'],
+  ['Wright-Heurtley House Lower Floor.png','floor-plan','Heurtley House · lower floor'],
+  ['Wright-Heurtley House Upper Floor.png','floor-plan','Heurtley House · upper floor'],
+  ['Wright-Willey.png','floor-plan','Willey House · floor plan'],
+  ['First Floor Plan'+price+'4 of 17).png','floor-plan','Price Tower · first floor'],
+  ['Section, and Light, Louver, and Spire Details'+price+'17 of 17).tif','section','Price Tower · section'],
+  ['East Elevation'+price+'12 of 17).tif','elevation','Price Tower · east elevation']
+ ]
+};
+const drawingRank = { 'floor-plan':0, section:1, elevation:2 };
+async function curatedDrawings(author, words) {
+ const specs=CURATED[author.key]||[];
+ const normalize=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/_/g,' ');
+ const query=normalize(words).replace(/\b(?:cortes?|sections?|plantas?|plans?|vistas?|elevations?|alzados?|fachadas?)\b/g,' ').trim();
+ const filtered=specs.filter(x=>!query||query.split(/\s+/).every(w=>normalize(x.join(' ')).includes(w)));
+ if(!filtered.length)return [];
+ const byTitle=new Map(filtered.map(x=>[normalize('File:'+x[0]),x]));
+ const u=new URL(API);
+ for(const [k,v] of Object.entries({action:'query',format:'json',formatversion:'2',titles:filtered.map(x=>'File:'+x[0]).join('|'),prop:'imageinfo',iiprop:'url|size|extmetadata',iiurlwidth:'1600',iiextmetadatafilter:'LicenseShortName|LicenseUrl|Artist'}))u.searchParams.set(k,v);
+ const res=await fetch(u,{headers:{'User-Agent':UA,Accept:'application/json'},cf:{cacheTtl:3600,cacheEverything:true}});
+ if(!res.ok)throw Error('Commons HTTP '+res.status);
+ const d=await res.json();
+ return (d.query?.pages||[]).flatMap(p=>{
+  const spec=byTitle.get(normalize(p.title)),i=p.imageinfo?.[0],m=i?.extmetadata||{},lic=strip(m.LicenseShortName?.value);
+  if(!spec||!i||!FREE.test(lic)||NC.test(lic))return [];
+  // Render TIFF/SVG originals as the provider's JPEG/PNG derivative, not as a photo.
+  const original=i.url||'',raster=/\.(?:png|jpe?g)(?:[?#]|$)/i.test(original)?original:i.thumburl;
+  const thumb=i.thumburl||raster;
+  if(!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(raster||'')||!/\.(?:png|jpe?g)(?:[?#]|$)/i.test(raster||''))return [];
+  return [{kind:'plate',drawingType:spec[1],curated:true,format:/\.png(?:[?#]|$)/i.test(raster)?'png':'jpg',title:spec[2],author:author.label,credit:strip(m.Artist?.value).slice(0,150),license:lic,licenseUrl:strip(m.LicenseUrl?.value),thumb,image:raster,page:i.descriptionurl||'https://commons.wikimedia.org/wiki/'+encodeURIComponent(p.title)}];
+ });
+}
+function historicalDrawingType(title) {
+ const q=String(title||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/_/g,' ');
+ if(/\b(?:photographs?|photos?|fotografias?|fotos?|perspectivas?|perspectives?|render|aerial|general view|seen from|street view|frontispiece|portada|cover)\b/.test(q))return null;
+ if(/\b(?:floor plans?|ground plans?|plans?|pianta|piante|planta|plantas|grundriss|grundrisse|ichnographia)\b/.test(q))return 'floor-plan';
+ if(/\b(?:cross sections?|sections?|sezione|sezioni|corte|cortes|seccion|schnitt)\b/.test(q))return 'section';
+ if(/\b(?:elevations?|alzados?|alzato|prospetto|orthographia)\b/.test(q))return 'elevation';
+ return null;
+}
+
 const COVER = '(frontispiece OR "title page" OR frontespizio OR frontispice OR portada OR Titelblatt OR Titelseite)';
 function linksFor(a, words = '') {
   const q = encodeURIComponent(a.name.replace(/"/g, '').replace(/\s+architecture$/, ''));
   const out = (a.links || []).map(([t, u]) => ({ t, u }));
   out.push({ t: 'Wikipedia', u: 'https://es.wikipedia.org/w/index.php?search=' + q });
   if (a.modern) {
-    // Their plans are not free: the user searches them outside and imports their own copy (File / URL), then CALCOPY.
+    // Additional documents remain accessible at their source; copyright is respected.
     const pq = encodeURIComponent((a.name.replace(/"/g, '') + ' ' + words + ' planta corte plan section').replace(/\s+/g, ' ').trim());
     out.unshift({ t: 'Plantas y cortes · Google', u: 'https://www.google.com/search?tbm=isch&q=' + pq });
     out.splice(1, 0, { t: 'Pinterest', u: 'https://www.pinterest.com/search/pins/?q=' + pq });
@@ -138,31 +198,32 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=5', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=6', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
   const list = chosen.length ? chosen.slice(0, 3) : AUTHORS.filter((a) => a.plates && !a.modern).slice(0, 4);
-  const onlyPhotos = /\bfotos?\b|\bphotos?\b/.test(raw);
-  const onlyCovers = /\b(?:tapas?|portadas?|covers?|frontispicios?|libros?|tratados?)\b/.test(raw);
-  const onlyPlates = !onlyPhotos && !onlyCovers && /\b(?:planta|plano|plan|corte|seccion|section|fachada|alzado|lamina)s?\b/.test(raw);
-  const rest = raw.replace(/[^a-z0-9 ]+/g, ' ').replace(DROP, ' ');
-  const words = AUTHORS.reduce((s, a) => s.replace(a.re, ' '), rest).replace(/\s+/g, ' ').trim();
-  const w = words ? words + ' ' : '';
-  const per = chosen.length === 1 ? 30 : 10;
-  const noDraw = ' -plan -pianta -planta -Grundriss -section -sezione -elevation -engraving';
-  const jobs = [];
-  for (const a of list) {
-    if (!onlyPhotos && !onlyCovers && !a.modern) jobs.push(commons(w + (a.plates || a.name + ' ' + DRAW), per).then((p) => p.map((x) => toItem(x, a, 'plate'))));
-    if (!onlyPhotos && !onlyPlates && a.book) jobs.push(commons((a.book || a.name) + ' ' + COVER, onlyCovers ? per : 6).then((p) => p.map((x) => toItem(x, a, 'cover'))));
-    if (!onlyPlates && !onlyCovers) jobs.push(commons(w + a.name + noDraw + (a.modern ? ' -drawing -sketch -dibujo -Zeichnung -model' : ''), a.modern ? Math.max(per, 20) : per).then((p) => p.map((x) => toItem(x, a, 'photo'))));
+  const rest = raw.replace(/[^a-z0-9 ]+/g,' ').replace(DROP,' ');
+  const words = AUTHORS.reduce((s,a)=>s.replace(a.re,' '),rest).replace(/\s+/g,' ').trim();
+  const w=words?words+' ':'';
+  const per=chosen.length===1?30:10;
+  const jobs=[];
+  for(const a of list){
+   if(a.modern){jobs.push(curatedDrawings(a,words));continue;}
+   jobs.push(commons(w+a.name+' '+DRAW,per).then(p=>p.flatMap(x=>{
+    const type=historicalDrawingType(x.title);
+    if(!type)return [];
+    const it=toItem(x,a,'plate');if(!it)return [];
+    const raster=/\.(?:png|jpe?g)(?:[?#]|$)/i.test(it.image)?it.image:it.thumb;
+    if(!/\.(?:png|jpe?g)(?:[?#]|$)/i.test(raster||''))return [];
+    return [{...it,image:raster,format:/\.png(?:[?#]|$)/i.test(raster)?'png':'jpg',drawingType:type,curated:false}];
+   })));
   }
   try {
     const groups = await Promise.all(jobs.map((j) => j.catch(() => [])));
     const seen = new Set(), items = [];
     for (const g of groups) for (const it of g) if (it && !seen.has(it.page)) { seen.add(it.page); items.push(it); }
-    const rank = { plate: 0, cover: 1, photo: 2 };
-    items.sort((p, q) => rank[p.kind] - rank[q.kind]);
+    items.sort((p,q)=>drawingRank[p.drawingType]-drawingRank[q.drawingType]);
     const res = json({ query: raw, authors: list.map((a) => a.label), links: chosen.slice(0, 3).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: chosen.some((a) => a.modern), index: chosen.length ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: items.slice(0, 60) });
     waitUntil(cache.put(key, res.clone()));
     return res;
