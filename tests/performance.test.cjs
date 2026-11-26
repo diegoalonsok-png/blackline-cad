@@ -21,3 +21,35 @@ test('10000 sample lines can be culled without mutation',()=>{
  assert.equal(visible,27);assert.deepEqual(entities[0].a,{x:0,y:0});
 });
 test('invalid view is rejected',()=>assert.equal(viewport({scale:0,ox:0,oy:0},100,100),null));
+
+test('wide polyline remains visible when its centreline is outside the viewport',()=>{
+ const e={type:'polyline',pwidth:4,pts:[{x:28,y:0},{x:28,y:8}]};
+ assert.equal(inViewport(e,v),true);
+ assert.equal(inViewport({...e,pwidth:1},v),false);
+});
+test('wide rectangles and bulged polylines use conservative paint culling',()=>{
+ assert.equal(inViewport({type:'rect',a:{x:28,y:0},b:{x:30,y:2},pwidth:4},v),true);
+ assert.equal(inViewport({type:'polyline',pts:[{x:28,y:0},{x:30,y:2}],bulges:[1],pwidth:4},v,()=>false),true);
+});
+test('rotated ellipse bounds match exact analytic extent',()=>{
+ const b=basicBounds({type:'ellipse',c:{x:10,y:20},rx:5,ry:2,rotation:Math.PI/2});
+ assert.ok(Math.abs(b.minX-8)<1e-9);assert.ok(Math.abs(b.maxX-12)<1e-9);
+ assert.ok(Math.abs(b.minY-15)<1e-9);assert.ok(Math.abs(b.maxY-25)<1e-9);
+});
+test('spatial index agrees with linear search for 10000 entities and 100 query boxes',()=>{
+ const {spatialIndex,overlap}=require('../cad-performance.js');
+ const items=Array.from({length:10000},(_,i)=>({type:'line',id:i,a:{x:i%100,y:Math.floor(i/100)},b:{x:i%100+0.4,y:Math.floor(i/100)+0.4}}));
+ const query=spatialIndex(items,basicBounds);
+ for(let i=0;i<100;i++){
+  const box={minX:i%25*4,minY:i%20*5,maxX:i%25*4+2,maxY:i%20*5+3};
+  assert.deepEqual(query(box).map(e=>e.id),items.filter(e=>overlap(basicBounds(e),box)).map(e=>e.id));
+ }
+});
+test('spatial index preserves unknown geometry and snapshots mutable bounds',()=>{
+ const {spatialIndex}=require('../cad-performance.js');
+ const b={minX:0,minY:0,maxX:1,maxY:1};
+ const query=spatialIndex(['known','unknown'],e=>{if(e==='unknown')throw Error('missing bounds');return b});
+ b.minX=100;b.maxX=101;
+ assert.deepEqual(query({minX:0,minY:0,maxX:1,maxY:1}),['known','unknown']);
+ assert.deepEqual(query({minX:99,minY:99,maxX:101,maxY:101}),['unknown']);
+});
