@@ -105,6 +105,7 @@ const add = (name, category, A, extra = {}) => {
   A.put('san-lav-acc', 'E', A.Y0 + 0.3, A.X1, 'basin');
   A.put('per-silla-ruedas', 'S', A.X0 + 1.1, A.Y0 + 1.0, 'wheelchair');
   A.door('v0-front0', A.X0 + 0.65, 0.9);
+  A.window('v0-side0', A.Y0 + 1.6, 0.6);
   add('Baño accesible 2,40 × 2,60 · inodoro, lavatorio y ducha', 'bathroom', A, { tags: ['accesible', 'discapacitados'], notes: ['Transferencia lateral 0,80 m a la derecha del inodoro; giro Ø 1,50 m.'] }); }
 
 /* ---------- Sanitarios públicos (teatro, auditorio, oficinas) ---------- */
@@ -112,23 +113,27 @@ const add = (name, category, A, extra = {}) => {
   cabins(A, A.X0, 6);
   for (let i = 0; i < 4; i++) A.put('san-lav-pie', 'S', A.X1 - 0.15 - (i + 1) * 0.7 + 0.075, A.Y0, 'basin');
   A.door('v0-front0', A.X0 + 0.7, 0.9);
+  A.window('v0-side1', A.Y0 + 2.0, 1.0);
   add('Sanitario público damas · 6 inodoros + 4 lavatorios (teatro)', 'bathroom', A, { tags: ['publico', 'teatro', 'damas'] }); }
 { const A = Plan('bathroom', 6.0, 4.0);
   const xr = cabins(A, A.X0, 3);
   for (let i = 0; i < 4; i++) { const x = xr + 0.25 + i * 0.7; A.put('san-mingitorio', 'N', x, A.Y1, 'urinal'); if (i) A.wall('ming-div' + i, [x - 0.17, A.Y1 - 0.45], [x - 0.17, A.Y1]); }
   for (let i = 0; i < 3; i++) A.put('san-lav-pie', 'S', A.X1 - 0.15 - (i + 1) * 0.7 + 0.075, A.Y0, 'basin');
   A.door('v0-front0', A.X0 + 0.7, 0.9);
+  A.window('v0-side1', A.Y0 + 2.0, 1.0);
   add('Sanitario público caballeros · 3 inodoros + 4 mingitorios + 3 lavatorios (teatro)', 'bathroom', A, { tags: ['publico', 'teatro', 'caballeros'] }); }
 { const A = Plan('bathroom', 3.6, 3.2);
   cabins(A, A.X0, 2);
   A.put('san-mingitorio', 'N', A.X0 + 2.2, A.Y1, 'urinal'); A.put('san-mingitorio', 'N', A.X0 + 2.9, A.Y1, 'urinal');
   A.put('san-lav-pie', 'S', A.X1 - 0.7, A.Y0, 'basin'); A.put('san-lav-pie', 'S', A.X1 - 1.4, A.Y0, 'basin');
   A.door('v0-front0', A.X0 + 0.6, 0.9);
+  A.window('v0-side1', A.Y0 + 1.6, 0.8);
   add('Sanitario público mixto chico · 2 inodoros + 2 mingitorios + 2 lavatorios', 'bathroom', A, { tags: ['publico', 'oficinas'] }); }
 { const A = Plan('bathroom', 8.0, 4.2);
   cabins(A, A.X0, 8);
   for (let i = 0; i < 6; i++) A.put('san-lav-pie', 'S', A.X1 - 0.15 - (i + 1) * 0.7 + 0.075, A.Y0, 'basin');
   A.door('v0-front0', A.X0 + 0.7, 1.0);
+  A.window('v0-side1', A.Y0 + 2.1, 1.2);
   add('Sanitario público damas grande · 8 inodoros + 6 lavatorios (teatro, estadio)', 'bathroom', A, { tags: ['publico', 'teatro', 'damas'] }); }
 
 /* ---------- Vestuarios de gimnasio ---------- */
@@ -139,6 +144,7 @@ const add = (name, category, A, extra = {}) => {
   for (let i = 0; i < 7; i++) A.put('mob-locker', 'W', A.Y0 + 0.2 + i * 0.4, A.X0, 'locker');
   A.put('mob-banco-vest', 'S', A.X0 + 1.4, A.Y0 + 1.4, 'bench'); A.put('mob-banco-vest', 'S', A.X0 + 1.4, A.Y0 + 0.35 + 0.05, 'bench');
   A.door('v0-front0', A.X0 + 4.2, 0.9);
+  A.window('v0-front0', A.X0 + 1.9, 1.2);
   add('Vestuario de gimnasio 6,40 × 5,00 · 4 duchas, 2 inodoros, 3 lavatorios, 7 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
 { const A = Plan('bathroom', 8.2, 6.0);
   let x = cabins(A, A.X0, 3);
@@ -149,6 +155,7 @@ const add = (name, category, A, extra = {}) => {
   for (let i = 0; i < 6; i++) A.put('mob-locker', 'S', A.X0 + 0.9 + i * 0.4, A.Y0, 'locker');
   A.put('mob-banco-vest', 'S', A.X0 + 1.6, A.Y0 + 2.0, 'bench'); A.put('mob-banco-vest', 'S', A.X0 + 3.3, A.Y0 + 2.0, 'bench');
   A.door('v0-front0', A.X0 + 4.6, 1.0);
+  A.window('v0-side1', A.Y0 + 4.6, 1.0);
   add('Vestuario de gimnasio 8,20 × 6,00 · 5 duchas, 3 inodoros, 2 mingitorios, 4 lavatorios, 16 lockers', 'bathroom', A, { tags: ['gimnasio', 'vestuario', 'club'] }); }
 
 /* ---------- Cocinas industriales ---------- */
@@ -156,6 +163,7 @@ const add = (name, category, A, extra = {}) => {
   let x = A.X0; for (const [id, w] of [['kq-industrial-fridge', 1.4], ['kq-industrial-prep', 1.8], ['kq-industrial-range', 1.2], ['kq-industrial-wash', 1.6]]) { A.put(id, 'N', x, A.Y1, id.slice(14)); x += w; }
   A.put('kq-industrial-prep', 'S', A.X1 - 1.8, A.Y0, 'prep'); A.put('kq-industrial-prep', 'S', A.X1 - 3.6, A.Y0, 'prep');
   A.door('v0-front0', A.X0 + 0.7, 1.0);
+  A.window('v0-side0', A.Y0 + 2.0, 1.2);
   add('Cocina industrial 6,00 × 4,00 · línea simple + mesada de apoyo', 'kitchen', A, { tags: ['industrial', 'gastronomica', 'restaurante'], notes: ['Pasillo libre 1,40 m entre líneas de trabajo.'] }); }
 { const A = Plan('kitchen', 8.0, 6.0);
   let x = A.X0; for (const [id, w] of [['kq-industrial-fridge', 1.4], ['kq-industrial-fridge', 1.4], ['kq-industrial-range', 1.2], ['kq-industrial-range', 1.2], ['kq-industrial-prep', 1.8]]) { A.put(id, 'N', x, A.Y1, id.slice(14)); x += w; }
@@ -163,6 +171,7 @@ const add = (name, category, A, extra = {}) => {
   A.put('kq-industrial-prep', 'S', A.X0 + 2.0, A.Y0 + 2.25, 'prep'); A.put('kq-industrial-prep', 'N', A.X0 + 2.0, A.Y0 + 3.75, 'prep');
   A.put('kq-industrial-prep', 'S', A.X0 + 3.8, A.Y0 + 2.25, 'prep'); A.put('kq-industrial-prep', 'N', A.X0 + 3.8, A.Y0 + 3.75, 'prep');
   A.door('v0-front0', A.X0 + 0.8, 1.0); A.door('v0-side1', A.Y0 + 3.0, 1.0);
+  A.window('v0-side0', A.Y0 + 3.0, 1.5);
   add('Cocina industrial 8,00 × 6,00 · doble línea + isla central de preparación', 'kitchen', A, { tags: ['industrial', 'gastronomica', 'restaurante'], notes: ['Pasillos de 1,40–1,50 m; isla de preparación doble enfrentada.'] }); }
 { const A = Plan('kitchen', 10.0, 7.0);
   // recepción y frío al oeste, preparación al centro, cocción al norte, lavado al este
@@ -173,6 +182,7 @@ const add = (name, category, A, extra = {}) => {
   A.put('kq-industrial-wash', 'E', A.Y0 + 0.4, A.X1, 'wash'); A.put('kq-industrial-wash', 'E', A.Y0 + 2.0, A.X1, 'wash');
   A.put('kq-industrial-prep', 'S', A.X0 + 3.0, A.Y0, 'prep'); A.put('kq-industrial-prep', 'S', A.X0 + 4.8, A.Y0, 'prep');
   A.door('v0-front0', A.X0 + 1.4, 1.2); A.door('v0-side1', A.Y0 + 4.6, 1.0);
+  A.window('v0-front0', A.X0 + 7.5, 1.5);
   add('Cocina de restaurante 10,00 × 7,00 · recepción, frío, preparación, cocción y lavado', 'kitchen', A, { tags: ['industrial', 'gastronomica', 'restaurante'], notes: ['Circuito lineal: recepción → cámara/frío → preparación → cocción → pase; lavado separado.'] }); }
 
 /* ---------- comprobaciones ---------- */
