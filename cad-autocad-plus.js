@@ -2,7 +2,8 @@
  * Implementación propia; los nombres de comandos son términos genéricos de dibujo.
  * Capas: CAPAISO/LAYISO, CAPAUNISO/LAYUNISO, CAPADES/LAYOFF, CAPAACT/LAYON, CAPABLOQ/LAYLCK,
  *        CAPADESBLOQ/LAYULK, CAPAACTUAL/LAYMCUR, CAPACAMBIAR/LAYMCH, CAPAFUSION/LAYMRG, CAPABORRAR/LAYDEL, PORCAPA/SETBYLAYER
- * Cotas: ACOCONT/DIMCONTINUE, ACOLINEABASE/DIMBASELINE
+ * Cotas: ACOCONT/DIMCONTINUE, ACOLINEABASE/DIMBASELINE, ACOARCO/DIMARC, ESPACIOCOTA/DIMSPACE, QLEADER/MLD
+ * Texto: ESCALATEXTO/SCALETEXT
  * Dibujo: SPLINE, ARANDELA/DONUT, MARCACENTRO/CENTERMARK, LINEACENTRO/CENTERLINE, MATRIZCAMINO/ARRAYPATH
  * Vista/consulta: ZOOMOBJETO/ZO, CALC/CAL, BUSCAR/FIND, ESTADO/STATUS, AUDITAR/AUDIT
  * Shift + clic derecho: menú de referencias a objetos (OSNAP).
@@ -281,6 +282,62 @@ reg(['AUDIT','AUDITAR','REVISAR'],()=>{
  if(!window.confirm('AUDITAR: '+bad.length+' objeto(s) dañados (coordenadas inválidas, líneas de largo cero o bloques sin definición). ¿Eliminarlos? Ctrl+Z deshace.'))return;
  CORE.saveHistory();const ids=new Set(bad.map(e=>e.id));st.entities=st.entities.filter(e=>!ids.has(e.id));CORE.updateAll();CORE.toast('AUDITAR: '+bad.length+' objeto(s) corregidos');
 });
+/* ---------- COTA DE LONGITUD DE ARCO (DIMARC) ---------- */
+function dimTextH(){const st=S(),ds=st.dimStyles?.[st.activeDimStyle];const h=Number(ds?.textHeight||ds?.height||0);return h>0?h:.20*f()}
+function fmtLen(v){const pr=Math.max(0,Math.min(6,Number(S().precision??2)));return v.toFixed(pr)}
+reg(['DIMARC','DAR','ACOARCO','COTAARCO'],()=>{
+ pick({mode:'object',label:'DIMARC · elegí un arco',done:arc=>{
+  if(arc.type!=='arc')return CORE.toast('DIMARC: el objeto debe ser un arco');
+  pick({need:1,label:'DIMARC · ubicación de la línea de cota',done:([q])=>{
+   let sw=arc.a1-arc.a0;while(sw<=0)sw+=Math.PI*2;const L=arc.r*sw;
+   const R=Math.max(CORE.dist(arc.c,q),1e-9),gap=.05*f(),ext=.08*f(),out=R>=arc.r?1:-1,h=dimTextH();
+   const pt=(r,t)=>P(arc.c.x+r*Math.cos(t),arc.c.y+r*Math.sin(t)),group='dimarc-'+Date.now().toString(36);
+   CORE.saveHistory();const lay=arc.layer;
+   for(const t of [arc.a0,arc.a0+sw])add({type:'line',a:pt(arc.r+out*gap,t),b:pt(R+out*ext,t),layer:lay,width:.09,dimGroup:group});
+   add({type:'arc',c:{...arc.c},r:R,a0:arc.a0,a1:arc.a0+sw,layer:lay,width:.09,dimGroup:group});
+   const tm=arc.a0+sw/2,tp=pt(R+out*h*1.1,tm);let rot=(tm*180/Math.PI)-90;if(rot>90)rot-=180;if(rot<-90)rot+=180;
+   const label='⌒'+fmtLen(L),w=label.length*h*.62,rr=rot*Math.PI/180,tx=P(Math.cos(rr),Math.sin(rr)),ny=P(-tx.y,tx.x);
+   add({type:'text',text:label,p:P(tp.x-tx.x*w/2-ny.x*h/2,tp.y-tx.y*w/2-ny.y*h/2),h,rotation:rot,fontFamily:'Arial',layer:lay,dimGroup:group});
+   CORE.updateAll();CORE.toast('DIMARC · longitud de arco '+fmtLen(L)+' '+S().unit);
+  }});
+ }});
+});
+
+/* ---------- ESPACIADO DE COTAS PARALELAS (DIMSPACE) ---------- */
+function dimNormal(d){
+ if(d.mode==='horizontal')return P(0,1);if(d.mode==='vertical')return P(1,0);
+ if(d.mode==='aligned'||!d.mode){const dx=d.b.x-d.a.x,dy=d.b.y-d.a.y,L=Math.hypot(dx,dy);return L?P(-dy/L,dx/L):null}
+ return null;
+}
+reg(['DIMSPACE','ESPACIOCOTA','ACOESPACIO'],()=>{
+ const st=S(),dims=unlocked(sel()).filter(e=>e.type==='dimension'&&e.a&&e.b&&e.p&&dimNormal(e));
+ if(dims.length<2)return CORE.toast('DIMSPACE: seleccioná 2 o más cotas lineales paralelas (la más cercana al objeto queda fija)');
+ const n=dimNormal(dims[0]);
+ const par=dims.filter(d=>{const m=dimNormal(d);return Math.abs(m.x*n.y-m.y*n.x)<1e-6});
+ if(par.length<2)return CORE.toast('DIMSPACE: las cotas deben ser paralelas');
+ const off=d=>{const m=dimNormal(d),s=Math.sign(m.x*n.x+m.y*n.y)||1;return ((d.p.x-d.a.x)*n.x+(d.p.y-d.a.y)*n.y)};
+ const sign=Math.sign(par.reduce((t,d)=>t+off(d),0))||1;
+ // posición absoluta de cada línea de cota sobre la normal común
+ const pos=d=>d.p.x*n.x+d.p.y*n.y;par.sort((x,y)=>sign*(pos(x)-pos(y)));
+ const auto=dimTextH()*2.2,r=ask('DIMSPACE · separación ('+st.unit+') · vacío = automático, 0 = alinear',String(+auto.toPrecision(3)));if(r===null)return;
+ const gap=r===''?auto:num(r);if(!(gap>=0))return CORE.toast('Separación inválida');
+ CORE.saveHistory();const p0=pos(par[0]);
+ par.forEach((d,i)=>{const target=p0+sign*gap*i,delta=target-pos(d);d.p=P(d.p.x+n.x*delta,d.p.y+n.y*delta);if(CORE.cadAssociateDim)try{CORE.cadAssociateDim(d)}catch(e){}});
+ CORE.updateAll();CORE.toast('DIMSPACE · '+par.length+' cotas a '+fmtLen(gap)+' '+st.unit);
+});
+
+/* ---------- DIRECTRIZ (alias de escritorio) ---------- */
+reg(['QLEADER','QLE','MLD','DIRECTRIZRAPIDA'],()=>CORE.setTool('dimLeader'));
+
+/* ---------- ESCALA DE TEXTO (SCALETEXT) ---------- */
+reg(['SCALETEXT','ESCALATEXTO','TEXTSCALE'],()=>{
+ const s=unlocked(sel()).filter(e=>e.type==='text');if(!s.length)return CORE.toast('SCALETEXT: seleccioná textos');
+ const r=ask('SCALETEXT · nueva altura ('+S().unit+') o factor con x (ej. x0.5)',String(s[0].h||dimTextH()));if(!r)return;
+ const factor=/^x/i.test(r)?num(r.slice(1)):null,h=factor?null:num(r);
+ if(factor!==null?!(factor>0):!(h>0))return CORE.toast('Valor inválido');
+ CORE.saveHistory();for(const e of s)e.h=factor!==null?(e.h||dimTextH())*factor:h;CORE.updateAll();CORE.toast('SCALETEXT · '+s.length+' texto(s)');
+});
+
 Object.assign(EXT.commands,C);
 
 /* ---------- Shift + clic derecho: referencias a objetos ---------- */
