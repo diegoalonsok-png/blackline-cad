@@ -2350,7 +2350,7 @@ function cadFastInteractiveFrame(){
 }
 function cadKeepLastFull(){
  if(!cadHeavyDrawing())return;
- try{const c=cadLastFull?.canvas||document.createElement('canvas');if(c.width!==canvas.width)c.width=canvas.width;if(c.height!==canvas.height)c.height=canvas.height;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,c.width,c.height);g.drawImage(canvas,0,0);cadLastFull={canvas:c,w:canvas.width,h:canvas.height,dpr,view:{scale:state.view.scale,ox:state.view.ox,oy:state.view.oy}};}catch(e){cadLastFull=null}
+ try{const c=(cadLastFull&&!cadLastFull.shared&&cadLastFull.canvas)||document.createElement('canvas');if(c.width!==canvas.width)c.width=canvas.width;if(c.height!==canvas.height)c.height=canvas.height;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,c.width,c.height);g.drawImage(canvas,0,0);cadLastFull={canvas:c,w:canvas.width,h:canvas.height,dpr,view:{scale:state.view.scale,ox:state.view.ox,oy:state.view.oy}};}catch(e){cadLastFull=null}
 }
 function cadDrawFrame(){drawPending=false;if(cadFastInteractiveFrame())return;const perfStart=performance.now();let painted=0;
  const idle=state.entities.length>=500&&state.tool==='select'&&!state.drag&&!state.stage.length&&!state.selected.length&&!cadPrimitiveGripPlacement&&!cadVertexPlacement&&!cadSelectionAnchor&&!state.mtextBox;
@@ -2380,7 +2380,9 @@ function cadDrawFrame(){drawPending=false;if(cadFastInteractiveFrame())return;co
  }batch?.flush();if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
  if(idle){try{const buffer=cadIdleFrame?.canvas||document.createElement('canvas');if(buffer.width!==canvas.width)buffer.width=canvas.width;if(buffer.height!==canvas.height)buffer.height=canvas.height;const bctx=buffer.getContext('2d');bctx.clearRect(0,0,buffer.width,buffer.height);bctx.drawImage(canvas,0,0);cadIdleFrame={canvas:buffer,key:frameKey,painted};cadIdleFrameValid=true}catch(e){cadIdleFrameValid=false}}else{cadIdleFrameValid=false;}
  }
- if(!reuse){cadLastFullCost=performance.now()-perfStart;cadKeepLastFull();}
+ if(!reuse){cadLastFullCost=performance.now()-perfStart;
+  // Si el cuadro en reposo ya se guardó, la vía rápida de zoom usa esa misma imagen (sin otra copia del lienzo).
+  if(idle&&cadIdleFrameValid&&cadIdleFrame?.key===frameKey){if(cadHeavyDrawing())cadLastFull={canvas:cadIdleFrame.canvas,w:canvas.width,h:canvas.height,dpr,view:{scale:state.view.scale,ox:state.view.ox,oy:state.view.oy},shared:true}}else cadKeepLastFull();}
  cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,world(pointer));
@@ -2530,7 +2532,11 @@ function drawSnapMarker(){
  ctx.fill();ctx.stroke();ctx.restore();
 }
 function arcSweep(a0,a1){let delta=((a1-a0)%TAU+TAU)%TAU;return delta<1e-8?TAU:delta}
-function tracePath(e,c=ctx){const s=screen;let a,b,d;switch(e.type){case 'line':a=s(e.a);b=s(e.b);c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);break;case 'polyline':if(!e.pts?.length)break;a=s(e.pts[0]);c.moveTo(a.x,a.y);e.pts.slice(1).forEach(p=>{b=s(p);c.lineTo(b.x,b.y)});if(e.closed)c.closePath();break;case 'rect':a=s(e.a);b=s(e.b);c.rect(a.x,a.y,b.x-a.x,b.y-a.y);break;case 'circle':a=s(e.c);c.moveTo(a.x+e.r*state.view.scale,a.y);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),0,TAU);break;case 'ellipse':a=s(e.c);c.ellipse(a.x,a.y,Math.abs(e.rx*state.view.scale),Math.abs(e.ry*state.view.scale),-(e.rotation||0),0,TAU);break;case 'arc':a=s(e.c);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),-e.a0,-(e.a0+arcSweep(e.a0,e.a1)),true);break;case 'dimension':a=s(e.a);b=s(e.b);d=s(e.p);let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1;let nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny;let p1=s(add(e.a,P(nx*off,ny*off))),p2=s(add(e.b,P(nx*off,ny*off)));c.moveTo(a.x,a.y);c.lineTo(p1.x,p1.y);c.moveTo(b.x,b.y);c.lineTo(p2.x,p2.y);c.moveTo(p1.x,p1.y);c.lineTo(p2.x,p2.y);break;}}
+function tracePath(e,c=ctx){const s=screen;let a,b,d;switch(e.type){case 'line':a=s(e.a);b=s(e.b);c.moveTo(a.x,a.y);c.lineTo(b.x,b.y);break;case 'polyline':{if(!e.pts?.length)break;const pts=e.pts,n=pts.length;a=s(pts[0]);c.moveTo(a.x,a.y);
+ // Sólo en pantalla: vértices a menos de medio píxel del último trazado se omiten (la geometría no cambia).
+ if(n>6){let lx=a.x,ly=a.y;for(let i=1;i<n;i++){b=s(pts[i]);const dx=b.x-lx,dy=b.y-ly;if(i===n-1||dx*dx+dy*dy>=.25){c.lineTo(b.x,b.y);lx=b.x;ly=b.y}}}
+ else for(let i=1;i<n;i++){b=s(pts[i]);c.lineTo(b.x,b.y)}
+ if(e.closed)c.closePath();break;}case 'rect':a=s(e.a);b=s(e.b);c.rect(a.x,a.y,b.x-a.x,b.y-a.y);break;case 'circle':a=s(e.c);c.moveTo(a.x+e.r*state.view.scale,a.y);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),0,TAU);break;case 'ellipse':a=s(e.c);c.ellipse(a.x,a.y,Math.abs(e.rx*state.view.scale),Math.abs(e.ry*state.view.scale),-(e.rotation||0),0,TAU);break;case 'arc':a=s(e.c);c.arc(a.x,a.y,Math.abs(e.r*state.view.scale),-e.a0,-(e.a0+arcSweep(e.a0,e.a1)),true);break;case 'dimension':a=s(e.a);b=s(e.b);d=s(e.p);let vx=e.b.x-e.a.x,vy=e.b.y-e.a.y,L=Math.hypot(vx,vy)||1;let nx=-vy/L,ny=vx/L,off=(e.p.x-e.a.x)*nx+(e.p.y-e.a.y)*ny;let p1=s(add(e.a,P(nx*off,ny*off))),p2=s(add(e.b,P(nx*off,ny*off)));c.moveTo(a.x,a.y);c.lineTo(p1.x,p1.y);c.moveTo(b.x,b.y);c.lineTo(p2.x,p2.y);c.moveTo(p1.x,p1.y);c.lineTo(p2.x,p2.y);break;}}
 
 let cadDimExtra={arrowType:'tick',color:'',extOffset:0,extBeyond:-1};
 function readDimensionStyle(){
@@ -3778,8 +3784,12 @@ function cadDrawRefFast(e){
    else if(k.type==='circle'){P2.moveTo(k.c.x+Math.abs(k.r),k.c.y);P2.arc(k.c.x,k.c.y,Math.abs(k.r),0,TAU)}
    else if(k.type==='arc'){const sw=arcSweep(k.a0,k.a1);P2.moveTo(k.c.x+Math.abs(k.r)*Math.cos(k.a0),k.c.y+Math.abs(k.r)*Math.sin(k.a0));P2.arc(k.c.x,k.c.y,Math.abs(k.r),k.a0,k.a0+sw,false)}
   }
-  c={kids,ss,groups:[...groups.values()],rest};cadRefPathCache.set(e,c);
+  let bb=null;try{bb=getBounds(kids)}catch(err){bb=null}
+  c={kids,ss,groups:[...groups.values()],rest,bb};cadRefPathCache.set(e,c);
  }
+ // Nivel de detalle: un bloque de menos de 2 px en pantalla se dibuja como un punto (sólo visualización).
+ if(c.bb&&Number.isFinite(c.bb.minX)){const px=Math.max(c.bb.maxX-c.bb.minX,c.bb.maxY-c.bb.minY)*state.view.scale;
+  if(px<2){const q=screen(P((c.bb.minX+c.bb.maxX)/2,(c.bb.minY+c.bb.maxY)/2));ctx.fillStyle=c.groups[0]?.col||cadScreenColor(layerFor(e).color);ctx.fillRect(Math.round(q.x)-.5,Math.round(q.y)-.5,1.5,1.5);return}}
  if(c.groups.length){
   const o=screen(P(0,0)),ux=screen(P(1,0)),uy=screen(P(0,1)),sc=Math.hypot(ux.x-o.x,ux.y-o.y)||1;
   ctx.save();ctx.transform(ux.x-o.x,ux.y-o.y,uy.x-o.x,uy.y-o.y,o.x,o.y);ctx.lineCap='round';ctx.lineJoin='round';ctx.setLineDash([]);
@@ -12344,6 +12354,7 @@ function cad2dDrawExtensions(){
 }
 window.CAD2D_CORE=Object.freeze({
  get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
+ perfFrames:()=>cadPerfFrames.slice(),
  dxf:Object.freeze({build:(entities,name,layers)=>buildDXFText(entities,name,layers),parse:(text,opts={})=>importDXF(text,'',{...opts,parseOnly:true})}),
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
