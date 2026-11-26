@@ -776,6 +776,56 @@ function doubleSuiteCorridor(plan,passage){
 // Individual rear cubicles; one clear common aisle, independent native doors.
 // Public sanitary batteries: explicit quantities and independent private cabins.
 // Classroom seating is a counted grid of native library blocks, not a raster.
+// Counted auditorium layouts with native walls, openings and furniture blocks.
+function auditoriumInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:auditorios?|teatros?|salas? de cine|cines?|auditoriums?|theaters?|theatres?|cinemas?)\b/);
+ if(!head)return null;
+ let tail=s.slice(head[0].length).trim();
+ if(!/\d/.test(tail))return null;
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?)?';
+ const dm=tail.match(new RegExp('^(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)'));
+ if(!dm)throw Error('Indicá ancho × profundidad del auditorio y cantidad de butacas.');
+ const width=num(dm[1])*unitScale(dm[2]||dm[4]),depth=num(dm[3])*unitScale(dm[4]||dm[2]);
+ tail=tail.slice(dm[0].length).trim();
+ let seats=null,aisle=1.5,rows=null,stage=/teatro|theatre|theater/.test(head[0])?2:0;
+ const seen=new Set(),opt=label=>new RegExp('^(?:'+label+')\\s*(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)');
+ while(tail){
+  tail=tail.replace(/^(?:con|para|y|with|for|and)\s+/,'');
+  let m,key;
+  if((m=tail.match(/^(\d+)\s+(?:butacas?|personas?|espectadores?|asientos?|seats?|people)(?=\s|$)/))){key='seats';seats=Number(m[1]);}
+  else if((m=tail.match(opt('pasillo(?: central)?|circulacion|aisle')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(/^(\d+)\s+(?:filas?|rows?)(?=\s|$)/))){key='rows';rows=Number(m[1]);}
+  else if((m=tail.match(opt('escenario|stage')))){key='stage';stage=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(/^(?:escenario|stage)\b/))){key='stage';stage=2;}
+  else if((m=tail.match(/^(?:sin escenario|without stage)\b/))){key='stage';stage=0;}
+  else throw Error('Opción de auditorio no soportada: '+tail);
+  if(seen.has(key))throw Error('Opción de auditorio repetida: '+key);seen.add(key);tail=tail.slice(m[0].length).trim();
+ }
+ if(!Number.isInteger(seats)||seats<1||seats>180||aisle<1.2||aisle>3||stage<0||stage>5||(stage>0&&stage<1)||rows!==null&&(!Number.isInteger(rows)||rows<1||rows>20))throw Error('Auditorio: 1–180 butacas, pasillo de 1,20–3 m, escenario de 1–5 m.');
+ return {kind:'room',count:1,width,depth,wall:.15,door:1.2,window:0,fixtures:[],seats,aisle,rows,stage,assumptions:[]};
+}
+function solveAuditorium(spec){
+ const {width:w,depth:d,seats,aisle,stage}=spec;
+ const sw=.6,sd=.75,px=.65,py=1.05,side=.9,rear=1.5,front=stage+2.2,half=(w-aisle)/2;
+ const cols=Math.max(0,Math.floor((half-side-sw+1e-8)/px)+1),maxRows=Math.max(0,Math.floor((d-front-rear-sd+1e-8)/py)+1);
+ const rows=spec.rows??Math.ceil(seats/(2*cols));
+ if(!cols||rows>maxRows||rows*cols*2<seats)throw Error('No entran todas las butacas con los pasillos indicados. Aumentá las medidas o reducí la capacidad.');
+ const plan=solve(spec);plan.brief={...spec,auditoriumGrid:true};plan.virtualDimensions.forEach(v=>v.editable=false);
+ const [X,Y]=plan.rooms[0].clearBounds;
+ const put=(id,role,x,y,bw,bd)=>plan.blocks.push({catalogId:id,role,point:[X+x,Y+y],rotation:0,scale:1,layer:'FURNITURE',envelope:[X+x,Y+y,bw,bd],nominalSize:[bw,bd]});
+ const screen=Math.min(12,Math.max(1.5,w*.6));
+ put('mob-pantalla-auditorio','screen',(w-screen)/2,d-.12,screen,.12);
+ if(stage){const stageW=Math.min(14,w-2*side);if(stageW<2)throw Error('Escenario demasiado estrecho.');put('mob-escenario','stage',(w-stageW)/2,d-stage-.2,stageW,stage);}
+ let placed=0;
+ for(let j=0;j<rows&&placed<seats;j++)for(let k=0;k<2*cols&&placed<seats;k++){
+  const x=k<cols?half-sw-k*px:w/2+aisle/2+(k-cols)*px;
+  put('mob-butaca-auditorio','auditoriumSeat',x,d-front-sd-j*py,sw,sd);placed++;
+ }
+ plan.rooms[0].seatCount=seats;plan.rooms[0].centralAisle=aisle;
+ plan.assumptions.push(seats+' butacas, pasillo central '+aisle+' m; escenario '+stage+' m.','Planta preliminar: no verifica evacuación, número de salidas, accesibilidad, visuales, acústica ni normativa.');
+ return plan;
+}
 function classroomInstruction(raw){
  const s=normalize(raw).trim().replace(/[.!]$/,'');
  const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:(\d+)\s+)?(?:aulas?|classrooms?|salones de clase)\b/);
@@ -895,6 +945,7 @@ function run(raw){
  const parking=parkingInstruction(raw);if(parking)return solveParking(parking);
  const battery=sanitaryBatteryInstruction(raw);if(battery)return collectiveCabins(battery);
  const classroom=classroomInstruction(raw);if(classroom)return solveClassroom(classroom);
+ const auditorium=auditoriumInstruction(raw);if(auditorium)return solveAuditorium(auditorium);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
