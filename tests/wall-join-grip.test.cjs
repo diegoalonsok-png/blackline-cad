@@ -72,3 +72,14 @@ test('reverse-drawn short wall also retains its original orientation',()=>{
  close(result.line.a.x,.05);assert.deepEqual(result.line.b,p(0,0));
  assert.deepEqual(result.updates,[]);
 });
+
+
+test('clearance measures the shared longitudinal interval of near-parallel walls',()=>{
+ const w=line(1,p(0,0),p(5,0));
+ const other=line(2,p(0,2),p(100,4));
+ close(grip.nearestParallelWall(w,[other]).signed,2.05);
+ close(grip.nearestParallelWall(w,[line(2,other.b,other.a)]).signed,2.05);
+});
+test('wall tips touching only in longitudinal projection do not report a room clearance',()=>{
+ assert.equal(grip.nearestParallelWall(line(1,p(0,0),p(5,0)),[line(2,p(5,2),p(10,2))]),null);
+});
