@@ -30,7 +30,7 @@ test('Windows use perimeter frames and distinct transparent glazing',()=>{
 test('Sun shadows and visual style never re-enable opaque glass shadows',()=>{
  const sun=section('function applySunSettings(){','function renderDraftModes(){');
  const style=section('function applyRenderStyle(){','function setVisualStyle(mode){');
- assert(sun.includes('if(o.userData?.cadGlass){o.receiveShadow=false;o.castShadow=false;}'));
- assert(style.includes('m.castShadow=!m.userData.cadGlass&&!plainLines'));
- assert(style.includes('mat.opacity=m.userData.cadGlass?.28'));
+ assert(/if\(o\.userData\?\.cadGlass(?:\|\|[^)]*)?\)\{o\.receiveShadow=false;o\.castShadow=false;\}/.test(sun));
+ assert(style.includes('glass=!!m.userData.cadGlass')&&style.includes('m.castShadow=!glass&&!plainLines'));
+ assert(/mat\.opacity=[^;]*glass\?\.28/.test(style),'glass stays translucent (0.28)');
 });

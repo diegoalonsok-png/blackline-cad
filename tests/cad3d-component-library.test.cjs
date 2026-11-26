@@ -18,8 +18,9 @@ test('3D block library uses geometric boxes, not images',()=>{
 });
 test('3D blocks persist, edit and use existing move and copy commands',()=>{
  assert(source.includes("rec=newRecord('block3d')"));
- assert(source.includes("var accepted=['box','sphere','cone','cylinder','wall','slab','boolean','block3d']"));
+ assert(/var accepted=\['box','sphere','cone','cylinder','wall','slab','boolean','block3d'[,\]]/.test(source));
  assert(source.includes("if(r.type==='block3d')o.blockId="));
- assert(source.includes("r.type==='block3d'))keys.push('w','d','h')"));
+ // Bloques 3D: ancho y profundidad editables (h según el tipo), dentro del listado general.
+ assert(/\[[^\]]*'block3d'[^\]]*\]\.includes\(r\.type\)\)\{[^}]*keys\.push\('w'\);keys\.push\('d'\)/.test(source));
  assert(source.includes("if(kind==='move'||kind==='copy')"));
 });

@@ -20,7 +20,7 @@ test('Natural sunlight uses warm direct light, skylight and color-managed render
  assert(sun.includes("sunLight.shadow.mapSize.set(2048,2048)"));
  assert(sun.includes('bounds.span*1.25'));
  assert(sun.includes("sunLight.castShadow=sunSettings.enabled"));
- assert(sun.includes('sunGround.visible=sunSettings.enabled&&sunSettings.onGround'));
+ assert(fs.readFileSync('cad3d-lab.js','utf8').includes('sunGround.receiveShadow=sunSettings.enabled&&sunSettings.onGround'));
  assert(sun.includes("sunSettings.elevation*Math.PI/180"));
  assert(!sun.includes('records.push('),'Sun controls must never create CAD objects');
 });

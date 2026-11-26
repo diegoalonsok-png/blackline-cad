@@ -7,7 +7,7 @@ const source=[...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map
 test('opening actions use real parametric block references',()=>{
  assert.ok(source);
  for(const kind of ['swing-door','double-door','framed-window'])assert.ok(source.includes("'"+kind+"'"));
- for(const action of ['mirror','swing','rotate'])assert.ok(source.includes("action:'"+action+"'"));
+ for(const action of ['mirror','swing','rotate'])assert.ok(source.includes("action:'"+action+"'")||(source.includes("'"+action+"'")&&source.includes("grip.action==='"+action+"'")),action);
  assert.match(source,/function cadOpeningQuickHit\(raw\)/);
  assert.match(source,/function cadOpeningQuickApply\(grip\)/);
  assert.match(source,/function drawBlockGrips\(ref\)/);

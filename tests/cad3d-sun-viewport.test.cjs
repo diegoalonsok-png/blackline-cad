@@ -15,7 +15,7 @@ test('Sun uses a lit WebGL ground receiver, separate from editable records',()=>
 });
 test('Sun direction tracks geometry bounds, with ground and face toggles',()=>{
  assert(src.includes('sunLight.target.position.set(bounds.x,bounds.y,bounds.z)'));
- assert(src.includes('sunGround.visible=sunSettings.enabled&&sunSettings.onGround'));
+ assert(src.includes('sunGround.receiveShadow=sunSettings.enabled&&sunSettings.onGround'));
  assert(src.includes('o.receiveShadow=sunSettings.enabled&&sunSettings.onFaces'));
  assert(src.includes("this.dataset.sunPreset"));
 });
@@ -26,7 +26,7 @@ test('CAD3D view controls and differentiated floor/sun icons are implemented',()
  assert(src.includes('function fit3DModel(){'));
 });
 test('Sun activates from the toolbar without requiring a second checkbox click',()=>{
- assert(src.includes('if(opening&&!sunSettings.enabled){sunSettings.enabled=true;applySunSettings();}'));
+ assert(/if\(opening\)\{\s*sunSettings\.enabled=true;applySunSettings\(\);/.test(src));
 });
 
 test('A user can compare actual WebGL rendered pixels with cast shadows on/off',()=>{

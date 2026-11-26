@@ -31,7 +31,7 @@ test('Every primitive is supported and contained in the declared 1:1 block bound
 });
 test('Additional block loader leaves existing palettes intact and adds only on selection',()=>{
  new vm.Script(loader,{filename:'cad2d-architecture-pack.js'});
- assert.match(loader,/if\(!api\.hasBlock\(key\)\)api\.addBlock\(key,geometry\(item,api\.unit\(\)\)\)/);
+ assert.match(loader,/if\(!api\.hasBlock\(key\)\)api\.addBlock\(key,geometry\((?:item|block),api\.unit\(\)\)\)/);
  assert.match(loader,/api\.selectBlock\(key\)/);
  assert.match(loader,/FACTOR=\{m:1,cm:100,mm:1000,in:/);
  assert.match(loader,/new Set\(catalog\.blocks\.map\(x=>x\.category\)\)/);

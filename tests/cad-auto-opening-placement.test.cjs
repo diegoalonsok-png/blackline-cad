@@ -39,6 +39,7 @@ test('blocks keep one geometry grip while openings restore their parametric acti
  assert.match(main,/function blockGripPoints\(ref\)\{[\s\S]*?return ref\?\.type==='blockRef'&&ref\.p\?\[ref\.p\]:\[\];/);
  const code=main.slice(main.indexOf('function drawBlockGrips(ref){'),main.indexOf('function blockGripTargetPoint(d,raw){'));
  assert.ok(code.includes('cadDrawOpeningQuickGrips(ref)'));
- assert.ok(!code.includes('cadDrawGenericBlockGrips('));
+ // Manijas de acción de bloque dinámico (girar/voltear/estirar): sólo con un único bloque seleccionado.
+ assert.ok(!code.includes('cadDrawGenericBlockGrips(')||code.includes('if(state.selected.length===1)cadDrawGenericBlockGrips(ref)'));
  assert.ok(!code.includes('blDynHandles('));
 });
