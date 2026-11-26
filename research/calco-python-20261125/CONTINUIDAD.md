@@ -30,3 +30,12 @@ No reiniciar el motor desde cero al cambiar de sesión. Este directorio conserva
 - native_wall_plan.py: valida y prepara datos de WALL y aberturas conocidas; no reconoce las aberturas por sí solo.
 
 Próximo paso: integrar y medir las cuatro piezas nuevas como un pipeline opt-in, con referencias verificadas y métricas de precisión/cobertura; mantener el código de producción intacto hasta superar las pruebas.
+
+## Orden de aceptación acordado (25/11, noche)
+1. Muros: corregir iterativamente con referencias independientes. No confundir ejecución sin error con exactitud; comprobar anchos reales, uniones, vanos y ausencia de falsos positivos.
+2. Puertas y ventanas: insertar bloques paramétricos y perforar con WALL nativo, sin duplicar cortes.
+3. Resto de bloques arquitectónicos: mobiliario, sanitarios y otros, con dimensiones, orientación y capas.
+4. HATCH/sombreados: al final, como entidades editables en CAD, con límites, huecos y escalas correctos. No confundir el relleno negro provisional de la detección de muros con HATCH final.
+5. Verificar todas las fases dentro de CAD2D3D publicado: CALCOPY, selección IMG, inserción nativa, UNDO/REDO, guardado DXF y reapertura, rendimiento y cancelación. No declarar listo hasta verificar producción.
+
+Nueva ronda: refine_caps.py y regression_gate.py. 53 casos de ensayo (51 sin referencia completa y 2 con máscaras manuales aproximadas), 0 errores de ejecución, 0 regresiones de IoU entre las dos referencias, 0 coincidencias exactas. En la última planta anotada la cobertura aumentó de 95,85% a 96,58%; precisión 99,61%. No certificar ni fusionar en producción por ahora. Se necesita ampliar el corpus anotado y validar geometría nativa, no solo máscara raster.
