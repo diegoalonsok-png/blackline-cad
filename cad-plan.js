@@ -24,8 +24,8 @@ const enforce=cfg.enforce===true&&!!urls.status;
    puede abrir y exportar sus propios dibujos (evita "secuestrar" el trabajo del cliente). */
 const PLANS={
  free:{label:'Gratis',price:'0 €',features:['draw','dxf','pdf-a4','arq-basic','projects-3']},
- pro:{label:'Pro',price:'5,99 € / mes · 49,99 € / año (ahorrás 30 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark']},
- studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','no-watermark','team']}
+ pro:{label:'Pro',price:'5,99 € / mes · 49,99 € / año (ahorrás 30 %) · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch']},
+ studio:{label:'Estudio',price:'9,99 € / mes · 89,99 € / año · 5 usuarios · IVA incl.',features:['draw','dxf','pdf-a4','pdf-all','arq-basic','arq-pro','projects-unlimited','dwg','cloud','ai-retouch','team']}
 };
 const FEATURE_LABEL={'arq-pro':'Bloques Pro de la galería (baño principal, cocinas con isla, sanitario público…)','pdf-all':'Ploteo PDF A0–A3 y escalas personalizadas','dwg':'Apertura de archivos .dwg de AutoCAD','cloud':'Proyectos en la nube y recuperación entre dispositivos','projects-unlimited':'Proyectos ilimitados','ai-retouch':'Retoque con IA del render artístico 3D','team':'Equipo: el titular + 4 personas con Pro'};
 
@@ -144,7 +144,7 @@ function showPlans(reason,notice){
   :'<p>'+L('Plan actual','Current plan')+': <b>'+(cur==='pro'?'Pro':cur==='studio'?L('Estudio','Studio'):L('Gratis','Free'))+'</b>'+(status.email?' · '+esc(status.email):'')+(status.teamOf?' · '+L('incluido en el equipo de ','included in the team of ')+esc(status.teamOf):'')+'</p>';
  const li=a=>'<ul>'+a.map(x=>'<li>'+x+'</li>').join('')+'</ul>';
  const free=li([L('Dibujo 2D completo, capas y cotas','Full 2D drafting, layers and dimensions'),L('DXF, SVG, PNG y PDF A4','DXF, SVG, PNG and A4 PDF'),L('Galería básica de bloques','Basic block gallery')]);
- const pro=li([L('Toda la galería de bloques dinámicos','The whole dynamic block gallery'),L('Ploteo PDF A0–A3 y escalas a medida','A0–A3 PDF plotting and custom scales'),L('Proyectos ilimitados','Unlimited projects'),L('Sin marca de agua','No watermark')]);
+ const pro=li([L('Toda la galería de bloques dinámicos','The whole dynamic block gallery'),L('Ploteo PDF A0–A3 y escalas a medida','A0–A3 PDF plotting and custom scales'),L('Proyectos ilimitados','Unlimited projects'),L('Retoque con IA del render 3D','AI retouch of the 3D render')]);
  const isPro=cur==='pro'||cur==='studio';
  const studio=li([L('Todo lo de Pro','Everything in Pro'),L('El titular + 4 personas con Pro','The owner + 4 people with Pro'),L('Invitás y quitás personas por correo cuando quieras','Add or remove people by email at any time')]);
  d.innerHTML='<div class="box"><div class="top"><b>BLACKLINE CAD · '+L('PLANES','PLANS')+'</b><button class="x" data-go="close" aria-label="Close">×</button></div>'+head+state+
