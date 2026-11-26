@@ -119,6 +119,58 @@ def snap(segs,T):
     for s in segs:
         if s['lo']>s['hi']:s['lo'],s['hi']=s['hi'],s['lo']
     return segs
+
+def thin_lines(im,paper,vertical):
+    hsv=cv2.cvtColor(im,cv2.COLOR_BGR2HSV);g=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
+    ink=((g<paper-35)&(hsv[...,1]<90)).astype(np.uint8)
+    src=ink.T.copy() if vertical else ink
+    H,W=src.shape;L=max(12,int(.025*max(H,W)))
+    m=cv2.morphologyEx(src,cv2.MORPH_CLOSE,np.ones((1,3),np.uint8))
+    m=cv2.morphologyEx(m,cv2.MORPH_OPEN,np.ones((1,L),np.uint8))
+    n,lab,st,cen=cv2.connectedComponentsWithStats(m,connectivity=4)
+    out=[]
+    for i in range(1,n):
+        x,y,w,h,a=st[i]
+        if w<L or h>max(6,.012*max(H,W)):continue
+        out.append(dict(c=float(cen[i][1]),lo=float(x),hi=float(x+w-1),t=float(a)/w))
+    return sorted(out,key=lambda q:q['c']),src
+def line_pairs(im,paper):
+    """Double-line walls: two parallel strokes at wall-thickness distance."""
+    raw=[]
+    for vertical in (False,True):
+        lines,src=thin_lines(im,paper,vertical)
+        for i,p in enumerate(lines):
+            for q in lines[i+1:]:
+                d=q['c']-p['c']
+                if d<4:continue
+                if d>.06*max(src.shape):break
+                a,b=max(p['lo'],q['lo']),min(p['hi'],q['hi'])
+                if b-a<max(3*d,.6*min(p['hi']-p['lo'],q['hi']-q['lo'])*0):continue
+                if b-a<3*d:continue
+                y0=int(p['c']+p['t']/2+1);y1=int(q['c']-q['t']/2)
+                core=src[y0:y1,int(a):int(b)]
+                if core.size==0:continue
+                # Empty or textured core, never a continuous stroke inside.
+                if core.mean()>.45 or (core.mean(axis=1).max(initial=0)>.8 and core.shape[0]>2):continue
+                # Stripes (stairs, decking, hatching) repeat: a wall pair has no third parallel stroke nearby.
+                def crowded(lo_c,hi_c):
+                    for r in lines:
+                        if lo_c<r['c']<hi_c and min(b,r['hi'])-max(a,r['lo'])>.5*(b-a):return True
+                    return False
+                if crowded(q['c']+1,q['c']+1.3*d) or crowded(p['c']-1.3*d,p['c']-1) or crowded(p['c']+1,q['c']-1):continue
+                raw.append(dict(v=vertical,c=(p['c']+q['c'])/2,t=d+(p['t']+q['t'])/2,lo=a,hi=b,gap=d,p=id(p),q=id(q)))
+    if not raw:return [],None
+    # Dominant wall thickness from long pairs.
+    hist={}
+    for r in raw:hist[round(r['gap'])]=hist.get(round(r['gap']),0)+(r['hi']-r['lo'])
+    d0=max(hist,key=hist.get)
+    keep=[r for r in raw if .55*d0<=r['gap']<=2.6*d0]
+    # Each stroke pairs once, nearest partner first.
+    keep.sort(key=lambda r:r['gap']);used=set();out=[]
+    for r in keep:
+        if r['p'] in used or r['q'] in used:continue
+        used|={r['p'],r['q']};out.append(dict(v=r['v'],c=r['c'],t=r['t'],lo=r['lo'],hi=r['hi']))
+    return out,d0+2
 def vectorize(mask,T):
     segs=runs(mask,T,False)+runs(mask,T,True)
     segs=merge(segs,T)
@@ -150,16 +202,20 @@ def wall_network(segs,T):
 def structure_score(segs,H,W):
     m=.12*max(H,W)
     return sum(s['hi']-s['lo'] for s in segs if s['hi']-s['lo']>=m)
-def detect(im):
+def finish(segs,T):
+    segs=merge(segs,T)
+    segs=[q for q in segs if q['hi']-q['lo']>=max(2*T,.6*q['t']+T) and q['t']<=3.5*T]
+    return wall_network(snap(segs,T),T)
+def detect(im,mode='auto'):
     g=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY);paper=float(np.percentile(g,90));H,W=g.shape
-    opts=[]
+    res={}
     sm,T=solid(im,paper)
-    if sm is not None:opts.append(('solid',sm,T))
-    hm,Th=hollow(im,paper)
-    if Th:opts.append(('hollow',hm,Th))
-    best=None
-    for kind,mask,T in opts:
-        segs=vectorize(mask,T);sc=structure_score(segs,H,W)
-        if best is None or sc>best[0]:best=(sc,segs,T,kind,mask)
-    if not best:return [],None,'none',None
-    return best[1],best[2],best[3],best[4]
+    if sm is not None:
+        segs=runs(sm,T,False)+runs(sm,T,True);segs=pair_outlines(merge(segs,T),T)
+        res['solid']=(finish(segs,T),T)
+    ps,Tp=line_pairs(im,paper)
+    if Tp:res['lines']=(finish(ps,Tp),Tp)
+    if mode in res:return res[mode][0],res[mode][1],mode,None
+    if not res:return [],None,'none',None
+    k=max(res,key=lambda k:structure_score(res[k][0],H,W))
+    return res[k][0],res[k][1],k,None

@@ -9,9 +9,8 @@ def draw(im,segs):
     return vis
 imgs=[]
 for k in KEYS:
-    im=load(k);g=cv2.cvtColor(im,cv2.COLOR_BGR2GRAY);paper=float(np.percentile(g,90))
-    sm,T=W.solid(im,paper);hm,Th=W.hollow(im,paper)
-    a=draw(im,W.vectorize(sm,T)) if sm is not None else im
-    b=draw(im,W.vectorize(hm,Th)) if Th else im
-    imgs.append((k+' LLENO',a));imgs.append((k+' HUECO',b))
+    im=load(k)
+    for mode,name in (('solid','LLENO'),('lines','DOBLE')):
+        segs,T,_,_=W.detect(im,mode)
+        imgs.append((k+' '+name+' %d'%len(segs),draw(im,segs) if T else im))
 sheet(imgs[:18],T=330,cols=6,out='both1.jpg');sheet(imgs[18:],T=330,cols=6,out='both2.jpg')
