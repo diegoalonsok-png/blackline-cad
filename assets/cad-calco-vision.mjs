@@ -86,3 +86,58 @@ export function orthogonalFit(box,item,sx,sy){
  return {rotation:a.angle,x:cx+(a.angle?d:-w)/2/sx,y:cy+(a.angle?w:d)/2/sy,
          uncertain:fits[1].valid&&Math.abs(fits[1].error-a.error)<.22};
 }
+
+/* Only compatible semantic families are considered; never substitute unrelated
+   objects just because their bounding boxes have similar dimensions. */
+const variantGroups=[
+ ['san-wc','san-wc-susp'],['san-lav','san-lav2','san-lav-pie','san-lav-acc'],
+ ['san-banera','san-banera-esq','san-hidromasaje'],['san-ducha','san-ducha-piso','san-ducha-doble'],
+ ['kq-bacha','kq-bacha2'],['kq-heladera','kq-heladera2','kq-industrial-fridge'],
+ ['kq-anafe2','kq-anafe4','kq-anafe5'],
+ ['dor-cama1','dor-cama-nido'],['dor-cama2','dor-queen','dor-king'],
+ ['mob-mesa4','mob-mesa6','mob-mesa8'],['mob-sofa2','mob-sofa3','mob-sofa-L'],
+ ['mob-placard','mob-placard-bat'],['mob-escritorio','mob-escritorio-L'],
+ ['esc-recta','esc-recta-descanso','esc-L','esc-U'],['esc-caracol','esc-caracol-inversa'],
+ ['veh-auto','veh-camioneta','veh-pickup'],['veh-moto','veh-moto-calle','veh-scooter'],
+ ['ext-arbol','ext-conifera'],['ext-arbusto','ext-maceta']
+];
+const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+export function rankCatalog(label,box,catalog,sx,sy){
+ const preferred=catalogId(label);
+ if(!preferred||!Array.isArray(box)||box.length!==4||!box.every(Number.isFinite)||!(sx>0&&sy>0))return [];
+ const [x0,y0,x1,y1]=box,bw=(x1-x0)*sx,bd=(y1-y0)*sy;
+ if(!(bw>0&&bd>0))return [];
+ const group=variantGroups.find(g=>g.includes(preferred))||[preferred];
+ const seed=catalog.find(q=>q.id===preferred),pool=catalog.filter(q=>
+  !q.hideFromGallery&&!q.pro&&!q.paidOnly&&!q.dxfPlan&&!q.remoteDK&&
+  (group.includes(q.id)||(seed?.family&&q.family===seed.family&&q.cat===seed.cat&&/^(san|kq|dor|mob|esc|veh|ext)-/.test(q.id))));
+ const ranked=[];
+ for(const item of pool){
+  const {w,d}=item;if(!Number.isFinite(w)||!Number.isFinite(d)||Math.min(w,d)<=0)continue;
+  const wl=item.wMin??w,wh=item.wMax??w,dl=item.dMin??d,dh=item.dMax??d;
+  if(![wl,wh,dl,dh].every(Number.isFinite)||wl<=0||dl<=0||wl>wh||dl>dh)continue;
+  for(const rotation of [0,90]){
+   const aw=rotation?bd:bw,ad=rotation?bw:bd;
+   let W=clamp(aw,wl,wh),D=clamp(ad,dl,dh);
+   if(item.lockAspect){
+    const ratio=d/w,lo=Math.max(wl,dl/ratio),hi=Math.min(wh,dh/ratio);
+    if(lo>hi)continue;
+    W=clamp(Math.sqrt(aw*ad/ratio),lo,hi);D=W*ratio;
+   }
+   // Reject grossly incompatible detections; modest crop error is expected.
+   if(aw/W<.45||aw/W>2||ad/D<.45||ad/D>2)continue;
+   const err=Math.abs(Math.log(aw/W))+Math.abs(Math.log(ad/D));
+   const nominal=Math.abs(Math.log(W/w))+Math.abs(Math.log(D/d));
+   const score=err+.16*nominal+(item.id===preferred?0:.07);
+   const cx=(x0+x1)/2,cy=(y0+y1)/2;
+   ranked.push({item,score,w:W,d:D,rotation,x:cx+(rotation?D:-W)/2/sx,y:cy+(rotation?W:D)/2/sy});
+  }
+ }
+ return ranked.sort((a,b)=>a.score-b.score||a.item.id.localeCompare(b.item.id)||a.rotation-b.rotation);
+}
+export function bestCatalogMatch(label,box,catalog,sx,sy){
+ const ranked=rankCatalog(label,box,catalog,sx,sy);
+ if(!ranked.length)return null;
+ const best=ranked[0],next=ranked[1];
+ return {...best,uncertain:!!next&&next.score-best.score<.12};
+}
