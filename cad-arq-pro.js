@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-parking2');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-modules1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1392,7 +1392,7 @@ function arqPoolRequest(raw){
 function arqRoomSetRequest(raw){
  const s=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/\b(?:buscar|busca|mostrar|mostrame|search|find|show|fotos?|jpg|png|referencias?|references)\b/.test(s))return false;
- const room='(?:habitacion(?:es)?|dormitorios?|cuartos?|banos?|bedrooms?|bathrooms?)';
+ const room='(?:habitacion(?:es)?|dormitorios?|cuartos?|banos?|bedrooms?|bathrooms?|oficinas?|despachos?|offices?|aulas?|classrooms?|salones de clase|cocinas?|kitchens?|lavaderos?|laundry|depositos?|storerooms?|vestidores?|closets?|consultorios?|consulting rooms?|locales?|locales comerciales|shops?)';
  const quantity='(?:\\d+(?:[.,]\\d+)?|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)';
  const set='(?:tandem|set|fila|row|conjunto|serie)';
  return new RegExp('\\b'+room+'\\s*(?:(?:en|in|de)\\s+)?(?:'+set+'\\s*(?:(?:de|of)\\s+)?)?(?:[x×*]|:|cantidad\\s*[:=]?)\\s*'+quantity+'(?=\\s|$)').test(s)||
