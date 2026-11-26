@@ -5,7 +5,7 @@ async function init(){
   const base='https://cdn.jsdelivr.net/pyodide/v0.27.7/full/';
   importScripts(base+'pyodide.js');
   const py=await loadPyodide({indexURL:base});
-  const r=await fetch(new URL('solver.py?v=20261124-semantic-v5',self.location.href),{cache:'no-cache'});
+  const r=await fetch(new URL('solver.py?v=20261126-italian1',self.location.href),{cache:'no-cache'});
   if(!r.ok)throw Error('Architecture solver unavailable');
   py.FS.writeFile('/architecture_solver.py',await r.text());
   await py.runPythonAsync('import sys\nsys.path.insert(0,"/")\nimport architecture_solver, json');
@@ -17,7 +17,7 @@ self.onmessage=async({data})=>{
  const id=data?.id;
  try{
   if(!data.semantic){
-   if(!self.BlacklineArchitectureAI)importScripts('blackline-engine.js?v=20261126-parking2');
+   if(!self.BlacklineArchitectureAI)importScripts('blackline-engine.js?v=20261126-modules1');
    const plan=data.brief?self.BlacklineArchitectureAI.solve(data.brief):self.BlacklineArchitectureAI.run(data.text);
    self.postMessage({id,plan});return;
   }
