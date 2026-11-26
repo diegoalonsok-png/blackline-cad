@@ -519,17 +519,17 @@ async function traceFile(file,source=null,python=false){
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
     ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
-     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-orientation',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-dynamic-match',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
      let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
-     for(const det of found){const id=module.catalogId(det.label),it=candidates.find(x=>x.id===id);if(!it)continue;
+     for(const det of found){
       const [x0,y0,x1,y1]=det.box.map((v,i)=>Math.max(0,Math.min(i%2?h:w,v)));if(x1<=x0||y1<=y0)continue;
-      const fit=module.orthogonalFit([x0,y0,x1,y1],it,sx,sy);if(!fit)continue;
+      const fit=module.bestCatalogMatch(det.label,[x0,y0,x1,y1],candidates,sx,sy);if(!fit)continue;const it=fit.item,id=it.id;
       const cx=(x0+x1)/2,cy=(y0+y1)/2;
       if(placements.some(p=>{const a=p.rotation*Math.PI/180,pcx=p.aiBox?(p.aiBox[0]+p.aiBox[2])/2:p.x+(p.w*Math.cos(a)-p.d*Math.sin(a))/2/sx,pcy=p.aiBox?(p.aiBox[1]+p.aiBox[3])/2:p.y-(p.w*Math.sin(a)+p.d*Math.cos(a))/2/sy;return Math.hypot((pcx-cx)*sx,(pcy-cy)*sy)<Math.min(it.w,it.d)*.4;}))continue;
       // Preserve the detected center and choose the best orthogonal axis.
-      const pl={...fit,id:it.id,name:it.name+' (IA)',w:it.w,d:it.d,aiBox:[x0,y0,x1,y1]};placements.push(pl);if(python)history.push(()=>{const i=placements.indexOf(pl);if(i>=0)placements.splice(i,1);});n++;
+      const pl={x:fit.x,y:fit.y,rotation:fit.rotation,uncertain:fit.uncertain,id:it.id,name:it.name+' (IA)',w:fit.w,d:fit.d,aiBox:[x0,y0,x1,y1]};placements.push(pl);if(python)history.push(()=>{const i=placements.indexOf(pl);if(i>=0)placements.splice(i,1);});n++;
      }
      redraw();aiStatus.textContent=n+LX(' candidatos añadidos de ',' candidates added out of ')+found.length+LX(' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.',' detections. Check position and rotation; use Undo mark to reject.');
     }catch(e){if(d.isConnected)aiStatus.textContent=LX('IA local no disponible: ','Local AI unavailable: ')+String(e.message||e).slice(0,180)+LX('. Podés seguir con el marcado manual.','. You can continue marking manually.');}
