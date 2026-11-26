@@ -468,20 +468,21 @@ async function traceFile(file,source=null,python=false){
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
   for(const wall of walls){pc.beginPath();pc.lineWidth=wall.t;pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}
-  const placements=[];
+  const placements=[];let blocksOnly=false;
   const accepted=await new Promise(resolve=>{
    const d=document.createElement('dialog');d.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:12px;width:min(720px,92vw);max-height:85vh;overflow:auto';
    const title=document.createElement('p');title.textContent='CALCO ARQUITECTÓNICO · '+walls.length+' tramos de muro candidatos'+(hatched?' (muros rayados)':'')+LX('. Revisá la vista previa. Aberturas aún no reconocidas.','. Check the preview. Openings not recognized yet.');
    preview.style.cssText='width:100%;max-height:55vh;object-fit:contain;display:block';
    const ok=document.createElement('button'),cancel=document.createElement('button');ok.className=cancel.className='btn';ok.textContent=LX('Insertar muros y bloques marcados','Insert walls and marked blocks');cancel.textContent=LX('Cancelar','Cancel');ok.onclick=()=>d.close('ok');cancel.onclick=()=>d.close('cancel');
+   const onlyBlocks=document.createElement('button');onlyBlocks.className='btn';onlyBlocks.textContent=LX('Insertar solo bloques','Insert blocks only');onlyBlocks.disabled=true;onlyBlocks.onclick=()=>{blocksOnly=true;d.close('ok');};
    const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0';
    const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button'),retry=document.createElement('button');retry.className='btn';retry.textContent=LX('Probar otro detector','Try another detector');
    const catalog=window.CAD2D_ARQ_LIBRARY?.library||[];
-   const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-cama|dor-queen|dor-king|mob-placard|mob-escritorio|mob-sillon)/.test(i.id));
+   const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-|mob-|kq-|esc-|ext-|veh-|ofi-|per-)/.test(i.id)&&Number.isFinite(i.w)&&i.w>0&&Number.isFinite(i.d)&&i.d>0);
    picker.add(new Option(LX('Marcar objeto sobre la imagen…','Mark an object on the image…'),''));for(const i of candidates)picker.add(new Option(i.name,i.id));
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
    undo.textContent=LX('Deshacer marca','Undo mark');undo.className='btn';
-   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip);title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin candidatos; probá otro detector. No se insertará nada.','No candidates; try another detector. Nothing will be inserted.'));
+   const redraw=()=>{pc.clearRect(0,0,w,h);pc.drawImage(cv,0,0);for(const wall of walls){pc.strokeStyle=wall.skip?'#b86b60':'#008b99';pc.setLineDash(wall.skip?[4,4]:[]);pc.beginPath();pc.lineWidth=Math.max(2,wall.t*.25);pc.moveTo(...wall.a);pc.lineTo(...wall.b);pc.stroke();}pc.setLineDash([]);ok.disabled=!walls.some(w=>!w.skip)&&!placements.length;onlyBlocks.disabled=!placements.length;title.textContent='CALCO ARQUITECTÓNICO · '+walls.filter(w=>!w.skip).length+' de '+walls.length+' tramos activos · '+mode+'. '+(walls.length?LX('Aberturas no reconocidas.','Openings not recognized.'):LX('Sin candidatos; probá otro detector. No se insertará nada.','No candidates; try another detector. Nothing will be inserted.'));
     if(python){
      for(const o of openings){const p0=o.v?[o.c,o.g0]:[o.g0,o.c],p1=o.v?[o.c,o.g1]:[o.g1,o.c];pc.strokeStyle=o.kind==='framed-window'?'#2f7de1':'#e8590c';pc.lineWidth=Math.max(3,o.t);pc.beginPath();pc.moveTo(...p0);pc.lineTo(...p1);pc.stroke();
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
@@ -508,21 +509,21 @@ async function traceFile(file,source=null,python=false){
      const module=await import(new URL('cad-calco-vision.mjs',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      const found=await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
-     let n=0;const sx=real/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h:sx;
+     let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
      for(const det of found){const id=module.catalogId(det.label),it=candidates.find(x=>x.id===id);if(!it)continue;
       const [x0,y0,x1,y1]=det.box.map((v,i)=>Math.max(0,Math.min(i%2?h:w,v)));if(x1<=x0||y1<=y0)continue;
       const bw=(x1-x0)*sx,bd=(y1-y0)*sy,ratio=bw/bd,normal=it.w/it.d,turn=Math.abs(Math.log(ratio/normal))>Math.abs(Math.log(ratio*normal));
       const aw=turn?bd:bw,ad=turn?bw:bd;
       if(aw<it.w*.45||aw>it.w*2||ad<it.d*.45||ad>it.d*2)continue;
       const cx=(x0+x1)/2,cy=(y0+y1)/2;
-      if(placements.some(p=>p.id===id&&Math.hypot((p.x-cx)*sx,(p.y-cy)*sy)<Math.min(it.w,it.d)*.45))continue;
+      if(placements.some(p=>{const a=p.rotation*Math.PI/180,pcx=p.aiBox?(p.aiBox[0]+p.aiBox[2])/2:p.x+(p.w*Math.cos(a)-p.d*Math.sin(a))/2/sx,pcy=p.aiBox?(p.aiBox[1]+p.aiBox[3])/2:p.y-(p.w*Math.sin(a)+p.d*Math.cos(a))/2/sy;return Math.hypot((pcx-cx)*sx,(pcy-cy)*sy)<Math.min(it.w,it.d)*.4;}))continue;
       // Infer axis only; facing direction needs visual review. Anchor at block corner.
       const angle=turn?90:0,x=cx+(turn?it.d:-it.w)/2/sx,y=cy+(turn?it.w:it.d)/2/sy;
-      placements.push({x,y,id:it.id,name:it.name+' (IA)',w:it.w,d:it.d,rotation:angle,aiBox:[x0,y0,x1,y1]});n++;
+      const pl={x,y,id:it.id,name:it.name+' (IA)',w:it.w,d:it.d,rotation:angle,aiBox:[x0,y0,x1,y1]};placements.push(pl);if(python)history.push(()=>{const i=placements.indexOf(pl);if(i>=0)placements.splice(i,1);});n++;
      }
      redraw();aiStatus.textContent=n+LX(' candidatos añadidos de ',' candidates added out of ')+found.length+LX(' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.',' detections. Check position and rotation; use Undo mark to reject.');
     }catch(e){if(d.isConnected)aiStatus.textContent=LX('IA local no disponible: ','Local AI unavailable: ')+String(e.message||e).slice(0,180)+LX('. Podés seguir con el marcado manual.','. You can continue marking manually.');}
-    finally{ai.disabled=false;ok.disabled=false;}
+    finally{ai.disabled=false;redraw();}
    };
    retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent=LX('CALCO: buscando otra interpretación…','CALCO: trying another reading…');await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro','mixto experimental'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);if(mode==='mixto experimental'){makeMask(205);const solid=traceWallBands(mask,w,h),hatch=traceHatchedWallBands(mask,w,h),fineLight=traceFineWallBands(mask,w,h);makeMask(170);const fine=traceFineWallBands(mask,w,h);walls=combineTraceCandidates([solid,hatch,fineLight,fine]);}else{walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);}if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+LX(' candidatos · ',' candidates · ')+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
    const tool=document.createElement('select'),reading=document.createElement('select'),flip=document.createElement('button');
@@ -537,7 +538,7 @@ async function traceFile(file,source=null,python=false){
     controls.append(reading,tool,picker,rot,undo,flip,ai);
    }else controls.append(picker,rot,undo,ai);
    if(!python)controls.append(retry);const hint=document.createElement('p');if(python)hint.style.cssText='min-height:4.6em;margin:6px 0';hint.textContent=python?LX('1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.','1) Pick the reading that best follows the walls. 2) With «+ Wall» click missing walls; with «Remove» click extra ones. 3) With «+ Door» / «+ Window» click the gap. 4) Set the scale with two clicks on a dimension. 5) Mark furniture and fixtures. Undo reverts the last step.'):'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
-   redraw();d.append(title,hint,controls,aiStatus,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
+   redraw();d.append(title,hint,controls,aiStatus,preview,cancel,onlyBlocks,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
   if(!accepted||S.tool!=='select'||S.stage?.length)return;
   if(source&&!S.entities.some(e=>e.id===source.id&&e.type==='image'&&e.src===source.src&&e.a.x===source.a.x&&e.a.y===source.a.y&&e.b.x===source.b.x&&e.b.y===source.b.y))return C.toast('La imagen cambió; repetí CALCO.');
@@ -553,11 +554,11 @@ async function traceFile(file,source=null,python=false){
   const origin=Q([0,h]),toM=1000/C.U[S.unit],local=p=>{const q=Q(p);return [(q.x-origin.x)/toM,(q.y-origin.y)/toM]};
   const maxTraceThickness=python?1.2:.5;
   let tracePlan=null;
-  if(python){tracePlan=AS.buildPlan(walls,openings,local,maxTraceThickness);if(!tracePlan.walls.length)throw Error('Ningún muro tiene espesor válido de 0,08 a '+maxTraceThickness.toFixed(2)+' m. Ajustá la escala con dos clics sobre una cota.');}
-  const native=python?tracePlan.walls:walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)return null;const edge=local([wall.a[0]-dy/len*wall.t,wall.a[1]+dx/len*wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w&&w.thickness>=.08&&w.thickness<=maxTraceThickness+1e-9&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
-  if(!native.length)throw Error('Ningún muro tiene espesor válido de 0,08 a '+maxTraceThickness.toFixed(2)+' m. Calibrá la imagen.');
-  const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':'FURNITURE'}));
-  const planOpenings=python?tracePlan.openings:[];
+  if(python){tracePlan=blocksOnly?{walls:[],openings:[]}:AS.buildPlan(walls,openings,local,maxTraceThickness);}
+  const native=blocksOnly?[]:python?tracePlan.walls:walls.filter(w=>!w.skip).map((wall,i)=>{const a=local(wall.a),b=local(wall.b),dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)return null;const edge=local([wall.a[0]-dy/len*wall.t,wall.a[1]+dx/len*wall.t]);return {id:'trace-'+i,a,b,thickness:Math.hypot(edge[0]-a[0],edge[1]-a[1]),layer:'WALLS',join:'native'};}).filter(w=>w&&w.thickness>=.08&&w.thickness<=maxTraceThickness+1e-9&&Math.hypot(w.b[0]-w.a[0],w.b[1]-w.a[1])>.1);
+  if(!native.length&&!placements.length)throw Error('No hay muros válidos ni bloques para insertar. Revisá la escala o marcá objetos.');
+  const blocks=placements.map(b=>({catalogId:b.id,role:b.id,point:local([b.x,b.y]),rotation:b.rotation,scale:1,nominalSize:[b.w,b.d],layer:b.id.startsWith('san-')?'FIXTURES':b.id.startsWith('kq-')?'KITCHEN':/^(?:esc-|ext-|veh-|per-)/.test(b.id)?'EQUIPMENT':'FURNITURE'}));
+  const planOpenings=python&&!blocksOnly&&native.length?tracePlan.openings:[];
   window.CAD2D_APPLY_TRACE_PLAN({schema:'blackline.architecture.v1',units:'m',walls:native,openings:planOpenings,blocks,rooms:[],virtualDimensions:[],brief:{kind:'trace'},traceReviewed:python},origin);
   C.renderBlockLibrary?.();C.queueLocalBackup?.();C.toast('CALCO: '+native.length+' muros, '+planOpenings.length+' aberturas y '+blocks.length+' bloques. Revisá uniones.');
  }catch(e){const msg='CALCO: '+(e?.message||e);C.log(msg);C.toast(msg);window.alert(msg);}finally{calcoBusy=false;bitmap?.close?.();doc?.destroy?.();}
