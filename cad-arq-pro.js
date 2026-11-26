@@ -907,7 +907,7 @@ function T(en,es){try{return /^es/i.test(localStorage.getItem('cad2d-alias-langu
 function arqFurnishRequest(raw){
  const s=arqCleanRequest(raw);
  const verb=/\b(?:amuebl\w*|equip\w*|coloc\w*|pon\w*|arm\w*|distribu\w*|ubic\w*|furnish\w*|place|arrange|put|layout)\b/.test(String(raw).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''));
- const what=/\b(?:living|estar|sofas?|sillon(?:es)?|butacas?|ratona|mesa ratona|mesa baja|tv|television|tele|comedor|mesa y sillas|mesa con sillas|mesa de comedor|sillas|dining|lounge|sofa)\b/.test(s);
+ const what=/\b(?:living|estar|dormitorios?|habitacion(?:es)?|cuarto|bedroom|cocina|kitchen|bano|banos|bathroom|sofas?|sillon(?:es)?|butacas?|ratona|mesa ratona|mesa baja|tv|television|tele|comedor|mesa y sillas|mesa con sillas|mesa de comedor|sillas|dining|lounge|sofa)\b/.test(s);
  return verb&&what;
 }
 function arqFurnishSpec(raw){
@@ -916,7 +916,34 @@ function arqFurnishSpec(raw){
  const dining=/\b(?:comedor|mesa y sillas|mesa con sillas|mesa de comedor|sillas|dining)\b/.test(s);
  const sofa=living||/\b(?:sofas?|sillon(?!es)|sofa)\b/.test(s);
  const n=Number((s.match(/\b(\d+)\s*(?:personas|sillas|lugares|comensales|people|seats)\b/)||s.match(/\bpara\s+(\d+)\b/)||[])[1]||0);
+ const room=/\b(?:dormitorio|habitacion|cuarto|bedroom)\b/.test(s)?'bedroom':/\b(?:cocina|kitchen)\b/.test(s)&&!living?'kitchen':/\b(?:bano|bathroom|toilette)\b/.test(s)&&!living?'bath':null;
+ if(room)return {room,desk:/\b(?:escritorio|desk)\b/.test(s),queen:/\b(?:queen|king|matrimonial|2 plazas|doble)\b/.test(s),single:/\b(?:1 plaza|individual|single|chico|nino|nina)\b/.test(s)};
  return {sofa,coffee:sofa&&!/\bsin (?:mesa )?ratona\b/.test(s),armchairs:living||/\b(?:sillones|butacas|sillon(?:es)? individual(?:es)?)\b/.test(s),tv:living||/\b(?:tv|tele|television)\b/.test(s),dining,seats:n,sofaL:/\b(?:en l|sofa l|esquinero)\b/.test(s)};
+}
+function arqFurnishRoom(W,D,spec){
+ const swap=D>W,L=swap?D:W,S=swap?W:D,blocks=[],box=[];
+ const free=(x,y,w,d)=>x>=-1e-6&&y>=-1e-6&&x+w<=L+1e-6&&y+d<=S+1e-6&&!box.some(b=>x<b[0]+b[2]-1e-6&&b[0]<x+w-1e-6&&y<b[1]+b[3]-1e-6&&b[1]<y+d-1e-6);
+ const put=(id,role,x,y,w,d,rot)=>{if(!free(x,y,w,d))return false;box.push([x,y,w,d]);const it=byId(id),nw=rot%180?d:w,nd=rot%180?w:d;const pt=rot===0?[x,y]:rot===90?[x+w,y]:rot===180?[x+w,y+d]:[x,y+d];blocks.push({catalogId:id,role,point:pt,rotation:rot,scale:1,layer:'FURNITURE',nominalSize:[Math.max(it.wMin,Math.min(it.wMax,nw)),Math.max(it.dMin,Math.min(it.dMax,nd))]});return true;};
+ if(spec.room==='bedroom'){
+  const beds=spec.single?[['dor-cama1',1.4,2]]:spec.queen?[['dor-queen',2.6,2],['dor-cama2',2.4,1.9]]:[['dor-queen',2.6,2],['dor-cama2',2.4,1.9],['dor-cama1',1.4,2]];
+  const bed=beds.find(b=>b[1]+.2<=L&&b[2]+.6<=S);if(!bed)throw Error(T('Room too small for a bed (min. 1.60 × 2.60 m)','No entra una cama: hace falta al menos 1,60 × 2,60 m'));
+  const bx=Math.max(0,(L-bed[1])/2);put(bed[0],'bed',bx,0,bed[1],bed[2],180);
+  const free2=S-bed[2];
+  if(free2>=.62+.6){const pw=Math.min(Math.max(.8,L-1.4),2.4);put('mob-placard','wardrobe',0,S-.62,pw,.62,0);if(L-pw>=1.4)put('dor-comoda','dresser',L-1.2,S-.5,1.2,.5,0);}
+  else if(L-bed[1]-bx>=.62+.1){put('mob-placard','wardrobe',L-.62,0,.62,Math.min(2.4,S),90);}
+  if(spec.desk&&free2>=1.2+.6)put('mob-escritorio','desk',L-1.4,bed[2]+.6,1.4,1.2,0);
+ }else{
+  const cat=spec.room==='kitchen'?/^kit-/:/^bano-/;
+  // Prefer the largest complete layout at its own size, upright or turned 90°; stretch only when none fits as drawn.
+  const lib=LIB.library.filter(x=>cat.test(x.id));
+  let opts=lib.flatMap(x=>[x.w<=L&&x.d<=S?{x,rot:0,fw:x.w,fd:x.d}:null,x.d<=L&&x.w<=S?{x,rot:90,fw:x.d,fd:x.w}:null]).filter(Boolean).sort((a,b)=>b.x.w*b.x.d-a.x.w*a.x.d);
+  if(!opts.length)opts=lib.map(x=>({x,rot:0,fw:Math.min(x.wMax,L),fd:Math.min(x.dMax,S)})).filter(o=>o.fw>=o.x.wMin&&o.fd>=o.x.dMin).sort((a,b)=>b.fw*b.fd-a.fw*a.fd);
+  if(!opts.length)throw Error(spec.room==='kitchen'?T('No complete kitchen fits this room','Ninguna cocina completa entra en este ambiente'):T('No complete bathroom fits this room','Ningún baño completo entra en este ambiente'));
+  const o=opts[0];put(o.x.id,spec.room,0,0,o.fw,o.fd,o.rot);
+ }
+ if(!blocks.length)throw Error(T('Nothing could be placed','No se pudo colocar ningún mueble'));
+ if(swap)for(const b of blocks){const [x,y]=b.point;b.point=[S-y,x];b.rotation=(b.rotation+90)%360;}
+ return blocks;
 }
 function arqFurnishLayout(W,D,spec){
  // Local frame: long side along x.
@@ -954,7 +981,7 @@ function arqFurnish(raw){
  const run=(minX,minY,maxX,maxY)=>{
   const W=(maxX-minX)/k,D=(maxY-minY)/k;
   if(!(W>1&&D>1&&W<40&&D<40))throw Error(T('Invalid room size','Medidas de ambiente inválidas'));
-  const blocks=arqFurnishLayout(W,D,spec);
+  const blocks=spec.room?arqFurnishRoom(W,D,spec):arqFurnishLayout(W,D,spec);
   const plan={schema:'blackline.architecture.v1',units:'m',walls:[],openings:[],blocks,rooms:[],virtualDimensions:[],connections:[],variants:[]};
   const n=applyArchitecture(plan,P(minX,minY));
   CORE.toast('ARQASSIST · '+blocks.length+T(' furniture blocks placed (',' muebles colocados (')+W.toFixed(2)+' × '+D.toFixed(2)+' m)');return n;
