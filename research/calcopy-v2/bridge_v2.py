@@ -51,5 +51,10 @@ def analyze_v2(pixels, w, h):
     secondary = axes[other] + raw_lines
     mixed = S.fuse(ink, axes[best], secondary)
     readings['mixed'] = _walls(mixed, k)
-    # Keep the original default reading; mixed is opt-in until real-plan validation.
-    return json.dumps({'best': best, 'readings': readings})
+    # Use original grayscale evidence, including colored masonry, to review
+    # proposed black silhouettes. The source-support metric is not accuracy.
+    review_ink=(gray<min(paper*.90,paper-18)).astype(np.uint8)
+    validated,diagnostics=S.validate_mask(review_ink,mixed,max_passes=3)
+    readings['validated']=_walls(validated,k)
+    # Keep the original default until the new reading is validated on real plans.
+    return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics})
