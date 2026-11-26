@@ -29,6 +29,12 @@
   if((e.type==='circle'||e.type==='arc')&&finite(e.c)&&Number.isFinite(e.r)&&e.r>=0){
    return {minX:e.c.x-e.r,maxX:e.c.x+e.r,minY:e.c.y-e.r,maxY:e.c.y+e.r};
   }
+  if(e.type==='point'&&finite(e.p))return {minX:e.p.x,maxX:e.p.x,minY:e.p.y,maxY:e.p.y};
+  if(e.type==='ellipse'&&finite(e.c)&&Number.isFinite(e.rx)&&Number.isFinite(e.ry)&&e.rx>=0&&e.ry>=0){
+   const a=Number(e.rotation)||0,co=Math.cos(a),si=Math.sin(a);
+   const dx=Math.hypot(e.rx*co,e.ry*si),dy=Math.hypot(e.rx*si,e.ry*co);
+   if(Number.isFinite(dx)&&Number.isFinite(dy))return {minX:e.c.x-dx,maxX:e.c.x+dx,minY:e.c.y-dy,maxY:e.c.y+dy};
+  }
   if(e.type==='polyline'&&Array.isArray(e.pts)&&e.pts.length&&!e.bulges&&!e.bulge){
    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
    for(const p of e.pts){
@@ -46,7 +52,11 @@
   if(!v)return true;
   const b=basicBounds(e);
   // Keep the existing exact bounds calculator for complex CAD entities.
-  if(b)return overlap(b,v);
+  // A wide CAD polyline/rectangle may still paint inside the viewport even
+  // when its centreline is outside. Preserve visibility at every zoom level.
+  const halfWidth=(e?.type==='polyline'||e?.type==='rect')&&Number.isFinite(e.pwidth)&&e.pwidth>0?e.pwidth/2:0;
+  if(b)return halfWidth?overlap({minX:b.minX-halfWidth,minY:b.minY-halfWidth,maxX:b.maxX+halfWidth,maxY:b.maxY+halfWidth},v):overlap(b,v);
+  if(halfWidth)return true; // Complex wide geometry: conservative fallback.
   return typeof fallback==='function'?fallback(e):true;
  }
 
@@ -54,7 +64,13 @@
  // never retained across geometry edits. Unknown bounds are always included.
  function spatialIndex(items,bounds){
   const entries=[],unknown=[],source=items.slice();
-  source.forEach((value,i)=>{const b=bounds(value);if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX<=b.maxX&&b.minY<=b.maxY)entries.push({b,i,value});else unknown.push({i,value});});
+  source.forEach((value,i)=>{
+   let b;try{b=bounds(value)}catch(err){b=null}
+   if(b&&[b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite)&&b.minX<=b.maxX&&b.minY<=b.maxY){
+    // Snapshot bounds: a reused/mutated caller object cannot corrupt the tree.
+    entries.push({b:{minX:b.minX,minY:b.minY,maxX:b.maxX,maxY:b.maxY},i,value});
+   }else unknown.push({i,value});
+  });
   function build(list){
    if(!list.length)return null;
    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
