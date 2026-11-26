@@ -898,8 +898,8 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261126-bilingue2"></script>
-<script defer src="assets/cad-ui-language.js?v=20261126-bilingue"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261126-bilingue3"></script>
+<script defer src="assets/cad-ui-language.js?v=20261126-bilingue3"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
    Capture on window BEFORE CAD drawing listeners, so keys do not disappear
@@ -2771,20 +2771,29 @@ function cadDetailedArqOpening(ref){
 function cadGenericBlockGrips(ref){
  const def=state.blocks?.[ref.blockName];
  if(!def||def.dynamicActions===false||cadDetailedArqOpening(ref)||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
- const p=screen(ref.p||P(0,0));
  return [
-  {action:'genericMirror',x:p.x-30,y:p.y-37},
-  {action:'genericRotate',x:p.x,y:p.y-37},
-  {action:'genericScale',x:p.x+30,y:p.y-37}
+  ...(()=>{
+   // On the block itself, like AutoCAD: rotate dot at the top-right corner, flip arrow under
+   // the bottom edge, stretch triangle on the right edge.
+   const b=boundsEntity(ref);if(!b||![b.minX,b.minY,b.maxX,b.maxY].every(Number.isFinite))return [];
+   const tl=screen(P(b.minX,b.maxY)),br=screen(P(b.maxX,b.minY));
+   const x0=Math.min(tl.x,br.x),x1=Math.max(tl.x,br.x),y0=Math.min(tl.y,br.y),y1=Math.max(tl.y,br.y);
+   return [
+    {action:'genericRotate',kind:'rotate',x:x1+11,y:y0-11},
+    {action:'genericMirror',kind:'flip',x:(x0+x1)/2,y:y1+15},
+    {action:'genericScale',kind:'stretch',x:x1+14,y:(y0+y1)/2}
+   ];
+  })()
  ];
 }
 function cadGenericGripHit(raw){
+ if(state.selected.length!==1)return null;
  const lookup=cadSelectedLookup();
  for(const id of state.selected){
   const ref=lookup(id);
   if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
   for(const grip of cadGenericBlockGrips(ref))
-   if(Math.hypot(raw.x-grip.x,raw.y-grip.y)<12)return {id,action:grip.action};
+   if(Math.hypot(raw.x-grip.x,raw.y-grip.y)<14)return {id,action:grip.action};
  }
  return null;
 }
@@ -2816,10 +2825,29 @@ function cadMirrorGenericBlockGeometry(parts,ref){
   return e;
  });
 }
+/* AutoCAD-style dynamic grips: solid cyan glyphs with a dark outline, sized to read as buttons.
+   dot = rotate · flip arrow = mirror/swing side · triangle = stretch/width · square = base point. */
+function cadDrawAcadGrip(g){
+ const S=9,ang=Number(g.ang)||0;
+ ctx.save();ctx.translate(g.x,g.y);ctx.rotate(ang);ctx.setLineDash([]);
+ ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=3;
+ ctx.fillStyle=g.hot?'#ffffff':'#3ee0ff';ctx.strokeStyle='#05202b';ctx.lineWidth=1.6;ctx.lineJoin='round';
+ ctx.beginPath();
+ const kind=g.kind||'rotate';
+ if(kind==='rotate'){ctx.arc(0,0,S*.82,0,Math.PI*2);}
+ else if(kind==='flip'){
+  // Double-headed flip arrow (AutoCAD flip parameter).
+  const L=S*1.35,H=S*.95,t=S*.38;
+  ctx.moveTo(-L,0);ctx.lineTo(-L+H,-H);ctx.lineTo(-L+H,-t);ctx.lineTo(L-H,-t);ctx.lineTo(L-H,-H);ctx.lineTo(L,0);ctx.lineTo(L-H,H);ctx.lineTo(L-H,t);ctx.lineTo(-L+H,t);ctx.lineTo(-L+H,H);ctx.closePath();
+ }else if(kind==='stretch'){ctx.moveTo(S*1.05,0);ctx.lineTo(-S*.75,-S*.95);ctx.lineTo(-S*.75,S*.95);ctx.closePath();}
+ else if(kind==='lookup'){ctx.moveTo(-S,-S*.6);ctx.lineTo(S,-S*.6);ctx.lineTo(0,S*.9);ctx.closePath();}
+ else ctx.rect(-S*.7,-S*.7,S*1.4,S*1.4);
+ ctx.fill();ctx.shadowBlur=0;ctx.stroke();ctx.restore();
+}
 function cadDrawGenericBlockGrips(ref){
  const grips=cadGenericBlockGrips(ref);if(!grips.length)return;
  ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.3;ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 15px Arial';
- for(const g of grips){ctx.fillStyle='#102a39';ctx.strokeStyle='#81dffd';ctx.fillRect(g.x-10,g.y-10,20,20);ctx.strokeRect(g.x-10,g.y-10,20,20);ctx.fillStyle='#85e4ff';ctx.fillText(g.action==='genericMirror'?'↔':g.action==='genericRotate'?'↻':'⤢',g.x,g.y+1)}
+ for(const g of grips)cadDrawAcadGrip(g);
  ctx.restore();
 }
 function cadOpeningQuickGrips(ref){
@@ -2832,15 +2860,28 @@ function cadOpeningQuickGrips(ref){
   const center=(ref.flipBlockX?-1:1)*cx*(1000/U[state.unit])*(Number(ref.scale)||1);
   const p=screen(P(ref.p.x+Math.cos(theta)*center,ref.p.y+Math.sin(theta)*center));
   const actions=['mirror',...(arq.door?['swing']:[]),'rotate','resize'];
-  return actions.map((action,i)=>({action,x:p.x+(i-(actions.length-1)/2)*29,y:p.y-35}));
+  const sp=screen(ref.p),ux=Math.cos(theta),uy=-Math.sin(theta),half=Math.max(18,width*state.view.scale/2);
+  return actions.map(action=>cadOpeningGripPlace(action,p,ux,uy,half,sp));
  }
  if(!['swing-door','double-door','framed-window'].includes(def?.parametric?.kind))return [];
  const width=Number(ref.params?.width??def.parametric.defaults.width)*(Number(ref.scale)||1);
  if(!(width>0))return [];
  const theta=(Number(ref.rotation)||0)*Math.PI/180;
  const p=screen(P(ref.p.x+Math.cos(theta)*width/2,ref.p.y+Math.sin(theta)*width/2));
- return [{action:'mirror',x:p.x-58,y:p.y-35},{action:'swing',x:p.x-29,y:p.y-35},{action:'rotate',x:p.x,y:p.y-35},{action:'resize',x:p.x+29,y:p.y-35},
-  ...(def.parametric.kind==='framed-window'?[{action:'depth',x:p.x+58,y:p.y-35}]:[])];
+ const sp=screen(ref.p),ux=Math.cos(theta),uy=-Math.sin(theta),half=Math.max(18,width*state.view.scale/2);
+ const acts=['mirror',...(def.parametric.kind==='framed-window'?['depth']:['swing']),'rotate','resize'];
+ return acts.map(action=>cadOpeningGripPlace(action,p,ux,uy,half,sp));
+}
+// Grips sit on the opening itself (screen px): stretch triangle beyond the free end, rotate dot
+// before the start, flip arrows across the middle (mirror along the wall, swing across it).
+function cadOpeningGripPlace(action,mid,ux,uy,half,start){
+ const nx=-uy,ny=ux;
+ if(action==='resize')return {action,kind:'stretch',x:mid.x+ux*(half+16),y:mid.y+uy*(half+16),ang:Math.atan2(uy,ux)};
+ if(action==='rotate')return {action,kind:'rotate',x:mid.x-ux*(half+30),y:mid.y-uy*(half+30)};
+ if(action==='mirror')return {action,kind:'flip',x:mid.x-nx*24,y:mid.y-ny*24,ang:Math.atan2(uy,ux)};
+ if(action==='swing')return {action,kind:'flip',x:mid.x+nx*24,y:mid.y+ny*24,ang:Math.atan2(ny,nx)};
+ if(action==='depth')return {action,kind:'stretch',x:mid.x+nx*24,y:mid.y+ny*24,ang:Math.atan2(ny,nx)};
+ return {action,kind:'rotate',x:mid.x,y:mid.y};
 }
 function cadOpeningQuickHit(raw){
  const lookup=cadSelectedLookup();
@@ -2848,7 +2889,7 @@ function cadOpeningQuickHit(raw){
   const ref=lookup(id);
   if(!ref||ref.type!=='blockRef'||layerFor(ref).locked||!layerFor(ref).visible)continue;
   for(const grip of cadOpeningQuickGrips(ref))
-   if(Math.hypot(grip.x-raw.x,grip.y-raw.y)<12)return {id,action:grip.action};
+   if(Math.hypot(grip.x-raw.x,grip.y-raw.y)<14)return {id,action:grip.action};
  }
  return null;
 }
@@ -3030,12 +3071,7 @@ function cadOpeningResizeEditor(ref,client){
 function cadDrawOpeningQuickGrips(ref){
  const grips=cadOpeningQuickGrips(ref);if(!grips.length)return;
  ctx.save();ctx.setLineDash([]);ctx.lineWidth=1.4;ctx.textAlign='center';ctx.textBaseline='middle';
- for(const grip of grips){
-  ctx.fillStyle='#112b3c';ctx.strokeStyle='#80e2ff';
-  ctx.fillRect(grip.x-10,grip.y-10,20,20);ctx.strokeRect(grip.x-10,grip.y-10,20,20);
-  ctx.fillStyle='#80e2ff';ctx.font='bold 16px Arial';
-  ctx.fillText(grip.action==='mirror'?'↔':grip.action==='swing'?'↕':grip.action==='resize'?'⇔':grip.action==='depth'?'↕':'↻',grip.x,grip.y+1);
- }
+ for(const grip of grips)cadDrawAcadGrip(grip);
  ctx.restore();
 }
 /* Velocidad: la geometría de cada referencia se calcula una vez y se reutiliza en cada cuadro
@@ -3476,6 +3512,7 @@ function drawBlockGrips(ref){
  // Insertion point remains the only geometry grip. Doors/windows additionally
  // show their original parametric action buttons, not child-geometry grips.
  cadDrawOpeningQuickGrips(ref);
+ if(state.selected.length===1)cadDrawGenericBlockGrips(ref);
  const vertex=ref?.p;
  if(!vertex)return;
  const p=screen(vertex);
@@ -6394,6 +6431,8 @@ canvas.addEventListener('pointerdown',ev=>{if(ev.button===2)return;
    }
    cadOpeningQuickApply(openingGrip);return;
   }
+  const genericGrip=cadGenericGripHit(raw);
+  if(genericGrip){cadGenericBlockAction(genericGrip);return}
   const wallGrip=findWallMiddleGrip(raw);
   if(wallGrip){
    const entity=state.entities.find(e=>e.id===wallGrip.id);
@@ -12397,7 +12436,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/blackline-select-premium.js?v=20261122-2"></script><script src="cad-my-blocks.js?v=20261120-1940"></script>
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
-<script src="cad-arq-pro.js?v=20261126-arq-lectura"></script>
+<script src="cad-arq-pro.js?v=20261126-arq-lectura2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261124-affine-v2"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>

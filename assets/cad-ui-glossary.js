@@ -4,6 +4,11 @@
 window.CAD2D_UI_GLOSSARY={
  phrases:[
  // Auditoría de idioma 26/11/2026: textos que quedaban en castellano con la interfaz en inglés.
+ ["Ver bloques","View blocks"],
+ ["Ver web","View web"],
+ ["Viviendas","Houses"],
+ ["Galería de viviendas por superficie","House gallery by floor area"],
+ ["Referencias arquitectónicas","Architectural references"],
  // Textos escritos en inglés que deben pasar a castellano en modo ES.
  ["Dibujo sin título.dxf","Untitled Drawing.dxf"],
  ["Imprimir / PDF","Print / PDF"],

@@ -81,7 +81,7 @@
   // "Baños completos (13)" y similares: traducir sin el contador.
   const count=/^(.+?)(\s*\(\d+\))$/.exec(core);
   if(count&&table.has(count[1]))return a+table.get(count[1])+count[2]+b;
-  if(language!=='es'){const g=/^GALERÍA ARQUITECTÓNICA · (\d+) BLOQUES DINÁMICOS$/.exec(core);if(g)return a+'ARCHITECTURAL GALLERY · '+g[1]+' DYNAMIC BLOCKS'+b;const rs=/^(\d+) resultados$/.exec(core);if(rs)return a+rs[1]+' results'+b;const bv=/^(\d+) bloques visibles de (\d+) disponibles\. La geometría se descarga solamente al elegir un bloque\.$/.exec(core);if(bv)return a+bv[1]+' of '+bv[2]+' blocks shown. Geometry downloads only when you choose a block.'+b}
+  if(language!=='es'){const g=/^GALERÍA ARQUITECTÓNICA · (\d+) BLOQUES DINÁMICOS$/.exec(core);if(g)return a+'ARCHITECTURAL GALLERY · '+g[1]+' DYNAMIC BLOCKS'+b;const rs=/^(\d+) resultados$/.exec(core);if(rs)return a+rs[1]+' results'+b;const md=/^(\d+) modelos$/.exec(core);if(md)return a+md[1]+' models'+b;const bv=/^(\d+) bloques visibles de (\d+) disponibles\. La geometría se descarga solamente al elegir un bloque\.$/.exec(core);if(bv)return a+bv[1]+' of '+bv[2]+' blocks shown. Geometry downloads only when you choose a block.'+b}
   if(language!=='es'){const wrap=/^(Insert |Move )(.+?)( at 1:1| command group)$/.exec(core);if(wrap){const inner=table.get(wrap[2])||wordwise(wrap[2]);if(inner!==wrap[2])return a+wrap[1]+inner+wrap[3]+b}}
   if(language!=='es'){const w=core.split(/(\s·\s)/).map(part=>/^\s·\s$/.test(part)?part:(table.get(part)||wordwise(part))).join('');if(w!==core)return a+w+b}
   return input;
