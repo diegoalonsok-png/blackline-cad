@@ -412,7 +412,7 @@ function runPythonTrace(ctx,w,h){
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
-   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-v2',BASE));
+   worker=new Worker(new URL('../../cad-calcopy-worker.js?v=20261126-semantic-v2',BASE));
    worker.onerror=e=>finish(new Error(e.message||'No se pudo iniciar Python.'));
    worker.onmessage=({data})=>{
     if(data.type==='progress'){status.textContent=data.message;C.log('CALCOPY: '+data.message);}
@@ -487,7 +487,7 @@ async function traceFile(file,source=null,python=false){
       if(o.kind!=='framed-window'){const W0=o.g1-o.g0,hu=o.hingeAtLo?o.g0:o.g1,hp=o.v?[o.c,hu]:[hu,o.c],tip=o.v?[o.c+o.side*W0,hu]:[hu,o.c+o.side*W0];pc.lineWidth=2;pc.beginPath();pc.moveTo(...hp);pc.lineTo(...tip);pc.stroke();}}
      pc.fillStyle='#7b2cbf';for(const q of scalePts){pc.beginPath();pc.arc(q[0],q[1],Math.max(4,w/160),0,2*Math.PI);pc.fill();}
      const ts=walls.filter(x=>!x.skip).map(x=>x.t).sort((a,b)=>a-b),tm=ts.length?ts[ts.length>>1]*real*scaleF/w:0;
-     {const nw=walls.filter(x=>!x.skip).length,nd=openings.filter(o=>o.kind!=='framed-window').length,nv=openings.length-nd;title.textContent=LX('CALCOPY · '+nw+' muros, '+nd+' puertas, '+nv+' ventanas, '+placements.length+' bloques · lectura: '+(mode==='lines'?'doble línea':'muros llenos')+(tm?' · espesor típico '+Math.round(tm*100)+' cm':'')+(tm&&(tm<.07||tm>.45)?' ⚠ revisá la escala':''),'CALCOPY · '+nw+' walls, '+nd+' doors, '+nv+' windows, '+placements.length+' blocks · reading: '+(mode==='lines'?'double line':'solid walls')+(tm?' · typical thickness '+Math.round(tm*100)+' cm':'')+(tm&&(tm<.07||tm>.45)?' ⚠ check the scale':''));}
+     {const nw=walls.filter(x=>!x.skip).length,nd=openings.filter(o=>o.kind!=='framed-window').length,nv=openings.length-nd;title.textContent=LX('CALCOPY · '+nw+' muros, '+nd+' puertas, '+nv+' ventanas, '+placements.length+' bloques · lectura: '+(mode==='mixed'?'mixta semántica':mode==='lines'?'doble línea':'muros llenos')+(tm?' · espesor típico '+Math.round(tm*100)+' cm':'')+(tm&&(tm<.07||tm>.45)?' ⚠ revisá la escala':''),'CALCOPY · '+nw+' walls, '+nd+' doors, '+nv+' windows, '+placements.length+' blocks · reading: '+(mode==='mixed'?'semantic mixed':mode==='lines'?'double line':'solid walls')+(tm?' · typical thickness '+Math.round(tm*100)+' cm':'')+(tm&&(tm<.07||tm>.45)?' ⚠ check the scale':''));}
     }
     pc.fillStyle='#b64912';pc.font=Math.max(12,w/70)+'px sans-serif';for(const [i,b] of placements.entries()){pc.beginPath();pc.arc(b.x,b.y,Math.max(4,w/180),0,2*Math.PI);pc.fill();pc.fillText((i+1)+' '+b.name,b.x+6,b.y-6);if(b.aiBox){const [x0,y0,x1,y1]=b.aiBox;pc.strokeStyle='#b64912';pc.lineWidth=2;pc.strokeRect(x0,y0,x1-x0,y1-y0);}}};
    // Position click is the insertion origin, not the centre; source image is kept.
@@ -528,7 +528,7 @@ async function traceFile(file,source=null,python=false){
    const tool=document.createElement('select'),reading=document.createElement('select'),flip=document.createElement('button');
    if(python){
     for(const [v,t,e] of [['toggle','Quitar / recuperar muro','Remove / restore wall'],['wall','+ Muro (clic sobre el muro)','+ Wall (click on the wall)'],['door','+ Puerta (clic en el hueco)','+ Door (click in the gap)'],['window','+ Ventana (clic en el hueco)','+ Window (click in the gap)'],['scale','Escala (2 clics sobre una cota)','Scale (2 clicks on a dimension)'],['block','+ Mueble / artefacto','+ Furniture / fixture']])tool.add(new Option(LX(t,e),v));
-    reading.add(new Option(LX('Lectura: muros llenos','Reading: solid walls'),'solid'));reading.add(new Option(LX('Lectura: muros de doble línea','Reading: double-line walls'),'lines'));reading.value=mode;
+    reading.add(new Option(LX('Lectura: muros llenos','Reading: solid walls'),'solid'));reading.add(new Option(LX('Lectura: muros de doble línea','Reading: double-line walls'),'lines'));if(Array.isArray(pyReadings.mixed))reading.add(new Option(LX('Lectura: mixta semántica (experimental)','Reading: semantic mixed (experimental)'),'mixed'));reading.value=mode;
     reading.onchange=()=>{mode=reading.value;walls=assistWalls(pyReadings[mode]);openings.length=0;history.length=0;redraw();};
     picker.onchange=()=>{if(picker.value)tool.value='block';};tool.onchange=()=>{if(tool.value!=='block')picker.value='';scalePts.length=0;};
     flip.className='btn';flip.textContent=LX('Invertir última puerta','Flip last door');flip.onclick=()=>{const o=[...openings].reverse().find(q=>q.kind!=='framed-window');if(!o)return;
