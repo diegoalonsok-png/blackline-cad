@@ -26,7 +26,7 @@ export async function onRequestGet({ request, waitUntil }) {
   api.searchParams.set('mature', 'false');
   try {
     const res = await fetch(api, { headers: { 'User-Agent': UA, Accept: 'application/json' }, cf: { cacheTtl: 86400, cacheEverything: true } });
-    if (!res.ok) throw Error('Openverse HTTP ' + res.status);
+    if (!res.ok) throw Error('Openverse HTTP ' + res.status + ' ' + (await res.text()).slice(0, 120));
     const data = await res.json();
     const modern = MODERN.test(norm);
     const items = (data.results || []).flatMap((r) => {
@@ -50,6 +50,6 @@ export async function onRequestGet({ request, waitUntil }) {
     waitUntil(cache.put(key, out.clone()));
     return out;
   } catch (e) {
-    return json({ items: [], error: 'Openverse no disponible' }, 502);
+    return new Response(JSON.stringify({ items: [], error: 'Openverse no disponible: ' + String(e && e.message || e).slice(0, 160) }), { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
   }
 }
