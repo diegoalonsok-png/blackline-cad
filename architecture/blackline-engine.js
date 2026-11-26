@@ -284,6 +284,71 @@ function solve(spec){
 }
 
 // Rectangular swimming pool: dimensions refer to the clear water surface.
+// Parking layouts: dimensions always describe one clear vehicle bay.
+function parkingInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)\s+)?(?:(modulos? de\s+))?(?:playa de estacionamiento|plazas? de estacionamiento|estacionamientos?|cocheras?|garajes?|garages?|parking(?: spaces?)?)\b/);
+ if(!head)return null;
+ let rest=s.slice(head[0].length).trim();
+ const parking=/estacionamiento|parking/.test(head[0]);
+ const organized=/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|en serie)\b/.test(rest);
+ const explicitQuantity=!!head[1]||/^[x×*]\s*\d+/.test(rest);
+ // Retain the existing native four-wall generator for a single plain garage.
+ if(!parking&&!organized&&!explicitQuantity&&!head[2])return null;
+ if(!rest&&!head[1]&&!head[2])return null;
+ let count=head[1]?(numberWords[head[1]]??Number(head[1])):null;
+ let tandem=false,double=!!head[2],w=2.5,d=5,aisle=0,cars=false;
+ const used=new Set(),notes=[];
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?|ft|feet)?';
+ const dims=new RegExp('^(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)');
+ while(rest){
+  rest=rest.replace(/^(?:con|y|with|and)\s+/,'');
+  let m,key;
+  if((m=rest.match(/^(?:(?:en|in)\s+)?(?:tandem|en linea longitudinal)\b/))){key='layout';tandem=true;}
+  else if((m=rest.match(/^(?:(?:en|in)\s+)?(?:fila|hilera|contigu[ao]s?|row|side by side|set|serie)\b/))){key='layout';tandem=false;}
+  else if((m=rest.match(/^(?:dobles?|double)\b/))){key='double';double=true;}
+  else if((m=rest.match(/^(?:[x×*]\s*|cantidad\s*[:=]?\s*|de\s+|of\s+)?(\d+)\s+(?:plazas?|modulos?)(?=\s|$)/))){key='count';if(count!==null)throw Error('Indicá una sola cantidad de cocheras.');count=Number(m[1]);if(/modulos?/.test(m[0]))double=true;}
+  else if((m=rest.match(/^[x×*]\s*(\d+)(?=\s|$)/))){key='count';if(count!==null)throw Error('Indicá una sola cantidad de cocheras.');count=Number(m[1]);}
+  else if((m=rest.match(dims))){key='size';w=num(m[1])*unitScale(m[2]||m[4]);d=num(m[3])*unitScale(m[4]||m[2]);}
+  else if((m=rest.match(new RegExp('^(?:circulacion|calle(?: de maniobra)?|pasillo vehicular|aisle)\\s*(?:(?:de|of)\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
+  else if((m=rest.match(/^(?:autos?|vehiculos?|cars?)\b/))){key='cars';cars=true;}
+  else if((m=rest.match(/^(?:sin autos?|sin vehiculos?|without cars?)\b/))){key='cars';cars=false;}
+  else throw Error('Opción de estacionamiento no soportada: '+rest);
+  if(used.has(key))throw Error('Opción de estacionamiento repetida: '+key);
+  used.add(key);rest=rest.slice(m[0].length).trim();
+ }
+ if(count===null)count=tandem?2:1;
+ if(double&&!tandem)throw Error('Para módulos dobles indicá expresamente en tándem.');
+ if(!used.has('size'))notes.push('Medidas iniciales por plaza: 2,50 × 5,00 m.');
+ return {kind:'parking_plan',count,width:w,depth:d,tandem,double,aisle,cars,assumptions:notes};
+}
+function solveParking(spec){
+ const {count,width:w,depth:d,tandem,double,aisle,cars}=spec;
+ const cols=tandem?(double?count:1):count,rows=tandem?(double?2:count):1,total=cols*rows,W=cols*w,D=rows*d;
+ if(!Number.isInteger(count)||count<1||total>60||![w,d,aisle].every(Number.isFinite)||w<1.8||w>6||d<3||d>15||aisle<0||aisle>15||W>450||D+aisle>500)throw Error('Estacionamiento: hasta 60 plazas, ancho 1,80–6 m y largo 3–15 m por plaza.');
+ if(cars&&(w<2||d<4))throw Error('El símbolo de auto necesita una plaza de al menos 2 × 4 m.');
+ const entities=[],spaces=[];
+ const line=(a,b,layer)=>entities.push({type:'line',a,b,layer});
+ const rect=(x,y,a,b,layer)=>entities.push({type:'polyline',closed:true,pts:[[x,y],[x+a,y],[x+a,y+b],[x,y+b]],layer});
+ // One common perimeter, one division per internal boundary; no duplicate edges.
+ rect(0,0,W,D,'PARKING-SPACE');
+ for(let i=1;i<cols;i++)line([i*w,0],[i*w,D],'PARKING-SPACE');
+ for(let j=1;j<rows;j++)line([0,j*d],[W,j*d],'PARKING-SPACE');
+ for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){
+  const x=i*w,y=j*d;
+  spaces.push({id:'parking-'+(spaces.length+1),clearBounds:[x,y,w,d]});
+  if(cars){const cw=1.8,cd=3.8,cx=x+(w-cw)/2,cy=y+(d-cd)/2;
+   rect(cx,cy,cw,cd,'PARKING-CARS');
+   line([cx,cy+.85],[cx+cw,cy+.85],'PARKING-CARS');
+   line([cx,cy+cd-.85],[cx+cw,cy+cd-.85],'PARKING-CARS');
+  }
+ }
+ if(aisle>0){line([0,0],[0,-aisle],'PARKING-AISLE');line([0,-aisle],[W,-aisle],'PARKING-AISLE');line([W,-aisle],[W,0],'PARKING-AISLE');}
+ const assumptions=[...(spec.assumptions||[]),total+' plazas de '+w+' × '+d+' m · '+(tandem?'tándem':'fila')+(double?' · '+count+' módulos dobles':''),'Planta preliminar: verificar circulación, radios de giro y normativa.'];
+ if(tandem&&rows>1)assumptions.push('En tándem, las plazas interiores dependen de la retirada del vehículo precedente.');
+ return {schema:'blackline.architecture.detail.v1',units:'m',entities,spaces,brief:spec,assumptions};
+}
+
 function poolInstruction(raw){
  const s=normalize(raw).trim().replace(/[.!]$/,'');
  const head=s.match(/^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(\d+|un|una|dos|tres|cuatro|cinco|one|two|three|four|five)\s+)?(?:piletas?|piscinas?|swimming pools?|pools?)\b(?:\s+(?:de natacion|rectangulares?|rectangular))*/);
@@ -703,6 +768,7 @@ function collectiveCabins(spec){
 function run(raw){
  if(typeof raw!=='string'||raw.length>4000)throw Error('Instrucción inválida.');
  const pool=poolInstruction(raw);if(pool)return solvePool(pool);
+ const parking=parkingInstruction(raw);if(parking)return solveParking(parking);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
