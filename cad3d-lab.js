@@ -540,6 +540,7 @@ var css=`
  margin:0 7px 0 2px!important;
  white-space:nowrap!important;
 }
+#cad3dLab .camera3DBar button.cad3dRenderSketchLaunch,
 #cad3dLab .cad3dBar button.btn,
 #cad3dLab .cad3dProfileTools button.btn,
 #cad3dLab .cad3dModelTools button.btn,
@@ -568,6 +569,7 @@ var css=`
  box-shadow:none!important;
  cursor:pointer!important;
 }
+#cad3dLab .camera3DBar button.cad3dRenderSketchLaunch:hover,
 #cad3dLab .cad3dBar button.btn:hover,
 #cad3dLab .cad3dProfileTools button.btn:hover,
 #cad3dLab .cad3dModelTools button.btn:hover,
@@ -586,6 +588,7 @@ var css=`
  color:#f3fbff!important;
  box-shadow:inset 0 -2px 0 #8dcce0!important;
 }
+#cad3dLab .camera3DBar button.cad3dRenderSketchLaunch svg,
 #cad3dLab .cad3dBar button.btn svg,
 #cad3dLab .cad3dProfileTools button.btn svg,
 #cad3dLab .cad3dModelTools button.btn svg,
@@ -4730,7 +4733,7 @@ function build(){
  '<button type="button" class="btn" data-max title="Maximizar o restaurar ventana 3D">□</button>'+
  '<button type="button" class="btn" data-close title="Cerrar 3D">×</button></div>'+
  cad3dBasicBars()+cad3dCompact3DBar()+
- '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+cad3dSketchRenderMarkup()+
+ '<div class="camera3DBar" role="toolbar" aria-label="Cámaras 3D"><button type="button" class="btn cad3dRenderSketchLaunch" title="Abrir render artístico desde la geometría 3D" aria-label="Render artístico">'+ico('renderSketch')+'<span>Render artístico</span></button><strong>C · CÁMARAS</strong><button type="button" class="btn" data-camera-restore title="Corregir perspectiva y reducir distorsión óptica sin cambiar el modelo">Restaurar perspectiva</button><button type="button" class="btn" data-camera-create title="Guardar la cámara actual">＋ Crear cámara</button><select class="camera3DList" aria-label="Cámaras guardadas"><option value="">Seleccionar cámara…</option></select><button type="button" class="btn" data-camera-back title="Retroceder por el recorrido">◀ Atrás</button><button type="button" class="btn" data-camera-forward title="Avanzar por el recorrido">Adelante ▶</button></div>'+cad3dSketchRenderMarkup()+
 
  '<div class="cad3dModelTools" role="toolbar" aria-label="3D solid modeling" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 12px;border-bottom:1px solid #354552;background:#16232d">'+
  '<strong style="font-size:11px;margin-right:5px;color:#aabecb">3D MODEL</strong>'+
@@ -4746,7 +4749,6 @@ function build(){
  '</div>'+
  '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label>'+cad3DBlockCatalog()+'<button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Architecture · Muros, puertas, ventanas, escaleras y vanos paramétricos" aria-label="Herramientas paramétricas de arquitectura">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>ARQ 3D</span></button>'+
  
- '<button type="button" class="btn cad3dRenderSketchLaunch" title="Abrir render artístico desde la geometría 3D" aria-label="Render artístico">'+ico('renderSketch')+'<span>Render artístico</span></button>'+
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
  '<div class="sunFloatingHeader" title="Arrastrar para mover los controles de sol"><strong>☀ SOL / ENTORNO</strong><button type="button" class="sunDockButton" data-sun-dock aria-pressed="false" title="Acoplar a Layers" aria-label="Acoplar o desacoplar Sol / Entorno">⇥</button><button type="button" class="sunFloatingClose" aria-label="Cerrar controles solares">×</button></div>'+
