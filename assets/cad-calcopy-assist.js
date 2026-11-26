@@ -63,6 +63,11 @@ function snapEnds(A,walls){
  return A;
 }
 /* Opening from a click in a wall gap. pxPerM converts the standard widths. */
+function doorWidthReview(width,role){
+ const sizes=role==='perimeter'?[.9,1,1.2]:role==='interior'?[.7,.8,.9]:[.7,.8,.9,1,1.2];
+ const nominal=sizes.reduce((a,b)=>Math.abs(b-width)<Math.abs(a-width)?b:a);
+ return {nominal,review:Math.abs(width-nominal)>.06};
+}
 function openingAt(G,walls,x,y,kind,pxPerM){
  const live=walls.filter(w=>!w.skip);let best=null;
  for(const w of live){
@@ -85,10 +90,11 @@ function openingAt(G,walls,x,y,kind,pxPerM){
   for(const o of live)if(o.v!==w.v&&o.lo-1<=w.c&&w.c<=o.hi+1&&o.c<w.lo&&o.c+o.t/2>far){far=o.c+o.t/2;perp=o;partner=null;}
   g0=far;
  }
- if(!partner&&!perp){const def=(kind==='window'?1.2:.8)*pxPerM;if(best.after)g1=g0+def;else g0=g1-def;}
+ if(!partner&&!perp){const def=(kind==='window'?1.2:w.wall_role==='perimeter'?1:.8)*pxPerM;if(best.after)g1=g0+def;else g0=g1-def;}
  const width=(g1-g0)/pxPerM;
  if(kind==='window'?!(width>=.3&&width<=5):!(width>=.5&&width<=2.4))return null;
  const op={w,partner,perp,v:w.v,c:w.c,g0,g1,t:w.t,kind:kind==='window'?'framed-window':width>1.3?'double-door':'swing-door',side:1,hingeAtLo:true};
+ if(kind!=='window'){const review=doorWidthReview(width,w.wall_role);op.nominalWidth=review.nominal;op.widthReview=review.review;}
  if(kind!=='window'&&G){
   const {g,w:W,h:H,thr}=G,W0=g1-g0;
   const ink=(u,s)=>{const X=Math.round(op.v?s:u),Y=Math.round(op.v?u:s);return X>=0&&Y>=0&&X<W&&Y<H&&g[Y*W+X]<thr?1:0;};
@@ -176,6 +182,6 @@ function classifyRooms(regions,objects){
  for(const r of out){if(r.use!=='bathroom_candidate'||r.area_review)continue;const primary=out.filter(p=>['bedroom_candidate','living_candidate','dining_candidate'].includes(p.use));if(primary.length&&primary.every(p=>r.area>=p.area))r.area_review='bathroom_larger_than_primary_rooms';}
  return out;
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms};
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
