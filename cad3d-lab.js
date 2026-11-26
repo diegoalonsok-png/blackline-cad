@@ -9985,6 +9985,7 @@ function action(a,presetId){
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
+ else if(['stl','stlout','exportstl'].includes(a))exportSTL();
  else if(a==='dxf')exportDXF();
  else if(a==='json')exportJSON();
  else if(a==='open')root.querySelector('.fileInput').click();
@@ -10020,6 +10021,30 @@ function exportOBJ(){
  });
  download('blackline-cad3d.obj',result.join('\n')+'\n');text('OBJ exportado · '+(index-1)+' vértices');
 }
+// ASCII STL: independent triangle exchange for fabrication and model checking.
+// STL is unitless; coordinates are explicitly converted from model metres to mm.
+function cad3dSTLFacet(points){
+ if(!Array.isArray(points)||points.length!==3||points.some(p=>!Array.isArray(p)||p.length!==3||!p.every(Number.isFinite)))return null;
+ const v=points.map(p=>p.map(x=>x*1000));
+ if(v.some(p=>!p.every(Number.isFinite)))return null;
+ const a=v[1].map((x,i)=>x-v[0][i]),b=v[2].map((x,i)=>x-v[0][i]);
+ const n=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=Math.hypot(...n);
+ if(!Number.isFinite(len)||len<=1e-12)return null;
+ const fmt=p=>p.map(x=>String(+x.toPrecision(12))).join(' ');
+ return '  facet normal '+fmt(n.map(x=>x/len))+'\n    outer loop\n'+v.map(p=>'      vertex '+fmt(p)).join('\n')+'\n    endloop\n  endfacet';
+}
+function exportSTL(){
+ if(!records.some(visibleRecord)||!T)return text('STL: no hay geometría 3D visible disponible');
+ const lines=['solid CAD2D3D_mm'];let count=0,skipped=0;
+ try{trianglesWorld(points=>{
+  if(count+skipped>=250000)throw Error('STL: límite de 250.000 caras; exportá un modelo más pequeño');
+  const facet=cad3dSTLFacet(points);if(facet){lines.push(facet);count++}else skipped++;
+ });}catch(e){return text(e.message||'STL: exportación interrumpida')}
+ if(!count)return text('STL: no hay triángulos válidos');
+ lines.push('endsolid CAD2D3D_mm');
+ download('CAD2D3D-model-mm.stl',lines.join('\n')+'\n','model/stl');
+ text('STL · '+count+' caras · coordenadas en mm'+(skipped?' · '+skipped+' degeneradas omitidas':'')+' · verificar malla cerrada antes de fabricar');
+}
 function exportDXF(){
  if(!records.some(visibleRecord))return text('No hay geometría 3D visible');
  if(!T)return text('El motor de geometría 3D todavía no está disponible');
@@ -10054,7 +10079,11 @@ function segmentsFromEntities(list,multiplier){
   if(e.type==='polyline'||e.type==='hatch'){
    var pts=e.pts||[];
    for(var i=1;i<pts.length;i++)line(pts[i-1],pts[i]);
-   if(e.closed&&pts.length>2)line(pts[pts.length-1],pts[0]);
+   if((e.closed||e.type==='hatch')&&pts.length>2)line(pts[pts.length-1],pts[0]);
+   if(e.type==='hatch'&&Array.isArray(e.holes))for(const loop of e.holes){
+    if(!Array.isArray(loop)||loop.length<3)continue;
+    for(let j=0;j<loop.length;j++)line(loop[j],loop[(j+1)%loop.length]);
+   }
   }
   if(e.type==='rect'&&e.a&&e.b){
    var p=[e.a,{x:e.b.x,y:e.a.y},e.b,{x:e.a.x,y:e.b.y}];
