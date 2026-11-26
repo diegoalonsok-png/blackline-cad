@@ -292,6 +292,95 @@ function traceFineWallBands(mask,w,h){
  return kept.map(q=>({a:q.v?[q.c,q.lo]:[q.lo,q.c],b:q.v?[q.c,q.hi]:[q.hi,q.c],t:q.t}));
 }
 
+// Local, non-generative preprocessing. Preserve drawing coordinates.
+function imageFilterPixels(data,w,h,mode,strength=.65){
+ const n=w*h,gray=new Uint8Array(n),hist=new Uint32Array(256);
+ for(let i=0;i<n;i++){const j=i*4,v=Math.round(.299*data[j]+.587*data[j+1]+.114*data[j+2]);gray[i]=v;hist[v]++;}
+ let hi=255,lo=0,count=0;for(let k=255;k>=0;k--){count+=hist[k];if(count>=n*.18){hi=k;break;}}count=0;
+ for(let k=0;k<256;k++){count+=hist[k];if(count>=n*.015){lo=k;break;}}
+ const clamp=v=>Math.max(0,Math.min(255,Math.round(v)));
+ const paper=Math.max(80,hi),dark=Math.min(paper-20,lo);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const i=y*w+x,j=i*4,v=gray[i];let z=v;
+  if(mode==='light')z=clamp(v*255/paper);
+  else if(mode==='contrast')z=clamp((v-dark)*255/(paper-dark));
+  else if(mode==='binary')z=v<paper*(.48+.36*strength)?0:255;
+  else if(mode==='walls')z=clamp(120+135*v/paper);
+  else if(mode==='sharp'||mode==='up2'||mode==='up4'){
+   const near=(gray[y*w+Math.max(0,x-1)]+gray[y*w+Math.min(w-1,x+1)]+gray[Math.max(0,y-1)*w+x]+gray[Math.min(h-1,y+1)*w+x])/4;
+   const delta=clamp(v+(v-near)*strength*1.7)-v;
+   for(let k=0;k<3;k++)data[j+k]=clamp(data[j+k]+delta);
+   data[j+3]=255;continue;
+  }
+  data[j]=data[j+1]=data[j+2]=z;data[j+3]=255;
+ }
+ return {paper,gray};
+}
+function imageOutputSize(w,h,factor){
+ const scale=Math.min(factor,4096/Math.max(w,h),Math.sqrt(8000000/(w*h)));
+ return [Math.max(1,Math.floor(w*scale)),Math.max(1,Math.floor(h*scale))];
+}
+
+let imageProcessingBusy=false;
+async function editCalcoImage(entity,action){
+ const S=C.state,valid=()=>S.entities.find(e=>e.id===entity.id&&e.type==='image'&&e.src===entity.src);
+ if(imageProcessingBusy)return C.toast('Ya hay una imagen en procesamiento.');
+ if(action==='restore'){
+  if(!entity.imageOriginalSrc)return C.toast('La imagen ya es la original.');
+  C.saveHistory();entity.src=entity.imageOriginalSrc;delete entity.imageOriginalSrc;delete entity.calcoUseProcessed;C.updateAll();C.toast('Imagen original restaurada.');return;
+ }
+ imageProcessingBusy=true;let dlg;
+ try{
+  const source=entity.src,im=new Image();im.src=source;await im.decode();
+  if(!im.naturalWidth||!im.naturalHeight)throw Error('Imagen inválida.');
+  const modes=[['light','Aclarar fondo'],['contrast','Contraste'],['binary','Blanco y negro'],['walls','Muros negros · candidatos'],['sharp','Nitidez'],['up2','Resolución ×2'],['up4','Resolución ×4']];
+  dlg=document.createElement('dialog');dlg.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:14px;width:min(850px,94vw);max-height:88vh;overflow:auto';
+  const title=document.createElement('h3');title.textContent='Mejorar imagen para CALCO';
+  const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+  const select=document.createElement('select');for(const [id,name] of modes)select.add(new Option(name,id));select.value=action==='resolution'?'up2':action;
+  const intensity=document.createElement('input');intensity.type='range';intensity.min='0';intensity.max='100';intensity.value='65';intensity.title='Intensidad';
+  const run=document.createElement('button');run.className='btn';run.textContent='Actualizar vista previa';
+  const msg=document.createElement('p');msg.textContent='La imagen original y las medidas CAD se conservan.';
+  const previews=document.createElement('div');previews.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:10px';
+  const original=document.createElement('img');original.src=source;original.alt='Imagen antes de procesar';original.style.cssText='width:100%;max-height:48vh;object-fit:contain;background:white';
+  const cv=document.createElement('canvas');cv.style.cssText='width:100%;max-height:48vh;object-fit:contain;background:white';
+  for(const [label,el] of [['Antes',original],['Procesada',cv]]){const col=document.createElement('div'),caption=document.createElement('p');caption.textContent=label;col.append(caption,el);previews.append(col);}
+  const use=document.createElement('input');use.type='checkbox';use.checked=entity.calcoUseProcessed!==false;const label=document.createElement('label');label.append(use,document.createTextNode(' Usar imagen procesada para CALCO'));
+  const apply=document.createElement('button'),cancel=document.createElement('button');apply.className=cancel.className='btn';apply.textContent='Aplicar';cancel.textContent='Cancelar';apply.disabled=true;
+  const render=async()=>{run.disabled=true;apply.disabled=true;msg.textContent='Procesando localmente…';await new Promise(r=>setTimeout(r,25));
+   try{
+    const mode=select.value,factor=mode==='up4'?4:mode==='up2'?2:1;
+    let [w,h]=imageOutputSize(im.naturalWidth,im.naturalHeight,factor);
+    cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(im,0,0,w,h);
+    const p=ctx.getImageData(0,0,w,h),str=Number(intensity.value)/100;
+    const {paper,gray}=imageFilterPixels(p.data,w,h,mode,str);ctx.putImageData(p,0,0);
+    let suffix='';
+    if(mode==='walls'){
+     // Detect at bounded resolution on original grayscale, then paint only candidate bands.
+     const k=Math.min(1,1400/Math.max(w,h)),dw=Math.max(1,Math.round(w*k)),dh=Math.max(1,Math.round(h*k)),mask=new Uint8Array(dw*dh);
+     for(let y=0;y<dh;y++)for(let x=0;x<dw;x++)mask[y*dw+x]=gray[Math.min(h-1,Math.floor(y*h/dh))*w+Math.min(w-1,Math.floor(x*w/dw))]<paper*(.60+.30*str)?1:0;
+     const all=[...traceWallBands(mask,dw,dh),...traceHatchedWallBands(mask,dw,dh),...traceFineWallBands(mask,dw,dh)];
+     const walls=[];for(const q of all){if(walls.length>=250)break;const v=q.a[0]===q.b[0],c=v?q.a[0]:q.a[1],lo=v?q.a[1]:q.a[0],hi=v?q.b[1]:q.b[0];if(walls.some(t=>t.v===v&&Math.abs(t.c-c)<Math.max(q.t,t.q.t)*.6&&Math.min(hi,t.hi)-Math.max(lo,t.lo)>.5*Math.min(hi-lo,t.hi-t.lo)))continue;walls.push({q,v,c,lo,hi});}
+     ctx.save();ctx.scale(w/dw,h/dh);ctx.strokeStyle='#000';ctx.lineCap='butt';for(const {q} of walls){ctx.lineWidth=q.t;ctx.beginPath();ctx.moveTo(...q.a);ctx.lineTo(...q.b);ctx.stroke();}ctx.restore();
+     suffix=' · '+walls.length+' candidatos. Revisá falsos positivos y vanos; no es reconocimiento definitivo.';
+     if(!walls.length){msg.textContent='No se detectaron candidatos. Elegí otro filtro.';return;}
+    }
+    msg.textContent=im.naturalWidth+' × '+im.naturalHeight+' → '+w+' × '+h+' px'+suffix+(factor>1?' · Interpolación y nitidez; no recupera detalles inexistentes.':'');apply.disabled=false;
+   }catch(e){msg.textContent='Error: '+e.message;}finally{run.disabled=false;}
+  };
+  select.onchange=()=>{apply.disabled=true;msg.textContent='Actualizá la vista previa.';};intensity.oninput=()=>{apply.disabled=true;msg.textContent='Actualizá la vista previa.';};run.onclick=render;
+  cancel.onclick=()=>dlg.close();apply.onclick=()=>{
+   try{const current=S.entities.find(e=>e.id===entity.id&&e.type==='image'&&e.src===source);if(!current||C.layerFor(current).locked)throw Error('La imagen cambió o está bloqueada.');
+    const url=cv.toDataURL('image/png');if(url.length>12000000)throw Error('Imagen procesada demasiado pesada. Elegí una resolución menor.');
+    C.saveHistory();current.imageOriginalSrc=current.imageOriginalSrc||current.src;current.src=url;current.calcoUseProcessed=use.checked;C.updateAll();C.toast('Imagen mejorada. Podés restaurar el original.');dlg.close();
+   }catch(e){msg.textContent=e.message;}
+  };
+  toolbar.append(select,intensity,run);dlg.append(title,toolbar,msg,previews,label,document.createElement('hr'),cancel,apply);
+  await new Promise(resolve=>{dlg.addEventListener('close',resolve,{once:true});document.body.append(dlg);dlg.showModal();render();});
+ }catch(e){C.toast('IMG: '+e.message);}finally{dlg?.remove();imageProcessingBusy=false;}
+}
+window.CAD2D_IMAGE_FILTER=editCalcoImage;
+
 let calcoBusy=false;
 async function traceFile(file,source=null){
  const S=C.state;if(S.tool!=='select'||S.stage?.length)return C.toast('Terminá el comando actual antes de calcar.');
@@ -299,7 +388,7 @@ async function traceFile(file,source=null){
  let bitmap,doc;
  try{
   C.log('CALCO: analizando imagen…');C.toast('CALCO: analizando imagen…');await new Promise(resolve=>setTimeout(resolve,30));
-  if(source){bitmap=new Image();bitmap.src=source.src;await bitmap.decode();}else if(/\.pdf$/i.test(file.name)){
+  if(source){bitmap=new Image();bitmap.src=source.calcoUseProcessed===false&&source.imageOriginalSrc?source.imageOriginalSrc:source.src;await bitmap.decode();}else if(/\.pdf$/i.test(file.name)){
    const L=await pdfjs();doc=await L.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
    const no=doc.numPages===1?1:Number(prompt('Página del PDF (1–'+doc.numPages+')','1'));
    if(!Number.isInteger(no)||no<1||no>doc.numPages)return;
