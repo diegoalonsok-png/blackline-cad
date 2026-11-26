@@ -3,7 +3,7 @@
 export async function onRequest(context) {
  const {request,env,next}=context;
  const url=new URL(request.url),key=url.pathname.slice(1);
- if(!/^(?:assets\/arq-catalogue\/v1\/(?:index\.json|plan-\d+\.(?:svg|json))|assets\/architecture-references\/(?:(?:index|user-house-plans|drive-house-references|r2-house-plans)\.json|[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.(?:png|jpe?g|webp|pdf|dxf|dwg)))$/i.test(key))return next();
+ if(!/^(?:assets\/user-cad\/v1\/(?:catalog\.json|[a-z0-9_-]+-[0-9a-f]{12}\.(?:dxf|dwg|webp))|assets\/arq-catalogue\/v1\/(?:index\.json|plan-\d+\.(?:svg|json))|assets\/architecture-references\/(?:(?:index|user-house-plans|drive-house-references|r2-house-plans)\.json|[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+\.(?:png|jpe?g|webp|pdf|dxf|dwg)))$/i.test(key))return next();
  if(!['GET','HEAD'].includes(request.method))return new Response(null,{status:405,headers:{Allow:'GET, HEAD'}});
  const bucket=env.ARCHITECTURE_LIBRARY;
  const fallback=async()=>{const res=await next();if(!res.ok)return res;const headers=new Headers(res.headers);headers.set('X-CAD-Library-Storage','pages');return new Response(res.body,{status:res.status,headers});};
