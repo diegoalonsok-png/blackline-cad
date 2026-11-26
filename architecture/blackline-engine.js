@@ -283,6 +283,60 @@ function solve(spec){
  return out;
 }
 
+// Rectangular swimming pool: dimensions refer to the clear water surface.
+function poolInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(\d+|un|una|dos|tres|cuatro|cinco|one|two|three|four|five)\s+)?(?:piletas?|piscinas?|swimming pools?|pools?)\b(?:\s+(?:de natacion|rectangulares?|rectangular))*/);
+ if(!head)return null;
+ const rest=s.slice(head[0].length).trim();
+ if(/^(?:de\s+)?(?:lavar|lavadero|cocina|sink)\b/.test(rest)||!/\d/.test(rest))return null;
+ const q=rest.match(/^(?:en\s+(?:set|tandem|fila)\s*)?[x×*]\s*(\d+)\s+(?:de|of)\s+/);
+ const count=q?Number(q[1]):head[1]?(numberWords[head[1]]??Number(head[1])):1;
+ if(q&&head[1])throw Error('Indicá una sola cantidad de piletas.');
+ const tail=(q?rest.slice(q[0].length):rest).replace(/^(?:de|of)\s+/,'');
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?|ft|feet)?';
+ const dm=tail.match(new RegExp('^'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)'));
+ if(!dm)throw Error('Pileta rectangular: indicá largo × ancho, por ejemplo pileta 8 x 4 m.');
+ const length=num(dm[1])*unitScale(dm[2]||dm[4]),width=num(dm[3])*unitScale(dm[4]||dm[2]);
+ let options=tail.slice(dm[0].length).trim(),border=.25,stairs=false,gap=1;
+ const used=new Set();
+ const measureOption=(label)=>options.match(new RegExp('^(?:'+label+')\\s*(?:(?:de|of)\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)'));
+ while(options){
+  options=options.replace(/^(?:con|y|with|and)\s+/,'');
+  let m=measureOption('borde(?: perimetral)?|solado(?: perimetral)?|deck|border'),key='border';
+  if(m)border=num(m[1])*unitScale(m[2]);
+  else if((m=options.match(/^(?:sin borde|without border|no border)\b/)))border=0;
+  else if((m=options.match(/^(?:escalera(?: recta)?|stairs|steps)\b/))){key='stairs';stairs=true;}
+  else if((m=options.match(/^(?:sin escalera|without stairs|no stairs)\b/))){key='stairs';stairs=false;}
+  else if((m=measureOption('separacion|gap'))){key='gap';gap=num(m[1])*unitScale(m[2]);}
+  else throw Error('Opción de pileta no soportada: '+options);
+  if(used.has(key))throw Error('Opción de pileta repetida: '+key);
+  used.add(key);options=options.slice(m[0].length).trim();
+ }
+ return {kind:'pool_plan',count,length,width,border,stairs,gap};
+}
+function solvePool(spec){
+ const {count,length:l,width:w,border:b,stairs,gap}=spec;
+ if(!Number.isInteger(count)||count<1||count>10||![l,w,b,gap].every(Number.isFinite)||l<1||w<1||l>50||w>50||b<0||b>5||gap<.1||gap>20||typeof stairs!=='boolean')throw Error('Pileta: 1 a 10 unidades, lados de 1 a 50 m, borde de 0 a 5 m.');
+ if(count*(l+2*b)+(count-1)*gap>500)throw Error('Conjunto de piletas demasiado extenso.');
+ if(stairs&&(l<2||w<1.5))throw Error('La escalera esquemática necesita al menos 2 × 1,50 m.');
+ const entities=[],pools=[];
+ const rect=(x,y,a,c,layer)=>entities.push({type:'polyline',closed:true,pts:[[x,y],[x+a,y],[x+a,y+c],[x,y+c]],layer});
+ const line=(a,b,layer)=>entities.push({type:'line',a,b,layer});
+ for(let i=0;i<count;i++){
+  const x=i*(l+2*b+gap)+b,y=b;
+  rect(x,y,l,w,'POOL-WATER');
+  if(b>0)rect(x-b,y-b,l+2*b,w+2*b,'POOL-DECK');
+  if(stairs){
+   const sw=Math.min(1.2,w-.2),sy=y+(w-sw)/2,run=Math.min(1.2,l*.5);
+   line([x,sy],[x+run,sy],'POOL-STAIRS');line([x,sy+sw],[x+run,sy+sw],'POOL-STAIRS');
+   for(let j=1;j<=4;j++)line([x+j*run/4,sy],[x+j*run/4,sy+sw],'POOL-STAIRS');
+  }
+  pools.push({id:'pool-'+(i+1),waterBounds:[x,y,l,w],border:b});
+ }
+ return {schema:'blackline.architecture.detail.v1',units:'m',entities,pools,brief:spec,assumptions:[count+' pileta(s) · espejo de agua '+l+' × '+w+' m · borde '+b+' m','Planta preliminar 2D; no define profundidad, estructura, instalaciones ni seguridad.']};
+}
+
 function detailInstruction(raw){
  const s=normalize(raw);
  if(/\b(?:bano|banos|bathroom)\b/.test(s)&&/\b(?:corte|seccion|elevacion|alzado|section|elevation)\b/.test(s)){
@@ -647,6 +701,8 @@ function collectiveCabins(spec){
  p.assumptions.push(p.warning);return p;
 }
 function run(raw){
+ if(typeof raw!=='string'||raw.length>4000)throw Error('Instrucción inválida.');
+ const pool=poolInstruction(raw);if(pool)return solvePool(pool);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
