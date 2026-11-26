@@ -167,8 +167,10 @@ function classifyRooms(regions,objects){
  for(const r of out){
   const has=re=>r.objects.some(id=>re.test(id));
   const wc=has(/^san-wc(?:-|$)/),shower=has(/^san-(?:ducha|banera|hidromasaje)/),otherSanitary=has(/^san-(?:bidet|lav|mingitorio)/);
-  const bed=has(/^dor-(?:cama|queen|king|cucheta)/),living=has(/^mob-(?:sofa|sillon|ratona|tv)/),dining=has(/^mob-mesa(?:4|6|8|-red)/),kitchen=has(/^kq-(?:cocina|anafe|horno|heladera|bacha)/);
-  r.use=wc?'bathroom_candidate':bed?'bedroom_candidate':living?'living_candidate':kitchen?'kitchen_candidate':dining?'dining_candidate':shower||otherSanitary?'sanitary_space_review':null;
+  const bed=has(/^dor-(?:cama|queen|king|cucheta)/),living=has(/^mob-(?:sofa|sillon|ratona|tv)/),dining=has(/^mob-mesa(?:4|6|8|-red)/),kitchen=has(/^kq-(?:cocina|anafe|horno|heladera|bacha|mesada|isla|lv|industrial-range|industrial-prep|industrial-fridge)/);
+  r.use=wc?'bathroom_candidate':bed?'bedroom_candidate':kitchen?'kitchen_candidate':living?'living_candidate':dining?'dining_candidate':shower||otherSanitary?'sanitary_space_review':null;
+  r.zones=[...(wc?['bathroom']:[]),...(bed?['bedroom']:[]),...(kitchen?['kitchen']:[]),...(living?['living']:[]),...(dining?['dining']:[])];
+  r.kitchen_dining=kitchen&&dining;
   r.bathroom_type=wc?(shower?'full_bath_candidate':'toilette_candidate'):null;
   r.evidence=wc?'wc':r.use==='sanitary_space_review'?'sanitary_without_wc':null;
  }
