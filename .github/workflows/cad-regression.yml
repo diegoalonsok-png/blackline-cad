@@ -12,7 +12,7 @@ permissions:
 jobs:
   cad-static:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -39,4 +39,6 @@ jobs:
           console.log('Validated', inline.length, 'inline scripts and structured-data blocks');
           NODE
       - name: Run CAD geometry regression tests
-        run: node --test tests/*.test.cjs
+        # Browser tests each launch Chromium; cap concurrent test files to avoid
+        # resource contention on shared CI runners without skipping checks.
+        run: node --test --test-concurrency=2 tests/*.test.cjs
