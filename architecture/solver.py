@@ -155,7 +155,7 @@ def interpret(text):
     s = "".join(ch for ch in unicodedata.normalize("NFD", text.lower())
                 if unicodedata.category(ch) != "Mn")
     kinds = {
-        "bedroom": r"\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|chambres?|schlafzimmer|quartos?|camere?)\b",
+        "bedroom": r"\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|chambres?|schlafzimmer|quartos?|camer[ae])\b",
         "bathroom": r"\b(?:banos?|bathrooms?|baths?|salle[s]? de bain[s]?|badezimmer|banheiros?|bagni|bagno)\b",
         "kitchen": r"\b(?:cocinas?|kitchens?|cuisines?|kuchen|cozinhas?|cucine?|cucina)\b",
         "living": r"\b(?:livings?|salones?|salas? de estar|living rooms?|salons?|wohnzimmer|salas? de estar|soggiorni?|soggiorno)\b",
