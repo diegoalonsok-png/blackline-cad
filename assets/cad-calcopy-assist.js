@@ -153,6 +153,7 @@ function pointInRing(x,y,pts){
  return inside;
 }
 function roomContains(r,x,y){
+ if(typeof r.contains==='function')return r.contains(x,y);
  if(!(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;
  if(!r.rings?.length)return true;
  return r.rings.some(q=>!q.hole&&pointInRing(x,y,q.points))&&!r.rings.some(q=>q.hole&&pointInRing(x,y,q.points));
@@ -300,6 +301,39 @@ function bathroomBasinAlignment(openings,blocks,sx,sy){
  }
  return out;
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance,bathroomBasinAlignment};
+// A review-only occupancy grid: close marked openings for topology, not CAD.
+// Flood-fill exterior and interior, preserving actual polygon footprints.
+function reviewSpaces(walls,openings,width,height,metersPerPixel){
+ if(![width,height,metersPerPixel].every(Number.isFinite)||width<=0||height<=0||metersPerPixel<=0)return {regions:[],labels:new Int32Array(0),width:0,height:0,scale:1};
+ const k=Math.min(1,900/Math.max(width,height)),W=Math.max(1,Math.ceil(width*k)),H=Math.max(1,Math.ceil(height*k)),N=W*H,labels=new Int32Array(N),queue=new Int32Array(N);
+ const rect=(v,c,lo,hi,t)=>{
+  if(![c,lo,hi,t].every(Number.isFinite)||hi<=lo||t<=0)return;
+  const x0=Math.max(0,Math.floor((v?c-t/2:lo)*k)),x1=Math.min(W-1,Math.ceil((v?c+t/2:hi)*k));
+  const y0=Math.max(0,Math.floor((v?lo:c-t/2)*k)),y1=Math.min(H-1,Math.ceil((v?hi:c+t/2)*k));
+  for(let y=y0;y<=y1;y++)labels.fill(-1,y*W+x0,y*W+x1+1);
+ };
+ for(const w of walls)if(!w.skip)rect(w.v,w.c,w.lo,w.hi,w.t);
+ for(const o of openings)if(o.w&&!o.w.skip&&/door|window/.test(o.kind||''))rect(o.v,o.c,o.g0,o.g1,o.t);
+ const regions=[];let id=0;
+ for(let start=0;start<N;start++){
+  if(labels[start]!==0)continue;
+  id++;let tail=1,head=0;queue[0]=start;labels[start]=id;
+  let x0=W,y0=H,x1=0,y1=0,edge=false,adjacent=0;
+  const add=i=>{if(labels[i]===0){labels[i]=id;queue[tail++]=i;}else if(labels[i]===-1)adjacent++;};
+  while(head<tail){const i=queue[head++],x=i%W,y=(i/W)|0;x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);
+   if(x===0||y===0||x===W-1||y===H-1)edge=true;
+   if(x>0)add(i-1);if(x<W-1)add(i+1);if(y>0)add(i-W);if(y<H-1)add(i+W);
+  }
+  if(edge||tail<16||!adjacent)continue;
+  const rw=x1-x0+1,rh=y1-y0+1,area=tail/k**2,wm=rw/k*metersPerPixel,hm=rh/k*metersPerPixel,am=area*metersPerPixel**2;
+  const kind=Math.min(wm,hm)<=.60&&Math.max(wm,hm)<=.90&&am<=.54?'technical_void_candidate':Math.min(wm,hm)<.75||am<1?'small_space_review':tail/(rw*rh)>=.98?'room_candidate':'polygonal_room_candidate';
+  const label=id,contains=(x,y)=>{const X=Math.floor(x*k),Y=Math.floor(y*k);return X>=0&&X<W&&Y>=0&&Y<H&&labels[Y*W+X]===label;};
+  regions.push({id:'live-'+id,label,x:x0/k,y:y0/k,w:rw/k,h:rh/k,area,area_m2:am,kind,rectangularity:tail/(rw*rh),contains});
+ }
+ regions.sort((a,b)=>b.area-a.area);
+ for(const q of regions){const parents=regions.filter(p=>p.area>q.area&&p.rectangularity<.98&&p.x<=q.x&&p.y<=q.y&&p.x+p.w>=q.x+q.w&&p.y+p.h>=q.y+q.h);if(parents.length)q.possible_parent=parents.sort((a,b)=>a.area-b.area)[0].id;}
+ return {regions:regions.slice(0,250),labels,width:W,height:H,scale:k};
+}
+const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance,reviewSpaces,bathroomBasinAlignment};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
