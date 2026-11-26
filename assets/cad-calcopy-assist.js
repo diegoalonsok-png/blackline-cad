@@ -138,11 +138,24 @@ function buildPlan(walls,openings,local,maxT){
 }
 // Room use is inferred only from recognized objects, never from size alone.
 // Bounding boxes provide a provisional assignment; actual access requires a door.
+function pointInRing(x,y,pts){
+ let inside=false;
+ for(let i=0,j=pts.length-1;i<pts.length;j=i++){
+  const [ax,ay]=pts[i],[bx,by]=pts[j];
+  if((ay>y)!==(by>y)&&x<(bx-ax)*(y-ay)/(by-ay)+ax)inside=!inside;
+ }
+ return inside;
+}
+function roomContains(r,x,y){
+ if(!(x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h))return false;
+ if(!r.rings?.length)return true;
+ return r.rings.some(q=>!q.hole&&pointInRing(x,y,q.points))&&!r.rings.some(q=>q.hole&&pointInRing(x,y,q.points));
+}
 function classifyRooms(regions,objects){
  const out=regions.map(r=>({...r,objects:[]}));
  for(const o of objects){
   if(!Number.isFinite(o.x)||!Number.isFinite(o.y)||typeof o.id!=='string')continue;
-  const candidates=out.filter(r=>r.kind!=='technical_void_candidate'&&r.kind!=='isolated_object_candidate'&&o.x>=r.x&&o.x<=r.x+r.w&&o.y>=r.y&&o.y<=r.y+r.h).sort((a,b)=>a.area-b.area);
+  const candidates=out.filter(r=>r.kind!=='technical_void_candidate'&&r.kind!=='isolated_object_candidate'&&roomContains(r,o.x,o.y)).sort((a,b)=>a.area-b.area);
   if(candidates.length)candidates[0].objects.push(o.id);
  }
  for(const r of out){
@@ -158,7 +171,9 @@ function classifyRooms(regions,objects){
   r.possible_suite=r.use==='bathroom_candidate'&&parent?.use==='bedroom_candidate';
   r.possible_nested_bath=r.use==='bathroom_candidate'&&!!parent&&parent.use!=='bathroom_candidate';
   r.parent_use=r.possible_nested_bath?parent.use:null;
+  r.area_review=r.use==='bathroom_candidate'&&parent&&r.area>=parent.area?'bathroom_not_smaller_than_parent':null;
  }
+ for(const r of out){if(r.use!=='bathroom_candidate'||r.area_review)continue;const primary=out.filter(p=>['bedroom_candidate','living_candidate','dining_candidate'].includes(p.use));if(primary.length&&primary.every(p=>r.area>=p.area))r.area_review='bathroom_larger_than_primary_rooms';}
  return out;
 }
 const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms};
