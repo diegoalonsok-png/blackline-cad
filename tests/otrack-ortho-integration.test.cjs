@@ -79,3 +79,35 @@ test('with ORTHO disabled, standard endpoint snapping still works',()=>{
  assert.equal(p.x,7);assert.equal(p.y,5);
  assert.equal(cad.acquired.length,1);
 });
+
+test('OTRACK captures vertical LINE against acquired horizontal reference without ORTHO',()=>{
+ const cad=editor({orthoOn:false});
+ cad.state.stage=[{x:10,y:0}];cad.state.view.scale=80;
+ cad.state.entities=[];cad.anchors.push({x:9.2,y:-2});
+ const p=cad.point(10.26,-2.04);
+ assert.equal(p.x,10);assert.equal(p.y,-2);
+ assert.equal(cad.context.otrkGuide.point.x,p.x);
+ assert.equal(cad.context.otrkGuide.point.y,p.y);
+ assert.equal(cad.context.otrkGuide.intersection,true);
+ const click=cad.point(10.26,-2.04);
+ assert.equal(click.x,p.x);assert.equal(click.y,p.y);
+});
+test('OTRACK captures horizontal PLINE against acquired vertical reference without ORTHO',()=>{
+ const cad=editor({orthoOn:false});
+ cad.state.tool='polyline';cad.state.view.scale=80;
+ cad.state.entities=[];cad.anchors.push({x:12,y:1});
+ const p=cad.point(12.04,0.26);
+ assert.equal(p.x,12);assert.equal(p.y,0);
+});
+test('OTRACK does not force a deliberately diagonal LINE to ORTHO',()=>{
+ const cad=editor({orthoOn:false});
+ cad.state.view.scale=80;cad.state.entities=[];cad.anchors.push({x:9.2,y:-2});
+ const p=cad.point(11,-2.04);
+ assert.ok(Math.abs(p.x-11)<1e-9);assert.ok(Math.abs(p.y+2)<1e-9);
+});
+test('OTRACK off does not impose a near-axis capture',()=>{
+ const cad=editor({orthoOn:false,otrackOn:false});
+ cad.state.view.scale=80;cad.state.entities=[];cad.anchors.push({x:9.2,y:-2});
+ const p=cad.point(10.26,-2.04);
+ assert.equal(p.x,10.26);assert.equal(p.y,-2.04);
+});
