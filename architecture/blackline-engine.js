@@ -774,10 +774,48 @@ function doubleSuiteCorridor(plan,passage){
  return p;
 }
 // Individual rear cubicles; one clear common aisle, independent native doors.
+// Public sanitary batteries: explicit quantities and independent private cabins.
+function sanitaryBatteryInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:(\d+)\s+)?(?:banos? (?:publicos?|colectivos?|en bateria)|bateria de (?:banos?|sanitarios?)|sanitarios? en bateria|vestuarios? deportivos?|public bathrooms?|public restrooms?)\b/);
+ if(!head)return null;
+ let tail=s.slice(head[0].length).trim();
+ const q=tail.match(/^[x×*]\s*(\d+)\s+(?:de|of)\s+/);
+ if(q&&head[1])throw Error('Indicá una sola cantidad de baterías.');
+ const count=Number(q?.[1]||head[1]||1);if(q)tail=tail.slice(q[0].length);
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?)?';
+ const dims=()=>N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)';
+ const dm=tail.match(new RegExp('^(?:de\\s+|of\\s+)?'+dims()));
+ if(!dm)throw Error('Indicá ancho × profundidad de la batería y cantidades de artefactos.');
+ const width=num(dm[1])*unitScale(dm[2]||dm[4]),depth=num(dm[3])*unitScale(dm[4]||dm[2]);
+ tail=tail.slice(dm[0].length).trim();
+ const names={inodoro:'toilet',inodoros:'toilet',wc:'toilet',toilet:'toilet',toilets:'toilet',ducha:'shower',duchas:'shower',shower:'shower',showers:'shower',lavatorio:'basin',lavatorios:'basin',lavamanos:'basin',basin:'basin',basins:'basin',bidet:'bidet',bidets:'bidet',bide:'bidet',bides:'bidet',locker:'locker',lockers:'locker',casillero:'locker',casilleros:'locker',banco:'changingBench',bancos:'changingBench'};
+ const fixtures=[],seen=new Set();let cellW=1.1,cellD=1.8,passage=1.2,wall=.15,cellDoor=.7;
+ const opt=(label)=>new RegExp('^(?:'+label+')\\s*(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)');
+ while(tail){
+  tail=tail.replace(/^(?:,|\+|\by\b|\band\b|\bcon\b|\bwith\b)\s*/,'').trim();
+  let m,key;
+  if((m=tail.match(/^(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six)\s+([a-z]+)(?=\s|,|\+|$)/))&&names[m[2]]){
+   key=names[m[2]];const n=numberWords[m[1]]??Number(m[1]);if(n<1||n>12)throw Error('Cantidad de artefactos fuera de rango.');
+   for(let i=0;i<n;i++)fixtures.push(key);
+  }else if((m=tail.match(new RegExp('^cabinas?\\s+(?:de\\s+)?'+dims())))){key='cell';cellW=num(m[1])*unitScale(m[2]||m[4]);cellD=num(m[3])*unitScale(m[4]||m[2]);}
+  else if((m=tail.match(opt('circulacion|pasillo|aisle')))){key='passage';passage=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(opt('tabiques?|muros?|walls?')))){key='wall';wall=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(opt('puertas? de cabinas?')))){key='door';cellDoor=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(/^(?:en cabinas(?: individuales)?|cada uno)\b/))){key='cabins';}
+  else throw Error('Opción sanitaria no soportada: '+tail);
+  if(seen.has(key))throw Error('Opción sanitaria repetida: '+key);
+  seen.add(key);tail=tail.slice(m[0].length).trim();
+ }
+ if(!fixtures.length||fixtures.length>12||!fixtures.some(k=>k==='toilet'||k==='shower'))throw Error('Indicá de 1 a 12 artefactos por batería, incluyendo inodoros o duchas.');
+ return {kind:'bathroom',count,width,depth,wall,door:.9,window:0,fixtures,cellW,cellD,passage,cellDoor,assumptions:['Batería sanitaria con cabinas independientes; medidas interiores por recinto.']};
+}
 function collectiveCabins(spec){
- const {width:w,depth:d,count:n,fixtures}=spec,t=.15,door=.7,cellW=1.1,cellD=1.65;
+ const {width:w,depth:d,count:n,fixtures}=spec,t=spec.wall??.15,door=spec.cellDoor??.7,cellW=spec.cellW??1.1,cellD=spec.cellD??1.65,passage=spec.passage??1.2;
+ if(![t,door,cellW,cellD,passage].every(Number.isFinite)||t<.08||t>.5||cellW<1||cellW>3||cellD<1.5||cellD>4||door<.6||door>cellW-.15||passage<1.2||passage>4)throw Error('Medidas de cabina, tabique, puerta o circulación fuera de rango.');
  const cells=fixtures.filter(k=>k==='toilet'||k==='shower'),other=fixtures.filter(k=>k!=='toilet'&&k!=='shower');
- if(!cells.length||n<1||n>10||w>20||d>20||d<cellD+2.2||cells.length*(cellW+t)-t>w+1e-7)throw Error('Cabinas: aumentá el ancho o profundidad para alojar todas las cabinas y la circulación.');
+ if(spec.cellD!==undefined&&cells.some(k=>C[k][1]>cellW-.1||C[k][2]+door+.05>cellD))throw Error('La cabina no deja espacio para el giro de puerta y el artefacto.');
+ if(!cells.length||n<1||n>10||w>20||d>20||d<cellD+t+passage+.9||cells.length*(cellW+t)-t>w+1e-7)throw Error('Cabinas: aumentá el ancho o profundidad para alojar todas las cabinas y la circulación.');
  const p=solve({...spec,fixtures:[]});
  p.blocks=[];p.brief=spec;
  for(let i=0;i<n;i++){
@@ -793,18 +831,19 @@ function collectiveCabins(spec){
    const k=cells[j],bw=C[k][1],bd=C[k][2];put(k,a+t/2+(cellW-bw)/2,back-bd,180);
   }
   // Keep the central entry door zone and a 1.2 m aisle clear.
-  const low=d-cellD-t-1.2;
+  const low=d-cellD-t-passage;
   if(other.length){const lay=arrange(w,low,other,[R((w-spec.door)/2,0,spec.door,spec.door)],0);
    for(const o of lay)put(o.key,x+o.r.x,y+o.r.y,o.rot);
   }
  }
- p.status='approximate';p.warning='Cabinas individuales preliminares de 1,10 × 1,65 m; puertas y tabiques nativos. Verificar giros, privacidad, accesibilidad y normativa.';
+ p.status='approximate';p.warning='Cabinas individuales preliminares de '+cellW.toFixed(2)+' × '+cellD.toFixed(2)+' m; circulación '+passage.toFixed(2)+' m. Verificar giros, privacidad, accesibilidad, ventilación y normativa.';
  p.assumptions.push(p.warning);return p;
 }
 function run(raw){
  if(typeof raw!=='string'||raw.length>4000)throw Error('Instrucción inválida.');
  const pool=poolInstruction(raw);if(pool)return solvePool(pool);
  const parking=parkingInstruction(raw);if(parking)return solveParking(parking);
+ const battery=sanitaryBatteryInstruction(raw);if(battery)return collectiveCabins(battery);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
