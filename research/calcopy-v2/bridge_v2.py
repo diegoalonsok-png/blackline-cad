@@ -61,6 +61,58 @@ def _mixed(solid, lines):
     return out
 
 
+def _recover_returns(im, established, T):
+    """Recover short double-face wall returns missed by the long-line pass.
+    The architectural prior is conditional: an unclassified closed band
+    touching the established wall network is a candidate, not proof.
+    Single strokes and isolated furniture-like rectangles are not walls.
+    No new gap is bridged. Return candidates for the existing review UI.
+    """
+    if not established or not T:
+        return []
+    paper = float(np.percentile(cv2.cvtColor(im, cv2.COLOR_BGR2GRAY), 90))
+    result = []
+    for v in (False, True):
+        faces, ink = W.thin_lines(im, paper, v)
+        # The main detector already handles the long faces.
+        for i, p in enumerate(faces):
+            for q in faces[i+1:]:
+                gap = q['c'] - p['c']
+                t = gap + (p['t'] + q['t']) / 2
+                if gap > 2.1 * T:
+                    break
+                if gap < max(3, .45 * T) or t > 2.4 * T:
+                    continue
+                lo, hi = max(p['lo'], q['lo']), min(p['hi'], q['hi'])
+                if hi - lo < max(8, 1.8 * t):
+                    continue
+                c = (p['c'] + q['c']) / 2
+                candidate = dict(v=v, c=c, t=t, lo=lo, hi=hi)
+                # Require an actual perpendicular contact near an endpoint.
+                contacts = []
+                for s in established:
+                    if s['v'] == v:
+                        continue
+                    if not s['lo'] - s['t']/2 <= c <= s['hi'] + s['t']/2:
+                        continue
+                    if min(abs(lo-s['c']), abs(hi-s['c'])) <= s['t']/2 + max(2,.25*t):
+                        contacts.append(s)
+                if not contacts:
+                    continue
+                y0 = max(0, int(np.ceil(p['c'] + p['t']/2)))
+                y1 = min(ink.shape[0], int(np.floor(q['c'] - q['t']/2))+1)
+                core = ink[y0:y1, int(lo):int(hi)+1]
+                if not core.size or core.mean() > .55:
+                    continue
+                # A continuous middle stroke often means furniture/stairs.
+                if core.shape[0] > 2 and core[1:-1].mean(axis=1).max(initial=0) > .8:
+                    continue
+                result.append(candidate)
+                if len(result) >= 250:
+                    return []
+    return result
+
+
 def analyze_v2(pixels, w, h):
     rgba = np.frombuffer(bytes(pixels), dtype=np.uint8).reshape(h, w, 4)
     im = cv2.cvtColor(rgba, cv2.COLOR_RGBA2BGR)
@@ -78,9 +130,12 @@ def analyze_v2(pixels, w, h):
         readings[mode] = _walls(segs, k)
         scores[mode] = _network_score(segs, thickness[mode] or 1)
     combined = _mixed(raw['solid'], raw['lines'])
-    readings['mixed'] = _walls(combined, k)
     primary = max(('solid', 'lines'), key=lambda m: (scores[m], len(raw[m])))
     T = min((v for v in thickness.values() if v), default=1)
+    # Recover missing connected returns after the primary classification.
+    if combined and any(thickness.values()):
+        combined = _mixed(combined, _recover_returns(im, combined, T))
+    readings['mixed'] = _walls(combined, k)
     mixed_score = _network_score(combined, T)
     # Prefer mixed only if it adds meaningful connected evidence. The
     # user can still review each independent reading.
