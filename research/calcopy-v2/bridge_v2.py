@@ -67,6 +67,7 @@ def analyze_v2(pixels, w, h, real_width_m=None):
             region['area_m2']=round(region['area']/ppm**2,3)
         for key in ('x','y','w','h'):region[key]=round(region[key]/k,2)
         region['area']=round(region['area']/k**2,2)
+        for ring in region.get('rings',[]):ring['points']=[[round(x/k,2),round(y/k,2)] for x,y in ring['points']]
     diagnostics['residual']=S.residual_summary(review_ink,mask)
     # Diagnostic room candidates only; do not alter wall geometry or invent doors.
     return json.dumps({'best': best, 'readings': readings, 'validation':diagnostics,'regions':regions})
