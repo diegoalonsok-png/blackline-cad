@@ -629,7 +629,7 @@
     const [own,archive]=await Promise.all([localRoomPreviews(room),room.category==='living'?Promise.resolve([]):archivedReferences('References '+room.category).catch(()=>[])]);
     if(epoch!==webEpoch||!webMode||ctrl.signal.aborted)return;
     const refs=room.terms.length?archive.filter(x=>roomTermsMatch({name:x.title},room.terms)):archive;
-    webItems=own.concat(refs.filter(x=>x.cadUrl),refs.filter(x=>!x.cadUrl));webStatus=webItems.length?'':T('No matching editable plans yet. Try the room name alone.','Todavía no hay plantas editables para esa búsqueda. Probá el nombre del ambiente solo.');paintWeb();
+    webItems=own.filter(x=>x.cadUrl).concat(refs.filter(x=>x.cadUrl),own.filter(x=>!x.cadUrl),refs.filter(x=>!x.cadUrl));webStatus=webItems.length?'':T('No matching editable plans yet. Try the room name alone.','Todavía no hay plantas editables para esa búsqueda. Probá el nombre del ambiente solo.');paintWeb();
    }catch(e){if(epoch===webEpoch){webStatus=T('Room catalogue unavailable. Retry.','Catálogo de ambientes no disponible. Volvé a buscar.');paintWeb();}}
    return;
   }
