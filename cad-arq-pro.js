@@ -1225,6 +1225,7 @@ function openArchitectureBar(focus=true){
    const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
    if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw)){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
+   {const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs){EXT.cancelArchitectureCommand();window.CAD2D_ARQ_DOCS.open(docs,raw);return;}}
    if(arqClassicQuery(raw)){const b=window.CAD2D_BLOCK_BROWSER;if(b?.openClassics){EXT.cancelArchitectureCommand();b.openClassics(raw);}return;}
    if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
    if(arqHouseGallery(raw)){arqOpenHouseGallery(raw);return;}

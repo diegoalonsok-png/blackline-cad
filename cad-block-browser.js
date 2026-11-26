@@ -709,6 +709,7 @@
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
   if(a==='all-houses')return openHouses('Casas')
   if(a==='house-references'){if(!houseMode)return openHouses('Casas referencias');const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
+  if(a==='ref-type'&&window.CAD2D_ARQ_DOCS&&['Detalles','Cotas'].includes(button.dataset.refType)){close();window.CAD2D_ARQ_DOCS.open(button.dataset.refType==='Cotas'?'dim':'detail','');return;}
   if(a==='ref-type'){const kind=button.dataset.refType;if(strictRoomCategory(kind))return openWeb(T(({Baños:'Bathrooms',Cocinas:'Kitchens',Dormitorios:'Bedrooms'})[kind]||kind,kind));const raw='Referencias '+kind;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='search')return searchWeb(q);
