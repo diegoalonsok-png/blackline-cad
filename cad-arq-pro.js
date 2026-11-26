@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-pools1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-parking1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -817,20 +817,20 @@ function solveGeometry(text,brief=null,semantic=false){
 
 function applyArchitectureDetail(plan,origin){
  if(plan.units!=='m'||!Array.isArray(plan.entities)||!plan.entities.length||plan.entities.length>500)throw Error('Detalle inválido.');
- const pool=plan.brief?.kind==='pool_plan';
- const st=S(),k=f(),names=new Set(pool?['POOL-WATER','POOL-DECK','POOL-STAIRS']:['STAIRS','RAILS','SECTIONS','SECTION-CUT','SECTION-FINISH','SECTION-FIXTURES']),layers=new Map(),add=[];
- const validPoint=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=(pool?500:100));
+ const pool=plan.brief?.kind==='pool_plan',parking=plan.brief?.kind==='parking_plan';
+ const st=S(),k=f(),names=new Set(pool?['POOL-WATER','POOL-DECK','POOL-STAIRS']:parking?['PARKING-SPACE','PARKING-AISLE','PARKING-CARS']:['STAIRS','RAILS','SECTIONS','SECTION-CUT','SECTION-FINISH','SECTION-FIXTURES']),layers=new Map(),add=[];
+ const validPoint=p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<=(pool||parking?500:100));
  const getLayer=name=>{
   if(!names.has(name))throw Error('Capa de detalle inválida');
   if(!layers.has(name)){
    const old=st.layers.find(l=>l.name.toUpperCase()===name);
    if(old&&(old.locked||old.visible===false))throw Error('Capa bloqueada u oculta: '+name);
    const id=old?.id||'arq-detail-'+name.toLowerCase();if(!old&&st.layers.some(l=>l.id===id))throw Error('Colisión de capa.');
-   const l=old||{id,name,color:name==='POOL-WATER'?'#45b8df':name==='POOL-DECK'?'#b9a78f':name==='SECTION-CUT'?'#777b80':name==='SECTION-FINISH'?'#8d9295':'#e5e7eb',visible:true,locked:false,width:name==='SECTIONS'?.35:.13,linetype:'CONTINUOUS'};
+   const l=old||{id,name,color:name==='PARKING-AISLE'?'#8d9295':name==='PARKING-CARS'?'#a5b9ca':name==='POOL-WATER'?'#45b8df':name==='POOL-DECK'?'#b9a78f':name==='SECTION-CUT'?'#777b80':name==='SECTION-FINISH'?'#8d9295':'#e5e7eb',visible:true,locked:false,width:name==='SECTIONS'?.35:.13,linetype:'CONTINUOUS'};
    layers.set(name,l);if(!old)add.push(l);
   }return layers.get(name).id;
  };
- for(const e of plan.entities){if(pool&&e.type==='polyline'){if(!e.closed||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint)||Math.abs(e.pts[2][0]-e.pts[0][0])<1e-8||Math.abs(e.pts[2][1]-e.pts[0][1])<1e-8)throw Error('Contorno de pileta inválido.');}else if(e.type!=='line'||![e.a,e.b].every(validPoint)||Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Geometría de detalle inválida.');getLayer(e.layer);}
+ for(const e of plan.entities){if((pool||parking)&&e.type==='polyline'){if(!e.closed||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint)||Math.abs(e.pts[2][0]-e.pts[0][0])<1e-8||Math.abs(e.pts[2][1]-e.pts[0][1])<1e-8)throw Error('Contorno rectangular inválido.');}else if(e.type!=='line'||![e.a,e.b].every(validPoint)||Math.hypot(e.a[0]-e.b[0],e.a[1]-e.b[1])<1e-8)throw Error('Geometría de detalle inválida.');getLayer(e.layer);}
  const fills=plan.fills||[],blocks=plan.blocks||[];
  if(!Array.isArray(fills)||fills.length>50||!Array.isArray(blocks)||blocks.length>50)throw Error('Detalle demasiado complejo.');
  for(const e of fills){if(e.layer!=='SECTION-CUT'||!Array.isArray(e.pts)||e.pts.length!==4||!e.pts.every(validPoint))throw Error('Relleno inválido.');getLayer(e.layer);}
@@ -1084,10 +1084,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectu
 EXT.drawArchitectureCommand=async raw=>{
  if(!arqRoomSetRequest(raw)){
  if(!arqPoolRequest(raw)){
+ if(!arqParkingRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
  if(arqHouseGallery(raw)){arqOpenHouseGallery(raw);return;}
  if(arqWebReference(raw)){arqOpenWebReference(raw);return;}
  const object=!arqCatalogueCategory(raw)&&arqObjectSearch(raw);if(object){arqOpenObjectSearch(object);return;}
+ }
  }
  }
  const epoch=++arqCommandEpoch;
@@ -1316,11 +1318,11 @@ function openArchitectureBar(focus=true){
 #cadArqInstructionBar.arq-min textarea,#cadArqInstructionBar.arq-min button[aria-label="Abrir catálogo de plantas"],#cadArqInstructionBar.arq-min [data-arq-run],#cadArqInstructionBar.arq-min .qb-sep{display:none}
 `;document.head.append(css);
   bar=document.createElement('div');bar.id='cadArqInstructionBar';bar.setAttribute('role','region');bar.setAttribute('aria-label','ARQASSIST');
-  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><textarea rows="1" wrap="soft" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitaciones x 5 de 4 x 3 m · Pileta 8 x 4 / Pool 8 x 4"></textarea><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
+  bar.innerHTML='<button class="qb-handle" type="button" title="Arrastrar · doble clic para plegar / Drag · double-click to collapse">⠿</button><b>ARQASSIST</b><span class="qb-sep"></span><textarea rows="1" wrap="soft" data-arq-text aria-label="Architectural instruction" autocomplete="off" spellcheck="false" placeholder="Habitaciones x 5 · Pileta 8 x 4 · Cocheras x 6 de 2,5 x 5"></textarea><span class="qb-sep"></span><button type="button" data-arq-run title="Dibujar / Draw" aria-label="Dibujar / Draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button><button type="button" data-arq-close title="Ocultar / Hide ARQASSIST" aria-label="Ocultar / Hide"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none;width:auto;min-width:max-content;padding:0 10px;margin-right:6px';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
-  const updateCatalogue=()=>{if(arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
+  const updateCatalogue=()=>{if(arqParkingRequest(input.value)||arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
   catalogue.onclick=()=>{if(arqRoomCAD(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenRoomCAD(input.value);return;}if(arqClassicQuery(input.value)){const b=window.CAD2D_BLOCK_BROWSER;if(b?.openClassics){EXT.cancelArchitectureCommand();b.openClassics(arqClassicExpand(input.value));}return;}if(arqHouseGallery(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenHouseGallery(input.value);return;}if(arqWebReference(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenWebReference(input.value);return;}const cat=arqCatalogueCategory(input.value);const object=!cat&&arqObjectSearch(input.value);if(!cat&&!object)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(object){arqOpenObjectSearch(object);return;}EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
 
   const KEY='cad2d-arqbar-pos';
@@ -1367,6 +1369,13 @@ function arqWallRequest(raw){
 }
 // Decisión de ARQ Assist para un pedido (sin efectos): la usa el envío y sirve para medir aciertos.
 // Repeated room requests are drawing commands, not block-catalogue queries.
+function arqParkingRequest(raw){
+ const s=String(raw||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ const head=s.match(/^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(\d+|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six|seven|eight|nine|ten)\s+)?(?:(modulos? de\s+))?(?:playa de estacionamiento|plazas? de estacionamiento|estacionamientos?|cocheras?|garajes?|garages?|parking(?: spaces?)?)\b/);
+ if(!head||/\b(?:jpg|png|fotos?|references|referencias)\b/.test(s))return false;
+ const rest=s.slice(head[0].length).trim();
+ return !!(head[1]||head[2]||/\b(?:tandem|fila|hilera|contigu[ao]s?|dobles?|row|side by side|set|serie)\b/.test(rest)||/^[x×*]\s*\d+/.test(rest)||(/estacionamiento|parking/.test(head[0])&&/\d/.test(rest)));
+}
 function arqPoolRequest(raw){
  const s=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  return /^(?:(?:por favor|quiero|necesito|dibujar|dibuja|generar|genera|crear|crea|colocar|insertar|draw|create|generate|insert)\s+)*(?:(?:\d+|un|una|dos|tres|cuatro|cinco|one|two|three|four|five)\s+)?(?:piletas?|piscinas?|swimming pools?|pools?)\b/.test(s)&&/\d/.test(s)&&!/\b(?:de lavar|lavadero|cocina|sink|jpg|png|fotos?|references|referencias)\b/.test(s);
@@ -1383,6 +1392,7 @@ function arqRoomSetRequest(raw){
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
  if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw))return {kind:'calco'};
+ if(arqParkingRequest(raw))return {kind:'draw'};
  if(arqPoolRequest(raw))return {kind:'draw'};
  if(arqRoomSetRequest(raw))return {kind:'draw'};
  if(arqFurnishRequest(raw))return {kind:'furnish'};
