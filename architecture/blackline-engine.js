@@ -16,7 +16,7 @@ const C=Object.freeze({
  coffee:['mob-ratona',1.10,.60],tv:['mob-tv',1.80,.45],
  washer:['kq-lavarropas',.60,.60],dryer:['kq-secarropas',.60,.60],laundrySink:['kq-pileta',.60,.55],bookshelf:['mob-biblioteca',1.60,.35],shelving:['mob-estanteria',1.20,.35],meetingTable:['ofi-reuniones',3.20,2.20],workstations:['ofi-puestos-4',2.80,2.60],receptionDesk:['ofi-recepcion',2.40,1.60],entryBench:['mob-recibidor',1,.40],bunk:['dor-cucheta',.90,2],crib:['dor-cuna',.70,1.30],dishwasher:['kq-lv',.60,.60],oven:['kq-horno',.60,.60]
 });
-const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']],laundry:[2.2,2.5,['washer','laundrySink']],office:[3.5,4,['desk','bookshelf']],dining:[4,4,['table6']],storage:[2.4,3,['shelving']],meeting:[5,4.5,['meetingTable']],reception:[4,4,['receptionDesk','sofa']],closet:[2.4,2.4,['wardrobe']],nursery:[3,3.5,['crib','wardrobe']]};
+const DEFAULT={bedroom:[4,5,['bed','wardrobe']],bathroom:[2.2,2.6,['toilet','bidet','basin','shower']],kitchen:[4,5,['sink','range','fridge']],living:[5,6,['sofa','table6']],laundry:[2.2,2.5,['washer','laundrySink']],office:[3.5,4,['desk','bookshelf']],dining:[4,4,['table6']],storage:[2.4,3,['shelving']],meeting:[5,4.5,['meetingTable']],reception:[4,4,['receptionDesk','sofa']],closet:[2.4,2.4,['wardrobe']],nursery:[3,3.5,['crib','wardrobe']],commercial:[8,12,[]],garage:[3,5.5,[]],quincho:[6,4,['table6']],gallery:[3,8,[]],room:[4,4,[]]};
 const aliases={
  bedroom:'habitacion habitaciones dormitorio dormitorios cuarto cuartos pieza piezas recamara recamaras alcoba alcobas bedroom bedrooms chambre chambres schlafzimmer quarto quartos camera camere',
  bathroom:'bano banos toilette toilettes sanitario sanitarios bathroom bathrooms restroom restrooms badezimmer banheiro banheiros bagno bagni',
@@ -30,6 +30,11 @@ const aliases={
  reception:'recepcion recepciones reception',
  closet:'vestidor vestidores dressing',
  nursery:'guarderia guarderias nursery',
+ commercial:'local locales comercial comerciales negocio negocios tienda tiendas shop shops store stores',
+ garage:'cochera cocheras garaje garajes garage garages',
+ quincho:'quincho quinchos',
+ gallery:'galeria galerias porche porches porch semicubierto semicubiertos',
+ room:'room rooms ambiente espacio espacios',
  washer:'lavarropas lavadora lavadoras washer',dryer:'secarropas secadora dryer',laundrySink:'lavadero_pileta',bookshelf:'biblioteca bibliotecas librero libreros bookshelf',shelving:'estanteria estanterias estante estantes shelving',bunk:'cucheta cuchetas litera literas bunk',crib:'cuna cunas crib',dishwasher:'lavavajillas dishwasher',oven:'horno hornos oven',
  wall:'muro muros pared paredes tabique tabiques wall walls mur murs wand wande parede paredes muro muri',
  door:'puerta puertas door doors porte portes tur turen porta portas',
@@ -64,7 +69,7 @@ function measure(s){const m=s.match(new RegExp('^\\s*'+N+'\\s*'+U+'\\b','i'));re
 function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by|par|mal|per)\\s*'+N+'\\s*'+U,'i'));return m?[num(m[1])*unitScale(m[2]||m[4]),num(m[3])*unitScale(m[4]||m[2])]:null}
 function interpret(raw){
  if(typeof raw!=='string'||!raw.trim()||raw.length>4000)throw Error('Escribí una instrucción arquitectónica.');
- let s=normalize(raw).replace(/\bsala de reuniones\b/g,'reunion').replace(/\b(?:living comedor|living-comedor)\b/g,'living').replace(/\b(?:pileta de lavar|pileta de lavadero)\b/g,'laundry_sink').replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
+ let s=normalize(raw).replace(/\b(dining|meeting|laundry|storage|reception)\s+rooms?\b/g,'$1').replace(/\blocal comercial\b/g,'local').replace(/\bsala de reuniones\b/g,'reunion').replace(/\b(?:living comedor|living-comedor)\b/g,'living').replace(/\b(?:pileta de lavar|pileta de lavadero)\b/g,'laundry_sink').replace(/\b(?:hav|hab)\s*itacion\b/g,'habitacion').replace(/\bsalles? de bains?\b/g,'bathroom').replace(/\b(?:sala de estar|living room|salas de estar)\b/g,'living').replace(/\b(?:al lado|side by side|cote a cote|lado a lado)\b/g,'tandem');
  if(/\b(?:agranda\w*|achica\w*|reduce\w*|amplia\w*|ensancha\w*|modifica\w*|desplaza\w*|corre(?:r|lo|la|los|las)?|mueve\w*|cambia\w*|resize|move|enlarge)\b/.test(s))throw Error('La edición por lenguaje natural de objetos existentes todavía no está disponible. Usá las cotas virtuales o los grips.');
  if(/\b(?:en corte|en seccion|section view)\b/.test(s))throw Error('El corte arquitectónico requiere un generador de sección; no se dibujará una planta.');
  const tokens=[...s.matchAll(/[a-z]+|\d+(?:[.,]\d+)?/g)].map(m=>({t:m[0],i:m.index,end:m.index+m[0].length,k:concept(m[0])}));
