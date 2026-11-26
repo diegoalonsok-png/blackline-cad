@@ -20,3 +20,11 @@ test('linear and aligned dimensions export as DIMENSION with an anonymous *D blo
  assert.match(f,/'100','AcDbRotatedDimension'/);
  assert.match(f,/'70','1','10','0','20','0','30','0','3',d\.name/,'anonymous block flag');
 });
+test('pattern hatches export as editable HATCH with islands, and import keeps islands as holes',()=>{
+ assert.match(f,/const patternHatch=e=>/);
+ assert.match(f,/ansi\?'ANSI31':'CAD2D_'/);
+ assert.match(f,/OUT\.push\('92',i\?'2':'19'/);
+ const parser=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
+ assert.match(parser,/g\.holes\.push\(p\.pts\)/);
+ assert.match(parser,/\^CAD2D_\(\[A-Z0-9\]\+\)\$/);
+});

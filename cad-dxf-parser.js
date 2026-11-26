@@ -61,7 +61,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  const vertsToPts=(verts,closed)=>{const out=[verts[0].p];for(let k=0;k<verts.length-(closed?0:1);k++){const a=verts[k],b=verts[(k+1)%verts.length];out.push(...bulgePts(a.p,b.p,a.b||0))}if(closed&&out.length>2&&Math.hypot(out.at(-1).x-out[0].x,out.at(-1).y-out[0].y)<1e-9)out.pop();return out};
  const cleanMText=s=>s.replace(/\\P/g,'\n').replace(/\\[A-Za-z][^;\\{}]*;/g,'').replace(/\\[LlOoKk]/g,'').replace(/[{}]/g,'').replace(/%%[cC]/g,'Ø').replace(/%%[dD]/g,'°').replace(/%%[pP]/g,'±').trim();
  const patMap={SOLID:'solid','AR-SAND':'sand',SAND:'sand',EARTH:'earth','AR-CONC':'concrete',GRAVEL:'sand',LINE:'single',ANGLE:'steel',NET:'grid',NET3:'net3',HONEY:'honey',BRICK:'masonry','AR-B816':'masonry','AR-BRSTD':'masonry',STEEL:'steel',CROSS:'cross',DASH:'single'};
- const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
+ const patFor=n=>{n=String(n||'').toUpperCase().split(',')[0].replace(/_O$/,'');if(patMap[n])return patMap[n];const own=/^CAD2D_([A-Z0-9]+)$/.exec(n),HP=root.BlacklineHatchPatterns;if(own&&HP?.patterns?.[own[1].toLowerCase()])return own[1].toLowerCase();if(/^ANSI3[1-8]$/.test(n))return n.toLowerCase();return 'ansi31'};
  const silent=new Set(['POINT','VIEWPORT','SEQEND','VERTEX','3DSOLID','REGION','IMAGE','WIPEOUT','OLE2FRAME']);
  const note=t=>unsupported.set(t,(unsupported.get(t)||0)+1);
  // --- Read one record in block-local coordinates ---
@@ -132,8 +132,17 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const name=str(2,'SOLID'),style=solid?'solid':patFor(name);
   let angle=get(52,0),spacing=3.175*(get(41,1)||1);
   const li=record.findIndex(q=>q[0]===53);
-  if(li>=0&&!solid){const la=Number(record[li][1])*Math.PI/180,o=record.slice(li),ox=Number(o.find(q=>q[0]===45)?.[1]||0),oy=Number(o.find(q=>q[0]===46)?.[1]||0),perp=Math.abs(-ox*Math.sin(la)+oy*Math.cos(la));if(perp>1e-9)spacing=perp;if(style==='single')angle=Number(record[li][1])}
-  return paths.map(p=>({type:'hatch',pts:p.pts,hatchStyle:style,hatchSpacing:+spacing.toPrecision(4),hatchAngle:style==='single'?angle:angle,width:.05}));
+  if(li>=0&&!solid){const la=Number(record[li][1])*Math.PI/180,o=record.slice(li),ox=Number(o.find(q=>q[0]===45)?.[1]||0),oy=Number(o.find(q=>q[0]===46)?.[1]||0),perp=Math.abs(-ox*Math.sin(la)+oy*Math.cos(la));if(perp>1e-9)spacing=perp;if(style==='single')angle=Number(record[li][1])
+   // Patrón propio CAD2D: la primera familia puede tener separación relativa ≠ 1 → separación base.
+   const HP=root.BlacklineHatchPatterns,k0=/^CAD2D_/i.test(name)&&HP?HP.passes(style,1,0)?.[0]?.spacing:0;if(k0>0)spacing/=k0}
+  // Islas: los contornos no exteriores dentro de uno exterior son huecos de ese sombreado (no rellenos aparte).
+  const box=pts=>pts.reduce((b,q)=>({x0:Math.min(b.x0,q.x),y0:Math.min(b.y0,q.y),x1:Math.max(b.x1,q.x),y1:Math.max(b.y1,q.y)}),{x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity});
+  const outers=paths.filter(p=>p.outer);let groups=paths.map(p=>({pts:p.pts,holes:[]}));
+  if(outers.length&&outers.length<paths.length){
+   groups=outers.map(p=>({pts:p.pts,holes:[],b:box(p.pts)}));
+   for(const p of paths){if(p.outer)continue;const b=box(p.pts),g=groups.find(g=>b.x0>=g.b.x0-1e-9&&b.y0>=g.b.y0-1e-9&&b.x1<=g.b.x1+1e-9&&b.y1<=g.b.y1+1e-9);if(g)g.holes.push(p.pts);else groups.push({pts:p.pts,holes:[]})}
+  }
+  return groups.map(g=>({type:'hatch',pts:g.pts,...(g.holes.length?{holes:g.holes}:{}),hatchStyle:style,hatchSpacing:+spacing.toPrecision(4),hatchAngle:angle,width:.05}));
  }
  // --- Transform one entity by matrix m ---
  function xform(e,m){

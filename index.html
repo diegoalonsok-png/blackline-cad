@@ -8599,10 +8599,23 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   return OUT.push(...head('MTEXT',e,lay,color),'100','AcDbMText',...pos(top.x,top.y),'40',dxfNum(e.h),'41',dxfNum(Number(e.mtextWidth)||0),'71','1','72','1',...chunks.flatMap(c=>['3',c]),'1',last,'7',fontToDXFStyle(e),'11',dxfNum(Math.cos(r)),'21',dxfNum(Math.sin(r)),'31','0','73','1','44',dxfNum(Math.max(.25,Math.min(4,(Number(e.lineSpacing)||1.5)/1.6667))));
  }
  return OUT.push(...head('TEXT',e,lay,color),'100','AcDbText',...pos(p.x,p.y),'40',dxfNum(e.h),'1',String(e.text||'').replace(/\r?\n/g,' '),'50',dxfNum(e.rotation||0),'7',fontToDXFStyle(e),'100','AcDbText');}
+ // Contorno exterior + islas (92: 2 polilínea | 1 externa | 16 más exterior).
+ const hatchPaths=e=>{const holes=(Array.isArray(e.holes)?e.holes:[]).filter(h=>h?.length>2);OUT.push('91',String(1+holes.length));
+  [e.pts,...holes].forEach((pts,i)=>{OUT.push('92',i?'2':'19','72','0','73','1','93',String(pts.length));appendPoints(OUT,pts);OUT.push('97','0')})};
+ // Sombreado con patrón como HATCH editable: ANSI31 es idéntico al de AutoCAD (escala = separación/3,175);
+ // los demás se guardan como patrón propio CAD2D_<NOMBRE> con sus familias de líneas escritas en el archivo.
+ const patternHatch=e=>{
+  const kind=String(e.hatchStyle||''),sp=Number(e.hatchSpacing),ang=Number(e.hatchAngle)||0,fam=window.BlacklineHatchPatterns?.passes(kind,sp,ang);
+  if(!fam||!fam.length||!(e.pts?.length>2))return false;const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))return true;
+  const ansi=kind==='ansi31',name=ansi?'ANSI31':'CAD2D_'+kind.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2',name,'70','0','71','0');hatchPaths(e);
+  OUT.push('75','0','76',ansi?'1':'2','52',dxfNum(ansi?0:ang),'41',dxfNum(ansi?sp/3.175:1),'77','0','78',String(fam.length));
+  for(const f of fam){const r=f.angle*Math.PI/180;OUT.push('53',dxfNum(((f.angle%360)+360)%360),'43','0','44','0','45',dxfNum(-Math.sin(r)*f.spacing),'46',dxfNum(Math.cos(r)*f.spacing),'79','0')}
+  OUT.push('98','0');return true};
  const writeList=list=>{
- for(const source of flattenCADEntities(list,{keepMText:true})){for(const e of source.type==='hatch'&&source.hatchStyle&&source.hatchStyle!=='solid'&&!cadIsGradient(source)?cadHatchPatternPrimitives(source,12000):[source]){
+ for(const source of flattenCADEntities(list,{keepMText:true})){if(source.type==='hatch'&&source.hatchStyle&&source.hatchStyle!=='solid'&&!cadIsGradient(source)&&patternHatch(source))continue;for(const e of source.type==='hatch'&&source.hatchStyle&&source.hatchStyle!=='solid'&&!cadIsGradient(source)?cadHatchPatternPrimitives(source,12000):[source]){
   const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))continue;
-  if(e.type==='hatch'){if(!(e.pts?.length>2))continue;OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2','SOLID','70','1','71','0','91','1','92','2','72','0','73','1','93',String(e.pts.length));appendPoints(OUT,e.pts);OUT.push('97','0','75','0','76','1','98','0');if(cadIsGradient(e)){const c2=hex(e.color2||'#ffffff'),c1=hex(e.color||'#888888');OUT.push('450','1','451','0','452','0','453','2','460',dxfNum((Number(e.hatchAngle)||0)*Math.PI/180),'461','0','462','1','463','0','63','7','421',c1,'463','1','63','7','421',c2,'470',e.hatchStyle==='gradient-radial'?'SPHERICAL':'LINEAR')}}
+  if(e.type==='hatch'){if(!(e.pts?.length>2))continue;OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2','SOLID','70','1','71','0');hatchPaths(e);OUT.push('75','0','76','1','98','0');if(cadIsGradient(e)){const c2=hex(e.color2||'#ffffff'),c1=hex(e.color||'#888888');OUT.push('450','1','451','0','452','0','453','2','460',dxfNum((Number(e.hatchAngle)||0)*Math.PI/180),'461','0','462','1','463','0','63','7','421',c1,'463','1','63','7','421',c2,'470',e.hatchStyle==='gradient-radial'?'SPHERICAL':'LINEAR')}}
   else if(e.type==='line'||e.type==='dimension')OUT.push(...head('LINE',e,lay),'100','AcDbLine',...pos(e.a.x,e.a.y),'11',dxfNum(e.b.x),'21',dxfNum(e.b.y),'31','0');
   else if(e.type==='polyline'||e.type==='rect'){const pts=e.type==='rect'?[e.a,P(e.b.x,e.a.y),e.b,P(e.a.x,e.b.y)]:e.pts;if(!(pts?.length>1))continue;OUT.push(...head('LWPOLYLINE',e,lay),'100','AcDbPolyline','90',String(pts.length),'70',String(e.closed||e.type==='rect'?1:0),'43',dxfNum(e.pwidth||0));appendPoints(OUT,pts)}
   else if(e.type==='circle'){if(!(e.r>0))continue;OUT.push(...head('CIRCLE',e,lay),'100','AcDbCircle',...pos(e.c.x,e.c.y),'40',dxfNum(e.r))}
@@ -12547,7 +12560,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
 <script src="cad-arq-pro.js?v=20261126-amueblar2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261124-affine-v2"></script>
+<script src="cad-dxf-parser.js?v=20261126-hatch1"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-autocad-plus.js?v=20261126-dimarc1"></script>
