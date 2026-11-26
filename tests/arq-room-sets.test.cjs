@@ -35,3 +35,31 @@ test('room set bar routing takes priority without hijacking the gallery',()=>{
  assert.match(source,/if\(arqRoomSetRequest\(raw\)\)return \{kind:'draw'\}/);
  assert.match(source,/EXT\.drawArchitectureCommand=async raw=>\{\s*if\(!arqRoomSetRequest\(raw\)\)/);
 });
+
+
+const modularCases=[
+ ['oficinas x 5 de 4 x 5 m',5,4,5,'office',2],
+ ['aulas en set x 3 de 7 x 8 m',3,7,8,'classroom',1],
+ ['consultorios x 4 de 4 x 4 m',4,4,4,'consulting',2],
+ ['cocinas x 3 de 4 x 5 m',3,4,5,'kitchen',3],
+ ['lavaderos en tándem de 3 de 3 x 4 m',3,3,4,'laundry',2],
+ ['depósitos x 5 de 3 x 4 m',5,3,4,'storage',1],
+ ['classrooms x 4 of 7 by 8 m',4,7,8,'classroom',1],
+ ['vestidores x 3 de 3 x 4 m',3,3,4,'closet',1],
+ ['locales x 3 de 5 x 8 m',3,5,8,'commercial',0]
+];
+for(const [raw,n,w,d,kind,blocks] of modularCases)test('modular architecture: '+raw,()=>{
+ const plan=engine.run(raw);assert.equal(plan.rooms.length,n);assert.equal(plan.walls.length,3*n+1);
+ assert.equal(plan.openings.filter(o=>o.kind==='swing-door').length,n);
+ assert.equal(plan.openings.filter(o=>o.kind==='framed-window').length,n);
+ assert.equal(plan.blocks.length,n*blocks);
+ for(const room of plan.rooms){assert.equal(room.kind,kind);assert.deepEqual(room.clearBounds.slice(2),[w,d]);}
+ for(let i=1;i<n;i++)assert.ok(Math.abs(plan.rooms[i].clearBounds[0]-plan.rooms[i-1].clearBounds[0]-w-plan.brief.wall)<1e-8);
+});
+test('modular sets route to drawing instead of search',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../cad-arq-pro.js'),'utf8');
+ const a=src.indexOf('function arqRoomSetRequest(raw)'),b=src.indexOf('function arqRouteOf(raw)',a);
+ const match=new Function(src.slice(a,b)+'return arqRoomSetRequest;')();
+ for(const [raw] of modularCases)assert.equal(match(raw),true,raw);
+ for(const raw of ['oficinas','buscar aulas','consultorios jpg','cocina de 4 x 5'])assert.equal(match(raw),false,raw);
+});
