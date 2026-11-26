@@ -198,9 +198,14 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   let A=[Math.cos(o.rot)*o.sx,Math.sin(o.rot)*o.sx,-Math.sin(o.rot)*o.sy,Math.cos(o.rot)*o.sy],ix=o.ix,iy=o.iy;
   if(o.ext<0){A=[-A[0],A[1],-A[2],A[3]];ix=-ix}
   let flip=false;if(A[0]*A[3]-A[1]*A[2]<0){A=[-A[0],-A[1],A[2],A[3]];flip=true}
-  const sc=Math.hypot(A[0],A[1]);if(!(sc>0)||Math.abs(A[0]-A[3])>1e-6*sc||Math.abs(A[1]+A[2])>1e-6*sc)return null;
+  const sc=Math.hypot(A[0],A[1]);
+  // Escala distinta en X e Y (sin extrusión invertida): se conserva como bloque con escalaX/escalaY.
+  const nonUniform=sc>0&&(Math.abs(A[0]-A[3])>1e-6*sc||Math.abs(A[1]+A[2])>1e-6*sc);
+  if(nonUniform&&(o.ext<0||!(Math.abs(o.sx)>0)||!(Math.abs(o.sy)>0)))return null;
+  if(!(sc>0))return null;
   const name=defName(def.name);
   if(!importedBlocks[name]){const list=[];walk(def.recs,[1,0,0,1,-def.base.x,-def.base.y],{layer:lname,color:undefined,linetype:sub.linetype,width:sub.width},1,list);if(!list.length)return null;importedBlocks[name]={name,entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'}}
+  if(nonUniform){const ref={type:'blockRef',blockName:name,p:P(o.ix,o.iy),scale:1,scaleX:+o.sx.toPrecision(10),scaleY:+o.sy.toPrecision(10),rotation:o.rot*180/Math.PI,layer:lname,lineweight:common.width};if(common.color)ref.color=common.color;return ref}
   const ref={type:'blockRef',blockName:name,p:P(ix,iy),scale:+sc.toPrecision(10),rotation:Math.atan2(A[1],A[0])*180/Math.PI,layer:lname,lineweight:common.width};
   if(flip)ref.flipBlockX=true;if(common.color)ref.color=common.color;
   return ref;

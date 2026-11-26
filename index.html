@@ -3190,7 +3190,8 @@ function blockChildren(ref,keepAttDefs=false){
  const definition=state.blocks?.[ref.blockName];
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ const sxy=Number.isFinite(Number(ref.scaleX))&&Number.isFinite(Number(ref.scaleY))?{x:scale*Number(ref.scaleX),y:scale*Number(ref.scaleY)}:null;
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle,sxy).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef||keepAttDefs)return [e];
   if(e.attdef.invisible)return [];
@@ -6853,7 +6854,10 @@ function boundsEntity(e){if(e.type==='point')return e.p?{minX:e.p.x,minY:e.p.y,m
   const kids=cadBlockChildrenCached(e),hit=cadChildCache.get(e);if(hit&&hit.out===kids&&hit.box)return {...hit.box};
   const box=cadBoundsUnion(kids)||{minX:e.p.x,minY:e.p.y,maxX:e.p.x,maxY:e.p.y};
   if(hit&&hit.out===kids)hit.box=box;return {...box};
- }if(e.type==='dimension'){return cadBoundsUnion(dimensionPrimitives(e))}let pts=getVertices(e);if(['circle','arc'].includes(e.type))pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='ellipse'){const a=Number(e.rotation)||0,co=Math.cos(a),si=Math.sin(a),dx=Math.hypot(e.rx*co,e.ry*si),dy=Math.hypot(e.rx*si,e.ry*co);pts.push(P(e.c.x-dx,e.c.y-dy),P(e.c.x+dx,e.c.y+dy));}if(e.type==='hatch')pts=e.pts||[];if(e.type==='text'){if(e.textPath==='circle'){const r=Number(e.textRadius)||0;pts.push(P(e.p.x-r-e.h,e.p.y-r-e.h),P(e.p.x+r+e.h,e.p.y+r+e.h))}else pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));}if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
+ }if(e.type==='dimension'){return cadBoundsUnion(dimensionPrimitives(e))}let pts=getVertices(e);if(e.type==='circle')pts.push(P(e.c.x-e.r,e.c.y-e.r),P(e.c.x+e.r,e.c.y+e.r));if(e.type==='arc'&&e.c&&e.r>0){
+  // Arco: extremos y cuadrantes que realmente recorre (no el círculo completo ni el centro).
+  const sw=arcSweep(e.a0,e.a1),at=t=>P(e.c.x+e.r*Math.cos(t),e.c.y+e.r*Math.sin(t));pts=[at(e.a0),at(e.a0+sw)];
+  for(let k=Math.ceil(e.a0/(Math.PI/2));k*Math.PI/2<=e.a0+sw+1e-12;k++)pts.push(at(k*Math.PI/2));}if(e.type==='ellipse'){const a=Number(e.rotation)||0,co=Math.cos(a),si=Math.sin(a),dx=Math.hypot(e.rx*co,e.ry*si),dy=Math.hypot(e.rx*si,e.ry*co);pts.push(P(e.c.x-dx,e.c.y-dy),P(e.c.x+dx,e.c.y+dy));}if(e.type==='hatch')pts=e.pts||[];if(e.type==='text'){if(e.textPath==='circle'){const r=Number(e.textRadius)||0;pts.push(P(e.p.x-r-e.h,e.p.y-r-e.h),P(e.p.x+r+e.h,e.p.y+r+e.h))}else pts.push(P(e.p.x+(e.text||'').length*e.h*.8,e.p.y+e.h));}if(!pts.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const p of pts){if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return Number.isFinite(minX)?{minX,minY,maxX,maxY}:null}
 function getBounds(entities=state.entities){return cadWithLayerLookup(()=>cadGetBoundsIndexed(entities))}
 function cadGetBoundsIndexed(entities){let b={minX:Infinity,minY:Infinity,maxX:-Infinity,maxY:-Infinity};for(const e of entities){if(!layerFor(e).visible||e.cadHidden)continue;let a=boundsEntity(e);if(!a)continue;b.minX=Math.min(b.minX,a.minX);b.minY=Math.min(b.minY,a.minY);b.maxX=Math.max(b.maxX,a.maxX);b.maxY=Math.max(b.maxY,a.maxY)}return Number.isFinite(b.minX)?b:{minX:-5,maxX:5,minY:-3,maxY:3}}
 function zoomWindowToPixels(a,b){
@@ -8662,7 +8666,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  for(const r of entities){
   if(r.type!=='blockRef'||!state.blocks?.[r.blockName])continue;
   // Con sus ATTDEF y sin valores: las referencias que sólo difieren en atributos comparten definición.
-  let local=null;try{const {attrs,...bare}=r;local=blockChildren({...bare,p:P(0,0),scale:1,rotation:0},true)}catch(err){local=null}
+  let local=null;try{const {attrs,scaleX,scaleY,...bare}=r;local=blockChildren({...bare,p:P(0,0),scale:1,rotation:0},true)}catch(err){local=null}
   if(!local||!local.length)continue;
   const key=r.blockName+'|'+JSON.stringify(local.map(e=>{const o={...e};delete o.id;return o}));
   let d=blockDefs.get(key);
@@ -8779,7 +8783,7 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
   const lay=layerFor(r);if(!layerList.some(l=>l.name===lay.name))continue;const sc=Number(r.scale)||1;
   let atts=[];try{atts=blockChildren(r,true).filter(c=>c.type==='text'&&c.attdef&&String(c.attdef.tag||'').trim())}catch(err){atts=[]}
   const ins=head('INSERT',r,lay),insH=ins[3];
-  ents.push(...ins,'100','AcDbBlockReference',...(atts.length?['66','1']:[]),'2',d.name,...pos(r.p.x,r.p.y),'41',dxfNum(sc),'42',dxfNum(sc),'43','1','50',dxfNum(Number(r.rotation)||0));
+  ents.push(...ins,'100','AcDbBlockReference',...(atts.length?['66','1']:[]),'2',d.name,...pos(r.p.x,r.p.y),'41',dxfNum(sc*(Number.isFinite(Number(r.scaleX))?Number(r.scaleX):1)),'42',dxfNum(sc*(Number.isFinite(Number(r.scaleY))?Number(r.scaleY):1)),'43','1','50',dxfNum(Number(r.rotation)||0));
   if(atts.length){
    // ATTRIB de esta referencia: posición ya transformada y valor propio (o el valor por defecto).
    OWN=insH;
@@ -10204,7 +10208,27 @@ function normalizeBlockEntities(entries){
   return item;
  });
 }
-function blockInsertionEntities(block,point,scale,angle){
+// Inserción con escala distinta en X e Y (bloques DXF): círculos → elipses; arcos y elipses → polilíneas
+// muestreadas (la escala no uniforme no conserva su forma); textos con la altura escalada en Y.
+function cadNonUniformInsertion(block,point,sx,sy,angle){
+ const th=angle*Math.PI/180,c=Math.cos(th),s=Math.sin(th),ax=Math.abs(sx),ay=Math.abs(sy),k=Math.sqrt(ax*ay);
+ const T=p=>P(point.x+c*sx*p.x-s*sy*p.y,point.y+s*sx*p.x+c*sy*p.y);
+ const arcPts=(cx,cy,rx,ry,rot,a0,sw,n)=>{const out=[],cr=Math.cos(rot),sr=Math.sin(rot);for(let i=0;i<=n;i++){const t=a0+sw*i/n,x=rx*Math.cos(t),y=ry*Math.sin(t);out.push(T(P(cx+x*cr-y*sr,cy+x*sr+y*cr)))}return out};
+ return block.entities.map(entity=>{
+  let e;
+  if(entity.type==='circle'&&entity.c)e={...clone(entity),type:'ellipse',c:T(entity.c),rx:entity.r*ax,ry:entity.r*ay,rotation:th};
+  else if(entity.type==='arc'&&entity.c){const sw=arcSweep(entity.a0,entity.a1);e={...clone(entity),type:'polyline',pts:arcPts(entity.c.x,entity.c.y,entity.r,entity.r,0,entity.a0,sw,Math.max(8,Math.ceil(sw/(Math.PI/24)))),closed:false};delete e.c;delete e.r;delete e.a0;delete e.a1}
+  else if(entity.type==='ellipse'&&entity.c){e={...clone(entity),type:'polyline',pts:arcPts(entity.c.x,entity.c.y,entity.rx,entity.ry,Number(entity.rotation)||0,0,Math.PI*2,64).slice(0,-1),closed:true};delete e.c;delete e.rx;delete e.ry;delete e.rotation}
+  else if(entity.type==='rect'){e={...clone(entity),type:'polyline',pts:[T(P(entity.a.x,entity.a.y)),T(P(entity.b.x,entity.a.y)),T(P(entity.b.x,entity.b.y)),T(P(entity.a.x,entity.b.y))],closed:true};delete e.a;delete e.b}
+  else{e=transformEntity(entity,T);if(Array.isArray(e.holes))e.holes=e.holes.map(h=>h.map(T));
+   if(e.h!==undefined)e.h*=ay;if(e.type==='text')e.rotation=(Number(e.rotation)||0)+angle;
+   if(e.type==='dimension'&&e.style){e.style={...e.style,textHeight:(e.style.textHeight||0)*ay,arrow:(e.style.arrow||0)*ay}}
+   if(e.type==='blockRef'){e.scale=(Number(e.scale)||1)*k;e.rotation=(Number(e.rotation)||0)+angle}}
+  e.blockName=block.name;delete e.id;return e;
+ });
+}
+function blockInsertionEntities(block,point,scale,angle,sxy=null){
+ if(sxy&&Number.isFinite(sxy.x)&&Number.isFinite(sxy.y)&&Math.abs(Math.abs(sxy.x)-Math.abs(sxy.y))>1e-9*Math.max(Math.abs(sxy.x),Math.abs(sxy.y)))return cadNonUniformInsertion(block,point,sxy.x,sxy.y,angle);
  const theta=angle*Math.PI/180,cos=Math.cos(theta),sin=Math.sin(theta);
  const transform=p=>P(point.x+scale*(p.x*cos-p.y*sin),point.y+scale*(p.x*sin+p.y*cos));
  return block.entities.map(entity=>{
@@ -12696,7 +12720,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
 <script src="cad-arq-pro.js?v=20261126-ruta1"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261126-point5"></script>
+<script src="cad-dxf-parser.js?v=20261126-nonuni6"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-comandos-plus.js?v=20261126-comandos1"></script>

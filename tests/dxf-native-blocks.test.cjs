@@ -59,3 +59,15 @@ test('DXF POINT is read, drawn, selectable, snappable and written back',()=>{
  assert.match(html,/function hit\(e,p\)\{const tol=8\/state\.view\.scale;if\(e\.type==='point'\)/);
  assert.match(html,/e\.type==='blockRef'\|\|e\.type==='point'\?\[\[e\.p,'POINT'\]\]/);
 });
+test('INSERT with different X/Y scale stays a block (scaleX/scaleY) and exports 41/42',()=>{
+ global.self=globalThis;new Function(fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8')).call(globalThis);
+ const dxf=['0','SECTION','2','HEADER','9','$INSUNITS','70','6','0','ENDSEC','0','SECTION','2','BLOCKS','0','BLOCK','2','HOJA','10','0','20','0',
+  '0','CIRCLE','8','0','10','0','20','0','40','1','0','ENDBLK','0','ENDSEC','0','SECTION','2','ENTITIES',
+  '0','INSERT','8','0','2','HOJA','10','10','20','10','41','2','42','-0.5','50','30','0','ENDSEC','0','EOF'].join('\n');
+ const p=globalThis.CAD2DDxfParser.parse(dxf,{},{textHeight:.2});
+ const ref=p.entities.find(e=>e.type==='blockRef');
+ assert.ok(ref,'kept as block');assert.equal(ref.scaleX,2);assert.equal(ref.scaleY,-0.5);assert.ok(Math.abs(ref.rotation-30)<1e-9);
+ assert.match(html,/function cadNonUniformInsertion\(block,point,sx,sy,angle\)/);
+ assert.match(f,/'41',dxfNum\(sc\*\(Number\.isFinite\(Number\(r\.scaleX\)\)/);
+ assert.match(f,/const \{attrs,scaleX,scaleY,\.\.\.bare\}=r/);
+});
