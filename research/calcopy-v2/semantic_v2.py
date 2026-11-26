@@ -396,3 +396,22 @@ def detect_door_symbols(ink,segs,pixels_per_m):
                         break
                 if len(out)>=150:return out
     return out
+
+
+def room_partition_mask(mask, doors):
+    """Virtual room boundaries for diagnostics only. Never modify physical WALL
+    geometry, and never close an unconfirmed pocket/window/empty opening."""
+    import cv2
+    partition=mask.copy()
+    H,W=mask.shape
+    for d in doors:
+        if d.get('kind')!='swing-door' or d.get('review'):continue
+        c=int(round(d['c']));a=int(round(d['g0']));b=int(round(d['g1']))
+        if b<=a:continue
+        p,q=((c,a),(c,b)) if d['v'] else ((a,c),(b,c))
+        if not all(0<=x<W and 0<=y<H for x,y in (p,q)):continue
+        # Extend at most two pixels to join the detected wall ends.
+        if d['v']:p=(c,max(0,a-2));q=(c,min(H-1,b+2))
+        else:p=(max(0,a-2),c);q=(min(W-1,b+2),c)
+        cv2.line(partition,p,q,1,1)
+    return partition
