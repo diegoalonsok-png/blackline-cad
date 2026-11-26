@@ -231,3 +231,55 @@ def region_hierarchy(regions):
         if candidates:
             q['possible_parent']=min(candidates,key=lambda p:p['w']*p['h'])['id']
     return regions
+
+
+def metric_wall_review(ink,segs,pixels_per_m):
+    """Physical width gate and contextual nominal width hints.
+    Preserve measured dimensions: 30 cm outside and 10/15/20 cm inside
+    are architectural priors, not a command to deform the original plan.
+    """
+    import cv2
+    stats=dict(scale_known=False,rejected_thin=0,review_width=0,perimeter=0,interior=0,undetermined=0)
+    if not np.isfinite(pixels_per_m) or pixels_per_m<=0:
+        return [dict(q) for q in segs],stats
+    stats['scale_known']=True
+    # Use the native CAD minimum, allowing raster rounding near 10 cm.
+    accepted=[]
+    for s in segs:
+        q=dict(s);cm=100*q['t']/pixels_per_m
+        if cm<8:
+            stats['rejected_thin']+=1
+            continue
+        q['thickness_cm']=round(cm,2)
+        accepted.append(q)
+    m=black_mask(ink.shape,accepted)
+    n,labels,st,_=cv2.connectedComponentsWithStats(1-m,connectivity=4)
+    # Border-connected background is exterior evidence only when an enclosed
+    # space exists on the other side. Open rooms remain undetermined.
+    edge=np.unique(np.concatenate((labels[0,:],labels[-1,:],labels[:,0],labels[:,-1])))
+    exterior=set(map(int,edge))-{0}
+    for q in accepted:
+        src=labels.T if q['v'] else labels
+        lo=max(0,int(np.ceil(q['lo'])));hi=min(src.shape[1],int(np.floor(q['hi']))+1)
+        if hi<=lo:
+            role='undetermined'
+        else:
+            xs=np.linspace(lo,hi-1,min(31,hi-lo)).round().astype(int)
+            votes=[]
+            for sign in (-1,1):
+                y=int(round(q['c']+sign*(q['t']/2+2)))
+                if not 0<=y<src.shape[0]:
+                    votes.append('unknown');continue
+                vals=src[y,xs];vals=vals[vals>0]
+                if vals.size<.55*xs.size:
+                    votes.append('unknown');continue
+                ext=sum(int(v) in exterior for v in vals)/len(vals)
+                votes.append('outside' if ext>=.8 else 'inside' if ext<=.2 else 'unknown')
+            role='perimeter' if sorted(votes)==['inside','outside'] else 'interior' if votes==['inside','inside'] else 'undetermined'
+        q['wall_role']=role;stats[role]+=1
+        priors=(30,) if role=='perimeter' else (10,15,20) if role=='interior' else (10,15,20,30)
+        cm=q['thickness_cm'];nom=min(priors,key=lambda x:abs(x-cm))
+        q['nominal_cm']=nom
+        q['width_review']=abs(cm-nom)>max(3,nom*.20)
+        stats['review_width']+=int(q['width_review'])
+    return accepted,stats
