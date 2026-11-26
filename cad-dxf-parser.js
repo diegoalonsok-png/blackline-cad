@@ -142,7 +142,18 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
    groups=outers.map(p=>({pts:p.pts,holes:[],b:box(p.pts)}));
    for(const p of paths){if(p.outer)continue;const b=box(p.pts),g=groups.find(g=>b.x0>=g.b.x0-1e-9&&b.y0>=g.b.y0-1e-9&&b.x1<=g.b.x1+1e-9&&b.y1<=g.b.y1+1e-9);if(g)g.holes.push(p.pts);else groups.push({pts:p.pts,holes:[]})}
   }
-  return groups.map(g=>({type:'hatch',pts:g.pts,...(g.holes.length?{holes:g.holes}:{}),hatchStyle:style,hatchSpacing:+spacing.toPrecision(4),hatchAngle:angle,width:.05}));
+  // Patrón original del archivo (nombre, escala, ángulo y líneas): se devuelve tal cual al exportar si no se cambió el estilo.
+  let dxfPattern=null;
+  if(!solid&&li>=0&&name&&name.toUpperCase()!=='SOLID'){
+   const lines=[];let j=li,guard=0;
+   while(j<record.length&&record[j][0]===53&&lines.length<64&&guard++<200){
+    const L={a:Number(record[j][1]),bx:0,by:0,ox:0,oy:0,d:[]};j++;
+    while(j<record.length&&record[j][0]!==53&&record[j][0]!==98&&record[j][0]!==47){const [c,v]=record[j];const n=Number(v);if(c===43)L.bx=n;else if(c===44)L.by=n;else if(c===45)L.ox=n;else if(c===46)L.oy=n;else if(c===49&&L.d.length<32)L.d.push(n);j++}
+    if([L.a,L.bx,L.by,L.ox,L.oy,...L.d].every(Number.isFinite))lines.push(L);
+   }
+   if(lines.length)dxfPattern={name:String(name).slice(0,64),type:get(76,1),angle:get(52,0),scale:get(41,1),double:get(77,0),lines,style,spacing:+spacing.toPrecision(4)};
+  }
+  return groups.map(g=>({type:'hatch',pts:g.pts,...(g.holes.length?{holes:g.holes}:{}),hatchStyle:style,hatchSpacing:+spacing.toPrecision(4),hatchAngle:angle,width:.05,...(dxfPattern?{dxfPattern}:{})}));
  }
  // --- Transform one entity by matrix m ---
  function xform(e,m){

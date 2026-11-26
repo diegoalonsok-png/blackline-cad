@@ -2335,10 +2335,12 @@ function cadVectorBatch(selectedIds){
 }
 // Heavy drawings: while the wheel zoom or a pan is in progress, the last full frame is redrawn
 // scaled and shifted (a bitmap move, < 2 ms) and the full vector repaint runs once the motion stops.
-var cadInteractiveUntil=0,cadLastFull=null,cadInteractiveTimer=0;
+var cadInteractiveUntil=0,cadLastFull=null,cadInteractiveTimer=0,cadLastFullCost=0;
+// Pesado = muchas entidades o un cuadro completo lento (p. ej. pocos objetos sueltos pero miles dentro de bloques).
+function cadHeavyDrawing(){return state.entities.length>=4000||cadLastFullCost>10}
 function cadFastInteractiveFrame(){
- const n=state.entities.length,panning=state.drag?.type==='pan',zooming=performance.now()<cadInteractiveUntil;
- if(n<4000||!(panning||zooming)||!cadLastFull||cadLastFull.w!==canvas.width||cadLastFull.h!==canvas.height||cadLastFull.dpr!==dpr)return false;
+ const panning=state.drag?.type==='pan',zooming=performance.now()<cadInteractiveUntil;
+ if(!cadHeavyDrawing()||!(panning||zooming)||!cadLastFull||cadLastFull.w!==canvas.width||cadLastFull.h!==canvas.height||cadLastFull.dpr!==dpr)return false;
  const v=state.view,o=cadLastFull.view,k=v.scale/o.scale;if(!(k>.02&&k<50))return false;
  // screen_new = k*(screen_old - o.o) + v.o   (same world point)
  const w=canvas.width/dpr,h=canvas.height/dpr;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=displayColors.background;ctx.fillRect(0,0,w,h);
@@ -2347,7 +2349,7 @@ function cadFastInteractiveFrame(){
  return true;
 }
 function cadKeepLastFull(){
- if(state.entities.length<4000)return;
+ if(!cadHeavyDrawing())return;
  try{const c=cadLastFull?.canvas||document.createElement('canvas');if(c.width!==canvas.width)c.width=canvas.width;if(c.height!==canvas.height)c.height=canvas.height;const g=c.getContext('2d');g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,c.width,c.height);g.drawImage(canvas,0,0);cadLastFull={canvas:c,w:canvas.width,h:canvas.height,dpr,view:{scale:state.view.scale,ox:state.view.ox,oy:state.view.oy}};}catch(e){cadLastFull=null}
 }
 function cadDrawFrame(){drawPending=false;if(cadFastInteractiveFrame())return;const perfStart=performance.now();let painted=0;
@@ -2378,7 +2380,7 @@ function cadDrawFrame(){drawPending=false;if(cadFastInteractiveFrame())return;co
  }batch?.flush();if(cadWallCapCache)for(const c of cadWallCapCache){if(layerFor(c).visible)drawEntity(c)}
  if(idle){try{const buffer=cadIdleFrame?.canvas||document.createElement('canvas');if(buffer.width!==canvas.width)buffer.width=canvas.width;if(buffer.height!==canvas.height)buffer.height=canvas.height;const bctx=buffer.getContext('2d');bctx.clearRect(0,0,buffer.width,buffer.height);bctx.drawImage(canvas,0,0);cadIdleFrame={canvas:buffer,key:frameKey,painted};cadIdleFrameValid=true}catch(e){cadIdleFrameValid=false}}else{cadIdleFrameValid=false;}
  }
- if(!reuse)cadKeepLastFull();
+ if(!reuse){cadLastFullCost=performance.now()-perfStart;cadKeepLastFull();}
  cadDrawWallFlipGrips();if(state.stage.length)previewEntity();cad2dDrawExtensions();cadDrawMeasureTag();cadDrawGripHoverDim();cadDrawMTextBox();
  if(cadPrimitiveGripPlacement){
   const job=cadPrimitiveGripPlacement,dest=cadGripTypedDest(job)||cadGripTrackingDestination(job,world(pointer));
@@ -8308,7 +8310,7 @@ async function convertDWGAutomatically(file,options={}){
  const local=window.CAD2D_DWG_BATCH?.convertLocal;
  if(typeof local!=='function')throw Error('El conversor local todavía no se cargó. Recargá CAD2D3D y volvé a intentar.');
  const started=performance.now();
- log('DWG [1/3] Conversión local · '+info.version+' · '+Math.round(file.size/1024)+' KiB');
+ log('DWG [1/3] Conversión local · '+info.code+' (AutoCAD '+info.release+') · '+Math.round(file.size/1024)+' KiB');
  toast('DWG 1/3 · convirtiendo '+file.name+'…');
  const bytes=await local(file,'dwg-dxf',{signal});check();
  if(!(bytes instanceof ArrayBuffer)||!bytes.byteLength)throw Error('El conversor no devolvió un archivo válido.');
@@ -8626,6 +8628,14 @@ function buildDXFText(entities=state.entities,filename=state.file,layers=state.l
  // Sombreado con patrón como HATCH editable: ANSI31 es idéntico al de AutoCAD (escala = separación/3,175);
  // los demás se guardan como patrón propio CAD2D_<NOMBRE> con sus familias de líneas escritas en el archivo.
  const patternHatch=e=>{
+  const op=e.dxfPattern;
+  if(op&&op.style===e.hatchStyle&&Math.abs((Number(e.hatchSpacing)||0)-(Number(op.spacing)||0))<1e-6&&Array.isArray(op.lines)&&op.lines.length&&e.pts?.length>2&&/^[\p{L}\p{N}_$.-]{1,64}$/u.test(op.name||'')){
+   // Sin cambios desde la importación: el patrón original del archivo (p. ej. LINE, ANGLE, AR-SAND) vuelve idéntico.
+   const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))return true;
+   OUT.push(...head('HATCH',e,lay),'100','AcDbHatch','10','0','20','0','30','0','210','0','220','0','230','1','2',op.name,'70','0','71','0');hatchPaths(e);
+   OUT.push('75','0','76',String([0,1,2].includes(op.type)?op.type:1),'52',dxfNum(op.angle||0),'41',dxfNum(op.scale||1),'77',op.double?'1':'0','78',String(op.lines.length));
+   for(const L of op.lines){OUT.push('53',dxfNum(L.a),'43',dxfNum(L.bx),'44',dxfNum(L.by),'45',dxfNum(L.ox),'46',dxfNum(L.oy),'79',String(L.d.length));for(const d of L.d)OUT.push('49',dxfNum(d))}
+   OUT.push('98','0');return true}
   const kind=String(e.hatchStyle||''),sp=Number(e.hatchSpacing),ang=Number(e.hatchAngle)||0,fam=window.BlacklineHatchPatterns?.passes(kind,sp,ang);
   if(!fam||!fam.length||!(e.pts?.length>2))return false;const lay=layerFor(e);if(!layerList.some(l=>l.name===lay.name))return true;
   const ansi=kind==='ansi31',name=ansi?'ANSI31':'CAD2D_'+kind.toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -8801,7 +8811,7 @@ function cadParseDXFWorker(text,style,signal){
   const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);signal?.removeEventListener('abort',cancel);worker?.terminate();if(cadDxfActiveJob===cancel)cadDxfActiveJob=null;if(error)reject(error);else resolve(result)};
   const cancel=()=>finish(Error('Importación cancelada; dibujo anterior conservado'));
   if(cadDxfActiveJob)cadDxfActiveJob();
-  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261124-worker-v2',document.baseURI));}
+  try{worker=new Worker(new URL('cad-dxf-import-worker.js?v=20261126-worker-v3',document.baseURI));}
   catch(e){return finish(Error('No se pudo iniciar el lector DXF local: '+e.message))}
   cadDxfActiveJob=cancel;
   if(signal?.aborted)return cancel();signal?.addEventListener('abort',cancel,{once:true});
@@ -12601,7 +12611,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
 <script src="cad-arq-pro.js?v=20261126-amueblar2"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261126-dims2"></script>
+<script src="cad-dxf-parser.js?v=20261126-pat3"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-autocad-plus.js?v=20261126-dimarc1"></script>

@@ -41,3 +41,12 @@ test('radius, diameter, 3-point angular and ordinate dimensions export and impor
  assert.match(parser,/\[3,4,5,6\]\.includes\(dt\)/);
  assert.match(parser,/'ordinateX':'ordinateY'/);
 });
+test('original DXF hatch patterns are kept and written back unchanged; worker loads current parser and patterns',()=>{
+ const parser=fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8');
+ assert.match(parser,/dxfPattern=\{name:/);
+ assert.match(f,/const op=e\.dxfPattern;/);
+ const worker=fs.readFileSync(path.join(__dirname,'../cad-dxf-import-worker.js'),'utf8');
+ const v=(worker.match(/cad-dxf-parser\.js\?v=([\w-]+)/)||[])[1];
+ assert.ok(v&&html.includes('cad-dxf-parser.js?v='+v),'worker and page must load the same parser version');
+ assert.match(worker,/cad-hatch-patterns\.js/);
+});
