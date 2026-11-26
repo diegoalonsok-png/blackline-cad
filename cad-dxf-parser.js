@@ -168,7 +168,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   switch(e.type){
    case 'line':out.a=tp(m,e.a);out.b=tp(m,e.b);return out;
    case 'point':out.p=tp(m,e.p);return out;
-   case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
+   case 'polyline':case 'hatch':out.pts=e.pts.map(p=>tp(m,p));if(Array.isArray(e.holes))out.holes=e.holes.map(loop=>loop.map(p=>tp(m,p)));if(e.pwidth)out.pwidth=e.pwidth*s;if(e.hatchSpacing)out.hatchSpacing=+(e.hatchSpacing*s).toPrecision(4);if(e.type==='hatch'&&e.hatchStyle!=='solid')out.hatchAngle=(e.hatchAngle||0)+rotDeg;return out;
    case 'circle':if(uni){out.c=tp(m,e.c);out.r=e.r*s;return out}return{...e,type:'polyline',closed:true,pts:arcPts(e.c,e.r,0,Math.PI*2).slice(1).map(p=>tp(m,p))};
    case 'arc':{let sw=e.a1-e.a0;if(!Number.isFinite(sw))throw Error('Arco DXF inválido');sw=((sw%(Math.PI*2))+(Math.PI*2))%(Math.PI*2)||Math.PI*2;if(uni){const c=tp(m,e.c),d0=tv(m,Math.cos(e.a0),Math.sin(e.a0)),d1=tv(m,Math.cos(e.a1),Math.sin(e.a1));let a0=Math.atan2(d0.y,d0.x),a1=Math.atan2(d1.y,d1.x);if(det<0)[a0,a1]=[a1,a0];return{...e,c,r:e.r*s,a0,a1}}return{...e,type:'polyline',closed:false,pts:arcPts(e.c,e.r,e.a0,sw).map(p=>tp(m,p))}}
    case 'ellipse':{
