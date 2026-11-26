@@ -32,17 +32,26 @@
   if(copy.b)copy.b=map(copy.b);
   if(copy.c)copy.c=map(copy.c);
   if(Array.isArray(copy.pts))copy.pts=copy.pts.map(map);
+  if(Array.isArray(copy.holes))copy.holes=copy.holes.map(loop=>Array.isArray(loop)?loop.map(map):loop);
+  if(copy.wall2d){
+   if(Number.isFinite(copy.wall2d.thickness))copy.wall2d.thickness*=factor;
+   for(const key of ['guideA','guideB'])if(copy.wall2d[key])copy.wall2d[key]=map(copy.wall2d[key]);
+  }
   if(copy.type==='blockRef')copy.scale=(Number(copy.scale)||1)*factor;
   else{
-   for(const prop of ['r','rx','ry','h'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
+   for(const prop of ['r','rx','ry','h','pwidth','hatchSpacing','hatchScale'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
+   // Original DXF hatch definitions no longer describe a scaled contour/pattern.
+   // The exporter rebuilds the pattern from the scaled native spacing.
+   if(copy.type==='hatch'&&factor!==1)delete copy.dxfPattern;
    if(copy.type==='text'){
     // Model-space text box and circular path must scale with glyph height.
     for(const prop of ['mtextWidth','textRadius'])if(Number.isFinite(copy[prop]))copy[prop]*=factor;
    }
    if(copy.type==='dimension'&&copy.style){
-    for(const prop of ['textHeight','arrow','gap','extensionOffset','extensionExtension','tickSize']){
+    for(const prop of ['textHeight','arrow','gap','extensionOffset','extensionExtension','tickSize','extOffset','tolerance']){
      if(Number.isFinite(copy.style[prop]))copy.style[prop]*=factor;
     }
+    if(Number.isFinite(copy.style.extBeyond)&&copy.style.extBeyond>=0)copy.style.extBeyond*=factor;
    }
   }
   return copy;
