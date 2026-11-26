@@ -59,7 +59,7 @@ const AUTHORS = [
   // Modern masters: curated licensed drawings and measured surveys, never generic photographs.
   M('lecorbusier', /\ble ?corbusier\b|\bcorbu\b/, 'Le Corbusier (1887–1965)', '"Le Corbusier"', [['Fondation Le Corbusier', 'https://www.fondationlecorbusier.fr/']]),
   M('mies', /\bmies\b/, 'Ludwig Mies van der Rohe (1886–1969)', '"Mies van der Rohe"', [['MoMA', 'https://www.moma.org/']]),
-  M('wright', /\b(?:frank\s+loy?ds?\s+(?:wright|write)|frank\s+lloyd\s+wright|wright)\b/, 'Frank Lloyd Wright (1867–1959)', '"Frank Lloyd Wright"', [['Frank Lloyd Wright Foundation', 'https://franklloydwright.org/']]),
+  M('wright', /\b(?:frank\s+l(?:l)?oy(?:d|ds|s)?\s+(?:wright|write)|frank\s+lloyd\s+wright|wright)\b/, 'Frank Lloyd Wright (1867–1959)', '"Frank Lloyd Wright"', [['Frank Lloyd Wright Foundation', 'https://franklloydwright.org/']]),
   M('gropius', /\bgropius\b|\bbauhaus\b/, 'Walter Gropius (1883–1969)', '"Walter Gropius"', [['Bauhaus-Archiv', 'https://www.bauhaus.de/']]),
   M('aalto', /\baalto\b/, 'Alvar Aalto (1898–1976)', '"Alvar Aalto"', [['Alvar Aalto Foundation', 'https://www.alvaraalto.fi/']]),
   M('kahn', /\b(?:louis )?kahn\b/, 'Louis Kahn (1901–1974)', '"Louis Kahn"'),
@@ -92,7 +92,7 @@ const CURATED = {
   ['East Elevation'+price+'12 of 17).tif','elevation','Price Tower · east elevation']
  ]
 };
-const drawingRank = { 'floor-plan':0, section:1, elevation:2 };
+const drawingRank = { 'floor-plan':0, section:1, elevation:2, 'technical-detail':3 };
 async function curatedDrawings(author, words) {
  const specs=CURATED[author.key]||[];
  const normalize=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/_/g,' ');
@@ -121,6 +121,7 @@ function historicalDrawingType(title) {
  if(/\b(?:floor plans?|ground plans?|plans?|pianta|piante|planta|plantas|grundriss|grundrisse|ichnographia)\b/.test(q))return 'floor-plan';
  if(/\b(?:cross sections?|sections?|sezione|sezioni|corte|cortes|seccion|schnitt)\b/.test(q))return 'section';
  if(/\b(?:elevations?|alzados?|alzato|prospetto|orthographia)\b/.test(q))return 'elevation';
+ if(/\b(?:architectural details?|construction details?|technical drawings?|detalles? constructivos?|detalles? arquitectonicos?)\b/.test(q))return 'technical-detail';
  return null;
 }
 
@@ -178,7 +179,7 @@ function toItem(page, author, kind) {
   if (!info?.thumburl || !info?.url || !FREE.test(lic) || NC.test(lic)) return null;
   // Drawings must be public domain; photographs may be CC BY / CC BY-SA with credit.
   const pd = /public\s*domain|^pd|cc0|dominio/i.test(lic);
-  if ((kind === 'plate' || kind === 'cover') && !pd) return null;
+  if (kind === 'cover' && !pd) return null; // freely licensed drawings retain the declared attribution
   const desc = strip(m.ImageDescription?.value || m.ObjectName?.value).slice(0, 200);
   const big = info.width > 2000 && /\/360px-/.test(info.thumburl) ? info.thumburl.replace('/360px-', '/2000px-') : info.url;
   return {
@@ -198,18 +199,20 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=6', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=7', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
-  const list = chosen.length ? chosen.slice(0, 3) : AUTHORS.filter((a) => a.plates && !a.modern).slice(0, 4);
+  const explicitAuthor=raw.match(/^(?:autor(?:a)?|author|arquitect[oa]|architect)\s*:?\s+([a-z][a-z .'-]{2,70})$/i);
+  const custom=!chosen.length&&explicitAuthor?A('custom',/$^/,explicitAuthor[1],'"'+explicitAuthor[1].trim()+'"',undefined,{modern:true,links:[]}):null;
+  const list = chosen.length ? chosen.slice(0,3) : custom?[custom]:AUTHORS.filter(a=>a.plates&&!a.modern).slice(0,4);
   const rest = raw.replace(/[^a-z0-9 ]+/g,' ').replace(DROP,' ');
-  const words = AUTHORS.reduce((s,a)=>s.replace(a.re,' '),rest).replace(/\s+/g,' ').trim();
+  const words = custom?'':AUTHORS.reduce((s,a)=>s.replace(a.re,' '),rest).replace(/\s+/g,' ').trim();
   const w=words?words+' ':'';
   const per=chosen.length===1?30:10;
   const jobs=[];
   for(const a of list){
-   if(a.modern){jobs.push(curatedDrawings(a,words));continue;}
+   if(a.modern)jobs.push(curatedDrawings(a,words));
    jobs.push(commons(w+a.name+' '+DRAW,per).then(p=>p.flatMap(x=>{
     const type=historicalDrawingType(x.title);
     if(!type)return [];
@@ -224,7 +227,7 @@ export async function onRequestGet({ request, waitUntil }) {
     const seen = new Set(), items = [];
     for (const g of groups) for (const it of g) if (it && !seen.has(it.page)) { seen.add(it.page); items.push(it); }
     items.sort((p,q)=>drawingRank[p.drawingType]-drawingRank[q.drawingType]);
-    const res = json({ query: raw, authors: list.map((a) => a.label), links: chosen.slice(0, 3).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: chosen.some((a) => a.modern), index: chosen.length ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: items.slice(0, 60) });
+    const res = json({ query: raw, authors: list.map((a) => a.label), links: (custom?[custom]:chosen.slice(0,3)).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: list.some((a) => a.modern), index: chosen.length||custom ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: items.slice(0, 60) });
     waitUntil(cache.put(key, res.clone()));
     return res;
   } catch (e) {
