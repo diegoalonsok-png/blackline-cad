@@ -599,7 +599,8 @@
   const query=webQuery(raw);if(!query)return;
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
-  try{const [own,archived]=await Promise.all([localHousePreviews(raw).catch(()=>[]),archivedReferences(raw).catch(()=>[])]);if(epoch!==webEpoch||!webMode)return;webItems=own.concat(archived);paintWeb();}catch(e){}
+  const objectQ=/\b(?:symbol plan|detail|construction detail|symbol)\b/.test(refQuery(raw));
+  if(!objectQ)try{const [own,archived]=await Promise.all([localHousePreviews(raw).catch(()=>[]),archivedReferences(raw).catch(()=>[])]);if(epoch!==webEpoch||!webMode)return;webItems=own.concat(archived);paintWeb();}catch(e){}
   const api=new URL('https://commons.wikimedia.org/w/api.php');
   const args={action:'query',generator:'search',gsrsearch:query,gsrnamespace:'6',gsrlimit:'40',prop:'imageinfo',iiprop:'url|mime|extmetadata',iiurlwidth:'360',format:'json',origin:'*'};
   for(const [k,v] of Object.entries(args))api.searchParams.set(k,v);
