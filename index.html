@@ -1500,10 +1500,20 @@ var cadHistorySizes=new WeakMap(),cadHistoryBudget=96*1024*1024;
 // edited, and the memory budget counts only those new copies. Snapshot entities are never edited
 // in place; restoring one materialises fresh copies first (cadMaterializeSnapshot).
 var cadSnapEntityCache=new WeakMap();
+// Igualdad estructural con la semántica de JSON (ignora undefined): más rápida que serializar.
+function cadJsonEqual(a,b){
+ if(a===b)return true;
+ if(typeof a==='number'&&typeof b==='number')return a===b||(!Number.isFinite(a)&&b===null);
+ if(a===null||b===null||typeof a!=='object'||typeof b!=='object'){if(typeof a==='number'&&!Number.isFinite(a))return b===null;return false}
+ if(Array.isArray(a)){if(!Array.isArray(b)||a.length!==b.length)return false;for(let i=0;i<a.length;i++){const x=a[i]===undefined||typeof a[i]==='function'?null:a[i];if(!cadJsonEqual(x,b[i]))return false}return true}
+ if(Array.isArray(b))return false;
+ let n=0;for(const k in a){const v=a[k];if(v===undefined||typeof v==='function')continue;n++;if(!Object.prototype.hasOwnProperty.call(b,k)||!cadJsonEqual(v,b[k]))return false}
+ let m=0;for(const k in b)m++;return n===m;
+}
 function cadSnapEntity(e,acc){
- const s=JSON.stringify(e),c=cadSnapEntityCache.get(e);
- if(c&&c.s===s)return c.clone;
- const clone=JSON.parse(s);cadSnapEntityCache.set(e,{s,clone});acc.bytes+=s.length*4;return clone;
+ const c=cadSnapEntityCache.get(e);
+ if(c&&cadJsonEqual(e,c))return c;
+ const s=JSON.stringify(e),clone=JSON.parse(s);cadSnapEntityCache.set(e,clone);acc.bytes+=s.length*4;return clone;
 }
 function historySnapshot(){
  const json=JSON.stringify({layers:state.layers,blocks:state.blocks,dimStyles:state.dimStyles,activeDimStyle:state.activeDimStyle,nextId:state.nextId,layerId:state.layerId,layerStates:state.layerStates||[],unit:state.unit,grid:state.grid});
