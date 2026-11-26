@@ -4348,7 +4348,22 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
   }else{
    const angs=[0,90,180,270];if(state.polarOn){const inc=Number(state.polarAngle)||45;for(let a=inc;a<360-1e-9;a+=inc)if(!angs.some(x=>Math.abs(x-a)<1e-6))angs.push(a)}
    const guide=BlacklineTrackingMath.projectRays?BlacklineTrackingMath.projectRays(q,otrkAnchors,state.view.scale,10,angs):BlacklineTrackingMath.project(q,otrkAnchors,state.view.scale,10);
-   if(guide){otrkGuide=guide;return P(guide.point.x,guide.point.y)}
+   if(guide){
+    // When a LINE/PLINE is nearly axial, intersect its direction with the
+    // acquired perpendicular tracking reference instead of leaving it skewed.
+    // The physical pointer must be close to both constraints; diagonals stay free.
+    if(!guide.intersection&&['line','polyline'].includes(state.tool)&&state.stage.length){
+     const base=state.stage.at(-1),dx=rawPointer.x-base.x,dy=rawPointer.y-base.y;
+     const axis=Math.abs(dx)>=Math.abs(dy)?'h':'v',major=axis==='h'?Math.abs(dx):Math.abs(dy),minor=axis==='h'?Math.abs(dy):Math.abs(dx);
+     if(major>10/state.view.scale&&minor<=major*Math.tan(10*Math.PI/180)&&minor*state.view.scale<=24){
+      const aligned=BlacklineTrackingMath.projectOrtho?.(rawPointer,base,otrkAnchors,state.view.scale,10,axis);
+      if(aligned?.intersection){
+       otrkGuide=aligned;return P(aligned.point.x,aligned.point.y);
+      }
+     }
+    }
+    otrkGuide=guide;return P(guide.point.x,guide.point.y)
+   }
   }
  }
  if(state.snapOn&&state.grid>0)return constrain(P(Math.round(q.x/state.grid)*state.grid,Math.round(q.y/state.grid)*state.grid));
