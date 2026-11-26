@@ -198,7 +198,7 @@ def classify_region(q,pixels_per_m):
     if q['main_wall_fraction']<.5:return 'isolated_object_candidate'
     if min(w,d)<=.60 and max(w,d)<=.90 and area<=.54:return 'technical_void_candidate'
     if min(w,d)<.75 or area<1:return 'small_space_review'
-    return 'room_candidate' if q.get('rectangularity',0)>=.85 else 'polygonal_room_candidate'
+    return 'room_candidate' if q.get('rectangularity',0)>=.98 else 'polygonal_room_candidate'
 
 
 def residual_summary(ink,wall_mask):
@@ -223,7 +223,7 @@ def region_hierarchy(regions):
     for q in regions:
         candidates=[]
         for p in regions:
-            if p is q or p['area']<=q['area'] or p.get('rectangularity',1)>=.85:continue
+            if p is q or p['area']<=q['area'] or p.get('rectangularity',1)>=.98:continue
             if min(p['main_wall_fraction'],q['main_wall_fraction'])<.5:continue
             if (p['x']<=q['x'] and p['y']<=q['y'] and
                 q['x']+q['w']<=p['x']+p['w'] and q['y']+q['h']<=p['y']+p['h']):
