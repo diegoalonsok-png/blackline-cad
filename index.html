@@ -4470,8 +4470,8 @@ function closeDrawing(){
  if(!['line','polyline'].includes(state.tool)||state.stage.length<3)return toast('Need at least 3 points to close');
  finishStage(true);
 }
-function transformEntity(e,fn){const c=clone(e);if(c.type==='blockRef'){c.p=fn(c.p);return c;}if(c.a)c.a=fn(c.a);if(c.b)c.b=fn(c.b);if(c.c)c.c=fn(c.c);if(c.p)c.p=fn(c.p);if(c.pts)c.pts=c.pts.map(fn);return c}
-function doTransform(t,p){const s=state.stage;if((t==='rotate'||t==='scale')&&cad2dCmdOpt.transformRef)return cadReferencePoint(p);if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[];for(const id of [...state.selected]){const ix=state.entities.findIndex(e=>e.id===id);if(ix<0)continue;const original=state.entities[ix];const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();state.entities=state.entities.map(e=>state.selected.includes(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
+function transformEntity(e,fn){const c=clone(e);if(c.type==='blockRef'){c.p=fn(c.p);return c;}if(c.a)c.a=fn(c.a);if(c.b)c.b=fn(c.b);if(c.c)c.c=fn(c.c);if(c.p)c.p=fn(c.p);if(c.pts)c.pts=c.pts.map(fn);if(Array.isArray(c.holes))c.holes=c.holes.map(loop=>Array.isArray(loop)?loop.map(fn):loop);if(c.wall2d)for(const key of ['guideA','guideB'])if(c.wall2d[key])c.wall2d[key]=fn(c.wall2d[key]);return c}
+function doTransform(t,p){const s=state.stage;if((t==='rotate'||t==='scale')&&cad2dCmdOpt.transformRef)return cadReferencePoint(p);if(!state.selected.length){let hitEntity=pick(p);if(hitEntity){state.selected=[hitEntity.id];updateProps();toast(`Selected ${hitEntity.type}. Click base point`)}else toast('Select an entity first');return}if(t==='move'||t==='copy'){if(!s.length){s.push(p);prompt();return}const delta=sub(p,s[0]);saveHistory();const moving=[];for(const id of [...state.selected]){const ix=state.entities.findIndex(e=>e.id===id);if(ix<0)continue;const original=state.entities[ix],lay=layerFor(original);if(lay.locked||!lay.visible||original.cadHidden)continue;const e=transformEntity(original,q=>add(q,delta));if(t==='copy')newEntity({...e,id:undefined});else{state.entities[ix]=e;if(e.type==='blockRef')moving.push({id:e.id,previous:clone(original.p)})}}if(t==='move')for(const item of moving){const ref=state.entities.find(e=>e.id===item.id);if(ref)relocateOpeningWithBlock(ref,item.previous)}if(t==='copy'&&cad2dCmdOpt.copyMulti){updateAll();prompt();schedule();return}if(t==='copy')state.selected=[];s.length=0;updateAll();log(t.toUpperCase());return}if(t==='mirror'){s.push(p);if(s.length<2){prompt();return}let a=s[0],b=s[1],v=sub(b,a),den=v.x*v.x+v.y*v.y||1;saveHistory();state.entities=state.entities.map(e=>state.selected.includes(e.id)?transformEntity(e,q=>{let z=sub(q,a),k=(z.x*v.x+z.y*v.y)/den,h=add(a,mul(v,k));return sub(mul(h,2),q)}):e);state.stage=[];updateAll();log('MIRROR');return}if(t==='scale'){
   if(!s.length){
    s.push(P(p.x,p.y));state.scaleReference=BlacklineScaleMath.referenceRadius(
     state.entities.filter(e=>state.selected.includes(e.id)&&layerFor(e).visible&&!layerFor(e).locked),p,boundsEntity);
@@ -7165,12 +7165,12 @@ function scaleDrawingEntity(e,ratio){
   cadScaleLengthFields(v.dynamic,['width','height'],ratio);
   return v;
  }
- cadScaleLengthFields(v,['r','rx','ry','h'],ratio);
+ cadScaleLengthFields(v,['r','rx','ry','h','pwidth','hatchSpacing','hatchScale'],ratio);
+ if(v.type==='hatch'&&e.dxfPattern&&window.BlacklineScaleMath)v.dxfPattern=BlacklineScaleMath.scaleEntity(e,P(0,0),ratio).dxfPattern;
  if(v.type==='text')cadScaleLengthFields(v,['mtextWidth','textRadius'],ratio);
  if(v.type==='dimension')cadConvertDimStyle(v.style,ratio);
  if(v.wall2d){
   cadScaleLengthFields(v.wall2d,['thickness'],ratio);
-  for(const key of ['guideA','guideB'])if(v.wall2d[key])v.wall2d[key]=mul(v.wall2d[key],ratio);
  }
  return v;
 }
@@ -10257,7 +10257,7 @@ function cadNonUniformInsertion(block,point,sx,sy,angle){
   else if(entity.type==='arc'&&entity.c){const sw=arcSweep(entity.a0,entity.a1);e={...clone(entity),type:'polyline',pts:arcPts(entity.c.x,entity.c.y,entity.r,entity.r,0,entity.a0,sw,Math.max(8,Math.ceil(sw/(Math.PI/24)))),closed:false};delete e.c;delete e.r;delete e.a0;delete e.a1}
   else if(entity.type==='ellipse'&&entity.c){e={...clone(entity),type:'polyline',pts:arcPts(entity.c.x,entity.c.y,entity.rx,entity.ry,Number(entity.rotation)||0,0,Math.PI*2,64).slice(0,-1),closed:true};delete e.c;delete e.rx;delete e.ry;delete e.rotation}
   else if(entity.type==='rect'){e={...clone(entity),type:'polyline',pts:[T(P(entity.a.x,entity.a.y)),T(P(entity.b.x,entity.a.y)),T(P(entity.b.x,entity.b.y)),T(P(entity.a.x,entity.b.y))],closed:true};delete e.a;delete e.b}
-  else{e=transformEntity(entity,T);if(Array.isArray(e.holes))e.holes=e.holes.map(h=>h.map(T));
+  else{e=transformEntity(entity,T);
    if(e.h!==undefined)e.h*=ay;if(e.type==='text')e.rotation=(Number(e.rotation)||0)+angle;
    if(e.type==='dimension'&&e.style){e.style={...e.style,textHeight:(e.style.textHeight||0)*ay,arrow:(e.style.arrow||0)*ay}}
    if(e.type==='blockRef'){e.scale=(Number(e.scale)||1)*k;e.rotation=(Number(e.rotation)||0)+angle}}
@@ -10751,7 +10751,7 @@ function cadPersonalBlockInsert(item){
  if(!item?.definition?.entities?.length||!U[item.unit]||!U[state.unit])return toast('Bloque de galería inválido');
  const def=clone(item.definition),ratio=U[item.unit]/U[state.unit];
  if(ratio!==1){
-  def.entities=def.entities.map(e=>{const scaled=scaleDrawingEntity(e,ratio);for(const k of ['pwidth','hatchSpacing','hatchScale'])if(Number.isFinite(e[k]))scaled[k]=e[k]*ratio;return scaled});
+  def.entities=def.entities.map(e=>scaleDrawingEntity(e,ratio));
   if(def.parametric?.defaults)for(const k of ['width','depth','frameWidth','frameDepth'])if(Number.isFinite(def.parametric.defaults[k]))def.parametric.defaults[k]*=ratio;
  }
  const base=item.name||'Bloque personal';let name=base,n=2;
