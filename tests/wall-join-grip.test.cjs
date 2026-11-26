@@ -58,3 +58,17 @@ test('opening preset is selectable and preserves block width as editable paramet
  assert.match(html,/ref\.params\.width=width/);
  assert.match(html,/blRefWidth/);
 });
+
+
+test('short wall auto join extends the correct endpoint without reversing direction',()=>{
+ const incoming=line(2,p(0,0),p(.04,0)), existing=line(1,p(.05,-1),p(.05,1));
+ const result=plan(incoming,[existing],.08);
+ assert.deepEqual(result.line.a,p(0,0));close(result.line.b.x,.05);
+ assert.deepEqual(result.updates,[]);
+ assert.deepEqual(incoming.b,p(.04,0));
+});
+test('reverse-drawn short wall also retains its original orientation',()=>{
+ const result=plan(line(2,p(.04,0),p(0,0)),[line(1,p(.05,-1),p(.05,1))],.08);
+ close(result.line.a.x,.05);assert.deepEqual(result.line.b,p(0,0));
+ assert.deepEqual(result.updates,[]);
+});
