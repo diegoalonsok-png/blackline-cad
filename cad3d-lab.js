@@ -9111,6 +9111,17 @@ function cad3dVoidSelection(){
  if(a.type==='slab'){cad3dSubtractSlab(a,cutter);return;}
  return cad3dMeshBoolean('subtract',a,cutter,[a.id,p.id]);
 }
+function cad3dShellSelection(){
+ try{
+  const k=cad3dSolidKernel(),r=records.find(v=>selected.length===1&&v.id===selected[0]&&editableRecord(v));
+  if(!r||r.type!=='box')throw Error('SHELL: seleccioná una caja BOX editable. Esta versión vacía cajas por su cara superior.');
+  const raw=window.prompt('SHELL · espesor uniforme de paredes y fondo (m):','0.15');if(raw===null)return false;
+  const t=Number(raw.replace(',','.'));if(!raw.trim()||!Number.isFinite(t))throw Error('Espesor inválido');
+  const mesh=k.boxShell(r.w,r.d,r.h,t),angle=(r.rot||0)*Math.PI/180,co=Math.cos(angle),si=Math.sin(angle);
+  for(let i=0;i<mesh.length;i+=3){const x=mesh[i],y=mesh[i+1];mesh[i]=r.x+x*co-y*si;mesh[i+1]=r.y+x*si+y*co;mesh[i+2]+=r.z||0;}
+  return cad3dCommitSolids([r.id],[cad3dMakeSolid(mesh,r,'Shell '+t+' m')],'SHELL · caja vaciada con fondo sólido');
+ }catch(e){text(e.message);return false}
+}
 function cad3dSliceSelection(){
  try{
   var k=cad3dSolidKernel(),r=records.find(v=>selected.length===1&&v.id===selected[0]&&editableRecord(v));
@@ -9957,6 +9968,7 @@ function action(a,presetId){
  if(['revolve','revolucion'].includes(a)){cad3dRevolveSelection();return true;}
  if(['voidextrude','extrusionvacia','vacio'].includes(a)){cad3dVoidSelection();return true;}
  if(['slice','cortesolido'].includes(a)){cad3dSliceSelection();return true;}
+ if(['shell','vaciado','vaciar'].includes(a)){cad3dShellSelection();return true;}
  if(a==='extrudeface'){setPlacement('extrudeface');return true;}
  if(['box','sphere','cylinder','cone','dist','floor','line','polyline','rectangle','ellipse','roundrect','circle','arc'].includes(a)||Object.prototype.hasOwnProperty.call(ARCH_STYLES,a)){
   if(!renderer&&!fallbackCanvas)text('Todavía se está iniciando el visor 3D');
