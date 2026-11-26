@@ -334,3 +334,65 @@ def repeated_floor_grid(ink,wall_mask,pixels_per_m):
                             tile_depth_m=round(dy/pixels_per_m,3),kind='floor_grid_candidate'))
             if len(out)>=20:return out
     return out
+
+
+def detect_door_symbols(ink,segs,pixels_per_m):
+    """Find door candidates at paired wall ends using source-image symbols.
+    Swing: leaf plus quarter arc. Pocket: aligned thin leaf extending into
+    a wall pocket. Ambiguous glazing/sliding symbols are review-only.
+    """
+    import cv2
+    if not np.isfinite(pixels_per_m) or pixels_per_m<=0:return []
+    dist=cv2.distanceTransform((ink==0).astype(np.uint8),cv2.DIST_L2,3)
+    H,W=ink.shape
+    out=[]
+    for v in (False,True):
+        ds=dist.T if v else dist
+        walls=sorted([q for q in segs if bool(q['v'])==v],key=lambda q:q['lo'])
+        def support(u,s,tol):
+            x=np.rint(u).astype(int);y=np.rint(s).astype(int)
+            good=(x>=0)&(x<ds.shape[1])&(y>=0)&(y<ds.shape[0])
+            return float((ds[y[good],x[good]]<=tol).sum()/max(1,len(x)))
+        for i,a in enumerate(walls):
+            for j,b in enumerate(walls[i+1:],i+1):
+                gap=b['lo']-a['hi'];wm=gap/pixels_per_m
+                if wm>1.35:break
+                if wm<.55 or abs(a['c']-b['c'])>max(2,.35*min(a['t'],b['t'])):continue
+                if max(a['t'],b['t'])>1.6*min(a['t'],b['t']):continue
+                c=(a['c']+b['c'])/2;t=(a['t']+b['t'])/2
+                if any(q is not a and q is not b and abs(q['c']-c)<t*.4 and q['lo']<b['lo']-gap*.15 and q['hi']>a['hi']+gap*.15 for q in walls):continue
+                tol=max(1.5,min(3.5,gap*.045));best=None
+                for hinge_low in (True,False):
+                    hinge=a['hi'] if hinge_low else b['lo'];direction=1 if hinge_low else -1
+                    for side in (-1,1):
+                        for face in (c,c+side*t/2):
+                            theta=np.linspace(.18,1.42,24)
+                            arc=support(hinge+direction*gap*np.cos(theta),face+side*gap*np.sin(theta),tol)
+                            d=np.linspace(.18,.92,18)*gap
+                            leaf=support(np.full_like(d,hinge),face+side*d,tol)
+                            score=min(arc,leaf)
+                            if best is None or score>best[0]:best=(score,hinge_low,side,arc,leaf)
+                rec=dict(v=v,c=c,g0=a['hi'],g1=b['lo'],width_m=round(wm,3))
+                if best and best[0]>=.68:
+                    out.append(dict(rec,kind='swing-door',hingeAtLo=best[1],side=best[2],arc_support=round(best[3],3),leaf_support=round(best[4],3)))
+                    continue
+                # A sliding leaf is parallel to its host. Require thin center
+                # strokes through the opening AND into a hollow pocket. A plain
+                # window across the gap alone is deliberately not classified.
+                src=ink.T if v else ink
+                def band(u0,u1,offset):
+                    x0=max(0,int(np.ceil(u0)));x1=min(src.shape[1],int(np.floor(u1))+1)
+                    y=int(round(c+offset))
+                    if x1<=x0 or y<1 or y+1>=src.shape[0]:return 0.
+                    return float((src[y-1:y+2,x0:x1].max(axis=0)>0).mean())
+                for sign in (-1,1):
+                    p0,p1=(a['hi']-.8*gap,a['hi']-.15*gap) if sign<0 else (b['lo']+.15*gap,b['lo']+.8*gap)
+                    if (sign<0 and p0<a['lo']) or (sign>0 and p1>b['hi']):continue
+                    center=band(a['hi']+.12*gap,b['lo']-.12*gap,0)
+                    pocket=band(p0,p1,0)
+                    blank=min(1-band(p0,p1,t*.30),1-band(p0,p1,-t*.30))
+                    if center>=.7 and pocket>=.7 and blank>=.55:
+                        out.append(dict(rec,kind='pocket-door-candidate',pocket_side=sign,review=True))
+                        break
+                if len(out)>=150:return out
+    return out
