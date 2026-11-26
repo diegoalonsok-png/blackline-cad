@@ -565,7 +565,7 @@
   return {category:hit[0],terms:matches};
  }
  let roomCADPromise=null;
- function roomCADIndex(){if(!roomCADPromise)roomCADPromise=fetch(new URL('assets/arq-room-cad/v1/index.json?v=20261126-rooms-v2',document.baseURI)).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(d=>{if(d.schema!=='blackline-room-cad-v1'||d.units!=='m'||!Array.isArray(d.items))throw Error('Invalid CAD catalogue');return d.items}).catch(e=>{roomCADPromise=null;throw e});return roomCADPromise}
+ function roomCADIndex(){if(!roomCADPromise)roomCADPromise=fetch(new URL('assets/arq-room-cad/v1/index.json?v=20261126-clearance-v2',document.baseURI)).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(d=>{if(d.schema!=='blackline-room-cad-v1'||d.units!=='m'||!Array.isArray(d.items))throw Error('Invalid CAD catalogue');return d.items}).catch(e=>{roomCADPromise=null;throw e});return roomCADPromise}
  function roomTermsMatch(it,terms){if(!terms.length)return true;const t=(it.tags||'')+' '+(it.es||'')+' '+(it.en||'')+' '+(it.name||'');const q=t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');return terms.some(k=>q.includes(k)||k==='accessible'&&/accesible|accessible/.test(q)||k==='compact'&&/compact/.test(q)||k==='sectional'&&/sofa en l/.test(q)||k==='public'&&/public|colectiv/.test(q));}
  async function localRoomPreviews(query){
   const cat=query.category,terms=query.terms,base=new URL('assets/arq-room-cad/v1/',document.baseURI),nativeBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
