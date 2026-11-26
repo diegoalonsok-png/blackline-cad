@@ -381,6 +381,24 @@ async function editCalcoImage(entity,action){
 }
 window.CAD2D_IMAGE_FILTER=editCalcoImage;
 
+// Opt-in mixed detector: preserve the solid detector and add distinct hatch candidates.
+function combineTraceCandidates(groups){
+ const result=[];
+ const descriptor=q=>{const v=q.a[0]===q.b[0],axis=v?1:0;return {v,c:q.a[1-axis],lo:Math.min(q.a[axis],q.b[axis]),hi:Math.max(q.a[axis],q.b[axis]),t:q.t};};
+ for(const group of groups){
+  if(!group.length||group.length>250)continue;
+  for(const q of group){
+   if(!q?.a?.every(Number.isFinite)||!q?.b?.every(Number.isFinite)||!Number.isFinite(q.t)||q.t<=0)continue;
+   if(q.a[0]!==q.b[0]&&q.a[1]!==q.b[1])continue;
+   const a=descriptor(q);if(a.hi<=a.lo)continue;
+   const duplicate=result.some(p=>{const b=descriptor(p);return a.v===b.v&&Math.abs(a.c-b.c)<=.55*Math.max(a.t,b.t)&&Math.min(a.hi,b.hi)-Math.max(a.lo,b.lo)>.2*Math.min(a.hi-a.lo,b.hi-b.lo);});
+   if(!duplicate)result.push({a:q.a.slice(),b:q.b.slice(),t:q.t});
+   if(result.length>=250)return result;
+  }
+ }
+ return result;
+}
+
 let calcoBusy=false;
 async function traceFile(file,source=null){
  const S=C.state;if(S.tool!=='select'||S.stage?.length)return C.toast('Terminá el comando actual antes de calcar.');
@@ -454,7 +472,7 @@ async function traceFile(file,source=null){
     }catch(e){if(d.isConnected)aiStatus.textContent='IA local no disponible: '+String(e.message||e).slice(0,180)+'. Podés seguir con el marcado manual.';}
     finally{ai.disabled=false;ok.disabled=false;}
    };
-   retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent='CALCO: buscando otra interpretación…';await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+' candidatos · '+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
+   retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent='CALCO: buscando otra interpretación…';await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro','mixto experimental'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);if(mode==='mixto experimental'){makeMask(205);const solid=traceWallBands(mask,w,h),hatch=traceHatchedWallBands(mask,w,h),fineLight=traceFineWallBands(mask,w,h);makeMask(170);const fine=traceFineWallBands(mask,w,h);walls=combineTraceCandidates([solid,hatch,fineLight,fine]);}else{walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);}if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+' candidatos · '+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
    controls.append(picker,rot,undo,ai,retry);const hint=document.createElement('p');hint.textContent='Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
    redraw();d.append(title,hint,controls,aiStatus,preview,cancel,ok);d.addEventListener('close',()=>{const yes=d.returnValue==='ok';d.remove();resolve(yes)},{once:true});document.body.append(d);d.showModal();
   });
