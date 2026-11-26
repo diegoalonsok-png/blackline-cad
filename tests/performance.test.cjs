@@ -53,3 +53,13 @@ test('spatial index preserves unknown geometry and snapshots mutable bounds',()=
  assert.deepEqual(query({minX:0,minY:0,maxX:1,maxY:1}),['known','unknown']);
  assert.deepEqual(query({minX:99,minY:99,maxX:101,maxY:101}),['unknown']);
 });
+
+
+test('full spatial query preserves source order and unknown entities',()=>{
+ const {spatialIndex}=require('../cad-performance.js');
+ const items=Array.from({length:10000},(_,i)=>i%11?{type:'point',id:i,p:{x:i,y:0}}:{type:'unknown',id:i});
+ const query=spatialIndex(items,basicBounds);
+ const result=query({minX:-1,minY:-1,maxX:10001,maxY:1});
+ assert.deepEqual(result,items);assert.notEqual(result,items);
+ result.pop();assert.equal(query({minX:-1,minY:-1,maxX:10001,maxY:1}).length,10000);
+});
