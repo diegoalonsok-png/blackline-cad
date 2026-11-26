@@ -507,6 +507,7 @@
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilets?|toilettes?|sanitarios?|vestuarios?|locker rooms?)\b/.test(q))return 'bathroom';
   if(/\b(?:cocinas?|kitchens?)\b/.test(q))return 'kitchen';
+  if(/\b(?:dormis?|dormitorios?|habitaciones?|suites?|bedrooms?|ensuite)\b/.test(q))return 'bedroom';
   return null;
  }
  function roomImagesOnly(raw){return /\b(?:jpg|jpeg|png)\b/i.test(String(raw||'').normalize('NFD').replace(/[\u0300-\u036f]/g,''));}
@@ -647,7 +648,7 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Searching open references…','Buscando referencias libres…');paintWeb();
   const strictCategory=strictRoomCategory(raw),imagesOnly=!!strictCategory&&roomImagesOnly(raw);
-  const room=roomQuery(raw)||(strictCategory?{category:strictCategory,terms:[]}:null);
+  const room=roomQuery(raw)||(strictCategory?{category:strictCategory,terms:strictCategory==='bedroom'&&/\b(?:suites?|ensuite)\b/i.test(raw)?['suite']:[]}:null);
   if(room){
    try{
     const [own,archive]=await Promise.all([imagesOnly?Promise.resolve([]):localRoomPreviews(room),room.category==='living'?Promise.resolve([]):archivedReferences('References '+room.category).catch(()=>[])]);
@@ -705,7 +706,7 @@
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
   if(a==='all-houses')return openHouses('Casas')
   if(a==='house-references'){if(!houseMode)return openHouses('Casas referencias');const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
-  if(a==='ref-type'){const kind=button.dataset.refType;if(strictRoomCategory(kind))return openWeb(T(kind==='Baños'?'Bathrooms':'Kitchens',kind));const raw='Referencias '+kind;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
+  if(a==='ref-type'){const kind=button.dataset.refType;if(strictRoomCategory(kind))return openWeb(T(({Baños:'Bathrooms',Cocinas:'Kitchens',Dormitorios:'Bedrooms'})[kind]||kind,kind));const raw='Referencias '+kind;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
