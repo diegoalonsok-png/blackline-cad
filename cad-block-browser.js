@@ -525,7 +525,8 @@
    const r=await fetch(api,{credentials:'omit',signal:AbortSignal.timeout(15000)});if(!r.ok)return;const d=await r.json();if(epoch!==webEpoch||!still()||!Array.isArray(d.results))return;
    const modern=MODERN_RE.test(String(raw).normalize('NFD').replace(/[̀-ͯ]/g,'')),img=u=>'/classics/img?u='+encodeURIComponent(u);
    const extra=d.results.flatMap(x=>{const lic=String(x.license||'').toLowerCase();if(!['by','by-sa','cc0','pdm'].includes(lic)||!/^[0-9a-f-]{36}$/.test(x.id||'')||!safeHttps(x.foreign_landing_url))return [];const title=String(x.title||'').replace(/\s+/g,' ').trim().slice(0,140)||T('Reference','Referencia');if(modern&&DRAW_RE.test(title+' '+(x.tags||[]).map(t=>t.name).join(' ')))return [];const thumb='https://api.openverse.org/v1/images/'+x.id+'/thumb/',big=/^https:\/\/(?:live|farm\d+)\.staticflickr\.com\/[\w/.-]+\.(?:jpe?g|png)$/i.test(x.url||'')?x.url:thumb;const license=lic==='pdm'?T('Public domain','Dominio público'):lic==='cc0'?'CC0':'CC '+lic.toUpperCase()+(x.license_version?' '+x.license_version:'');return [{title,area:parseArea(title),local:true,thumb:img(thumb),url:img(big),source:safeHttps(x.foreign_landing_url),license:license+(x.creator?' · '+String(x.creator).slice(0,60):'')+' · '+(x.source||x.provider||'Openverse')}];}).filter(x=>!webItems.some(j=>j.source===x.source));
-   if(extra.length){webItems=webItems.concat(extra);webStatus='';paintWeb();}}catch(e){}
+   const specific=refQuery(raw).replace(/\b(?:floor|plan|house|architecture|square|meters|\d+)\b/g,'').trim().length>0;
+   if(extra.length){webItems=specific?extra.concat(webItems):webItems.concat(extra);if(specific)searchPage=0;webStatus='';paintWeb();}}catch(e){}
  }
  let localGalleryPromise=null;
  function localGallery(){
