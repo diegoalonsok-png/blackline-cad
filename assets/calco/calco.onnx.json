@@ -1,0 +1,1 @@
+{"clases": ["fondo", "muro", "puerta", "ventana", "mueble", "texto"], "lado": 320, "normalizacion": "(x/255-0.5)/0.5", "iou_medio": 0.63788}
