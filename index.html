@@ -899,7 +899,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 .cad-command-active{display:inline-block;max-width:min(34vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#b4c6d4;font:11px Consolas,Monaco,monospace;flex:0 1 auto}
 .cad-command-active[hidden]{display:none}
 </style>
-<script defer src="assets/cad-ui-glossary.js?v=20261126-bilingue8"></script>
+<script defer src="assets/cad-ui-glossary.js?v=20261127-bilingue9"></script>
 <script defer src="assets/cad-ui-language.js?v=20261126-bilingue3"></script>
 <script>
 /* Blackline CAD — single global keyboard-to-command dispatcher.
@@ -1201,7 +1201,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Inter,"S
 <label style="display:block;margin-top:16px;font-size:13px;font-weight:600">Custom <input type="color" id="cadLexiconCustomBackground" aria-label="Custom background color" style="display:block;margin-top:7px;width:100%;height:38px;cursor:pointer"></label>
 <button type="button" id="cadLexiconResetBackground" style="display:block;margin-top:15px;width:100%;padding:10px 8px;background:#1b1e22;color:#f6f6f6;border:1px solid #76818b;border-radius:12px;font-size:14px">Reset</button>
 </div><div id="cadStatusMenu" class="cad-status-menu" role="menu" hidden></div><div id="cadContextMenu" role="menu" aria-label="Drawing context menu"></div>
-<div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="ctb">Por color · tabla CTB</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option><option value="arq">Rótulo de arquitectura</option><option value="municipal">Carátula municipal</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
+<div class="modal-backdrop" id="printBackdrop"><div class="modal"><div class="modal-head"><h2>Plot / Export PDF</h2><button class="btn" id="closePrint">✕ Close</button></div><div class="plot-layout"><div class="plot-settings"><div class="field"><label>Paper size</label><select id="paper"><option value="A4">ISO A4 · 210 × 297 mm</option><option value="A3" selected>ISO A3 · 297 × 420 mm</option><option value="A2">ISO A2 · 420 × 594 mm</option><option value="A1">ISO A1 · 594 × 841 mm</option><option value="A0">ISO A0 · 841 × 1189 mm</option><option value="LETTER">US Letter · 8.5 × 11 in</option><option value="LEGAL">US Legal · 8.5 × 14 in</option><option value="ARCHD">ARCH D · 24 × 36 in</option><option value="ARCH E">ARCH E · 36 × 48 in</option><option value="CUSTOM">Custom size</option></select></div><div class="field"><label>Orientation</label><select id="orientation"><option value="landscape" selected>Landscape</option><option value="portrait">Portrait</option></select></div><div class="field"><label>Custom width (mm)</label><input id="paperW" type="number" value="420" min="10"></div><div class="field"><label>Custom height (mm)</label><input id="paperH" type="number" value="297" min="10"></div><div class="field"><label>Scale</label><select id="plotScale"><option value="fit" selected>Fit drawing to page</option><option value="1">1:1</option><option value="10">1:10</option><option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option><option value="75">1:75</option><option value="125">1:125</option><option value="250">1:250</option><option value="100">1:100</option><option value="200">1:200</option><option value="500">1:500</option><option value="1000">1:1000</option><option value="custom">Custom ratio</option></select></div><div class="field"><label>Custom 1 :</label><input id="customScale" type="number" value="100" min="0.001" step="any"></div><div class="field"><label>Margins (mm)</label><input id="plotMargin" type="number" value="10" min="0" step="1"></div><div class="field"><label>Print style</label><select id="plotStyle"><option value="color">Color</option><option value="ctb">Por color · tabla CTB</option><option value="mono-hatch" selected>Monochrome · colored hatches</option><option value="mono">Monochrome</option></select></div><div class="field"><label title="Color de fondo del papel en el PDF, PNG y JPG (por defecto blanco)">Paper color</label><input id="plotPaperColor" type="color" value="#ffffff"></div><div class="field"><label>Title block</label><select id="titleBlock"><option value="none" selected>No title block</option><option value="simple">Simple title block</option><option value="arq">Rótulo de arquitectura</option><option value="municipal">Carátula municipal</option></select></div></div><div><div class="preview" id="printPreview" role="img" aria-label="CAD plot sheet preview"></div><p class="plot-summary" id="plotInfo"></p><button type="button" class="btn" id="plotAutoPaper" style="display:none;margin-bottom:8px">Ampliar papel sin cambiar la escala</button><p class="plot-hint" id="plotWarning">Vector PDF with real sheet dimensions. Print at 100%.</p></div></div><div class="modal-footer"><button class="btn" id="svgBtn">Export SVG</button><button class="btn" id="pngBtn">Export PNG</button><button class="btn" id="cadPrintPrinter" title="Abre el diálogo de impresión del sistema para elegir impresora, plotter o PDF">🖨 Print… (choose printer)</button><button class="btn primary" id="downloadPdf">Download vector PDF</button></div></div></div>
 <div class="modal-backdrop" id="helpBackdrop"><div class="modal"><div class="modal-head"><h2>CAD2D3D — Quick start</h2><button class="btn" id="closeHelp">✕ Close</button></div><div class="shortcuts"><div><h3>Drawing</h3><p>Click Line and click two points; repeat; Enter finishes.</p><p>Polyline connects points; Enter or double click finishes.</p><p>Circle: center then radius point.</p><p>Text: click the insertion point, type text in the prompt.</p><p>Coordinates can be entered in the command line.</p></div><div><h3>Editing and navigation</h3><p>Select with a click or drag left to right for a BLUE enclosed window; drag right to left for a GREEN crossing window. Use Shift to add objects. Borrar / Erase or Delete removes selected entities.</p><p>Hold Shift to select multiple entities.</p><p>Use Move, Copy, Rotate, Scale and Mirror on selected entities.</p><p>Mouse wheel zooms, middle mouse pans.</p><p>Space + left drag pans; Esc cancels.</p></div><div><h3>Output</h3><p>Export DXF R2000 (AC1015).</p><p>Import standard ASCII DXF entities (basic 2D types).</p><p>Save/Open native project JSON to preserve editing state.</p><p>Vector PDF at ISO, US or custom page size.</p></div><div><h3>Accuracy</h3><p>Coordinates are stored numerically, not in pixels.</p><p>Unit selection converts existing geometry to preserve physical size.</p><p>SNAP follows the selected grid spacing.</p><p>OSNAP recognizes endpoints, midpoints and centers.</p></div></div><section aria-label="Acerca de CAD2D3D" style="margin-top:16px;border-top:1px solid #39424b;padding-top:12px">
 <h3 style="margin:0 0 6px">Acerca de CAD2D3D · Independencia y licencias</h3>
 <p class="help">CAD2D3D es un software independiente de dibujo técnico 2D y modelado 3D. No está afiliado, patrocinado ni respaldado por otros fabricantes de software. Las marcas de terceros pertenecen a sus respectivos titulares; los formatos de archivo se mencionan sólo para describir la compatibilidad.</p>
@@ -9420,11 +9420,21 @@ function cadCtbPreset(kind){
  const colors=new Set(cadCtbDrawingColors());for(let n=1;n<=9;n++)colors.add(cadAci(n));
  for(const c of colors){
   const aci=Object.keys(CAD_CTB_PRESET_LW).find(n=>cadAci(+n)===c);
+  const presetLw=aci?CAD_CTB_PRESET_LW[aci]:.25,hexGray=v=>{const g=Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0');return '#'+g+g+g};
+  const lum=()=>{const v=parseInt(c.slice(1),16);return .2126*(v>>16&255)+.7152*(v>>8&255)+.0722*(v&255)};
   if(kind==='color')map[c]={color:'object',lw:0};
-  else if(kind==='gray')map[c]={color:'#7f7f7f',lw:aci?CAD_CTB_PRESET_LW[aci]:.25};
-  else map[c]={color:aci==='8'?'#808080':aci==='9'?'#c0c0c0':'#000000',lw:aci?CAD_CTB_PRESET_LW[aci]:.25};
+  else if(kind==='gray')map[c]={color:'#7f7f7f',lw:presetLw};
+  // Escala de grises: cada color imprime en el gris de su luminosidad (los muy claros, en gris visible).
+  else if(kind==='grayscale')map[c]={color:hexGray(Math.min(lum(),200)),lw:0};
+  // Tramado (pantalla): todo en negro atenuado al porcentaje de tinta, para planos de base o antecedentes.
+  else if(/^screen(\d+)$/.test(kind))map[c]={color:hexGray(255*(1-Number(kind.slice(6))/100)),lw:presetLw};
+  else if(kind==='monoobj')map[c]={color:'#000000',lw:0};
+  // Arquitectura: grosores habituales por color (muros gruesos, cotas y textos finos, ejes y sombreados mínimos).
+  else if(kind==='arq'){const A={1:.18,2:.25,3:.35,4:.50,5:.25,6:.70,7:.30,8:.09,9:.05};map[c]={color:aci==='8'?'#808080':aci==='9'?'#b0b0b0':'#000000',lw:aci?A[aci]:.18}}
+  else map[c]={color:aci==='8'?'#808080':aci==='9'?'#c0c0c0':'#000000',lw:presetLw};
  }
- return {name:kind==='color'?'Color del objeto':kind==='gray'?'Gris':'Monocromo con grosores (monochrome.ctb)',map};
+ const names={color:'Color del objeto',gray:'Gris',grayscale:'Escala de grises (grayscale.ctb)',screen25:'Tramado 25 %',screen50:'Tramado 50 %',screen75:'Tramado 75 %',monoobj:'Monocromo, grosor del objeto',arq:'Arquitectura (grosores por color)'};
+ return {name:names[kind]||'Monocromo con grosores (monochrome.ctb)',map};
 }
 function cadCtbDrawingColors(){
  const out=new Set();
@@ -9482,11 +9492,15 @@ function cadEditCtb(){
    out.append(sel,pick);row.append(sw,hx,out,lw);list.append(row);
   }
  };
- const presets=[['Monocromo con grosores','mono'],['Color del objeto','color'],['Gris','gray']];
- for(const [l,k] of presets){const b=mk(l);b.onclick=()=>{state.ctb=cadCtbPreset(k);cadCtbChanged();render()};bar.append(b)}
+ const presets=[['Monocromo con grosores','mono'],['Monocromo, grosor del objeto','monoobj'],['Arquitectura','arq'],['Color del objeto','color'],['Escala de grises','grayscale'],['Gris','gray'],['Tramado 25 %','screen25'],['Tramado 50 %','screen50'],['Tramado 75 %','screen75']];
+ const ps=document.createElement('select');ps.title='Tablas prediseñadas';ps.style.cssText='background:#111a21;color:#fff;border:1px solid #698596;border-radius:5px;padding:4px';
+ {const o0=document.createElement('option');o0.value='';o0.textContent='Tabla prediseñada…';ps.append(o0)}
+ for(const [l,k] of presets){const o=document.createElement('option');o.value=k;o.textContent=l;ps.append(o)}
+ ps.onchange=()=>{if(!ps.value)return;state.ctb=cadCtbPreset(ps.value);ps.value='';cadCtbChanged();render()};bar.append(ps);
  const imp=mk('Importar tabla .ctb…');const file=document.createElement('input');file.type='file';file.accept='.ctb';file.hidden=true;
  imp.onclick=()=>file.click();file.onchange=async()=>{const f=file.files[0];file.value='';if(!f)return;try{state.ctb=await cadImportCtbFile(f);cadCtbChanged();render();toast('Tabla CTB importada: '+state.ctb.name)}catch(err){toast('No se pudo leer el .ctb: '+err.message)}};
- bar.append(imp,file);
+ const exp=mk('Guardar como .ctb…');exp.title='Descargar esta tabla como archivo .ctb para usarla en otros programas de CAD';exp.onclick=()=>cadExportCtbFile();
+ bar.append(imp,file,exp);
  const foot=document.createElement('div');foot.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:10px;color:#afc2cc;gap:8px';
  const note=document.createElement('span');note.textContent='Grosor vacío = el del objeto. El blanco del objeto imprime en negro.';
  const allL=document.createElement('label');allL.style.cssText='display:flex;gap:5px;align-items:center;white-space:nowrap';const all=document.createElement('input');all.type='checkbox';all.onchange=()=>{showAll=all.checked;render()};allL.append(all,'Ver los 255 colores');
@@ -9499,10 +9513,46 @@ function cadCtbChanged(){
  queueLocalBackup();try{if($('printBackdrop')?.classList.contains('show'))updatePreview()}catch(e){}try{if(typeof renderLayoutWorkspace==='function'&&$('cadLayoutPage')?.offsetParent)renderLayoutWorkspace()}catch(e){}schedule();
 }
 window.cadEditCtb=cadEditCtb;
+// Color del papel también en el diálogo de impresión, sincronizado con el de las láminas.
+{const pc=$('plotPaperColor'),lc=$('layoutPaperColor');if(pc&&lc){const sync=()=>{pc.value=cadPaperColor()};
+ pc.addEventListener('input',()=>{lc.value=pc.value;lc.dispatchEvent(new Event('input',{bubbles:true}));lc.dispatchEvent(new Event('change',{bubbles:true}));try{if($('printBackdrop')?.classList.contains('show'))updatePreview()}catch(e){}});
+ for(const ev of ['input','change'])lc.addEventListener(ev,sync);sync();}}
+/* Tabla CTB → archivo .ctb (texto de estilos comprimido con zlib, cabecera PIAFILEVERSION_2.0). */
+const CAD_CTB_LW=[0,.05,.09,.10,.13,.15,.18,.20,.25,.30,.35,.40,.45,.50,.53,.60,.65,.70,.80,.90,1.00,1.06,1.20,1.40,1.58,2.00,2.11];
+function cadCtbText(t){
+ const q=s=>String(s).replace(/[\r\n"]/g,' ');
+ const out=['description="'+q(t.name||'CAD2D3D')+' · CAD2D3D','aci_table_available=TRUE','scale_factor=1.0','apply_factor=FALSE','custom_lineweight_display_units=0','aci_table{'];
+ for(let i=0;i<255;i++)out.push(' '+i+'="Color_'+(i+1));
+ out.push('}','plot_style{');
+ for(let i=0;i<255;i++){
+  const m=t.map?.[cadAci(i+1)]||{color:'object',lw:0};
+  let col=-1006632961;if(/^#[0-9a-f]{6}$/i.test(m.color||''))col=(0xC2000000|parseInt(m.color.slice(1),16))|0;
+  let lwi=0;if(m.lw>0){let best=1,bd=Infinity;CAD_CTB_LW.forEach((v,k)=>{if(k&&Math.abs(v-m.lw)<bd){bd=Math.abs(v-m.lw);best=k}});lwi=best}
+  out.push(' '+i+'{','  name="Color_'+(i+1),'  localized_name="Color_'+(i+1),'  description="','  color='+col,'  mode_color='+col,'  color_policy=1','  physical_pen_number=0','  virtual_pen_number=0','  screen=100','  linepattern_size=0.5','  linetype=31','  adaptive_linetype=TRUE','  lineweight='+lwi,'  fill_style=73','  end_style=4','  join_style=5',' }');
+ }
+ out.push('}','custom_lineweight_table{');CAD_CTB_LW.forEach((v,k)=>out.push(' '+k+'='+v.toFixed(2)));out.push('}');
+ return out.join('\n')+'\n';
+}
+async function cadCtbBytes(t){
+ const raw=new TextEncoder().encode(cadCtbText(t));
+ const comp=new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate'))).arrayBuffer());
+ let a=1,b=0;for(const x of comp){a=(a+x)%65521;b=(b+a)%65521}const adler=((b<<16)|a)>>>0;
+ const head=new TextEncoder().encode('PIAFILEVERSION_2.0,CTBVER1,compress\r\npmzlibcodec');
+ const out=new Uint8Array(head.length+12+comp.length),dv=new DataView(out.buffer);
+ out.set(head,0);dv.setUint32(head.length,adler,true);dv.setUint32(head.length+4,raw.length,true);dv.setUint32(head.length+8,comp.length,true);out.set(comp,head.length+12);
+ return out;
+}
+async function cadExportCtbFile(){
+ if(!state.ctb)state.ctb=cadCtbPreset('mono');
+ const name=(window.prompt('Nombre del archivo .ctb',String(state.ctb.name||'CAD2D3D').replace(/[\\/:*?"<>|]/g,'_'))||'').trim();if(!name)return;
+ try{const bytes=await cadCtbBytes(state.ctb);state.ctb.name=name.replace(/\.ctb$/i,'');download(state.ctb.name+'.ctb',new Blob([bytes],{type:'application/octet-stream'}),'application/octet-stream');toast('Tabla guardada: '+state.ctb.name+'.ctb');queueLocalBackup()}
+ catch(err){toast('No se pudo guardar el .ctb: '+err.message)}
+}
+window.CAD2D_CTB=Object.freeze({text:cadCtbText,bytes:cadCtbBytes,import:cadImportCtbFile});
 for(const id of ['plotStyle','layoutStyle']){const sel=$(id);if(!sel)continue;
  sel.addEventListener('change',()=>{if(sel.value==='ctb'&&!document.getElementById('cadCtbEditor'))cadEditCtb()});
  const b=document.createElement('button');b.type='button';b.className='btn slim';b.textContent='Tabla CTB…';b.title='Editar qué color y grosor imprime cada color del dibujo';b.style.marginTop='4px';b.onclick=()=>cadEditCtb();sel.insertAdjacentElement('afterend',b);}
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CTB','PLOTSTYLE','STYLESMANAGER','ESTILOSIMPRESION','PLUMAS'])X.commands[k]=()=>cadEditCtb();}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CTB','PLOTSTYLE','STYLESMANAGER','ESTILOSIMPRESION','PLUMAS'])X.commands[k]=()=>cadEditCtb();for(const k of['CTBOUT','GUARDARCTB','EXPORTARCTB'])X.commands[k]=()=>cadExportCtbFile();}
 function colorOutput(e,o){if(e.wipeout)return '#ffffff';if(o.style==='ctb'){const m=cadCtbEntry(e),src=cadSrcColor(e);if(!m)return '#161616';if(m.color==='object')return cadNearWhite(src)?'#161616':src;return m.color}if(o.style==='mono-hatch')return e.type==='hatch'?(e.color||layerFor(e).color):'#161616';return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
 function escXML(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 function makeSVG(o){
@@ -9795,7 +9845,7 @@ const preflight=cadPrintPreflight(o),warning=$('plotWarning');
  warning.textContent=preflight.issues.length?'PREIMPRESIÓN: '+preflight.issues.join(' · '):'PDF vectorial con tamaño de hoja exacto. Al imprimir, usar Tamaño real / 100 %, no Ajustar a página.';
 const custom=$('paper').value==='CUSTOM';$('paperW').disabled=!custom;$('paperH').disabled=!custom;$('customScale').disabled=scaleValue!=='custom';
 } $('plotAutoPaper').onclick=()=>{const o=plotOptions();const neededW=Math.ceil((o.b.maxX-o.b.minX)*o.factor+2*o.margin+5),neededH=Math.ceil((o.b.maxY-o.b.minY)*o.factor+2*o.margin+5);$('paper').value='CUSTOM';$('paperW').value=Math.max(10,neededW);$('paperH').value=Math.max(10,neededH);$('orientation').value=neededW>=neededH?'landscape':'portrait';updatePreview()};$('pdfBtn').onclick=openPrint;$('closePrint').onclick=()=>$('printBackdrop').classList.remove('show');$('closeHelp').onclick=()=>$('helpBackdrop').classList.remove('show');document.querySelectorAll('#printBackdrop input,#printBackdrop select').forEach(x=>x.onchange=updatePreview);$('svgBtn').onclick=()=>download(`${state.file}.svg`,makeSVG(plotOptions()),'image/svg+xml');
-$('pngBtn').onclick=()=>{const o=plotOptions(),svg=makeSVG(o),img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));img.onload=()=>{const ratio=150/25.4;const c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);let cx=c.getContext('2d');cx.fillStyle='white';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);c.toBlob(b=>{if(b)download(`${state.file}.png`,b,'image/png');URL.revokeObjectURL(url)},'image/png')};img.onerror=()=>toast('PNG export failed');img.src=url};
+$('pngBtn').onclick=()=>{const o=plotOptions(),svg=makeSVG(o),img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));img.onload=()=>{const ratio=150/25.4;const c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);let cx=c.getContext('2d');cx.fillStyle=o.paperColor||'#ffffff';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);c.toBlob(b=>{if(b)download(`${state.file}.png`,b,'image/png');URL.revokeObjectURL(url)},'image/png')};img.onerror=()=>toast('PNG export failed');img.src=url};
 // Built-in minimal, dependency-free vector PDF writer; measurements and line art are true PDF vectors.
 function makePDF(o){
  const sheets=Array.isArray(o)?o:[o];
@@ -11284,7 +11334,7 @@ function cadActiveBlockRef(){return state.entities.find(e=>state.selected.includ
 
 function cadExportRaster(kind){
  const o=plotOptions(),svg=makeSVG(o),img=new Image(),url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
- img.onload=()=>{const ratio=150/25.4,c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);const cx=c.getContext('2d');cx.fillStyle='white';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);
+ img.onload=()=>{const ratio=150/25.4,c=document.createElement('canvas');c.width=Math.round(o.w*ratio);c.height=Math.round(o.h*ratio);const cx=c.getContext('2d');cx.fillStyle=o.paperColor||'#ffffff';cx.fillRect(0,0,c.width,c.height);cx.drawImage(img,0,0,c.width,c.height);
   const mime='image/'+kind,ext=kind==='jpeg'?'jpg':kind;c.toBlob(b=>{if(b)download(`${state.file}.${ext}`,b,mime);else toast(ext.toUpperCase()+' not supported by this browser');URL.revokeObjectURL(url)},mime,.9)};
  img.onerror=()=>toast('Image export failed');img.src=url;
 }
