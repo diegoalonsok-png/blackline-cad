@@ -281,12 +281,12 @@ function initializeTaupeWorkspace(){
 /* Visual reference arrangement: layers and object properties at left, Spanish CAD navigation.
    This leaves CAD commands and original panel handlers untouched. */
 function useReferenceCadLayout(){
- const navLabels={home:'Inicio',draw:'Dibujo',modify:'Modificar',annotate:'Anotar',view:'Vista',output:'Salida'};
+ const navLabels={home:'Home',draw:'Draw',modify:'Modify',annotate:'Annotate',view:'View',output:'Output'};
  doc.querySelectorAll('#tabs [data-tab]').forEach(button=>{
   if(navLabels[button.dataset.tab])button.textContent=navLabels[button.dataset.tab];
  });
  const brand=doc.querySelector('.brand small');
- if(brand)brand.textContent='DISEÑO Y DIBUJO ARQUITECTÓNICO · 2D';
+ if(brand)brand.textContent='DESIGN AND ARCHITECTURAL DRAFTING · 2D';
  const left=side.left;
  if(left){
   const layerPanel=left.querySelector('#layers')?.closest('.panel')||doc.querySelector('#layers')?.closest('.panel');
