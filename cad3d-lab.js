@@ -6098,10 +6098,14 @@ function cad3dRenderPlanWalls(){
  var top=activeView==='top'||(viewMode==='ortho'&&orbit.el>1.555);
  var plan=top&&['wire2d','wire3d','hidden','shaded','shaded-edges','monochrome'].includes(renderStyle);
  overlay.style.display=plan?'block':'none';
- if(modelRoot)modelRoot.children.forEach(function(group){
-  var wall=records.some(function(r){return r.id===group.userData.owner&&r.type==='wall';});
-  group.traverse(function(o){if(o.userData&&o.userData.cadSketch)o.visible=!(plan&&wall);});
- });
+ if(modelRoot){
+  // Build membership once instead of scanning all records for each scene group.
+  var wallIds=new Set();if(plan)records.forEach(function(r){if(r.type==='wall')wallIds.add(r.id);});
+  modelRoot.children.forEach(function(group){
+   var wall=wallIds.has(group.userData.owner);
+   group.traverse(function(o){if(o.userData&&o.userData.cadSketch)o.visible=!(plan&&wall);});
+  });
+ }
  if(!plan)return;
  var w=view.clientWidth,h=view.clientHeight;
  overlay.setAttribute('viewBox','0 0 '+w+' '+h);overlay.setAttribute('width',w);

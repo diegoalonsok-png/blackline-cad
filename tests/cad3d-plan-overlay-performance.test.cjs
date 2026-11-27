@@ -1,0 +1,26 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('cad3d-lab.js','utf8');
+test('plan overlay resolves wall membership once and restores sketch visibility in orbit',()=>{
+ const start=source.indexOf('function cad3dRenderPlanWalls(){'),end=source.indexOf('\nfunction ',start+10);
+ assert(start>=0&&end>start);
+ let reads=0;
+ const records=Array.from({length:10000},(_,i)=>({id:i,get type(){reads++;return i%2?'wall':'box';}}));
+ const sketches=records.map(()=>({userData:{cadSketch:true},visible:true}));
+ const groups=records.map((r,i)=>({userData:{owner:r.id},traverse:fn=>fn(sketches[i])}));
+ const overlay={style:{},setAttribute(){}};
+ const view={querySelector:()=>overlay,clientWidth:0,clientHeight:0};
+ const ctx={root:{querySelector:()=>view},activeView:'top',viewMode:'ortho',orbit:{el:1.56},renderStyle:'wire2d',records,modelRoot:{children:groups}};
+ vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ ctx.cad3dRenderPlanWalls();
+ assert.equal(reads,10000);
+ assert.equal(overlay.style.display,'block');
+ assert(sketches.every((s,i)=>s.visible===!(i%2)));
+ ctx.activeView='iso';ctx.orbit.el=.55;reads=0;
+ ctx.cad3dRenderPlanWalls();
+ assert.equal(reads,0);
+ assert.equal(overlay.style.display,'none');
+ assert(sketches.every(s=>s.visible));
+});
