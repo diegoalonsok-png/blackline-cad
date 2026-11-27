@@ -889,6 +889,17 @@ function prepareReviewedTrace(raw){
  });
  return {plan:{schema:'blackline.architecture.v1',units:'m',traceReviewed:true,walls:raw.walls,openings,blocks,rooms:[]},custom};
 }
+// Calco con IA: inserta el plano revisado en el origen indicado (bloques del catálogo y rectángulos propios).
+function applyTracePlan(raw,origin){
+ const {plan,custom}=prepareReviewedTrace(raw);
+ return CORE.wall.applyPlan({...plan,brief:{kind:'trace'}},origin||P(0,0),b=>{
+  if(!custom.has(b.catalogId)){const it=byId(b.catalogId);return ensureDefinition(it,it.w,it.d,true);}
+  const def=custom.get(b.catalogId),k=f(),name='CALCO · '+b.catalogId+' · '+JSON.stringify(def)+' · '+S().unit;
+  if(!S().blocks[name])S().blocks[name]={name,entities:[{type:'rect',a:P(def.a[0]*k,def.a[1]*k),b:P(def.b[0]*k,def.b[1]*k),layer:'0',color:'#ffffff',width:.13}],dynamicActions:true,libraryLayer0:true};
+  return name;
+ });
+}
+EXT.applyTracePlan=applyTracePlan;
 function insertReviewedTrace(raw){
  if(S().entities.length)throw Error('Abrí un dibujo vacío para esta prueba.');
  const {plan,custom}=prepareReviewedTrace(raw);
@@ -1273,11 +1284,13 @@ function arqWebReference(raw){
  if(/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q)&&/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q))return true;
  return /\b(?:planos?|plantas?|floor plans?|detalles constructivos|construction details|fachadas?|facades?|architectural references)\b/.test(q)&&!/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q);
 }
+const arqTypologyBase=new URL('assets/arq-tipologias/v1/',document.baseURI);
 async function insertCataloguePlanById(id,isCurrent=()=>true){
- if(!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
+ const typology=/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(id);
+ if(!typology&&!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
  if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
  const epoch=++arqCommandEpoch;
- const response=await fetch(new URL(id+'.json',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ const response=await fetch(new URL(id+'.json?v=20261127-tipologias1',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
  const plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
  if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
  if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return false;
