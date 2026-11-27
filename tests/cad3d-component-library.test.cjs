@@ -128,3 +128,18 @@ test('large gallery renders at most 48 cards per page and clamps page bounds',()
  assert(source.includes('page.ids.map(function(id)'));
  assert(source.includes('cad3dGalleryPage=0;cad3dBlockCatalogItems()'));
 });
+
+
+test('photographic cutouts retain color and alpha through local visual styles',()=>{
+ const start=source.indexOf('function applyRenderStyle(){'),end=source.indexOf('function setVisualStyle(',start);
+ assert(start>=0&&end>start);
+ let hex=0xabcdef;
+ const material={map:{isCanvasTexture:false},color:{getHex:()=>hex,setHex:v=>{hex=v}},transparent:true,opacity:1,alphaTest:.25,depthWrite:true};
+ const mesh={isMesh:true,material,geometry:{},userData:{cadCutout:true},children:[]};
+ const ctx={T:{},CAD3D_SKETCH_PRESETS:{},renderStyle:'realistic',renderStyleControls(){},isCAD3DWireframe(){return false},isCad3DWireframe:()=>false,cad3dShowsGrid:()=>true,gridHelper:null,axesHelper:null,underlayGroup:null,apply3DEnvironment(){},modelRoot:{traverse:fn=>fn(mesh)},sunSettings:{enabled:true,onFaces:true}};
+ vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ ctx.applyRenderStyle();assert.equal(hex,0xabcdef);assert.equal(material.alphaTest,.25);assert.equal(material.depthWrite,true);
+ ctx.renderStyle='monochrome';ctx.applyRenderStyle();assert.equal(hex,0xabcdef);assert.equal(material.alphaTest,.25);
+ ctx.renderStyle='xray';ctx.applyRenderStyle();assert.equal(material.opacity,.5);assert.equal(material.transparent,true);assert.equal(material.depthWrite,false);
+ ctx.renderStyle='realistic';ctx.applyRenderStyle();assert.equal(material.opacity,1);assert.equal(material.alphaTest,.25);assert.equal(material.depthWrite,true);
+});
