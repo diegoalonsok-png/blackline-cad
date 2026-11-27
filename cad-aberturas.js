@@ -61,7 +61,7 @@ function flipSide(){const refs=selectedOpenings();if(!refs.length)return;CORE.sa
 /* ---------- Barra flotante: aparece al seleccionar aberturas ---------- */
 const bar=(()=>{
  const el=document.createElement('div');el.id='cadOpeningSwap';el.hidden=true;el.setAttribute('role','toolbar');
- const css=document.createElement('style');css.textContent=`#cadOpeningSwap{position:fixed;left:50%;top:142px;transform:translateX(-50%);z-index:8500;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:min(860px,96vw);background:#16222b;color:#e6eef3;border:1px solid #d3b47a;border-radius:12px;padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font:12px system-ui,sans-serif}
+ const css=document.createElement('style');css.textContent=`#cadOpeningSwap[hidden]{display:none!important}#cadOpeningSwap{position:fixed;left:50%;top:142px;transform:translateX(-50%);z-index:8500;display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:min(860px,96vw);background:#16222b;color:#e6eef3;border:1px solid #d3b47a;border-radius:12px;padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font:12px system-ui,sans-serif}
 #cadOpeningSwap b{margin-right:4px;white-space:nowrap}#cadOpeningSwap button{all:unset;cursor:pointer;padding:5px 8px;border:1px solid #3a4b57;border-radius:8px;display:flex;gap:5px;align-items:center;white-space:nowrap}
 #cadOpeningSwap button:hover{border-color:#9adff3;background:#1d2c36}#cadOpeningSwap button.cur{border-color:#d3b47a;background:#2a2518}#cadOpeningSwap .i{font-size:15px;line-height:1}
 .bl-light #cadOpeningSwap{background:#fff;color:#1e2a33}.bl-light #cadOpeningSwap button{border-color:#cfd8de}`;
