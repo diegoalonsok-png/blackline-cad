@@ -6637,6 +6637,45 @@ function cad3dSlabHolesValid(r){
  var holes=cad3dSlabHoles(r);
  return holes.every(function(p,i){return cad3dPolyValid(p,r)&&holes.slice(0,i).every(function(q){return !cad3dPolyOverlaps(p,q);});});
 }
+// Bounds are in slab-local metres, so edits remain attached to moved/rotated slabs.
+function cad3dSlabCutBounds(p){
+ if(!Array.isArray(p)||p.length<3||p.some(v=>!Array.isArray(v)||v.length!==2||!v.every(Number.isFinite)))return null;
+ var xs=p.map(v=>v[0]),ys=p.map(v=>v[1]),a=Math.min(...xs),b=Math.max(...xs),c=Math.min(...ys),d=Math.max(...ys);
+ return b>a&&d>c?{x:(a+b)/2,y:(c+d)/2,w:b-a,d:d-c}:null;
+}
+function cad3dSlabCutEditPlan(r,index,key,value){
+ var holes=r.slabPolyHoles||[],p=holes[index],q=cad3dSlabCutBounds(p);
+ if(!Number.isInteger(index)||!q||!Number.isFinite(value)||!['x','y','w','d','rotate'].includes(key)||((key==='w'||key==='d')&&value<.02))return null;
+ var angle=key==='rotate'?((value%360)*Math.PI/180):0,co=Math.cos(angle),si=Math.sin(angle);
+ var x=key==='x'?value:q.x,y=key==='y'?value:q.y,sx=key==='w'?value/q.w:1,sy=key==='d'?value/q.d:1;
+ var next=p.map(v=>{var a=(v[0]-q.x)*sx,b=(v[1]-q.y)*sy;return [x+a*co-b*si,y+a*si+b*co];});
+ var result=holes.map((v,i)=>i===index?next:v);
+ return cad3dSlabHolesValid(Object.assign({},r,{slabPolyHoles:result}))?result:null;
+}
+function cad3dSlabCutShapePlan(r,shape,x,y,w,d,angle=0){
+ if(!['rectangle','ellipse','circle'].includes(shape)||![x,y,w,d,angle].every(Number.isFinite)||w<.02||d<.02||(r.slabPolyHoles||[]).length>=32)return null;
+ if(shape==='circle')d=w;
+ var points=shape==='rectangle'?[[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2]]:
+  Array.from({length:96},(_,i)=>[w/2*Math.cos(2*Math.PI*i/96),d/2*Math.sin(2*Math.PI*i/96)]);
+ var a=(angle%360)*Math.PI/180,co=Math.cos(a),si=Math.sin(a);
+ var p=points.map(v=>[x+v[0]*co-v[1]*si,y+v[0]*si+v[1]*co]);
+ var holes=(r.slabPolyHoles||[]).concat([p]);
+ return cad3dSlabHolesValid(Object.assign({},r,{slabPolyHoles:holes}))?holes:null;
+}
+function cad3dSlabCutHTML(r){
+ var fmt=v=>Number(v.toFixed(4)),number=(i,key,label,v)=>'<label>'+label+' <input type="number" step="any" data-slab-cut="'+i+'" data-cut-param="'+key+'" value="'+fmt(v)+'"></label>';
+ var html='<div class="detail"><strong>CORTES PARAMÉTRICOS / SLAB CUTS</strong><small>LOSACORTE / SUBTRACT · coordenadas locales de la losa (m).</small>';
+ (r.slabPolyHoles||[]).forEach((p,i)=>{var q=cad3dSlabCutBounds(p);if(!q)return;
+  html+='<div class="detail"><strong>Corte '+(i+1)+' · '+Math.abs(cad3dPolyArea(p)).toFixed(3)+' m²</strong>'+
+   number(i,'x','Centro X',q.x)+number(i,'y','Centro Y',q.y)+number(i,'w','Ancho envolvente X',q.w)+number(i,'d','Largo envolvente Y',q.d)+number(i,'rotate','Girar (° relativos)',0)+
+   '<button type="button" class="btn" data-remove-slab-poly="'+i+'">Cerrar vano / Remove</button></div>';
+ });
+ return html+'<div class="detail" data-slab-cut-create><strong>Nuevo corte / New cut</strong>'+
+  '<label>Forma <select data-cut-new="shape"><option value="rectangle">Rectangular</option><option value="circle">Circular</option><option value="ellipse">Elíptico / Ellipse</option></select></label>'+
+  '<label>Centro X <input type="number" step="any" data-cut-new="x" value="0"></label><label>Centro Y <input type="number" step="any" data-cut-new="y" value="0"></label>'+
+  '<label>Ancho / diámetro <input type="number" min=".02" step="any" data-cut-new="w" value="1"></label><label>Largo (no aplica al círculo) <input type="number" min=".02" step="any" data-cut-new="d" value="1"></label>'+
+  '<label>Giro (°) <input type="number" step="any" data-cut-new="angle" value="0"></label><button type="button" class="btn" data-add-slab-cut>Perforar / Cut slab</button></div></div>';
+}
 function cad3dCutSlabPolyline(){
  var chosen=records.filter(function(r){return selected.includes(r.id);});
  var slab=chosen.find(r=>r.type==='slab'),profile=chosen.find(r=>r.type==='profile2d');
@@ -8677,7 +8716,7 @@ function renderProps(){
  var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
  '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
- if(r.type==='slab'&&!focus){html+='<div class="detail"><strong>CORTES DE LOSA</strong><p>Dibujá un contorno cerrado y seleccioná los dos objetos. Comando LOSACORTE.</p>'+(r.slabPolyHoles||[]).map(function(p,i){return '<p>Corte '+(i+1)+' · '+Math.abs(cad3dPolyArea(p)).toFixed(2)+' m² <button class="btn" data-remove-slab-poly="'+i+'">Cerrar vano</button></p>';}).join('')+'</div>';}
+ if(r.type==='slab'&&!focus)html+=cad3dSlabCutHTML(r);
  var host=['wall','slab','stair','railing'].includes(r.type);
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
  if(!focus&&r.type==='profile2d')html+='<div class="detail">2D PROFILE: '+escapeHtml(r.name||'Profile')+
@@ -8790,8 +8829,14 @@ function cad3dRailPartsHTML(r){
 }
 function change(e){
  var input=e.target;
- if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param],[data-arch-param],input[data-object-color]'))return;
+ if(!input.matches('input[data-key],input[data-opening],select[data-object-style],select[data-object-layer],select[data-opening-style],[data-opening-param],[data-arch-param],input[data-object-color],input[data-slab-cut]'))return;
  var r=records.find(function(v){return selected.includes(v.id);});if(!r||!editableRecord(r))return;
+ if(input.matches('input[data-slab-cut]')){
+  if(r.type!=='slab'||selected.length!==1)return;
+  var v=input.value.trim()===''?NaN:Number(input.value),holes=cad3dSlabCutEditPlan(r,Number(input.dataset.slabCut),input.dataset.cutParam,v);
+  if(!holes){renderProps();text('Corte inválido: debe quedar dentro de la losa y separado de otros vanos.');return;}
+  cad3dHistoryStart();r.slabPolyHoles=holes;redraw();renderProps();text('Corte paramétrico actualizado · Ctrl+Z deshace');return;
+ }
  if(input.matches('[data-arch-param]')){
   if(!['stair','railing'].includes(r.type))return;
   var key=input.dataset.archParam;
@@ -8930,7 +8975,14 @@ function cad3dFocusObject(id){
 }
 function clickProps(e){
  if(e.target.closest('[data-slab-poly-cut]')){cad3dCutSlabPolyline();return;}
- var cut=e.target.closest('[data-remove-slab-poly]');if(cut){var r=records.find(v=>selected.length===1&&v.id===selected[0]&&v.type==='slab'&&editableRecord(v));var i=Number(cut.dataset.removeSlabPoly);if(r&&r.slabPolyHoles&&Number.isInteger(i)&&i>=0&&i<r.slabPolyHoles.length){r.slabPolyHoles.splice(i,1);redraw();renderProps();text('Corte eliminado · losa regenerada');}return;}
+ var create=e.target.closest('[data-add-slab-cut]');if(create){
+  var host=records.find(v=>selected.length===1&&v.id===selected[0]&&v.type==='slab'&&editableRecord(v)),box=create.closest('[data-slab-cut-create]');if(!host||!box)return;
+  var field=k=>box.querySelector('[data-cut-new="'+k+'"]')?.value??'',num=k=>field(k).trim()===''?NaN:Number(field(k));
+  var holes=cad3dSlabCutShapePlan(host,field('shape'),num('x'),num('y'),num('w'),num('d'),num('angle'));
+  if(!holes){text('Corte inválido: revisá dimensiones, posición y separación de vanos.');return;}
+  cad3dHistoryStart();host.slabPolyHoles=holes;redraw();renderProps();text('Perforación paramétrica pasante creada · Ctrl+Z deshace');return;
+ }
+ var cut=e.target.closest('[data-remove-slab-poly]');if(cut){var r=records.find(v=>selected.length===1&&v.id===selected[0]&&v.type==='slab'&&editableRecord(v));var i=Number(cut.dataset.removeSlabPoly);if(r&&r.slabPolyHoles&&Number.isInteger(i)&&i>=0&&i<r.slabPolyHoles.length){cad3dHistoryStart();r.slabPolyHoles.splice(i,1);redraw();renderProps();text('Corte eliminado · losa regenerada');}return;}
  if(e.target.closest('[data-save-arch-preset]')){
   var component=records.find(function(x){return selected.length===1&&selected[0]===x.id;});
   if(component&&['stair','railing'].includes(component.type))cad3dSaveStairPreset(component);
