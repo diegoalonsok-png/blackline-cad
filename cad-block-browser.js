@@ -51,6 +51,8 @@
  const KEY='cad2d-block-browser';
  let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120,paper:'vintage-blue'};
  try{Object.assign(st,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){}
+ // One-time palette synchronization: both entry points start with the reference blue paper.
+ if(st.paperThemeRevision!==2){st.paper='vintage-blue';st.paperThemeRevision=2;try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
  const css=document.createElement('style');
  css.textContent=`#cadBlockBrowser{position:fixed;z-index:9000;display:flex;flex-direction:column;background:#141b22;border:1px solid #4a6070;border-radius:18px;box-shadow:0 26px 70px #000a;color:#e6eef3;font:13px/1.35 system-ui,-apple-system,Segoe UI,Arial,sans-serif;overflow:hidden;min-width:420px;min-height:300px}
@@ -197,6 +199,9 @@
 #cadBlockBrowser.visual.arq-block-search .card .mt{font-size:11px;line-height:1.35}
 #cadBlockBrowser.visual .card .preview .uploaded-cad-preview{background:transparent;mix-blend-mode:multiply;filter:contrast(1.4);object-fit:contain}
 #cadBlockBrowser.visual .card .preview svg.personal-cad-preview{background:transparent!important}
+#cadBlockBrowser.visual[data-paper-tone=light] .card .preview{isolation:isolate}
+#cadBlockBrowser.visual[data-paper-tone=light] .card .preview img{background:transparent;mix-blend-mode:multiply}
+#cadBlockBrowser.visual[data-paper-tone=dark] .card .preview .uploaded-cad-preview{mix-blend-mode:screen;filter:invert(1) contrast(1.4)}
 #cadBlockBrowser.visual.web-reference .web-card .plan-preview{background:#b7cfdc;border-color:#c8bca8;isolation:isolate}
 #cadBlockBrowser.visual.web-reference .web-card .plan-preview img{background:transparent;mix-blend-mode:multiply}
 
@@ -429,6 +434,7 @@
   const visual=commandGallery||st.view==='visual'||st.view==='olymp3'||st.view==='imported';
   const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
   el.style.setProperty('--paper-bg',paper.bg);
+  el.dataset.paperTone=['blue','black'].includes(paper.id)?'dark':'light';
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
