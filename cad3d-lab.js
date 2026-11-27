@@ -4855,14 +4855,51 @@ function cad3dInitSemanticRender(panel){
  '<button class="btn" type="button" data-semantic-learn>Aprender mis ajustes</button>'+
  '<button class="btn" type="button" data-semantic-export>Exportar aprendizaje JSON</button>'+
  '<button class="btn" type="button" data-semantic-import>Importar aprendizaje</button>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-semantic-auto checked> Práctica automática en segundo plano</label>'+
+ '<button class="btn" type="button" data-semantic-practice>Practicar ahora</button>'+
+ '<output data-semantic-practice-status role="status" aria-live="polite" style="flex:1 1 100%"></output>'+
  '<input type="file" accept=".json,application/json" data-semantic-file hidden>'+
  '<output data-semantic-status role="status" aria-live="polite" style="flex:1 1 100%"></output>';
  panel.querySelector('.cad3dSketchCaptureActions').before(section);
  var key='blackline-semantic-render-training-v1',data={version:1,examples:[]},status=section.querySelector('[data-semantic-status]'),prompt=section.querySelector('[data-semantic-prompt]'),file=section.querySelector('[data-semantic-file]');
  function message(s){status.textContent=s;}
- function save(next){next=ai.validate(next);localStorage.setItem(key,JSON.stringify(next));data=next;}
+ function save(next){next=ai.validate(next);localStorage.setItem(key,JSON.stringify(next));data=next;resetPractice();schedulePractice();}
  try{var saved=localStorage.getItem(key);if(saved)data=ai.validate(JSON.parse(saved));}catch(e){message('No se pudo recuperar el entrenamiento guardado: '+e.message);}
  if(!status.textContent)message(data.examples.length+' ejemplos locales · sin clave ni servicio externo. Ajustá el render y enseñale tus preferencias.');
+ var auto=section.querySelector('[data-semantic-auto]'),practiceStatus=section.querySelector('[data-semantic-practice-status]'),worker=null,jobTimer=null,timeout=null,round=0,revision=0,calibration=ai.calibration(),lastScene=null,lastPrompt='',calKey=key+'-calibration';
+ var fingerprint=()=>JSON.stringify(data);
+ try{var savedCal=JSON.parse(localStorage.getItem(calKey)||'null');if(savedCal?.dataset===fingerprint()){calibration=ai.calibration(savedCal.calibration);round=Math.max(0,Math.min(3,Number(savedCal.round)||0));}}catch(e){}
+ function stopPractice(){clearTimeout(jobTimer);clearTimeout(timeout);jobTimer=null;timeout=null;if(worker){worker.terminate();worker=null;}}
+ function resetPractice(){revision++;stopPractice();round=0;calibration=ai.calibration();}
+ function schedulePractice(){clearTimeout(jobTimer);if(!auto.checked||panel.hidden||document.hidden||round>=3||worker)return;jobTimer=setTimeout(()=>runPractice(false),12000);}
+ function runPractice(manual){
+  if(worker||panel.hidden||document.hidden||(!manual&&(!auto.checked||round>=3)))return;
+  var ticket=revision;practiceStatus.textContent='Práctica local · evaluando parámetros y renders pequeños…';
+  try{
+   worker=new Worker(new URL('assets/cad3d-semantic-practice-worker.js',document.baseURI));
+   var currentWorker=worker;
+   function finish(){if(worker===currentWorker)stopPractice();}
+   worker.onmessage=function(ev){if(ticket!==revision||worker!==currentWorker)return;var m=ev.data;finish();if(!m.ok){practiceStatus.textContent='Práctica descartada: '+m.error;return;}
+    try{var r=m.result;calibration=ai.calibration(r.calibration);round++;
+     try{localStorage.setItem(calKey,JSON.stringify({dataset:fingerprint(),calibration,round}));}catch(e){}
+     var result=r.reason==='insufficient'?'faltan correcciones de 8 instrucciones distintas para calibrar':r.accepted?'error de parámetros '+r.before.toFixed(5)+' → '+r.after.toFixed(5):'se conserva la calibración anterior';
+     practiceStatus.textContent='Pasada '+round+' · '+m.checks.length+' renders de control válidos · '+result+'.';schedulePractice();
+    }catch(e){practiceStatus.textContent='Resultado descartado: '+e.message;}
+   };
+   worker.onerror=function(){finish();practiceStatus.textContent='No se pudo iniciar la práctica local.';};
+   timeout=setTimeout(()=>{finish();practiceStatus.textContent='Práctica detenida por límite de tiempo (20 s).';},20000);
+   worker.postMessage({dataset:data,calibration,pass:round,scene:lastScene,prompt:lastPrompt});
+  }catch(e){stopPractice();practiceStatus.textContent='Práctica no disponible: '+e.message;}
+ }
+ auto.addEventListener('change',()=>{if(auto.checked)schedulePractice();else stopPractice();});
+ section.querySelector('[data-semantic-practice]').addEventListener('click',()=>runPractice(true));
+ new MutationObserver(()=>{if(panel.hidden)stopPractice();else schedulePractice();}).observe(panel,{attributes:true,attributeFilter:['hidden']});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPractice();else schedulePractice();});
+ function rememberPracticeScene(){
+  var gb=cad3dStudioGBuffer;if(!gb)return;var f=Math.min(1,120/gb.w,100/gb.h),small=engine.resample(gb,Math.max(1,Math.round(gb.w*f)),Math.max(1,Math.round(gb.h*f)));
+  lastScene={w:small.w,h:small.h,id:small.id,depth:small.depth,normal:small.normal,light:small.light,lightFree:small.lightFree,materials:small.materials,camera:small.camera,up:small.up,cut:small.cut,segments:(small.segments||[]).slice(0,300)};lastPrompt=prompt.value;
+  round=0;schedulePractice();
+ }
  var mapping={color:'studioColor',density:'studioDensity',shadow:'studioShadow',grain:'studioGrain',lineWeight:'studioLineWeight',extension:'studioExtension',jitter:'studioJitter',depthCue:'studioDepthCue',dirt:'studioDirt'};
  function apply(pred){
   var selector=panel.querySelector('[data-sketch-preset]');selector.value='studio:'+pred.style;
@@ -4877,7 +4914,7 @@ function cad3dInitSemanticRender(panel){
   if(!prompt.value.trim())return message('Escribí una intención artística.');
   try{
    if(!cad3dStudioGBuffer){cad3dSketchCapture();if(!cad3dStudioGBuffer)return message('Abrí una perspectiva 3D válida; se necesita el búfer geométrico.');}
-   var pred=ai.predict(prompt.value,ai.scene(cad3dStudioGBuffer),cad3dStudioOptions(panel).style,data);apply(pred);
+   var pred=ai.predict(prompt.value,ai.scene(cad3dStudioGBuffer),cad3dStudioOptions(panel).style,data,calibration);apply(pred);rememberPracticeScene();
    message('Estilo '+pred.style+' · '+pred.similar+' ejemplos similares de '+pred.examples+' · geometría sin deformación.');
   }catch(e){message('No se pudo generar: '+e.message);}
  });
