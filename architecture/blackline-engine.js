@@ -777,6 +777,49 @@ function doubleSuiteCorridor(plan,passage){
 // Public sanitary batteries: explicit quantities and independent private cabins.
 // Classroom seating is a counted grid of native library blocks, not a raster.
 // Counted auditorium layouts with native walls, openings and furniture blocks.
+// Restaurant dining rooms: exact table and seat quantities, with full furniture envelopes.
+function restaurantInstruction(raw){
+ const s=normalize(raw).trim().replace(/[.!]$/,'');
+ const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:restaurantes?|restoran(?:es)?|restaurant(?:s)?|comedores gastronomicos?|salones gastronomicos?)\b/);
+ if(!head)return null;
+ let tail=s.slice(head[0].length).trim();
+ if(!/\d/.test(tail))return null;
+ const PU='(mm|cm|metros?|meters?|metres?|mts?|m|centimetros?|milimetros?)?';
+ const dm=tail.match(new RegExp('^(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'\\s*(?:x|×|por|by)\\s*'+N+'\\s*'+PU+'(?=\\s|$)'));
+ if(!dm)throw Error('Indicá ancho × profundidad del salón y cantidad de mesas o personas.');
+ const width=num(dm[1])*unitScale(dm[2]||dm[4]),depth=num(dm[3])*unitScale(dm[4]||dm[2]);
+ tail=tail.slice(dm[0].length).trim();
+ let tables=null,seats=null,per=4,aisle=1.5,gap=.9;const seen=new Set(),opt=label=>new RegExp('^(?:'+label+')\\s*(?:de\\s+|of\\s+)?'+N+'\\s*'+PU+'(?=\\s|$)');
+ while(tail){
+  tail=tail.replace(/^(?:con|para|y|with|for|and)\s+/,'');
+  let m,key;
+  if((m=tail.match(/^(\d+)\s+(?:mesas?|tables?)(?:\s+(?:de|for|of)\s+(\d+)(?:\s+(?:personas?|plazas?|comensales?|seats?|people))?)?(?=\s|$)/))){key='tables';tables=Number(m[1]);if(m[2])per=Number(m[2]);}
+  else if((m=tail.match(/^(\d+)\s+(?:personas?|comensales?|plazas?|seats?|people)(?=\s|$)/))){key='seats';seats=Number(m[1]);}
+  else if((m=tail.match(opt('pasillo(?: central)?|circulacion|aisle')))){key='aisle';aisle=num(m[1])*unitScale(m[2]);}
+  else if((m=tail.match(opt('separacion(?: entre mesas)?|table gap|gap')))){key='gap';gap=num(m[1])*unitScale(m[2]);}
+  else throw Error('Opción de restaurante no soportada: '+tail);
+  if(seen.has(key))throw Error('Opción de restaurante repetida: '+key);seen.add(key);tail=tail.slice(m[0].length).trim();
+ }
+ if(![2,4,6,8].includes(per))throw Error('Mesas disponibles de 2, 4, 6 u 8 plazas.');
+ if(tables===null&&seats!==null&&seats%per===0)tables=seats/per;
+ if(!Number.isInteger(tables)||tables<1||tables>60||seats!==null&&seats!==tables*per||aisle<1.2||aisle>3||gap<.6||gap>2)throw Error('Indicá 1–60 mesas o una cantidad exacta de personas divisible por las plazas de cada mesa; pasillo 1,20–3 m.');
+ return {kind:'dining',count:1,width,depth,wall:.15,door:1.2,window:1.2,fixtures:[],tables,seats:tables*per,per,aisle,gap,assumptions:[]};
+}
+function solveRestaurant(spec){
+ const {width:w,depth:d,tables,per,aisle,gap}=spec;
+ const tw={2:.8,4:1.25,6:1.85,8:2.45}[per],td=1.8,side=.6,entry=1.5,rear=.6,half=(w-aisle)/2;
+ const cols=Math.max(0,Math.floor((half-side-tw+1e-8)/(tw+gap))+1),rows=Math.max(0,Math.floor((d-entry-rear-td+1e-8)/(td+gap))+1);
+ if(!cols||rows*cols*2<tables)throw Error('No entran todas las mesas con la circulación y separación solicitadas. Aumentá el salón o reducí la cantidad.');
+ const plan=solve(spec);plan.brief={...spec,restaurantGrid:true};plan.virtualDimensions.forEach(v=>v.editable=false);
+ const room=plan.rooms[0],[X,Y]=room.clearBounds;let placed=0;
+ for(let j=0;j<rows&&placed<tables;j++)for(let k=0;k<2*cols&&placed<tables;k++){
+  const x=k<cols?half-tw-k*(tw+gap):w/2+aisle/2+(k-cols)*(tw+gap),y=entry+j*(td+gap);
+  plan.blocks.push({catalogId:'mob-rest-mesa'+per,role:'restaurantTable',point:[X+x,Y+y],rotation:0,scale:1,layer:'FURNITURE',envelope:[X+x,Y+y,tw,td],nominalSize:[tw,td],seatCount:per});placed++;
+ }
+ room.tableCount=tables;room.seatCount=spec.seats;room.centralAisle=aisle;
+ plan.assumptions.push(tables+' mesas de '+per+' plazas: '+spec.seats+' comensales; pasillo central '+aisle+' m.','Salón gastronómico preliminar: no incluye cocina, sanitarios ni verificación normativa, evacuación o accesibilidad.');
+ return plan;
+}
 function auditoriumInstruction(raw){
  const s=normalize(raw).trim().replace(/[.!]$/,'');
  const head=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:auditorios?|teatros?|salas? de cine|cines?|auditoriums?|theaters?|theatres?|cinemas?)\b/);
@@ -946,6 +989,7 @@ function run(raw){
  const battery=sanitaryBatteryInstruction(raw);if(battery)return collectiveCabins(battery);
  const classroom=classroomInstruction(raw);if(classroom)return solveClassroom(classroom);
  const auditorium=auditoriumInstruction(raw);if(auditorium)return solveAuditorium(auditorium);
+ const restaurant=restaurantInstruction(raw);if(restaurant)return solveRestaurant(restaurant);
  const {text,corrections}=correctText(normalizeRoomSet(internationalText(raw)));
  if(/\b(?:ultima|ultimo|primera|primero|anterior|existente|seleccionad[oa])\s+(?:habitacion(?:es)?|dormitorio|bano|cocina|puerta|ventana|muro)\b/.test(text))throw Error('Edición de un ambiente existente: todavía no hay contexto de selección en ARQASSIST. No se insertará otro ambiente por error.');
  const industrial=normalize(raw).match(/^(?:(?:generar|crear|dibujar)\s+)?cocina\s+(?:industrial|gastronomica|profesional)\s+(?:de\s+)?(\d+(?:[.,]\d+)?)\s*(?:x|×|por)\s*(\d+(?:[.,]\d+)?)(?:\s*m)?(?:\s+con\s+(.+))?$/);
