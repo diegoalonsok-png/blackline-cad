@@ -1610,7 +1610,13 @@ const ARCH_STYLES={
   {id:'modern-steel-glass-door',name:'Modern steel glazed door',w:1.10,h:2.30,sill:0},
   {id:'art-deco-door',name:'Art Deco geometric door',w:1.00,h:2.25,sill:0},
   {id:'barn-sliding-door',name:'Barn sliding door',w:1.10,h:2.20,sill:0},
-  {id:'arched-style-entrance',name:'Arched-style entrance · decorative glazing',w:1.20,h:2.50,sill:0}
+  {id:'arched-style-entrance',name:'Arched-style entrance · decorative glazing',w:1.20,h:2.50,sill:0},
+  {id:'four-sliding-glazed-door',name:'Corrediza vidriada 4 hojas / 4-panel sliding · 400 cm',w:4,h:2.40,sill:0},
+  {id:'six-sliding-glazed-door',name:'Corrediza vidriada 6 hojas / 6-panel sliding · 600 cm',w:6,h:2.60,sill:0},
+  {id:'single-glazed-door',name:'Puerta vidriada / glazed single · 100 cm',w:1,h:2.20,sill:0},
+  {id:'double-glazed-door',name:'Doble vidriada / glazed double · 180 cm',w:1.80,h:2.30,sill:0},
+  {id:'pivot-glazed-door',name:'Pivotante vidriada / glazed pivot · 140 cm',w:1.40,h:2.40,sill:0},
+  {id:'four-fixed-glazed-door',name:'Paño fijo vidriado / fixed glazed screen · 400 cm',w:4,h:2.40,sill:0}
  ],
  window:[
   {id:'fixed',name:'Fixed glazing',w:1.20,h:1.20,sill:.90},
@@ -1646,7 +1652,13 @@ const ARCH_STYLES={
   {id:'industrial-steel-grid',name:'Industrial steel · 4 × 4 grid',w:2.00,h:1.70,sill:.65},
   {id:'japanese-shoji-grid',name:'Japanese grid · 4 × 5',w:1.80,h:1.70,sill:.50},
   {id:'modern-ribbon-grid',name:'Contemporary horizontal mullions',w:2.60,h:.90,sill:1.15},
-  {id:'mediterranean-arched-style',name:'Mediterranean · decorative arch tracery',w:1.20,h:1.65,sill:.85}
+  {id:'mediterranean-arched-style',name:'Mediterranean · decorative arch tracery',w:1.20,h:1.65,sill:.85},
+  {id:'four-sliding-window',name:'Corrediza 4 hojas / 4-panel sliding · 320 cm',w:3.20,h:1.50,sill:.90},
+  {id:'six-sliding-window',name:'Corrediza 6 hojas / 6-panel sliding · 480 cm',w:4.80,h:1.60,sill:.80},
+  {id:'four-fixed-window',name:'Paño fijo 4 módulos / 4-panel fixed · 400 cm',w:4,h:2.40,sill:0},
+  {id:'six-fixed-window',name:'Paño fijo 6 módulos / 6-panel fixed · 600 cm',w:6,h:2.60,sill:0},
+  {id:'double-awning-window',name:'Proyectante doble / double awning · 160 cm',w:1.60,h:.75,sill:1.40},
+  {id:'double-tilt-turn-window',name:'Oscilobatiente doble / double tilt-turn · 160 cm',w:1.60,h:1.40,sill:.85}
  ],
  slab:[
   {id:'floor-20',name:'Concrete 20 cm',h:.20,pitch:0,slabKind:'floor'},
@@ -1701,9 +1713,9 @@ const ARCH_STYLES={
    Original implementation; no third-party source code. */
 function cad3DOpeningDefaults(kind,styleId){
  var id=String(styleId||'').toLowerCase(),triple=/triple|three|3-leaf/.test(id),
-  double=/double|two-leaf|french|terrace/.test(id),leaves=triple?3:double?2:1;
+  double=/double|two-leaf|french|terrace/.test(id),leaves=/six|6-leaf/.test(id)&&!/pane/.test(id)?6:/four|4-leaf/.test(id)?4:triple?3:double?2:1;
  if(kind==='door'){
-  return {operation:/garage/.test(id)?'sectional':/sliding|pocket/.test(id)?'sliding':
+  return {operation:/fixed/.test(id)?'fixed':/garage/.test(id)?'sectional':/sliding|pocket/.test(id)?'sliding':
    /fold/.test(id)?'folding':/pivot/.test(id)?'pivot':'hinged',
    leaves:leaves,hinge:/right/.test(id)?'right':'left',swing:'in',openAngle:0,openPercent:0};
  }
@@ -1714,10 +1726,10 @@ function cad3DOpeningDefaults(kind,styleId){
 }
 function cad3DOpeningConfig(o){
  var d=cad3DOpeningDefaults(o.kind,o.styleId);
- var permitted=o.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+ var permitted=o.kind==='door'?['fixed','hinged','sliding','folding','pivot','sectional']:
   ['fixed','casement','sliding','awning','hopper','tilt-turn'];
  var op=permitted.includes(o.operation)?o.operation:d.operation;
- return {operation:op,leaves:clamp(Math.round(Number(o.leaves)||d.leaves),1,3),
+ return {operation:op,leaves:clamp(Math.round(Number(o.leaves)||d.leaves),1,6),
   hinge:['left','right'].includes(o.hinge)?o.hinge:d.hinge,
   swing:['in','out'].includes(o.swing)?o.swing:d.swing,
   openAngle:clamp(Number(o.openAngle)||0,0,120),
@@ -1741,9 +1753,11 @@ function cad3DLeafMotion(config,i,count,x0,x1,z,h){
   m.angle=(config.operation==='awning'?-1:1)*
    (config.swing==='out'?1:-1)*config.openAngle*Math.PI/180;
  }else if(sliding){
-  // Each sliding leaf moves into the adjacent track, exposing part of the opening.
-  m.shiftX=(i%2===0?1:-1)*config.openPercent/100*(x1-x0);
-  m.shiftY=(i%2===0?1:-1)*.03;
+  // Stack leaves onto adjacent tracks, rather than swapping panels at 100%.
+  var group=count>=4?Math.ceil(count/2):count,first=count>=4&&i>=group?group:0;
+  var last=first?count-1:group-1,stack=count>=4?(first?last:0):(right?last:0);
+  m.shiftX=(count===1?(right?1:-1):stack-i)*config.openPercent/100*(x1-x0);
+  m.shiftY=(i-first-(last-first)/2)*.055;
  }else if(sectional){
   m.shiftZ=config.openPercent/100*h;
   m.shiftY=-config.openPercent/100*.08;
@@ -7850,7 +7864,7 @@ function architectureParts(r,part){
   var frame=Math.min(.055,w/4,h/4);
   var cfg=typeof cad3DOpeningConfig==='function'?cad3DOpeningConfig(opening):
    {operation:'fixed',leaves:1,hinge:'left',swing:'in',openAngle:0,openPercent:0};
-  var leaves=Math.max(1,Math.min(3,cfg.leaves||1));
+  var leaves=Math.max(1,Math.min(6,cfg.leaves||1));
   var innerW=Math.max(.06,w-2*frame),leafW=innerW/leaves,leafH=Math.max(.06,h-2*frame);
   var left=o.left+frame,door=opening.kind==='door';
   var color=door?0x88745e:0x528a9b;
@@ -7868,13 +7882,19 @@ function architectureParts(r,part){
    var motion=typeof cad3DLeafMotion==='function'?
     cad3DLeafMotion(cfg,leaf,leaves,x0,x1,z+frame,leafH):null;
    if(door){
-    carpPart(Math.max(.03,leafW-.013),.047,leafH,leafCenter,0,z+frame,color,0,motion);
-    if(/french|terrace|neoclassical|victorian|gothic|colonial|art-deco|glazed|arched-style/.test(opening.styleId||'')){
-     carpPart(Math.max(.04,leafW-.12),.052,leafH*.72,leafCenter,0,z+leafH*.19,0x568ea4,0,motion);
-    }
+    var glazed=/french|terrace|neoclassical|victorian|gothic|art-deco|glazed|arched-style/.test(opening.styleId||'');
+    if(glazed){
+     // Actual transparent pane inside a perimeter leaf: no opaque backing panel.
+     var dw=Math.max(.03,leafW-.013),bar=Math.min(.075,dw*.18,leafH*.15),bottom=Math.min(.18,leafH*.18);
+     carpPart(bar,.055,leafH,leafCenter-dw/2+bar/2,0,z+frame,color,0,motion);
+     carpPart(bar,.055,leafH,leafCenter+dw/2-bar/2,0,z+frame,color,0,motion);
+     carpPart(Math.max(.01,dw-2*bar),.055,bottom,leafCenter,0,z+frame,color,0,motion);
+     carpPart(Math.max(.01,dw-2*bar),.055,bar,leafCenter,0,z+frame+leafH-bar,color,0,motion);
+     carpPart(Math.max(.01,dw-2*bar),.014,Math.max(.01,leafH-bottom-bar),leafCenter,0,z+frame+bottom,0x4d8297,0,motion);
+    }else carpPart(Math.max(.03,leafW-.013),.047,leafH,leafCenter,0,z+frame,color,0,motion);
     cad3DPaneBars(carpPart,opening,true,leafCenter,leafW,z+frame,leafH,motion);
     // A bar on each leaf makes its angle and opening direction legible in 3D.
-    carpPart(.024,.065,.08,leafCenter+(cfg.hinge==='left'?leafW*.30:-leafW*.30),
+    if(cfg.operation!=='fixed')carpPart(.024,.065,.08,leafCenter+(cfg.hinge==='left'?leafW*.30:-leafW*.30),
      -.045,z+leafH*.52,0xc5ccd1,0,motion);
    }else{
     // Per-leaf sash and glazing all inherit the same hinge/sliding transformation.
@@ -8724,7 +8744,7 @@ function renderProps(){
     var fallback={operation:'fixed',leaves:1,hinge:'left',swing:'in',openAngle:0,openPercent:0};
     var cfg=typeof cad3DOpeningConfig==='function'?cad3DOpeningConfig(o):fallback;
     var operations=o.kind==='door'?
-     [['hinged','Batiente / hinged'],['sliding','Corrediza / sliding'],['folding','Plegadiza / folding'],['pivot','Pivotante / pivot'],['sectional','Seccional / garage']]:
+     [['fixed','Fija / fixed'],['hinged','Batiente / hinged'],['sliding','Corrediza / sliding'],['folding','Plegadiza / folding'],['pivot','Pivotante / pivot'],['sectional','Seccional / garage']]:
      [['fixed','Fija / fixed'],['casement','Batiente / casement'],['sliding','Corrediza / sliding'],['awning','Basculante superior / awning'],
       ['hopper','Basculante inferior / hopper'],['tilt-turn','Oscilobatiente / tilt-turn']];
     function optValue(key,v){return String(cfg[key])===String(v)?' selected':'';}
@@ -8732,7 +8752,7 @@ function renderProps(){
      '<label>Opening system <select data-opening-param="'+o.id+'" data-param="operation">'+
      operations.map(function(a){return '<option value="'+a[0]+'"'+optValue('operation',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>'+
      '<label>Leaves <select data-opening-param="'+o.id+'" data-param="leaves">'+
-     [1,2,3].map(function(n){return '<option value="'+n+'"'+optValue('leaves',n)+'>'+n+' leaf'+(n===1?'':'s')+'</option>';}).join('')+'</select></label>'+
+     [1,2,3,4,5,6].map(function(n){return '<option value="'+n+'"'+optValue('leaves',n)+'>'+n+' leaf'+(n===1?'':'s')+'</option>';}).join('')+'</select></label>'+
      '<label>Hinge side <select data-opening-param="'+o.id+'" data-param="hinge">'+
      [['left','Left'],['right','Right']].map(function(a){return '<option value="'+a[0]+'"'+optValue('hinge',a[0])+'>'+a[1]+'</option>';}).join('')+'</select></label>'+
      '<label>Opening direction <select data-opening-param="'+o.id+'" data-param="swing">'+
@@ -8810,11 +8830,11 @@ function change(e){
   var key=input.dataset.param,allowed=['operation','leaves','hinge','swing','openAngle','openPercent'];
   if(!allowed.includes(key))return;
   var v=(key==='leaves'||key==='openAngle'||key==='openPercent')?Number(input.value):input.value;
-  if(key==='leaves')v=clamp(Math.round(v),1,3);
+  if(key==='leaves')v=clamp(Math.round(v),1,6);
   if(key==='openAngle')v=clamp(v,0,120);
   if(key==='openPercent')v=clamp(v,0,100);
   if(key==='operation'){
-   var permitted=op.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+   var permitted=op.kind==='door'?['fixed','hinged','sliding','folding','pivot','sectional']:
     ['fixed','casement','sliding','awning','hopper','tilt-turn'];
    if(!permitted.includes(v))return;
   }
@@ -10273,9 +10293,9 @@ async function readJSON(e){
      if(v.kind==='door'||v.kind==='window'){
       var defs=cad3DOpeningDefaults(v.kind,v.styleId);
       Object.assign(op,defs);
-      op.operation=(v.kind==='door'?['hinged','sliding','folding','pivot','sectional']:
+      op.operation=(v.kind==='door'?['fixed','hinged','sliding','folding','pivot','sectional']:
        ['fixed','casement','sliding','awning','hopper','tilt-turn']).includes(v.operation)?v.operation:defs.operation;
-      op.leaves=clamp(Math.round(finite(v.leaves,defs.leaves)),1,3);
+      op.leaves=clamp(Math.round(finite(v.leaves,defs.leaves)),1,6);
       op.hinge=v.hinge==='right'?'right':'left';
       op.swing=v.swing==='out'?'out':'in';
       op.openAngle=clamp(finite(v.openAngle,0),0,120);
