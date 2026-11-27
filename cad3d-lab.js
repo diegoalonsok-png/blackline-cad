@@ -8684,7 +8684,9 @@ function cad3dSectionCut(){
  meshes.forEach(function(o){
   var mats=Array.isArray(o.material)?o.material:[o.material];
   if(mats.every(function(m){return m&&m.transparent&&m.opacity<.05;}))return;
-  var glass=!!(o.userData&&o.userData.cadGlass),pos=o.geometry.attributes.position,idx=o.geometry.index,tri=idx?idx.count/3:pos.count/3;
+  var glass=!!(o.userData&&o.userData.cadGlass),openKey=null;
+  for(var pa=o;pa&&pa!==modelRoot;pa=pa.parent)if(pa.userData&&pa.userData.openingId!=null){openKey=String(pa.userData.owner??'')+':'+pa.userData.openingId;break;}
+  var pos=o.geometry.attributes.position,idx=o.geometry.index,tri=idx?idx.count/3:pos.count/3;
   var copies=o.isInstancedMesh?o.count:1,segs=[];
   for(var k=0;k<copies;k++){
    if(used>budget)break;
@@ -8701,7 +8703,7 @@ function cad3dSectionCut(){
     if(pts.length===2&&Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1])>1e-7)segs.push(pts);
    }
   }
-  if(segs.length)out.push({glass:glass,segs:segs});
+  if(segs.length)out.push({glass:glass,opening:openKey,segs:segs});
  });
  return {axis:axis,offset:off,parts:out,truncated:used>budget};
 }
@@ -8744,18 +8746,28 @@ function cad3dSectionTo2D(){
   closed.forEach(function(c){c.area=Math.abs(cad3dPolyArea(c.pts));});
   closed.sort(function(a,b){return b.area-a.area;});
   closed.forEach(function(c,i){if(c.parent)return;c.holes=[];for(var j=i+1;j<closed.length;j++){var h=closed[j];if(!h.parent&&cad3dPointInPoly(h.pts[0],c.pts)){h.parent=c;c.holes.push(h.pts);}}});
-  chains.forEach(function(c){loops.push({pts:c.pts,closed:c.closed,kind:part.glass?'glass':'cut',fill:!part.glass&&c.closed&&!c.parent,holes:c.holes||[]});});
+  chains.forEach(function(c){loops.push({pts:c.pts,closed:c.closed,kind:part.glass?'glass':'cut',fill:!part.glass&&c.closed&&!c.parent,holes:c.holes||[],opening:part.opening});});
  });
+ // Aberturas cortadas (puertas, ventanas): extensión de marco + hoja + vidrio, para acotar antepecho y altura.
+ var openMap=new Map();
+ loops.forEach(function(l){if(!l.opening)return;var b=openMap.get(l.opening)||{h0:Infinity,h1:-Infinity,z0:Infinity,z1:-Infinity};
+  l.pts.forEach(function(q){b.h0=Math.min(b.h0,q[0]);b.h1=Math.max(b.h1,q[0]);b.z0=Math.min(b.z0,q[1]);b.z1=Math.max(b.z1,q[1]);});openMap.set(l.opening,b);});
+ var openings=[...openMap.values()].filter(function(b){return b.z1-b.z0>.05;}).slice(0,200)
+  .map(function(b){return {h0:b.h0,h1:b.h1,z0:Math.round(b.z0*100)/100,z1:Math.round(b.z1*100)/100};});
+
  if(!loops.length)return text('El plano de sección no corta ningún sólido visible: movelo o usá «Situar en el modelo»');
  // Niveles: bordes horizontales del corte (pisos, losas, techos).
  var levelMap=new Map();
- if(cut.axis!=='z')loops.forEach(function(l){if(l.kind!=='cut'||!l.closed)return;for(var i=0;i<l.pts.length;i++){var a=l.pts[i],b=l.pts[(i+1)%l.pts.length],len=Math.abs(b[0]-a[0]);
+ if(cut.axis!=='z')loops.forEach(function(l){if(l.kind!=='cut'||!l.closed||l.opening)return;for(var i=0;i<l.pts.length;i++){var a=l.pts[i],b=l.pts[(i+1)%l.pts.length],len=Math.abs(b[0]-a[0]);
   if(Math.abs(b[1]-a[1])<1e-4&&len>=.05){var z=Math.round(a[1]*100)/100;levelMap.set(z,(levelMap.get(z)||0)+len);}}});
  var levels=[...levelMap].filter(function(e){return e[1]>=.1;}).map(function(e){return e[0];}).sort(function(a,b){return a-b;});
  levels=levels.filter(function(z,i){return i===0||z-levels[i-1]>.03;}).slice(0,16);
+ // Los bordes de antepecho y dintel pertenecen a las aberturas: no son niveles del edificio.
+ levels=levels.filter(function(z,i,all){return i===0||i===all.length-1||!openings.some(function(o){return Math.abs(z-o.z0)<.04||Math.abs(z-o.z1)<.04;});});
  var name=cut.axis==='x'?'CORTE X = ':cut.axis==='y'?'CORTE Y = ':'PLANTA DE CORTE Z = ';
  var title=name+cut.offset.toFixed(2).replace('.',',')+' m';
- var res=bridge.addSection({title:title,axis:cut.axis,loops:loops,levels:levels});
+ loops.forEach(function(l){delete l.opening;});
+ var res=bridge.addSection({title:title,axis:cut.axis,loops:loops,levels:levels,openings:cut.axis==='z'?[]:openings});
  text((res&&res.count?res.count+' objetos 2D · ':'')+title+' enviado al plano 2D (polilíneas editables, relleno y cotas de nivel)'+(cut.truncated?' · modelo muy grande: corte parcial':''));
  return res;
 }

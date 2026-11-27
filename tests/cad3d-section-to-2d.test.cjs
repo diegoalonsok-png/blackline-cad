@@ -17,3 +17,8 @@ test('section panel sends to 2D through the bridge; 2D receives plain editable e
  for(const l of ['A-CORTE','A-CORTE-RELLENO','A-CORTE-VIDRIO','A-CORTE-COTAS'])assert.ok(html.includes("'"+l+"'"),l);
  assert.match(html,/mode:'vertical',a:Q\(xr,levels\[i\]\)/);
 });
+test('openings are dimensioned on their own and never become building levels',()=>{
+ assert.match(src,/openKey=String\(pa\.userData\.owner/);assert.match(src,/openings:cut\.axis==='z'\?\[\]:openings/);
+ assert.match(src,/l\.kind!=='cut'\|\|!l\.closed\|\|l\.opening/);
+ assert.match(html,/Aberturas: antepecho y altura de vano/);
+});
