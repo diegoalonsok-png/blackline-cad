@@ -1372,7 +1372,7 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
  if(!typology&&!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
  if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
  const epoch=++arqCommandEpoch;
- const response=await fetch(new URL(id+'.json?v=20261127-private-sanitary-v3',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ const response=await fetch(new URL(id+'.json?v=20261127-sanitary-right-wall',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
  let plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
  if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
  if(typology){const checked=arqLeftSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta IA pendiente de revisión: '+checked.issues.join(' · '));plan=checked.plan;}
