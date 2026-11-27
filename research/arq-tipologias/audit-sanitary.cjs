@@ -19,7 +19,10 @@ function run(folder,typology){
    const file=path.join(dir,code+'.json'),original=JSON.parse(fs.readFileSync(file,'utf8')),result=check(original,lib);
    if(result.issues.length){report.review++;report.rows.push({code,status:'review',issues:result.issues});continue}
    assert.deepEqual(result.plan.walls,original.walls);assert.deepEqual(result.plan.openings,original.openings);assert.deepEqual(result.plan.rooms,original.rooms);
-   assert.deepEqual(result.plan.blocks.map(b=>b.catalogId),original.blocks.map(b=>b.catalogId));
+   assert.deepEqual(result.plan.blocks.slice(0,original.blocks.length).map(b=>b.catalogId),original.blocks.map(b=>b.catalogId));
+   const additions=result.plan.blocks.slice(original.blocks.length);
+   assert.ok(additions.every(b=>b.catalogId==='san-bidet'));
+   assert.equal(additions.length,result.moved.filter(x=>x==='added:san-bidet').length);
    const second=check(result.plan,lib);
    if(second.issues.length){report.review++;report.rows.push({code,status:'review',issues:second.issues});continue}
    const changed=result.moved.length>0;report.accepted++;
