@@ -1166,7 +1166,9 @@ css+=`
 #cad3dLab .cad3dObjectTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:move;touch-action:none;flex:none}
 #cad3dLab .cad3dObjectTitle strong{font-size:13px}
 #cad3dLab .block3DPanel .cad3dBlockGrid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
-#cad3dLab .block3DPanel .cad3dBlockPreview{height:105px;min-height:105px;background:#f1eee7}
+#cad3dLab .block3DPanel .cad3dBlockPreview{height:125px;min-height:125px;background:#f1eee7}
+#cad3dLab .block3DPanel .cad3dBlockFilters{flex-wrap:wrap;overflow-x:visible;max-height:120px;overflow-y:auto}
+#cad3dLab .block3DPanel .cad3dBlockGrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
 #cad3dLab .block3DPanel .cad3dBlockPreview img{width:100%;height:100%;object-fit:contain}
 #cad3dLab .block3DPanel .cad3dBlockTabs{grid-template-columns:repeat(2,minmax(0,1fr))}
 #cad3dLab .side.sidebar.cad3dArchDockCandidate{
@@ -2409,6 +2411,109 @@ var CAD3D_COMPONENTS={
   C[e.id]={name:e.name,group:e.group,w:e.w,d:.05,h:e.h,parts:[],cutout:e.kind,mount:e.mount,entourage:true};
  });
 })();
+
+/* CAD3D_DETAIL_FURNITURE_V1 — original metric furniture. Legacy IDs remain
+   loadable but are hidden from the catalogue when a detailed successor exists. */
+(function(){
+ var C=CAD3D_COMPONENTS, oak=0xa9825d, walnut=0x70523e, cream=0xe8e1d5, linen=0xc2b6a2, charcoal=0x3f4546, sage=0x7b8b80, brass=0xb69a68;
+ function p(x,y,z,w,d,h,c,r){return [x,y,z,w,d,h,c,r||0];}
+ function feet(w,d,h,c){return [-1,1].flatMap(x=>[-1,1].map(y=>p(x*(w/2-.09),y*(d/2-.09),0,.065,.065,h,c,.012)));}
+ function add(id,name,group,w,d,h,parts,old){C[id]={name,group,w,d,h,parts,detail:true};if(old&&C[old])C[old].superseded=true;}
+ function bed(id,name,w,d,h,c,old){
+  var head=.13, top=.52, mw=w-.08, md=d-.20, my=-.04, parts=feet(w,d,.12,charcoal);
+  parts.push(p(0,0,.12,w,d,.22,c,.035),p(0,my,.34,mw,md,.19,cream,.045),
+   p(0,d/2-head/2,.14,w,head,h-.14,c,.045),
+   p(0,d/2-head-.028,.48,w-.12,.06,h-.52,linen,.027),
+   p(0,-d*.17,top,mw-.025,d*.59,.065,sage,.025),
+   p(0,-d*.43,top+.043,mw-.025,d*.085,.035,linen,.014));
+  var count=w>1.2?2:1;
+  for(var i=0;i<count;i++)parts.push(p((i-(count-1)/2)*mw/count,d*.29,top+.005,mw/count-.095,.37,.13,cream,.058));
+  add(id,name,'Dormitorios',w,d,h,parts,old);
+ }
+ function chest(id,name,w,d,h,n,c,old){
+  var base=.10, t=.038, gap=.008, fh=(h-base-t*2-gap*(n+1))/n, parts=feet(w,d,base,charcoal);
+  parts.push(p(0,0,base,w,d-.04,h-base-t,c,.012),p(0,0,h-t,w,d,t,c,.012));
+  for(var i=0;i<n;i++){var z=base+t+gap+i*(fh+gap);
+   parts.push(p(0,-d/2+.012,z,w-.045,.024,fh,linen,.006),
+   p(0,-d/2+.006-.015,z+fh*.58,w*.33,.03,.021,brass,.009));}
+  add(id,name,'Dormitorios',w,d,h,parts,old);
+ }
+ function wardrobe(id,name,w,d,h,n,c,old){
+  var parts=[p(0,0,0,w-.10,d-.06,.07,charcoal,.005),p(0,.018,.07,w,d-.06,h-.07,c,.012)];
+  for(var i=0;i<n;i++){var x=(i-(n-1)/2)*w/n, dw=w/n-.013;parts.push(p(x,-d/2+.018,.085,dw,.036,h-.11,cream,.009),p(x+dw*.35,-d/2+.003-.014,h*.40,.025,.028,.40,brass,.01));}
+  add(id,name,'Dormitorios',w,d,h,parts,old);
+ }
+ function sofa(id,name,w,d,h,c,n,old){
+  var parts=feet(w,d,.12,charcoal), arm=.16, iw=w-2*arm, seatZ=.35, seatD=d-.23;
+  parts.push(p(0,0,.12,w,d,.25,c,.055),p(0,d/2-.10,.33,w,.20,h-.33,c,.065));
+  [-1,1].forEach(x=>parts.push(p(x*(w/2-arm/2),-.025,.29,arm,d-.05,.40,c,.065)));
+  for(var i=0;i<n;i++){var x=(i-(n-1)/2)*iw/n;parts.push(p(x,-.08,seatZ,iw/n-.018,seatD,.14,c,.055),
+   p(x,d/2-.185,.49,iw/n-.023,.16,h-.51,c,.065));}
+  add(id,name,'Muebles',w,d,h,parts,old);
+ }
+ bed('detail-bed-single','Cama individual · lino y roble',1,2.05,.92,oak,'bedSingle');
+ bed('detail-bed-double','Cama doble · cabecero tapizado',2,2.1,1.04,walnut,'bed');
+ bed('detail-bed-queen','Cama queen · roble natural',1.65,2.1,1.02,oak);
+ chest('detail-nightstand','Mesa de luz · dos cajones',.5,.42,.56,2,oak,'nightstand');
+ chest('detail-dresser','Cómoda · cuatro cajones',1.2,.5,.9,4,walnut,'dresser');
+ chest('detail-nightstand-wide','Mesa de luz · tres cajones',.60,.45,.62,3,walnut);
+ wardrobe('detail-wardrobe','Placard · cuatro puertas',2.4,.65,2.5,4,oak,'wardrobe1');
+ wardrobe('detail-wardrobe-wide','Placard · cinco puertas',3,.65,2.5,5,walnut,'wardrobe2');
+ sofa('detail-sofa-two','Sofá de dos plazas · tapizado',2.1,.9,.9,linen,2,'sofa');
+ sofa('detail-sofa-three','Sofá de tres plazas · tela verde',2.5,.95,.9,sage,3,'sofa2');
+ sofa('detail-sofa-wide','Sofá de cuatro plazas · lino',3.1,1,.9,linen,4,'sofa3');
+ sofa('detail-armchair','Sillón individual · tapizado',1,.95,.9,sage,1,'armchair1');
+ sofa('detail-armchair-wide','Sillón lounge · lino',1.1,.95,.9,linen,1,'armchair2');
+})();
+function cad3dDetailedPartGeometry(p,sx,sy,sz){
+ var w=p[3]*sx,d=p[4]*sy,h=p[5]*sz;
+ var radius=Math.min(p[7]||0,p[3]*.48,p[4]*.48,p[5]*.48);
+ if(!radius)return boxGeom(w,d,h);
+ // Rounded cuboid, sampled near the edges; each part remains actual mesh geometry.
+ var a=[p[3]/2,p[4]/2,p[5]/2],g=new T.BoxGeometry(p[3],p[4],p[5],8,8,8),pos=g.attributes.position,n=g.attributes.normal;
+ var sample=[-1,-.75,-.5,-.25,0,.25,.5,.75,1];
+ function remap(v,half){var i=Math.max(0,Math.min(8,Math.round((v/half+1)*4))),j=i-4;
+  if(j===0)return 0;if(Math.abs(j)===1)return Math.sign(j)*(half-radius);
+  return Math.sign(j)*(half-radius+radius*(Math.abs(j)-1)/3);}
+ for(var i=0;i<pos.count;i++){
+  var v=[remap(pos.getX(i),a[0]),remap(pos.getY(i),a[1]),remap(pos.getZ(i),a[2])],
+   inner=v.map((q,k)=>Math.max(-a[k]+radius,Math.min(a[k]-radius,q))),
+   delta=v.map((q,k)=>q-inner[k]),len=Math.hypot(...delta)||1;
+  var normal=delta.map(q=>q/len),out=inner.map((q,k)=>q+normal[k]*radius);
+  pos.setXYZ(i,out[0]*sx,out[1]*sy,(out[2]+a[2])*sz);
+  var nn=[normal[0]/sx,normal[1]/sy,normal[2]/sz],nl=Math.hypot(...nn)||1;
+  n.setXYZ(i,nn[0]/nl,nn[1]/nl,nn[2]/nl);
+ }
+ pos.needsUpdate=true;n.needsUpdate=true;g.computeBoundingBox();g.computeBoundingSphere();return g;
+}
+function cad3dDetailedPreview(c,spec){
+ var polys=[],minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+ function iso(x,y,z){return [(x+y)*.84,(x-y)*.40-z*.98,x-y+z*.8163265];}
+ spec.parts.forEach(function(p){
+  var g=cad3dDetailedPartGeometry(p,1,1,1),pos=g.attributes.position,idx=g.index;
+  var points=Array.from({length:pos.count},(_,i)=>iso(pos.getX(i)+p[0],pos.getY(i)+p[1],pos.getZ(i)+p[2]));
+  for(var i=0;i<(idx?idx.count:pos.count);i+=3){
+   var ids=[0,1,2].map(j=>idx?idx.getX(i+j):i+j),pts=ids.map(j=>points[j]),a=pts[0],b=pts[1],e=pts[2];
+   var area=(b[0]-a[0])*(e[1]-a[1])-(b[1]-a[1])*(e[0]-a[0]);
+   if(area>=-1e-10)continue;
+   var n=g.attributes.normal, nx=ids.reduce((v,j)=>v+n.getX(j),0),ny=ids.reduce((v,j)=>v+n.getY(j),0),nz=ids.reduce((v,j)=>v+n.getZ(j),0),nl=Math.hypot(nx,ny,nz)||1;
+   var light=.67+.30*Math.max(0,(nx*.38-ny*.50+nz*.78)/nl);
+   pts.forEach(q=>{minX=Math.min(minX,q[0]);maxX=Math.max(maxX,q[0]);minY=Math.min(minY,q[1]);maxY=Math.max(maxY,q[1]);});
+   polys.push({pts,depth:(a[2]+b[2]+e[2])/3,color:p[6],light});
+  }
+  g.dispose();
+ });
+ if(!polys.length||maxX<=minX||maxY<=minY)return;
+ var scale=Math.min(246/(maxX-minX),128/(maxY-minY)),dx=140-(minX+maxX)*scale/2,dy=74-(minY+maxY)*scale/2;
+ c.save();var shadow=c.createRadialGradient(140,139,3,140,139,94);shadow.addColorStop(0,'rgba(45,36,25,.17)');shadow.addColorStop(1,'rgba(45,36,25,0)');c.translate(140,139);c.scale(1,.13);c.translate(-140,-139);c.fillStyle=shadow;c.fillRect(40,39,200,200);c.restore();
+ polys.sort((a,b)=>a.depth-b.depth);
+ polys.forEach(function(f){
+  var rgb=[f.color>>16&255,f.color>>8&255,f.color&255].map(v=>Math.round(v*f.light));
+  c.fillStyle=c.strokeStyle='rgb('+rgb.join(',')+')';c.lineWidth=.65;
+  c.beginPath();f.pts.forEach((q,i)=>{if(i)c.lineTo(dx+q[0]*scale,dy+q[1]*scale);else c.moveTo(dx+q[0]*scale,dy+q[1]*scale);});c.closePath();c.fill();c.stroke();
+ });
+}
+
 var cad3dEntourageCache={};
 function cad3dCutoutCanvas(kind,id){
  if(window.BlacklineEntourage&&window.BlacklineEntourage.spec(id)){
@@ -2479,6 +2584,8 @@ function cad3dBlockPreview(spec,id){
   var ratio=Math.max(.18,Math.min(1.35,spec.w/spec.h));
   var h=144,w=Math.min(226,Math.max(28,h*ratio));
   c.drawImage(source,140-w/2,8,w,h);
+ }else if(spec.detail&&T){
+  cad3dDetailedPreview(c,spec);
  }else{
   var parts=spec.parts||[], polys=[], minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   var iso=function(x,y,z){return {x:(x-y)*.84,y:(x+y)*.40-z*.98};};
@@ -2511,7 +2618,7 @@ function cad3dBlockPreview(spec,id){
 function cad3dBlockCatalogItems(){
  var ids=Object.keys(CAD3D_COMPONENTS).filter(function(id){
   var spec=CAD3D_COMPONENTS[id];
-  if(spec.legacy&&window.BlacklineEntourage)return false; // saved files keep working; gallery shows the new library
+  if(spec.superseded||(spec.legacy&&window.BlacklineEntourage))return false; // saved files keep working; gallery shows the new library
   return cad3dBlockKind(spec)===cad3dBlockView&&
     (cad3dBlockCategory==='all'||spec.group===cad3dBlockCategory);
  });
@@ -2538,7 +2645,7 @@ function cad3dRefreshBlockCatalog(){
  panel.querySelector('.cad3dBlockFilters').innerHTML=[['all','Todas']].concat(groups.map(g=>[g,g.replace(/^2.5D /,'')])).map(function(g){
   return '<button type="button" class="cad3dBlockFilter" data-block-category="'+escapeHtml(g[0])+'" aria-pressed="'+String(g[0]===cad3dBlockCategory)+'">'+escapeHtml(g[1])+'</button>';
  }).join('');
- var count=Object.keys(CAD3D_COMPONENTS).filter(id=>cad3dBlockKind(CAD3D_COMPONENTS[id])===cad3dBlockView).length;
+ var count=Object.keys(CAD3D_COMPONENTS).filter(id=>!CAD3D_COMPONENTS[id].superseded&&!(CAD3D_COMPONENTS[id].legacy&&window.BlacklineEntourage)&&cad3dBlockKind(CAD3D_COMPONENTS[id])===cad3dBlockView).length;
  var empty=panel.querySelector('.cad3dBlockEmptyNotice');
  empty.hidden=cad3dBlockView!=='photo';
  panel.querySelector('.cad3dBlockResults').hidden=cad3dBlockView==='photo';
@@ -2886,7 +2993,7 @@ function buildCAD3DBlock(record,group){
   });return;
  }
  def.parts.forEach(function(p){
-  var w=p[3]*sx,d=p[4]*sy,h=p[5]*sz,g=boxGeom(w,d,h);
+  var w=p[3]*sx,d=p[4]*sy,h=p[5]*sz,g=def.detail?cad3dDetailedPartGeometry(p,sx,sy,sz):boxGeom(w,d,h);
   addMesh(g,p[6],record.id,group,p[0]*sx,p[1]*sy,p[2]*sz);
  });
 }
