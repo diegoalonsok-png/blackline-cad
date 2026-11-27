@@ -8,7 +8,7 @@ app.classList.add('blackline-modern');
 // Raise legacy compact 42px ribbon once for the new 39px icon tiles; users can resize afterward.
 try{if(!localStorage.getItem('blackline-modern-ribbon-v1')){const current=parseFloat(getComputedStyle(app).getPropertyValue('--ribbon-height'))||42;if(current<58){app.style.setProperty('--ribbon-height','61px');localStorage.setItem('cad2d-ribbon-height','61');}localStorage.setItem('blackline-modern-ribbon-v1','1')}}catch(e){}
 const brand=d.querySelector('.brand');
-if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='CAD2D3D BIM';const sm=brand.querySelector('small');if(sm)sm.textContent='ARCHITECTURAL DRAFTING · 2D';}
+if(brand){const n=[...brand.childNodes].find(x=>x.nodeType===Node.TEXT_NODE);if(n)n.textContent='CAD2D3D BIM';const sm=brand.querySelector('small');if(sm)sm.remove();}
 const mark=d.querySelector('.brandbar .mark');
 if(mark){
  mark.innerHTML='<svg class="cad2d-logo-symbol" viewBox="0 0 40 40" aria-hidden="true" focusable="false"><path d="M20 4 34 12 34 28 20 36 6 28 6 12Z"/><path d="M6 12 20 20 34 12M20 20V36M20 4V12"/><path d="M14 8 26 15 26 25 20 29 14 25V15" opacity=".55"/></svg>';
