@@ -5,7 +5,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../cad3d-lab.j
 const section=(start,end)=>source.slice(source.indexOf(start),source.indexOf(end));
 const ctx={TextEncoder,TextDecoder,ArrayBuffer,DataView,Uint8Array,Float32Array,cad3dImportTriangles:(v,f)=>{ctx.result={v,f}}};
 vm.createContext(ctx);
-vm.runInContext(section('function cad3dEncodeMesh(','function exportMeshExchange(')+section('function cad3dParsePLY(','function cad3dParseGLTFDocument('),ctx);
+vm.runInContext(section('function cad3dEncodeMesh(','function cad3dEncodeIFC(')+section('function cad3dParsePLY(','function cad3dParseGLTFDocument('),ctx);
 const tri=[[[0,0,0],[2,0,0],[0,1,3]]];
 test('ASCII PLY export and import preserve coordinates',()=>{
  const ply=ctx.cad3dEncodeMesh(tri,'ply');
@@ -34,4 +34,17 @@ test('OFF and invalid coordinates',()=>{
  assert.ok(ctx.cad3dEncodeMesh(tri,'off').startsWith('OFF\n3 1 0\n'));
  assert.throws(()=>ctx.cad3dEncodeMesh([],'off'));
  assert.throws(()=>ctx.cad3dEncodeMesh([[[NaN,0,0],[0,0,0],[0,1,0]]],'glb'));
+});
+
+test('IFC4 exporter builds separate products, material and references',()=>{
+ const c={};vm.createContext(c);vm.runInContext(section('function cad3dEncodeIFC(','function exportIFC('),c);
+ let n=0;const rng=()=>Uint8Array.from({length:16},(_,i)=>i===15?++n:0);
+ const ifc=c.cad3dEncodeIFC([{id:1,type:'wall',name:"Múro's",material:'Brick',triangles:tri},{id:2,type:'slab',triangles:tri}],rng);
+ assert.ok(ifc.includes("FILE_SCHEMA(('IFC4'))"));
+ assert.equal((ifc.match(/=IFCTRIANGULATEDFACESET\(/g)||[]).length,2);
+ assert.ok(ifc.includes('=IFCWALL(')&&ifc.includes('=IFCSLAB(')&&ifc.includes('=IFCRELASSOCIATESMATERIAL('));
+ assert.ok(ifc.includes("\\X2\\00FA\\X0\\")&&ifc.includes("ro''s"));
+ const refs=new Set([...ifc.matchAll(/^#(\d+)=/gm)].map(m=>m[1]));
+ for(const m of ifc.matchAll(/#(\d+)/g))assert.ok(refs.has(m[1]));
+ assert.throws(()=>c.cad3dEncodeIFC([],rng));
 });
