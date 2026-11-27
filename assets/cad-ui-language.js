@@ -4,6 +4,7 @@
 (function(root){
  'use strict';
  const pairs=[
+ ['DISEÑO Y DIBUJO ARQUITECTÓNICO · 2D','DESIGN AND ARCHITECTURAL DRAFTING · 2D'],['Menú CAD2D','CAD2D Menu'],
  ['Inicio','Home'],['Arquitectura','Architecture'],['Dibujo','Draw'],['Modificar','Modify'],['Anotar','Annotate'],['Vista','View'],['Salida','Output'],
  ['MUROS PARAMÉTRICOS 2D','PARAMETRIC 2D WALLS'],['Espesor de muro (m)','Wall thickness (m)'],
  ['Justificación','Justification'],['Izquierda','Left'],['Centro','Center'],['Derecha','Right'],
@@ -125,7 +126,7 @@
  }
  function init(){
   let value='en';
-  try{value=localStorage.getItem('cad2d-ui-language')==='pt'?'pt':localStorage.getItem('cad2d-alias-language')==='es'?'es':'en'}catch(_){}
+  try{const ui=localStorage.getItem('cad2d-ui-language'),alias=localStorage.getItem('cad2d-alias-language');value=['en','es','pt'].includes(ui)?ui:['en','es','pt'].includes(alias)?alias:'en'}catch(_){}
   setLanguage(value);
   if(typeof MutationObserver==='function'){
    // Both directions (EN<->ES). Added subtrees are batched and walked once; a node that keeps
