@@ -4902,6 +4902,7 @@ function build(){
  '<button type="button" class="btn" data-section-to2d title="Genera el corte como dibujo 2D editable (polilíneas, relleno y cotas de nivel) al costado de la planta">Enviar corte a 2D</button>'+
  '<button type="button" class="btn" data-section-tolayout title="Envía el corte al 2D y arma una lámina nueva con su ventana a escala y el rótulo">Corte a lámina</button>'+
  '<button type="button" class="btn" data-schedule-to2d title="Planilla de puertas y ventanas del modelo, con alto y antepecho, en el plano 2D">Planilla de aberturas</button>'+
+ '<button type="button" class="btn" data-bim-inventory title="Exportar inventario BIM del modelo 3D y sus aberturas">BIM CSV</button>'+
  '<label><input type="checkbox" data-section-visible checked> Mostrar plano y flecha</label>'+
  '</div></section>'+
  '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
@@ -8848,6 +8849,21 @@ function cad3dSectionTo2D(opts){
  return res;
 }
 /* Planilla de aberturas del modelo 3D (puertas y ventanas en muros y losas), enviada al 2D con alto y antepecho. */
+function cad3dBimInventory(format='csv'){
+ const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
+ const n=v=>Number.isFinite(v)?v:null, out=[];
+ for(const r of records){
+  const layer=layerForRecord(r),cls=r.type==='slab'&&r.slabKind==='roof'?'Roof':types[r.type]||'Other';
+  const id='3D:'+r.id;
+  out.push({id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
+  for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
+ }
+ if(!out.length)return text('BIM3D · No hay elementos en el modelo');
+ const keys=['id','host','class','nativeType','name','layer','material','style','x','y','z','width','depth','height','sill','openingCount'];
+ const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native record dimensions, not measured net quantities; hosted openings have no global placement here. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
+ const blob=new Blob([content],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='CAD2D3D-BIM-3D.'+format;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);text('BIM3D · '+out.length+' registros exportados; MASSPROP para volúmenes y superficies');
+}
+
 function cad3dScheduleTo2D(){
  var bridge=window.BlacklineCAD3DBridge;
  if(!bridge||typeof bridge.addSchedule!=='function')return text('Puente con el 2D no disponible: recargá la página');
@@ -8879,6 +8895,7 @@ function cad3dSectionSetup(){
  p.querySelector('[data-section-to2d]').addEventListener('click',function(){cad3dSectionTo2D();});
  p.querySelector('[data-section-tolayout]').addEventListener('click',function(){cad3dSectionTo2D({toLayout:true});});
  p.querySelector('[data-schedule-to2d]').addEventListener('click',function(){cad3dScheduleTo2D();});
+ p.querySelector('[data-bim-inventory]').addEventListener('click',function(){cad3dBimInventory('csv');});
  p.querySelector('[data-section-center]').addEventListener('click',function(){
   var b=cad3dBounds();cad3dSection.offset=cad3dSection.axis==='x'?b.x:cad3dSection.axis==='y'?b.y:b.z;update();
  });
@@ -10372,6 +10389,8 @@ function run3DCommand(){
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(['corte2d','seccion2d','section2d','sectionto2d','cortea2d'].includes(command)){cad3dSectionTo2D();return;}
  if(['cortealamina','cortelamina','sectiontolayout','cortelam'].includes(command)){cad3dSectionTo2D({toLayout:true});return;}
+ if(['bim','bim3d','bimcsv'].includes(command)){cad3dBimInventory('csv');return;}
+ if(command==='bimjson'){cad3dBimInventory('json');return;}
  if(['planillaaberturas','tablaaberturas','doorschedule','windowschedule','openingschedule','planilla'].includes(command)){cad3dScheduleTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
