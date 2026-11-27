@@ -1851,7 +1851,7 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    if(!(depth>0&&depth<=.5&&frame>0&&frame<o.width*.2))throw Error('Invalid opening frame');
    const name='ARQ · '+o.kind+' · '+Math.round(o.width*1000)+' · '+Math.round(w.thickness*1000)+' · '+state.unit+(reviewed?' · CALCO '+Math.round(depth*1000)+'-'+Math.round(frame*1000):'');
    const openingLayer=layer(o.kind==='framed-window'?'WINDOWS':'DOORS');
-   const defaults={width:o.width*k,frameWidth:frame*k,frameDepth:depth*k,mirror:reviewed&&Boolean(o.orientation?.mirror)};
+   const defaults={width:o.width*k,frameWidth:frame*k,frameDepth:depth*k,mirror:Boolean(o.orientation?.mirror)};
    if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(o.width*k,0),layer:'0'}],parametric:{kind:o.kind,defaults}};
    const definition=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI+(reverse?180:0),layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.segments[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
    state.entities.push(ref);
@@ -1861,6 +1861,14 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    if(!['FIXTURES','FURNITURE','KITCHEN','EQUIPMENT',...(plan.brief?.kind==='trace'?['STAIRS','VEGETATION','VEHICLES','EXTERIOR','OFFICE','ACCESSIBILITY']:[])].includes(b.layer)||b.scale!==1||!Number.isFinite(b.rotation)||!Array.isArray(b.point))throw Error('Invalid fixture');
    const name=resolveBlock(b);if(!state.blocks[name])throw Error('Missing block: '+b.catalogId);
    state.entities.push({id:state.nextId++,type:'blockRef',blockName:name,p:point(...b.point),scale:1,rotation:b.rotation,layer:layer(b.layer),arqBatch:batch,arqRole:b.role});
+  }
+  // Rótulos de locales (nombre + superficie), centrados en el punto indicado.
+  if(Array.isArray(plan.labels)&&plan.labels.length<=200){
+   const textLayer=plan.labels.length?layer('TEXTS'):null;
+   for(const l of plan.labels){
+    if(!Array.isArray(l?.point))continue;const c=point(...l.point);
+    for(const [txt,h,dy,bold] of [[String(l.text||'').slice(0,40),.18,.02,true],[String(l.sub||'').slice(0,24),.13,-.26,false]]){if(!txt)continue;const H=h*k;state.entities.push({id:state.nextId++,type:'text',p:P(c.x-txt.length*H*(bold?.33:.27),c.y+dy*k),text:txt,h:H,fontFamily:'Arial',rotation:0,...(bold?{bold:true}:{}),layer:textLayer,arqBatch:batch});}
+   }
   }
   // Permanent native dimensions for individual architectural rooms; separate
   // layers permit independent visibility and do not change model geometry.
@@ -13218,6 +13226,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-bloques-dinamicos.js?v=20261127-bloques3"></script>
 <script src="cad-tablas.js?v=20261127-tablas3"></script>
 <script src="cad-aberturas.js?v=20261127-aberturas2"></script>
+<script src="assets/cad-calco-ia.js?v=20261127-calcoia1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261127-maestros1"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>
