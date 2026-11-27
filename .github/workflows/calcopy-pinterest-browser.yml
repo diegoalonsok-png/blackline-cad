@@ -1,0 +1,26 @@
+name: CALCOPY Pinterest browser smoke test
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  browser:
+    if: github.head_ref == 'test/calcopy-pinterest-browser-20261125'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install playwright==1.56.0
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m py_compile research/calco-python-20261125/test_pinterest_browser.py
+      - run: python research/calco-python-20261125/test_pinterest_browser.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calcopy-browser-results
+          path: calcopy-browser-results/
+          retention-days: 3
