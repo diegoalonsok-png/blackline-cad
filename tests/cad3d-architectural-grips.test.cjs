@@ -16,7 +16,10 @@ function pure(){
  const check=src.slice(src.indexOf('function openingFitsCADHost(host,item,excludeId){'),src.indexOf('function placeOpening(e){'));
  assert(start>=0&&end>start&&check.includes('openingFitsCADHost'));
  const ctx={JSON,Math,Number,clamp:(x,a,b)=>Math.max(a,Math.min(b,x)),root:null,records:[]};
- vm.runInNewContext(check+'\n'+src.slice(start,end),ctx);return ctx;
+ const cloneStart=src.indexOf('function cad3dCloneRecord(r){');
+ const cloneEnd=src.indexOf('function cad3dBuildImportedMesh',cloneStart);
+ assert(cloneStart>=0&&cloneEnd>cloneStart,'production clone helper must exist');
+ vm.runInNewContext(src.slice(cloneStart,cloneEnd)+'\n'+check+'\n'+src.slice(start,end),ctx);return ctx;
 }
 const c=pure();
 const wall={id:5,type:'wall',layerId:'0',x:0,y:0,z:0,rot:0,w:6,d:.20,h:3,radius:1,openings:[
