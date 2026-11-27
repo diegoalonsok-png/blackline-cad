@@ -353,6 +353,55 @@ function reviewSpaces(walls,openings,width,height,metersPerPixel){
  for(const q of regions){const parents=regions.filter(p=>p.area>q.area&&p.rectangularity<.98&&p.x<=q.x&&p.y<=q.y&&p.x+p.w>=q.x+q.w&&p.y+p.h>=q.y+q.h);if(parents.length)q.possible_parent=parents.sort((a,b)=>a.area-b.area)[0].id;}
  return {regions:regions.slice(0,250),labels,width:W,height:H,scale:k};
 }
-const api={gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance,reviewSpaces,bathroomBasinAlignment};
+/* Trace the outside and inside boundaries of dark masonry. A square opening
+   removes thin ink before tracing; it does not bridge openings or invent walls.
+   Pixel-edge coordinates, closed rings (no repeated endpoint). */
+function darkWallContours(G,metersPerPixel,minThickness=.08){
+ const {g,w,h,thr}=G;
+ if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w*h>8000000||!g||g.length!==w*h||!Number.isFinite(metersPerPixel)||metersPerPixel<=0)return [];
+ const radius=Math.max(1,Math.min(24,Math.floor(minThickness/metersPerPixel/2))),size=2*radius+1;
+ const mask=new Uint8Array(w*h),tmp=new Uint8Array(w*h),core=new Uint8Array(w*h);
+ for(let i=0;i<mask.length;i++)mask[i]=g[i]<thr?1:0;
+ // Separable binary erosion and dilation, linear in the number of pixels.
+ function pass(src,dst,vertical,erode){
+  const rows=vertical?w:h,n=vertical?h:w;
+  for(let y=0;y<rows;y++){
+   const at=x=>vertical?x*w+y:y*w+x;
+   let sum=0;for(let x=0;x<=radius&&x<n;x++)sum+=src[at(x)];
+   for(let x=0;x<n;x++){dst[at(x)]=erode?(sum===size?1:0):(sum>0?1:0);if(x-radius>=0)sum-=src[at(x-radius)];if(x+radius+1<n)sum+=src[at(x+radius+1)];}
+  }
+ }
+ pass(mask,tmp,false,true);pass(tmp,core,true,true);pass(core,tmp,false,false);pass(tmp,core,true,false);
+ // Directed exposed pixel edges, always with dark material on the right.
+ const stride=w+1,edges=new Map();let count=0;
+ const edge=(x,y,dir)=>{const id=y*stride+x;edges.set(id,(edges.get(id)||0)|(1<<dir));count++;};
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  const i=y*w+x;if(!core[i])continue;
+  if(y===0||!core[i-w])edge(x,y,0);
+  if(x===w-1||!core[i+1])edge(x+1,y,1);
+  if(y===h-1||!core[i+w])edge(x+1,y+1,2);
+  if(x===0||!core[i-1])edge(x,y+1,3);
+  if(count>200000)return [];
+ }
+ const step=[1,stride,-1,-stride],out=[];
+ while(edges.size){
+  const start=edges.keys().next().value;let at=start,dir=[0,1,2,3].find(k=>edges.get(at)&(1<<k)),first=dir,pts=[],closed=false;
+  for(let n=0;n<=count;n++){
+   const bits=edges.get(at)||0;if(!(bits&(1<<dir)))break;
+   const left=bits&~(1<<dir);if(left)edges.set(at,left);else edges.delete(at);
+   if(!pts.length||dir!==first)pts.push([at%stride,Math.floor(at/stride)]);
+   first=dir;at+=step[dir];if(at===start){closed=true;break;}
+   const next=edges.get(at)||0;dir=[(dir+1)%4,dir,(dir+3)%4,(dir+2)%4].find(k=>next&(1<<k));if(dir===undefined)break;
+  }
+  if(!closed||pts.length<4)continue;
+  // Remove redundant initial point if it lies on the closing straight edge.
+  const a=pts.at(-1),b=pts[0],c=pts[1];if((a[0]===b[0]&&b[0]===c[0])||(a[1]===b[1]&&b[1]===c[1]))pts.shift();
+  const area=pts.reduce((s,p,i)=>{const q=pts[(i+1)%pts.length];return s+p[0]*q[1]-q[0]*p[1];},0)/2;
+  if(pts.length>=4&&Math.abs(area)*metersPerPixel**2>=.015)out.push({pts,areaPx:area,hole:area<0});
+  if(out.length>500)return [];
+ }
+ return out;
+}
+const api={darkWallContours,gray,axis,seg,measureWall,snapEnds,openingAt,buildPlan,classifyRooms,doorWidthReview,layoutDiagnostics,bathroomEnclosure,doorClearance,reviewSpaces,bathroomBasinAlignment};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.CAD2D_CALCOPY_ASSIST=api;
 })(typeof self!=='undefined'?self:this);
