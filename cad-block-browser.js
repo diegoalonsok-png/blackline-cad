@@ -597,7 +597,7 @@
  const MODERN_RE=/\b(?:le ?corbusier|corbu|mies|frank lloyd wright|gropius|aalto|louis kahn|niemeyer|tadao ando|zaha|gehry|koolhaas|siza|barragan|utzon|scarpa|botta|herzog|eisenman|venturi|aldo rossi)\b/i,DRAW_RE=/\b(?:plan|plans|planta|plantas|plano|planos|section|sections|corte|cortes|seccion|elevation|alzado|fachada|drawing|dibujo|sketch|croquis|grundriss|pianta)\b/i;
  let localGalleryPromise=null;
  function localGallery(){
-  if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json?v=20261127-bathroom-catalogue3',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
+  if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json?v=20261127-bathroom-catalogue4',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
   return localGalleryPromise;
  }
  // Bilingual room search. Explicit raster requests keep the reference route.
