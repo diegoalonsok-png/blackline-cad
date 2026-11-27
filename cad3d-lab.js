@@ -2942,6 +2942,25 @@ function cad3dDecodeIFC(source){
    materials.set(id,name);
   }
  }
+ // Preserve the original Blackline property set independently of editable CAD fields.
+ const nativeProps=new Map(),allowedProps=new Set(['NativeType','NativeId','Style','Layer']);
+ for(const r of records.values()){
+  if(r.type!=='IFCRELDEFINESBYPROPERTIES')continue;
+  const a=split(r.args),pset=records.get((a[5]||'').slice(1));
+  if(!pset||pset.type!=='IFCPROPERTYSET')continue;
+  const p=split(pset.args);if(label(p[2])!=='Blackline_Native')continue;
+  const values={};
+  for(const id of list(p[4])){
+   const entry=ref(id,'IFCPROPERTYSINGLEVALUE'),name=label(entry[0]),v=/^IFCLABEL\(([\s\S]*)\)$/.exec(entry[2]||'');
+   if(!allowedProps.has(name)||!v)continue;
+   values[name]=label(v[1]);
+  }
+  for(const id of list(a[4])){
+   const prior=nativeProps.get(id)||{};
+   for(const name of Object.keys(values))if(Object.prototype.hasOwnProperty.call(prior,name)&&prior[name]!==values[name])throw Error('IFC import: conflicting native properties');
+   nativeProps.set(id,{...prior,...values});
+  }
+ }
  const items=[];let total=0;
  for(const [id,r] of records){
   if(!Object.prototype.hasOwnProperty.call(types,r.type))continue;
@@ -2953,7 +2972,7 @@ function cad3dDecodeIFC(source){
   const vertices=coords.map(v=>{const p=list(v).map(value);if(p.length!==3)throw Error('IFC import: invalid point');return p;});
   const faces=list(m[3]);total+=faces.length;if(total>120000||items.length>=1000)throw Error('IFC import: geometry limit exceeded');
   const triangles=faces.map(v=>{const inds=list(v).map(value);if(inds.length!==3||inds.some(n=>!Number.isInteger(n)||n<1||n>vertices.length))throw Error('IFC import: invalid triangle index');return inds.map(n=>vertices[n-1]);});
-  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,level:assigned.get('#'+id)||null,...(materials.has('#'+id)?{material:materials.get('#'+id)}:{}),triangles});
+  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,level:assigned.get('#'+id)||null,...(materials.has('#'+id)?{material:materials.get('#'+id)}:{}),...(nativeProps.has('#'+id)?{nativeProps:nativeProps.get('#'+id)}:{}),triangles});
  }
  const allMeshes=[...records.values()].filter(r=>r.type==='IFCTRIANGULATEDFACESET').length;
  if(!items.length||allMeshes!==items.length)throw Error('IFC import: unsupported or unassigned geometry');
@@ -2968,7 +2987,7 @@ function cad3dImportIFC(source){
   const size=max.map((v,k)=>Math.max(.001,v-min[k])),origin=[(min[0]+max[0])/2,(min[1]+max[1])/2,min[2]];
   if(size.some(v=>!Number.isFinite(v)||v>1000))throw Error('IFC import: unsupported object dimensions');
   const meshVertices=item.triangles.flatMap(t=>t.flatMap(p=>p.map((v,k)=>(v-origin[k])/size[k])));
-  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,...(item.material?{ifcMaterial:item.material}:{}),...(item.level?{bimLevel:cad3dBimLevelValue(item.level.name,item.level.elevation)}:{}),x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
+  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,...(item.material?{ifcMaterial:item.material}:{}),...(item.nativeProps?{ifcNativeProps:item.nativeProps}:{}),...(item.level?{bimLevel:cad3dBimLevelValue(item.level.name,item.level.elevation)}:{}),x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
  });
  cad3dHistoryStart();const added=planned.map(p=>Object.assign(newRecord('imported3d'),p));records.push(...added);selected=added.map(r=>r.id);redraw();renderProps();text('IFC4 · '+added.length+' objects · Blackline tessellation subset; not parametric');
 }
@@ -7118,7 +7137,7 @@ function placePoint(pt){
   records.filter(function(r){return ids.has(r.id)&&editableRecord(r);}).forEach(function(r){
    var dest=kind==='copy'?cad3dCloneRecord(r):r;
    if(kind==='copy'){
-    dest.id=serial++;delete dest.ifcGuid;dest.openings?.forEach(function(o){o.id=serial++;});records.push(dest);
+    dest.id=serial++;delete dest.ifcGuid;if(dest.ifcNativeProps)delete dest.ifcNativeProps.NativeId;dest.openings?.forEach(function(o){o.id=serial++;});records.push(dest);
    }
    dest.x+=dx;dest.y+=dy;moved.push(dest.id);
   });
@@ -9618,7 +9637,7 @@ function change(e){
 /* CAD3D_EDIT_ENHANCEMENTS_V1: duplicate, locate and recolor imported geometry. */
 function cad3dCloneObject(id){
  var source=records.find(function(r){return r.id===id&&editableRecord(r);});if(!source)return;
- var copy=cad3dCloneRecord(source);copy.id=serial++;delete copy.ifcGuid;copy.x=(source.x||0)+.65;copy.y=(source.y||0)+.65;
+ var copy=cad3dCloneRecord(source);copy.id=serial++;delete copy.ifcGuid;if(copy.ifcNativeProps)delete copy.ifcNativeProps.NativeId;copy.x=(source.x||0)+.65;copy.y=(source.y||0)+.65;
  // Ensure architectural openings receive unique object-local identifiers.
  if(copy.openings)copy.openings.forEach(function(o){o.id=serial++;});
  records.push(copy);selected=[copy.id];selectedOpeningId=null;
@@ -10958,7 +10977,8 @@ function cad3dEncodeIFC(items,randomBytes){
   const product=add(cls,guid(item.ifcGuid)+',$,'+str(item.name||item.type)+',$,$,'+placement+','+shape+','+str(item.id)+',.NOTDEFINED.');
   products.push(product);getStorey(item.level).products.push(product);
   if(item.material){const material=add('IFCMATERIAL',str(item.material)+',$,$');add('IFCRELASSOCIATESMATERIAL',guid()+',$,$,$,('+product+'),'+material);}
-  const props=[['NativeType',item.type],['NativeId',item.id],['Style',item.style],['Layer',item.layer]].filter(p=>p[1]!=null&&String(p[1])!=='').map(p=>add('IFCPROPERTYSINGLEVALUE',str(p[0])+',$,IFCLABEL('+str(p[1])+'),$'));
+  const original=item.nativeProps||{};
+  const props=[['NativeType',original.NativeType??item.type],['NativeId',original.NativeId??item.id],['Style',original.Style??item.style],['Layer',original.Layer??item.layer]].filter(p=>p[1]!=null&&String(p[1])!=='').map(p=>add('IFCPROPERTYSINGLEVALUE',str(p[0])+',$,IFCLABEL('+str(p[1])+'),$'));
   if(props.length){const pset=add('IFCPROPERTYSET',guid()+",$,'Blackline_Native',$,("+props.join(',')+')');add('IFCRELDEFINESBYPROPERTIES',guid()+',$,$,$,('+product+'),'+pset);}
  }
  if(!products.length)throw Error('IFC: sin geometría exportable');
@@ -10969,7 +10989,7 @@ function cad3dEncodeIFC(items,randomBytes){
 function exportIFC(){
  if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
  try{
-  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='box'&&r.bimClass?r.bimClass.toLowerCase():r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.ifcMaterial||r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,ifcGuid:r.ifcGuid,triangles:[]}]));
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='box'&&r.bimClass?r.bimClass.toLowerCase():r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.ifcMaterial||r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,nativeProps:r.ifcNativeProps,ifcGuid:r.ifcGuid,triangles:[]}]));
   let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
   const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
   download('CAD2D3D-model.ifc',content,'application/x-step');
@@ -11215,6 +11235,10 @@ async function readJSON(e){
     if(['Wall','Slab','Roof','Stair','Railing','Column','Beam','Footing','Other'].includes(r.ifcClass))o.ifcClass=r.ifcClass;
     if(typeof r.ifcGuid==='string'&&/^[0-3][A-Za-z0-9_$]{21}$/.test(r.ifcGuid))o.ifcGuid=r.ifcGuid;
     if(typeof r.ifcMaterial==='string'&&r.ifcMaterial.trim())o.ifcMaterial=r.ifcMaterial.slice(0,120);
+    if(r.ifcNativeProps&&typeof r.ifcNativeProps==='object'){
+     const props={};for(const k of ['NativeType','NativeId','Style','Layer'])if(typeof r.ifcNativeProps[k]==='string')props[k]=r.ifcNativeProps[k].slice(0,120);
+     if(Object.keys(props).length)o.ifcNativeProps=props;
+    }
     ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
