@@ -2471,7 +2471,6 @@ function cad3dDetailedPartGeometry(p,sx,sy,sz){
  if(!radius)return boxGeom(w,d,h);
  // Rounded cuboid, sampled near the edges; each part remains actual mesh geometry.
  var a=[p[3]/2,p[4]/2,p[5]/2],g=new T.BoxGeometry(p[3],p[4],p[5],8,8,8),pos=g.attributes.position,n=g.attributes.normal;
- var sample=[-1,-.75,-.5,-.25,0,.25,.5,.75,1];
  function remap(v,half){var i=Math.max(0,Math.min(8,Math.round((v/half+1)*4))),j=i-4;
   if(j===0)return 0;if(Math.abs(j)===1)return Math.sign(j)*(half-radius);
   return Math.sign(j)*(half-radius+radius*(Math.abs(j)-1)/3);}
@@ -2613,7 +2612,7 @@ function cad3dBlockPreview(spec,id){
   }
  }
  var img='<img alt="" loading="lazy" draggable="false" src="'+canvas.toDataURL('image/png')+'">';
- cad3dPreviewCache[id]=img;return img;
+ if(!spec.detail||T)cad3dPreviewCache[id]=img;return img;
 }
 function cad3dBlockCatalogItems(){
  var ids=Object.keys(CAD3D_COMPONENTS).filter(function(id){
