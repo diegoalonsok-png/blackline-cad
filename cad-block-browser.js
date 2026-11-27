@@ -16,6 +16,7 @@
   {id:'white',label:'blanco',bg:'#ffffff',ink:'#20272d'},
   {id:'ivory',label:'marfil',bg:'#f4ecd8',ink:'#293238'},
   {id:'gray',label:'gris claro',bg:'#e5e7e9',ink:'#252b30'},
+  {id:'vintage-blue',label:'celeste viejo',bg:'#b7cfdc',ink:'#293238'},
   {id:'kraft',label:'papel kraft',bg:'#d5c19e',ink:'#292929'},
   {id:'rose',label:'rosado',bg:'#f4ded8',ink:'#2a292b'},
   {id:'blue',label:'azul técnico',bg:'#28465c',ink:'#f5f8fc'},
@@ -48,7 +49,7 @@
   doc:{en:'Documentation (levels, axes, sections…)',es:'Documentación (niveles, ejes, cortes…)',cats:c=>c==='Documentación'}
  };
  const KEY='cad2d-block-browser';
- let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120,paper:'cream'};
+ let st={x:null,y:null,w:980,h:640,view:'all',cat:'',q:'',size:120,paper:'vintage-blue'};
  try{Object.assign(st,JSON.parse(localStorage.getItem(KEY)||'{}'))}catch(e){}
  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}};
  const css=document.createElement('style');
@@ -187,12 +188,17 @@
 #cadBlockBrowser.web-reference .web-card a{color:#59482d;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cadBlockBrowser.web-reference .web-card button,#cadBlockBrowser.web-reference .web-links button{border:1px solid #b8a17a;background:#fffaf0;color:#51432e;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
 #cadBlockBrowser.web-reference.min .web-links{display:none}
-/* Keep the entire gallery cream. Only CAD drawing paper is vintage sky blue. */
-#cadBlockBrowser.visual.arq-block-search .card .preview,
-#cadBlockBrowser.visual.web-reference .web-card .plan-preview{background:#b7cfdc;border-color:#9db6c5;color:#293238;isolation:isolate}
-#cadBlockBrowser.visual.arq-block-search .card .preview img,
-#cadBlockBrowser.visual.web-reference .web-card .plan-preview img{background:transparent;mix-blend-mode:multiply;filter:grayscale(1)}
-#cadBlockBrowser.visual.arq-block-search .card .preview svg{background:transparent!important;mix-blend-mode:multiply}
+/* ArqAssist uses the same cream gallery cards, paper and ink as the full visual gallery. */
+#cadBlockBrowser.visual.arq-block-search .grid{gap:14px;padding:12px;grid-auto-rows:auto;align-content:start;overflow:auto}
+#cadBlockBrowser.visual.arq-block-search .card{min-height:0;padding:12px;gap:4px;overflow:visible}
+#cadBlockBrowser.visual.arq-block-search .card .preview{background:var(--paper-bg,#b7cfdc);border:1px solid #c8bca8;color:var(--paper-ink,#293238);padding:7px;flex:none;height:auto;aspect-ratio:1/1;min-height:0!important;overflow:hidden;isolation:isolate}
+#cadBlockBrowser.visual.arq-block-search .card .preview svg,#cadBlockBrowser.visual.arq-block-search .card .preview img{width:100%;height:100%!important;max-height:none!important;object-fit:contain;max-width:100%;min-width:0}
+#cadBlockBrowser.visual.arq-block-search .card .nm{font-size:12px;line-height:1.35}
+#cadBlockBrowser.visual.arq-block-search .card .mt{font-size:11px;line-height:1.35}
+#cadBlockBrowser.visual .card .preview .uploaded-cad-preview{background:transparent;mix-blend-mode:multiply;filter:contrast(1.4);object-fit:contain}
+#cadBlockBrowser.visual .card .preview svg.personal-cad-preview{background:transparent!important}
+#cadBlockBrowser.visual.web-reference .web-card .plan-preview{background:#b7cfdc;border-color:#c8bca8;isolation:isolate}
+#cadBlockBrowser.visual.web-reference .web-card .plan-preview img{background:transparent;mix-blend-mode:multiply}
 
 `;document.head.append(css);
 
@@ -421,8 +427,8 @@
   const allItems=items(),pool=allItems.filter(inView),names=simpleBlockNames(),counts=new Map();
   for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
   const visual=commandGallery||st.view==='visual'||st.view==='olymp3'||st.view==='imported';
-  const paper=PAPERS.find(p=>p.id===(commandGallery?'cream':st.paper))||PAPERS[0];
-  el.style.setProperty('--paper-bg',commandGallery?'#b7cfdc':paper.bg);
+  const paper=PAPERS.find(p=>p.id===st.paper)||PAPERS[0];
+  el.style.setProperty('--paper-bg',paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
@@ -439,16 +445,16 @@
   const searchQuery=blockQuery(st.q);if(commandGallery&&searchQuery.q){loadPersonalBlocks();list.push(...extraSearch(searchQuery));}else extraMatches.clear();
   if(visual)list.sort((a,b)=>{
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
-   return (a.extra?a.extraRank:blockMatchRank(a,searchQuery))-(b.extra?b.extraRank:blockMatchRank(b,searchQuery))||Number(!a.extra)-Number(!b.extra)||Number(archivedView(a))-Number(archivedView(b))||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
+   return (a.extra?a.extraRank:blockMatchRank(a,searchQuery))-(b.extra?b.extraRank:blockMatchRank(b,searchQuery))||Number(archivedView(a))-Number(archivedView(b))||Number(!!a.extra)-Number(!!b.extra)||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
   });
-  searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=commandGallery?100:visual?Math.max(170,st.size):st.size;
+  searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
   grid.innerHTML=shown.map(it=>it.extra?`<button class="card" data-extra-id="${it.id}"></button>`:`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)%3===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   for(const node of grid.querySelectorAll('[data-extra-id]')){
    const item=extraMatches.get(node.dataset.extraId);if(!item)continue;
    const preview=document.createElement('span');preview.className='preview';
-   if(item.uploaded){const img=document.createElement('img');img.loading='lazy';img.decoding='async';img.src=item.uploaded.thumb;img.alt='CAD';img.onerror=()=>{preview.textContent='CAD';};preview.append(img);}
-   else if(CORE.personalBlocks?.preview){try{preview.append(CORE.personalBlocks.preview(item.def));}catch(e){preview.textContent='CAD';}}
+   if(item.uploaded){const img=document.createElement('img');img.loading='lazy';img.decoding='async';img.className='uploaded-cad-preview';img.src=item.uploaded.thumb;img.alt='CAD';img.onerror=()=>{preview.textContent='CAD';};preview.append(img);}
+   else if(CORE.personalBlocks?.preview){try{const svg=CORE.personalBlocks.preview(item.def);svg.classList.add('personal-cad-preview');preview.append(svg);}catch(e){preview.textContent='CAD';}}
    else preview.textContent='CAD';
    const name=document.createElement('span');name.className='nm';name.textContent=item.name;
    const meta=document.createElement('span');meta.className='mt';meta.textContent=item.uploaded?'DXF':item.personal?T('Saved block','Bloque guardado'):T('Drawing block','Bloque del plano');
@@ -575,7 +581,7 @@
   }catch(e){}finally{if(epoch===webEpoch&&houseMode)scheduleHouseRefresh();}
  }
 
- function openSearch(term){if(generalPlanQuery(term))return openWeb(term);stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
+ function openSearch(term){if(generalPlanQuery(term))return openWeb(term);stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-460)/2),y:bar?bar.bottom+8:80,w:460,h:580};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
  // Tipologías del catálogo de referencias (Commons + propias). Orden: lo específico antes que lo genérico.
  const ARQ_TYPOLOGIES=[
