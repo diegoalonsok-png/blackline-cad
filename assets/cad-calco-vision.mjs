@@ -150,17 +150,18 @@ export function bestCatalogMatch(label,box,catalog,sx,sy){
 /* Approximate scale from a whole toilet footprint, never a precision dimension.
    Use both axes; reject implausible proportions, truncated or duplicate boxes. */
 export function toiletScale(detections,catalog,width,height){
- const candidates=catalog.filter(q=>/^san-wc(?:-|$)/.test(q.id)&&q.w>0&&q.d>0&&!q.hideFromGallery);
+ if(!Array.isArray(detections)||!Array.isArray(catalog)||![width,height].every(Number.isFinite)||width<=0||height<=0)return null;
+ const candidates=catalog.filter(q=>['san-wc','san-wc-susp'].includes(q.id)&&Number.isFinite(q.w)&&Number.isFinite(q.d)&&q.w>=.3&&q.w<=.5&&q.d>=.5&&q.d<=.85&&!q.hideFromGallery);
  const samples=[];
  for(const det of detections){
-  if(catalogId(det.label)!=='san-wc'||!Array.isArray(det.box)||det.box.length!==4)continue;
+  if(!det||!/^\s*(?:toilet|toilet bowl|wc|inodoro)(?:\s+(?:fixture|symbol))?\s*$/i.test(String(det.label||''))||!Array.isArray(det.box)||det.box.length!==4)continue;
   const [x,y,X,Y]=det.box,a=X-x,b=Y-y;
   if(!det.box.every(Number.isFinite)||x<=1||y<=1||X>=width-1||Y>=height-1||Math.min(a,b)<10)continue;
   const fits=candidates.flatMap(q=>[0,90].map(rotation=>{
    const sx=(rotation?q.d:q.w)/a,sy=(rotation?q.w:q.d)/b;
    return {scale:Math.sqrt(sx*sy),error:Math.abs(Math.log(sx/sy)),id:q.id,rotation};
   })).sort((a,b)=>a.error-b.error);
-  if(!fits.length||fits[0].error>.25)continue;
+  if(!fits.length||fits[0].error>.20)continue;
   const cx=(x+X)/2,cy=(y+Y)/2;
   if(samples.some(s=>Math.hypot(cx-s.cx,cy-s.cy)<Math.min(a,b)*.5))continue;
   samples.push({...fits[0],cx,cy});
@@ -171,5 +172,5 @@ export function toiletScale(detections,catalog,width,height){
  const consistent=vals.filter(v=>Math.abs(v/median-1)<=.18);
  if(consistent.length<Math.ceil(vals.length*.67))return null;
  const i=consistent.length>>1,scale=consistent.length%2?consistent[i]:(consistent[i-1]+consistent[i])/2;
- return {metersPerPixel:scale,widthM:width*scale,samples:consistent.length,approximate:true};
+ return {metersPerPixel:scale,widthM:width*scale,heightM:height*scale,samples:consistent.length,totalSamples:samples.length,confidence:consistent.length>=2?'corroborated':'single-reference',approximate:true};
 }
