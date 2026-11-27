@@ -65,3 +65,19 @@ test('Blackline IFC4 round-trip retains distinct objects, classes and global coo
  assert.throws(()=>c.cad3dDecodeIFC(ifc.replace('(1,2,3)','(1,2,99)')));
  assert.throws(()=>c.cad3dDecodeIFC(ifc.replace('0.,0.,0.','1.,0.,0.')));
 });
+
+test('BIMLEVEL metadata validates input and IFC4 preserves assigned storeys',()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(section('function cad3dBimLevelValue(','function cad3dAssignBimLevel(')+section('function cad3dEncodeIFC(','function exportIFC(')+section('function cad3dDecodeIFC(','function cad3dImportIFC('),c);
+ const ground=c.cad3dBimLevelValue(' Ground floor ','0'),upper=c.cad3dBimLevelValue('Level 1',3.2);
+ assert.equal(ground.name,'Ground floor');assert.equal(upper.elevation,3.2);
+ for(const bad of ['',Infinity,10001,'bad'])assert.throws(()=>c.cad3dBimLevelValue('Level',bad));
+ assert.throws(()=>c.cad3dBimLevelValue('',0));
+ let n=0;const rng=()=>Uint8Array.from({length:16},(_,i)=>i===15?++n:0);
+ const ifc=c.cad3dEncodeIFC([{id:1,type:'wall',level:ground,triangles:tri},{id:2,type:'slab',level:upper,triangles:tri},{id:3,type:'wall',level:ground,triangles:tri}],rng);
+ assert.equal((ifc.match(/=IFCBUILDINGSTOREY\(/g)||[]).length,2);
+ assert.equal((ifc.match(/=IFCRELCONTAINEDINSPATIALSTRUCTURE\(/g)||[]).length,2);
+ const items=c.cad3dDecodeIFC(ifc);
+ assert.equal(items[0].level.name,'Ground floor');assert.equal(items[1].level.elevation,3.2);assert.equal(items[2].level.elevation,0);
+ assert.equal(JSON.stringify(items[1].triangles),JSON.stringify(tri),'metadata does not translate world geometry');
+});
