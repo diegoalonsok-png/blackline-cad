@@ -12922,6 +12922,7 @@ window.CAD2D_CORE=Object.freeze({
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
+ personalBlocks:Object.freeze({read:cadPersonalBlocksRead,preview:cadDocumentBlockPreview,insert:cadPersonalBlockInsert}),
  savePersonalBlock:async name=>{if(cadBlockEdit)throw Error('Cerrá el editor de bloques.');return cadPersonalBlockSave(name)},
  exportTrace:async (entities,name,format)=>{
   if(!Array.isArray(entities)||!entities.length||entities.length>12000||entities.some(e=>e.type!=='line'||![e.a?.x,e.a?.y,e.b?.x,e.b?.y].every(Number.isFinite)))throw Error('Trazado inválido');
@@ -13254,7 +13255,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-aberturas.js?v=20261127-aberturas2"></script>
 <script src="assets/cad-calco-ia.js?v=20261127-calcoia1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
-<script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261127-vintage-blue18"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
+<script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261127-unified-block-search19"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>
 <script src="assets/blackline-original-review-viewers.js?v=20261122-5"></script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));</script>
