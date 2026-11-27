@@ -648,10 +648,23 @@
   return tip.concat(rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id})));
  }
  function isScaleFloorPlan(item){return !!item&&!item.classic&&(item.floorPlanVerified===true||item.drawingType==='floor-plan'||item.category==='house'||item.category==='bathroom'||item.planId&&Number.isFinite(item.area))&&!/\b(?:section|elevation|corte|vista|fachada)\b/i.test(String(item.drawingType||''));}
+ const rejectedRasterUrls=new Set();
+ let rasterInsertBusy=false;
  async function insertLocalPreview(item){
-  const im=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=()=>reject(Error('No se pudo cargar la planta'));i.src=item.url;});
-  const w=im.naturalWidth||800,h=im.naturalHeight||800,k=1800/Math.max(w,h),cv=document.createElement('canvas');cv.width=Math.max(1,Math.round(w*k));cv.height=Math.max(1,Math.round(h*k));cv.getContext('2d').drawImage(im,0,0,cv.width,cv.height);
-  const blob=await new Promise(resolve=>cv.toBlob(resolve,'image/png'));if(!blob)throw Error('No se pudo crear imagen');await importReference(new File([blob],item.title+'.png',{type:'image/png'}),{autoToiletScale:isScaleFloorPlan(item)});
+  if(rasterInsertBusy)throw Error('Ya se está cargando una imagen.');
+  if(!item.url||rejectedRasterUrls.has(item.url))throw Error('Imagen excluida de esta sesión por seguridad.');
+  rasterInsertBusy=true;
+  try{
+   const u=new URL(item.url,document.baseURI);if(u.protocol!=='https:'&&u.origin!==location.origin)throw Error('Origen de imagen no admitido');
+   const r=await fetch(u,{signal:AbortSignal.timeout(12000),credentials:'omit'});if(!r.ok)throw Error('Imagen no disponible');
+   const max=12*1024*1024;if(Number(r.headers.get('content-length'))>max)throw Error('Imagen demasiado pesada');
+   const type=(r.headers.get('content-type')||'').split(';')[0].toLowerCase(),ext=({'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif','image/bmp':'bmp'})[type];if(!ext)throw Error('Formato raster no admitido; utilizá el CAD editable o una imagen PNG/JPG/WebP.');
+   if(!r.body)throw Error('Imagen sin datos');
+   const rd=r.body.getReader(),parts=[];let n=0;try{for(;;){const {done,value}=await rd.read();if(done)break;n+=value.length;if(n>max)throw Error('Imagen demasiado pesada');parts.push(value)}}finally{await rd.cancel().catch(()=>{})}
+   const ok=await importReference(new File(parts,(item.title||'referencia')+'.'+ext,{type}),{autoToiletScale:isScaleFloorPlan(item)});
+   if(ok===false)throw Error('Imagen rechazada por el importador CAD.');
+   return true;
+  }catch(e){rejectedRasterUrls.add(item.url);if(webMode)paintWeb();throw e}finally{rasterInsertBusy=false;}
  }
 
  async function archivedReferences(raw){
@@ -745,7 +758,7 @@
  }
  function paintWeb(){
   if(!el||!webMode||el.style.display==='none'||el.classList.contains('min'))return;
-  webItems=onlyArchitecturalDrawings(webItems);
+  webItems=onlyArchitecturalDrawings(webItems).filter(item=>!rejectedRasterUrls.has(item.url)||item.planId||item.cadUrl);
   const roomCat=strictRoomCategory(st.q)||roomQuery(st.q)?.category;
   if(roomCat&&!classicMode)webItems=webItems.filter(x=>x.category===roomCat&&x.drawingType==='floor-plan'&&(x.roomCad===true||verifiedRoomReference(x,roomCat)));
   resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · TECHNICAL DRAWINGS','MAESTROS MODERNOS · DIBUJOS TÉCNICOS'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):((roomQuery(st.q)||strictRoomCategory(st.q))?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA')));
@@ -758,12 +771,12 @@
   for(const [offset,item] of webItems.slice(searchPage*per,searchPage*per+per).entries()){
    const card=document.createElement('div');card.className='web-card';
    const preview=document.createElement('div');preview.className='plan-preview';
-   const img=document.createElement('img');img.alt=item.title||'Planta';img.loading='eager';img.decoding='async';img.referrerPolicy='no-referrer';
-   let retried=false;img.onerror=()=>{if(!retried&&item.url&&item.url!==item.thumb&&/\.(?:png|jpe?g|webp|svg)(?:\?|$)/i.test(item.url)){retried=true;img.src=item.url;return;}const notice=document.createElement('span');notice.textContent=T('Preview unavailable','Miniatura no disponible');preview.replaceChildren(notice);};
+   const img=document.createElement('img');img.alt=item.title||'Planta';img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';
+   img.onerror=()=>{const notice=document.createElement('span');notice.textContent=T('Preview unavailable','Miniatura no disponible');preview.replaceChildren(notice);};
    preview.append(img);img.src=item.thumb;
    const name=document.createElement('a');name.href=item.source;name.target='_blank';name.rel='noopener noreferrer';name.textContent=item.title;name.title=item.title;
    const info=document.createElement('span');info.style.fontSize='10px';const fileType=item.cadUrl?(/\.dwg(?:[?#]|$)/i.test(item.cadUrl)?'DWG':'DXF'):item.planId?'CAD':item.format?item.format.toUpperCase():/\.png(?:[?#]|$)/i.test(item.url||'')?'PNG':'JPG';info.textContent=fileType+' · '+(item.classic?item.license:(item.area!==null?Number(item.area.toFixed(2))+' m²':T('Area unverified','Superficie sin verificar'))+' · '+item.license);
-   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&item.kind!=='portrait'&&!(item.classic&&item.cadUrl)&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'&&!item.cadUrl){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}if(item.tipo){for(const [k,lab] of [['jpg','JPG'],['dxf','DXF'],['dwg','DWG']]){const d=document.createElement('button');d.dataset.web='dl-'+k;d.dataset.index=String(searchPage*per+offset);d.textContent=lab;d.title=T('Download ','Descargar ')+lab;d.style.flex='none';d.style.padding='0 7px';actions.append(d);}}grid.append(card);
+   const button=document.createElement('button');button.dataset.web='insert';button.dataset.index=String(searchPage*per+offset);button.textContent=T('Insert image','Insertar imagen');const actions=document.createElement('div');actions.style.cssText='display:flex;gap:4px;flex:none';button.style.flex='1';if(item.url&&!rejectedRasterUrls.has(item.url)&&item.kind!=='portrait'&&!(item.classic&&item.cadUrl)&&(!(houseMode||roomQuery(st.q))||!(item.planId||item.cadUrl)))actions.append(button);if(item.classic&&item.kind==='plate'&&!item.cadUrl&&!rejectedRasterUrls.has(item.url)){const vb=document.createElement('button');vb.dataset.web='insert-trace';vb.dataset.index=button.dataset.index;vb.textContent=T('Insert + vectorize','Insertar y vectorizar');vb.title='CALCOPY';vb.style.flex='1';actions.append(vb);}card.append(preview,name,info,actions);if(item.planId||item.cadUrl){const cad=document.createElement('button');cad.dataset.web='cad';cad.dataset.index=String(searchPage*per+offset);cad.textContent=T('Insert CAD','Insertar CAD');cad.style.flex='1';actions.append(cad);}if(item.tipo){for(const [k,lab] of [['jpg','JPG'],['dxf','DXF'],['dwg','DWG']]){const d=document.createElement('button');d.dataset.web='dl-'+k;d.dataset.index=String(searchPage*per+offset);d.textContent=lab;d.title=T('Download ','Descargar ')+lab;d.style.flex='none';d.style.padding='0 7px';actions.append(d);}}grid.append(card);
    if(needsSanitaryPreview(item)&&window.CAD2D_SANITARY_PREVIEW){
     const r=sanitaryGalleryResult(item);
     if(r?.preview&&!r.issues.length){img.onerror=()=>{card.remove();};img.src=r.preview;name.href=r.preview;for(const b of actions.querySelectorAll('button'))if(/^dl-/.test(b.dataset.web||'')){b.disabled=true;b.title=T('Regenerate export from editable CAD','Regenerar exportación desde el CAD editable');}}
@@ -772,14 +785,14 @@
   if(!webItems.length){const p=document.createElement('p');p.style.cssText='grid-column:1/-1;color:#51432e;font-size:12px';p.textContent=webStatus;grid.append(p)}
   const ft=el.querySelector('.ft');ft.replaceChildren();const prev=document.createElement('button'),next=document.createElement('button'),label=document.createElement('span');prev.dataset.page='-1';next.dataset.page='1';prev.textContent='‹';next.textContent='›';prev.disabled=searchPage===0;next.disabled=(searchPage+1)*per>=webItems.length;label.textContent=webItems.length?((searchPage*per+1)+'–'+Math.min((searchPage+1)*per,webItems.length)+' / '+webItems.length):'0';ft.append(prev,label,next);
  }
- async function importReference(f,opts={}){if(!window.CAD2D_IMPORT_REFERENCE)throw Error('Importador no disponible');const ok=await window.CAD2D_IMPORT_REFERENCE(f,opts);if(ok!==false)close()}
+ async function importReference(f,opts={}){if(!window.CAD2D_IMPORT_REFERENCE)throw Error('Importador no disponible');const ok=await window.CAD2D_IMPORT_REFERENCE(f,opts);if(ok!==false)close();return ok}
  async function importWebUrl(url,opts={}){
   const u=safeHttps(url);if(!u)throw Error('URL HTTPS inválida');const ext=new URL(u).pathname.match(/\.(pdf|png|jpe?g|webp|dxf|dwg)$/i)?.[1];if(!ext)throw Error('Usá un enlace directo PDF, PNG, JPG, DXF o DWG');
   const res=await fetch(u,{credentials:'omit',signal:AbortSignal.timeout(20000)});if(!res.ok)throw Error('HTTP '+res.status);
   if(/text\/html/i.test(res.headers.get('content-type')||''))throw Error('El enlace es una página, no un archivo');
-  const max=30*1024*1024;if(Number(res.headers.get('content-length'))>max)throw Error('Máximo 30 MB');
+  const max=/^(?:png|jpe?g|webp)$/i.test(ext)?12*1024*1024:30*1024*1024;if(Number(res.headers.get('content-length'))>max)throw Error('Máximo 30 MB');
   const reader=res.body.getReader(),parts=[];let size=0;try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max)throw Error('Máximo 30 MB');parts.push(value)}}finally{await reader.cancel().catch(()=>{})}
-  await importReference(new File(parts,'referencia.'+ext.toLowerCase(),{type:res.headers.get('content-type')||''}),opts);
+  const ok=await importReference(new File(parts,'referencia.'+ext.toLowerCase(),{type:res.headers.get('content-type')||''}),opts);if(ok===false)throw Error('Archivo rechazado por el importador CAD.');
  }
  async function handleWebAction(button){
   const a=button.dataset.web,q=el.querySelector('input[type=search]').value;
@@ -794,7 +807,7 @@
   if(a==='file'){const i=document.createElement('input');i.type='file';i.accept='.pdf,.png,.jpg,.jpeg,.webp,.dxf,.dwg';i.onchange=()=>{if(i.files[0])importReference(i.files[0]).catch(e=>CORE.toast(e.message))};i.click();return;}
   const item=(a==='insert'||a==='cad'||a==='insert-trace')?webItems[Number(button.dataset.index)]:null;
   if(item&&!approvedArchitecturalDrawing(item))return CORE.toast(T('Only approved architectural drawings','Solo dibujos arquitectónicos aprobados'));
-  if(a==='insert-trace'&&item?.local){button.disabled=true;try{await insertLocalPreview(item);setTimeout(()=>{try{const S=CORE.state,im=S.entities.filter(e=>e.type==='image').at(-1);if(im){S.selected=[im.id];}if(window.CAD2D_CALCO)window.CAD2D_CALCO(true);else CORE.toast('CALCOPY');}catch(e){CORE.toast(e.message)}},400);}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
+  if(a==='insert-trace'&&item?.local){button.disabled=true;try{if(!await insertLocalPreview(item))return;setTimeout(()=>{try{const S=CORE.state,im=S.entities.filter(e=>e.type==='image').at(-1);if(im){S.selected=[im.id];}if(window.CAD2D_CALCO)window.CAD2D_CALCO(true);else CORE.toast('CALCOPY');}catch(e){CORE.toast(e.message)}},400);}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(a==='cad'&&item?.cadUrl){button.disabled=true;const epoch=webEpoch;try{if(item.roomCad&&window.cadInsertDxfPlan){const ok=await window.cadInsertDxfPlan(item.cadUrl,item.title,{isCurrent:()=>webMode&&epoch===webEpoch});if(ok)close();}else await importWebUrl(item.cadUrl)}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(item?.tipo&&/^dl-(jpg|dxf|dwg)$/.test(a)){button.disabled=true;try{const kind=a.slice(3);let blob;if(kind==='dxf'){const r=await fetch(item.dxfGz);if(!r.ok)throw Error('DXF no disponible');blob=await new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).blob();blob=new Blob([blob],{type:'application/dxf'});}else{const r=await fetch(kind==='jpg'?item.url:item.dwg);if(!r.ok)throw Error(kind.toUpperCase()+' no disponible');blob=await r.blob();}const u=URL.createObjectURL(blob),l=document.createElement('a');l.href=u;l.download=item.tipo+'.'+kind;document.body.append(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
   if(a==='cad'&&item?.planId){const epoch=webEpoch;button.disabled=true;try{if(!window.CAD2D_INSERT_CATALOGUE_PLAN)throw Error('Importador CAD no disponible');const ok=await window.CAD2D_INSERT_CATALOGUE_PLAN(item.planId,()=>webMode&&epoch===webEpoch);if(ok)close();}catch(e){CORE.toast(e.message)}finally{button.disabled=false}return;}
