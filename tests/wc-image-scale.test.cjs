@@ -12,7 +12,7 @@ test('toilet scale rejects cropped, room-sized, tiny and incompatible labels',as
 });
 test('WC image resize is uniform, anchored and respects model units',()=>{
  const src=fs.readFileSync(path.join(__dirname,'../assets/cad-pdf-import.js'),'utf8');
- const a=src.indexOf('function toiletImageResize'),b=src.indexOf('async function wcScaleImage',a);
+ const a=src.indexOf('function toiletImageResize'),b=src.indexOf('// Calibrate from a measured segment',a);
  const resize=new Function(src.slice(a,b)+'return toiletImageResize;')();
  for(const [unit,w,h] of [[1000,5,4],[1,5000,4000],[10,500,400]]){
   const image={a:{x:4,y:5},b:{x:4+w,y:5-h}};
