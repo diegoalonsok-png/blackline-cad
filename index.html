@@ -8700,7 +8700,24 @@ function cadRasterHeader(bytes){
  throw Error('Imagen no reconocida o dañada. Usá PNG, JPG o WebP.');
 }
 function cadRasterSizeOK(w,h){return Number.isInteger(w)&&Number.isInteger(h)&&w>0&&h>0&&w<=8192&&h<=8192&&w*h<=12000000;}
+let cadRasterImportBusy=false;
 async function cadReadImage(file){
+ if(!file||!file.size||file.size>12*1024*1024)throw Error('Imagen rechazada: máximo 12 MB.');
+ if(typeof Worker==='undefined')return cadReadImageLocal(file);
+ let worker;try{worker=new Worker(new URL('cad-raster-import-worker.js?v=20261127-raster1',document.baseURI))}catch(e){return cadReadImageLocal(file)}
+ const result=await new Promise((resolve,reject)=>{
+  let finished=false;const finish=(err,value)=>{if(finished)return;finished=true;clearTimeout(timer);worker.terminate();if(err)reject(err);else resolve(value)};
+  const timer=setTimeout(()=>finish(Error('Tiempo de procesamiento de imagen agotado; dibujo conservado')),15000);
+  worker.onmessage=ev=>{const v=ev.data||{};if(v.error)finish(Error(v.error));else if(v.unsupported)finish(null,v);else if(v.blob&&cadRasterSizeOK(v.w,v.h)&&v.blob.size<=1800000)finish(null,v);else finish(Error('Imagen optimizada inválida'))};
+  worker.onerror=()=>finish(Error('No se pudo procesar la imagen localmente'));
+  worker.onmessageerror=()=>finish(Error('No se pudo recuperar la imagen'));
+  try{worker.postMessage({file})}catch(e){finish(e)}
+ });
+ if(result.unsupported)return cadReadImageLocal(file);
+ const src=await new Promise((ok,ko)=>{const rd=new FileReader();rd.onload=()=>ok(rd.result);rd.onerror=()=>ko(Error('No se pudo leer la imagen optimizada'));rd.readAsDataURL(result.blob)});
+ return {src,w:result.w,h:result.h};
+}
+async function cadReadImageLocal(file){
  if(!file||!file.size||file.size>12*1024*1024)throw Error('Imagen rechazada: máximo 12 MB.');
  const header=cadRasterHeader(new Uint8Array(await file.arrayBuffer()));
  if(!cadRasterSizeOK(header.w,header.h))throw Error('Imagen rechazada: máximo 12 megapíxeles y 8192 px por lado.');
@@ -8833,10 +8850,17 @@ $('cadImportTableBtn').onclick=()=>{
 async function cadImportFile(f,insertPoint=null){
  try{
   if(/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)){
-   const img=await cadReadImage(f),c=insertPoint||cadViewCenter(),W=cadViewWidth()*.5,H=W*img.h/img.w;
+   if(cadRasterImportBusy){toast('Ya se está preparando una imagen; esperá a que termine');return false}
+   cadRasterImportBusy=true;const original=state.entities,originalUnit=state.unit;
+   try{
+   toast('Preparando foto del plano…');
+   const img=await cadReadImage(f);
+   if(original!==state.entities||originalUnit!==state.unit)throw Error('El dibujo cambió; volvé a insertar la foto en el dibujo actual.');
+   const c=insertPoint||cadViewCenter(),W=cadViewWidth()*.5,H=W*img.h/img.w;
    const imageBytes=state.entities.reduce((n,e)=>n+(e.type==='image'&&typeof e.src==='string'?e.src.length:0),0);if(imageBytes+img.src.length>8*1024*1024)throw Error('Límite de memoria de imágenes del dibujo. Quitá alguna referencia antes de insertar otra.');
    saveHistory();const e={id:state.nextId++,type:'image',src:img.src,a:P(insertPoint?c.x:c.x-W/2,insertPoint?c.y-H:c.y-H/2),b:P(insertPoint?c.x+W:c.x+W/2,insertPoint?c.y:c.y+H/2),layer:state.layerId,name:f.name,pxW:img.w,pxH:img.h};state.entities.push(e);state.selected=[e.id];updateAll();
    toast('Image placed: '+f.name+' · use SCALE or the grips to size it, M to move it');log('IMAGEATTACH '+f.name);return true;
+   }finally{cadRasterImportBusy=false}
   }
   if(/\.doc$/i.test(f.name))return toast('For Word .doc files, save as .docx or .txt first');
   if(/\.docx$/i.test(f.name)){
@@ -8891,7 +8915,7 @@ async function loadDrawingFile(f){if(!f)return;
  if(/\.(bak|sv\$|tmp)$/i.test(f.name)){const head=new TextDecoder('latin1').decode(await f.slice(0,64).arrayBuffer()),base=f.name.replace(/\.(bak|sv\$|tmp)$/i,'').replace(/_\d{8}-\d{4}$/,'');
   const ext=/^AC10\d\d/.test(head)?'.dwg':/^\s*[\[{]/.test(head)?'.cadjson':'.dxf';toast('Abriendo copia de seguridad '+f.name+' como '+ext.slice(1).toUpperCase());
   return loadDrawingFile(new File([f],base+ext,{type:f.type}))}
-if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)await cadOpenDXFAsync(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.layerStates=cadLayerStatesValidate(data.layerStates);state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||Math.max(0,...state.entities.map(e=>e.id))+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');cadDrawingExt=/\.dxf$/i.test(f.name)?'dxf':'cadjson';state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
+if(/\.pdf$/i.test(f.name)){if(window.CAD2D_PDF_IMPORT)return window.CAD2D_PDF_IMPORT(f);return toast('Importador de PDF no disponible')}if(/\.(png|jpe?g|webp|gif|bmp|txt|csv|tsv|xlsx|xls|docx|doc)$/i.test(f.name))return cadImportFile(f);try{if(/\.dwg$/i.test(f.name)){await convertDWGAutomatically(f);return}let txt=/\.dxf$/i.test(f.name)?await cadDxfDecode(await f.arrayBuffer()):await f.text(),embedded=false;if(/\.dxf$/i.test(f.name)){const mark=txt.lastIndexOf('\n'+CAD2D_DXF_PROJECT_MARK+'\n');if(mark>0&&txt.slice(0,mark).trimEnd().endsWith('EOF')){try{const proj=txt.slice(mark+CAD2D_DXF_PROJECT_MARK.length+2).trim();JSON.parse(proj);txt=proj;embedded=true}catch(e){}}}if(/\.dxf$/i.test(f.name)&&!embedded&&!txt.includes('SECTION'))throw Error('This DXF is not a recognized ASCII DXF. Please save it as ASCII DXF in a CAD application.');if(/\.dxf$/i.test(f.name)&&!embedded)await cadOpenDXFAsync(txt,f.name);else if(/\.svg$/i.test(f.name))importSVG(txt,f.name);else{let data=JSON.parse(txt);if(!Array.isArray(data.entities)||!Array.isArray(data.layers))throw Error('Invalid CAD project');saveHistory();state.entities=data.entities;state.layers=data.layers;state.layerStates=cadLayerStatesValidate(data.layerStates);state.blocks=data.blocks||{};state.dimStyles=data.dimStyles&&typeof data.dimStyles==='object'&&!Array.isArray(data.dimStyles)?Object.fromEntries(Object.entries(data.dimStyles).slice(0,200).map(([name,style])=>[name,validateDimStyle(style)]).filter(([,style])=>style)):{};state.activeDimStyle=state.dimStyles[data.activeDimStyle]?data.activeDimStyle:'';renderDimStyles();if(state.activeDimStyle)applyDimStyleToForm(state.dimStyles[state.activeDimStyle]);state.ctb=cadValidCtb(data.ctb);if(data.layout)applyLayoutState(data.layout);if(!cadLayoutsLoad(data.layouts)){cadLayouts=[{name:'Layout 1',state:data.layout||null}];cadLayoutIdx=0;renderLayoutTabs()};renderBlockLibrary();state.unit=data.unit||'m';state.grid=data.grid||1;state.precision=data.precision??2;state.ltscale=Number(data.ltscale)||1;state.nextId=data.nextId||state.entities.reduce((max,e)=>Math.max(max,Number(e.id)||0),0)+1;state.layerId=state.layers.some(l=>l.id===data.layerId)?data.layerId:(state.layers[0]?.id||'0');cadDrawingExt=/\.dxf$/i.test(f.name)?'dxf':'cadjson';state.file=cadCleanDrawingName(data.filename||f.name.replace(/\.(cadjson|json)$/i,''));$('units').value=state.unit;$('gridSpacing').value=state.grid;$('precision').value=state.precision;updateAll();zoomExtents();toast('Project opened')}}catch(ex){alert(`Unable to open file: ${ex.message}`)}}$('fileInput').onchange=async ev=>{const file=ev.target.files[0];await loadDrawingFile(file);ev.target.value=''};
 let dragDepth=0;document.addEventListener('dragenter',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files')){ev.preventDefault();dragDepth++}});document.addEventListener('dragover',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))ev.preventDefault()});document.addEventListener('dragleave',ev=>{if([...ev.dataTransfer?.types||[]].includes('Files'))dragDepth=Math.max(0,dragDepth-1)});document.addEventListener('drop',async ev=>{if(ev.dataTransfer?.files?.length){
  ev.preventDefault();dragDepth=0;
  const f=ev.dataTransfer.files[0],rect=canvas.getBoundingClientRect();
@@ -9205,9 +9229,9 @@ async function cadInsertDxfPlan(url,label,opts={}){
  cadPendingPlanCancel?.();
  const original=state.entities,blocks=state.blocks,unit=state.unit,epoch=cadDrawEpoch;
  const initialTool=state.tool,initialStage=state.stage;
- let cancelled=false,armed=false;
+ const planController=new AbortController();let cancelled=false,armed=false;
  const valid=()=>!cancelled&&state.entities===original&&state.blocks===blocks&&state.unit===unit&&cadDrawEpoch===epoch&&(armed?state.tool==='select':state.tool===initialTool&&state.stage===initialStage&&(!opts.isCurrent||opts.isCurrent()));
- const cleanup=()=>{cancelled=true;canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);if(armed&&canvas.style.cursor==='copy')canvas.style.cursor='';if(cadPendingPlanCancel===cleanup)cadPendingPlanCancel=null};
+ const cleanup=()=>{cancelled=true;planController.abort();canvas.removeEventListener('pointerdown',onDown,true);document.removeEventListener('keydown',onKey,true);if(armed&&canvas.style.cursor==='copy')canvas.style.cursor='';if(cadPendingPlanCancel===cleanup)cadPendingPlanCancel=null};
  const onKey=ev=>{if(ev.key==='Escape'){cleanup();toast('Inserción cancelada')}};
  const onDown=ev=>{
   if(!valid()){cleanup();return}
@@ -9217,7 +9241,7 @@ async function cadInsertDxfPlan(url,label,opts={}){
  };
  cadPendingPlanCancel=cleanup;document.addEventListener('keydown',onKey,true);
  let parsed;
- try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);if(!valid()){cleanup();return false}const text=await cadDxfDecode(await r.arrayBuffer());if(!valid()){cleanup();return false}parsed=importDXF(text,label||'plano',{parseOnly:true})}
+ try{const r=await fetch(url,{signal:planController.signal});if(!r.ok)throw Error('HTTP '+r.status);if(!valid()){cleanup();return false}const text=await cadDxfDecode(await r.arrayBuffer());if(!valid()){cleanup();return false}parsed=await cadParseDXFWorker(text,readDimensionStyle(),planController.signal)}
  catch(e){const report=valid();cleanup();if(report)toast('No se pudo cargar el plano: '+e.message);return false}
  if(!valid()){cleanup();return false}
  const fromUnit={1:'in',2:'ft',3:'mi',4:'mm',5:'cm',6:'m',7:'km',10:'yd'}[parsed.unitCode]||'m',k=U[fromUnit]/U[state.unit];
