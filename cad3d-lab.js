@@ -4866,14 +4866,15 @@ function cad3dInitSemanticRender(panel){
  function save(next){next=ai.validate(next);localStorage.setItem(key,JSON.stringify(next));data=next;resetPractice();schedulePractice();}
  try{var saved=localStorage.getItem(key);if(saved)data=ai.validate(JSON.parse(saved));}catch(e){message('No se pudo recuperar el entrenamiento guardado: '+e.message);}
  if(!status.textContent)message(data.examples.length+' ejemplos locales · sin clave ni servicio externo. Ajustá el render y enseñale tus preferencias.');
- var auto=section.querySelector('[data-semantic-auto]'),practiceStatus=section.querySelector('[data-semantic-practice-status]'),worker=null,jobTimer=null,timeout=null,round=0,revision=0,calibration=ai.calibration(),lastScene=null,lastPrompt='',calKey=key+'-calibration';
+ var auto=section.querySelector('[data-semantic-auto]'),practiceStatus=section.querySelector('[data-semantic-practice-status]'),worker=null,jobTimer=null,timeout=null,round=0,revision=0,calibration=ai.calibration(),lastScene=null,lastPrompt='',practiceArmed=false,manualJob=false,calKey=key+'-calibration';
  var fingerprint=()=>JSON.stringify(data);
  try{var savedCal=JSON.parse(localStorage.getItem(calKey)||'null');if(savedCal?.dataset===fingerprint()){calibration=ai.calibration(savedCal.calibration);round=Math.max(0,Math.min(3,Number(savedCal.round)||0));}}catch(e){}
  function stopPractice(){clearTimeout(jobTimer);clearTimeout(timeout);jobTimer=null;timeout=null;if(worker){worker.terminate();worker=null;}}
- function resetPractice(){revision++;stopPractice();round=0;calibration=ai.calibration();}
- function schedulePractice(){clearTimeout(jobTimer);if(!auto.checked||panel.hidden||document.hidden||round>=3||worker)return;jobTimer=setTimeout(()=>runPractice(false),12000);}
+ function resetPractice(){revision++;stopPractice();round=0;calibration=ai.calibration();practiceArmed=true;}
+ function schedulePractice(){clearTimeout(jobTimer);if(!practiceArmed||!auto.checked||document.hidden||round>=3||worker)return;jobTimer=setTimeout(()=>runPractice(false),12000);}
  function runPractice(manual){
-  if(worker||panel.hidden||document.hidden||(!manual&&(!auto.checked||round>=3)))return;
+  if(worker||document.hidden||(!manual&&(!practiceArmed||!auto.checked||round>=3)))return;
+  manualJob=manual;
   var ticket=revision;practiceStatus.textContent='Práctica local · evaluando parámetros y renders pequeños…';
   try{
    worker=new Worker(new URL('assets/cad3d-semantic-practice-worker.js',document.baseURI));
@@ -4893,12 +4894,15 @@ function cad3dInitSemanticRender(panel){
  }
  auto.addEventListener('change',()=>{if(auto.checked)schedulePractice();else stopPractice();});
  section.querySelector('[data-semantic-practice]').addEventListener('click',()=>runPractice(true));
- new MutationObserver(()=>{if(panel.hidden)stopPractice();else schedulePractice();}).observe(panel,{attributes:true,attributeFilter:['hidden']});
+ // Keep practice available while the render panel is closed, but yield to CAD input.
+ function yieldPractice(){if(worker&&!manualJob)stopPractice();schedulePractice();}
+ root.addEventListener('pointerdown',yieldPractice,{capture:true,passive:true});
+ root.addEventListener('keydown',yieldPractice,{capture:true});
  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPractice();else schedulePractice();});
  function rememberPracticeScene(){
   var gb=cad3dStudioGBuffer;if(!gb)return;var f=Math.min(1,120/gb.w,100/gb.h),small=engine.resample(gb,Math.max(1,Math.round(gb.w*f)),Math.max(1,Math.round(gb.h*f)));
   lastScene={w:small.w,h:small.h,id:small.id,depth:small.depth,normal:small.normal,light:small.light,lightFree:small.lightFree,materials:small.materials,camera:small.camera,up:small.up,cut:small.cut,segments:(small.segments||[]).slice(0,300)};lastPrompt=prompt.value;
-  round=0;schedulePractice();
+  round=0;practiceArmed=true;schedulePractice();
  }
  var mapping={color:'studioColor',density:'studioDensity',shadow:'studioShadow',grain:'studioGrain',lineWeight:'studioLineWeight',extension:'studioExtension',jitter:'studioJitter',depthCue:'studioDepthCue',dirt:'studioDirt'};
  function apply(pred){
