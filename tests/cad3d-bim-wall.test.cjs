@@ -19,3 +19,22 @@ test('BIM wall keeps missing quantities null and connects existing property cont
  for(const token of ['data-bim-level','data-bim-wall','data-bim-qto','cad3dBimWallLayers(r.bimWallLayers,o.d)'])assert.ok(s.includes(token),token);
  assert.doesNotThrow(()=>new Function(s));
 });
+
+test('structural BIM primitives remain editable native boxes with reliable volumes',()=>{
+ const spec=new Function(section('function cad3dBimStructureSpec(','function cad3dCreateBimStructure(')+';return cad3dBimStructureSpec;')();
+ const mass=new Function(section('function cad3dMassProperties(','function cad3dPropertyDetails(')+';return cad3dMassProperties;')();
+ for(const [kind,dims,expected] of [['Column',[.3,.3,3,2,3,0],.27],['Beam',[4,.25,.45,0,0,3],.45],['Footing',[1.2,1.2,.4,0,0,-.4],.576]]){
+  const r=spec(kind,dims);assert.equal(r.type,'box');assert.equal(r.bimClass,kind);assert.ok(Math.abs(mass(r).volume-expected)<1e-12);
+ }
+ assert.throws(()=>spec('Beam',[0,.25,.45,0,0,0]));
+ assert.throws(()=>spec('Unknown',[1,1,1,0,0,0]));
+ assert.throws(()=>spec('Column',[1,1,1,NaN,0,0]));
+});
+test('IFC4 exchange preserves structural element classes',()=>{
+ const x=new Function(section('function cad3dEncodeIFC(','function exportIFC(')+section('function cad3dDecodeIFC(','function cad3dImportIFC(')+';return {cad3dEncodeIFC,cad3dDecodeIFC};')();
+ let i=0;const rng=()=>Uint8Array.from({length:16},(_,k)=>k===15?++i:0);
+ const triangles=[[[0,0,0],[1,0,0],[0,1,0]]];
+ const ifc=x.cad3dEncodeIFC(['column','beam','footing'].map((type,id)=>({id,type,triangles})),rng);
+ assert.match(ifc,/=IFCFOOTING\(/);
+ assert.deepEqual(x.cad3dDecodeIFC(ifc).map(r=>r.ifcClass),['Column','Beam','Footing']);
+});
