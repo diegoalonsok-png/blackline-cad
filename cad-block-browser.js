@@ -205,6 +205,14 @@
 #cadBlockBrowser.visual.web-reference .web-card .plan-preview,#cadBlockBrowser.visual.web-reference .web-card img{background:#fff}
 #cadBlockBrowser.visual.web-reference .classic-links{color:#345366!important}
 #cadBlockBrowser.visual.web-reference .classic-links button{background:#edf4f8!important;border-color:#8eaabb!important;color:#345366!important}
+#cadBlockBrowser.visual.arq-block-search{background:#c8dbe5;border-color:#7894a6;color:#263f4d}
+#cadBlockBrowser.visual.arq-block-search .hd{background:#a9c4d4;border-color:#829faf}
+#cadBlockBrowser.visual.arq-block-search .hd b,#cadBlockBrowser.visual.arq-block-search .hd button{color:#284352}
+#cadBlockBrowser.visual.arq-block-search .tools,#cadBlockBrowser.visual.arq-block-search .grid{background:#d5e4ec;border-color:#9db6c5}
+#cadBlockBrowser.visual.arq-block-search input[type=search],#cadBlockBrowser.visual.arq-block-search .card{background:#edf4f8;color:#263f4d;border-color:#9db7c7}
+#cadBlockBrowser.visual.arq-block-search .card .preview{background:#fff}
+#cadBlockBrowser.visual.arq-block-search .card .nm,#cadBlockBrowser.visual.arq-block-search .card .mt{color:#34566b}
+#cadBlockBrowser.visual.arq-block-search .ft,#cadBlockBrowser.visual.arq-block-search .ft button{background:#bdd3e0;border-color:#91adbe;color:#284352}
 
 `;document.head.append(css);
 
@@ -315,7 +323,7 @@
   const forms=wordForms(w),aliases=aliasesFor(w),rx=termIndex.get(w);
   if(words.some(t=>forms.some(v=>wordForms(t).includes(v))))return 0;
   if(words.some(t=>aliases.includes(t))||(rx&&rx.test(words.join(' '))))return 1;
-  if(w.length>=3&&words.some(t=>t.startsWith(w)&&t.length<=w.length+7))return 2;
+  if(w.length>=3&&!termIndex.has(w)&&!aliases.length&&words.some(t=>t.startsWith(w)&&t.length<=w.length+7))return 2;
   if(allowFuzzy&&w.length>=4&&words.some(t=>t.length>=4&&Math.abs(t.length-w.length)<=(w.length>=7?2:1)&&editDistance(w,t)<=(w.length>=7?2:1)))return 4;
   return -1;
  }
@@ -410,6 +418,22 @@
    nodes.forEach(node=>previewObserver.observe(node));
   }else nodes.forEach(enqueue);
  }
+ let personalBlocks=null,personalLoad=null,uploadedSearch={q:null,rows:[],pending:false};
+ const extraMatches=new Map();
+ function loadPersonalBlocks(){
+  if(personalBlocks!==null||personalLoad||!CORE.personalBlocks)return;
+  personalLoad=CORE.personalBlocks.read().then(rows=>{personalBlocks=Array.isArray(rows)?rows:[];}).catch(()=>{personalBlocks=[];}).finally(()=>{personalLoad=null;if(commandGallery&&!webMode)paint();});
+ }
+ document.addEventListener('cad-personal-blocks-changed',()=>{personalBlocks=null;if(commandGallery&&!webMode){loadPersonalBlocks();paint();}});
+ function extraSearch(query){
+  extraMatches.clear();if(!query.q||!query.text)return [];
+  const out=[];const add=(key,name,def,personal,uploaded)=>{if(!uploaded&&(!def?.entities?.length||def.xref))return;const rank=uploaded?uploaded.searchRank:nameMatchRank(query.text,name);if(rank<0)return;const item={id:key,name,cat:'Mis bloques',w:0,d:0,extraRank:rank*3,extra:true};extraMatches.set(key,{name,def,personal,uploaded});out.push(item);};
+  Object.entries(CORE.state.blocks||{}).forEach(([name,def],i)=>add('doc-search-'+i,name,def,null,null));
+  (personalBlocks||[]).forEach((item,i)=>add('saved-search-'+i,item.name,item.definition,item,null));
+  if(uploadedSearch.q!==query.q){const request={q:query.q,rows:[],pending:true};uploadedSearch=request;userCadMatches(query.q,Infinity).then(rows=>{request.rows=rows;}).catch(()=>{}).finally(()=>{request.pending=false;if(uploadedSearch===request&&commandGallery&&!webMode&&blockQuery(st.q).q===request.q)paint();});}
+  uploadedSearch.rows.forEach((item,i)=>add('upload-search-'+i,item.title,null,null,item));
+  return out;
+ }
  function paint(){
   if(!el||el.style.display==='none'||el.classList.contains('min'))return;
   if(webMode){paintWeb();return;}
@@ -422,7 +446,7 @@
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
-  el.classList.remove('web-reference','house-gallery');el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
+  el.classList.remove('web-reference','house-gallery');el.classList.toggle('arq-block-search',commandGallery);el.classList.toggle('visual',visual);el.classList.toggle('compact-search',commandGallery);
   el.setAttribute('aria-label',visual?T('Visual block gallery','Galería visual de bloques'):'Block browser');
   el.querySelector('.hd b').textContent=visual?'BLACKLINE CAD · '+T('VISUAL GALLERY','GALERÍA VISUAL'):'BLACKLINE CAD · '+T('BLOCK BROWSER','EXPLORADOR DE BLOQUES');
   el.querySelectorAll('.tabs button').forEach(b=>{b.classList.toggle('on',b.dataset.v===st.view);if(b.dataset.v==='imported')b.textContent=T('Imported blocks','Bloques importados')+' · '+allItems.filter(it=>/^userdx4-/.test(it.id)).length;});
@@ -432,17 +456,25 @@
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
   const list=filtered(pool),grid=el.querySelector('.grid');
-  const searchQuery=blockQuery(st.q);
+  const searchQuery=blockQuery(st.q);if(commandGallery&&searchQuery.q){loadPersonalBlocks();list.push(...extraSearch(searchQuery));}else extraMatches.clear();
   if(visual)list.sort((a,b)=>{
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
-   return blockMatchRank(a,searchQuery)-blockMatchRank(b,searchQuery)||Number(archivedView(a))-Number(archivedView(b))||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
+   return (a.extra?a.extraRank:blockMatchRank(a,searchQuery))-(b.extra?b.extraRank:blockMatchRank(b,searchQuery))||Number(!a.extra)-Number(!b.extra)||Number(archivedView(a))-Number(archivedView(b))||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
   });
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=commandGallery?100:visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)%3===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>it.extra?`<button class="card" data-extra-id="${it.id}"></button>`:`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)%3===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  for(const node of grid.querySelectorAll('[data-extra-id]')){
+   const item=extraMatches.get(node.dataset.extraId);if(!item)continue;
+   const preview=document.createElement('span');preview.className='preview';
+   if(item.uploaded){const img=document.createElement('img');img.loading='lazy';img.decoding='async';img.src=item.uploaded.thumb;img.alt='CAD';img.onerror=()=>{preview.textContent='CAD';};preview.append(img);}
+   else if(CORE.personalBlocks?.preview){try{preview.append(CORE.personalBlocks.preview(item.def));}catch(e){preview.textContent='CAD';}}
+   else preview.textContent='CAD';
+   const name=document.createElement('span');name.className='nm';name.textContent=item.name;
+   const meta=document.createElement('span');meta.className='mt';meta.textContent=item.uploaded?'DXF':item.personal?T('Saved block','Bloque guardado'):T('Drawing block','Bloque del plano');
+   node.append(preview,name,meta);
+  }
   mountPreviews(grid);
-  if(commandGallery&&list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q||!el)return;const b=document.createElement('button');b.className='card';b.style.cssText='grid-column:1/-1;justify-content:center;align-items:center;min-height:44px;text-align:center;font-weight:600';b.textContent=T('Your DWG/DXF blocks: ','Tus bloques DWG/DXF: ')+items.length+' →';b.onclick=()=>{openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();};grid.prepend(b);}).catch(()=>{});}
-  if(commandGallery&&!list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q)return;openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();}).catch(()=>{});}
 
   if(!commandGallery&&list.length>shown.length)grid.insertAdjacentHTML('beforeend',`<button class="card" data-more="1" style="justify-content:center;align-items:center;min-height:110px;text-align:center">${T('Show more','Mostrar más')} · ${list.length-shown.length} ${T('remaining','restantes')}</button>`);
   el.querySelector('.ft').textContent=visual
@@ -483,6 +515,14 @@
    const v=e.target.closest('[data-v]')?.dataset.v;if(v){selectionEpoch++;st.view=v;st.cat='';visibleCount=pageSize();save();paint();return}
    const c=e.target.closest('[data-c]');if(c){selectionEpoch++;st.cat=c.dataset.c;visibleCount=pageSize();save();paint();return}
    if(e.target.closest('[data-more]')){const grid=el.querySelector('.grid'),pos=grid.scrollTop;visibleCount+=pageSize();paint();el.querySelector('.grid').scrollTop=pos;return}
+   const extra=e.target.closest('[data-extra-id]');
+   if(extra){const item=extraMatches.get(extra.dataset.extraId);if(!item)return;const epoch=++selectionEpoch,initial=CORE.state;const entities=initial.entities,blocks=initial.blocks;const current=()=>epoch===selectionEpoch&&el?.style.display!=='none'&&CORE.state.entities===entities&&CORE.state.blocks===blocks&&CORE.state.tool==='select'&&!CORE.state.stage?.length;
+    if(!current())return CORE.toast(T('Finish the current CAD command','Terminá el comando CAD actual'));
+    try{if(item.uploaded){extra.disabled=true;try{if(!window.cadInsertDxfPlan)throw Error('Importador DXF no disponible');const ok=await window.cadInsertDxfPlan(item.uploaded.cadUrl,item.name,{isCurrent:current});if(ok)close();}finally{extra.disabled=false;}}
+     else if(item.personal){if(!CORE.personalBlocks?.insert)throw Error('Biblioteca no disponible');CORE.personalBlocks.insert(item.personal);close();}
+     else{window.BlacklineBlockAPI.selectBlock(item.name);close();}
+    }catch(err){CORE.toast(String(err?.message||err));}return;
+   }
    const card=e.target.closest('[data-id]');
    if(card){
     const targetId=card.dataset.id,epoch=++selectionEpoch,initial=CORE.state;
@@ -678,7 +718,7 @@
   if(!q)return [];
   const scored=rows.map(x=>[nameMatchRank(q,x.name,[x.id,x.original_name,x.filename,Array.isArray(x.tags)?x.tags.join(' '):x.tags].filter(Boolean).join(' '),[x.category,x.category_title].join(' ')),x]).filter(([rank])=>rank>=0).sort((a,b)=>a[0]-b[0]||String(a[1].name).localeCompare(String(b[1].name))).slice(0,max);
   const root=new URL('./',document.baseURI);
-  return scored.map(([,x])=>({title:x.name||x.id,category:x.category,drawingType:'cad-block',thumb:new URL(x.preview,root).href,cadUrl:new URL(x.dxf,root).href,source:new URL(x.dxf,root).href,license:T('DWG/DXF uploaded · ','DWG/DXF propio · ')+(x.category_title||x.category||''),roomCad:true,local:true}));
+  return scored.map(([searchRank,x])=>({searchRank,title:x.name||x.id,category:x.category,drawingType:'cad-block',thumb:new URL(x.preview,root).href,cadUrl:new URL(x.dxf,root).href,source:new URL(x.dxf,root).href,license:T('DWG/DXF uploaded · ','DWG/DXF propio · ')+(x.category_title||x.category||''),roomCad:true,local:true}));
  }
  let roomCADPromise=null;
  function roomCADIndex(){if(!roomCADPromise)roomCADPromise=fetch(new URL('assets/arq-room-cad/v1/index.json?v=20261126-clearance-v2',document.baseURI)).then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.json()}).then(d=>{if(d.schema!=='blackline-room-cad-v1'||d.units!=='m'||!Array.isArray(d.items))throw Error('Invalid CAD catalogue');return d.items}).catch(e=>{roomCADPromise=null;throw e});return roomCADPromise}
@@ -813,7 +853,7 @@
   const beforeCADFilter=webItems.length;webItems=onlyArchitecturalDrawings(webItems).filter(editableGalleryItem);if(beforeCADFilter&&!webItems.length)webStatus=T('No editable CAD drawings available for this search.','No hay planos CAD editables para esta búsqueda.');
   const roomCat=strictRoomCategory(st.q)||roomQuery(st.q)?.category;
   if(roomCat&&!classicMode)webItems=webItems.filter(x=>x.category===roomCat&&x.drawingType==='floor-plan'&&(x.roomCad===true||verifiedRoomReference(x,roomCat)));
-  resetPreviews();el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · TECHNICAL DRAWINGS','MAESTROS MODERNOS · DIBUJOS TÉCNICOS'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):((roomQuery(st.q)||strictRoomCategory(st.q))?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA')));
+  resetPreviews();el.classList.remove('arq-block-search');el.classList.add('visual','compact-search','web-reference');el.classList.toggle('house-gallery',houseMode);el.querySelector('.hd b').textContent='ARQASSIST · '+(classicMode?(classicModern?T('MODERN MASTERS · TECHNICAL DRAWINGS','MAESTROS MODERNOS · DIBUJOS TÉCNICOS'):T('CLASSIC PLANS · PUBLIC DOMAIN','PLANTAS CLÁSICAS · DOMINIO PÚBLICO')):houseMode?(houseRefCategory(st.q)?T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA'):T('HOUSE PLANS','PLANTAS DE VIVIENDAS')):((roomQuery(st.q)||strictRoomCategory(st.q))?T('EDITABLE CAD PLANS','PLANTAS CAD EDITABLES'):T('ARCHITECTURAL PLANS & SECTIONS','PLANTAS Y CORTES DE ARQUITECTURA')));
   el.querySelectorAll('[data-area]').forEach(b=>b.setAttribute('aria-pressed',String(houseMode&&Number(b.dataset.area)===webArea)));const grid=el.querySelector('.grid');const per=houseMode?4:9,cols=houseMode?2:3;grid.style.gridTemplateColumns='repeat('+cols+',minmax(0,1fr))';grid.replaceChildren();grid.parentNode.querySelectorAll(':scope>.classic-links').forEach(n=>n.remove());if(classicMode&&classicIndex.length){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:11px;color:#51432e;max-height:118px;overflow:auto';const lb=document.createElement('b');lb.textContent=T('Authors:','Autores:');row.append(lb);for(const x of classicIndex){const b=document.createElement('button');b.type='button';b.textContent=x.label;b.title=x.modern?T('Modern master · source links','Maestro moderno · enlaces a fuentes'):T('Plans and sections','Plantas y cortes');b.style.cssText='padding:2px 8px;border:1px solid #b7a17a;border-radius:999px;background:'+(x.modern?'#efe6d4':'#fff8ea')+';color:#3b2f1c;font-size:11px;cursor:pointer';b.onclick=()=>{const inp=el.querySelector('input[type=search]');inp.value=x.q;searchClassics(x.q);};row.append(b);}grid.parentNode.insertBefore(row,grid);}
   if(classicMode&&(classicLinks.length||classicModern)){const row=document.createElement('div');row.className='classic-links';row.style.cssText='margin:6px 8px 2px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:#51432e';const lb=document.createElement('b');lb.textContent=T('Codices and sources:','Códices y fuentes:');row.append(lb);for(const l of classicLinks){const a=document.createElement('a');a.href=l.u;a.target='_blank';a.rel='noopener noreferrer';a.textContent=l.t+' ↗';a.title=l.a||'';a.style.cssText='padding:3px 8px;border:1px solid #b7a17a;border-radius:999px;color:#3b2f1c;text-decoration:none;background:#fff8ea';row.append(a);}if(classicModern){const n=document.createElement('span');n.style.cssText='flex-basis:100%;opacity:.8';n.textContent=T('Editable CAD plans, sections, elevations and technical details only.','Solo plantas, cortes, alzados y detalles técnicos en CAD editable.');row.append(n);}grid.parentNode.insertBefore(row,grid);}
   if(!filterSanitaryGallery()){
