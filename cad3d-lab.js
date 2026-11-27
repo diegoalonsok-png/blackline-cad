@@ -2651,16 +2651,41 @@ function cad3dParseOFF(textContent,name){
  var faces=lines.slice(0,nf).map(l=>{var v=l.split(/\s+/).map(Number);return v.slice(1,1+v[0]);});
  cad3dImportTriangles(verts,faces,name);
 }
-function cad3dParsePLY(textContent,name){
- var lines=textContent.split(/\r?\n/),end=lines.indexOf('end_header');
- if(lines[0].trim()!=='ply'||end<0||end>200)throw Error('Cabecera PLY inválida');
- var hdr=lines.slice(0,end+1).join('\n');
- if(!/format\s+ascii\s+1\.0/.test(hdr))throw Error('Solo PLY ASCII; convertir PLY binario a OBJ o STL');
- var v=/element vertex (\d+)/.exec(hdr),f=/element face (\d+)/.exec(hdr);
- if(!v||!f||+v[1]>400000||+f[1]>120000)throw Error('Elementos PLY inválidos');
- var vStart=end+1,nv=+v[1],nf=+f[1];
- var verts=lines.slice(vStart,vStart+nv).map(l=>l.trim().split(/\s+/).slice(0,3).map(Number));
- var faces=lines.slice(vStart+nv,vStart+nv+nf).map(l=>{var a=l.trim().split(/\s+/).map(Number);return a.slice(1,a[0]+1);});
+/* PLY ASCII and binary (both byte orders), bounded and property-aware. */
+function cad3dParsePLY(buffer,name){
+ var bytes=new Uint8Array(buffer),limit=Math.min(bytes.length,65536),headerEnd=-1,header='';
+ for(var i=0;i<limit;i++)if(bytes[i]===10){
+  var lineEnd=i>0&&bytes[i-1]===13?i-1:i;
+  var start=i-1;while(start>=0&&bytes[start]!==10)start--;
+  if(new TextDecoder().decode(bytes.subarray(start+1,lineEnd)).trim()==='end_header'){headerEnd=i+1;break;}
+ }
+ if(headerEnd<0)throw Error('Cabecera PLY inválida');
+ header=new TextDecoder().decode(bytes.subarray(0,headerEnd));
+ var lines=header.trim().split(/\r?\n/),format='',elements=[],current=null;
+ if(lines.shift().trim()!=='ply')throw Error('Cabecera PLY inválida');
+ var types={char:['getInt8',1],int8:['getInt8',1],uchar:['getUint8',1],uint8:['getUint8',1],short:['getInt16',2],int16:['getInt16',2],ushort:['getUint16',2],uint16:['getUint16',2],int:['getInt32',4],int32:['getInt32',4],uint:['getUint32',4],uint32:['getUint32',4],float:['getFloat32',4],float32:['getFloat32',4],double:['getFloat64',8],float64:['getFloat64',8]};
+ for(var line of lines){
+  var p=line.trim().split(/\s+/);
+  if(p[0]==='format'){if(p[2]!=='1.0')throw Error('Versión PLY no admitida');format=p[1];}
+  if(p[0]==='element'){var count=Number(p[2]);if(!Number.isSafeInteger(count)||count<0||count>400000||elements.length>=32)throw Error('Cantidad PLY inválida');current={name:p[1],count:count,props:[]};elements.push(current);}
+  if(p[0]==='property'){if(!current||current.props.length>=64)throw Error('Propiedades PLY inválidas');var list=p[1]==='list',type=list?p[3]:p[1],countType=list?p[2]:null;if(!types[type]||list&&(!types[countType]||/Float/.test(types[countType][0])))throw Error('Tipo PLY inválido');current.props.push({name:list?p[4]:p[2],type:type,countType:countType});}
+ }
+ if(!['ascii','binary_little_endian','binary_big_endian'].includes(format))throw Error('Formato PLY inválido');
+ var ve=elements.filter(e=>e.name==='vertex'),fe=elements.filter(e=>e.name==='face');
+ if(ve.length!==1||fe.length!==1||!ve[0].count||!fe[0].count||fe[0].count>120000)throw Error('PLY sin malla válida');
+ if(!['x','y','z'].every(k=>ve[0].props.some(p=>p.name===k&&!p.countType))||!fe[0].props.some(p=>['vertex_indices','vertex_index'].includes(p.name)&&p.countType))throw Error('PLY sin coordenadas o índices');
+ var ascii=format==='ascii',tokens=ascii?new TextDecoder().decode(bytes.subarray(headerEnd)).trim().split(/\s+/):null,at=ascii?0:headerEnd,dv=new DataView(buffer),little=format==='binary_little_endian';
+ function read(type){var spec=types[type],v;if(ascii){if(at>=tokens.length)throw Error('PLY truncado');v=Number(tokens[at++]);}else{if(at+spec[1]>dv.byteLength)throw Error('PLY truncado');v=dv[spec[0]](at,little);at+=spec[1];}if(!Number.isFinite(v))throw Error('Valor PLY inválido');return v;}
+ var verts=[],faces=[],totalTriangles=0;
+ for(var e of elements)for(var j=0;j<e.count;j++){
+  var vertex=[NaN,NaN,NaN],face=null;
+  for(var prop of e.props){
+   if(prop.countType){var n=read(prop.countType);if(!Number.isInteger(n)||n<0||n>4096)throw Error('Lista PLY inválida');var keep=e.name==='face'&&['vertex_indices','vertex_index'].includes(prop.name);if(keep)face=[];for(var k=0;k<n;k++){var v=read(prop.type);if(keep)face.push(v);}}
+   else{var v=read(prop.type),idx=['x','y','z'].indexOf(prop.name);if(e.name==='vertex'&&idx>=0)vertex[idx]=v;}
+  }
+  if(e.name==='vertex'){if(!vertex.every(Number.isFinite))throw Error('Vértice PLY inválido');verts.push(vertex);}
+  if(e.name==='face'){if(!face||face.length<3||face.some(v=>!Number.isInteger(v)||v<0||v>=ve[0].count))throw Error('Cara PLY inválida');totalTriangles+=face.length-2;if(totalTriangles>120000)throw Error('PLY supera 120.000 triángulos');faces.push(face);}
+ }
  cad3dImportTriangles(verts,faces,name);
 }
 function cad3dParseGLTFDocument(json,buffers,name){
@@ -2717,12 +2742,14 @@ async function cad3dImportOCCT(file,ext){
 async function cad3dImportMeshFile(file){
  var name=file.name,ext=name.split('.').pop().toLowerCase();
  if(file.size>18000000)throw Error('Archivo mayor a 18 MB');
+ if(ext==='max')throw Error('MAX es el formato nativo de 3ds Max. Exportá desde 3ds Max a 3DS, OBJ o GLB. No es lo mismo que 3DS.');
+ if(ext==='ifc'||ext==='rvt')throw Error('IFC/RVT: todavía no hay importador BIM nativo. Convertí a STEP, OBJ o GLB para geometría solamente.');
  if(['step','stp','iges','igs','brep','brp'].includes(ext))return cad3dImportOCCT(file,ext);
  if(ext==='obj')return cad3dImportOBJ(await file.text(),name);
  if(ext==='3ds')return cad3dParse3DS(await file.arrayBuffer(),name);
  if(ext==='stl')return cad3dParseSTL(await file.arrayBuffer(),name);
  if(ext==='off')return cad3dParseOFF(await file.text(),name);
- if(ext==='ply')return cad3dParsePLY(await file.text(),name);
+ if(ext==='ply')return cad3dParsePLY(await file.arrayBuffer(),name);
  if(ext==='glb'){
   var data=await file.arrayBuffer(),dv=new DataView(data),offset=12,json=null,bin=null;
   if(dv.getUint32(0,true)!==0x46546c67||dv.getUint32(4,true)!==2)throw Error('GLB inválido o versión no admitida');
@@ -2740,7 +2767,7 @@ async function cad3dImportMeshFile(file){
   var buffers=(j.buffers||[]).map(function(b){var uri=b.uri.split(','),str=atob(uri[1]),buf=new Uint8Array(str.length);for(var i=0;i<str.length;i++)buf[i]=str.charCodeAt(i);return buf.buffer;});
   return cad3dParseGLTFDocument(j,buffers,name);
  }
- throw Error('Formato no admitido directamente. Para SKP/DAE/FBX exportá GLB, OBJ o STL.');
+ throw Error('Formato no admitido directamente. Para MAX (3ds Max), SKP, DAE o FBX exportá 3DS, GLB u OBJ; para RVT exportá IFC con un lector BIM externo o STEP/OBJ para geometría.');
 }
 
 function cad3dImportOBJ(content,fileName){
