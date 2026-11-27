@@ -8771,6 +8771,21 @@ function cad3dSectionTo2D(){
  text((res&&res.count?res.count+' objetos 2D · ':'')+title+' enviado al plano 2D (polilíneas editables, relleno y cotas de nivel)'+(cut.truncated?' · modelo muy grande: corte parcial':''));
  return res;
 }
+/* Planilla de aberturas del modelo 3D (puertas y ventanas en muros y losas), enviada al 2D con alto y antepecho. */
+function cad3dScheduleTo2D(){
+ var bridge=window.BlacklineCAD3DBridge;
+ if(!bridge||typeof bridge.addSchedule!=='function')return text('Puente con el 2D no disponible: recargá la página');
+ var items=[];
+ records.forEach(function(r){(r.openings||[]).forEach(function(o){
+  if(o.kind!=='door'&&o.kind!=='window')return;
+  var st=archStyle(o.kind,o.styleId);
+  items.push({t:o.kind==='door'?'P':'V',w:Number(o.w)||0,h:Number(o.h)||Number(o.d)||0,sill:o.kind==='window'?Number(o.sill)||0:0,desc:st&&st.name?st.name:(o.kind==='door'?'Puerta':'Ventana')});
+ });});
+ if(!items.length)return text('El modelo no tiene puertas ni ventanas para la planilla');
+ var res=bridge.addSchedule({items:items});
+ text((res&&res.count?res.count:items.length)+' abertura(s) enviadas al plano 2D como planilla (cerrá el 3D para verla)');
+ return res;
+}
 function cad3dSectionSetup(){
  var p=root.querySelector('.cad3dSectionPanel');if(!p)return;
  try{var v=JSON.parse(localStorage.getItem('blackline-cad3d-section-v1')||'null');
@@ -10183,6 +10198,7 @@ function run3DCommand(){
  if(command==='laymrg'){cad3dMergeLayer();return;}if(command==='layselect'){cad3dSelectLayer();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(['corte2d','seccion2d','section2d','sectionto2d','cortea2d'].includes(command)){cad3dSectionTo2D();return;}
+ if(['planillaaberturas','tablaaberturas','doorschedule','windowschedule','openingschedule','planilla'].includes(command)){cad3dScheduleTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
  if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}

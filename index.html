@@ -7426,7 +7426,7 @@ function copySelectedCadObjects(){
  if(items.length>10000)return toast('COPYCLIP limit: 10,000 objects');
  const b=getBounds(items);
  cadClipboard=items.map(e=>transformEntity(e,p=>sub(p,P(b.minX,b.minY))));
- toast('Copied '+items.length+' CAD objects into local clipboard');
+ toast('Copied '+items.length+' CAD objects into local clipboard');window.CAD2D_TABLES?.noteInternalCopy();
  log('COPYCLIP '+items.length);
 }
 function pasteCadObjects(){
@@ -8127,7 +8127,8 @@ document.addEventListener('keydown',ev=>{
  if((ev.ctrlKey||ev.metaKey)&&!isEditing){
   const key=ev.key.toLowerCase();
   if(key==='c'){ev.preventDefault();copySelectedCadObjects();return}
-  if(key==='v'){if(cadClipboard.length){ev.preventDefault();pasteCadObjects();return}}
+  // Con el módulo de tablas, Ctrl+V decide entre objetos internos, texto o tabla (evento paste).
+  if(key==='v'){if(cadClipboard.length&&!window.CAD2D_TABLES){ev.preventDefault();pasteCadObjects();return}}
   if(key==='x'){ev.preventDefault();cutSelectedCadObjects();return}
  }
  if(ev.ctrlKey||ev.metaKey||ev.altKey)return;
@@ -12545,7 +12546,7 @@ window.CAD2D_CORE=Object.freeze({
  get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
  perfFrames:()=>cadPerfFrames.slice(),
  dxf:Object.freeze({build:(entities,name,layers)=>buildDXFText(entities,name,layers),parse:(text,opts={})=>importDXF(text,'',{...opts,parseOnly:true})}),
- blockEdit:()=>cadBlockEdit,editBlock:name=>cadEditBlockDefinition(name),
+ blockEdit:()=>cadBlockEdit,hasCadClipboard:()=>cadClipboard.length>0,editBlock:name=>cadEditBlockDefinition(name),
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
@@ -12818,6 +12819,7 @@ function cadAddSectionFrom3D(p){
 }
 window.BlacklineCAD3DBridge=Object.freeze({
  addSection:p=>cadAddSectionFrom3D(p),
+ addSchedule:p=>window.CAD2D_TABLES?.addSchedule(p)||{count:0},
  snapshot:()=>({unit:state.unit,layers:clone(state.layers),entities:clone(flattenCADEntities(state.entities))}),
  convertDWG: file=>convertDWGAutomatically(file,{textOnly:true}),
  decodeDXF: async file=>cadDxfDecode(await file.arrayBuffer()),
@@ -12860,6 +12862,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-comandos-plus.js?v=20261127-comandos5"></script>
 <script src="cad-bloques-dinamicos.js?v=20261127-bloques2"></script>
+<script src="cad-tablas.js?v=20261127-tablas1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261126-usercad4"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>
@@ -12868,6 +12871,6 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script defer src="cad3d-solid-ops.js?v=20261126-shell-v1"></script>
 <script defer src="cad3d-entourage.js?v=20261125-entourage-v1"></script>
 <script defer src="cad3d-croquis-studio.js?v=20261125-studio-v1"></script>
-<script defer src="cad3d-lab.js?v=20261126-corte2d2"></script>
+<script defer src="cad3d-lab.js?v=20261127-planilla1"></script>
 <script defer src="cad3d-ai-croquis.js?v=20261125-art-retouch-v1"></script>
 </body></html>
