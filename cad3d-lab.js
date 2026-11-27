@@ -2548,6 +2548,11 @@ function cad3dPhotoTexture(image){
  if(cad3dPhotoTextures.has(image))return cad3dPhotoTextures.get(image);
  var tex=new T.TextureLoader().load(image);tex.colorSpace=T.SRGBColorSpace;cad3dPhotoTextures.set(image,tex);return tex;
 }
+// Keep textures used by the current scene; free deleted or hidden photographs after rebuild.
+function cad3dPrunePhotoTextures(visible){
+ var keep=new Set(visible.filter(r=>r.type==='block3d'&&r.cutoutSpec).map(r=>r.cutoutSpec.image));
+ cad3dPhotoTextures.forEach(function(tex,image){if(!keep.has(image)){tex.dispose();cad3dPhotoTextures.delete(image);}});
+}
 var activeCAD3DBlock='chair',cad3dRemoteCatalogue=null,cad3dRemoteEpoch=0,cad3dRemotePending=false;
 var CAD3D_LIBRARY_ROOT=new URL('assets/3d-object-library/v1/',document.baseURI);
 function cad3dSafeLibraryFile(name,ext){return typeof name==='string'&&/^[a-z0-9-]+\.[a-z0-9]+$/i.test(name)&&name.toLowerCase().endsWith('.'+ext);}
@@ -2582,7 +2587,8 @@ async function cad3dFetchRemoteModel(spec){
  if(Number(res.headers.get('content-length'))>18000000)throw Error('Modelo mayor a 18 MB');
  var raw=await res.text();if(raw.length>18000000)throw Error('Modelo mayor a 18 MB');
  var data=JSON.parse(raw),p=data.meshVertices;
- if(data.version===3){var cutout=cad3dValidatePhotoCutout(data);if(!spec.cutout||['w','d','h'].some(k=>Math.abs(cutout[k]-spec[k])>.001))throw Error('Dimensiones de recorte inconsistentes');return {cutout};}
+ if(data.version===3){var cutout=cad3dValidatePhotoCutout(data);if(spec.cutout!=='photo'||cutout.mount!==spec.mount||['w','d','h'].some(k=>Math.abs(cutout[k]-spec[k])>.001))throw Error('Dimensiones de recorte inconsistentes');return {cutout};}
+ if(spec.cutout)throw Error('Expected photographic cutout model');
  if(data.version===2){var detail=cad3dValidateRemoteParts(data);if(['w','d','h'].some(k=>Math.abs(detail[k]-spec[k])>.001))throw Error('Dimensiones de catálogo inconsistentes');return {detail};}
  if(data.version!==1||!Array.isArray(p)||!p.length||p.length%9||p.length>1080000||!p.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Geometría 3D inválida');
  return {meshVertices:p,materialColor:/^#[0-9a-f]{6}$/i.test(data.materialColor||'')?data.materialColor:'#b6bdc0'};
@@ -9268,8 +9274,8 @@ function cad3dImportMeshKey(r){return [r.w,r.d,r.h,r.materialColor||''].join('|'
 var cad3dHeavyViewport=false;
 function redraw(){
  cad3dHistoryCapture();
- if(fallbackCanvas){fallbackDraw();render3DGrips();cad3dRenderPlanWalls();return;}
- if(!modelRoot)return;
+ if(fallbackCanvas){cad3dPrunePhotoTextures([]);fallbackDraw();render3DGrips();cad3dRenderPlanWalls();return;}
+ if(!modelRoot){cad3dPrunePhotoTextures([]);return;}
  var existing=new Map(),visible=records.filter(visibleRecord),triangles=0;
  modelRoot.children.slice().forEach(function(group){
   if(group.userData.importMeshSource)existing.set(group.userData.owner,group);
@@ -9286,6 +9292,7 @@ function redraw(){
  cad3dHeavyViewport=triangles>45000||visible.length>350;
  disposeMeshes(modelRoot);
  modelRoot.clear();visible.forEach(function(record){modelRoot.add(reused.get(record.id)||buildObject(record));});
+ cad3dPrunePhotoTextures(visible);
  modelRoot.updateMatrixWorld(true);applyRenderStyle();highlight();applySunSettings();cad3dSectionApply();render3DGrips();cad3dRenderPlanWalls();
 }
 function highlight(){
