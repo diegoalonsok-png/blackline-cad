@@ -4886,6 +4886,105 @@ function cad3dSketchSetStyle(panel,o){
  cad3dSketchProcess();
 }
 function cad3dSketchRenderMarkup(){return "<section class=\"cad3dSketchCapturePanel\" hidden role=\"dialog\" aria-label=\"Render arquitectónico Croquis\">\n <div class=\"cad3dSketchCaptureHead\"><strong>RENDER ARTÍSTICO · ESTUDIO DE CROQUIS</strong><button type=\"button\" class=\"cad3dSketchClose\" aria-label=\"Cerrar render\">×</button></div>\n <div class=\"cad3dSketchCaptureControls\">\n  <label>Estilo artístico<select data-sketch-preset aria-label=\"Estilo de render de croquis\">\n   <optgroup label=\"Estudio artístico · geometría real\"><option value=\"studio:estudio\" selected>Croquis de estudio · grafito (tipo SketchUp)</option><option value=\"studio:acuarela\">Acuarela de arquitecto</option><option value=\"studio:plumilla\">Plumilla densa · tinta</option><option value=\"studio:grabado\">Grabado a dos tintas</option><option value=\"studio:bicromia\">Bicromía de trama</option><option value=\"studio:aguada\">Aguada de tinta · ilustración 60</option><option value=\"studio:lineaclara\">Línea clara color</option><option value=\"studio:riso\">Póster risográfico</option><option value=\"studio:sucio\">Acuarela sucia · capas y deformación</option></optgroup>\n   <optgroup label=\"Croquis clásico · procesado de imagen\">\n   <option value=\"technical\">Técnico limpio</option><option value=\"ink\">Tinta arquitectónica</option>\n   <option value=\"pencil\">Lápiz y grafito</option><option value=\"charcoal\">Carboncillo</option>\n   <option value=\"engraving\">Grabado a plumilla</option><option value=\"watercolor\">Acuarela arquitectónica</option>\n   <option value=\"pastel\">Pastel sobre papel</option><option value=\"marker\">Marcadores</option>\n   <option value=\"wash\">Lavado ilustrado</option><option value=\"custom\">Personalizado</option>\n  </optgroup></select></label>\n  <label>Motor de acabado<select class=\"cad3dSketchCaptureStyle\" aria-label=\"Acabado de croquis\">\n   <option value=\"ink\">Tinta</option><option value=\"pencil\">Grafito</option>\n   <option value=\"charcoal\">Carboncillo</option><option value=\"engraving\">Grabado</option>\n   <option value=\"watercolor\" selected>Acuarela</option><option value=\"pastel\">Pastel</option>\n   <option value=\"marker\">Marcador</option><option value=\"wash\">Lavado</option>\n  </select></label>\n  <label>Base cromática<select data-sketch-setting=\"baseStyle\">\n   <option value=\"realistic\" selected>Materiales originales del 3D</option>\n   <option value=\"current\">Colores de la vista actual</option>\n  </select></label>\n  <label>Resolución WebGL<select data-sketch-setting=\"resolution\">\n   <option value=\"1\">Original</option><option value=\"1.5\" selected>Alta · 1,5×</option>\n   <option value=\"2\">Máxima · 2×</option></select></label>\n  <label>Fuerza del trazo<input class=\"cad3dSketchCaptureStrength\" type=\"range\" min=\"0\" max=\"100\" value=\"68\"></label>\n  <label>Papel<select data-sketch-setting=\"paper\">\n   <option value=\"white\">Blanco</option><option value=\"cream\">Crema</option>\n   <option value=\"watercolor\" selected>Algodón acuarela</option></select></label>\n  <label>Contorno<input type=\"range\" data-sketch-setting=\"profile\" min=\".4\" max=\"3.2\" step=\".1\" value=\"1.2\"></label>\n  <label>Trazo irregular<input type=\"range\" data-sketch-setting=\"jitter\" min=\"0\" max=\"3\" step=\".1\" value=\".55\"></label>\n  <label>Curvatura<input type=\"range\" data-sketch-setting=\"bowing\" min=\"0\" max=\"2\" step=\".1\" value=\".2\"></label>\n  <label>Detalle<input type=\"range\" data-sketch-setting=\"detail\" min=\"0\" max=\"100\" value=\"65\"></label>\n  <label>Grosor de tinta<input type=\"range\" data-sketch-setting=\"weight\" min=\"1\" max=\"6\" value=\"2\"></label>\n  <label>Sombras<input type=\"range\" data-sketch-setting=\"shadow\" min=\"0\" max=\"100\" value=\"55\"></label>\n  <label>Grano del papel<input type=\"range\" data-sketch-setting=\"grain\" min=\"0\" max=\"100\" value=\"58\"></label>\n  <label>Pinceladas<input type=\"range\" data-sketch-setting=\"brush\" min=\"0\" max=\"100\" value=\"50\"></label>\n  <label>Pigmento / agua<input type=\"range\" data-sketch-setting=\"pigment\" min=\"0\" max=\"100\" value=\"78\"></label>\n  <label>Acabado<input type=\"range\" data-sketch-setting=\"finish\" min=\"0\" max=\"100\" value=\"65\"></label>\n  <label>Color del trazo<input type=\"color\" data-sketch-setting=\"edgeColor\" value=\"#303843\"></label>\n  <label>Cielo<input type=\"color\" data-sketch-setting=\"skyColor\" value=\"#b9dbf2\"></label>\n  <label>Suelo<input type=\"color\" data-sketch-setting=\"groundColor\" value=\"#ddd6c8\"></label>\n  <label>Muros<input type=\"color\" data-sketch-setting=\"wallColor\" value=\"#e8d7b9\"></label>\n  <label>Muros coloreados<select data-sketch-setting=\"wallMode\"><option value=\"original\" selected>Material original</option><option value=\"tint\">Veladura suave</option></select></label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"passes\" checked> Pasadas artísticas</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"geometry\" checked> Aristas visibles del 3D</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"multiStroke\"> Doble trazo</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"sky\" checked> Cielo pintado</label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"ground\" checked> Suelo pintado</label>\n  <input type=\"hidden\" data-sketch-setting=\"extension\" value=\"0\"><input type=\"hidden\" data-sketch-setting=\"endpoints\" value=\"0\">\n </div>\n <div class=\"cad3dStudioControls\" aria-label=\"Ajustes del estudio artístico\">\n  <input type=\"hidden\" data-sketch-setting=\"engine\" value=\"studio\"><input type=\"hidden\" data-sketch-setting=\"studioStyle\" value=\"estudio\">\n  <label>Tinta / grafito<input type=\"color\" data-sketch-setting=\"studioInk\" value=\"#33363a\"></label><label>Papel<input type=\"color\" data-sketch-setting=\"studioPaper\" value=\"#f5f0e3\"></label><label>Segunda tinta / acento<input type=\"color\" data-sketch-setting=\"studioAccent\" value=\"#c8643a\"></label><label>Cielo<input type=\"color\" data-sketch-setting=\"studioSky\" value=\"#b8cdd9\"></label>\n  <label>Color de materiales<input type=\"range\" data-sketch-setting=\"studioColor\" min=\"0\" max=\"100\" step=\"1\" value=\"38\"></label><label>Densidad de trama<input type=\"range\" data-sketch-setting=\"studioDensity\" min=\"0\" max=\"100\" step=\"1\" value=\"55\"></label><label>Sombras proyectadas<input type=\"range\" data-sketch-setting=\"studioShadow\" min=\"0\" max=\"100\" step=\"1\" value=\"70\"></label><label>Grano del papel<input type=\"range\" data-sketch-setting=\"studioGrain\" min=\"0\" max=\"100\" step=\"1\" value=\"55\"></label>\n  <label>Grosor de línea<input type=\"range\" data-sketch-setting=\"studioLineWeight\" min=\".4\" max=\"2.6\" step=\".05\" value=\"1\"></label><label>Prolongación de aristas<input type=\"range\" data-sketch-setting=\"studioExtension\" min=\"0\" max=\"20\" step=\".5\" value=\"7\"></label><label>Vibrado del trazo<input type=\"range\" data-sketch-setting=\"studioJitter\" min=\"0\" max=\"3\" step=\".05\" value=\".85\"></label><label>Profundidad atmosférica<input type=\"range\" data-sketch-setting=\"studioDepthCue\" min=\"0\" max=\"100\" step=\"1\" value=\"45\"></label><label>Deformación de la imagen<input type=\"range\" data-sketch-setting=\"studioWarp\" min=\"0\" max=\"100\" step=\"1\" value=\"0\"></label><label>Suciedad · manchas y frotado<input type=\"range\" data-sketch-setting=\"studioDirt\" min=\"0\" max=\"100\" step=\"1\" value=\"0\"></label>\n  <label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"studioVector\" checked> Aristas a mano alzada</label><label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"studioSun\" checked> Sol artístico (sombras)</label><label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"studioAccentAuto\" checked> Acento en material de color</label><label class=\"cad3dSketchCheck\"><input type=\"checkbox\" data-sketch-setting=\"studioBorder\"> Margen de lámina</label>\n </div>\n <div class=\"cad3dSketchCaptureActions\">\n  <label class=\"cad3dSketchOutputLabel\">Salida\n    <select class=\"cad3dSketchOutputFormat\" aria-label=\"Formato para exportar el croquis\">\n      <option value=\"png\" selected>PNG</option><option value=\"jpg\">JPG</option><option value=\"pdf\">PDF</option>\n    </select>\n  </label>\n  <button type=\"button\" class=\"btn cad3dSketchRecapture\">Actualizar desde cámara</button>\n  <button type=\"button\" class=\"btn\" data-sketch-save-preset>Guardar ajustes</button>\n  <button type=\"button\" class=\"btn\" data-sketch-load-preset>Cargar ajustes</button>\n  <button type=\"button\" class=\"btn\" data-sketch-ai hidden title=\"Retoque final del render artístico con IA · función del plan Pro\">✦ Retocar con IA</button>\n  <button type=\"button\" class=\"btn\" data-sketch-local-ai title=\"Superresolución neuronal en tu equipo, sin clave ni coste por imagen\">IA local · mejorar nitidez 2× (beta)</button>\n  <button type=\"button\" class=\"btn cad3dSketchDownload\">Exportar croquis PNG</button>\n </div>\n <div class=\"cad3dSketchCompare\">\n  <div><strong>Vista 3D · origen</strong><canvas class=\"cad3dSketchCaptureOriginal\" aria-label=\"Captura original 3D\"></canvas></div>\n  <div><strong>Croquis · pasadas NPR</strong><canvas class=\"cad3dSketchCapturePreview\" aria-label=\"Vista previa del croquis\"></canvas></div>\n </div>\n <small>Render local en tu navegador: profundidad, normales, materiales, luz y sombras reales del modelo, más trazo, trama, pigmento y papel. No modifica objetos, capas ni herramientas CAD.</small>\n</section>";}
+
+function cad3dInitSemanticRender(panel){
+ var engine=cad3dStudioEngine(),ai=engine?.semantic;if(!ai)return;
+ var section=document.createElement('section');section.className='cad3dStudioControls';
+ section.setAttribute('aria-label','Blackline Semantic Render AI');
+ section.innerHTML='<label style="flex:1 1 100%">BLACKLINE SEMANTIC RENDER · IA local entrenable<textarea data-semantic-prompt rows="2" maxlength="500" placeholder="Acuarela suave de fachada, línea fina y sombras ligeras / Soft architectural watercolor"></textarea></label>'+
+ '<button class="btn" type="button" data-semantic-render>Generar render semántico</button>'+
+ '<button class="btn" type="button" data-semantic-learn>Aprender mis ajustes</button>'+
+ '<button class="btn" type="button" data-semantic-export>Exportar aprendizaje JSON</button>'+
+ '<button class="btn" type="button" data-semantic-import>Importar aprendizaje</button>'+
+ '<label class="cad3dSketchCheck"><input type="checkbox" data-semantic-auto checked> Práctica automática en segundo plano</label>'+
+ '<button class="btn" type="button" data-semantic-practice>Practicar ahora</button>'+
+ '<output data-semantic-practice-status role="status" aria-live="polite" style="flex:1 1 100%"></output>'+
+ '<input type="file" accept=".json,application/json" data-semantic-file hidden>'+
+ '<output data-semantic-status role="status" aria-live="polite" style="flex:1 1 100%"></output>';
+ panel.querySelector('.cad3dSketchCaptureActions').before(section);
+ var key='blackline-semantic-render-training-v1',data={version:1,examples:[]},status=section.querySelector('[data-semantic-status]'),prompt=section.querySelector('[data-semantic-prompt]'),file=section.querySelector('[data-semantic-file]');
+ function message(s){status.textContent=s;}
+ function save(next){next=ai.validate(next);localStorage.setItem(key,JSON.stringify(next));data=next;resetPractice();schedulePractice();}
+ try{var saved=localStorage.getItem(key);if(saved)data=ai.validate(JSON.parse(saved));}catch(e){message('No se pudo recuperar el entrenamiento guardado: '+e.message);}
+ if(!status.textContent)message(data.examples.length+' ejemplos locales · sin clave ni servicio externo. Ajustá el render y enseñale tus preferencias.');
+ var auto=section.querySelector('[data-semantic-auto]'),practiceStatus=section.querySelector('[data-semantic-practice-status]'),worker=null,jobTimer=null,timeout=null,round=0,revision=0,calibration=ai.calibration(),lastScene=null,lastPrompt='',practiceArmed=false,manualJob=false,calKey=key+'-calibration';
+ var fingerprint=()=>JSON.stringify(data);
+ try{var savedCal=JSON.parse(localStorage.getItem(calKey)||'null');if(savedCal?.dataset===fingerprint()){calibration=ai.calibration(savedCal.calibration);round=Math.max(0,Math.min(3,Number(savedCal.round)||0));}}catch(e){}
+ function stopPractice(){clearTimeout(jobTimer);clearTimeout(timeout);jobTimer=null;timeout=null;if(worker){worker.terminate();worker=null;}}
+ function resetPractice(){revision++;stopPractice();round=0;calibration=ai.calibration();practiceArmed=true;}
+ function schedulePractice(){clearTimeout(jobTimer);if(!practiceArmed||!auto.checked||document.hidden||round>=3||worker)return;jobTimer=setTimeout(()=>runPractice(false),12000);}
+ function runPractice(manual){
+  if(worker||document.hidden||(!manual&&(!practiceArmed||!auto.checked||round>=3)))return;
+  manualJob=manual;
+  var ticket=revision;practiceStatus.textContent='Práctica local · evaluando parámetros y renders pequeños…';
+  try{
+   worker=new Worker(new URL('assets/cad3d-semantic-practice-worker.js',document.baseURI));
+   var currentWorker=worker;
+   function finish(){if(worker===currentWorker)stopPractice();}
+   worker.onmessage=function(ev){if(ticket!==revision||worker!==currentWorker)return;var m=ev.data;finish();if(!m.ok){practiceStatus.textContent='Práctica descartada: '+m.error;return;}
+    try{var r=m.result;calibration=ai.calibration(r.calibration);round++;
+     try{localStorage.setItem(calKey,JSON.stringify({dataset:fingerprint(),calibration,round}));}catch(e){}
+     var result=r.reason==='insufficient'?'faltan correcciones de 8 instrucciones distintas para calibrar':r.accepted?'error de parámetros '+r.before.toFixed(5)+' → '+r.after.toFixed(5):'se conserva la calibración anterior';
+     practiceStatus.textContent='Pasada '+round+' · '+m.checks.length+' renders de control válidos · '+result+'.';schedulePractice();
+    }catch(e){practiceStatus.textContent='Resultado descartado: '+e.message;}
+   };
+   worker.onerror=function(){finish();practiceStatus.textContent='No se pudo iniciar la práctica local.';};
+   timeout=setTimeout(()=>{finish();practiceStatus.textContent='Práctica detenida por límite de tiempo (20 s).';},20000);
+   worker.postMessage({dataset:data,calibration,pass:round,scene:lastScene,prompt:lastPrompt});
+  }catch(e){stopPractice();practiceStatus.textContent='Práctica no disponible: '+e.message;}
+ }
+ auto.addEventListener('change',()=>{if(auto.checked)schedulePractice();else stopPractice();});
+ section.querySelector('[data-semantic-practice]').addEventListener('click',()=>runPractice(true));
+ // Keep practice available while the render panel is closed, but yield to CAD input.
+ function yieldPractice(){if(worker&&!manualJob)stopPractice();schedulePractice();}
+ root.addEventListener('pointerdown',yieldPractice,{capture:true,passive:true});
+ root.addEventListener('keydown',yieldPractice,{capture:true});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPractice();else schedulePractice();});
+ function rememberPracticeScene(){
+  var gb=cad3dStudioGBuffer;if(!gb)return;var f=Math.min(1,120/gb.w,100/gb.h),small=engine.resample(gb,Math.max(1,Math.round(gb.w*f)),Math.max(1,Math.round(gb.h*f)));
+  lastScene={w:small.w,h:small.h,id:small.id,depth:small.depth,normal:small.normal,light:small.light,lightFree:small.lightFree,materials:small.materials,camera:small.camera,up:small.up,cut:small.cut,segments:(small.segments||[]).slice(0,300)};lastPrompt=prompt.value;
+  round=0;practiceArmed=true;schedulePractice();
+ }
+ var mapping={color:'studioColor',density:'studioDensity',shadow:'studioShadow',grain:'studioGrain',lineWeight:'studioLineWeight',extension:'studioExtension',jitter:'studioJitter',depthCue:'studioDepthCue',dirt:'studioDirt'};
+ function apply(pred){
+  var selector=panel.querySelector('[data-sketch-preset]');selector.value='studio:'+pred.style;
+  cad3dStudioApplyDefaults(panel,pred.style);
+  for(var k of ai.keys){var el=panel.querySelector('[data-sketch-setting="'+mapping[k]+'"]');if(el)el.value=String(pred.settings[k]);}
+  panel.querySelector('[data-sketch-setting="studioWarp"]').value='0';
+  panel.querySelector('[data-sketch-setting="studioVector"]').checked=true;
+  cad3dStudioSyncPanel(panel);
+  if(!cad3dStudioGBuffer)cad3dSketchCapture();else cad3dSketchProcess();
+ }
+ section.querySelector('[data-semantic-render]').addEventListener('click',function(){
+  if(!prompt.value.trim())return message('Escribí una intención artística.');
+  try{
+   if(!cad3dStudioGBuffer){cad3dSketchCapture();if(!cad3dStudioGBuffer)return message('Abrí una perspectiva 3D válida; se necesita el búfer geométrico.');}
+   var pred=ai.predict(prompt.value,ai.scene(cad3dStudioGBuffer),cad3dStudioOptions(panel).style,data,calibration);apply(pred);rememberPracticeScene();
+   message('Estilo '+pred.style+' · '+pred.similar+' ejemplos similares de '+pred.examples+' · geometría sin deformación.');
+  }catch(e){message('No se pudo generar: '+e.message);}
+ });
+ section.querySelector('[data-semantic-learn]').addEventListener('click',function(){
+  if(!prompt.value.trim()||!cad3dStudioGBuffer||!cad3dStudioActive(panel))return message('Generá un render semántico, corregí sus ajustes y después enseñale el resultado.');
+  try{var opts=cad3dStudioOptions(panel),settings={};for(var k of ai.keys)settings[k]=opts[k];
+   save(ai.train(data,prompt.value,ai.scene(cad3dStudioGBuffer),opts.style,settings));
+   message('Aprendizaje guardado: '+data.examples.length+' ejemplos locales. El modelo adapta futuros renders similares.');
+  }catch(e){message('No se guardó el aprendizaje: '+e.message);}
+ });
+ section.querySelector('[data-semantic-export]').addEventListener('click',function(){
+  var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='blackline-semantic-render-training-v1.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);
+ });
+ section.querySelector('[data-semantic-import]').addEventListener('click',function(){file.click();});
+ file.addEventListener('change',async function(){
+  var f=file.files?.[0];file.value='';if(!f)return;
+  try{if(f.size>1000000)throw Error('Archivo mayor a 1 MB');
+   var incoming=ai.validate(JSON.parse(await f.text())),next=data;
+   for(var e of incoming.examples)next=ai.train(next,e.prompt,e.scene,e.style,e.settings);
+   save(next);message(data.examples.length+' ejemplos locales; aprendizaje importado y combinado (máximo 300).');
+  }catch(e){message('No se importó: '+e.message);}
+ });
+}
+
 function cad3dInitSketchCapture(){
  var panel=root.querySelector('.cad3dSketchCapturePanel');
  if(!panel)return;
@@ -4896,6 +4995,7 @@ function cad3dInitSketchCapture(){
  if(cad3dStudioEngine())cad3dStudioApplyDefaults(panel,'estudio');
  else{var eng0=panel.querySelector('[data-sketch-setting="engine"]');if(eng0)eng0.value='classic';var pr0=panel.querySelector('[data-sketch-preset]');if(pr0)pr0.value='watercolor';}
  cad3dStudioSyncPanel(panel);
+ cad3dInitSemanticRender(panel);
  root.querySelector('.cad3dRenderSketchLaunch').addEventListener('click',function(){
   panel.hidden=false;cad3dBringPaletteFront(panel);
   cad3dSketchCapture();

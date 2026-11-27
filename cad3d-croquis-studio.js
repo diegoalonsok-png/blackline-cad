@@ -685,7 +685,150 @@ function resample(gb,W,H){
  return o;
 }
 
-var api={version:'1.0.0',STYLES:STYLES,DEFAULTS:DEFAULTS,resolveOptions:resolveOptions,prepare:prepare,
+
+/* Semantic Render V1 — interpretable, trainable local regression over architectural
+   intents and actual G-buffer statistics. No hosted inference or model download.
+   Supervision is the user's corrected render parameters, not image generation. */
+var SEM_KEYS=['color','density','shadow','grain','lineWeight','extension','jitter','depthCue','dirt'];
+var SEM_LIMITS=[[0,100],[0,100],[0,100],[0,100],[.4,2.6],[0,20],[0,3],[0,100],[0,100]];
+var SEM_CONCEPTS=[
+ /\b(acuarela|watercolor|watercolour|pigmento|lavado|wash|aguada)\b/,
+ /\b(sketch|croquis|grafito|pencil|lapiz|boceto)\b/,
+ /\b(tinta|ink|plumilla|pen|grabado)\b/,
+ /\b(suave|delicado|soft|light|sutil|tenue|claro|clara)\b/,
+ /\b(fuerte|intenso|strong|bold|oscuro|dramatico|contrastado)\b/,
+ /\b(detalle|detallado|preciso|detail|detailed|technical|tecnico)\b/,
+ /\b(minimalista|minimal|limpio|clean|simple)\b/,
+ /\b(color|colorido|colour|vibrante|saturado|vivid)\b/,
+ /\b(monocromo|monochrome|gris|grayscale|blanco y negro)\b/,
+ /\b(papel|paper|textura|texture|grano|grain)\b/,
+ /\b(vegetacion|arboles|jardin|trees|garden|landscape|plantas)\b/,
+ /\b(interior|interiores|inside|indoor)\b/,
+ /\b(exterior|exteriores|fachada|facade|outdoor)\b/,
+ /\b(sombras|shadow|shadows|contraluz|atardecer)\b/,
+ /\b(antiguo|antigua|vintage|historic|historico)\b/,
+ /\b(concurso|competition|presentation|presentacion|lamina)\b/
+];
+function semanticText(s){return String(s||'').slice(0,500).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
+function semanticScene(gb){
+ var empty={sky:0,glass:0,ground:0,cutout:0,light:.5,edges:0};
+ if(!gb||!gb.id||!gb.id.length)return empty;
+ var n=gb.id.length,step=Math.max(1,Math.floor(n/12000)),count=0,solid=0,sky=0,glass=0,ground=0,cutout=0,light=0,edges=0;
+ for(var i=0;i<n;i+=step){
+  count++;var id=gb.id[i];if(!id){sky++;continue;}
+  solid++;var m=gb.materials?.[id]||{};glass+=m.glass?1:0;ground+=m.ground?1:0;cutout+=m.cutout?1:0;light+=(gb.light?.[i]||0)/255;
+  if(i%gb.w<gb.w-1&&gb.id[i+1]!==id)edges++;
+ }
+ return {sky:sky/count,glass:glass/count,ground:ground/count,cutout:cutout/count,light:solid?light/solid:.5,edges:Math.min(1,edges/Math.max(1,solid)*12)};
+}
+function semanticFeatures(prompt,scene){
+ var t=semanticText(prompt),v=SEM_CONCEPTS.map(r=>r.test(t)?1:0),s=scene||{};
+ // Hashed token features retain learnable vocabulary outside the built-in concepts.
+ var hashv=Array(32).fill(0),words=t.split(' ').filter(w=>w.length>2);
+ words.forEach(w=>{var h=2166136261;for(var i=0;i<w.length;i++)h=Math.imul(h^w.charCodeAt(i),16777619);hashv[(h>>>0)%32]=1;});
+ return v.concat(hashv.map(x=>x*.35),['sky','glass','ground','cutout','light','edges'].map(k=>clamp01(Number.isFinite(s[k])?s[k]:0)*.65));
+}
+function semanticStyle(prompt,fallback){
+ var t=semanticText(prompt),c=SEM_CONCEPTS.map(r=>r.test(t));
+ if(c[0])return /(?:aguada|wash)/.test(t)&&c[2]&&!/acuarela|watercolou?r/.test(t)?'aguada':'acuarela';
+ if(c[2])return /grabado/.test(t)?'grabado':'plumilla';
+ if(c[1])return 'estudio';
+ return DEFAULTS[fallback]?fallback:'estudio';
+}
+function semanticClamp(o){
+ var out={};
+ SEM_KEYS.forEach((k,i)=>{var n=Number(o?.[k]);if(!Number.isFinite(n))throw Error('Invalid parameter '+k);out[k]=Math.max(SEM_LIMITS[i][0],Math.min(SEM_LIMITS[i][1],n));});
+ return out;
+}
+function semanticBaseline(prompt,scene,style){
+ var d=DEFAULTS[style],c=SEM_CONCEPTS.map(r=>r.test(semanticText(prompt))),s=scene||{},o={color:d.color,density:d.density,shadow:d.shadow,grain:d.grain,lineWeight:1,extension:d.line.extension,jitter:d.line.jitter,depthCue:d.line.depthCue*100,dirt:d.dirt||0};
+ if(c[3]){o.shadow-=18;o.density-=12;o.lineWeight-=.15;o.color-=8;}
+ if(c[4]){o.shadow+=15;o.density+=15;o.lineWeight+=.2;}
+ if(c[5]){o.density+=10;o.jitter*=.45;o.extension*=.5;}
+ if(c[6]){o.density-=20;o.grain-=15;o.jitter*=.5;o.extension*=.5;}
+ if(c[7])o.color+=20;
+ if(c[8])o.color=0;
+ if(c[9])o.grain+=20;
+ if(c[13])o.shadow+=12;
+ if(c[14]){o.grain+=15;o.dirt+=12;}
+ if(c[15]){o.extension*=.7;o.jitter*=.65;}
+ if((s.sky||0)>.35||c[12])o.depthCue+=8;
+ if((s.cutout||0)>.12||c[10])o.density-=8;
+ if(c[11]||(s.sky||0)<.08)o.shadow-=8;
+ if((s.edges||0)>.45)o.lineWeight-=.15;
+ return semanticClamp(o);
+}
+function semanticValidateDataset(data){
+ if(!data||data.version!==1||!Array.isArray(data.examples)||data.examples.length>300)throw Error('Invalid training dataset');
+ return {version:1,examples:data.examples.map(e=>{
+  if(typeof e.prompt!=='string'||!semanticText(e.prompt)||e.prompt.length>500||!DEFAULTS[e.style])throw Error('Invalid training example');
+  var scene={};for(var k of ['sky','glass','ground','cutout','light','edges']){if(!Number.isFinite(e.scene?.[k])||e.scene[k]<0||e.scene[k]>1)throw Error('Invalid scene feature');scene[k]=e.scene[k];}
+  return {prompt:e.prompt,style:e.style,scene,settings:semanticClamp(e.settings)};
+ })};
+}
+function semanticTrain(dataset,prompt,scene,style,settings){
+ var data=semanticValidateDataset(dataset),e=semanticValidateDataset({version:1,examples:[{prompt,scene,style,settings}]}).examples[0];
+ // Latest explicit correction replaces an identical prompt/scene/style sample.
+ var key=x=>semanticText(x.prompt)+'|'+x.style+'|'+JSON.stringify(x.scene);
+ data.examples=data.examples.filter(x=>key(x)!==key(e));data.examples.push(e);data.examples=data.examples.slice(-300);return data;
+}
+function semanticCalibration(c){
+ var base={bandwidth:1.5,strength:1,neighbors:5};if(!c)return base;
+ if(![.5,1,1.5,2.5,4].includes(c.bandwidth)||![0,.25,.5,.75,1,1.25].includes(c.strength)||![3,5,8].includes(c.neighbors))throw Error('Invalid calibration');
+ return {bandwidth:c.bandwidth,strength:c.strength,neighbors:c.neighbors};
+}
+function semanticPredict(prompt,scene,style,dataset,calibration){
+ var cal=semanticCalibration(calibration);
+ style=semanticStyle(prompt,style);var base=semanticBaseline(prompt,scene,style),v=semanticFeatures(prompt,scene),matches=[];
+ for(var e of semanticValidateDataset(dataset).examples){
+  if(e.style!==style)continue;
+  var f=semanticFeatures(e.prompt,e.scene),dist=0;for(var i=0;i<v.length;i++)dist+=(v[i]-f[i])**2;
+  matches.push({e,dist});
+ }
+ matches.sort((a,b)=>a.dist-b.dist);matches=matches.slice(0,cal.neighbors);
+ var exact=matches.find(m=>m.dist<1e-12);
+ if(exact)base=Object.assign({},exact.e.settings);
+ else if(matches.length){
+  var total=0,correction=Object.fromEntries(SEM_KEYS.map(k=>[k,0]));
+  for(var m of matches){if(m.dist>4)continue;var weight=Math.exp(-m.dist/cal.bandwidth);total+=weight;var orig=semanticBaseline(m.e.prompt,m.e.scene,style);for(var k of SEM_KEYS)correction[k]+=weight*(m.e.settings[k]-orig[k]);}
+  if(total>0)for(var k of SEM_KEYS)base[k]+=cal.strength*correction[k]/Math.max(1,total);
+ }
+ return {style,settings:semanticClamp(base),examples:dataset.examples.length,similar:matches.filter(m=>m.dist<=4).length,warp:0};
+}
+
+/* Recursive practice: learn ONLY from approved corrections, never from own
+   predictions. Hold out entire prompt groups; calibrate on the remaining groups.
+   The independent holdout is a gate, not a visual quality score. */
+function semanticPractice(data,current,pass){
+ var ds=semanticValidateDataset(data),active=semanticCalibration(current);
+ var groups=new Map();for(var e of ds.examples){var key=semanticText(e.prompt);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
+ var keys=[...groups.keys()].sort(),round=Math.max(0,Math.floor(Number(pass)||0));
+ if(keys.length<8)return {calibration:active,accepted:false,reason:'insufficient',groups:keys.length,pass:round};
+ // Keep a stable holdout, never select candidate using its errors.
+ var hold=new Set(keys.filter((_,i)=>i%4===0)),train=keys.filter(k=>!hold.has(k));
+ var tune=new Set(train.filter((_,i)=>i%3===round%3));
+ var fit=ds.examples.filter(e=>!hold.has(semanticText(e.prompt))&&!tune.has(semanticText(e.prompt)));
+ var tuneRows=ds.examples.filter(e=>tune.has(semanticText(e.prompt))),holdRows=ds.examples.filter(e=>hold.has(semanticText(e.prompt)));
+ var trainRows=ds.examples.filter(e=>!hold.has(semanticText(e.prompt)));
+ // Bounds on dataset and candidate grid keep the background job small.
+ function loss(rows,examples,c){
+  var sum=0;for(var e of rows){var p=semanticPredict(e.prompt,e.scene,e.style,{version:1,examples},c).settings;
+   for(var i=0;i<SEM_KEYS.length;i++){var k=SEM_KEYS[i],d=(p[k]-e.settings[k])/(SEM_LIMITS[i][1]-SEM_LIMITS[i][0]);sum+=d*d;}}
+  return sum/(Math.max(1,rows.length)*SEM_KEYS.length);
+ }
+ var best=active,bestLoss=loss(tuneRows,fit,active);
+ var candidates=[active];
+ for(var b of [.5,1,1.5,2.5,4])for(var a of [0,.25,.5,.75,1,1.25])candidates.push({bandwidth:b,strength:a,neighbors:active.neighbors});
+ for(var n of [3,5,8])candidates.push({bandwidth:active.bandwidth,strength:active.strength,neighbors:n});
+ for(var c of candidates){var l=loss(tuneRows,fit,c);if(l+1e-9<bestLoss){best=c;bestLoss=l;}}
+ var before=loss(holdRows,trainRows,active),after=loss(holdRows,trainRows,best);
+ var accepted=after+Math.max(1e-8,before*.005)<before;
+ return {calibration:accepted?best:active,accepted,reason:accepted?'improved':'retained',groups:keys.length,pass:round+1,before,after,holdout:holdRows.length,tune:tuneRows.length};
+}
+
+var semantic=Object.freeze({version:2,keys:SEM_KEYS,scene:semanticScene,predict:semanticPredict,train:semanticTrain,validate:semanticValidateDataset,calibration:semanticCalibration,practice:semanticPractice});
+
+var api={version:'1.0.0',semantic:semantic,STYLES:STYLES,DEFAULTS:DEFAULTS,resolveOptions:resolveOptions,prepare:prepare,
  paint:paint,warp:warp,dirt:dirt,strokePlan:strokePlan,drawStrokes:drawStrokes,finish:finish,render:render,resample:resample};
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 if(global)global.BlacklineCroquisStudio=Object.freeze(api);
