@@ -65,3 +65,39 @@ test('Opening selections are saved and sanitized on import of 3DJSON',()=>{
  for(const field of ['op.openAngle=clamp','op.openPercent=clamp','op.leaves=clamp','op.hinge=','op.swing=','op.operation='])
   assert(importCode.includes(field),field);
 });
+
+test('four and six leaf presets retain the full parametric leaf count',()=>{
+ for(const kind of ['door','window'])for(const [n,word] of [[4,'four'],[6,'six']]){
+  const style=word+'-sliding-'+(kind==='door'?'glazed-door':'window');
+  assert.equal(ctx.cad3DOpeningDefaults(kind,style).leaves,n);
+  const parts=renderOpening(kind,style,{w:n,openPercent:100});
+  const glass=parts.filter(p=>p[6]===0x4d8297);
+  assert.equal(glass.length,n);
+  const centers=glass.map(p=>p[3]+p[9].shiftX);
+  assert(Math.abs(centers[0]-centers[n/2-1])<1e-8);
+  assert(Math.abs(centers[n/2]-centers[n-1])<1e-8);
+  assert(centers[n-1]-centers[0]>n*.6);
+  for(let i=1;i<n/2;i++)assert(Math.abs(glass[i][9].shiftY-glass[i-1][9].shiftY)>=.05);
+ }
+});
+test('glazed doors are framed around transparent glass, without an opaque full leaf',()=>{
+ const parts=renderOpening('door','single-glazed-door',{w:1,h:2.2,openAngle:45});
+ const glass=parts.find(p=>p[6]===0x4d8297);
+ assert(glass&&glass[0]>.6&&glass[2]>1.5&&glass[1]<.02);
+ assert(!parts.some(p=>p[6]===0x88745e&&p[0]>.7&&p[2]>1.5));
+ assert(parts.filter(p=>p[6]===0x88745e).length>=4);
+ assert(glass[9].angle>0);
+});
+test('fixed glass wall screen has six leaves and does not open',()=>{
+ const parts=renderOpening('window','six-fixed-window',{w:6,h:2.6,openPercent:100,openAngle:90});
+ const glass=parts.filter(p=>p[6]===0x4d8297);
+ assert.equal(glass.length,6);
+ assert(glass.every(p=>p[9].angle===0&&p[9].shiftX===0&&p[9].shiftY===0));
+ assert.equal(ctx.cad3DOpeningDefaults('door','four-fixed-glazed-door').operation,'fixed');
+});
+test('two leaf sliding system opens a clear span instead of exchanging leaves',()=>{
+ const cfg={operation:'sliding',hinge:'left',openPercent:100};
+ const a=ctx.cad3DLeafMotion(cfg,0,2,0,1,0,2),b=ctx.cad3DLeafMotion(cfg,1,2,1,2,0,2);
+ assert.equal(a.shiftX,0);assert.equal(b.shiftX,-1);
+ assert(Math.abs(a.shiftY-b.shiftY)>=.05);
+});
