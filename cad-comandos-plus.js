@@ -338,10 +338,46 @@ reg(['SCALETEXT','ESCALATEXTO','TEXTSCALE'],()=>{
  CORE.saveHistory();for(const e of s)e.h=factor!==null?(e.h||dimTextH())*factor:h;CORE.updateAll();CORE.toast('SCALETEXT · '+s.length+' texto(s)');
 });
 
+/* ---------- PUNTO ---------- */
+reg(['POINT','PO','PUNTO','PUNTOS'],()=>pick({mode:'repeat',need:1,label:'PUNTO · indicá la ubicación (Enter termina)',done:([p])=>{CORE.saveHistory();add({type:'point',p:P(p.x,p.y)});CORE.updateAll()}}));
+/* ---------- CAPA ACTUAL PARA LOS OBJETOS ---------- */
+reg(['LAYCUR','CAPAAACTUAL','PASARACAPAACTUAL'],()=>{
+ const s=unlocked(sel());if(!s.length)return CORE.toast('LAYCUR: seleccioná los objetos que pasan a la capa actual');
+ const st=S(),l=layerById(st.layerId);CORE.saveHistory();for(const e of s)e.layer=st.layerId;CORE.updateAll();CORE.toast(s.length+' objeto(s) → capa actual '+(l?.name||''));
+});
+/* ---------- Equivalencias de órdenes de uso habitual ---------- */
+const same=(names,target)=>reg(names,()=>CORE.command(target));
+same(['TEXTEDIT'],'DDEDIT');same(['BE'],'BEDIT');same(['XR','ATTACH'],'XREF');same(['DOR'],'DIMORDINATE');
+same(['LINETYPE'],'LTYPE');same(['COL'],'COLOR');same(['SN'],'SNAP');same(['MS'],'MSPACE');same(['PS'],'PSPACE');
+same(['PAGESETUP'],'PLOT');same(['EXPORT'],'EXPORTMENU');same(['DXFOUT'],'SAVE');same(['PASTEBLOCK'],'PASTECLIP');
+same(['GRADIENT'],'HATCH');same(['DS','DSETTINGS'],'OSNAP');same(['LW','LWEIGHT'],'PROPERTIES');
+/* Órdenes de arquitectura con sus nombres habituales: llevan a la herramienta equivalente de CAD2D3D. */
+same(['WALLADD'],'MURO');same(['OPENINGADD'],'VANO');same(['SPACEADD','SPACEAUTOGENERATE'],'LOCAL');
+same(['AECSCHEDULEADD'],'SUPERFICIES');same(['STAIRADD'],'ESCALERA');same(['AECDIMADD'],'DIMCONTINUE');
+reg(['DOORADD','WINDOWADD','PUERTA','PUERTAS','VENTANAS'],()=>{try{document.querySelector('[data-tool="blockgallery"]')?.click()}catch(e){}CORE.toast('Elegí una puerta o ventana en la paleta BLOQUES → Openings: se alinea y corta el muro sola')});
+const in3D=(names,what)=>reg(names,()=>CORE.toast(what+' se modela en el 3D (botón 3D). Para llevarlo al plano: panel Sección → «Enviar corte a 2D».'));
+in3D(['SLABADD','LOSA'],'La losa');in3D(['ROOFADD','TECHO'],'El techo');in3D(['RAILINGADD','BARANDA'],'La baranda');
+in3D(['CURTAINWALLADD'],'El muro cortina');in3D(['COLUMNGRIDADD','COLUMNA'],'La columna');
+in3D(['BLDGSECTIONLINEADD','BLDGELEVATIONLINEADD','CORTE','ALZADO'],'El corte o la vista');
+/* Órdenes que CAD2D3D no tiene: en lugar de «desconocida», se indica la alternativa. */
+const alt=(names,msg)=>reg(names,()=>{CORE.toast(msg);CORE.log?.(names[0]+': '+msg)});
+alt(['REGION','REG'],'REGION no existe: las polilíneas cerradas ya funcionan como regiones (área, sombreado, contorno con BOUNDARY).');
+alt(['WIPEOUT','COBERTURA'],'COBERTURA no existe: usá un sombreado sólido del color de fondo y ALFONDO / ALFRENTE.');
+alt(['SKETCH','BOCETO'],'BOCETO no existe: usá SPLINE o POLILÍNEA.');
+alt(['SPLINEDIT'],'Las splines se editan con pinzamientos en sus puntos de ajuste o con PEDIT.');
+alt(['BLEND'],'BLEND no existe: usá EMPALME (FILLET) o SPLINE entre los extremos.');
+alt(['JUSTIFYTEXT'],'La justificación del texto se cambia en PROPIEDADES.');
+alt(['REFEDIT'],'Para editar un bloque usá BEDIT (EDITARBLOQUE).');
+alt(['DIMBREAK','TOLERANCE'],'Esta variante de cota todavía no está disponible.');
+alt(['LAYWALK'],'Para recorrer capas usá LAYISO / LAYUNISO o la paleta de capas.');
+alt(['LIMITS'],'No hace falta definir límites: el dibujo es ilimitado y las láminas definen el papel.');
+alt(['CLOSE'],'El dibujo se guarda solo; para empezar otro usá NEW.');
+alt(['OPTIONS','OP'],'Las opciones están en el menú de cada barra de estado (▾) y en Workspace / Background.');
+alt(['IMAGE','IMAGEATTACH'],'Para una imagen o un PDF de fondo usá IMPORTAR PDF o CALIBRAR.');
 Object.assign(EXT.commands,C);
 
 /* ---------- Shift + clic derecho: referencias a objetos ---------- */
-const OSN={END:'Punto final',MID:'Punto medio',INT:'Intersección',CENTER:'Centro',QUAD:'Cuadrante',TAN:'Tangente',PERP:'Perpendicular',NEAREST:'Cercano',POINT:'Vértice / nodo'};
+const OSN={END:'Punto final',MID:'Punto medio',INT:'Intersección',CENTER:'Centro',QUAD:'Cuadrante',TAN:'Tangente',PERP:'Perpendicular',NEAREST:'Cercano',POINT:'Vértice / nodo',EXT:'Extensión',PAR:'Paralelo'};
 function osnapMenu(x,y){
  $('cadOsnapMenu')?.remove();if(!CORE.osnap)return;
  const m=document.createElement('div');m.id='cadOsnapMenu';m.setAttribute('role','menu');

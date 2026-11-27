@@ -2574,7 +2574,14 @@ function drawSnapMarker(){
  else if(snapIndicator.type==='QUAD'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y);ctx.lineTo(p.x,p.y+d);ctx.lineTo(p.x-d,p.y);ctx.closePath()}
  else if(snapIndicator.type==='MID'){ctx.moveTo(p.x,p.y-d);ctx.lineTo(p.x+d,p.y+d);ctx.lineTo(p.x-d,p.y+d);ctx.closePath()}
  else if(snapIndicator.type==='CENTER'){ctx.arc(p.x,p.y,d,0,TAU)}
+ else if(snapIndicator.type==='EXT'||snapIndicator.type==='PAR'){
+  // Guía punteada desde el extremo adquirido (EXT) o desde el último punto (PAR).
+  if(snapIndicator.from){const f=screen(snapIndicator.from);ctx.save();ctx.setLineDash([3,4]);ctx.beginPath();ctx.moveTo(f.x,f.y);ctx.lineTo(p.x,p.y);ctx.stroke();ctx.restore();ctx.beginPath()}
+  if(snapIndicator.type==='PAR'){ctx.moveTo(p.x-d,p.y+d*.4);ctx.lineTo(p.x+d*.4,p.y-d);ctx.moveTo(p.x-d*.4,p.y+d);ctx.lineTo(p.x+d,p.y-d*.4)}
+  else{for(const dx of [-d,0,d]){ctx.moveTo(p.x+dx+1.3,p.y);ctx.arc(p.x+dx,p.y,1.3,0,TAU)}}
+ }
  else ctx.rect(p.x-d,p.y-d,d*2,d*2);
+ if(cadExtAcquired.length&&(snapIndicator.type==='EXT'||snapIndicator.type==='PAR'))for(const sa of cadExtAcquired){const q=screen(sa.end);ctx.moveTo(q.x-3,q.y);ctx.lineTo(q.x+3,q.y);ctx.moveTo(q.x,q.y-3);ctx.lineTo(q.x,q.y+3)}
  ctx.fill();ctx.stroke();ctx.restore();
 }
 function arcSweep(a0,a1){let delta=((a1-a0)%TAU+TAU)%TAU;return delta<1e-8?TAU:delta}
@@ -4159,9 +4166,11 @@ function drawOtrackGuides(){
   if(label){ctx.font='12px Arial';const tw=ctx.measureText(label).width;ctx.fillStyle='#16202aee';ctx.fillRect(p.x+12,p.y+10,tw+12,20);ctx.strokeStyle='#7dff9a';ctx.strokeRect(p.x+12,p.y+10,tw+12,20);ctx.fillStyle='#e8fff0';ctx.fillText(label,p.x+18,p.y+24)}}
  ctx.restore();
 }
-const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN'];
-let cadActiveOsnaps=new Set(['END','POINT','MID','CENTER','INT','QUAD']); // Keep existing defaults; extra OSNAP modes are opt-in.
+const CAD_OSNAP_TYPES=['END','POINT','MID','CENTER','INT','QUAD','PERP','NEAREST','TAN','EXT','PAR'];
+let cadActiveOsnaps=new Set(['END','POINT','MID','CENTER','INT','QUAD','EXT']); // Keep existing defaults; extra OSNAP modes are opt-in.
 try{const saved=JSON.parse(localStorage.getItem('cad2d-osnap-modes')||'null');if(Array.isArray(saved))cadActiveOsnaps=new Set(saved.filter(x=>CAD_OSNAP_TYPES.includes(x)))}catch(e){}
+// EXTENSIÓN / PARALELO: segmentos adquiridos al pasar el cursor por un extremo (como en los CAD de escritorio).
+let cadExtAcquired=[];
 let cadOneShotOsnap=null; // Shift+right-click, for only the next drawing point
 function cadOsnapEnabled(kind){return cadOneShotOsnap?kind===cadOneShotOsnap:cadActiveOsnaps.has(kind)}
 function saveCadOsnapModes(){try{localStorage.setItem('cad2d-osnap-modes',JSON.stringify([...cadActiveOsnaps]))}catch(e){};schedule()}
@@ -4321,9 +4330,36 @@ const orthoLocksPointer=state.orthoOn&&(!!gripBase||(state.stage.length&&!['rect
    }
    for(let i=0;i<nearbyCurves.length;i++)for(let j=i+1;j<nearbyCurves.length;j++)for(const pt of cadCircleCircleInts(nearbyCurves[i],nearbyCurves[j]))tryInt(pt);
   }
+  // Adquisición: pasar por el extremo de un segmento lo guarda para EXTENSIÓN y PARALELO.
+  let guideFrom=null;
+  if(cadOsnapEnabled('EXT')||cadOsnapEnabled('PAR')){
+   const acqPx=7;
+   for(const L of nearbyLines){
+    for(const [end,other] of [[L.a,L.b],[L.b,L.a]]){
+     if(!end||!other||dist(screen(end),screen(osnapProbe))>acqPx||Math.hypot(end.x-other.x,end.y-other.y)<1e-9)continue;
+     if(!cadExtAcquired.some(s=>Math.hypot(s.end.x-end.x,s.end.y-end.y)<1e-9&&Math.hypot(s.other.x-other.x,s.other.y-other.y)<1e-9)){
+      cadExtAcquired.push({end:P(end.x,end.y),other:P(other.x,other.y)});if(cadExtAcquired.length>3)cadExtAcquired.shift();
+     }
+    }
+   }
+   if(!nearest){
+    const tolPx=7;let best=tolPx;
+    for(const s of cadExtAcquired){
+     const L=Math.hypot(s.end.x-s.other.x,s.end.y-s.other.y),u=P((s.end.x-s.other.x)/L,(s.end.y-s.other.y)/L);
+     if(cadOsnapEnabled('EXT')){
+      const t=(osnapProbe.x-s.end.x)*u.x+(osnapProbe.y-s.end.y)*u.y;
+      if(t>1e-9){const pt=P(s.end.x+u.x*t,s.end.y+u.y*t),d=dist(screen(pt),screen(osnapProbe));if(d<best){best=d;nearest=pt;type='EXT';guideFrom=s.end}}
+     }
+     if(cadOsnapEnabled('PAR')&&state.stage.length&&['line','polyline','dimension','move','copy','wall'].includes(state.tool)){
+      const base=state.stage.at(-1),t=(osnapProbe.x-base.x)*u.x+(osnapProbe.y-base.y)*u.y;
+      if(Math.abs(t)*state.view.scale>20){const pt=P(base.x+u.x*t,base.y+u.y*t),d=dist(screen(pt),screen(osnapProbe));if(d<best){best=d;nearest=pt;type='PAR';guideFrom=base}}
+     }
+    }
+   }
+  }
   if(!nearest&&nearFallback){nearest=nearFallback;type='NEAREST'}
   if(nearest){
-   snapIndicator={point:P(nearest.x,nearest.y),type};
+   snapIndicator={point:P(nearest.x,nearest.y),type,...(guideFrom?{from:P(guideFrom.x,guideFrom.y)}:{})};
    if(trackingEligible()&&window.BlacklineTrackingMath&&['END','POINT','MID','CENTER','INT','QUAD'].includes(type))cadOtrackHover(nearest);
    else cadOtrackReleaseHover();
    // An off-axis vertex may be acquired as an OTRACK reference, but it must
@@ -6809,7 +6845,8 @@ function openCadSnapOverrideMenu(x,y){
  menu.append(heading);
  const choices=[['END','Endpoint','Extremo'],['MID','Midpoint','Punto medio'],['CENTER','Center','Centro'],
   ['INT','Intersection','Intersección'],['PERP','Perpendicular','Perpendicular'],
-  ['TAN','Tangent','Tangente'],['NEAREST','Nearest','Cercano'],['QUAD','Quadrant','Cuadrante'],['POINT','Node','Nodo']];
+  ['TAN','Tangent','Tangente'],['NEAREST','Nearest','Cercano'],['QUAD','Quadrant','Cuadrante'],['POINT','Node','Nodo'],
+  ['EXT','Extension','Extensión'],['PAR','Parallel','Paralelo']];
  for(const [kind,en,es] of choices){
   const button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');
   button.textContent=cad2dAliasLanguage==='es'?es:en;
@@ -7775,6 +7812,14 @@ function runCommand(){let value=$('command').value.trim();$('command').value='';
  if(!value){if(state.tool==='select'&&cad2dLastCommand){$('command').value=cad2dLastCommand;return runCommand()}return finishStage();}
  const rawOption=value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
  const upper=cad2dNormalizeCommand(value);
+ // Referencia puntual escrita a mitad de una orden (FIN, MED, INT, CEN, EXT, PAR… o sus equivalentes en inglés).
+ {const OV={END:'END',ENDP:'END',ENDPOINT:'END',FIN:'END',FINAL:'END',MID:'MID',MED:'MID',MEDIO:'MID',INT:'INT',INTERSECCION:'INT',CEN:'CENTER',CENTER:'CENTER',CENTRO:'CENTER',
+  QUA:'QUAD',QUAD:'QUAD',CUA:'QUAD',CUADRANTE:'QUAD',PER:'PERP',PERP:'PERP',PERPENDICULAR:'PERP',TAN:'TAN',TANGENTE:'TAN',NEA:'NEAREST',NEAREST:'NEAREST',CER:'NEAREST',CERCANO:'NEAREST',
+  NOD:'POINT',NODE:'POINT',NODO:'POINT',EXT:'EXT',EXTENSION:'EXT',PAR:'PAR',PARALLEL:'PAR',PARALELO:'PAR'};
+  const kind=OV[rawOption];
+  if(kind&&state.tool!=='select'&&!['trim','extend','erase','offset','fillet','chamfer','explode','join','zoomWindow'].includes(state.tool)){
+   cadOneShotOsnap=kind;toast('OSNAP '+kind+' · '+(cad2dAliasLanguage==='es'?'próximo punto':'next point'));log('Referencia puntual: '+kind);schedule();return;
+  }}
  {const n=Number(value.replace(',','.'));if(/^\d*[.,]?\d+$/.test(value)&&n>0&&!state.orthoOn&&otrkGuide?.rays?.length===1&&!otrkGuide.intersection&&trackingEligible()&&state.tool!=='select'&&!cad2dCmdOpt.transformRef){const r=otrkGuide.rays[0];otrkGuide=null;handlePoint(P(r.anchor.x+r.ux*n,r.anchor.y+r.uy*n),false);schedule();return}}
 /* ---------- Opciones de comando por teclado (estilo CAD de escritorio) ---------- */
  {const num=value.replace(',','.'),isNum=/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(num),n=Number(num),t=state.tool,st=state.stage,opt=rawOption;
@@ -12806,7 +12851,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dxf-parser.js?v=20261126-layouts7"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
-<script src="cad-comandos-plus.js?v=20261126-comandos1"></script>
+<script src="cad-comandos-plus.js?v=20261126-comandos3"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261126-usercad4"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>
