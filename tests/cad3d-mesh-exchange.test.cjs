@@ -48,3 +48,20 @@ test('IFC4 exporter builds separate products, material and references',()=>{
  for(const m of ifc.matchAll(/#(\d+)/g))assert.ok(refs.has(m[1]));
  assert.throws(()=>c.cad3dEncodeIFC([],rng));
 });
+
+test('Blackline IFC4 round-trip retains distinct objects, classes and global coordinates',()=>{
+ const c={};vm.createContext(c);
+ vm.runInContext(section('function cad3dEncodeIFC(','function exportIFC(')+section('function cad3dDecodeIFC(','function cad3dImportIFC('),c);
+ let n=0;const rng=()=>Uint8Array.from({length:16},(_,i)=>i===15?++n:0);
+ const second=[[[10,20,3],[11,20,3],[10,21,3]]];
+ const ifc=c.cad3dEncodeIFC([{id:1,type:'wall',name:"Múro's",triangles:tri},{id:2,type:'slab',triangles:second}],rng);
+ const got=c.cad3dDecodeIFC(ifc);
+ assert.equal(got.length,2);
+ assert.equal(got[0].name,"Múro's");
+ assert.equal(got[0].ifcClass,'Wall');
+ assert.equal(got[1].ifcClass,'Slab');
+ assert.equal(JSON.stringify(got[1].triangles),JSON.stringify(second));
+ assert.throws(()=>c.cad3dDecodeIFC(ifc.replace("FILE_SCHEMA(('IFC4'))","FILE_SCHEMA(('IFC2X3'))")));
+ assert.throws(()=>c.cad3dDecodeIFC(ifc.replace('(1,2,3)','(1,2,99)')));
+ assert.throws(()=>c.cad3dDecodeIFC(ifc.replace('0.,0.,0.','1.,0.,0.')));
+});
