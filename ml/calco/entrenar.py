@@ -8,7 +8,7 @@ Uso (Colab con GPU o local):
   python3 entrenar.py --datos dataset --epocas 40 --salida calco.onnx
   python3 entrenar.py --datos dataset --epocas 1 --lado 256 --salida /tmp/prueba.onnx   (prueba rápida en CPU)
 """
-import argparse, json, math, os, random, time
+import math, argparse, json, math, os, random, time
 import numpy as np
 import torch, torch.nn as nn, torch.nn.functional as F
 from PIL import Image
@@ -135,13 +135,19 @@ def main():
     # Pesos por clase: puertas, ventanas y muebles son pocos píxeles comparados con el fondo.
     pesos = torch.tensor([0.3, 1.0, 2.5, 2.5, 1.2, 1.0], device=disp)
     opt = torch.optim.AdamW(modelo.parameters(), lr=2e-3, weight_decay=1e-4)
-    pasos = a.epocas * len(dl); sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=2e-3, total_steps=max(1, pasos))
+    pasos = a.epocas * len(dl)
+    # Con límite de minutos (CPU), el ritmo de aprendizaje sigue el tiempo transcurrido: calentamiento corto y coseno hasta el final.
+    def ritmo(paso, t):
+        frac = min(1.0, (t / (a.minutos * 60)) if a.minutos else paso / max(1, pasos))
+        return 2e-3 * min(1.0, (paso + 1) / 100) * (0.05 + 0.95 * 0.5 * (1 + math.cos(math.pi * frac)))
     t0 = time.time(); paso = 0; mejor = -1
     for ep in range(a.epocas):
         suma = 0.0
         for x, y in dl:
             x, y = x.to(disp), y.to(disp); loss = perdida(modelo(x), y, pesos)
-            opt.zero_grad(); loss.backward(); opt.step(); sched.step(); suma += loss.item(); paso += 1
+            for g in opt.param_groups: g["lr"] = ritmo(paso, time.time() - t0)
+            opt.zero_grad(); loss.backward(); opt.step(); suma += loss.item(); paso += 1
+            if paso % 50 == 0: print(f"  paso {paso} · pérdida {loss.item():.3f} · {time.time() - t0:.0f} s", flush=True)
             if a.minutos and time.time() - t0 > a.minutos * 60:
                 break
         iou = evaluar(modelo, dv, disp); media = sum(list(iou.values())[1:]) / (NCLASES - 1)

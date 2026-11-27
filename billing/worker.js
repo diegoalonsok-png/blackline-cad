@@ -24,6 +24,9 @@
  *   GET  /api/projects            lista de proyectos en la nube · POST /api/projects {id?,name,data} guarda (crea o actualiza; guarda 10 versiones)
  *   GET  /api/projects/<id>       abre · POST …/rename · POST …/delete · POST …/share {on} · GET …/versions[/<n>]
  *   GET  /api/share/<shareId>     proyecto compartido de solo lectura (sin sesión)
+ *   GET  /api/share/<shareId>/comments · POST {name,text,x?,y?}  comentarios de quien recibe el enlace (dueño Pro/Estudio/prueba)
+ *   GET  /api/projects/<id>/comments · POST /api/projects/<id>/comments/<n>/delete   el dueño lee y borra comentarios
+ *   Versiones: 30 por proyecto en Pro y Estudio (también durante la prueba), 10 en el plan gratis.
  *
  * Mercado Pago (cobro en pesos para Argentina; se activa solo si están MP_ACCESS_TOKEN y los precios MP_PRICE_*)
  *   POST /api/mp-checkout         {plan} → {url} de suscripción automática (preapproval) de Mercado Pago
@@ -168,6 +171,18 @@ function universityEmail(env,mail){
 }
 async function studentUntil(env,userId){try{await ensureStudents(env);return (await env.DB.prepare('SELECT verified_until FROM students WHERE user_id=?').bind(userId).first())?.verified_until||0}catch(e){return 0}}
 
+/* ---------- Nube: versiones por plan y comentarios en enlaces compartidos ---------- */
+const PAID=new Set(['pro','studio','trial']);
+const versionsFor=plan=>PAID.has(plan)?30:10;
+let commentsReady=false;
+async function ensureComments(env){
+ if(commentsReady)return;
+ await env.DB.prepare('CREATE TABLE IF NOT EXISTS share_comments (id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL, author TEXT NOT NULL, text TEXT NOT NULL, x REAL, y REAL, created_at INTEGER NOT NULL)').run();
+ await env.DB.prepare('CREATE INDEX IF NOT EXISTS idx_comments_project ON share_comments(project_id, id)').run();
+ commentsReady=true;
+}
+const commentRows=async(env,pid)=>((await env.DB.prepare('SELECT id,author,text,x,y,created_at FROM share_comments WHERE project_id=? ORDER BY id LIMIT 300').bind(pid).all()).results||[]).map(r=>({id:r.id,author:r.author,text:r.text,x:r.x,y:r.y,createdAt:r.created_at}));
+
 const PLAN_BY_PRICE=env=>({[env.PRICE_PRO_MONTHLY]:'pro',[env.PRICE_PRO_YEARLY]:'pro',[env.PRICE_STUDIO_MONTHLY]:'studio',[env.PRICE_STUDIO_YEARLY]:'studio'});
 
 /* ---------- Equipo del plan Estudio: el titular + hasta 4 correos invitados, que pasan a Pro ---------- */
@@ -288,6 +303,26 @@ async function handle(req,env){
     if(type==='subscription_preapproval'||type==='preapproval')await mpSync(env,await mp(env,'/preapproval/'+encodeURIComponent(dataId)));
     else if(type==='subscription_authorized_payment'){const pay=await mp(env,'/authorized_payments/'+encodeURIComponent(dataId));if(pay.preapproval_id)await mpSync(env,await mp(env,'/preapproval/'+encodeURIComponent(pay.preapproval_id)))}
     return json({ok:true});
+   }
+   // Comentarios de un enlace compartido (sin sesión; solo si el dueño tiene Pro, Estudio o la prueba vigente)
+   {const cm=path.match(/^\/api\/share\/([A-Za-z0-9_-]{4,40})\/comments$/);
+    if(cm){
+     const row=await env.DB.prepare('SELECT id,user_id FROM projects WHERE share_id=?').bind(cm[1]).first();
+     if(!row)return cors(env,req,json({error:'enlace no válido o desactivado'},404));
+     const owner=(await planFor(env,row.user_id))?.plan||'free';
+     if(!PAID.has(owner))return cors(env,req,json({error:isEs(req)?'Los comentarios son parte de los planes Pro y Estudio.':'Comments are part of the Pro and Studio plans.',disabled:true},402));
+     await ensureComments(env);
+     if(req.method==='GET')return cors(env,req,json({comments:await commentRows(env,row.id)}));
+     const b=await req.json().catch(()=>({}));
+     const text=String(b.text||'').replace(/[\u0000-\u0008\u000b-\u001f]/g,'').trim().slice(0,1000);
+     const author=String(b.name||'').replace(/[\u0000-\u001f]/g,'').trim().slice(0,60)||(isEs(req)?'Invitado':'Guest');
+     if(!text)return cors(env,req,json({error:isEs(req)?'Escribí un comentario.':'Write a comment.'},400));
+     const x=Number.isFinite(Number(b.x))&&Math.abs(b.x)<1e12?Number(b.x):null,y=Number.isFinite(Number(b.y))&&Math.abs(b.y)<1e12?Number(b.y):null;
+     const n=(await env.DB.prepare('SELECT COUNT(*) AS n FROM share_comments WHERE project_id=?').bind(row.id).first())?.n||0;
+     if(n>=300)return cors(env,req,json({error:isEs(req)?'Este plano llegó al máximo de 300 comentarios.':'This drawing reached the 300-comment limit.'},400));
+     await env.DB.prepare('INSERT INTO share_comments(project_id,author,text,x,y,created_at) VALUES(?,?,?,?,?,?)').bind(row.id,author,text,x,y,now()).run();
+     return cors(env,req,json({ok:true,comments:await commentRows(env,row.id)}));
+    }
    }
    // Proyecto compartido (solo lectura, sin sesión): GET /api/share/<id>
    if(path.startsWith('/api/share/')&&req.method==='GET'){
@@ -454,18 +489,24 @@ async function handle(req,env){
      await env.DB.prepare('INSERT INTO projects(id,user_id,name,data,size,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id,userId,name,packed,body.data.length,now(),now()).run();
     }else{
      await env.DB.prepare('INSERT INTO project_versions(project_id,data,created_at) VALUES(?,?,?)').bind(id,own.data,now()).run();
-     await env.DB.prepare('DELETE FROM project_versions WHERE project_id=? AND id NOT IN (SELECT id FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT 10)').bind(id,id).run();
+     await env.DB.prepare('DELETE FROM project_versions WHERE project_id=? AND id NOT IN (SELECT id FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT ?)').bind(id,id,versionsFor(plan)).run();
      await env.DB.prepare('UPDATE projects SET name=?,data=?,size=?,updated_at=? WHERE id=? AND user_id=?').bind(name,packed,body.data.length,now(),id,userId).run();
     }
     return cors(env,req,json({ok:true,id,updatedAt:now()}));
    }
-   {const m=path.match(/^\/api\/projects\/([A-Za-z0-9-]{8,40})(?:\/(share|delete|versions|rename))?(?:\/(\d+))?$/);
+   {const m=path.match(/^\/api\/projects\/([A-Za-z0-9-]{8,40})(?:\/(share|delete|versions|rename|comments))?(?:\/(\d+))?(\/delete)?$/);
     if(m){
-     const [,pid,action,vid]=m;
+     const [,pid,action,vid,del]=m;
      const own=await env.DB.prepare('SELECT id,name,data,share_id FROM projects WHERE id=? AND user_id=?').bind(pid,userId).first();
      if(!own)return cors(env,req,json({error:'no encontrado'},404));
      if(!action&&req.method==='GET')return cors(env,req,json({id:pid,name:own.name,data:await unzip(own.data)}));
-     if(action==='delete'&&req.method==='POST'){await env.DB.prepare('DELETE FROM project_versions WHERE project_id=?').bind(pid).run();await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(pid,userId).run();return cors(env,req,json({ok:true}))}
+     if(action==='comments'){
+      await ensureComments(env);
+      if(req.method==='GET'&&!vid)return cors(env,req,json({comments:await commentRows(env,pid)}));
+      if(req.method==='POST'&&vid&&del){await env.DB.prepare('DELETE FROM share_comments WHERE id=? AND project_id=?').bind(Number(vid),pid).run();return cors(env,req,json({ok:true,comments:await commentRows(env,pid)}))}
+      return cors(env,req,json({error:'no encontrado'},404));
+     }
+     if(action==='delete'&&req.method==='POST'){try{await ensureComments(env);await env.DB.prepare('DELETE FROM share_comments WHERE project_id=?').bind(pid).run()}catch(e){}await env.DB.prepare('DELETE FROM project_versions WHERE project_id=?').bind(pid).run();await env.DB.prepare('DELETE FROM projects WHERE id=? AND user_id=?').bind(pid,userId).run();return cors(env,req,json({ok:true}))}
      if(action==='rename'&&req.method==='POST'){const b=await req.json().catch(()=>({}));const nm=String(b.name||'').trim().slice(0,80);if(!nm)return cors(env,req,json({error:'nombre vacío'},400));await env.DB.prepare('UPDATE projects SET name=? WHERE id=? AND user_id=?').bind(nm,pid,userId).run();return cors(env,req,json({ok:true}))}
      if(action==='share'&&req.method==='POST'){
       const b=await req.json().catch(()=>({}));
@@ -474,8 +515,9 @@ async function handle(req,env){
      }
      if(action==='versions'&&req.method==='GET'){
       if(vid){const v=await env.DB.prepare('SELECT data,created_at FROM project_versions WHERE id=? AND project_id=?').bind(Number(vid),pid).first();if(!v)return cors(env,req,json({error:'no encontrado'},404));return cors(env,req,json({name:own.name,data:await unzip(v.data),createdAt:v.created_at}))}
-      const {results}=await env.DB.prepare('SELECT id,created_at,length(data) AS bytes FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT 10').bind(pid).all();
-      return cors(env,req,json({versions:(results||[]).map(r=>({id:r.id,createdAt:r.created_at,bytes:r.bytes}))}));
+      const keep=versionsFor((await planFor(env,userId))?.plan||'free');
+      const {results}=await env.DB.prepare('SELECT id,created_at,length(data) AS bytes FROM project_versions WHERE project_id=? ORDER BY id DESC LIMIT ?').bind(pid,keep).all();
+      return cors(env,req,json({keep,versions:(results||[]).map(r=>({id:r.id,createdAt:r.created_at,bytes:r.bytes}))}));
      }
     }
    }

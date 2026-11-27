@@ -644,16 +644,17 @@
   webController?.abort();const ctrl=new AbortController();webController=ctrl;const epoch=++webEpoch;
   st.q=raw;searchPage=0;webItems=[];webArea=null;webStatus=T('Loading classic plans…','Cargando plantas clásicas…');paintWeb();
   try{
-   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=10',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
+   const [res,archive]=await Promise.all([fetch('/classics/search?q='+encodeURIComponent(raw)+'&v=11',{signal:ctrl.signal,credentials:'omit'}),archivedReferences('').catch(()=>[])]);
    const data=await res.json();if(epoch!==webEpoch||!classicMode)return;
    if(!res.ok||!Array.isArray(data.items))throw Error(data?.error||'HTTP '+res.status);
    const img=u=>'/classics/img?u='+encodeURIComponent(u);
    classicIndex=Array.isArray(data.index)?data.index:[];classicLinks=Array.isArray(data.links)?data.links.filter(l=>/^https:\/\//.test(l.u)):[];classicModern=!!data.modern;webItems=onlyArchitecturalDrawings(data.items.filter(x=>x.kind==='plate'||x.kind==='portrait').map(x=>({title:x.title,area:null,classic:true,kind:x.kind,drawingType:x.drawingType,format:x.format,local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:[x.author,x.license,x.credit].filter(Boolean).join(' · ')})));
-   webItems=webItems.concat(data.items.filter(x=>x.kind==='photo').slice(0,6).map(x=>({title:x.title,area:null,classic:true,kind:'photo',drawingType:'photo',local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:T('Photo','Foto')+' · '+[x.license,x.credit].filter(Boolean).join(' · ')})));
+   webItems=webItems.concat(data.items.filter(x=>x.kind==='photo').slice(0,10).map(x=>({title:x.title,area:null,classic:true,kind:'photo',drawingType:'photo',local:true,thumb:img(x.thumb),url:img(x.image),source:x.page,license:T('Photo','Foto')+' · '+[x.license,x.credit].filter(Boolean).join(' · ')})));
    const normalizeAuthor=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\([^)]*\)/g,'').trim();
    const authors=(Array.isArray(data.authors)?data.authors:[]).map(normalizeAuthor);
    const authorCAD=archive.filter(x=>x.cadUrl&&x.architect&&authors.includes(normalizeAuthor(x.architect))).map(x=>({...x,classic:true,kind:'plate',local:true,license:[x.architect,x.license,'CAD'].filter(Boolean).join(' · ')}));
-   const photos=webItems.filter(x=>x.kind==='photo');webItems=onlyArchitecturalDrawings(authorCAD.concat(webItems.filter(x=>x.kind!=='photo'))).concat(photos);
+   // Orden de arquitecto: plantas → cortes → vistas → fotos de las obras → retrato al final (nunca al revés).
+   const photos=webItems.filter(x=>x.kind==='photo'),portraits=webItems.filter(x=>x.kind==='portrait');webItems=onlyArchitecturalDrawings(authorCAD.concat(webItems.filter(x=>x.kind!=='photo'&&x.kind!=='portrait'))).concat(photos,portraits);
    webStatus=webItems.length?'':T('Nothing found. Try another work or author: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.','No encontré resultados. Probá otra obra o autor: Palladio, Vitruvio, Serlio, Piranesi, Ledoux, Viollet-le-Duc, Choisy, Mies, Le Corbusier.');
   }catch(e){if(e.name==='AbortError'||epoch!==webEpoch)return;webStatus=T('Classic library unavailable. Retry.','Biblioteca clásica no disponible. Volvé a buscar.');}
   if(epoch===webEpoch&&classicMode)paintWeb();

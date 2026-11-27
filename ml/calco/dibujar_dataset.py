@@ -14,6 +14,9 @@ import argparse, io, json, math, os, random
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+INGLES = {"DORMITORIO": "Bedroom", "DORM.": "Bedroom", "HABITACIÓN": "Bedroom", "BAÑO": "Bath", "COCINA": "Kitchen", "LIVING": "Great Room",
+          "ESTAR": "Living", "LIVING COMEDOR": "Great Room", "COMEDOR": "Dining", "LAVADERO": "Utility", "OFICINA": "Office", "DESPACHO": "Den",
+          "ESTUDIO": "Den", "HALL": "Entry", "PASO": "Hall", "CIRC.": "Hall", "GARAGE": "Garage", "COCHERA": "Garage", "DEPÓSITO": "Storage", "DEP.": "Storage"}
 CLASES = {"fondo": 0, "muro": 1, "puerta": 2, "ventana": 3, "mueble": 4, "texto": 5}
 COLOR_MASCARA = [(0, 0, 0), (230, 57, 70), (69, 123, 157), (42, 157, 143), (244, 162, 97), (160, 160, 160)]
 NOMBRES = {"bedroom": ["DORMITORIO", "DORM.", "HABITACIÓN"], "bath": ["BAÑO"], "kitchen": ["COCINA"],
@@ -200,6 +203,9 @@ def dibujar(p: Planta, r: random.Random, lado=768):
         "puerta": r.choice(["hoja_arco", "hoja_arco", "hoja", "arco_punteado"]),
         "ventana": r.choice([2, 3, 3]),
         "textos": r.random() < 0.85, "cotas": r.random() < 0.7, "muebles": r.random() < 0.9,
+        # Elementos de plantas reales de internet: pisos con trama, vegetación, autos, solados, títulos.
+        "pisos": r.random() < 0.45, "vegetacion": r.random() < 0.45, "autos": r.random() < 0.3,
+        "solado": r.random() < 0.4, "titulo": r.random() < 0.45, "ingles": r.random() < 0.35,
     }
     azul = estilo["fondo"] == (28, 60, 110)
     tinta = (235, 240, 255) if azul else r.choice([(0, 0, 0), (20, 20, 20), (40, 40, 60)])
@@ -216,6 +222,38 @@ def dibujar(p: Planta, r: random.Random, lado=768):
         P0 = (ax + ux * (a0 + e0), ay + uy * (a0 + e0)); P1 = (ax + ux * (a1 + e1), ay + uy * (a1 + e1))
         return [T(P0[0] + nx, P0[1] + ny), T(P1[0] + nx, P1[1] + ny), T(P1[0] - nx, P1[1] - ny), T(P0[0] - nx, P0[1] - ny)]
 
+    gris_claro = (150, 170, 210) if azul else tuple(int(c * 0.72 + 255 * 0.28) for c in (r.choice([170, 185, 200]),) * 3)
+    fino0 = max(1, lw // 3)
+    bx0, by0 = T(minx, miny); bx1, by1 = T(maxx, maxy)
+    caja = (min(bx0, bx1), min(by0, by1), max(bx0, bx1), max(by0, by1))  # edificio en píxeles (con sobremuestreo)
+    # Solado exterior: rectángulos punteados con grilla de baldosas pegados al edificio (patios, galerías).
+    if estilo["solado"]:
+        for _ in range(r.randint(1, 3)):
+            w_, h_ = r.uniform(0.15, 0.35) * S, r.uniform(0.1, 0.3) * S
+            lado_ = r.choice(["izq", "der", "arr", "aba"])
+            if lado_ == "izq": x0 = caja[0] - w_ * r.uniform(0.6, 1); y0 = r.uniform(caja[1], max(caja[1] + 1, caja[3] - h_))
+            elif lado_ == "der": x0 = caja[2] - w_ * r.uniform(0, 0.4); y0 = r.uniform(caja[1], max(caja[1] + 1, caja[3] - h_))
+            elif lado_ == "arr": x0 = r.uniform(caja[0], max(caja[0] + 1, caja[2] - w_)); y0 = caja[1] - h_ * r.uniform(0.6, 1)
+            else: x0 = r.uniform(caja[0], max(caja[0] + 1, caja[2] - w_)); y0 = caja[3] - h_ * r.uniform(0, 0.4)
+            x1, y1 = x0 + w_, y0 + h_; paso = r.uniform(10, 22) * ss
+            for q in np.arange(x0, x1, paso): di.line([(q, y0), (q, y1)], fill=gris_claro, width=fino0)
+            for q in np.arange(y0, y1, paso): di.line([(x0, q), (x1, q)], fill=gris_claro, width=fino0)
+            for (a1, a2) in [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]:
+                n_ = int(math.hypot(a2[0] - a1[0], a2[1] - a1[1]) // (8 * ss)) or 1
+                for q in range(0, n_, 2):
+                    t0, t1 = q / n_, min(1, (q + 1) / n_)
+                    di.line([(a1[0] + (a2[0] - a1[0]) * t0, a1[1] + (a2[1] - a1[1]) * t0), (a1[0] + (a2[0] - a1[0]) * t1, a1[1] + (a2[1] - a1[1]) * t1)], fill=tinta, width=fino0)
+    # Pisos con trama dentro de los locales (baldosas, tablas o gris uniforme): siguen siendo fondo.
+    if estilo["pisos"]:
+        tipo_piso = r.choice(["grilla", "grilla", "tablas", "gris"])
+        for (_, x0, y0, x1, y1) in p.locales:
+            if r.random() < 0.25: continue
+            a_, b_ = T(x0, y0), T(x1, y1); X0, X1 = sorted([a_[0], b_[0]]); Y0, Y1 = sorted([a_[1], b_[1]])
+            if tipo_piso == "gris": di.rectangle([X0, Y0, X1, Y1], fill=tuple(min(255, c + 40) for c in gris_claro)); continue
+            paso = r.uniform(7, 16) * ss
+            for q in np.arange(X0, X1, paso): di.line([(q, Y0), (q, Y1)], fill=gris_claro, width=fino0)
+            if tipo_piso == "grilla":
+                for q in np.arange(Y0, Y1, paso): di.line([(X0, q), (X1, q)], fill=gris_claro, width=fino0)
     # Tramos de muro entre aberturas.
     for k, m in enumerate(p.muros):
         ax, ay, bx, by, t = m[:5]; L = math.hypot(bx - ax, by - ay)
@@ -290,12 +328,62 @@ def dibujar(p: Planta, r: random.Random, lado=768):
                     di.line([pts[0], pts[2]], fill=tinta, width=fino); di.line([pts[1], pts[3]], fill=tinta, width=fino)
             vec["muebles"].append({"tipo": tipo, "caja": [[v / ss for v in q] for q in pts]})
 
+    # Mesadas de cocina: líneas paralelas a un muro con bachas (artefacto).
+    if estilo["muebles"] and r.random() < 0.5 and p.locales:
+        (_, x0, y0, x1, y1) = r.choice(p.locales)
+        prof = 0.6; horiz = (x1 - x0) > (y1 - y0)
+        q0, q1 = (T(x0 + 0.1, y1 - 0.1), T(x1 - 0.1, y1 - 0.1 - prof)) if horiz else (T(x0 + 0.1, y0 + 0.1), T(x0 + 0.1 + prof, y1 - 0.1))
+        bb = [min(q0[0], q1[0]), min(q0[1], q1[1]), max(q0[0], q1[0]), max(q0[1], q1[1])]
+        di.rectangle(bb, outline=tinta, width=max(1, lw // 2)); dm.rectangle(bb, fill=CLASES["mueble"])
+        cx_, cy_ = (bb[0] + bb[2]) / 2, (bb[1] + bb[3]) / 2; k_ = min(bb[2] - bb[0], bb[3] - bb[1]) * 0.3
+        di.rectangle([cx_ - k_, cy_ - k_ * 0.8, cx_ + k_, cy_ + k_ * 0.8], outline=tinta, width=max(1, lw // 2))
+    # Vegetación (árboles en planta: copa con trazos radiales) y autos fuera del edificio.
+    def afuera(rad):
+        for _ in range(30):
+            x, y = r.uniform(rad, S - rad), r.uniform(rad, S - rad)
+            if not (caja[0] - rad < x < caja[2] + rad and caja[1] - rad < y < caja[3] + rad): return x, y
+        return None
+    if estilo["vegetacion"]:
+        for _ in range(r.randint(3, 12)):
+            rad = r.uniform(8, 26) * ss; c_ = afuera(rad) if r.random() < 0.8 else (r.uniform(caja[0], caja[2]), r.uniform(caja[1], caja[3]))
+            if not c_: continue
+            x, y = c_; n_ = r.randint(7, 16)
+            for q in range(n_):
+                ang = 2 * math.pi * q / n_ + r.uniform(-0.2, 0.2); rr = rad * r.uniform(0.55, 1)
+                di.line([(x, y), (x + rr * math.cos(ang), y + rr * math.sin(ang))], fill=tinta, width=max(1, lw // 2))
+                if r.random() < 0.6: di.ellipse([x + rr * math.cos(ang) - 3 * ss, y + rr * math.sin(ang) - 3 * ss, x + rr * math.cos(ang) + 3 * ss, y + rr * math.sin(ang) + 3 * ss], outline=tinta, width=fino0)
+            if r.random() < 0.5: di.ellipse([x - rad, y - rad, x + rad, y + rad], outline=tinta, width=fino0)
+    if estilo["autos"]:
+        for _ in range(r.randint(1, 2)):
+            L_, W_ = r.uniform(55, 95) * ss, 0; W_ = L_ * 0.45
+            vert = r.random() < 0.5; w_, h_ = (W_, L_) if vert else (L_, W_)
+            c_ = afuera(max(w_, h_) / 2) if r.random() < 0.5 else (r.uniform(caja[0] + w_, max(caja[0] + w_ + 1, caja[2] - w_)), r.uniform(caja[1] + h_, max(caja[1] + h_ + 1, caja[3] - h_)))
+            if not c_: continue
+            x, y = c_; bb = [x - w_ / 2, y - h_ / 2, x + w_ / 2, y + h_ / 2]
+            di.rounded_rectangle(bb, radius=int(min(w_, h_) * 0.3), outline=tinta, width=max(1, lw // 2))
+            ins = [bb[0] + w_ * 0.15, bb[1] + h_ * 0.25, bb[2] - w_ * 0.15, bb[3] - h_ * 0.3] if vert else [bb[0] + w_ * 0.25, bb[1] + h_ * 0.15, bb[2] - w_ * 0.3, bb[3] - h_ * 0.15]
+            di.rounded_rectangle(ins, radius=int(min(w_, h_) * 0.15), outline=tinta, width=fino0)
+            dm.rounded_rectangle(bb, radius=int(min(w_, h_) * 0.3), fill=CLASES["mueble"])
+    # Título, rótulo y logo fuera del dibujo (texto).
+    if estilo["titulo"]:
+        f4 = fuente(r.uniform(12, 20) * ss)
+        txt = r.choice(["Planta baja", "PLANTA GENERAL", "Planta do Pav. terreo", "FLOOR PLAN", "First Floor", "PLANTA ARQUITECTURA ESC 1:100"])
+        x, y = r.uniform(0.04, 0.4) * S, r.choice([r.uniform(0.9, 0.96), r.uniform(0.02, 0.06)]) * S
+        bb = di.textbbox((x, y), txt, font=f4); di.text((x, y), txt, fill=tinta, font=f4); dm.rectangle(bb, fill=CLASES["texto"])
+        if r.random() < 0.5:
+            f5 = fuente(r.uniform(7, 10) * ss); t2 = r.choice(["AREA CONSTRUIDA TOTAL = 251.00 M2", "© 2026 Estudio de arquitectura", "SUP. CUBIERTA 148,50 m²"])
+            bb = di.textbbox((x, y + 24 * ss), t2, font=f5); di.text((x, y + 24 * ss), t2, fill=tinta, font=f5); dm.rectangle(bb, fill=CLASES["texto"])
     # Textos de locales y superficies.
     if estilo["textos"]:
         f1 = fuente(r.uniform(9, 15) * ss); f2 = fuente(r.uniform(7, 11) * ss)
         for (nombre, x0, y0, x1, y1) in p.locales:
             cx, cy = T((x0 + x1) / 2, (y0 + y1) / 2)
-            for txt, f, dy in [(nombre, f1, -8 * ss), (f"{abs((x1 - x0) * (y1 - y0)):.2f} m²".replace(".", ","), f2, 8 * ss)]:
+            if estilo["ingles"]:
+                pies = lambda m: f"{int(m * 3.2808)}'" + (f"{int(round((m * 3.2808 % 1) * 12))}\"" if r.random() < 0.5 else "")
+                filas = [(INGLES.get(nombre, nombre.title()), f1, -8 * ss), (f"{pies(abs(x1 - x0))} x {pies(abs(y1 - y0))}", f2, 8 * ss)]
+            else:
+                filas = [(nombre, f1, -8 * ss), (f"{abs((x1 - x0) * (y1 - y0)):.2f} m²".replace(".", ","), f2, 8 * ss)]
+            for txt, f, dy in filas:
                 if r.random() < 0.15 and dy > 0:
                     continue
                 bb = di.textbbox((cx, cy + dy), txt, font=f, anchor="mm")

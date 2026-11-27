@@ -57,11 +57,11 @@ const AUTHORS = [
   A('asplund', /\basplund\b/, 'Gunnar Asplund (1885–1940)', 'Asplund'),
   A('lutyens', /\blutyens\b/, 'Edwin Lutyens (1869–1944)', 'Lutyens'),
   // Modern masters: curated licensed drawings and measured surveys, never generic photographs.
-  M('lecorbusier', /\ble ?corbusier\b|\bcorbu\b/, 'Le Corbusier (1887–1965)', '"Le Corbusier"', [['Fondation Le Corbusier', 'https://www.fondationlecorbusier.fr/']]),
-  M('mies', /\bmies\b/, 'Ludwig Mies van der Rohe (1886–1969)', '"Mies van der Rohe"', [['MoMA', 'https://www.moma.org/']]),
+  M('lecorbusier', /\ble ?corbusier\b|\bcorbu\b|\bcharles.edouard jeanneret\b/, 'Le Corbusier (1887–1965)', '"Le Corbusier"', [['Fondation Le Corbusier', 'https://www.fondationlecorbusier.fr/']]),
+  M('mies', /\bmies(?: van der rohe)?\b|\bvan der rohe\b/, 'Ludwig Mies van der Rohe (1886–1969)', '"Mies van der Rohe"', [['MoMA', 'https://www.moma.org/']]),
   M('wright', /\b(?:frank\s+l(?:l)?oy(?:d|ds|s)?\s+(?:wright|write)|frank\s+lloyd\s+wright|wright)\b/, 'Frank Lloyd Wright (1867–1959)', '"Frank Lloyd Wright"', [['Frank Lloyd Wright Foundation', 'https://franklloydwright.org/']]),
-  M('gropius', /\bgropius\b|\bbauhaus\b/, 'Walter Gropius (1883–1969)', '"Walter Gropius"', [['Bauhaus-Archiv', 'https://www.bauhaus.de/']]),
-  M('aalto', /\baalto\b/, 'Alvar Aalto (1898–1976)', '"Alvar Aalto"', [['Alvar Aalto Foundation', 'https://www.alvaraalto.fi/']]),
+  M('gropius', /\b(?:walter )?gropius\b|\bbauhaus\b/, 'Walter Gropius (1883–1969)', '"Walter Gropius"', [['Bauhaus-Archiv', 'https://www.bauhaus.de/']]),
+  M('aalto', /\b(?:alvar )?aalto\b/, 'Alvar Aalto (1898–1976)', '"Alvar Aalto"', [['Alvar Aalto Foundation', 'https://www.alvaraalto.fi/']]),
   M('kahn', /\b(?:louis )?kahn\b/, 'Louis Kahn (1901–1974)', '"Louis Kahn"'),
 ];
 
@@ -92,9 +92,21 @@ const CURATED = {
   ['East Elevation'+price+'12 of 17).tif','elevation','Price Tower · east elevation']
  ]
 };
+/* Obras principales de cada maestro moderno: se buscan sus plantas, cortes y vistas con licencia libre
+   (p. ej. relevamientos HABS de EE. UU., de dominio público) y algunas fotos de cada obra por su nombre.
+   Así el panel muestra arquitectura del autor y nunca resultados genéricos (baños, carteles, mapas). */
+const WORKS = {
+ mies: ['Barcelona Pavilion','Farnsworth House','Villa Tugendhat','Neue Nationalgalerie','S. R. Crown Hall','Seagram Building','Lake Shore Drive'],
+ lecorbusier: ['Villa Savoye','Unité d\'habitation','Notre-Dame-du-Haut','Sainte-Marie de La Tourette','Maison Curutchet','Villa La Roche','Chandigarh Capitol Complex'],
+ wright: ['Fallingwater','Robie House','Solomon R. Guggenheim Museum','Taliesin West','Johnson Wax Headquarters','Unity Temple','Hollyhock House'],
+ aalto: ['Villa Mairea','Paimio Sanatorium','Säynätsalo Town Hall','Viipuri Library','Finlandia Hall','Aalto House','Baker House'],
+ gropius: ['Bauhaus Dessau','Fagus Factory','Gropius House','Meisterhäuser Dessau'],
+ kahn: ['Salk Institute','Kimbell Art Museum','Phillips Exeter Academy Library','National Assembly of Bangladesh','Yale Center for British Art'],
+};
 const drawingRank = { photo:8, 'floor-plan':0, section:1, elevation:2, 'technical-detail':3, portrait:4 };
 // A single specifically identified portrait, never a generic photograph search.
 const PORTRAITS = {
+ gropius:'Walter Gropius Foto 1920.jpg',
  mies:'Hugo Erfurth - Portrait Ludwig Mies van der Rohe, 1934.jpg',
  lecorbusier:'Le Corbusier (1964).jpg',
  wright:'Frank Lloyd Wright portrait.jpg'
@@ -172,6 +184,9 @@ function json(body, status = 200, maxAge = 86400) {
     },
   });
 }
+const norm = v => String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+// Fotos que nunca corresponden a la arquitectura de la obra.
+const BAD_PHOTO = /\b(?:bano|banos|bathroom|toilet|restroom|wc|sink|plaque|sign|placa|cartel|grave|tumba|stamp|sello|book|libro|logo|map|mapa|street sign|poster|ticket|coin|moneda)\b/;
 const strip = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim();
 
 async function commons(search, limit) {
@@ -228,7 +243,7 @@ function toItem(page, author, kind) {
 export async function onRequestGet({ request, waitUntil }) {
   const url = new URL(request.url);
   const raw = String(url.searchParams.get('q') || '').slice(0, 120).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=10', { method: 'GET' });
+  const cache = caches.default, key = new Request(url.toString() + (url.search ? '&' : '?') + 'cv=11', { method: 'GET' });
   const hit = await cache.match(key);
   if (hit) return hit;
   const chosen = AUTHORS.filter((a) => a.re.test(raw));
@@ -244,8 +259,26 @@ export async function onRequestGet({ request, waitUntil }) {
   for(const a of list){
    if(a.modern)jobs.push(curatedDrawings(a,words));
    if(chosen.length===1&&PORTRAITS[a.key])jobs.push(authorPortrait(a));
+   // Maestros modernos: plantas/cortes/vistas libres y fotos de cada obra principal, buscadas por su nombre.
+   if(a.modern&&WORKS[a.key]&&(chosen.length===1||custom)){
+    const works=WORKS[a.key].filter(wk=>!words||norm(wk).includes(norm(words))||norm(words).includes(norm(wk))).slice(0,7);
+    for(const wk of (works.length?works:WORKS[a.key])){
+     const t='intitle:"'+wk.replace(/"/g,'')+'"';
+     jobs.push(commons(t+' '+DRAW,8).then(p=>p.flatMap(x=>{
+      const type=historicalDrawingType(x.title);if(!type)return [];
+      const it=toItem(x,a,'plate');if(!it)return [];
+      const raster=/\.(?:png|jpe?g)(?:[?#]|$)/i.test(it.image)?it.image:it.thumb;if(!/\.(?:png|jpe?g)(?:[?#]|$)/i.test(raster||''))return [];
+      return [{...it,title:wk+' · '+it.title,image:raster,format:/\.png(?:[?#]|$)/i.test(raster)?'png':'jpg',drawingType:type,curated:false}];
+     })));
+     jobs.push(commons(t,6).then(p=>p.flatMap(x=>{
+      const tt=norm(x.title);if(historicalDrawingType(x.title)||!tt.includes(norm(wk).split(' ')[0]))return [];
+      if(BAD_PHOTO.test(tt))return [];
+      const it=toItem(x,a,'photo');return it?[{...it,title:wk+' · '+it.title,drawingType:'photo',curated:false,work:wk}]:[];
+     })));
+    }
+   }
    // A few photographs of the works go after the drawings (never dozens, never interiors of toilets, signs or portraits).
-   if(chosen.length===1||custom)jobs.push(commons(w+a.name+' building -plan -drawing -section -elevation -grundriss -portrait',12).then(p=>p.flatMap(x=>{
+   if(!(a.modern&&WORKS[a.key])&&(chosen.length===1||custom))jobs.push(commons(w+a.name+' building -plan -drawing -section -elevation -grundriss -portrait',12).then(p=>p.flatMap(x=>{
     const t=String(x.title||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     if(/\b(?:bano|banos|bathroom|toilet|restroom|wc|sink|plaque|sign|placa|cartel|portrait|retrato|grave|tumba|stamp|sello|book|libro|logo|map|mapa|plan|drawing)\b/.test(t))return [];
     const it=toItem(x,a,'photo');return it?[{...it,drawingType:'photo',curated:false}]:[];
@@ -265,7 +298,10 @@ export async function onRequestGet({ request, waitUntil }) {
     for (const g of groups) for (const it of g) if (it && !seen.has(it.page)) { seen.add(it.page); items.push(it); }
     items.sort((p,q)=>drawingRank[p.drawingType]-drawingRank[q.drawingType]);
     const drawings=items.filter(x=>x.kind==='plate'),portrait=items.find(x=>x.kind==='portrait');
-    const photos=items.filter(x=>x.kind==='photo').slice(0,6);
+    // Fotos: primero una por obra, luego el resto, hasta 10.
+    const allPhotos=items.filter(x=>x.kind==='photo'),firsts=[],seenWork=new Set();
+    for(const x of allPhotos)if(!seenWork.has(x.work||x.page)){seenWork.add(x.work||x.page);firsts.push(x)}
+    const photos=firsts.concat(allPhotos.filter(x=>!firsts.includes(x))).slice(0,10);
     const ordered=drawings.slice(0,53).concat(photos);if(portrait)ordered.push(portrait);
     const res = json({ query: raw, authors: list.map((a) => a.label), links: (custom?[custom]:chosen.slice(0,3)).flatMap((a) => linksFor(a, words).map((l) => ({ ...l, a: a.label }))), modern: list.some((a) => a.modern), index: chosen.length||custom ? [] : AUTHORS.map((a) => ({ label: a.label, q: a.name.replace(/"/g, '').replace(/\s+architecture$/, ''), modern: !!a.modern })), items: ordered });
     waitUntil(cache.put(key, res.clone()));
