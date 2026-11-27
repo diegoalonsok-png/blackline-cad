@@ -185,8 +185,30 @@ function furnish(house) {
         if (tub) need(F.wall('san-banera', { w: Math.min(1.7, Math.min(cw, cd)), d: 0.75, use: 0.5, score: (fp, s) => (s === 'N' ? 1 : 0) + ((fp[2] - fp[0]) > 1.6 || (fp[3] - fp[1]) > 1.6 ? 0.5 : 0) - Math.min(Math.abs(fp[0] - r.cx0), Math.abs(r.cx1 - fp[2])) }) || F.wall('san-ducha', { w: Math.min(1.0, cw), d: 0.9, use: 0.5 }), 'bañera');
         else need(F.wall('san-ducha', { w: Math.max(0.8, Math.min(1.2, Math.min(cw, cd) - 0.0, cw * cd < 3.6 ? 0.85 : 9)), d: cw * cd < 3.6 ? 0.8 : 0.9, use: 0.55, score: (fp, s) => (s === 'N' ? 1 : 0) - Math.min(Math.abs(fp[0] - r.cx0), Math.abs(r.cx1 - fp[2]), Math.abs(fp[1] - r.cy0), Math.abs(r.cy1 - fp[3])) }), 'ducha');
       }
-      need(F.wall('san-wc', { use: 0.5, useSides: 0.15, score: (fp) => -Math.min(Math.abs(fp[0] - r.cx0), Math.abs(r.cx1 - fp[2]), Math.abs(fp[1] - r.cy0), Math.abs(r.cy1 - fp[3])) * 2 }), 'inodoro');
-      { const wc = F.blocks.find((b) => b.catalogId === 'san-wc'); if (full && cw * cd > 4.6 && wc) F.wall('san-bidet', { use: 0.5, useSides: 0.05, score: (fp, s) => -Math.hypot((fp[0] + fp[2]) / 2 - (wc.footprint[0] + wc.footprint[2]) / 2, (fp[1] + fp[3]) / 2 - (wc.footprint[1] + wc.footprint[3]) / 2) }); }
+      // El inodoro y bidé forman un conjunto: mismo respaldo, misma pared.
+      // Probar el par antes de aceptar un WC individual; nunca repartirlos entre paredes.
+      let pair = false;
+      if (full && cw * cd > 4.6) {
+        const wc = require('./blocks.js').item('san-wc'), bd = require('./blocks.js').item('san-bidet');
+        for (const side of ['W', 'E', 'N', 'S']) {
+          const L = side === 'W' || side === 'E' ? cd : cw;
+          for (const order of [[wc, bd], [bd, wc]]) {
+            if (pair) break;
+            for (let t = 0.05; t + order[0].w + 0.25 + order[1].w <= L + 1e-6; t += 0.05) {
+              const save = F.snap(), a = order[0], b = order[1];
+              const fp = fpOf(r, side, a.w, a.d, t), use = frontOf(fp, side, 0.5, 0.1);
+              const next = fpOf(r, side, b.w, b.d, t + a.w + 0.25), nextUse = frontOf(next, side, 0.5, 0.1);
+              if (!F.free(fp, use) || F.underWindow(fp, side) || F.underWindow(next, side)) continue;
+              F.commit(a.id, a.w, a.d, fp, side, use);
+              if (F.free(next, nextUse)) { F.commit(b.id, b.w, b.d, next, side, nextUse); pair = true; break; }
+              F.undo(save);
+            }
+          }
+          if (pair) break;
+        }
+        need(pair, 'par inodoro + bidé sobre misma pared; revisar distribución si no cabe');
+      }
+      if (!pair) need(F.wall('san-wc', { use: 0.5, useSides: 0.15, sides: ['W','E','N','S'], noWindow: true }) || F.wall('san-wc', { use: 0.5, useSides: 0.15 }), 'inodoro');
       need(F.wall(full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 'san-lav2' : 'san-lav', { w: full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 1.2 : 0.6, use: 0.55 }) || F.wall('san-lav-pie', { use: 0.5 }), 'lavatorio');
     } else if (r.type === 'lav') {
       need(F.wall('kq-lavarropas', { use: 0.6 }), 'lavarropas'); F.wall('kq-pileta', { use: 0.5 }); F.wall('kq-termo', { use: 0.3 });
