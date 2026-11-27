@@ -19,7 +19,7 @@ test('3D block library uses geometric boxes, not images',()=>{
 test('3D blocks persist, edit and use existing move and copy commands',()=>{
  assert(source.includes("rec=newRecord('block3d')"));
  assert(/var accepted=\['box','sphere','cone','cylinder','wall','slab','boolean','block3d'[,\]]/.test(source));
- assert(source.includes("if(r.type==='block3d'){if(r.detailSpec)"));
+ assert(source.includes("if(r.type==='block3d'){if(r.cutoutSpec)"));
  assert(source.includes("else o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair'"));
  // Bloques 3D: ancho y profundidad editables (h según el tipo), dentro del listado general.
  assert(/\[[^\]]*'block3d'[^\]]*\]\.includes\(r\.type\)\)\{[^}]*keys\.push\('w'\);keys\.push\('d'\)/.test(source));
@@ -37,4 +37,33 @@ test('R2 gallery downloads geometry only at placement, not selection or opening'
  const routes=JSON.parse(fs.readFileSync('_routes.json','utf8'));
  assert(routes.include.includes('/assets/3d-object-library/v1/*'));
  assert(fs.readFileSync('functions/assets/_middleware.js','utf8').includes('3d-object-library'));
+});
+
+test('realism status requires explicit review and redistributable license',()=>{
+ const start=source.indexOf('function cad3dGalleryQualityFromManifest');
+ const end=source.indexOf('function cad3dBlockKind',start);
+ const ctx={window:{},cad3dShowProvisional:false};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ const q=ctx.cad3dGalleryQualityFromManifest;
+ const valid={quality:'realistic',source:'https://polyhaven.com/a/example',license:'CC0-1.0',review:{approved:true,date:'2026-11-27',reviewer:'Blackline'}};
+ assert.equal(q(valid),'realistic');
+ assert.equal(q({...valid,review:undefined}),'provisional');
+ assert.equal(q({...valid,license:'unknown'}),'provisional');
+ assert.equal(q({...valid,source:''}),'provisional');
+ assert.equal(ctx.cad3dGalleryVisible({}),false);
+ assert.equal(ctx.cad3dGalleryVisible({detail:true}),true);
+ assert.equal(ctx.cad3dGalleryVisible({quality:'realistic'}),true);
+ ctx.cad3dShowProvisional=true;assert.equal(ctx.cad3dGalleryVisible({}),true);
+ assert.equal(ctx.cad3dGalleryVisible({superseded:true}),false);
+});
+test('photographic cutout validates bounded embedded image and mount',()=>{
+ const start=source.indexOf('function cad3dValidatePhotoCutout');
+ const end=source.indexOf('async function cad3dFetchRemoteModel',start);
+ const ctx={};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ const valid={version:3,w:1,d:.05,h:1.8,mount:'face',image:'data:image/png;base64,AAAA'};
+ assert.equal(ctx.cad3dValidatePhotoCutout(valid).cutout,'photo');
+ assert.throws(()=>ctx.cad3dValidatePhotoCutout({...valid,image:'https://example.org/foo.png'}));
+ assert.throws(()=>ctx.cad3dValidatePhotoCutout({...valid,mount:'invalid'}));
+ assert.throws(()=>ctx.cad3dValidatePhotoCutout({...valid,image:'data:image/svg+xml;base64,AAAA'}));
+ assert(source.includes('cutoutSpec:mesh.cutout'));
+ assert(source.includes('cad3dPhotoTexture(record.cutoutSpec.image)'));
 });
