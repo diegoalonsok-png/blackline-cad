@@ -38,6 +38,34 @@ Período gratuito: **3 meses (90 días)** desde el alta (`TRIAL_DAYS=90`). Plan 
 
 Al crear los precios en Stripe, marcá *Incluir impuestos en el precio* (`tax_behavior=inclusive`) para que el cliente pague exactamente esos importes. Con tickets tan chicos conviene **destacar el plan anual**: la comisión fija de 0,25 € se paga una vez por año en lugar de doce.
 
+## Mercado Pago en pesos (Argentina) y descuento de estudiante (27 nov 2026)
+
+**Mercado Pago:**
+- Se ofrece solo a quien se conecta desde Argentina, según el país que informa Cloudflare. Fuera de Argentina el cuadro de planes queda igual que antes.
+- Es una **suscripción automática** (*preapproval*): Mercado Pago debita cada mes o cada año, con tarjeta o con dinero en cuenta.
+- Si la persona todavía está en la prueba de 90 días, el primer débito se hace cuando la prueba termina.
+- Al cancelar, la suscripción deja de renovarse y el plan sigue activo hasta el fin del período pagado.
+
+**Puesta en marcha (la hace el titular, las claves nunca pasan por el repositorio):**
+
+1. En Mercado Pago Developers, creá la aplicación «CAD2D3D» y copiá el *Access Token* de producción.
+2. En Webhooks, cargá `https://api.blackline-cad.org/api/mp-webhook` con el evento **Planes y suscripciones** y copiá la clave secreta.
+3. Cargá los dos secretos en el Worker `cad2d-billing`:
+   ```
+   wrangler secret put MP_ACCESS_TOKEN
+   wrangler secret put MP_WEBHOOK_SECRET
+   ```
+   También se pueden cargar en el panel: Workers → cad2d-billing → Settings → Variables and Secrets, tipo *Secret*.
+4. Cargá los precios en pesos con IVA incluido como variables: `MP_PRICE_PRO_MONTHLY`, `MP_PRICE_PRO_YEARLY`, `MP_PRICE_STUDIO_MONTHLY`, `MP_PRICE_STUDIO_YEARLY`. Un precio vacío oculta esa opción.
+5. Publicá el Worker y la tabla `students` de `schema.sql`. El Worker también crea la tabla solo si falta.
+
+**Estudiantes:**
+- Descuento del 50 % durante 1 año para quien verifica un correo universitario.
+- El Worker manda un código de 6 dígitos por correo (Resend). Se admiten 5 intentos y el código vence a los 15 minutos.
+- Se aceptan dominios `.edu`, `.edu.ar`, `.ac.uk` y similares, subdominios de alumnos (`alumnos.`, `estudiantes.`…) y una lista de universidades (UBA, USP, UNICAMP, UCM…). `STUDENT_DOMAINS` agrega dominios.
+- En Mercado Pago, el monto se calcula al 50 %.
+- En Stripe se aplica el cupón `STRIPE_STUDENT_COUPON`: un cupón del 50 % con duración *forever*, creado por el titular. Si la variable está vacía, Stripe cobra el precio normal.
+
 ## Cuenta de Stripe: diagnóstico (18 nov 2026)
 
 La cuenta conectada (`acct_…U61u`, país **ES**, moneda **EUR**, con **N26** vinculada e identidad verificada) **no está lista para CAD2D**:

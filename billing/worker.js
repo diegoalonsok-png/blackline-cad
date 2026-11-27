@@ -24,6 +24,17 @@
  *   GET  /api/projects            lista de proyectos en la nube · POST /api/projects {id?,name,data} guarda (crea o actualiza; guarda 10 versiones)
  *   GET  /api/projects/<id>       abre · POST …/rename · POST …/delete · POST …/share {on} · GET …/versions[/<n>]
  *   GET  /api/share/<shareId>     proyecto compartido de solo lectura (sin sesión)
+ *
+ * Mercado Pago (cobro en pesos para Argentina; se activa solo si están MP_ACCESS_TOKEN y los precios MP_PRICE_*)
+ *   POST /api/mp-checkout         {plan} → {url} de suscripción automática (preapproval) de Mercado Pago
+ *   POST /api/mp-cancel           cancela la renovación; el plan sigue hasta el fin del período pagado
+ *   POST /api/mp-webhook          avisos firmados de Mercado Pago (x-signature con MP_WEBHOOK_SECRET)
+ *   Secretos: MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET · Vars: MP_PRICE_PRO_MONTHLY, MP_PRICE_PRO_YEARLY, MP_PRICE_STUDIO_MONTHLY, MP_PRICE_STUDIO_YEARLY (ARS, IVA incl.)
+ *
+ * Estudiantes (50 % con correo universitario, válido 1 año)
+ *   POST /api/student/request     {email} → envía un código de 6 dígitos a ese correo universitario
+ *   POST /api/student/verify      {code}  → activa el descuento (Mercado Pago: 50 % del precio; Stripe: cupón STRIPE_STUDENT_COUPON)
+ *   Vars opcionales: STUDENT_DOMAINS (dominios extra separados por coma), STUDENT_DISCOUNT (por defecto 50)
  */
 const enc=new TextEncoder();
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8',...headers}});
@@ -105,6 +116,58 @@ async function verifyStripe(env,req,raw){
  const sig=hex(await hmac(env.STRIPE_WEBHOOK_SECRET,t+'.'+raw));
  return header.split(',').filter(x=>x.startsWith('v1=')).some(x=>safeEqual(x.slice(3),sig));
 }
+/* ---------- Mercado Pago (pesos argentinos) ---------- */
+const MP_PLANS={pro:['pro',1,'MP_PRICE_PRO_MONTHLY'],'pro-yearly':['pro',12,'MP_PRICE_PRO_YEARLY'],studio:['studio',1,'MP_PRICE_STUDIO_MONTHLY'],'studio-yearly':['studio',12,'MP_PRICE_STUDIO_YEARLY']};
+const mpPrice=(env,key)=>{const n=Number(String(env[MP_PLANS[key]?.[2]]||'').replace(',','.'));return Number.isFinite(n)&&n>0?n:0};
+const mpReady=env=>!!env.MP_ACCESS_TOKEN&&Object.keys(MP_PLANS).some(k=>mpPrice(env,k));
+const discountPct=env=>{const n=Number(env.STUDENT_DISCOUNT||50);return n>0&&n<100?n:50};
+async function mp(env,path,method='GET',body){
+ const r=await fetch('https://api.mercadopago.com'+path,{method,headers:{authorization:'Bearer '+env.MP_ACCESS_TOKEN,'content-type':'application/json',...(method==='POST'?{'x-idempotency-key':crypto.randomUUID()}:{})},body:body?JSON.stringify(body):undefined});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.message||'Mercado Pago '+r.status);return j;
+}
+// Firma de Mercado Pago: x-signature "ts=…,v1=…" sobre "id:<data.id>;request-id:<x-request-id>;ts:<ts>;"
+async function verifyMp(env,req,dataId){
+ if(!env.MP_WEBHOOK_SECRET)return false;
+ const parts=Object.fromEntries(String(req.headers.get('x-signature')||'').split(',').map(x=>x.trim().split('=')));
+ const ts=parts.ts,v1=parts.v1;if(!ts||!v1)return false;
+ const t=Number(ts)>1e11?Math.floor(Number(ts)/1000):Number(ts);if(!t||Math.abs(now()-t)>600)return false;
+ const id=/^[a-z0-9]+$/i.test(dataId)?String(dataId).toLowerCase():String(dataId);
+ let manifest='';if(id)manifest+='id:'+id+';';const rid=req.headers.get('x-request-id');if(rid)manifest+='request-id:'+rid+';';manifest+='ts:'+ts+';';
+ return safeEqual(hex(await hmac(env.MP_WEBHOOK_SECRET,manifest)),v1);
+}
+// Guarda el estado de una suscripción de Mercado Pago (id con prefijo mp_ en la tabla subscriptions).
+async function mpSync(env,pre){
+ const [userId,key]=String(pre.external_reference||'').split('|');const def=MP_PLANS[key];
+ if(!userId||!def)return;
+ const user=await env.DB.prepare('SELECT id FROM users WHERE id=?').bind(userId).first();if(!user)return;
+ const id='mp_'+pre.id,row=await env.DB.prepare('SELECT current_period_end FROM subscriptions WHERE id=?').bind(id).first();
+ const next=Math.floor(Date.parse(pre.next_payment_date||'')/1000)||0;
+ let status,end;
+ if(pre.status==='authorized'){status='active';end=Math.max(next,row?.current_period_end||0,now()+86400)}
+ else if(pre.status==='cancelled'||pre.status==='paused'){status=row?'active':'canceled';end=row?.current_period_end||0} // lo pagado se respeta hasta el fin del período
+ else{status='incomplete';end=row?.current_period_end||0}
+ await env.DB.prepare(`INSERT INTO subscriptions(id,user_id,plan,status,current_period_end,updated_at) VALUES(?,?,?,?,?,?)
+  ON CONFLICT(id) DO UPDATE SET plan=excluded.plan,status=excluded.status,current_period_end=excluded.current_period_end,updated_at=excluded.updated_at`)
+  .bind(id,userId,def[0],status,end,now()).run();
+}
+
+/* ---------- Estudiantes: correo universitario verificado con un código ---------- */
+let studentsReady=false;
+async function ensureStudents(env){
+ if(studentsReady)return;
+ await env.DB.prepare('CREATE TABLE IF NOT EXISTS students (user_id TEXT PRIMARY KEY, email TEXT NOT NULL, code_hash TEXT, code_expires INTEGER, tries INTEGER NOT NULL DEFAULT 0, verified_until INTEGER NOT NULL DEFAULT 0)').run();
+ studentsReady=true;
+}
+const STUDENT_BASE=['uba.ar','usp.br','unicamp.br','ufrj.br','ufmg.br','unesp.br','ufrgs.br','ufsc.br','unb.br','ucm.es','upm.es','upc.edu','ub.edu','us.es','ugr.es','uv.es','unam.mx','uchile.cl','udelar.edu.uy'];
+function universityEmail(env,mail){
+ const dom=String(mail).split('@')[1]||'';if(!dom)return false;
+ if(/(^|\.)(edu|ac)(\.[a-z]{2})?$/.test(dom))return true;            // .edu, .edu.ar, .ac.uk…
+ if(/^(alumnos?|estudiantes?|alu|students?|alunos?|est|mail\.edu)\./.test(dom))return true;
+ const extra=String(env.STUDENT_DOMAINS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+ return [...STUDENT_BASE,...extra].some(d=>dom===d||dom.endsWith('.'+d));
+}
+async function studentUntil(env,userId){try{await ensureStudents(env);return (await env.DB.prepare('SELECT verified_until FROM students WHERE user_id=?').bind(userId).first())?.verified_until||0}catch(e){return 0}}
+
 const PLAN_BY_PRICE=env=>({[env.PRICE_PRO_MONTHLY]:'pro',[env.PRICE_PRO_YEARLY]:'pro',[env.PRICE_STUDIO_MONTHLY]:'studio',[env.PRICE_STUDIO_YEARLY]:'studio'});
 
 /* ---------- Equipo del plan Estudio: el titular + hasta 4 correos invitados, que pasan a Pro ---------- */
@@ -151,12 +214,12 @@ async function handle(req,env){
   if(req.method==='OPTIONS')return cors(env,req,new Response(null,{status:204}));
   try{
    if(req.method!=='GET'&&req.method!=='POST')return json({error:'método no permitido'},405);
-   if(req.method==='POST'&&path!=='/api/stripe-webhook'){
+   if(req.method==='POST'&&path!=='/api/stripe-webhook'&&path!=='/api/mp-webhook'){
     if(!originAllowed(env,req))return cors(env,req,json({error:'origen no permitido'},403));
     if(tooLarge(req,path.startsWith('/api/projects')?8*1024*1024:16*1024))return cors(env,req,json({error:'demasiado grande'},413));
    }
-   if(path==='/api/stripe-webhook'&&tooLarge(req,512*1024))return json({error:'demasiado grande'},413);
-   if(path.startsWith('/api/')&&path!=='/api/stripe-webhook'&&await limited(env.API_LIMITER,clientIp(req)))return cors(env,req,json({error:'demasiados pedidos'},429));
+   if((path==='/api/stripe-webhook'||path==='/api/mp-webhook')&&tooLarge(req,512*1024))return json({error:'demasiado grande'},413);
+   if(path.startsWith('/api/')&&path!=='/api/stripe-webhook'&&path!=='/api/mp-webhook'&&await limited(env.API_LIMITER,clientIp(req)))return cors(env,req,json({error:'demasiados pedidos'},429));
    if(path==='/auth/login'&&req.method==='GET')return new Response(loginPage(env,isEs(req)),{headers:{'content-type':'text/html; charset=utf-8'}});
    if(path==='/auth/request'&&req.method==='POST'){
     const {email}=await req.json().catch(()=>({}));
@@ -216,6 +279,16 @@ async function handle(req,env){
     }
     return json({ok:true});
    }
+   if(path==='/api/mp-webhook'&&req.method==='POST'){
+    const raw=await req.text();let body={};try{body=JSON.parse(raw||'{}')}catch(e){}
+    const dataId=url.searchParams.get('data.id')||String(body?.data?.id||'');
+    if(!dataId||!await verifyMp(env,req,dataId))return new Response('firma inválida',{status:400});
+    const type=url.searchParams.get('type')||body.type||body.topic||'';
+    // Nunca se confía en el cuerpo del aviso: se consulta el estado real a Mercado Pago.
+    if(type==='subscription_preapproval'||type==='preapproval')await mpSync(env,await mp(env,'/preapproval/'+encodeURIComponent(dataId)));
+    else if(type==='subscription_authorized_payment'){const pay=await mp(env,'/authorized_payments/'+encodeURIComponent(dataId));if(pay.preapproval_id)await mpSync(env,await mp(env,'/preapproval/'+encodeURIComponent(pay.preapproval_id)))}
+    return json({ok:true});
+   }
    // Proyecto compartido (solo lectura, sin sesión): GET /api/share/<id>
    if(path.startsWith('/api/share/')&&req.method==='GET'){
     const sid=path.slice(11).replace(/[^A-Za-z0-9_-]/g,'').slice(0,40);
@@ -226,8 +299,14 @@ async function handle(req,env){
    // A partir de aquí, endpoints de la app (requieren sesión)
    const userId=await readSession(env,req);
    if(path==='/api/status'&&req.method==='GET'){
-    if(!userId)return cors(env,req,json({plan:'free',email:null,trialEndsAt:null,anonymous:true}));
-    return cors(env,req,json(await planFor(env,userId)||{plan:'free'}));
+    // Mercado Pago se ofrece en Argentina (país de la conexión según Cloudflare) y solo si está configurado.
+    const pct=discountPct(env),ar=(req.cf?.country||'')==='AR'||url.searchParams.get('pais')==='AR';
+    const extra={};
+    if(ar&&mpReady(env))extra.mercadoPago={currency:'ARS',prices:Object.fromEntries(Object.keys(MP_PLANS).map(k=>[k,mpPrice(env,k)]).filter(x=>x[1]))};
+    extra.studentDiscount=pct;
+    if(!userId)return cors(env,req,json({plan:'free',email:null,trialEndsAt:null,anonymous:true,...extra}));
+    const st=await studentUntil(env,userId);if(st>now())extra.studentUntil=new Date(st*1000).toISOString();
+    return cors(env,req,json({...(await planFor(env,userId)||{plan:'free'}),...extra}));
    }
    if(!userId)return cors(env,req,json({error:'iniciá sesión'},401));
    if(path==='/api/checkout'&&req.method==='POST'){
@@ -240,13 +319,64 @@ async function handle(req,env){
     // Métodos de pago dinámicos: tarjeta, PayPal, SEPA, Apple/Google Pay… se activan desde el Dashboard
     // (Configuración → Métodos de pago) sin tocar este código (a propósito no se fija una lista de métodos).
     const tax=env.STRIPE_TAX==='1';
+    // Estudiante verificado: cupón del 50 % (STRIPE_STUDENT_COUPON); Stripe no admite cupón y códigos promocionales a la vez.
+    const studentCoupon=env.STRIPE_STUDENT_COUPON&&await studentUntil(env,userId)>now()?env.STRIPE_STUDENT_COUPON:'';
     const session=await stripe(env,'checkout/sessions',{mode:'subscription',client_reference_id:userId,locale:'auto',
      ...(user.stripe_customer_id?{customer:user.stripe_customer_id,customer_update:{address:'auto',name:'auto'}}:{customer_email:user.email}),
-     line_items:{0:{price,quantity:1}},allow_promotion_codes:'true',billing_address_collection:'required',
+     line_items:{0:{price,quantity:1}},...(studentCoupon?{discounts:{0:{coupon:studentCoupon}}}:{allow_promotion_codes:'true'}),billing_address_collection:'required',
      ...(tax?{automatic_tax:{enabled:'true'},tax_id_collection:{enabled:'true'}}:{}),
      subscription_data:{metadata:{user_id:userId},...(keepTrial?{trial_end:trialEnd}:{})},
      success_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',cancel_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=cancelado'});
     return cors(env,req,json({url:session.url}));
+   }
+   // ---------- Mercado Pago: suscripción automática en pesos ----------
+   if(path==='/api/mp-checkout'&&req.method==='POST'){
+    if(!mpReady(env))return cors(env,req,json({error:'Mercado Pago no está activado'},400));
+    const {plan='pro'}=await req.json().catch(()=>({}));const def=MP_PLANS[plan];let amount=def&&mpPrice(env,plan);
+    if(!amount)return cors(env,req,json({error:'plan inválido'},400));
+    const user=await env.DB.prepare('SELECT email,trial_ends_at FROM users WHERE id=?').bind(userId).first();
+    const student=await studentUntil(env,userId)>now();
+    if(student)amount=Math.round(amount*(100-discountPct(env)))/100;
+    // Si todavía tiene días de prueba, el primer débito se hace al terminar la prueba.
+    const trialEnd=Number(user.trial_ends_at)||0,start=trialEnd>now()+86400?new Date(trialEnd*1000).toISOString():undefined;
+    const label=(def[0]==='studio'?'CAD2D3D Estudio':'CAD2D3D Pro')+(def[1]===12?' · anual':' · mensual')+(student?' · estudiante':'');
+    const pre=await mp(env,'/preapproval','POST',{reason:label,external_reference:userId+'|'+plan,payer_email:user.email,status:'pending',
+     back_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',
+     auto_recurring:{frequency:def[1],frequency_type:'months',transaction_amount:amount,currency_id:'ARS',...(start?{start_date:start}:{})}});
+    await mpSync(env,pre);
+    return cors(env,req,json({url:pre.init_point}));
+   }
+   if(path==='/api/mp-cancel'&&req.method==='POST'){
+    const {results}=await env.DB.prepare("SELECT id FROM subscriptions WHERE user_id=? AND id LIKE 'mp_%' AND status IN ('active','incomplete')").bind(userId).all();
+    if(!results?.length)return cors(env,req,json({error:'sin suscripción de Mercado Pago'},400));
+    for(const r of results){const pre=await mp(env,'/preapproval/'+encodeURIComponent(r.id.slice(3)),'PUT',{status:'cancelled'});await mpSync(env,pre)}
+    return cors(env,req,json({ok:true}));
+   }
+   // ---------- Estudiantes ----------
+   if(path==='/api/student/request'&&req.method==='POST'){
+    await ensureStudents(env);
+    const {email}=await req.json().catch(()=>({}));const mail=String(email||'').trim().toLowerCase();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)||mail.length>200)return cors(env,req,json({error:'email inválido'},400));
+    if(!universityEmail(env,mail))return cors(env,req,json({error:isEs(req)?'Ese correo no parece de una universidad. Usá el de tu facultad.':'That does not look like a university email. Use your school address.'},400));
+    if(await limited(env.AUTH_LIMITER,clientIp(req)))return cors(env,req,json({error:'demasiados pedidos, probá en unos minutos'},429));
+    const taken=await env.DB.prepare('SELECT user_id FROM students WHERE email=? AND verified_until>? AND user_id<>?').bind(mail,now(),userId).first();
+    if(taken)return cors(env,req,json({error:isEs(req)?'Ese correo ya se usó en otra cuenta.':'That email is already used by another account.'},400));
+    const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');
+    await env.DB.prepare(`INSERT INTO students(user_id,email,code_hash,code_expires,tries) VALUES(?,?,?,?,0)
+     ON CONFLICT(user_id) DO UPDATE SET email=excluded.email,code_hash=excluded.code_hash,code_expires=excluded.code_expires,tries=0`).bind(userId,mail,await sha256(userId+':'+code),now()+900).run();
+    await fetch('https://api.resend.com/emails',{method:'POST',headers:{authorization:'Bearer '+env.RESEND_API_KEY,'content-type':'application/json'},
+     body:JSON.stringify({from:env.MAIL_FROM,to:mail,...(isEs(req)?{subject:'Tu código de estudiante CAD2D3D',html:`<p>Tu código para el descuento de estudiante es <b style="font-size:20px">${code}</b> (vence en 15 minutos).</p>`}:{subject:'Your CAD2D3D student code',html:`<p>Your student discount code is <b style="font-size:20px">${code}</b> (it expires in 15 minutes).</p>`})})});
+    return cors(env,req,json({ok:true}));
+   }
+   if(path==='/api/student/verify'&&req.method==='POST'){
+    await ensureStudents(env);
+    const {code}=await req.json().catch(()=>({}));const c=String(code||'').replace(/\D/g,'').slice(0,6);
+    const row=await env.DB.prepare('SELECT code_hash,code_expires,tries FROM students WHERE user_id=?').bind(userId).first();
+    if(!row||!row.code_hash||row.code_expires<now()||row.tries>=5)return cors(env,req,json({error:isEs(req)?'Código vencido. Pedí uno nuevo.':'Code expired. Request a new one.'},400));
+    if(!safeEqual(await sha256(userId+':'+c),row.code_hash)){await env.DB.prepare('UPDATE students SET tries=tries+1 WHERE user_id=?').bind(userId).run();return cors(env,req,json({error:isEs(req)?'Código incorrecto.':'Wrong code.'},400))}
+    const until=now()+365*86400;
+    await env.DB.prepare('UPDATE students SET verified_until=?,code_hash=NULL WHERE user_id=?').bind(until,userId).run();
+    return cors(env,req,json({ok:true,studentUntil:new Date(until*1000).toISOString(),discount:discountPct(env)}));
    }
    // ---------- Equipo (plan Estudio) ----------
    if(path==='/api/team'||path==='/api/team/add'||path==='/api/team/remove'){

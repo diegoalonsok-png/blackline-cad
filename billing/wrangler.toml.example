@@ -15,6 +15,18 @@ PRICE_PRO_MONTHLY = "price_1UdX22DY9yzl20JEdPDjQo3X"   # 1,59 €/mes (modo acti
 PRICE_PRO_YEARLY = "price_1UdX22DY9yzl20JE1Gzk27li"    # 12,99 €/año (modo activo; prueba: price_1UdWYdDRUE2reABAPWeKFW5K)
 PRICE_STUDIO_MONTHLY = ""                            # sin plan Studio por ahora
 
+# Mercado Pago (Argentina, en pesos). Se activa solo si hay precios y el secreto MP_ACCESS_TOKEN.
+# Secretos: wrangler secret put MP_ACCESS_TOKEN · wrangler secret put MP_WEBHOOK_SECRET
+# Webhook a cargar en Mercado Pago: https://api.blackline-cad.org/api/mp-webhook (eventos: Planes y suscripciones)
+MP_PRICE_PRO_MONTHLY = ""                            # ARS, IVA incluido (vacío = sin opción)
+MP_PRICE_PRO_YEARLY = ""
+MP_PRICE_STUDIO_MONTHLY = ""
+MP_PRICE_STUDIO_YEARLY = ""
+# Estudiantes: 50 % con correo universitario verificado (1 año). En Stripe, cupón del 50 % con duración "forever".
+STUDENT_DISCOUNT = "50"
+STUDENT_DOMAINS = ""                                 # dominios extra separados por coma, ej. "uflo.edu.ar,unsam.edu.ar"
+STRIPE_STUDENT_COUPON = ""                           # id del cupón de Stripe (vacío = sin descuento en Stripe)
+
 [[d1_databases]]
 binding = "DB"
 database_name = "cad2d"

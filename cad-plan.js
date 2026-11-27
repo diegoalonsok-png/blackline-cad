@@ -18,6 +18,10 @@ const cfg=window.CAD2D_AUTH_CONFIG||{};
 const https=u=>typeof u==='string'&&/^https:\/\//.test(u)?u:'';
 const urls={login:https(cfg.loginUrl),status:https(cfg.statusUrl),checkout:https(cfg.checkoutUrl),portal:https(cfg.portalUrl)};
 urls.team=https(cfg.teamUrl)||(urls.status?urls.status.replace(/\/status$/,'/team'):'');
+// Mercado Pago (pesos) y descuento de estudiante: mismos Worker y sesión que el resto.
+urls.mp=urls.status?urls.status.replace(/\/status$/,'/mp-checkout'):'';
+urls.mpCancel=urls.status?urls.status.replace(/\/status$/,'/mp-cancel'):'';
+urls.student=urls.status?urls.status.replace(/\/status$/,'/student'):'';
 const enforce=cfg.enforce===true&&!!urls.status;
 
 /* Matriz de planes. Las funciones básicas de dibujo NUNCA se bloquean: el usuario siempre
@@ -68,7 +72,8 @@ async function refresh(){
    const best=[ends,localTrialEnd].filter(Boolean).sort().pop();
    if(Date.parse(best)>Date.now()){plan='trial';ends=best}else{plan='free';ends=best}
   }
-  status={plan,trialEndsAt:ends,email:j.email||null,teamOf:j.teamOf||null,source:'server'};
+  status={plan,trialEndsAt:ends,email:j.email||null,teamOf:j.teamOf||null,source:'server',
+   mercadoPago:j.mercadoPago&&j.mercadoPago.prices?j.mercadoPago:null,studentDiscount:Number(j.studentDiscount)||0,studentUntil:j.studentUntil||null};
  }catch(e){
   // Si el servidor no responde, NO se bloquea al usuario (fail-open): mejor perder un cobro que un dibujo.
   status={...status,source:'offline'};
@@ -81,12 +86,14 @@ const track=(n,p)=>{try{window.cad2dTrack?.(n,p)}catch(e){}};
 async function go(kind,plan='pro'){
  const url=urls[kind];if(!url){toast(L('El cobro todavía no está activado: la beta es gratuita.','Payments are not active yet: the beta is free.'));return}
  if(kind==='login'){track('login_start');location.assign(url);return}
+ if(kind==='mp'){track('begin_checkout',{currency:'ARS',value:status.mercadoPago?.prices?.[plan]||0,items:[{item_id:plan,item_name:plan}]})}
  if(kind==='checkout'){track('begin_checkout',{currency:'EUR',value:PRICE_EUR[plan]||0,items:[{item_id:plan,item_name:plan}]});try{sessionStorage.setItem('cad2d-last-plan',plan)}catch(e){}}
  try{
   const r=await fetch(url,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify({plan,returnUrl:location.href})});
   // Sin sesión: se recuerda el plan elegido, se inicia sesión con el enlace por mail y la compra sigue sola al volver.
-  if(r.status===401&&kind==='checkout'&&urls.login){try{localStorage.setItem(PENDING_KEY,JSON.stringify({plan,at:Date.now()}))}catch(e){}location.assign(urls.login);return}
-  const j=await r.json();if(j.url&&/^https:\/\//.test(j.url))location.assign(j.url);else throw Error(j.error||'Respuesta inválida');
+  if(r.status===401&&(kind==='checkout'||kind==='mp')&&urls.login){try{localStorage.setItem(PENDING_KEY,JSON.stringify({plan,kind,at:Date.now()}))}catch(e){}location.assign(urls.login);return}
+  const j=await r.json();if(kind==='mpCancel'&&j.ok){toast(L('Listo: no se renueva más. Tu plan sigue hasta el fin del período pagado.','Done: it will not renew. Your plan stays active until the end of the paid period.'));return}
+  if(j.url&&/^https:\/\//.test(j.url))location.assign(j.url);else throw Error(j.error||'Respuesta inválida');
  }catch(e){toast(L('No se pudo abrir el pago: ','Could not open checkout: ')+e.message)}
 }
 function resumePendingCheckout(){
@@ -94,7 +101,7 @@ function resumePendingCheckout(){
  if(!p||!status.email||Date.now()-p.at>2*864e5)return;
  try{localStorage.removeItem(PENDING_KEY)}catch(e){}
  if(status.plan==='pro'||status.plan==='studio')return;
- go('checkout',['pro','pro-yearly','studio','studio-yearly'].includes(p.plan)?p.plan:'pro');
+ go(p.kind==='mp'?'mp':'checkout',['pro','pro-yearly','studio','studio-yearly'].includes(p.plan)?p.plan:'pro');
 }
 function paymentReturn(){
  const q=new URLSearchParams(location.search).get('pago');if(!q)return;
@@ -127,6 +134,7 @@ css.textContent=`#cadPlanDlg{position:fixed;inset:0;z-index:9300;background:rgba
 #cadPlanBadge{font-size:10px;padding:2px 8px;border-radius:9px;border:1px solid #4d6676;background:#1b2833;color:#cfe3ef;cursor:pointer;margin-left:6px}
 #cadPlanDlg .cols.three{grid-template-columns:.8fr 1.3fr 1.3fr}#cadPlanDlg .col.studio{border-color:#6f9fb8}
 #cadPlanDlg .team{border:1px solid #33495a;border-radius:12px;padding:10px 12px;margin:0 0 12px}#cadPlanDlg .team .row{display:flex;gap:6px;align-items:center;margin:4px 0}#cadPlanDlg .team .row span{flex:1}#cadPlanDlg .team input{flex:1;padding:7px;border-radius:7px;border:1px solid #4d6676;background:#0f151b;color:#e5eef7}
+#cadPlanDlg [hidden]{display:none!important}
 @media (max-width:760px){#cadPlanDlg .cols.three{grid-template-columns:1fr}}
 @media (max-width:640px){#cadPlanDlg .cols,#cadPlanDlg .cols.two{grid-template-columns:1fr}}`;
 document.head.append(css);
@@ -161,16 +169,47 @@ function showPlans(reason,notice){
      '<button class="opt" data-go="checkout" data-plan="studio-yearly"><span class="tag">'+L('Ahorrás 25 %','Save 25 %')+'</span><span class="per">'+L('Anual','Yearly')+'</span><span class="amt">89,99 €</span><span class="sub">'+L('por año · ≈ 7,50 € / mes','per year · ≈ €7.50 / month')+'</span></button>'+
     '</div>'+studio+'<p class="fine">'+L('IVA incluido · 2 € por persona al mes','VAT included · €2 per person per month')+'</p></div>'+
   '</div>'+(cur==='studio'&&!status.teamOf&&urls.team?'<div class="team" id="cadPlanTeam"><b>'+L('Tu equipo','Your team')+'</b> <span class="fine">'+L('Cada persona entra con su correo y tiene Pro mientras tu plan esté vigente.','Each person signs in with their email and has Pro while your plan is active.')+'</span><div class="list">…</div><div class="row"><input type="email" placeholder="'+L('correo@estudio.com','name@studio.com')+'" aria-label="Email"><button class="btn" data-team="add">'+L('Agregar','Add')+'</button></div></div>':'')+
+  arsBlock(isPro)+studentBlock()+
   '<div class="foot">'+
   (urls.login&&!status.email?'<button class="btn" data-go="login">'+L('Ingresar / crear cuenta','Sign in / create account')+'</button>':'')+
+  (status.mercadoPago&&status.email&&isPro?'<button class="btn" data-go="mpCancel">'+L('Cancelar renovación en Mercado Pago','Cancel Mercado Pago renewal')+'</button>':'')+
   (urls.portal&&status.email&&isPro?'<button class="btn" data-go="portal">'+L('Administrar suscripción','Manage subscription')+'</button>':'')+
   (window.CAD2D_BUY_GUIDE?'<button class="btn" data-go="guide">'+L('▶ Cómo funciona · 1 min','▶ How it works · 1 min')+'</button>':'')+
   '<button class="btn" data-go="close">'+L('Seguir con el plan gratis','Keep using the free plan')+'</button></div></div>';
  if(isPro)d.querySelectorAll('.opt').forEach(b=>b.disabled=true);
+ if(d.querySelector('#cadPlanStudent'))studentUI(d.querySelector('#cadPlanStudent'));
  document.body.append(d);
  if(d.querySelector('#cadPlanTeam'))teamUI(d.querySelector('#cadPlanTeam'));
  const onKey=e=>{if(e.key==='Escape'){d.remove();document.removeEventListener('keydown',onKey,true)}};document.addEventListener('keydown',onKey,true);
  d.addEventListener('click',e=>{const t=e.target.closest('[data-go]'),g=t?.dataset.go;if(!g&&e.target!==d)return;if(!g||g==='close'){d.remove();return}if(g==='guide'){d.remove();window.CAD2D_BUY_GUIDE?.open();return}go(g,t.dataset.plan||'pro')});
+}
+/* ---------- Pesos argentinos (Mercado Pago) y estudiantes ---------- */
+const ars=n=>'$ '+Math.round(n).toLocaleString('es-AR');
+function arsBlock(isPro){
+ const mpS=status.mercadoPago;if(!mpS)return '';
+ const pct=status.studentUntil?status.studentDiscount||50:0,names={pro:L('Pro mensual','Pro monthly'),'pro-yearly':L('Pro anual','Pro yearly'),studio:L('Estudio mensual','Studio monthly'),'studio-yearly':L('Estudio anual','Studio yearly')};
+ const btns=Object.entries(mpS.prices).map(([k,v])=>{const fin=pct?v*(100-pct)/100:v;
+  return '<button class="opt'+(k==='pro-yearly'?' best':'')+'" data-go="mp" data-plan="'+k+'"'+(isPro?' disabled':'')+'><span class="per">'+names[k]+'</span><span class="amt">'+ars(fin)+'</span><span class="sub">'+(pct?'<s>'+ars(v)+'</s> · '+L('estudiante','student'):k.endsWith('yearly')?L('por año','per year'):L('por mes','per month'))+'</span></button>'}).join('');
+ return '<div class="team" id="cadPlanArs"><b>'+L('Pagá en pesos con Mercado Pago','Pay in pesos with Mercado Pago')+'</b> <span class="fine">'+L('Débito automático con tarjeta o dinero en cuenta · cancelás cuando quieras · si estás en la prueba, el primer cobro es al terminarla','Automatic debit with card or account balance · cancel anytime · during the trial, the first charge is when it ends')+'</span><div class="opts" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:10px">'+btns+'</div></div>';
+}
+function studentBlock(){
+ if(!urls.status||!status.studentDiscount)return '';
+ const pct=status.studentDiscount;
+ if(status.studentUntil)return '<div class="team"><b>'+L('Descuento de estudiante activo','Student discount active')+' · '+pct+' %</b> <span class="fine">'+L('hasta el ','until ')+esc(new Date(status.studentUntil).toLocaleDateString())+'</span></div>';
+ return '<div class="team" id="cadPlanStudent"><b>'+L('¿Sos estudiante? ','Are you a student? ')+pct+' % '+L('de descuento','off')+'</b> <span class="fine">'+L('Verificá tu correo de la facultad o universidad: te mandamos un código.','Verify your school or university email: we will send you a code.')+'</span>'+
+  (status.email?'<div class="row"><input type="email" data-st="mail" placeholder="'+L('nombre@facultad.edu.ar','name@university.edu')+'"><button class="btn" data-st="send">'+L('Enviar código','Send code')+'</button></div><div class="row" data-st="step2" hidden><input inputmode="numeric" maxlength="6" data-st="code" placeholder="000000"><button class="btn" data-st="ok">'+L('Verificar','Verify')+'</button></div>'
+   :'<p class="fine">'+L('Primero ingresá con tu cuenta.','Sign in with your account first.')+'</p>')+'</div>';
+}
+async function studentCall(p,body){
+ const r=await fetch(urls.student+p,{method:'POST',credentials:'include',headers:{'content-type':'application/json'},body:JSON.stringify(body)});
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error||'HTTP '+r.status);return j;
+}
+function studentUI(box){
+ const q=k=>box.querySelector('[data-st="'+k+'"]');if(!q('send'))return;
+ box.addEventListener('click',e=>{const t=e.target.closest('[data-st]');if(!t||t.tagName!=='BUTTON')return;e.stopPropagation();
+  if(t.dataset.st==='send')studentCall('/request',{email:q('mail').value.trim()}).then(()=>{q('step2').hidden=false;q('code').focus();toast(L('Te mandamos el código. Revisá el correo de la facultad.','Code sent. Check your university inbox.'))},err=>toast(err.message));
+  if(t.dataset.st==='ok')studentCall('/verify',{code:q('code').value}).then(async()=>{await refresh();showPlans()},err=>toast(err.message));
+ });
 }
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function teamCall(path,body){

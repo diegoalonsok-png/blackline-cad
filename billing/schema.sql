@@ -56,3 +56,15 @@ CREATE TABLE IF NOT EXISTS team_members (
   PRIMARY KEY(owner_id,email)
 );
 CREATE INDEX IF NOT EXISTS idx_team_email ON team_members(email);
+
+-- Estudiantes: correo universitario verificado con un código de 6 dígitos (50 % durante 1 año).
+-- (El Worker también crea esta tabla solo si falta.)
+CREATE TABLE IF NOT EXISTS students (
+  user_id TEXT PRIMARY KEY,
+  email TEXT NOT NULL,
+  code_hash TEXT,
+  code_expires INTEGER,
+  tries INTEGER NOT NULL DEFAULT 0,
+  verified_until INTEGER NOT NULL DEFAULT 0
+);
+-- Las suscripciones de Mercado Pago usan la tabla subscriptions con id "mp_<preapproval_id>".
