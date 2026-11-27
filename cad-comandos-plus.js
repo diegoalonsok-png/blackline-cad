@@ -379,11 +379,23 @@ alt(['BLEND'],'BLEND no existe: usá EMPALME (FILLET) o SPLINE entre los extremo
 alt(['JUSTIFYTEXT'],'La justificación del texto se cambia en PROPIEDADES.');
 alt(['REFEDIT'],'Para editar un bloque usá BEDIT (EDITARBLOQUE).');
 alt(['DIMBREAK','TOLERANCE'],'Esta variante de cota todavía no está disponible.');
-alt(['LAYWALK'],'Para recorrer capas usá LAYISO / LAYUNISO o la paleta de capas.');
+reg(['LAYWALK','RECORRERCAPAS'],()=>{
+ const st=S();if(!st.layers.length)return CORE.toast('Sin capas');
+ if(document.getElementById('cadLayerWalkDialog'))return;
+ const dlg=document.createElement('dialog');dlg.id='cadLayerWalkDialog';dlg.style.cssText='width:min(420px,90vw);max-height:80vh;background:#f8f2e4;color:#26343d;border:1px solid #ad9e83;padding:12px;border-radius:8px';
+ dlg.innerHTML='<form method="dialog"><b>LAYWALK · Recorrer capas</b><p>Seleccioná una o más capas para una vista temporal. Al cerrar se restaura la visibilidad original.</p><select multiple size="12" style="width:100%"></select><p><button>Cerrar y restaurar</button></p></form>';
+ const original=st.layers.map(l=>[l,l.visible]),select=dlg.querySelector('select');for(const l of st.layers){const o=new Option(l.name,l.id);o.selected=!!l.visible;select.append(o)}
+ select.addEventListener('change',()=>{const ids=new Set(Array.from(select.selectedOptions,o=>o.value));for(const [l] of original)l.visible=ids.has(String(l.id));CORE.schedule();});
+ dlg.addEventListener('close',()=>{for(const [l,visible] of original)l.visible=visible;CORE.schedule();dlg.remove();},{once:true});
+ document.body.append(dlg);dlg.showModal();
+});
 alt(['LIMITS'],'No hace falta definir límites: el dibujo es ilimitado y las láminas definen el papel.');
 alt(['CLOSE'],'El dibujo se guarda solo; para empezar otro usá NEW.');
 alt(['OPTIONS','OP'],'Las opciones están en el menú de cada barra de estado (▾) y en Workspace / Background.');
-alt(['IMAGE','IMAGEATTACH'],'Para una imagen o un PDF de fondo usá IMPORTAR PDF o CALIBRAR.');
+reg(['IMAGE','IMAGEATTACH','ADJUNTARIMAGEN'],()=>{
+ if(typeof window.CAD2D_IMPORT_FILE!=='function')return CORE.toast('Importador de imágenes no disponible');
+ const input=document.createElement('input');input.type='file';input.accept='.png,.jpg,.jpeg,.webp,.gif,.bmp';input.addEventListener('change',async()=>{const f=input.files?.[0];if(f)await window.CAD2D_IMPORT_FILE(f)},{once:true});input.click();
+});
 Object.assign(EXT.commands,C);
 
 /* ---------- Shift + clic derecho: referencias a objetos ---------- */
