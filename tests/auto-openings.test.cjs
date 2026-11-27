@@ -51,3 +51,19 @@ test('properties panel triggers opening relocation and protects edits',()=>{
 test('wall trimming requires explicit WALLS layer',()=>{
  assert.match(html,/explicitWallLayerName\(l\.id\)\|\|explicitWallLayerName\(l\.name\)/);
 });
+
+test('opening cutter preserves physical stubs across meters and millimeters',()=>{
+ for(const k of [1,10,1000]){
+  const e=wall(1,-.001*k,0,100*k,0);
+  const edits=plan([e],origin,.9*k,0,.2*k);
+  assert.equal(edits.length,1);
+  assert.ok(Math.abs(edits[0].first.b.x)<1e-8*k);
+  assert.ok(Math.abs(edits[0].second.a.x-.9*k)<1e-8*k);
+ }
+});
+test('cardinal opening angles remain exact after multiple rotations',()=>{
+ for(const angle of [90,-270,450]){
+  const e=wall(1,2,-2,2,4),o=plan([e],{x:2,y:0},1.5,angle,.25);
+  assert.equal(o.length,1);assert.deepEqual(o[0].opening.end,{x:2,y:1.5});
+ }
+});
