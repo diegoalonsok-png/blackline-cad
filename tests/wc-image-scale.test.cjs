@@ -25,3 +25,24 @@ test('reference scaling remains explicitly gated and checks drawing state',()=>{
  assert.match(src,/opts\.autoToiletScale===true/);assert.match(src,/if\(!current\(\)\)return/);assert.match(src,/C\.saveHistory\(\);image\.b=/);
  const gallery=fs.readFileSync(path.join(__dirname,'../cad-block-browser.js'),'utf8');assert.match(gallery,/autoToiletScale:isScaleFloorPlan\(item\)/);
 });
+
+test('known dimension calibration preserves the first picked anchor and image aspect ratio',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../assets/cad-pdf-import.js'),'utf8');
+ const a=src.indexOf('function referenceImageResize'),b=src.indexOf('let imageCalibrationCancel',a);
+ const resize=new Function(src.slice(a,b)+'return referenceImageResize;')();
+ for(const unit of [1,10,1000]){
+  const k=1000/unit,image={a:{x:0,y:0},b:{x:10*k,y:8*k}};
+  const p={x:2*k,y:2*k},q={x:6*k,y:2*k},o=resize(image,p,q,8,unit);
+  assert.equal(o.factor,2);assert.equal(o.widthM,20);assert.deepEqual(o.a,{x:-2*k,y:-2*k});assert.deepEqual(o.b,{x:18*k,y:14*k});
+  assert.equal(resize(image,p,p,8,unit),null);
+  assert.equal(resize(image,p,{x:11*k,y:2*k},8,unit),null);
+  assert.equal(resize(image,p,q,0,unit),null);
+ }
+});
+test('known dimension takes priority over experimental toilet scaling',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../assets/cad-pdf-import.js'),'utf8');
+ assert.match(src,/image\.calcoScale\?\.method==='known-dimension'/);
+ assert.match(src,/method:'known-dimension',approximate:false/);
+ assert.match(src,/Does the plan lack known dimensions/);
+ assert.match(src,/IMAGECALIBRATE','CALIBRARIMAGEN','CALIBRARPLANTA/);
+});
