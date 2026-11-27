@@ -677,10 +677,56 @@ function toiletImageResize(image,widthM,unitMM){
  const ratio=w/oldW,signX=Math.sign(image.b.x-image.a.x),signY=Math.sign(image.b.y-image.a.y);
  return {a:{...image.a},b:{x:image.a.x+signX*w,y:image.a.y+signY*oldH*ratio},factor:ratio};
 }
+// Calibrate from a measured segment; preserve the first picked point as the anchor.
+function referenceImageResize(image,p,q,meters,unitMM){
+ if(![image?.a?.x,image?.a?.y,image?.b?.x,image?.b?.y,p?.x,p?.y,q?.x,q?.y,meters,unitMM].every(Number.isFinite)||meters<=0||unitMM<=0)return null;
+ const inside=v=>v.x>=Math.min(image.a.x,image.b.x)&&v.x<=Math.max(image.a.x,image.b.x)&&v.y>=Math.min(image.a.y,image.b.y)&&v.y<=Math.max(image.a.y,image.b.y);
+ if(!inside(p)||!inside(q))return null;
+ const distance=Math.hypot(q.x-p.x,q.y-p.y),factor=meters*1000/unitMM/distance;
+ if(!Number.isFinite(factor)||factor<1e-4||factor>1e4)return null;
+ const map=v=>({x:p.x+(v.x-p.x)*factor,y:p.y+(v.y-p.y)*factor}),a=map(image.a),b=map(image.b);
+ const widthM=Math.abs(b.x-a.x)*unitMM/1000;
+ if(![a.x,a.y,b.x,b.y,widthM].every(Number.isFinite)||widthM<=0||widthM>10000)return null;
+ return {a,b,factor,widthM};
+}
+let imageCalibrationCancel=null;
+function calibrateImageReference(){
+ const S=C.state,images=S.entities.filter(e=>e.type==='image'&&S.selected.includes(e.id));
+ if(wcScaleBusy||S.tool!=='select'||S.stage?.length||images.length!==1)return C.toast(LX('Seleccioná una imagen y terminá el comando activo.','Select one image and finish the active command.'));
+ const image=images[0],layer=()=>S.layers.find(l=>l.id===image.layer);
+ if(layer()?.locked||layer()?.visible===false||layer()?.frozen)return C.toast(LX('La capa no es editable.','Image layer is not editable.'));
+ if(image.rotation)return C.toast(LX('Calibrá primero una imagen sin rotación.','Calibrate an unrotated image first.'));
+ imageCalibrationCancel?.();
+ const canvas=C.canvas,unit=S.unit,entities=S.entities,signature=JSON.stringify([image.a,image.b,image.src,image.layer,image.rotation,image.calcoScale]),points=[];
+ const current=()=>C.state===S&&S.entities===entities&&entities.includes(image)&&S.unit===unit&&S.tool==='select'&&!S.stage?.length&&!layer()?.locked&&layer()?.visible!==false&&!layer()?.frozen&&S.selected.includes(image.id)&&JSON.stringify([image.a,image.b,image.src,image.layer,image.rotation,image.calcoScale])===signature;
+ const cleanup=()=>{canvas.removeEventListener('pointerdown',click,true);window.removeEventListener('keydown',key,true);imageCalibrationCancel=null;C.schedule();};
+ const key=e=>{if(e.key==='Escape'){cleanup();C.toast(LX('Calibración cancelada.','Calibration cancelled.'));}};
+ const click=e=>{
+  if(e.button!==0)return;
+  if(!current()){cleanup();return;}
+  e.preventDefault();e.stopImmediatePropagation();
+  const r=canvas.getBoundingClientRect(),p=C.world(C.P(e.clientX-r.left,e.clientY-r.top));
+  if(p.x<Math.min(image.a.x,image.b.x)||p.x>Math.max(image.a.x,image.b.x)||p.y<Math.min(image.a.y,image.b.y)||p.y>Math.max(image.a.y,image.b.y))return C.toast(LX('Marcá un punto dentro de la imagen.','Pick a point inside the image.'));
+  if(!points.length){points.push(p);return C.toast(LX('Marcá el segundo extremo de la cota.','Pick the second dimension endpoint.'));}
+  cleanup();
+  const raw=prompt(LX('Longitud real entre los puntos (metros):','Real distance between points (meters):'),'');
+  if(raw===null||!raw.trim()||!current())return;
+  const meters=Number(raw.replace(',','.')),next=referenceImageResize(image,points[0],p,meters,C.U[unit]);
+  if(!next)return C.toast(LX('Referencia inválida. Imagen sin cambios.','Invalid reference. Image unchanged.'));
+  C.saveHistory();image.a=C.P(next.a.x,next.a.y);image.b=C.P(next.b.x,next.b.y);
+  image.calcoScale={method:'known-dimension',approximate:false,widthM:next.widthM,referenceM:meters};C.updateAll();C.log('IMAGECALIBRATE · '+meters+' m');C.toast(LX('Imagen calibrada con cota conocida.','Image calibrated from known dimension.'));
+ };
+ imageCalibrationCancel=cleanup;canvas.addEventListener('pointerdown',click,true);window.addEventListener('keydown',key,true);
+ C.toast(LX('Marcá el primer extremo de una cota · Esc cancela.','Pick first dimension endpoint · Esc cancels.'));
+}
+for(const k of ['IMAGECALIBRATE','CALIBRARIMAGEN','CALIBRARPLANTA'])EXT.commands[k]=calibrateImageReference;
+
 async function wcScaleImage(image){
  const S=C.state;
  if(wcScaleBusy||!image||image.type!=='image'||S.tool!=='select'||S.stage?.length)return;
  if(S.layers.find(l=>l.id===image.layer)?.locked)return C.toast('Capa de imagen bloqueada.');
+ if(image.calcoScale?.method==='known-dimension')return C.toast(LX('La imagen ya tiene una cota conocida; se conserva su escala.','Known dimension already calibrated; scale retained.'));
+ if(!confirm(LX('¿La planta carece de cotas o medidas conocidas? Aceptar: estimar por inodoro. Cancelar: conservar escala; usá CALIBRARIMAGEN para una cota.','Does the plan lack known dimensions? OK: estimate from toilet. Cancel: retain scale; use IMAGECALIBRATE for a known dimension.')))return;
  if(!wcScaleConsent){
   if(!confirm(LX('Estimar escala con un inodoro mediante IA local. La primera descarga del modelo puede ocupar varios cientos de MB. ¿Continuar?','Estimate scale from a toilet using local AI. First model download may be several hundred MB. Continue?')))return;
   wcScaleConsent=true;
