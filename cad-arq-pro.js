@@ -1169,13 +1169,13 @@ function arqPlanThumbnail(plan){
   const ops=plan.openings.filter(o=>o.host===w.id).sort((a,b)=>a.offset-b.offset);let at=0;
   const line=(a,b)=>{if(b>a)body+='<line x1="'+pt(a)[0]+'" y1="'+pt(a)[1]+'" x2="'+pt(b)[0]+'" y2="'+pt(b)[1]+'" stroke="#53575a" stroke-width="'+w.thickness+'" stroke-linecap="butt"/>'};
   for(const o of ops){const a=o.offset-o.width/2,b=o.offset+o.width/2;line(at,a);const [x,y]=pt(a),angle=-Math.atan2(uy,ux)*180/Math.PI;
-   if(o.kind==='swing-door')body+='<g transform="translate('+x+' '+y+') rotate('+angle+')" stroke="#74716b" stroke-width=".012" fill="none"><path d="M0 0 V-'+o.width+' M0 -'+o.width+' A'+o.width+' '+o.width+' 0 0 1 '+o.width+' 0"/></g>';
+   if(o.kind==='swing-door'){const flip=o.orientation?.mirror?' translate('+o.width+' 0) scale(-1 1)':'',rev=o.orientation?.reverseHostDirection?' translate('+o.width+' 0) rotate(180)':'';body+='<g transform="translate('+x+' '+y+') rotate('+angle+')'+rev+flip+'" stroke="#74716b" stroke-width=".012" fill="none"><path d="M0 0 V-'+o.width+' M0 -'+o.width+' A'+o.width+' '+o.width+' 0 0 1 '+o.width+' 0"/></g>';}
    else body+='<g transform="translate('+x+' '+y+') rotate('+angle+')" stroke="#69949b" stroke-width=".018"><path d="M0 -.025 H'+o.width+' M0 .025 H'+o.width+'"/></g>';at=b;}
   line(at,L);
   // Corner fill only at actual junctions; native insertion has its own wall joiner.
   for(const [x,y] of [w.a,w.b])body+='<rect x="'+(x-w.thickness/2)+'" y="'+(-y-w.thickness/2)+'" width="'+w.thickness+'" height="'+w.thickness+'" fill="#53575a"/>';
  }
- for(const b of plan.blocks){const it=byId(b.catalogId);if(!it)continue;const svg=svgFor(it,...b.nominalSize,{height:110});const i=svg.indexOf('<g '),j=svg.lastIndexOf('</svg>');if(i<0||j<0)continue;
+ for(const b of plan.blocks){const it=byId(b.catalogId);if(!it)continue;const svg=svgFor(it,...(b.nominalSize||[it.w,it.d]),{height:110});const i=svg.indexOf('<g '),j=svg.lastIndexOf('</svg>');if(i<0||j<0)continue;
   body+='<g transform="translate('+b.point[0]+' '+(-b.point[1])+') rotate('+(-b.rotation)+')" color="#343e40">'+svg.slice(i,j)+'</g>';}
  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="'+[minX-pad,-maxY-pad,maxX-minX+2*pad,maxY-minY+2*pad].join(' ')+'" style="width:100%;height:142px;display:block;background:#f4efe3;border-radius:4px" role="img" aria-label="Planta arquitectónica">'+body+'</svg>';
 }
@@ -1228,9 +1228,10 @@ async function openArqPlanCatalogue(category,query=''){
   const img=document.createElement('img');img.src=new URL(item.id+'.svg?v=20261127-bathroom-catalogue6',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.category==='house'?fmt(item.area)+' m² cubiertos · '+fmt(w)+' × '+fmt(d)+' m':item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard',counter:'Mesada',kingbed:'Cama king',bunk:'Cucheta',crib:'Cuna',desk:'Escritorio',washer:'Lavarropas',dryer:'Secarropas',laundrySink:'Pileta',bookshelf:'Biblioteca',table8:'Mesa para ocho'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
   if(item.preliminary){const note=document.createElement('small');note.textContent='Preliminar / Preliminary';note.style.color='#dfc28b';button.append(note);}
   button.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');const epoch=++arqCommandEpoch;button.disabled=true;
-   try{const response=await fetch(new URL(item.id+'.json?v=20261127-typology-fixtures1',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');const plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
+   try{const response=await fetch(new URL(item.id+'.json?v=20261127-typology-fixtures1',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');let plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;{const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
    catch(e){CORE.toast(e.message)}finally{button.disabled=false}};
   grid.append(button);
+  if(['house','bathroom'].includes(item.category)&&window.CAD2D_SANITARY_PREVIEW){button.disabled=true;img.removeAttribute('src');window.CAD2D_SANITARY_PREVIEW(item.id).then(r=>{if(!button.isConnected)return;if(r.issues.length){img.alt=r.issues.join(' · ');button.title=img.alt;return}img.src=r.preview;button.disabled=false}).catch(e=>{button.title=e.message;img.alt=e.message;});}
  }
  const foot=document.createElement('p');foot.style.cssText='font-size:12px;opacity:.8;margin-bottom:0;flex:none';foot.textContent='Seleccioná una planta para insertarla como muros, aberturas y bloques independientes. / Select a plan to insert editable CAD objects.';dlg.append(foot);
 }
@@ -1288,11 +1289,10 @@ function arqWebReference(raw){
 }
 const arqTypologyBase=new URL('assets/arq-tipologias/v1/',document.baseURI);
 
-// Royal road for AI dwelling layouts: WC and bidet must share the LEFT wall.
-// Geometry is checked before preview or insertion, never silently rotated to another wall.
-function arqLeftSanitary(plan,library){
+// Shared residential sanitary QA: same wall, right preferred, privacy, clearance and collision checks.
+function arqCheckSanitary(plan,library){
  const lib=new Map(library.map(x=>[x.id,x])),eps=1e-6;
- const pairId=b=>/^san-(?:wc(?:-compact)?|bidet)$/.test(b.catalogId),bidet=b=>b.catalogId==='san-bidet';
+ const pairId=b=>/^san-(?:wc(?:-compact|-susp)?|bidet)$/.test(b.catalogId),bidet=b=>b.catalogId==='san-bidet';
  const dims=b=>b.nominalSize||[lib.get(b.catalogId)?.w,lib.get(b.catalogId)?.d];
  const box=b=>{const [w,d]=dims(b),a=(b.rotation||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),k=b.scale||1;
   if(!Number.isFinite(w)||!Number.isFinite(d))return null;
@@ -1305,6 +1305,9 @@ function arqLeftSanitary(plan,library){
   if(!/^(?:bath|bathroom|suite|toil|toilette)$/.test(room.kind)||!Array.isArray(room.clearBounds))continue;
   const [x,y,w,h]=room.clearBounds,R=[x,y,x+w,y+h],own=clone.blocks.filter(b=>inside(box(b),R));
   const sanitary=own.filter(pairId),wc=sanitary.filter(b=>!bidet(b)),bd=sanitary.filter(bidet);
+  if(!sanitary.length&&!own.some(b=>/^san-banera/.test(b.catalogId)))continue;
+  if(wc.length>1&&!bd.length&&!own.some(b=>/^san-banera/.test(b.catalogId))){sanitary.forEach(b=>assigned.add(b));continue} // public multi-stall rooms are not a residential pair
+  if(own.some(b=>/^san-banera/.test(b.catalogId))&&(wc.length!==1||bd.length!==1)){sanitary.forEach(b=>assigned.add(b));issues.push(room.id+': bañadera sin inodoro y bidet; rediseñar');continue}
   if(wc.length!==1||bd.length>1){issues.push(room.id+': conjunto sanitario ausente o ambiguo');continue}
   sanitary.forEach(b=>assigned.add(b));
   const sideOf=wall=>{
@@ -1318,7 +1321,7 @@ function arqLeftSanitary(plan,library){
   for(const o of clone.openings){
    const wall=walls.get(o.host);if(!wall)continue;const s=sideOf(wall);if(!s)continue;
    const dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)continue;
-   const cx=wall.a[0]+dx*o.offset/len,cy=wall.a[1]+dy*o.offset/len,half=o.width/2+.05,dep=o.width+wall.thickness/2+.05;
+   const cx=wall.a[0]+dx*o.offset/len,cy=wall.a[1]+dy*o.offset/len,half=o.width/2+.20,dep=o.width+wall.thickness/2+.20;
    const t=horizontal(s)?cx:cy,low=horizontal(s)?x:y,high=horizontal(s)?R[2]:R[3];
    if(t+half<=low||t-half>=high)continue;
    openings[s].push([t-half,t+half]);
@@ -1343,11 +1346,11 @@ function arqLeftSanitary(plan,library){
   }
   const conflict=(a,obs)=>obs.some(z=>overlaps(a.fp,z)||overlaps(a.front,z));
   const orders=bd.length?[[wc[0],bd[0]],[bd[0],wc[0]]]:[[wc[0]]];let best=null;
-  for(const side of ['W','E','N','S']){
+  for(const side of ['E','W','N','S']){
    if(doorSides.has(side))continue;
    const lo=horizontal(side)?x:y,hi=horizontal(side)?R[2]:R[3];
    for(const order of orders)for(let at=lo+.05;at<=hi;at+=.05){
-    let t=at,layout=[],ok=true,score=side==='W'?0:10;
+    let t=at,layout=[],ok=true,score=side==='E'?0:side==='W'?100:200;
     for(const b of order){const c=candidate(b,side,t);if(!c||conflict(c,[...fixed,...doors])||view.some(z=>overlaps(c.fp,z))){ok=false;break}
      score+=Math.hypot(c.point[0]-b.point[0],c.point[1]-b.point[1]);layout.push(c);t+=dims(b)[0]*(b.scale||1)+.25;
     }
@@ -1363,7 +1366,7 @@ function arqLeftSanitary(plan,library){
   if(!best){issues.push(room.id+': no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño');continue}
   for(const q of best.layout){if(q.keep)continue;const changed=q.b.rotation!==q.rotation||q.b.point.some((v,i)=>Math.abs(v-q.point[i])>eps);q.b.point=q.point;q.b.rotation=q.rotation;if(q.b.footprint)q.b.footprint=q.fp;if(q.b.box)q.b.box=q.fp;if(q.b.envelope)q.b.envelope=[q.fp[0],q.fp[1],q.fp[2]-q.fp[0],q.fp[3]-q.fp[1]];if(changed)moved.push(q.b.catalogId)}
  }
- for(const b of clone.blocks.filter(pairId))if(!assigned.has(b))issues.push('Sanitario fuera de un baño identificado: '+b.catalogId);
+ for(const b of clone.blocks.filter(pairId))if(!assigned.has(b)&&clone.rooms?.some(r=>/^(?:bath|bathroom|suite|toil|toilette)$/.test(r.kind)))issues.push('Sanitario fuera de un baño identificado: '+b.catalogId);
  return {plan:clone,issues,moved};
 }
 
@@ -1372,15 +1375,18 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
  if(!typology&&!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
  if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
  const epoch=++arqCommandEpoch;
- const response=await fetch(new URL(id+'.json?v=20261127-sanitary-right-wall',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ const response=await fetch(new URL(id+'.json?v=20261127-sanitary-global',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
  let plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
  if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
- if(typology){const checked=arqLeftSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta IA pendiente de revisión: '+checked.issues.join(' · '));plan=checked.plan;}
+ {const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}
  if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return false;
  if(S().tool!=='select'||S().stage.length||!isCurrent())return false;
  startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();return true;
 }
 window.CAD2D_INSERT_CATALOGUE_PLAN=insertCataloguePlanById;
+// Preview and insertion use the same validated native geometry, not stale raster files.
+const arqSanitaryPreviewCache=new Map();
+window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=fetch(new URL(id+'.json?v=20261127-sanitary-global',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Planta no disponible');return r.json()}).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
 function arqObjectSearch(raw){
  const q=arqCleanRequest(String(raw).replace(/^\s*(?:bloques? de)\s+/i,''));
