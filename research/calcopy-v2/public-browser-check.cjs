@@ -16,6 +16,8 @@ const results=[];
    const row={mode,url,sample:path.basename(sample),assumedWidthM:15,errors,dialogs};
    results.push(row);
    page.on('pageerror',e=>errors.push(e.message));
+   page.on('console',m=>{if(m.type()==='error')errors.push(m.text().slice(0,800));});
+   row.failedRequests=[];page.on('requestfailed',q=>{if(row.failedRequests.length<30)row.failedRequests.push({url:q.url().split('?')[0],error:q.failure()?.errorText});});
    page.on('dialog',async d=>{dialogs.push({type:d.type(),message:d.message()});if(d.type()==='confirm'&&/modelo|model/i.test(d.message()))await d.accept();else if(d.type()==='prompt')await d.dismiss();else await d.accept();});
    try{
     const response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:45000});
@@ -50,7 +52,7 @@ const results=[];
       await ai.click({timeout:10000});
       try{await page.waitForFunction(()=>[...document.querySelectorAll('dialog[open] button')].some(b=>/^(IA · Objetos|AI · Objects)$/.test(b.textContent)&&!b.disabled),{},{timeout:90000});}catch(e){row.aiTimeout=true;}
      }
-     row.preview=await bar.innerText();await page.screenshot({path:path.join(out,mode+'-02-preview.png')});
+     row.aiDetails=await bar.textContent();row.preview=await bar.innerText();await page.screenshot({path:path.join(out,mode+'-02-preview.png')});
      await bar.getByRole('button',{name:/^(Finalizar|Finish)$/}).click({timeout:10000});
     }
     await page.waitForTimeout(1200);
