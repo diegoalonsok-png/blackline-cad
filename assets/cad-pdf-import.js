@@ -455,7 +455,7 @@ async function traceFile(file,source=null,python=false,brush=false){
    if(!raw.trim()&&python&&!brush&&confirm('Estimar escala por inodoro con IA local. La primera descarga del modelo puede ocupar varios cientos de MB. ¿Continuar?')){
     try{
      C.toast('CALCOPY: buscando inodoros para estimar la escala…');
-     const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-floor-zones',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-wcscale1',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      preDetected=await vision.detect(cv,()=>{});
      const estimate=vision.toiletScale(preDetected,window.CAD2D_ARQ_LIBRARY?.library||[],w,h);
      if(estimate){const v=prompt('Escala APROXIMADA por '+estimate.samples+' inodoro(s). Ancho total de imagen (m). Confirmá o corregí; verificá con una medida conocida.',estimate.widthM.toFixed(2));if(v===null)return;real=Number(v.replace(',','.'));}
@@ -557,7 +557,7 @@ async function traceFile(file,source=null,python=false,brush=false){
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
     ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
-     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-floor-zones',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
+     const module=await import(new URL('cad-calco-vision.mjs?v=20261126-wcscale1',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
      const found=preDetected||await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
      if(!d.isConnected)return;
      let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
@@ -668,5 +668,58 @@ window.CAD2D_PDF_IMAGE=async function(file){
   await window.CAD2D_IMPORT_FILE(new File([blob],file.name.replace(/\.pdf$/i,'')+'-p'+n+'.png',{type:'image/png'}));return true;
  }finally{if(doc)await doc.destroy();}
 };
+// Image scale estimation is opt-in on reference import; the local model is never
+// downloaded for normal image editing. The selected-image command works afterwards.
+let wcScaleConsent=false,wcScaleBusy=false;
+function toiletImageResize(image,widthM,unitMM){
+ const w=widthM*1000/unitMM,oldW=Math.abs(image.b.x-image.a.x),oldH=Math.abs(image.b.y-image.a.y);
+ if(![w,oldW,oldH,unitMM].every(Number.isFinite)||Math.min(w,oldW,oldH,unitMM)<=0||widthM>10000)return null;
+ const ratio=w/oldW,signX=Math.sign(image.b.x-image.a.x),signY=Math.sign(image.b.y-image.a.y);
+ return {a:{...image.a},b:{x:image.a.x+signX*w,y:image.a.y+signY*oldH*ratio},factor:ratio};
+}
+async function wcScaleImage(image){
+ const S=C.state;
+ if(wcScaleBusy||!image||image.type!=='image'||S.tool!=='select'||S.stage?.length)return;
+ if(S.layers.find(l=>l.id===image.layer)?.locked)return C.toast('Capa de imagen bloqueada.');
+ if(!wcScaleConsent){
+  if(!confirm(LX('Estimar escala con un inodoro mediante IA local. La primera descarga del modelo puede ocupar varios cientos de MB. ¿Continuar?','Estimate scale from a toilet using local AI. First model download may be several hundred MB. Continue?')))return;
+  wcScaleConsent=true;
+ }
+ wcScaleBusy=true;
+ const original=JSON.stringify([image.a,image.b,image.src,image.layer,image.rotation,image.calcoScale]),unit=S.unit,entities=S.entities;
+ const current=()=>C.state===S&&S.entities===entities&&entities.includes(image)&&S.unit===unit&&S.tool==='select'&&!S.stage?.length&&!S.layers.find(l=>l.id===image.layer)?.locked&&JSON.stringify([image.a,image.b,image.src,image.layer,image.rotation,image.calcoScale])===original;
+ try{
+  C.toast(LX('Buscando inodoros para estimar escala…','Detecting toilets for scale estimation…'));
+  const im=new Image();im.src=image.src;await im.decode();
+  const k=Math.min(1,1800/Math.max(im.naturalWidth,im.naturalHeight)),w=Math.max(1,Math.round(im.naturalWidth*k)),h=Math.max(1,Math.round(im.naturalHeight*k)),cv=document.createElement('canvas');cv.width=w;cv.height=h;
+  const ctx=cv.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(im,0,0,w,h);
+  const vision=await import(new URL('cad-calco-vision.mjs?v=20261126-wcscale1',BASE.replace(/vendor\/pdfjs\/$/,'')).href);
+  const det=await vision.detect(cv,()=>{});
+  if(!current())return C.log('WC scale discarded: drawing changed.');
+  const e=vision.toiletScale(det,window.CAD2D_ARQ_LIBRARY?.library||[],w,h);
+  if(!e)return C.toast(LX('No se reconoció un inodoro completo. Conservando escala actual.','No complete toilet recognized. Existing scale retained.'));
+  const raw=prompt(LX('Escala aproximada por '+e.samples+' inodoro(s). Confirmá o corregí el ancho total en metros. Verificá después con una cota real.','Approximate scale from '+e.samples+' toilet(s). Confirm or correct total image width in meters. Verify against a known dimension.'),e.widthM.toFixed(3));
+  if(raw===null||!raw.trim()||!current())return;
+  const W=Number(raw.replace(',','.')),next=toiletImageResize(image,W,C.U[unit]);
+  if(!next)return C.toast('Invalid reference scale');
+  C.saveHistory();image.b=C.P(next.b.x,next.b.y);image.calcoScale={method:'toilet-estimate',approximate:true,samples:e.samples,widthM:W};C.updateAll();C.log('WCSCALE · '+W+' m · '+e.samples+' WC');C.toast(LX('Escala aproximada aplicada; verificá una cota real.','Approximate scale applied; verify a known dimension.'));
+ }catch(err){C.log('WCSCALE: '+String(err.message||err));C.toast(LX('No se pudo estimar la escala; imagen sin cambios.','Scale estimation unavailable; image unchanged.'));}
+ finally{wcScaleBusy=false;}
+}
+const originalReferenceImport=window.CAD2D_IMPORT_REFERENCE;
+if(typeof originalReferenceImport==='function')window.CAD2D_IMPORT_REFERENCE=async function(file,opts={}){
+ const S=C.state,known=new Set(S.entities.map(e=>e.id));
+ const result=await originalReferenceImport(file);
+ if(result===false||opts.autoToiletScale===false||C.state!==S||!/\.(?:png|jpe?g|webp)$/i.test(file?.name||''))return result;
+ const added=S.entities.filter(e=>e.type==='image'&&!known.has(e.id)&&S.selected.includes(e.id));
+ if(added.length===1&&!added[0].calcoScale&&opts.autoToiletScale===true)await wcScaleImage(added[0]);
+ return result;
+};
+for(const key of ['WCSCALE','ESCALAINODORO'])EXT.commands[key]=()=>{
+ const S=C.state,images=S.entities.filter(e=>e.type==='image'&&S.selected.includes(e.id));
+ if(images.length!==1)return C.toast(LX('Seleccioná una imagen.','Select one image.'));
+ return wcScaleImage(images[0]);
+};
+
 window.CAD2D_PDF_IMPORT=importPdf;
 })();
