@@ -1287,14 +1287,70 @@ function arqWebReference(raw){
  return /\b(?:planos?|plantas?|floor plans?|detalles constructivos|construction details|fachadas?|facades?|architectural references)\b/.test(q)&&!/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q);
 }
 const arqTypologyBase=new URL('assets/arq-tipologias/v1/',document.baseURI);
+
+// Royal road for AI dwelling layouts: WC and bidet must share the LEFT wall.
+// Geometry is checked before preview or insertion, never silently rotated to another wall.
+function arqLeftSanitary(plan,library){
+ const lib=new Map(library.map(x=>[x.id,x])),eps=1e-6;
+ const pairId=b=>/^san-(?:wc(?:-compact)?|bidet)$/.test(b.catalogId);
+ const bidet=b=>b.catalogId==='san-bidet';
+ const dims=b=>b.nominalSize||[lib.get(b.catalogId)?.w,lib.get(b.catalogId)?.d];
+ const box=b=>{const [w,d]=dims(b),a=(b.rotation||0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a),k=b.scale||1;
+  if(!Number.isFinite(w)||!Number.isFinite(d))return null;
+  const xy=[[0,0],[w,0],[w,d],[0,d]].map(([x,y])=>[b.point[0]+k*(x*c-y*s),b.point[1]+k*(x*s+y*c)]);
+  return [Math.min(...xy.map(p=>p[0])),Math.min(...xy.map(p=>p[1])),Math.max(...xy.map(p=>p[0])),Math.max(...xy.map(p=>p[1]))]};
+ const overlaps=(a,b)=>a[0]<b[2]-eps&&b[0]<a[2]-eps&&a[1]<b[3]-eps&&b[1]<a[3]-eps;
+ const inside=(a,r)=>a&&a[0]>=r[0]-eps&&a[1]>=r[1]-eps&&a[2]<=r[2]+eps&&a[3]<=r[3]+eps;
+ const clone=JSON.parse(JSON.stringify(plan)),walls=new Map(clone.walls.map(w=>[w.id,w])),issues=[],moved=[];
+ const assigned=new Set();
+ for(const room of clone.rooms||[]){
+  if(!/^(?:bath|bathroom|suite|toil|toilette)$/.test(room.kind)||!Array.isArray(room.clearBounds))continue;
+  const [x,y,w,h]=room.clearBounds,R=[x,y,x+w,y+h];
+  const own=clone.blocks.filter(b=>{const a=box(b);return a&&inside(a,R)});
+  const sanitary=own.filter(pairId),wc=sanitary.filter(b=>!bidet(b)),bd=sanitary.filter(bidet);
+  if(!sanitary.length){issues.push(room.id+': sin inodoro identificado');continue}
+  if(wc.length!==1||bd.length>1){issues.push(room.id+': conjunto sanitario ambiguo');continue}
+  sanitary.forEach(b=>assigned.add(b));
+  const leftWalls=clone.walls.filter(v=>Math.abs(v.a[0]-v.b[0])<eps&&Math.abs(v.a[0]+v.thickness/2-x)<0.015&&Math.min(v.a[1],v.b[1])<=y+0.05&&Math.max(v.a[1],v.b[1])>=y+h-0.05);
+  if(!leftWalls.length){issues.push(room.id+': pared izquierda no identificada');continue}
+  const obs=own.filter(b=>!pairId(b)).map(box).filter(Boolean);
+  const doors=[];
+  for(const o of clone.openings){
+   if(!/door/i.test(o.kind))continue;const wall=walls.get(o.host);if(!wall)continue;
+   const dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],len=Math.hypot(dx,dy);if(!len)continue;
+   const cx=wall.a[0]+dx*o.offset/len,cy=wall.a[1]+dy*o.offset/len,half=o.width/2+.05,dep=o.width+wall.thickness/2+.05;
+   const z=Math.abs(dx)>Math.abs(dy)?[cx-half,cy-dep,cx+half,cy+dep]:[cx-dep,cy-half,cx+dep,cy+half];
+   if(overlaps(z,R))doors.push(z);
+  }
+  const windows=[];
+  for(const o of clone.openings){if(!/window/i.test(o.kind)||!leftWalls.some(v=>v.id===o.host))continue;const wall=walls.get(o.host),dy=wall.b[1]-wall.a[1],cy=wall.a[1]+Math.sign(dy)*o.offset;windows.push([cy-o.width/2-.05,cy+o.width/2+.05])}
+  const orders=bd.length?[[wc[0],bd[0]],[bd[0],wc[0]]]:[[wc[0]]];let best=null;
+  for(const order of orders)for(let at=y+.05;at<=y+h;at+=.025){
+   let t=at,layout=[],ok=true,score=0;
+   for(const b of order){const [bw,depth]=dims(b),k=b.scale||1,along=bw*k,deep=depth*k;
+    const fp=[x,t,x+deep,t+along],front=[x+deep,t,x+deep+.50,t+along];
+    if(!inside(fp,R)||!inside(front,R)||[...obs,...doors].some(z=>overlaps(fp,z)||overlaps(front,z))||windows.some(z=>t<z[1]&&t+along>z[0])){ok=false;break}
+    const point=[x,t+along].map(n=>Math.round(n*1000)/1000);
+    score+=Math.hypot(point[0]-b.point[0],point[1]-b.point[1]);layout.push({b,point,fp});t+=along+.25;
+   }
+   if(ok&&(!best||score<best.score))best={layout,score};
+  }
+  if(!best){issues.push(room.id+': no cabe el conjunto en pared izquierda con circulación y puerta libres');continue}
+  for(const q of best.layout){q.b.point=q.point;q.b.rotation=270;if(q.b.footprint)q.b.footprint=q.fp;if(q.b.box)q.b.box=q.fp;if(q.b.envelope)q.b.envelope=[q.fp[0],q.fp[1],q.fp[2]-q.fp[0],q.fp[3]-q.fp[1]];moved.push(q.b.catalogId)}
+ }
+ for(const b of clone.blocks.filter(pairId))if(!assigned.has(b))issues.push('Sanitario fuera de un baño identificado: '+b.catalogId);
+ return {plan:clone,issues,moved};
+}
+
 async function insertCataloguePlanById(id,isCurrent=()=>true){
  const typology=/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(id);
  if(!typology&&!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
  if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
  const epoch=++arqCommandEpoch;
- const response=await fetch(new URL(id+'.json?v=20261127-bathroom-catalogue6',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
- const plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
+ const response=await fetch(new URL(id+'.json?v=20261127-left-sanitary-v2',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ let plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
  if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
+ if(typology){const checked=arqLeftSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta IA pendiente de revisión: '+checked.issues.join(' · '));plan=checked.plan;}
  if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return false;
  if(S().tool!=='select'||S().stage.length||!isCurrent())return false;
  startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();return true;
