@@ -10080,8 +10080,11 @@ function applyRenderStyle(){
   // Hidden-line mode uses an invisible depth prepass for proper edge occlusion.
   mat.depthWrite=plainLines?renderStyle==='hidden'&&!glass&&!cutout:
    !glass&&renderStyle!=='xray'&&(cutout||original.depthWrite);
-  if('roughness' in mat)mat.roughness=renderStyle==='realistic'?.54:original.roughness;
-  if('metalness' in mat)mat.metalness=renderStyle==='realistic'?.10:original.metalness;
+  // Only the untextured generic CAD finish receives the legacy realistic-style preset.
+  // Glass, textured materials and explicit physical finishes retain their authored values.
+  var genericFinish=!glass&&!cutout&&!mat.map&&!mat.roughnessMap&&!mat.metalnessMap&&original.roughness===.8&&original.metalness===.04;
+  if('roughness' in mat)mat.roughness=renderStyle==='realistic'&&genericFinish?.54:original.roughness;
+  if('metalness' in mat)mat.metalness=renderStyle==='realistic'&&genericFinish?.10:original.metalness;
   m.castShadow=!glass&&!plainLines;
   m.receiveShadow=!glass&&sunSettings.enabled&&sunSettings.onFaces&&!plainLines;
   mat.needsUpdate=true;
