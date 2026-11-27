@@ -384,6 +384,13 @@ one('mob-sillon','Sillón individual',MOB,.85,.85,(b,W,D)=>{b.rrect(0,0,W,D,.06)
 one('mob-ratona','Mesa ratona',MOB,1.10,.60,(b,W,D)=>{b.rect(0,0,W,D);b.rect(.05,.05,W-.10,D-.10)},{wMin:.60,wMax:1.60,dMin:.50,dMax:1.00});
 one('mob-escritorio','Escritorio con silla',MOB,1.40,1.20,(b,W)=>{b.rect(0,.50,W,.70);b.at(W/2,.30,180,bb=>{bb.circle(0,0,.25);bb.rect(-.20,-.30,.40,.08)})},{wMin:1.00,wMax:2.00});
 one('mob-pupitre','Pupitre individual con silla',MOB,.65,.90,(b,W,D)=>{b.rect(0,D-.42,W,.42);b.rrect((W-.38)/2,.05,.38,.34,.035);b.line((W-.38)/2,.08,(W+.38)/2,.08)},{wMin:.60,wMax:.80,dMin:.85,dMax:1.05});
+// Dining groups with a fixed, exact chair count and full furniture envelope.
+for(const [n,w,d] of [[2,.8,1.8],[4,1.25,1.8],[6,1.85,1.8],[8,2.45,1.8]]){
+ one('mob-rest-mesa'+n,'Mesa restaurante · '+n+' plazas',MOB,w,d,(b,W,D)=>{
+  const h=.5;b.rect(.025,h,W-.05,D-2*h);
+  for(let j=0;j<n/2;j++){const x=W*(j+.5)/(n/2);b.at(x,.25,180,bb=>F.silla(bb));b.at(x,D-.25,0,bb=>F.silla(bb));}
+ },{family:'mesa-restaurante'});
+}
 one('mob-butaca-auditorio','Butaca de auditorio',MOB,.60,.75,(b,W,D)=>{b.rrect(.07,.05,W-.14,D-.16,.045);b.rrect(.015,.14,.07,D-.23,.025);b.rrect(W-.085,.14,.07,D-.23,.025);b.rect(.07,.05,W-.14,.09)},{wMin:.50,wMax:.75,dMin:.65,dMax:.95});
 one('mob-pantalla-auditorio','Pantalla de proyección',MOB,4,.12,(b,W,D)=>{b.rect(0,0,W,D);b.line(.04,D/2,W-.04,D/2)},{wMin:1.50,wMax:12,dMin:.08,dMax:.20});
 one('mob-escenario','Escenario rectangular',MOB,6,2,(b,W,D)=>{b.rect(0,0,W,D);b.line(0,.08,W,.08)},{wMin:2,wMax:14,dMin:1,dMax:5});
