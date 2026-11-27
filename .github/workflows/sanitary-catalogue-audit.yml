@@ -1,0 +1,32 @@
+name: Sanitary catalogue correction
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sanitary-catalogue-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: sanitary-catalogue-audit
+  cancel-in-progress: false
+jobs:
+  correct-native-plans:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Audit and correct native plan JSON
+        run: node research/arq-tipologias/audit-sanitary.cjs --apply
+      - name: Verify corrected plans
+        run: node research/arq-tipologias/audit-sanitary.cjs
+      - name: Publish validated native plans and review report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- assets/arq-tipologias/v1/*.json research/arq-tipologias/sanitary-audit-report.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Correct validated sanitary layouts and record unresolved typologies"
+          git push origin HEAD:main
