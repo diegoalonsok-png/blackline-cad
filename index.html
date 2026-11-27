@@ -9552,7 +9552,7 @@ window.CAD2D_CTB=Object.freeze({text:cadCtbText,bytes:cadCtbBytes,import:cadImpo
 for(const id of ['plotStyle','layoutStyle']){const sel=$(id);if(!sel)continue;
  sel.addEventListener('change',()=>{if(sel.value==='ctb'&&!document.getElementById('cadCtbEditor'))cadEditCtb()});
  const b=document.createElement('button');b.type='button';b.className='btn slim';b.textContent='Tabla CTB…';b.title='Editar qué color y grosor imprime cada color del dibujo';b.style.marginTop='4px';b.onclick=()=>cadEditCtb();sel.insertAdjacentElement('afterend',b);}
-{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CTB','PLOTSTYLE','STYLESMANAGER','ESTILOSIMPRESION','PLUMAS'])X.commands[k]=()=>cadEditCtb();for(const k of['CTBOUT','GUARDARCTB','EXPORTARCTB'])X.commands[k]=()=>cadExportCtbFile();}
+{const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CTB','PLOTSTYLE','STYLESMANAGER','ESTILOSIMPRESION','PLUMAS'])X.commands[k]=()=>cadEditCtb();for(const k of['CTBOUT','GUARDARCTB','EXPORTARCTB'])X.commands[k]=()=>cadExportCtbFile();for(const k of['EXPORTLAYOUT','EXPORTARLAMINA','LAMINADXF'])X.commands[k]=()=>cadExportLayoutDXF();}
 function colorOutput(e,o){if(e.wipeout)return '#ffffff';if(o.style==='ctb'){const m=cadCtbEntry(e),src=cadSrcColor(e);if(!m)return '#161616';if(m.color==='object')return cadNearWhite(src)?'#161616':src;return m.color}if(o.style==='mono-hatch')return e.type==='hatch'?(e.color||layerFor(e).color):'#161616';return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
 function escXML(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 function makeSVG(o){
@@ -9718,6 +9718,88 @@ function cadViewportsResolved(viewports=cadLayoutViewports){
  });
 }
 function layoutPlotOptions(){syncLayoutToPlot();const o=plotOptions();const vps=cadViewportsResolved();if(vps.length)o.viewports=vps;return o}
+/* Exportar la lámina activa tal como se imprime (hoja, carátula, ventanas recortadas y a escala) como DXF
+ * en milímetros de papel. Se parte del mismo SVG de impresión, así el resultado coincide con el PDF. */
+function cadSvgToPaperEntities(svgText,o){
+ const host=document.createElement('div');host.style.cssText='position:fixed;left:-99999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+ host.innerHTML=svgText;document.body.append(host);const root=host.querySelector('svg');const out=[];
+ try{
+  root.setAttribute('width',o.w);root.setAttribute('height',o.h);
+  const H=o.h,tol=.02,toP=(m,x,y)=>P(m.a*x+m.c*y+m.e,H-(m.b*x+m.d*y+m.f));
+  const hex=c=>{if(!c||c==='none'||c==='transparent')return null;const m=c.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);if(m){const h=m[1].length===3?m[1].replace(/./g,x=>x+x):m[1];return '#'+h.toLowerCase()}
+   const r=c.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?/);if(r){if(r[4]!==undefined&&Number(r[4])<.05)return null;return '#'+[r[1],r[2],r[3]].map(v=>Math.round(+v).toString(16).padStart(2,'0')).join('')}return null};
+  // Recorte por el viewport de cada <svg> anidado (ventanas gráficas), en coordenadas de papel.
+  const meet=(r,c)=>r?{minX:Math.max(r.minX,c.minX),maxX:Math.min(r.maxX,c.maxX),minY:Math.max(r.minY,c.minY),maxY:Math.min(r.maxY,c.maxY)}:c;
+  const clipPathRect=p=>{const ref=(p.getAttribute('clip-path')||'').match(/url\(#([^)]+)\)/);if(!ref)return null;const cp=root.querySelector('clipPath#'+CSS.escape(ref[1]));const rc=cp?.querySelector('rect');if(!rc)return null;
+   const m=p.getCTM()||root.getCTM(),x=+rc.getAttribute('x')||0,y=+rc.getAttribute('y')||0,w=parseFloat(rc.getAttribute('width'))||0,h=parseFloat(rc.getAttribute('height'))||0,a=toP(m,x,y),b=toP(m,x+w,y+h);
+   return {minX:Math.min(a.x,b.x),maxX:Math.max(a.x,b.x),minY:Math.min(a.y,b.y),maxY:Math.max(a.y,b.y)}};
+  const clipOf=el=>{let r=null;for(let p=el;p&&p!==root;p=p.parentElement){const cr=clipPathRect(p);if(cr)r=meet(r,cr);if(p===el)continue;if(p.tagName.toLowerCase()==='svg'){const m=p.getCTM(),x=+p.getAttribute('x')||0,y=+p.getAttribute('y')||0,w=+p.getAttribute('width')||0,h=+p.getAttribute('height')||0;
+    const pm=p.parentElement.getCTM?.()||root.getCTM();const a=toP(pm,x,y),b=toP(pm,x+w,y+h);const c={minX:Math.min(a.x,b.x),maxX:Math.max(a.x,b.x),minY:Math.min(a.y,b.y),maxY:Math.max(a.y,b.y)};
+    r=r?{minX:Math.max(r.minX,c.minX),maxX:Math.min(r.maxX,c.maxX),minY:Math.max(r.minY,c.minY),maxY:Math.min(r.maxY,c.maxY)}:c}}return r};
+  const clipSeg=(a,b,r)=>{let t0=0,t1=1;const dx=b.x-a.x,dy=b.y-a.y;for(const [p,q] of [[-dx,a.x-r.minX],[dx,r.maxX-a.x],[-dy,a.y-r.minY],[dy,r.maxY-a.y]]){if(Math.abs(p)<1e-12){if(q<0)return null}else{const t=q/p;if(p<0){if(t>t1)return null;if(t>t0)t0=t}else{if(t<t0)return null;if(t<t1)t1=t}}}return [P(a.x+t0*dx,a.y+t0*dy),P(a.x+t1*dx,a.y+t1*dy)]};
+  const simplify=pts=>{if(pts.length<3)return pts;const keep=[pts[0]];for(let i=1;i<pts.length-1;i++){const a=keep.at(-1),b=pts[i],c=pts[i+1],L=Math.hypot(c.x-a.x,c.y-a.y)||1;if(Math.abs((c.x-a.x)*(a.y-b.y)-(a.x-b.x)*(c.y-a.y))/L>tol)keep.push(b)}keep.push(pts.at(-1));return keep};
+  const emitPoly=(pts,closed,style,clip)=>{
+   if(pts.length<2)return;
+   if(!clip){out.push(pts.length===2&&!closed?{type:'line',a:pts[0],b:pts[1],...style}:{type:'polyline',pts,closed,...style});return}
+   const seq=closed?[...pts,pts[0]]:pts;let run=[];
+   const flush=()=>{if(run.length>=2)out.push(run.length===2?{type:'line',a:run[0],b:run[1],...style}:{type:'polyline',pts:run,closed:false,...style});run=[]};
+   for(let i=1;i<seq.length;i++){const c=clipSeg(seq[i-1],seq[i],clip);if(!c){flush();continue}if(run.length&&Math.hypot(run.at(-1).x-c[0].x,run.at(-1).y-c[0].y)<1e-9)run.push(c[1]);else{flush();run=[c[0],c[1]]}if(c[1]!==seq[i]&&Math.hypot(c[1].x-seq[i].x,c[1].y-seq[i].y)>1e-9)flush()}flush();
+  };
+  const inside=(p,r)=>!r||(p.x>=r.minX-1e-9&&p.x<=r.maxX+1e-9&&p.y>=r.minY-1e-9&&p.y<=r.maxY+1e-9);
+  for(const el of root.querySelectorAll('line,polyline,polygon,path,rect,circle,ellipse,text')){
+   if(el.closest('defs,clipPath,mask,pattern,linearGradient,radialGradient'))continue;
+   const cs=getComputedStyle(el);if(cs.display==='none'||cs.visibility==='hidden')continue;
+   const m=el.getCTM();if(!m)continue;const clip=clipOf(el),scale=Math.hypot(m.a,m.b);
+   const stroke=hex(cs.stroke),fill=hex(cs.fill),sw=(parseFloat(cs.strokeWidth)||0)*scale;
+   const tag=el.tagName.toLowerCase();
+   if(tag==='text'){
+    const t=el.textContent.replace(/\s+/g,' ').trim();if(!t)continue;
+    const x=parseFloat(el.getAttribute('x'))||0,y=parseFloat(el.getAttribute('y'))||0,p=toP(m,x,y);if(!inside(p,clip))continue;
+    const fs=(parseFloat(cs.fontSize)||3)*scale,anchor=cs.textAnchor,w=t.length*fs*.55,px=anchor==='middle'?p.x-w/2:anchor==='end'?p.x-w:p.x;
+    out.push({type:'text',p:P(px,p.y),text:t,h:+(fs*.72).toFixed(3),rotation:+(-Math.atan2(m.b,m.a)*180/Math.PI).toFixed(4),color:fill||'#000000',fontFamily:'Arial',...(cs.fontWeight>=600||cs.fontWeight==='bold'?{bold:true}:{})});continue;
+   }
+   let pts=[],closed=false;
+   if(tag==='line')pts=[[+el.getAttribute('x1'),+el.getAttribute('y1')],[+el.getAttribute('x2'),+el.getAttribute('y2')]];
+   else if(tag==='polyline'||tag==='polygon'){pts=String(el.getAttribute('points')||'').trim().split(/[\s,]+/).map(Number).reduce((a,v,i,arr)=>(i%2?a:a.concat([[v,arr[i+1]]])),[]);closed=tag==='polygon'}
+   else if(tag==='rect'){const x=+el.getAttribute('x')||0,y=+el.getAttribute('y')||0,w=parseFloat(el.getAttribute('width'))||0,h=parseFloat(el.getAttribute('height'))||0;if(/%/.test(el.getAttribute('width')||''))continue;pts=[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];closed=true}
+   else{ // path, circle, ellipse: muestreo a lo largo de la curva y simplificación de tramos rectos
+    let len=0;try{len=el.getTotalLength()}catch(e){}if(!(len>0))continue;
+    const d=el.getAttribute('d')||'',subs=tag==='path'?d.split(/(?=[Mm])/).filter(x=>x.trim()):[d];
+    if(tag==='path'&&subs.length>1){ // varios subtrazos: cada uno por separado
+     for(const sub of subs){const tmp=document.createElementNS('http://www.w3.org/2000/svg','path');tmp.setAttribute('d',/^m/.test(sub.trim())?'M'+sub.trim().slice(1):sub);el.parentElement.append(tmp);
+      try{const L=tmp.getTotalLength(),n=Math.min(4000,Math.max(2,Math.ceil(L/(.4/scale))));const q=[];for(let i=0;i<=n;i++){const v=tmp.getPointAtLength(L*i/n);q.push(toP(m,v.x,v.y))}
+       const cl=/z\s*$/i.test(sub.trim());const sp=simplify(q);if(stroke&&sw>=0)emitPoly(cl?sp.slice(0,-1):sp,cl,{color:stroke,width:+Math.max(.05,sw).toFixed(3)},clip);if(fill&&cl&&sp.length>2)out.push({type:'hatch',pts:sp.slice(0,-1),hatchStyle:'solid',color:fill})}catch(e){}tmp.remove()}
+     continue;
+    }
+    const n=Math.min(4000,Math.max(2,Math.ceil(len/(.4/scale))));for(let i=0;i<=n;i++){const v=el.getPointAtLength(len*i/n);pts.push([v.x,v.y])}
+    closed=tag!=='path'||/z\s*$/i.test(d.trim());
+    pts=simplify(pts.map(([x,y])=>toP(m,x,y)));if(closed&&pts.length>2&&Math.hypot(pts[0].x-pts.at(-1).x,pts[0].y-pts.at(-1).y)<1e-6)pts.pop();
+    if(fill&&closed&&pts.length>2&&(!clip||pts.every(p=>inside(p,clip))))out.push({type:'hatch',pts,hatchStyle:'solid',color:fill});
+    if(stroke)emitPoly(pts,closed,{color:stroke,width:+Math.max(.05,sw).toFixed(3)},clip);
+    continue;
+   }
+   pts=pts.filter(p=>p.every(Number.isFinite)).map(([x,y])=>toP(m,x,y));
+   if(fill&&closed&&pts.length>2&&fill!=='#ffffff'&&(!clip||pts.every(p=>inside(p,clip))))out.push({type:'hatch',pts,hatchStyle:'solid',color:fill});
+   if(stroke)emitPoly(pts,closed,{color:stroke,width:+Math.max(.05,sw).toFixed(3)},clip);
+  }
+ }finally{host.remove()}
+ return out;
+}
+function cadLayoutDXF(){
+ const o=layoutPlotOptions(),svg=makeSVG(o);
+ const ents=cadSvgToPaperEntities(svg,o).filter(e=>e.type!=='hatch'||e.color!==String(o.paperColor||'#ffffff').toLowerCase());
+ const name=(cadLayouts?.[cadLayoutIdx]?.name||'Lamina').replace(/[\\/:*?"<>|]/g,'_'),lay=[{id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.18,linetype:'CONTINUOUS'}];
+ ents.forEach((e,i)=>{e.id=i+1;e.layer='0'});
+ const unit=state.unit;state.unit='mm';
+ try{return {name,count:ents.length,paper:{w:o.w,h:o.h},text:ents.length?buildDXFText(ents,state.file+' - '+name,lay):''}}finally{state.unit=unit}
+}
+function cadExportLayoutDXF(){
+ let r;try{r=cadLayoutDXF()}catch(e){return toast('No se pudo preparar la lámina: '+e.message)}
+ if(!r.count)return toast('La lámina está vacía');
+ download(`${state.file} - ${r.name}.dxf`,r.text,'application/dxf');
+ toast('Lámina «'+r.name+'» exportada a DXF en milímetros de papel (escala 1:1 de la hoja) · '+r.count+' objetos');log('EXPORTLAYOUT '+r.name+' · '+r.count);
+}
+window.CAD2D_LAYOUT_DXF=Object.freeze({build:()=>cadLayoutDXF()});
 function renderLayoutWorkspace(){
  if(cadActiveSpace!=='layout')return;
  try{
@@ -12128,7 +12210,8 @@ function initCadExportPopover(){
  const label=(title)=>{const e=document.createElement('div');e.className='cad-export-label';e.textContent=title;p.append(e)};
  const option=(name,detail,fn)=>{const b=document.createElement('button');b.type='button';b.className='cad-export-option';const left=document.createElement('strong');left.textContent=name;const right=document.createElement('small');right.textContent=detail;b.append(left,right);b.onclick=()=>{close();fn()};p.append(b)};
  label('Dibujo editable');
- option('Guardar .DXF','CAD 2D · 1:1',()=>exportDXF());
+ option('Guardar .DXF','Solo el modelo · CAD 2D · 1:1',()=>exportDXF());
+ option('Lámina activa → .DXF','Hoja tal como se imprime, en mm de papel',()=>cadExportLayoutDXF());
  option('Guardar .DWG','DWG · conversión local + .bak',()=>saveJSON(true,'dwg'));
  option('Carpeta de copias DWG .BAK','Autorizar ubicación una vez',()=>cadDwgChooseBakDir());
  option('Guardar proyecto .CADJSON','Edición en CAD2D',()=>saveJSON());

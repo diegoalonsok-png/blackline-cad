@@ -21,3 +21,8 @@ test('binary header, export command and button; presets; paper color in print di
  assert.match(html,/id="plotPaperColor" type="color"/);
  assert.equal((html.match(/cx\.fillStyle=o\.paperColor\|\|'#ffffff'/g)||[]).length,2,'PNG and JPG use the paper color');
 });
+test('active layout exports to DXF in paper millimetres, clipped like the printout',()=>{
+ assert.match(html,/function cadSvgToPaperEntities\(svgText,o\)/);assert.match(html,/const clipPathRect=p=>/);assert.match(html,/const clipSeg=\(a,b,r\)=>/);
+ assert.match(html,/state\.unit='mm';\n try\{return \{name,count:ents\.length/);
+ assert.match(html,/option\('Lámina activa → \.DXF','Hoja tal como se imprime, en mm de papel'/);assert.match(html,/\['EXPORTLAYOUT','EXPORTARLAMINA','LAMINADXF'\]/);
+});
