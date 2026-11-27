@@ -1,125 +1,145 @@
 {
   "total": 247,
-  "accepted": 239,
-  "changed": 29,
-  "review": 8,
+  "accepted": 61,
+  "changed": 41,
+  "review": 186,
   "special": 0,
   "errors": 0,
   "rows": [
     {
       "code": "T-M-025a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-M-025b",
-      "status": "corrected",
-      "moved": 1
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-028a",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-028b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-030a",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-030b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-030c",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-030d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-032a",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-032b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-032c",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-032d",
-      "status": "corrected",
-      "moved": 1
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-032e",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-035a",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-035b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-035c",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-035d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-035e",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-038a",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-038b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-038c",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-M-038d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-M-038e",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-1D-042a",
@@ -153,13 +173,13 @@
     },
     {
       "code": "T-1D-055a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 1
     },
     {
       "code": "T-1D-055b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 1
     },
     {
       "code": "T-1D-055c",
@@ -183,28 +203,28 @@
     },
     {
       "code": "T-1D-060c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 1
     },
     {
       "code": "T-1D-060d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 1
     },
     {
       "code": "T-1D-060e",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 1
     },
     {
       "code": "T-2D-055a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-055b",
       "status": "corrected",
-      "moved": 1
+      "moved": 2
     },
     {
       "code": "T-2D-060a",
@@ -238,23 +258,23 @@
     },
     {
       "code": "T-2D-070a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-070b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-070c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-070d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-070e",
@@ -263,23 +283,23 @@
     },
     {
       "code": "T-2D-075a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-075b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-075c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-075d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-075e",
@@ -288,68 +308,68 @@
     },
     {
       "code": "T-2D-080a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-080b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-080c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-080d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-085a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-085b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-085c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-085d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D-090a",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 3
     },
     {
       "code": "T-2D-090b",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 3
     },
     {
       "code": "T-2D-090c",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 3
     },
     {
       "code": "T-2D-090d",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 3
     },
     {
       "code": "T-2D-090e",
-      "status": "accepted",
-      "moved": 0
+      "status": "corrected",
+      "moved": 2
     },
     {
       "code": "T-2D2B-075a",
@@ -363,1104 +383,1547 @@
     },
     {
       "code": "T-2D2B-080a",
-      "status": "corrected",
-      "moved": 2
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-080b",
-      "status": "corrected",
-      "moved": 2
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-080c",
-      "status": "corrected",
-      "moved": 2
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-080d",
-      "status": "corrected",
-      "moved": 2
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-090a",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-090b",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-090c",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-090d",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-100a",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-100b",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-100c",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-100d",
       "status": "review",
       "issues": [
-        "s1: bañadera sin inodoro y bidet; rediseñar"
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
       ]
     },
     {
       "code": "T-2D2B-100e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-110a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-110b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-110c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-110d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D2B-110e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-100a",
-      "status": "corrected",
-      "moved": 4
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-100b",
-      "status": "corrected",
-      "moved": 4
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-100c",
-      "status": "corrected",
-      "moved": 4
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-100d",
-      "status": "corrected",
-      "moved": 4
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-110a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-110b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-110c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-110d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-120a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-120b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-120c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-120d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-130a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-130b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-130c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-130d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-140a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-140b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-140c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-140d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-140e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-150a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-150b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-150c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-150d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-130a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-130b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-130c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-130d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-150a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-150b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-150c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-150d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-150e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-165a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-165b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-165c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-165d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-165e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-180a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-180b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-180c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-180d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3DE-180e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-150a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-150b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-150c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-150d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-165a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-165b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-165c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-165d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-180a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-180b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-180c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-180d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-200a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-200b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-200c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-200d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-200e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-220a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-220b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-220c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-220d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-220e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-250a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-250b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-250c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-250d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-250e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-080a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-080b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-080c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-080d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-090a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-090b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-090c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-090d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-B-090e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-095a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-095b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-095c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-095d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-095e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-100a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-100b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-100c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-100d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-110a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-110b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-110c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-110d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-110e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-120a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-120b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-120c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-120d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-B-120e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-060a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-060b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-065a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-065b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-065c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-065d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-1D-L-065e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-075a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-075b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-080a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-080b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-080c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-080d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-090a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-090b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-090c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-090d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-L-090e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-100a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-100b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-110a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-110b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-110c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-110d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-110e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-120a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-120b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-120c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-120d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-120e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-130a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-130b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-130c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-130d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-L-130e",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-H-100a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-H-100b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-H-110a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-2D-H-110b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-125a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-125b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-135a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-135b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-150a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-3D-H-150b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-160a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-160b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-160c",
-      "status": "corrected",
-      "moved": 9
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-160d",
-      "status": "corrected",
-      "moved": 9
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-180a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-180b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-180c",
-      "status": "corrected",
-      "moved": 8
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-180d",
-      "status": "corrected",
-      "moved": 8
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-200a",
-      "status": "corrected",
-      "moved": 8
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-200b",
-      "status": "corrected",
-      "moved": 8
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-200c",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-200d",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-220a",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     },
     {
       "code": "T-4D-H-220b",
-      "status": "accepted",
-      "moved": 0
+      "status": "review",
+      "issues": [
+        "s1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b1: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+        "b2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+      ]
     }
   ],
   "catalogue": {
     "total": 67,
-    "accepted": 50,
-    "changed": 49,
-    "review": 9,
+    "accepted": 20,
+    "changed": 16,
+    "review": 39,
     "special": 8,
     "errors": 0,
     "rows": [
       {
         "code": "plan-001",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-008",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-010",
-        "status": "corrected",
-        "moved": 2
+        "status": "accepted",
+        "moved": 0
       },
       {
         "code": "plan-017",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-018",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-024",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-026",
         "status": "review",
         "issues": [
-          "mainupper: bañadera sin inodoro y bidet; rediseñar"
+          "mainupper: conjunto sanitario ausente o ambiguo",
+          "wc: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
         ]
       },
       {
         "code": "plan-027",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-028",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-029",
         "status": "review",
         "issues": [
-          "v0-room0: bañadera sin inodoro y bidet; rediseñar"
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
         ]
       },
       {
         "code": "plan-030",
-        "status": "accepted",
-        "moved": 0
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-035",
         "status": "review",
         "issues": [
-          "v0-room0: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
         ]
       },
       {
         "code": "plan-040",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-041",
-        "status": "corrected",
-        "moved": 2
+        "status": "accepted",
+        "moved": 0
       },
       {
         "code": "plan-042",
-        "status": "corrected",
-        "moved": 2
+        "status": "accepted",
+        "moved": 0
       },
       {
         "code": "plan-043",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-065",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-066",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-067",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-068",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-069",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-070",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-071",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-072",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-073",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-074",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-075",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-076",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-077",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-078",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-079",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-080",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-081",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-082",
         "status": "corrected",
-        "moved": 3
+        "moved": 5
       },
       {
         "code": "plan-083",
         "status": "corrected",
-        "moved": 3
+        "moved": 5
       },
       {
         "code": "plan-084",
         "status": "corrected",
-        "moved": 3
+        "moved": 5
       },
       {
         "code": "plan-085",
         "status": "corrected",
-        "moved": 3
+        "moved": 5
       },
       {
         "code": "plan-086",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "room6: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-087",
@@ -1471,8 +1934,10 @@
       },
       {
         "code": "plan-088",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "room6: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-089",
@@ -1497,87 +1962,113 @@
       },
       {
         "code": "plan-092",
-        "status": "corrected",
-        "moved": 4
+        "status": "review",
+        "issues": [
+          "room2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+          "room7: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-093",
-        "status": "corrected",
-        "moved": 4
+        "status": "review",
+        "issues": [
+          "room2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+          "room7: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-094",
-        "status": "corrected",
-        "moved": 4
+        "status": "review",
+        "issues": [
+          "room2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+          "room7: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-095",
-        "status": "corrected",
-        "moved": 4
+        "status": "review",
+        "issues": [
+          "room2: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño",
+          "room7: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-096",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-097",
-        "status": "corrected",
-        "moved": 2
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-098",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "bath: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-101",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-102",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-103",
         "status": "review",
         "issues": [
-          "v0-room0: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
         ]
       },
       {
         "code": "plan-104",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-105",
         "status": "corrected",
-        "moved": 1
+        "moved": 3
       },
       {
         "code": "plan-106",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-107",
         "status": "review",
         "issues": [
-          "v0-room0: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
         ]
       },
       {
         "code": "plan-108",
-        "status": "corrected",
-        "moved": 1
+        "status": "review",
+        "issues": [
+          "v0-room0: no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño"
+        ]
       },
       {
         "code": "plan-109",
-        "status": "corrected",
-        "moved": 1
+        "status": "accepted",
+        "moved": 0
       },
       {
         "code": "plan-166",
