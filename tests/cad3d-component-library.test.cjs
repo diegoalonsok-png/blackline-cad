@@ -99,3 +99,25 @@ test('remote photographic models must agree with catalogue type and orientation'
  await assert.rejects(ctx.cad3dFetchRemoteModel(spec),/Expected photographic/);
  assert.equal((await ctx.cad3dFetchRemoteModel({...spec,cutout:undefined})).meshVertices.length,9);
 });
+
+
+test('large gallery renders at most 48 cards per page and clamps page bounds',()=>{
+ const start=source.indexOf('function cad3dGalleryPageSlice');
+ const end=source.indexOf('var cad3dPreviewCache',start);
+ assert(start>=0&&end>start);
+ const ctx={};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ const ids=Array.from({length:10000},(_,i)=>'asset-'+i);
+ assert.equal(ctx.cad3dGalleryPageSlice(ids,0).ids.length,48);
+ const last=ctx.cad3dGalleryPageSlice(ids,9999);
+ assert.equal(last.index,208);assert.equal(last.ids.length,16);
+ assert.equal(last.ids[15],'asset-9999');
+ assert.equal(ctx.cad3dGalleryPageSlice(ids,-3).index,0);
+ assert.equal(ctx.cad3dGalleryPageSlice([],4).ids.length,0);
+ assert.equal(ctx.cad3dGalleryPageSlice([],4).pages,1);
+ assert.equal(ctx.cad3dGalleryRank({quality:'realistic'}),0);
+ assert.equal(ctx.cad3dGalleryRank({quality:'semirealistic'}),1);
+ assert.equal(ctx.cad3dGalleryRank({detail:true}),2);
+ assert.equal(ctx.cad3dGalleryRank({}),3);
+ assert(source.includes('page.ids.map(function(id)'));
+ assert(source.includes('cad3dGalleryPage=0;cad3dBlockCatalogItems()'));
+});
