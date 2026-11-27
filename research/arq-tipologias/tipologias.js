@@ -190,7 +190,7 @@ function furnish(house) {
       let pair = false;
       if (full && cw * cd > 4.6) {
         const wc = require('./blocks.js').item('san-wc'), bd = require('./blocks.js').item('san-bidet');
-        for (const side of ['W']) {
+        for (const side of ['W', 'E', 'N', 'S']) {
           const L = side === 'W' || side === 'E' ? cd : cw;
           for (const order of [[wc, bd], [bd, wc]]) {
             if (pair) break;
@@ -198,7 +198,7 @@ function furnish(house) {
               const save = F.snap(), a = order[0], b = order[1];
               const fp = fpOf(r, side, a.w, a.d, t), use = frontOf(fp, side, 0.5, 0.1);
               const next = fpOf(r, side, b.w, b.d, t + a.w + 0.25), nextUse = frontOf(next, side, 0.5, 0.1);
-              if (!F.free(fp, use) || F.underWindow(fp, side) || F.underWindow(next, side)) continue;
+              if (!F.free(fp, use) || !F.privateFixture(fp, side) || !F.privateFixture(next, side) || F.underWindow(fp, side) || F.underWindow(next, side)) continue;
               F.commit(a.id, a.w, a.d, fp, side, use);
               if (F.free(next, nextUse)) { F.commit(b.id, b.w, b.d, next, side, nextUse); pair = true; break; }
               F.undo(save);
@@ -208,7 +208,7 @@ function furnish(house) {
         }
         need(pair, 'par inodoro + bidé sobre misma pared; revisar distribución si no cabe');
       }
-      if (!pair) need(F.wall('san-wc', { use: 0.5, useSides: 0.15, sides: ['W'], noWindow: true }), 'inodoro en pared izquierda');
+      if (!pair) need(F.wall('san-wc', { use: 0.5, useSides: 0.15, sides: ['W','E','N','S'], privacy: true, noWindow: true, score: (fp,s) => s==='W'?10:0 }), 'inodoro fuera de vista frontal');
       need(F.wall(full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 'san-lav2' : 'san-lav', { w: full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 1.2 : 0.6, use: 0.55 }) || F.wall('san-lav-pie', { use: 0.5 }), 'lavatorio');
     } else if (r.type === 'lav') {
       need(F.wall('kq-lavarropas', { use: 0.6 }), 'lavarropas'); F.wall('kq-pileta', { use: 0.5 }); F.wall('kq-termo', { use: 0.3 });
