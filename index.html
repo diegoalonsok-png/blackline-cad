@@ -2789,6 +2789,7 @@ function cadSetWindowDepth(ref,meters){
  updateAll();return {ok:true,depth};
 }
 function blockInstanceGeometry(definition,ref){
+ if(definition?.dyn&&window.CAD2D_DYNBLOCK)return CAD2D_DYNBLOCK.apply(definition,ref);
  const dyn=blDynDimensions(definition,ref);
  if(dyn){
   const {b,width,height}=dyn,sx=width/b.width,sy=height/b.height;
@@ -2881,7 +2882,7 @@ function cadDetailedArqOpening(ref){
 }
 function cadGenericBlockGrips(ref){
  const def=state.blocks?.[ref.blockName];
- if(!def||def.dynamicActions===false||cadDetailedArqOpening(ref)||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
+ if(!def||def.dyn||def.dynamicActions===false||cadDetailedArqOpening(ref)||['swing-door','double-door','framed-window'].includes(def.parametric?.kind))return [];
  return [
   ...(()=>{
    // On the block itself, as in desktop CAD: rotate dot at the top-right corner, flip arrow under
@@ -3193,7 +3194,7 @@ let cadDrawEpoch=0;const cadChildCache=new WeakMap();
 const cadDefSigCache=new WeakMap();
 function cadDefSig(def){
  if(!def)return '';const c=cadDefSigCache.get(def);if(c&&c.epoch===cadDrawEpoch)return c.sig;
- let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.libraryLayer0,def.preserveLayers,def.arq,state.unit])}catch(e){sig=String(Math.random())}
+ let sig;try{sig=JSON.stringify([def.entities,def.base,def.parametric,def.dynamic2d,def.dyn,def.libraryLayer0,def.preserveLayers,def.arq,state.unit])}catch(e){sig=String(Math.random())}
  cadDefSigCache.set(def,{epoch:cadDrawEpoch,sig});return sig;
 }
 function cadBlockChildrenCached(ref){
@@ -10016,11 +10017,12 @@ function cadEditBlockDefinition(name){
  state.history=[];state.future=[];state.selected=[];setTool('select');
  const bar=document.createElement('div');bar.id='cadBlockEditBar';
  bar.innerHTML='<span class="t">BLOCK EDITOR · <b></b> · <i></i></span><button type="button" class="btn" data-a="base">'+(cad2dAliasLanguage==='es'?'Punto base':'Base point')+'</button><button type="button" class="btn primary" data-a="save">✓ Save block</button><button type="button" class="btn" data-a="cancel">✕ Close without saving</button>';
- bar.querySelector('b').textContent=name;bar.querySelector('i').textContent=copies===1?'1 copy in the drawing':copies+' copies in the drawing';
+ bar.querySelector('b').textContent=name;bar.querySelector('b').setAttribute('data-no-cad-translate','');bar.querySelector('i').textContent=copies===1?'1 copy in the drawing':copies+' copies in the drawing';
  bar.style.cssText='position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:45;display:flex;gap:10px;align-items:center;padding:8px 10px 8px 16px;border-radius:999px;background:#2a2112;border:1.5px solid #d4a748;color:#f3e3bf;box-shadow:0 10px 26px #0009;font:13px system-ui,sans-serif;white-space:nowrap';
  bar.addEventListener('click',e=>{const a=e.target.closest('[data-a]')?.dataset.a;if(a==='base')cadBlockEditPickBase();if(a==='save')cadBlockEditClose(true);if(a==='cancel')cadBlockEditClose(false)});
  for(const ev of ['pointerdown','wheel'])bar.addEventListener(ev,e=>e.stopPropagation());
  wrap.append(bar);wrap.classList.add('cad-block-editing');
+ window.CAD2D_DYNBLOCK?.onOpen();
  zoomExtents();updateAll();log('BEDIT '+name);
  toast('Block editor: edit with any tool, then “Save block” (or type BSAVE). Esc does not close it.');
 }
@@ -10035,8 +10037,9 @@ function cadBlockEditPickBase(){
 function cadBlockEditClose(save){
  const job=cadBlockEdit;if(!job)return;
  job.cancelBasePick?.();
- let entities=null,dropped=0;
+ let entities=null,dropped=0,dynOut;
  if(save){
+  dynOut=window.CAD2D_DYNBLOCK?.onSave(job.newBase);
   const usable=state.entities.filter(e=>['line','polyline','rect','circle','arc','ellipse','text','dimension'].includes(e.type));
   dropped=state.entities.length-usable.length;
   if(!usable.length)return toast('The block cannot be empty: draw something or close without saving');
@@ -10047,13 +10050,15 @@ function cadBlockEditClose(save){
  if(save){
   const def=state.blocks[job.name];saveHistory();
   if(job.newBase){const b=job.newBase;for(const ref of state.entities){if(ref.type!=='blockRef'||ref.blockName!==job.name)continue;const x=b.x*(ref.flipBlockX?-1:1),y=b.y*(ref.flipOpeningSide?-1:1),k=Number(ref.scale)||1,a=(Number(ref.rotation)||0)*Math.PI/180;ref.p=add(ref.p,P(k*(x*Math.cos(a)-y*Math.sin(a)),k*(x*Math.sin(a)+y*Math.cos(a))))}}
-  def.entities=entities;
+  def.entities=entities;delete def.__new;
+  if(dynOut!==undefined){if(dynOut)def.dyn=dynOut;else delete def.dyn}
   // Un bloque dinámico editado a mano pasa a ser propio: ya no se regenera al estirarlo.
   if(def.arq){delete def.arq;def.custom=true}
   renderBlockLibrary();queueLocalBackup();
   toast('Block saved: '+job.name+' · '+job.copies+(job.copies===1?' copy updated':' copies updated')+(dropped?' · '+dropped+' unsupported object(s) left out':'')+' · Ctrl+Z undoes');
   log('BSAVE '+job.name);
- }else toast('Block editor closed without changes');
+ }else{toast('Block editor closed without changes');if(state.blocks[job.name]?.__new)delete state.blocks[job.name]}
+ window.CAD2D_DYNBLOCK?.onClose();
  updateAll();
 }
 function openCadContextMenu(x,y,worldPoint){
@@ -10270,7 +10275,7 @@ function initAdjustableChrome(){
 })();
 function renderBlockLibrary(){
  const sel=$('blockLibrary');if(!sel)return;const previous=sel.value;
- const names=Object.keys(state.blocks||{}).sort(),signature=JSON.stringify(names);
+ const names=Object.keys(state.blocks||{}).filter(n=>!n.startsWith('__PRUEBA_')).sort(),signature=JSON.stringify(names);
  if(sel.dataset.blockSignature!==signature){
   sel.dataset.blockSignature=signature;sel.replaceChildren();
   const start=document.createElement('option');start.value='';start.textContent='Choose block...';sel.append(start);
@@ -12540,6 +12545,7 @@ window.CAD2D_CORE=Object.freeze({
  get state(){return state},get canvas(){return canvas},zoomShortcut:cadZoomShortcut,get ctx(){return ctx},U,
  perfFrames:()=>cadPerfFrames.slice(),
  dxf:Object.freeze({build:(entities,name,layers)=>buildDXFText(entities,name,layers),parse:(text,opts={})=>importDXF(text,'',{...opts,parseOnly:true})}),
+ blockEdit:()=>cadBlockEdit,editBlock:name=>cadEditBlockDefinition(name),
  P,dist,clone,world,screen,pick,snapPoint,layerFor,boundsEntity,getBounds,getVertices,blockChildren,
  saveHistory,updateAll,updateProps,schedule,toast,log,setTool,undo,redo,zoomExtents,finishStage,cancelCadCommand,
  normalizeBlockEntities,cadPrepareDynamicBlock,blDynEligible,renderBlockLibrary,queueLocalBackup,
@@ -12852,7 +12858,8 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dxf-parser.js?v=20261126-layouts7"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
-<script src="cad-comandos-plus.js?v=20261126-comandos4"></script>
+<script src="cad-comandos-plus.js?v=20261127-comandos5"></script>
+<script src="cad-bloques-dinamicos.js?v=20261127-bloques1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261126-usercad4"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>

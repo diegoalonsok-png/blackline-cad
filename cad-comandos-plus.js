@@ -437,5 +437,5 @@ EXT.context.push(({item,active,count})=>{
  }
  return out;
 });
-window.CAD2D_PLUS=Object.freeze({calc,catmull,commands:Object.keys(C)});
+window.CAD2D_PLUS=Object.freeze({calc,catmull,pick,commands:Object.keys(C)});
 })();
