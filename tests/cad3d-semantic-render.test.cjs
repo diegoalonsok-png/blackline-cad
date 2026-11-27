@@ -43,3 +43,43 @@ test('semantic panel uses local model, explicit learning and no remote service',
  for(const k of ['ai.predict','ai.train','localStorage.setItem','data-semantic-export','data-semantic-import','studioWarp'])assert(section.includes(k));
  assert(!/fetch\(|Authorization|apiKey|CAD2D_PLAN/.test(section));
 });
+
+
+test('recursive practice refuses to train on insufficient approved examples',()=>{
+ const r=ai.practice(empty,undefined,0);
+ assert.equal(r.accepted,false);assert.equal(r.reason,'insufficient');
+ assert.deepEqual(r.calibration,ai.calibration());
+});
+test('recursive calibration cannot promote a worse held-out error',()=>{
+ let data=empty;
+ for(let i=0;i<12;i++){
+  const prompt='acuarela suave fachada variante'+i,sc={...scene,sky:.1+i*.05};
+  const settings={...ai.predict(prompt,sc,'acuarela',empty).settings,grain:95,shadow:15};
+  data=ai.train(data,prompt,sc,'acuarela',settings);
+ }
+ const before=JSON.stringify(data);let c=ai.calibration();
+ for(let i=0;i<3;i++){
+  const r=ai.practice(data,c,i);
+  assert.equal(r.groups,12);assert(r.holdout>0);
+  if(r.accepted)assert(r.after<r.before);else assert.deepEqual(r.calibration,c);
+  c=r.calibration;
+ }
+ assert.equal(JSON.stringify(data),before,'never generate new training labels');
+ assert.throws(()=>ai.calibration({strength:999,bandwidth:1,neighbors:3}));
+});
+test('practice worker runs actual bounded artistic raster and contour checks locally',()=>{
+ const worker=fs.readFileSync('assets/cad3d-semantic-practice-worker.js','utf8');
+ let result;
+ const ctx={self:{BlacklineCroquisStudio:engine,postMessage:r=>{result=r;}},importScripts:()=>{}};
+ vm.runInNewContext(worker,ctx);
+ ctx.self.onmessage({data:{dataset:empty,calibration:ai.calibration(),pass:0}});
+ assert.equal(result.ok,true,result.error);
+ assert.equal(result.checks.length,3);
+ assert(result.checks.every(c=>c.pixels===96*64&&c.contrast>=8));
+ assert(!/fetch\(|Authorization|apiKey/.test(worker));
+});
+test('background practice is capped and terminates when hidden',()=>{
+ const lab=fs.readFileSync('cad3d-lab.js','utf8');
+ const section=lab.slice(lab.indexOf('function cad3dInitSemanticRender'),lab.indexOf('function cad3dInitSketchCapture'));
+ for(const k of ['new Worker','worker.terminate','round>=3','document.hidden','visibilitychange','revision','20000'])assert(section.includes(k));
+});
