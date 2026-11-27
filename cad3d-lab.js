@@ -2543,7 +2543,7 @@ function cad3dCutoutTexture(kind,id){
 }
 
 
-var activeCAD3DBlock='chair',cad3dRemoteMesh=null,cad3dRemoteCatalogue=null,cad3dRemoteEpoch=0;
+var activeCAD3DBlock='chair',cad3dRemoteCatalogue=null,cad3dRemoteEpoch=0,cad3dRemotePending=false;
 var CAD3D_LIBRARY_ROOT=new URL('assets/3d-object-library/v1/',document.baseURI);
 function cad3dSafeLibraryFile(name,ext){return typeof name==='string'&&/^[a-z0-9-]+\.[a-z0-9]+$/i.test(name)&&name.toLowerCase().endsWith('.'+ext);}
 async function cad3dLoadRemoteCatalogue(){
@@ -2555,10 +2555,16 @@ async function cad3dLoadRemoteCatalogue(){
   data.items.slice(0,10000).forEach(function(v){
    if(!v||!/^cloud-[a-z0-9-]{1,80}$/.test(v.id)||!cad3dSafeLibraryFile(v.model,'json')||!['svg','png','webp','jpg'].some(ext=>cad3dSafeLibraryFile(v.thumb,ext))||![v.w,v.d,v.h].every(n=>Number.isFinite(n)&&n>=.001&&n<=1000))return;
    CAD3D_COMPONENTS[v.id]={name:String(v.name||v.id).slice(0,100),group:String(v.group||'Objetos').slice(0,60),w:v.w,d:v.d,h:v.h,parts:[],remote:true,model:v.model,thumb:v.thumb};
+   if(/^detail-[a-z0-9-]+$/.test(v.replaces||'')&&CAD3D_COMPONENTS[v.replaces]?.detail)CAD3D_COMPONENTS[v.replaces].superseded=true;
   });
   return true;
  })().catch(err=>{cad3dRemoteCatalogue=null;return false});
  return cad3dRemoteCatalogue;
+}
+function cad3dValidateRemoteParts(data){
+ if(!data||data.version!==2||![data.w,data.d,data.h].every(n=>Number.isFinite(n)&&n>=.001&&n<=1000)||!Array.isArray(data.parts)||!data.parts.length||data.parts.length>100)throw Error('Modelo detallado inválido');
+ var parts=data.parts.map(p=>{if(!Array.isArray(p)||p.length!==8||!p.every(Number.isFinite)||!p.slice(3,6).every(n=>n>0)||!Number.isInteger(p[6])||p[6]<0||p[6]>0xffffff||p[7]<0||p[7]>Math.min(...p.slice(3,6)))throw Error('Pieza 3D inválida');if(Math.abs(p[0])+p[3]/2>data.w/2+.001||Math.abs(p[1])+p[4]/2>data.d/2+.001||p[2]<0||p[2]+p[5]>data.h+.001)throw Error('Pieza fuera de dimensiones');return p.slice();});
+ return {version:2,w:data.w,d:data.d,h:data.h,parts,detail:true,name:String(data.name||'Modelo 3D').slice(0,100)};
 }
 async function cad3dFetchRemoteModel(spec){
  var res=await fetch(new URL(spec.model,CAD3D_LIBRARY_ROOT),{cache:'no-store',signal:AbortSignal.timeout(20000)});
@@ -2566,6 +2572,7 @@ async function cad3dFetchRemoteModel(spec){
  if(Number(res.headers.get('content-length'))>18000000)throw Error('Modelo mayor a 18 MB');
  var raw=await res.text();if(raw.length>18000000)throw Error('Modelo mayor a 18 MB');
  var data=JSON.parse(raw),p=data.meshVertices;
+ if(data.version===2){var detail=cad3dValidateRemoteParts(data);if(['w','d','h'].some(k=>Math.abs(detail[k]-spec[k])>.001))throw Error('Dimensiones de catálogo inconsistentes');return {detail};}
  if(data.version!==1||!Array.isArray(p)||!p.length||p.length%9||p.length>1080000||!p.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Geometría 3D inválida');
  return {meshVertices:p,materialColor:/^#[0-9a-f]{6}$/i.test(data.materialColor||'')?data.materialColor:'#b6bdc0'};
 }
@@ -2963,7 +2970,7 @@ function cad3dBuildImportedMesh(r,group){
 }
 
 function buildCAD3DBlock(record,group){
- var def=CAD3D_COMPONENTS[record.blockId];if(!def)return;
+ var def=record.detailSpec||CAD3D_COMPONENTS[record.blockId];if(!def)return;
  var sx=record.w/def.w,sy=record.d/def.d,sz=record.h/def.h;
  if(def.cutout){
   /* 2.5D block: a cut-out drawing on crossed vertical planes (vegetation) or on a
@@ -5230,13 +5237,7 @@ function build(){
   if(category){cad3dBlockCategory=category.dataset.blockCategory;cad3dRefreshBlockCatalog();return;}
   var button=e.target.closest('[data-3d-block]');if(!button)return;
   var id=button.dataset['3dBlock'];if(!CAD3D_COMPONENTS[id])return;
-  var spec=CAD3D_COMPONENTS[id],epoch=++cad3dRemoteEpoch;cad3dRemoteMesh=null;
-  if(spec.remote){
-   button.disabled=true;text('Descargando '+spec.name+'…');
-   try{var mesh=await cad3dFetchRemoteModel(spec);if(epoch!==cad3dRemoteEpoch||!objectMenu.open)return;cad3dRemoteMesh=mesh;}
-   catch(err){if(epoch===cad3dRemoteEpoch)text('Error: '+err.message);return;}
-   finally{button.disabled=false;}
-  }
+  var spec=CAD3D_COMPONENTS[id];
   activeCAD3DBlock=id;setPlacement('block3d');objectMenu.open=false;
   text('Bloque '+spec.name+' · clic para colocarlo');
  });
@@ -5839,6 +5840,7 @@ function setPlacement(which){
   cad3dMaterialPaint=false;cad3dMaterialRender();
  }
  if(which)cad3dEndZoom();
+ cad3dRemoteEpoch++;cad3dRemotePending=false;
  placing=which;firstPoint=null;cursorPoint=null;cad3dDraftProfile=[];
  if(which){
   // All placement commands, including hosted doors/windows, own the left click.
@@ -6264,8 +6266,8 @@ function fallbackDraw(){
    architectureParts(rec,function(w,d,h,x,y,z,color,slope){
     fallbackBox(projection,rec,w,d,h,x,y,z,'#'+color.toString(16).padStart(6,'0'),slope);
    });
-  }else if(wire&&rec.type==='block3d'&&CAD3D_COMPONENTS[rec.blockId]?.parts){
-   var def=CAD3D_COMPONENTS[rec.blockId],sx=rec.w/def.w,sy=rec.d/def.d,sz=rec.h/def.h;
+  }else if(wire&&rec.type==='block3d'&&(rec.detailSpec||CAD3D_COMPONENTS[rec.blockId])?.parts){
+   var def=rec.detailSpec||CAD3D_COMPONENTS[rec.blockId],sx=rec.w/def.w,sy=rec.d/def.d,sz=rec.h/def.h;
    def.parts.forEach(function(part){
     fallbackBox(projection,rec,part[3]*sx,part[4]*sy,part[5]*sz,part[0]*sx,part[1]*sy,part[2]*sz);
    });
@@ -7064,9 +7066,16 @@ function placePoint(pt){
  }else if(kind==='block3d'){
   var spec=CAD3D_COMPONENTS[activeCAD3DBlock];if(!spec)return;
   if(spec.remote){
-   if(!cad3dRemoteMesh)return text('Seleccioná el modelo desde Gallery 3D');
-   rec=newRecord('imported3d');
-   Object.assign(rec,{name:spec.name,meshVertices:cad3dRemoteMesh.meshVertices,materialColor:cad3dRemoteMesh.materialColor,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
+   if(cad3dRemotePending)return;
+   cad3dRemotePending=true;var epoch=++cad3dRemoteEpoch,blockId=activeCAD3DBlock,location={x:pt.x,y:pt.y};
+   text('Descargando '+spec.name+' para insertar…');
+   cad3dFetchRemoteModel(spec).then(function(mesh){
+    if(epoch!==cad3dRemoteEpoch||placing!=='block3d'||activeCAD3DBlock!==blockId)return;
+    cad3dHistoryStart();var obj=newRecord(mesh.detail?'block3d':'imported3d');
+    Object.assign(obj,{name:spec.name,x:location.x,y:location.y,z:0,w:spec.w,d:spec.d,h:spec.h});
+    if(mesh.detail)Object.assign(obj,{blockId,detailSpec:mesh.detail});else Object.assign(obj,{meshVertices:mesh.meshVertices,materialColor:mesh.materialColor});
+    records.push(obj);selected=[obj.id];redraw();renderProps();setPlacement(null);cad3dHistoryCapture();text(spec.name+' · insertado');
+   }).catch(function(err){if(epoch===cad3dRemoteEpoch)text('No se pudo insertar: '+err.message+' · clic para reintentar');}).finally(function(){if(epoch===cad3dRemoteEpoch)cad3dRemotePending=false;});return;
   }else{
    rec=newRecord('block3d');
    Object.assign(rec,{blockId:activeCAD3DBlock,x:pt.x,y:pt.y,z:0,w:spec.w,d:spec.d,h:spec.h});
@@ -9275,7 +9284,7 @@ function renderProps(){
  if(!focus&&r.type==='profile2d')html+='<div class="detail">2D PROFILE: '+escapeHtml(r.name||'Profile')+
   ' · '+(r.profileClosed?'Closed':'Open')+' · '+(r.profilePoints||[]).length+' vertices'+
   (r.extrudedHeight?' · extruded '+r.extrudedHeight+' m':'')+'</div>';
- if(!focus&&r.type==='block3d')html+='<div class="detail">3D Block: '+escapeHtml(CAD3D_COMPONENTS[r.blockId]?.name||r.blockId)+'</div>';
+ if(!focus&&r.type==='block3d')html+='<div class="detail">3D Block: '+escapeHtml(r.detailSpec?.name||CAD3D_COMPONENTS[r.blockId]?.name||r.blockId)+'</div>';
  if(!focus&&r.type==='imported3d')html+='<div class="detail"><strong>Imported model:</strong> '+escapeHtml(r.name||'3D mesh')+
  ' · '+Math.floor((r.meshVertices||[]).length/9)+' triangles</div>'+
  '<label>Model color <input type="color" data-object-color value="'+(r.materialColor||'#b6bdc0')+'"></label>';
@@ -11096,7 +11105,7 @@ async function readJSON(e){
     ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
-   if(r.type==='block3d')o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';
+   if(r.type==='block3d'){if(r.detailSpec){o.detailSpec=cad3dValidateRemoteParts(r.detailSpec);o.blockId=/^cloud-[a-z0-9-]{1,80}$/.test(r.blockId||'')?r.blockId:'chair';}else o.blockId=CAD3D_COMPONENTS[r.blockId]?r.blockId:'chair';}
    if(r.type==='stair'){
     o.stepCount=clamp(Math.round(finite(r.stepCount,16)),3,48);
     o.stairBuild=cad3dStairConstruction(r);o.stairLayout=cad3dStairLayout(r);o.innerRadius=clamp(finite(r.innerRadius,o.stairLayout==='spiral'?.10:1),.06,20);o.turnAngle=clamp(finite(r.turnAngle,o.stairLayout==='spiral'?360:90),30,720);o.clockwise=!!r.clockwise;o.landingDepth=clamp(finite(r.landingDepth,o.d),o.d,Math.max(o.d,5));o.stairGap=clamp(finite(r.stairGap,.12),0,2);o.treadThickness=clamp(finite(r.treadThickness,.05),.015,.30);o.waistThickness=clamp(finite(r.waistThickness,.18),.08,.40);
