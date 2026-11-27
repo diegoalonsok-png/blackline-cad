@@ -2739,11 +2739,68 @@ async function cad3dImportOCCT(file,ext){
  for(var i=0;i<idx.length;i+=3)faces.push([idx[i],idx[i+1],idx[i+2]]);
  cad3dImportTriangles(vertices,faces,file.name);
 }
+/* Read only the IFC4 tessellation subset emitted by Blackline, not general IFC.
+ * Reject unsupported geometry/placements before changing the current drawing. */
+function cad3dDecodeIFC(source){
+ if(typeof source!=='string'||source.length>18000000||!source.includes("FILE_DESCRIPTION(('Experimental tessellated exchange'),'2;1');")||!source.includes("FILE_SCHEMA(('IFC4'));"))throw Error('IFC import: only Blackline IFC4 tessellation files are supported at present');
+ const start=source.indexOf('\nDATA;\n'),end=source.lastIndexOf('\nENDSEC;');
+ if(start<0||end<=start||!source.trim().endsWith('END-ISO-10303-21;'))throw Error('IFC import: invalid DATA section');
+ const records=new Map();
+ for(const line of source.slice(start+7,end).split(/\r?\n/)){
+  if(!line.trim())continue;
+  const m=/^#(\d+)=([A-Z0-9]+)\((.*)\);$/.exec(line.trim());
+  if(!m||records.has(m[1])||records.size>=30000)throw Error('IFC import: invalid entity');
+  records.set(m[1],{type:m[2],args:m[3]});
+ }
+ function split(s){
+  const out=[];let quoted=false,depth=0,start=0;
+  for(let i=0;i<s.length;i++){const c=s[i];if(c==="'"){if(quoted&&s[i+1]==="'"){i++;continue;}quoted=!quoted;}else if(!quoted){if(c==='(')depth++;else if(c===')')depth--;else if(c===','&&depth===0){out.push(s.slice(start,i).trim());start=i+1;}if(depth<0)throw Error('IFC import: invalid list');}}
+  if(quoted||depth!==0)throw Error('IFC import: invalid arguments');out.push(s.slice(start).trim());return out;
+ }
+ function ref(v,type){if(!/^#\d+$/.test(v))throw Error('IFC import: invalid reference');const r=records.get(v.slice(1));if(!r||r.type!==type)throw Error('IFC import: unsupported '+type);return split(r.args);}
+ function list(v){if(!v?.startsWith('(')||!v.endsWith(')'))throw Error('IFC import: invalid aggregate');return split(v.slice(1,-1));}
+ function label(v){if(!v?.startsWith("'")||!v.endsWith("'"))return '';return v.slice(1,-1).replace(/''/g,"'").replace(/\\X([24])\\([0-9A-F]+)\\X0\\/g,(_,k,h)=>{const n=Number.parseInt(h,16);return h.length===(k==='2'?4:8)&&n<=0x10ffff?String.fromCodePoint(n):'�';}).slice(0,120);}
+ function value(s){if(!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:E[+-]?\d+)?$/i.test(s))throw Error('IFC import: invalid number');const n=Number(s);if(!Number.isFinite(n)||Math.abs(n)>1000000)throw Error('IFC import: coordinate out of range');return n;}
+ const units=[...records.values()].filter(r=>r.type==='IFCSIUNIT'&&r.args.includes('.LENGTHUNIT.'));
+ if(units.length!==1||units[0].args!=='*,.LENGTHUNIT.,$,.METRE.')throw Error('IFC import: only metres supported');
+ function identity(v){const p=ref(v,'IFCLOCALPLACEMENT');if(p.length!==2||p[0]!=='$')throw Error('IFC import: nested placements unsupported');const a=ref(p[1],'IFCAXIS2PLACEMENT3D');if(a.length!==3||a[1]!=='$'||a[2]!=='$'||list(ref(a[0],'IFCCARTESIANPOINT')[0]).map(value).some(x=>x!==0))throw Error('IFC import: nonidentity placement unsupported');}
+ const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCBUILDINGELEMENTPROXY:'Other'};
+ const items=[];let total=0;
+ for(const [id,r] of records){
+  if(!Object.prototype.hasOwnProperty.call(types,r.type))continue;
+  const a=split(r.args);if(a.length!==9)throw Error('IFC import: invalid product');identity(a[5]);
+  const shape=ref(a[6],'IFCPRODUCTDEFINITIONSHAPE'),reps=list(shape[2]);if(reps.length!==1)throw Error('IFC import: multiple representations unsupported');
+  const rep=ref(reps[0],'IFCSHAPEREPRESENTATION'),meshes=list(rep[3]);if(rep[2]!=="'Tessellation'"||meshes.length!==1)throw Error('IFC import: only single triangulated representation supported');
+  const m=ref(meshes[0],'IFCTRIANGULATEDFACESET');if(m.length!==5||m[1]!=='$'||m[4]!=='$')throw Error('IFC import: indexed normal maps unsupported');
+  const coords=list(ref(m[0],'IFCCARTESIANPOINTLIST3D')[0]);if(coords.length>360000)throw Error('IFC import: too many vertices');
+  const vertices=coords.map(v=>{const p=list(v).map(value);if(p.length!==3)throw Error('IFC import: invalid point');return p;});
+  const faces=list(m[3]);total+=faces.length;if(total>120000||items.length>=1000)throw Error('IFC import: geometry limit exceeded');
+  const triangles=faces.map(v=>{const inds=list(v).map(value);if(inds.length!==3||inds.some(n=>!Number.isInteger(n)||n<1||n>vertices.length))throw Error('IFC import: invalid triangle index');return inds.map(n=>vertices[n-1]);});
+  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,triangles});
+ }
+ const allMeshes=[...records.values()].filter(r=>r.type==='IFCTRIANGULATEDFACESET').length;
+ if(!items.length||allMeshes!==items.length)throw Error('IFC import: unsupported or unassigned geometry');
+ return items;
+}
+function cad3dImportIFC(source){
+ const items=cad3dDecodeIFC(source);
+ if(records.length+items.length>1000)throw Error('IFC import: model limit exceeded');
+ const planned=items.map(item=>{
+  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(const t of item.triangles)for(const p of t)for(let k=0;k<3;k++){min[k]=Math.min(min[k],p[k]);max[k]=Math.max(max[k],p[k]);}
+  const size=max.map((v,k)=>Math.max(.001,v-min[k])),origin=[(min[0]+max[0])/2,(min[1]+max[1])/2,min[2]];
+  if(size.some(v=>!Number.isFinite(v)||v>1000))throw Error('IFC import: unsupported object dimensions');
+  const meshVertices=item.triangles.flatMap(t=>t.flatMap(p=>p.map((v,k)=>(v-origin[k])/size[k])));
+  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
+ });
+ cad3dHistoryStart();const added=planned.map(p=>Object.assign(newRecord('imported3d'),p));records.push(...added);selected=added.map(r=>r.id);redraw();renderProps();text('IFC4 · '+added.length+' objects · Blackline tessellation subset; not parametric');
+}
 async function cad3dImportMeshFile(file){
  var name=file.name,ext=name.split('.').pop().toLowerCase();
  if(file.size>18000000)throw Error('Archivo mayor a 18 MB');
  if(ext==='max')throw Error('MAX es el formato nativo de 3ds Max. Exportá desde 3ds Max a 3DS, OBJ o GLB. No es lo mismo que 3DS.');
- if(ext==='ifc'||ext==='rvt')throw Error('IFC/RVT: todavía no hay importador BIM nativo. Convertí a STEP, OBJ o GLB para geometría solamente.');
+ if(ext==='ifc')return cad3dImportIFC(await file.text());
+ if(ext==='rvt')throw Error('RVT: native import not supported. Export STEP, OBJ or GLB for geometry only.');
  if(['step','stp','iges','igs','brep','brp'].includes(ext))return cad3dImportOCCT(file,ext);
  if(ext==='obj')return cad3dImportOBJ(await file.text(),name);
  if(ext==='3ds')return cad3dParse3DS(await file.arrayBuffer(),name);
@@ -4790,7 +4847,7 @@ function build(){
  '<button type="button" class="btn" data-solid-command="subtract" title="Subtract: select slab first, then a through-cutting box, cylinder or extruded profile; also supports two unrotated boxes">'+ico('subtract')+'<span>Subtract</span></button>'+
  '<button type="button" class="btn" data-solid-command="intersect" title="Intersection of two unrotated box solids">'+ico('intersect')+'<span>Intersect</span></button>'+
  '</div>'+
- '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label>'+cad3DBlockCatalog()+'<button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Architecture · Muros, puertas, ventanas, escaleras y vanos paramétricos" aria-label="Herramientas paramétricas de arquitectura">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>ARQ 3D</span></button>'+
+ '<div class="tools"><label class="btn" style="cursor:pointer" title="Import 3D · IFC4 (Blackline subset), STEP, IGES, BREP, 3DS, OBJ, STL, OFF, PLY, GLB, glTF" aria-label="Import 3D">'+ico('folder')+'<span>Import 3D</span><input class="cad3dOBJInput" type="file" accept=".ifc,.step,.stp,.iges,.igs,.brep,.brp,.3ds,.obj,.stl,.off,.ply,.glb,.gltf" hidden></label>'+cad3DBlockCatalog()+'<button type="button" class="btn archLaunch" aria-controls="cad3dArchPalette" aria-expanded="false" title="Architecture · Muros, puertas, ventanas, escaleras y vanos paramétricos" aria-label="Herramientas paramétricas de arquitectura">'+'<svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h12v22H3z" stroke="#e9f2f7" stroke-width="2"/><path d="M6 8h6v16H6z" stroke="#75b5d0" stroke-width="1.3"/><circle cx="12.7" cy="17" r="1" fill="#e9f2f7"/><path d="M18 5h11v22H18zM23.5 5v22M18 16h11" stroke="#e9f2f7" stroke-width="2"/><path d="M20 8h7v6h-7M20 18h7v7h-7" stroke="#83cfed" stroke-width="1.2"/></svg>'+'<span>ARQ 3D</span></button>'+
  
  '<div class="sunControl"><button type="button" class="btn sunLaunch" aria-controls="cad3dSunPanel" aria-expanded="false" title="Sun and shadows">'+ico('sun')+'<span>Sol / Entorno</span></button>'+
  '<div class="sunPanel" id="cad3dSunPanel" hidden>'+ 
@@ -8880,7 +8937,7 @@ function cad3dBimInventory(format='csv'){
  const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
  const n=v=>Number.isFinite(v)?v:null, out=[];
  for(const r of records){
-  const layer=layerForRecord(r),cls=r.type==='slab'&&r.slabKind==='roof'?'Roof':types[r.type]||'Other';
+  const layer=layerForRecord(r),cls=r.type==='slab'&&r.slabKind==='roof'?'Roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass:types[r.type]||'Other';
   const id='3D:'+r.id;
   out.push({id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
   for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
@@ -10554,7 +10611,7 @@ function cad3dEncodeIFC(items,randomBytes){
 function exportIFC(){
  if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
  try{
-  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,triangles:[]}]));
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,triangles:[]}]));
   let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
   const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
   download('CAD2D3D-model.ifc',content,'application/x-step');
@@ -10794,6 +10851,8 @@ async function readJSON(e){
    if(r.type==='imported3d'){
     if(!Array.isArray(r.meshVertices)||!r.meshVertices.length||r.meshVertices.length>1080000||r.meshVertices.length%9||!r.meshVertices.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Malla 3D guardada inválida');
     o.meshVertices=r.meshVertices.slice();o.name=String(r.name||'Imported model').slice(0,120);
+    if(['Wall','Slab','Roof','Stair','Railing','Column','Beam','Other'].includes(r.ifcClass))o.ifcClass=r.ifcClass;
+    if(typeof r.ifcGuid==='string'&&/^[0-3][A-Za-z0-9_$]{21}$/.test(r.ifcGuid))o.ifcGuid=r.ifcGuid;
     ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
