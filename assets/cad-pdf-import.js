@@ -399,16 +399,25 @@ function combineTraceCandidates(groups){
  return result;
 }
 
+// Prefer geometrically reviewed wall candidates to raw line-only readings.
+function calcopyPreferredReading(readings,best){
+ if(!readings||typeof readings!=='object')return null;
+ for(const k of ['metric','validated','mixed',best,'solid','lines']){
+  const list=readings[k];if(Array.isArray(list)&&list.length>0&&list.length<=250)return k;
+ }
+ return null;
+}
 function runPythonTrace(ctx,w,h,realWidth){
  return new Promise((resolve,reject)=>{
-  let worker=null,done=false;
+  let worker=null,done=false,timer=null;
   const dialog=document.createElement('dialog');
   dialog.style.cssText='background:#25282d;color:#e5eef7;border:1px solid #777;border-radius:12px;padding:20px;width:min(420px,90vw)';
   const title=document.createElement('h3');title.textContent='CALCOPY · Python';
   const status=document.createElement('p');status.textContent='Preparando el motor…';
   const cancel=document.createElement('button');cancel.className='btn';cancel.textContent=LX('Cancelar','Cancel');
-  const finish=(err,walls)=>{if(done)return;done=true;worker?.terminate();dialog.remove();if(err)reject(err);else resolve(walls);};
+  const finish=(err,walls)=>{if(done)return;done=true;clearTimeout(timer);worker?.terminate();dialog.remove();if(err)reject(err);else resolve(walls);};
   cancel.onclick=()=>finish(new Error('Procesamiento cancelado.'));
+  timer=setTimeout(()=>finish(new Error('Tiempo máximo de carga del motor semántico.')),45000);
   dialog.addEventListener('cancel',e=>{e.preventDefault();cancel.click();});
   dialog.append(title,status,cancel);document.body.append(dialog);dialog.showModal();
   try{
@@ -471,11 +480,11 @@ async function traceFile(file,source=null,python=false,brush=false){
    const height=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000:real*h/w;
    if(Math.abs((height/h)/(real/w)-1)>.03)throw Error('CALCOPY: la imagen tiene escalas X/Y distintas. Calibrala antes de continuar.');
    try{
-    if(brush)throw Error('Interactive brush mode: local geometry');
+    // CALCOPY also runs the semantic reader; brush is a correction tool.
     const res=await runPythonTrace(ctx,w,h,real);
     if(!res||!res.readings||!Array.isArray(res.readings.solid)||!Array.isArray(res.readings.lines))throw Error('Respuesta Python inválida');
     pyReadings=res.readings;initialRegions=Array.isArray(res.regions)?res.regions:[];floorGrids=Array.isArray(res.floor_grids)?res.floor_grids:[];doorCandidates=Array.isArray(res.doors)?res.doors:[];mode=res.best;
-    if(!Array.isArray(pyReadings[mode])||!pyReadings[mode].length){mode=Object.keys(pyReadings).find(k=>Array.isArray(pyReadings[k])&&pyReadings[k].length>0)||'solid';}
+    mode=calcopyPreferredReading(pyReadings,mode)||'solid';
     walls=assistWalls(pyReadings[mode]);
     if(!walls.length)throw Error('Python returned no wall candidates');
    }catch(e){
@@ -498,7 +507,7 @@ async function traceFile(file,source=null,python=false,brush=false){
   if(walls.length<3||walls.length>250){makeMask(170);const fine=traceFineWallBands(mask,w,h);if(fine.length&&fine.length<=250){walls=fine;hatched=true;mode='rayado fino';}}
   if(walls.length>250)walls=[];
   }
-  if(brush){pyReadings={...pyReadings,brush:[]};mode='brush';walls=[];}
+  if(brush)pyReadings={...pyReadings,brush:[]};
   C.log('CALCO: '+walls.length+LX(' candidatos · ',' candidates · ')+mode+LX('. Revisar antes de insertar.','. Review before inserting.'));
   // Preview uses the same line endpoints as insertion; nothing is modified until confirmed.
   const preview=document.createElement('canvas');preview.width=w;preview.height=h;const pc=preview.getContext('2d');pc.fillStyle='#f4efe3';pc.fillRect(0,0,w,h);pc.strokeStyle='#343e40';pc.lineWidth=1.5;pc.beginPath();
@@ -545,14 +554,14 @@ async function traceFile(file,source=null,python=false,brush=false){
     if(python&&tool.value==='rotate'){const {sx,sy}=blockScale();selectedBlock=placements.filter(b=>{const a=b.rotation*Math.PI/180,dx=(x-b.x)*sx,dy=-(y-b.y)*sy,u=dx*Math.cos(a)+dy*Math.sin(a),v=-dx*Math.sin(a)+dy*Math.cos(a);return u>=0&&v>=0&&u<=b.w&&v<=b.d;}).at(-1)||null;redraw();return;}
     if(python&&tool.value!=='toggle'&&!(tool.value==='block'&&it)){
      const pxPerM=w/(real*scaleF);
-     if(tool.value==='wall'){const A=AS.measureWall(G,x,y);const tl=walls.filter(q=>!q.skip).map(q=>q.t).sort((a,b)=>a-b),tmed=tl.length>2?tl[tl.length>>1]:0;if(A&&tmed&&A.t>2.4*tmed)return void(hint.textContent=LX('Eso parece un relleno o un mueble, no un muro (demasiado ancho). Tocá sobre el muro.','That looks like a fill or furniture, not a wall (too wide). Click on the wall.'));if(!A){hint.textContent=LX('No encontré un muro en ese punto. Tocá justo sobre el muro de la imagen.','No wall found at that point. Click right on the wall in the image.');return;}AS.snapEnds(A,walls);syncWall(A);walls.push(A);history.push(()=>walls.splice(walls.indexOf(A),1));hint.textContent=LX('Muro agregado: ','Wall added: ')+Math.round(A.t/pxPerM*100)+' cm × '+((A.hi-A.lo)/pxPerM).toFixed(2)+' m.';}
+     if(tool.value==='wall'){const A=AS.measureWall(G,x,y);if(A&&walls.some(q=>!q.skip&&q.v===A.v&&Math.abs(q.c-A.c)<=Math.max(2,Math.min(q.t,A.t)*.35)&&q.lo<=A.lo+2&&q.hi>=A.hi-2)){hint.textContent=LX('Este muro ya está marcado.','This wall is already marked.');return;}const tl=walls.filter(q=>!q.skip).map(q=>q.t).sort((a,b)=>a-b),tmed=tl.length>2?tl[tl.length>>1]:0;if(A&&tmed&&A.t>2.4*tmed)return void(hint.textContent=LX('Eso parece un relleno o un mueble, no un muro (demasiado ancho). Tocá sobre el muro.','That looks like a fill or furniture, not a wall (too wide). Click on the wall.'));if(!A){hint.textContent=LX('No encontré un muro en ese punto. Tocá justo sobre el muro de la imagen.','No wall found at that point. Click right on the wall in the image.');return;}AS.snapEnds(A,walls);syncWall(A);walls.push(A);history.push(()=>walls.splice(walls.indexOf(A),1));hint.textContent=LX('Muro agregado: ','Wall added: ')+Math.round(A.t/pxPerM*100)+' cm × '+((A.hi-A.lo)/pxPerM).toFixed(2)+' m.';}
      else if(tool.value==='door'||tool.value==='window'){const o=AS.openingAt(G,walls,x,y,tool.value,pxPerM);if(!o){hint.textContent=LX('Tocá dentro del hueco de la abertura, en la línea del muro, junto al extremo de un muro detectado.','Click inside the opening gap, on the wall line, next to the end of a detected wall.');return;}openings.push(o);history.push(()=>openings.splice(openings.indexOf(o),1));{const wm=((o.g1-o.g0)/pxPerM).toFixed(2)+' m';hint.textContent=o.kind==='framed-window'?LX('Ventana de ','Window ')+wm+'.':LX('Puerta de '+wm+'. Si gira para el otro lado, usá «Invertir última puerta».','Door '+wm+'. If it swings the other way, use «Flip last door».');}}
      else if(tool.value==='scale'){scalePts.push([x,y]);if(scalePts.length===2){const [p,q]=scalePts,px=Math.hypot(q[0]-p[0],q[1]-p[1]);const m=Number(String(prompt(LX('Medida real entre los dos puntos (metros):','Real distance between the two points (meters):'),'')||'').replace(',','.'));scalePts.length=0;if(m>0&&px>5){const old=scaleF;scaleF=m/(px*real/w);history.push(()=>{scaleF=old;});hint.textContent=LX('Escala ajustada: '+(scaleF*real).toFixed(2)+' m de ancho total de imagen.','Scale set: image is '+(scaleF*real).toFixed(2)+' m wide.');}}else hint.textContent=LX('Tocá el otro extremo de la medida.','Click the other end of the dimension.');}
      redraw();return;
     }if(!it){let hit=null,best=Infinity;for(const wall of walls){const dx=wall.b[0]-wall.a[0],dy=wall.b[1]-wall.a[1],l=dx*dx+dy*dy;if(!l)continue;const t=Math.max(0,Math.min(1,((x-wall.a[0])*dx+(y-wall.a[1])*dy)/l)),dist=Math.hypot(x-wall.a[0]-t*dx,y-wall.a[1]-t*dy);if(dist<=Math.max(wall.t*.7,8/scale)&&dist<best){hit=wall;best=dist;}}if(hit){hit.skip=!hit.skip;if(python)history.push(()=>{hit.skip=!hit.skip;});redraw();}return;}const rotation=Number(rot.value),a=rotation*Math.PI/180,{sx,sy}=blockScale();const pl={x:brush?x-(it.w*Math.cos(a)-it.d*Math.sin(a))/2/sx:x,y:brush?y+(it.w*Math.sin(a)+it.d*Math.cos(a))/2/sy:y,id:it.id,name:it.name,w:it.w,d:it.d,rotation};placements.push(pl);if(python)history.push(()=>placements.splice(placements.indexOf(pl),1));redraw();};
    preview.onclick=e=>{const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h);if(scale>0)markAt((e.clientX-rect.left-(rect.width-w*scale)/2)/scale,(e.clientY-rect.top-(rect.height-h*scale)/2)/scale,scale);};
    undo.onclick=()=>{if(python){const f=history.pop();if(f)f();}else placements.pop();redraw();};
-   const ai=document.createElement('button');ai.className='btn';ai.textContent=LX('Reconocer con IA local (experimental)','Recognize with local AI (experimental)');
+   const ai=document.createElement('button');ai.className='btn';ai.textContent=LX('IA · Objetos','AI · Objects');ai.title=LX('Reconocer mobiliario y artefactos con el modelo visual local (experimental)','Recognize furniture and fixtures with the experimental local vision model');
    const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
    ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
     ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
@@ -605,7 +614,7 @@ async function traceFile(file,source=null,python=false,brush=false){
     bar.style.cssText='display:flex;gap:4px;align-items:center;flex-wrap:nowrap;max-width:calc(100vw - 48px);overflow-x:auto';
     const grip=document.createElement('span');grip.textContent='⠿';grip.style.cssText='cursor:move;padding:0 5px;touch-action:none';bar.prepend(grip);
     for(const [label,action] of [['−',()=>C.zoomShortcut?.('out')],['+',()=>C.zoomShortcut?.('in')],['Fit',()=>C.zoomExtents?.()]]){const b=document.createElement('button');b.className='btn';b.textContent=label;b.onclick=action;bar.append(b);}
-    ok.textContent=LX('Finalizar','Finish');cancel.textContent='×';bar.append(blockInput,rot,undo,rotateBtn,flip,ok,cancel);
+    ok.textContent=LX('Finalizar','Finish');cancel.textContent='×';bar.append(blockInput,rot,undo,rotateBtn,flip,ai,ok,cancel);
     for(const b of bar.querySelectorAll('button'))b.style.cssText='padding:4px 8px;min-height:30px;white-space:nowrap;border-radius:8px';
     const details=document.createElement('details');details.style.cssText='position:absolute;top:100%;right:0;background:#20252b;border-radius:8px;max-width:min(600px,85vw);padding:4px';const summary=document.createElement('summary');summary.textContent='⚙';summary.title=LX('Opciones','Options');details.append(summary,controls,aiStatus,topologyInfo,dimOption,onlyBlocks);bar.append(details);
     const status=document.createElement('span');status.style.cssText='font-size:11px;white-space:nowrap';bar.append(status);
@@ -617,8 +626,8 @@ async function traceFile(file,source=null,python=false,brush=false){
      for(const wall of walls){if(wall.skip)continue;const q=AS.seg(wall);p.fillStyle='rgba(0,190,210,.36)';p.strokeStyle='#00d5e8';p.lineWidth=1/Math.max(.01,(b.x-a.x)/w);const x=Math.min(q.a[0],q.b[0]),y=Math.min(q.a[1],q.b[1]);if(wall.v){p.fillRect(x-wall.t/2,y,wall.t,Math.abs(q.b[1]-q.a[1]));p.strokeRect(x-wall.t/2,y,wall.t,Math.abs(q.b[1]-q.a[1]));}else{p.fillRect(x,y-wall.t/2,Math.abs(q.b[0]-q.a[0]),wall.t);p.strokeRect(x,y-wall.t/2,Math.abs(q.b[0]-q.a[0]),wall.t);}}
      for(const o of openings){p.strokeStyle=o.kind==='framed-window'?'#359bff':'#ff9a40';p.lineWidth=Math.max(2,o.t*.35);p.beginPath();p.moveTo(...(o.v?[o.c,o.g0]:[o.g0,o.c]));p.lineTo(...(o.v?[o.c,o.g1]:[o.g1,o.c]));p.stroke();}
      const {sx,sy}=blockScale();for(const q of placements){p.save();p.translate(q.x,q.y);p.scale(1/sx,-1/sy);p.rotate(q.rotation*Math.PI/180);p.strokeStyle='#ff9a40';p.lineWidth=2*Math.min(sx,sy);p.strokeRect(0,0,q.w,q.d);p.restore();}
-     p.fillStyle='#d08cff';for(const q of scalePts){p.beginPath();p.arc(q[0],q[1],4,0,Math.PI*2);p.fill();}p.restore();status.textContent=walls.filter(q=>!q.skip).length+' WALL · '+placements.length+' BLK';if(hint.textContent!==lastMessage){lastMessage=hint.textContent;C.log('CALCOPY: '+lastMessage);}frame=requestAnimationFrame(paint);};
-    const onPointer=e=>{if(e.button!==0||e.target!==C.canvas)return;const r=bounds(),{a,b}=imageBounds(),x=(e.clientX-r.left-a.x)*w/(b.x-a.x),y=(e.clientY-r.top-a.y)*h/(b.y-a.y);e.preventDefault();e.stopImmediatePropagation();if(e.type==='pointerdown')markAt(x,y,(b.x-a.x)/w);};
+     p.fillStyle='#d08cff';for(const q of scalePts){p.beginPath();p.arc(q[0],q[1],4,0,Math.PI*2);p.fill();}p.restore();status.textContent=walls.filter(q=>!q.skip).length+' WALL · '+placements.length+' BLK';if(hint.textContent!==lastMessage){lastMessage=hint.textContent;status.title=lastMessage;C.log('CALCOPY: '+lastMessage);}frame=requestAnimationFrame(paint);};
+    const onPointer=e=>{if(e.button!==0||!(e.composedPath?.()||[e.target]).includes(C.canvas))return;const r=bounds(),{a,b}=imageBounds(),x=(e.clientX-r.left-a.x)*w/(b.x-a.x),y=(e.clientY-r.top-a.y)*h/(b.y-a.y);e.preventDefault();e.stopImmediatePropagation();if(e.type==='pointerdown'){try{markAt(x,y,(b.x-a.x)/w);}catch(err){hint.textContent='CALCOPY: '+String(err.message||err);C.toast(hint.textContent);}}};
     const onKey=e=>{if(e.key==='Escape'&&!e.defaultPrevented){e.preventDefault();e.stopImmediatePropagation();d.close('cancel');}};
     const events=['pointerdown','pointerup','mousedown','mouseup','click'];for(const name of events)window.addEventListener(name,onPointer,true);window.addEventListener('keydown',onKey,true);
     grip.onpointerdown=e=>{const r=d.getBoundingClientRect();drag={x:e.clientX-r.left,y:e.clientY-r.top};grip.setPointerCapture(e.pointerId);};grip.onpointermove=e=>{if(!drag)return;d.style.left=Math.max(0,Math.min(innerWidth-d.offsetWidth,e.clientX-drag.x))+'px';d.style.top=Math.max(0,Math.min(innerHeight-d.offsetHeight,e.clientY-drag.y))+'px';};grip.onpointerup=grip.onpointercancel=()=>{drag=null;};
