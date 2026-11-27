@@ -5254,7 +5254,8 @@ function cadHatchCreate(boundaries,detectIslands=false){
 }
 function cadHatchPatternPrimitives(entity,limit=6000){
  if(entity?.type!=='hatch'||!entity.pts?.length||!entity.hatchStyle||entity.hatchStyle==='solid'||/^gradient/.test(entity.hatchStyle))return [];
- const passes=window.BlacklineHatchPatterns?.passes(entity.hatchStyle,Number(entity.hatchSpacing),Number(entity.hatchAngle));
+ // Sin ángulo guardado (archivos antiguos o de otro programa) se usa 0°: nunca un sombreado invisible.
+ const passes=window.BlacklineHatchPatterns?.passes(entity.hatchStyle,Number(entity.hatchSpacing),Number(entity.hatchAngle)||0);
  if(!passes)return [];
  const output=[];
  for(const pass of passes){
