@@ -73,7 +73,28 @@ test('Public pages retain unique titles, valid structured data and consistent br
   assert(!titles.has(title),path+' duplicate title: '+title);titles.add(title);
   assert.match(head,/<html\b[^>]*\blang=["'][a-z]{2}(?:-[A-Za-z]+)?["']/i,path+' missing document language');
   for(const m of head.matchAll(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi))assert.doesNotThrow(()=>JSON.parse(m[1]),path+' malformed JSON-LD');
-  assert(!/auto[\s_-]*(?:cad|desk)/i.test(html),path+' restricted third-party brand');
+  // Explicit editorial comparisons are allowed only in the two dedicated guides.
+  // Keep all metadata, headings outside the comparison, and the rest of the site
+  // subject to the original restriction. Never allow competitor branding as our own.
+  const comparisons={
+   'cad-online-sin-instalar.html':{disclaimer:'no una versión de AutoCAD ni de SketchUp',heading:'Alternativas a AutoCAD y otros CAD para arquitectura'},
+   'no-install-online-cad.html':{disclaimer:'not a version of AutoCAD or SketchUp',heading:'CAD alternatives for architecture: which workflow fits?'}
+  };
+  let guarded=html;
+  if(Object.prototype.hasOwnProperty.call(comparisons,path)){
+   const info=comparisons[path],marker='<h2 id="compare-cad">'+info.heading+'</h2>';
+   const start=html.indexOf(marker),end=html.indexOf('</dl>',start);
+   assert(start>=0&&end>start,path+' comparison section missing');
+   assert.equal(html.indexOf(marker,start+marker.length),-1,path+' duplicate comparison section');
+   const section=html.slice(start,end+5);
+   assert(section.includes(info.disclaimer),path+' independence disclaimer missing');
+   assert(section.includes('<a href="https://www.autodesk.com/products/autocad-web/overview">AutoCAD Web</a>'),path+' official comparison reference missing');
+   // Remove only the literal approved references, rather than exempting arbitrary
+   // text, advertising, or metadata in the comparison block.
+   const clean=section.replace(marker,'').replace(info.disclaimer,'').replace('<a href="https://www.autodesk.com/products/autocad-web/overview">AutoCAD Web</a>','').replace(/Autodesk(?:'s| en)/,'');
+   guarded=html.slice(0,start)+clean+html.slice(end+5);
+  }
+  assert(!/auto[\s_-]*(?:cad|desk)/i.test(guarded),path+' restricted third-party brand outside approved editorial comparison');
  }
 });
 test('Academic resources link to the editor and contain the precision exercise in both languages',()=>{
