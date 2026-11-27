@@ -1,4 +1,4 @@
-name: Sanitary catalogue correction v2
+name: Sanitary catalogue correction v4 - left pair and separate basin
 on:
   push:
     branches: [main]
