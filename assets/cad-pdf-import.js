@@ -793,5 +793,56 @@ for(const key of ['WCSCALE','ESCALAINODORO'])EXT.commands[key]=()=>{
  return wcScaleImage(images[0]);
 };
 
+// Independent local silhouette reader. No Python or vision model download.
+function insertDarkContourPolylines(source,rings,w,h){
+ const S=C.state;
+ if(!rings.length||rings.length>500||!Number.isInteger(w)||!Number.isInteger(h)||w<=0||h<=0)throw Error('Contornos inválidos.');
+ const coords=[source.a.x,source.a.y,source.b.x,source.b.y];if(!coords.every(Number.isFinite)||source.a.x===source.b.x||source.a.y===source.b.y)throw Error('Imagen inválida.');
+ const x=Math.min(source.a.x,source.b.x),y=Math.max(source.a.y,source.b.y),sx=Math.abs(source.b.x-source.a.x)/w,sy=Math.abs(source.b.y-source.a.y)/h;
+ const add=rings.map(q=>{
+  if(!Array.isArray(q.pts)||q.pts.length<4||q.pts.length>20000||q.pts.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite)||p[0]<0||p[0]>w||p[1]<0||p[1]>h))throw Error('Polilínea inválida.');
+  return {type:'polyline',closed:true,pts:q.pts.map(p=>C.P(x+p[0]*sx,y-p[1]*sy)),width:.25,calcopyContour:true};
+ });
+ const old=S.layers.find(l=>l.name.toUpperCase()==='WALL-CONTOURS');
+ if(old&&(old.locked||!old.visible||old.frozen))throw Error('Capa WALL-CONTOURS bloqueada u oculta.');
+ const id=old?.id||'calcopy-wall-contours';
+ if(!old&&S.layers.some(l=>l.id===id))throw Error('Colisión de capa.');
+ C.saveHistory();
+ if(!old)S.layers.push({id,name:'WALL-CONTOURS',color:'#e5e7eb',visible:true,locked:false,width:.25,linetype:'CONTINUOUS'});
+ for(const e of add){e.id=C.nextId();e.layer=id;S.entities.push(e);}
+ S.selected=add.map(e=>e.id);C.updateAll();C.queueLocalBackup?.();return add.length;
+}
+async function traceDarkContours(){
+ const S=C.state,images=S.entities.filter(e=>e.type==='image'&&S.selected.includes(e.id));
+ if(calcoBusy||S.tool!=='select'||S.stage?.length||images.length!==1)return C.toast(LX('Seleccioná una imagen antes de ejecutar CALCOPYCONTORNO.','Select one image before CALCOPYCONTOUR.'));
+ const source=images[0],AS=window.CAD2D_CALCOPY_ASSIST;
+ if(!AS?.darkWallContours)return C.toast(LX('Actualizá CAD2D3D para cargar el detector.','Reload CAD2D3D to load the detector.'));
+ const signature=JSON.stringify([source.a,source.b,source.src,source.layer]),unit=S.unit,entities=S.entities;
+ const current=()=>C.state===S&&S.entities===entities&&entities.includes(source)&&S.unit===unit&&S.tool==='select'&&!S.stage?.length&&JSON.stringify([source.a,source.b,source.src,source.layer])===signature;
+ calcoBusy=true;
+ let bar,overlay,frame=0,key;
+ const cleanup=()=>{cancelAnimationFrame(frame);bar?.remove();overlay?.remove();if(key)window.removeEventListener('keydown',key,true);calcoBusy=false;};
+ try{
+  const im=new Image();im.src=source.src;await im.decode();if(!current()){cleanup();return;}
+  const k=Math.min(1,1800/Math.max(im.naturalWidth,im.naturalHeight)),w=Math.max(1,Math.round(im.naturalWidth*k)),h=Math.max(1,Math.round(im.naturalHeight*k));
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;const ctx=cv.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(im,0,0,w,h);
+  const G=AS.gray(ctx.getImageData(0,0,w,h).data,w,h),mpp=Math.abs(source.b.x-source.a.x)*C.U[unit]/1000/w;
+  let rings=AS.darkWallContours(G,mpp);
+  bar=document.createElement('div');bar.id='calcopyContourBar';bar.style.cssText='position:fixed;z-index:10000;display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:calc(100vw - 24px);padding:8px;background:#20252b;color:#e5eef7;border:1px solid #697582;border-radius:12px;box-shadow:0 3px 12px #0005';
+  const r=C.canvas.getBoundingClientRect();bar.style.left=Math.max(8,r.left+12)+'px';bar.style.top=Math.max(8,r.top+12)+'px';
+  const label=document.createElement('strong'),status=document.createElement('span');label.textContent=LX('CONTORNOS OSCUROS','DARK CONTOURS');
+  const threshold=document.createElement('input');threshold.type='range';threshold.min='30';threshold.max='235';threshold.value=String(Math.max(30,Math.min(235,Math.round(G.thr))));threshold.title=LX('Umbral de oscuridad','Darkness threshold');threshold.setAttribute('aria-label',threshold.title);
+  const finish=document.createElement('button'),cancel=document.createElement('button');finish.className=cancel.className='btn';finish.textContent=LX('Insertar polilíneas','Insert polylines');cancel.textContent='×';cancel.title=LX('Cancelar','Cancel');
+  const refresh=()=>{rings=AS.darkWallContours({...G,thr:Number(threshold.value)},mpp);status.textContent=rings.length+' '+LX('contornos','contours');finish.disabled=!rings.length;};
+  threshold.onchange=refresh;refresh();
+  bar.append(label,threshold,status,finish,cancel);document.body.append(bar);
+  overlay=document.createElement('canvas');overlay.style.cssText='position:fixed;pointer-events:none;z-index:9999;background:transparent';document.body.append(overlay);
+  const paint=()=>{if(!current()){cleanup();return;}const r=C.canvas.getBoundingClientRect(),a=C.screen(C.P(Math.min(source.a.x,source.b.x),Math.max(source.a.y,source.b.y))),b=C.screen(C.P(Math.max(source.a.x,source.b.x),Math.min(source.a.y,source.b.y)));overlay.style.left=r.left+'px';overlay.style.top=r.top+'px';overlay.style.width=r.width+'px';overlay.style.height=r.height+'px';const dpr=Math.min(devicePixelRatio||1,2),W=Math.max(1,Math.round(r.width*dpr)),H=Math.max(1,Math.round(r.height*dpr));if(overlay.width!==W)overlay.width=W;if(overlay.height!==H)overlay.height=H;const p=overlay.getContext('2d');p.setTransform(dpr,0,0,dpr,0,0);p.clearRect(0,0,r.width,r.height);p.strokeStyle='#00d5e8';p.lineWidth=1.5;for(const q of rings){p.beginPath();q.pts.forEach(([x,y],i)=>{const X=a.x+x*(b.x-a.x)/w,Y=a.y+y*(b.y-a.y)/h;i?p.lineTo(X,Y):p.moveTo(X,Y);});p.closePath();p.stroke();}frame=requestAnimationFrame(paint);};
+  finish.onclick=()=>{try{if(!current())throw Error('La imagen cambió.');const n=insertDarkContourPolylines(source,rings,w,h);cleanup();C.toast(n+' '+LX('polilíneas cerradas en WALL-CONTOURS. Revisá mobiliario oscuro.','closed polylines in WALL-CONTOURS. Review dark furniture.'));}catch(err){cleanup();C.toast(String(err.message||err));}};
+  cancel.onclick=cleanup;key=e=>{if(e.key==='Escape'){e.preventDefault();cleanup();}};window.addEventListener('keydown',key,true);paint();
+ }catch(err){cleanup();C.toast('CALCOPYCONTORNO: '+String(err.message||err));}
+}
+for(const k of ['CALCOPYCONTORNO','CALCOPYCONTOUR'])EXT.commands[k]=traceDarkContours;
+
 window.CAD2D_PDF_IMPORT=importPdf;
 })();
