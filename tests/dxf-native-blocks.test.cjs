@@ -71,3 +71,18 @@ test('INSERT with different X/Y scale stays a block (scaleX/scaleY) and exports 
  assert.match(f,/'41',dxfNum\(sc\*\(Number\.isFinite\(Number\(r\.scaleX\)\)/);
  assert.match(f,/const \{attrs,scaleX,scaleY,\.\.\.bare\}=r/);
 });
+test('DXF layouts become CAD2D sheets with viewports (position, model center, 1:N)',()=>{
+ global.self=globalThis;new Function(fs.readFileSync(path.join(__dirname,'../cad-dxf-parser.js'),'utf8')).call(globalThis);
+ const L=(...a)=>a.join('\n');
+ const dxf=L('0','SECTION','2','HEADER','9','$INSUNITS','70','6','0','ENDSEC',
+  '0','SECTION','2','TABLES','0','TABLE','2','BLOCK_RECORD','0','BLOCK_RECORD','5','1F','2','*Paper_Space','0','ENDTAB','0','ENDSEC',
+  '0','SECTION','2','ENTITIES','0','LINE','8','0','10','600','20','600','11','610','21','600',
+  '0','VIEWPORT','67','1','8','0','10','100','20','150','40','200','41','100','68','1','69','2','12','5','22','0','17','600','27','600','45','10',
+  '0','ENDSEC','0','SECTION','2','OBJECTS','0','LAYOUT','330','1A','1','','44','420','45','297','72','1','1','A3 Planta','71','1','10','0','20','0','11','420','21','297','330','1F','0','ENDSEC','0','EOF');
+ const p=globalThis.CAD2DDxfParser.parse(dxf,{},{textHeight:.2});
+ assert.equal(p.layouts.length,1);const l=p.layouts[0];
+ assert.equal(l.name,'A3 Planta');assert.equal(l.w,420);assert.equal(l.h,297);
+ const v=l.viewports[0];assert.equal(v.x,0);assert.equal(v.y,97);assert.equal(v.w,200);assert.equal(v.h,100);
+ assert.equal(v.cx,605);assert.equal(v.cy,600);assert.equal(v.viewHeight*1000/v.h,100,'1:100 in meters');
+ assert.match(html,/function cadImportDXFLayouts\(list\)/);
+});

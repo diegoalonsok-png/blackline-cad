@@ -15,6 +15,8 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
  if(raw.length>MAX_PAIRS*2+2)abortImport('demasiados registros DXF');
  for(let i=0;i<raw.length-1;i+=2){if((i&8191)===0)checkTime();const code=Number(raw[i].trim());if(Number.isFinite(code))pairs.push([code,raw[i+1].trim()])}
  let section='',table='',unitCode=0,entities=[],layers=new Map(),unsupported=new Map(),blockCount=0,paperCount=0;
+ // Presentaciones: registros de bloque, LAYOUT, capas por handle y objetos del espacio papel activo.
+ const brNames=new Map(),layerByHandle=new Map(),layoutRecs=[],paperRecs=[];
  const ACI_HEX='000000ff0000ffff0000ff0000ffff0000ffff00ffffffff808080c0c0c0ff0000ff7f7fa50000a552527f00007f3f3f4c00004c2626260000261313ff3f00ff9f7fa52900a567527f1f007f4f3f4c13004c2f26260900261713ff7f00ffbf7fa55200a57c527f3f007f5f3f4c26004c3926261300261c13ffbf00ffdf7fa57c00a591527f5f007f6f3f4c39004c4226261c00262113ffff00ffff7fa5a500a5a5527f7f007f7f3f4c4c004c4c26262600262613bfff00dfff7f7ca50091a5525f7f006f7f3f394c00424c261c26002126137fff00bfff7f52a5007ca5523f7f005f7f3f264c00394c261326001c26133fff009fff7f29a50067a5521f7f004f7f3f134c002f4c2609260017261300ff007fff7f00a50052a552007f003f7f3f004c00264c2600260013261300ff3f7fff9f00a52952a567007f1f3f7f4f004c13264c2f00260913581700ff7f7fffbf00a55252a57c007f3f3f7f5f004c26264c3900261313581c00ffbf7fffdf00a57c52a591007f5f3f7f6f004c39264c4200261c13585800ffff7fffff00a5a552a5a5007f7f3f7f7f004c4c264c4c00262613585800bfff7fdfff007ca55291a5005f7f3f6f7f00394c26427e001c26135858007fff7fbfff0052a5527ca5003f7f3f5f7f00264c26397e001326131c58003fff7f9fff0029a55267a5001f7f3f4f7f00134c262f7e0009261317580000ff7f7fff0000a55252a500007f3f3f7f00004c26267e0000261313583f00ff9f7fff2900a56752a51f007f4f3f7f13004c2f267e0900261713587f00ffbf7fff5200a57c52a53f007f5f3f7f26004c39267e1300261c1358bf00ffdf7fff7c00a59152a55f007f6f3f7f39004c42264c1c0026581358ff00ffff7fffa500a5a552a57f007f7f3f7f4c004c4c264c260026581358ff00bfff7fdfa5007ca552917f005f7f3f6f4c00394c264226001c581358ff007fff7fbfa50052a5527c7f003f7f3f5f4c00264c263926001358131cff003fff7f9fa50029a552677f001f7f3f4f4c00134c262f260009581317000000656565666666999999ccccccffffff';
  const aciHex=n=>{n=Math.abs(Math.round(n));return n>=1&&n<=255?'#'+ACI_HEX.substr(n*6,6):'#c7cbd0'};
  const toHex=v=>Number.isFinite(v)?'#'+(v&0xffffff).toString(16).padStart(6,'0'):'';
@@ -38,10 +40,12 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const {get,str}=fields(record);
   if(section==='TABLES'&&table==='LAYER'&&type==='LAYER'){
    let name=str(2,'0'),flags=get(70),colorIndex=get(62,7),trueColor=get(420,NaN),weight=get(370,-1);
-   let layer=getLayer(name);
+   let layer=getLayer(name);{const h=str(5,'');if(h)layerByHandle.set(h.toUpperCase(),name)}
    Object.assign(layer,{color:Number.isFinite(trueColor)?toHex(trueColor):aciHex(colorIndex),visible:colorIndex>=0,frozen:Boolean(flags&1),locked:Boolean(flags&4),width:weight>0?weight/100:.25,linetype:str(6,'CONTINUOUS')});
    continue;
   }
+  if(section==='TABLES'&&table==='BLOCK_RECORD'&&type==='BLOCK_RECORD'){const h=str(5,'');if(h)brNames.set(h.toUpperCase(),str(2,''));continue}
+  if(section==='OBJECTS'&&type==='LAYOUT'){layoutRecs.push(record);continue}
   if(section==='BLOCKS'){
    if(type==='BLOCK'){blockCount++;curBlock={name:str(2,''),base:P(get(10),get(20)),recs:[]};blocksDef.set(curBlock.name,curBlock);continue}
    if(type==='ENDBLK'){curBlock=null;continue}
@@ -50,7 +54,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   }
   if(section==='ENTITIES'){
    // Código 67=1: objeto del espacio papel (presentación). No pertenece al modelo 1:1.
-   if(record.some(q=>q[0]===67&&Number(q[1])===1)){if(type!=='VIEWPORT')paperCount++;continue}
+   if(record.some(q=>q[0]===67&&Number(q[1])===1)){if(type!=='VIEWPORT')paperCount++;paperRecs.push([type,record]);continue}
    modelRecs.push([type,record]);
   }
  }
@@ -73,7 +77,7 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   const {get,str}=fields(record);
   if(type==='ACAD_PROXY_ENTITY'){
    const recovered=root.CAD2DProxy2D?.decode(record)||[];
-   note(recovered.length?'ACAD_PROXY_ENTITY (representación gráfica parcial, sin propiedades AEC)':'ACAD_PROXY_ENTITY (sin geometría recuperable)');
+   note(recovered.length?'Objeto proxy de otra aplicación (representación gráfica parcial, sin propiedades AEC)':'Objeto proxy de otra aplicación (sin geometría recuperable)');
    return recovered.length?recovered:null;
   }
   if(type==='LINE')return{type:'line',a:P(get(10),get(20)),b:P(get(11),get(21))};
@@ -301,7 +305,35 @@ function parse(text,opts={},dimensionStyle={textHeight:.2,arrow:.12,precision:2}
   if(list.length)importedBlocks[defName(def.name)]={name:defName(def.name),entities:list.map(e=>{const c={...e};delete c.id;delete c.layer;return c}),source:'dxf'};
  }
  blockCount=0;
- return {entities,layers:[...layers.values()],blocks:importedBlocks,unitCode,dimStyles:importedDimStyles,warnings:[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')').concat(paperCount?['Espacio papel / presentaciones: '+paperCount+' objeto(s) fuera del modelo (no se mezclan con el dibujo 1:1)']:[])};
+ // Presentaciones (LAYOUT): hoja en mm y ventanas gráficas (centro y tamaño en papel, vista del modelo).
+ const layouts=[];
+ try{
+  for(const rec of layoutRecs){
+   const g=(c,d)=>{const q=rec.find(x=>x[0]===c);const n=q?Number(q[1]):NaN;return Number.isFinite(n)?n:d},sv=c=>{const q=rec.find(x=>x[0]===c);return q?String(q[1]).trim():''};
+   // El nombre de la presentación es el último código 1 (el primero es la configuración de página).
+   const ones=rec.filter(x=>x[0]===1),name=ones.length?String(ones[ones.length-1][1]).trim():'';if(!name||/^model$/i.test(name))continue;
+   const brs=rec.filter(x=>x[0]===330).map(x=>String(x[1]).trim().toUpperCase()),blockName=brs.map(h=>brNames.get(h)).find(n=>/^\*paper_space/i.test(n||''))||'';
+   const mm=g(72,1)===0?25.4:1;let W=(g(11,NaN)-g(10,0))*mm,H=(g(21,NaN)-g(20,0))*mm;
+   if(!(W>20&&H>20)){W=g(44,NaN);H=g(45,NaN);if(g(73,0)%2===1)[W,H]=[H,W]}
+   if(!(W>20&&H>20&&W<10000&&H<10000))continue;
+   const lim={x:g(10,0)*mm,y:g(20,0)*mm};
+   const recs=/^\*paper_space$/i.test(blockName)?paperRecs:(blocksDef.get(blockName)?.recs||[]);
+   const viewports=[];let objects=0;
+   for(const [t,r] of recs){
+    if(t!=='VIEWPORT'){objects++;continue}
+    const fv=fields(r),id=fv.get(69,0);if(id===1)continue;
+    const w=fv.get(40,0)*mm,h=fv.get(41,0)*mm,vh=fv.get(45,0);if(!(w>1&&h>1&&vh>0))continue;
+    const frozen=r.filter(x=>x[0]===341).map(x=>layerByHandle.get(String(x[1]).trim().toUpperCase())).filter(Boolean);
+    // Centro de la vista en coordenadas del modelo: objetivo (17/27) + centro DCS (12/22) girado por el ángulo de giro.
+    const tw=fv.get(51,0)*Math.PI/180,dx=fv.get(12,0),dy=fv.get(22,0),cx=fv.get(17,0)+dx*Math.cos(tw)-dy*Math.sin(tw),cy=fv.get(27,0)+dx*Math.sin(tw)+dy*Math.cos(tw);
+    const dir=[fv.get(16,0),fv.get(26,0)],plan=Math.abs(dir[0])<1e-9&&Math.abs(dir[1])<1e-9;
+    viewports.push({x:fv.get(10,0)*mm-w/2-lim.x,y:H-(fv.get(20,0)*mm+h/2-lim.y),w,h,cx,cy,viewHeight:vh,twist:fv.get(51,0),plan,frozen,off:fv.get(68,1)===0});
+   }
+   layouts.push({name:name.slice(0,30),order:g(71,layouts.length+1),w:+W.toFixed(3),h:+H.toFixed(3),viewports:viewports.filter(v=>!v.off).slice(0,24),paperObjects:objects});
+  }
+  layouts.sort((a,b)=>a.order-b.order);
+ }catch(err){layouts.length=0}
+ return {entities,layers:[...layers.values()],blocks:importedBlocks,unitCode,dimStyles:importedDimStyles,layouts,warnings:[...unsupported].filter(([key])=>key!=='ENDSEC').map(([key,n])=>key+' ('+n+')').concat(paperCount?['Espacio papel / presentaciones: '+paperCount+' objeto(s) fuera del modelo (no se mezclan con el dibujo 1:1)']:[])};
 }
 root.CAD2DDxfParser={parse};
 })(globalThis);

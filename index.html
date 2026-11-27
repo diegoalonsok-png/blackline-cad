@@ -8883,6 +8883,24 @@ function importDXF(text,name,opts={}){
  if(opts.parseOnly)return parsed;
  return cadApplyParsedDXF(parsed,name);
 }
+// Presentaciones del DXF/DWG → láminas de CAD2D: hoja (tamaño normalizado si coincide), ventanas gráficas
+// con su posición, centro, escala 1:N y capas congeladas. El marco y rótulo del espacio papel no se importan.
+function cadImportDXFLayouts(list){
+ if(!Array.isArray(list)||!list.length)return 0;
+ const base=collectLayoutState(),std=[1,2,5,10,20,25,50,75,100,125,150,200,250,300,400,500,750,1000,1250,1500,2000,2500,5000,10000];
+ const named=(w,h)=>{const a=Math.min(w,h),b=Math.max(w,h);for(const [k,[x,y]] of Object.entries(paperSizes))if(Math.abs(a-Math.min(x,y))<2.5&&Math.abs(b-Math.max(x,y))<2.5)return k;return 'CUSTOM'};
+ const out=list.slice(0,20).map((L,i)=>{
+  const vps=(L.viewports||[]).filter(v=>v.plan!==false&&[v.x,v.y,v.w,v.h,v.cx,v.cy,v.viewHeight].every(Number.isFinite)).map(v=>{
+   let n=v.viewHeight*U[state.unit]/v.h;const near=std.find(k=>Math.abs(k-n)/k<.015);n=near||Math.max(1,Math.round(n));
+   return {x:+v.x.toFixed(3),y:+v.y.toFixed(3),w:+v.w.toFixed(3),h:+v.h.toFixed(3),cx:v.cx,cy:v.cy,scale:n,label:false,frozenLayers:(v.frozen||[]).map(nm=>state.layers.find(l=>l.name===nm)?.id).filter(Boolean)};
+  });
+  const paper=named(L.w,L.h);
+  return {name:String(L.name||('Layout '+(i+1))).slice(0,30),state:{...clone(base),paper,paperW:Math.max(L.w,L.h),paperH:Math.min(L.w,L.h),orientation:L.w>=L.h?'landscape':'portrait',margin:0,title:false,viewports:vps,titleFields:{...(base.titleFields||{}),plano:String(L.name||'').slice(0,80),lamina:''}}};
+ });
+ cadLayouts=out;cadLayoutIdx=0;applyLayoutState(out[0].state);
+ try{renderLayoutTabs();localStorage.setItem(CAD_LAYOUTS_KEY,JSON.stringify({index:0,list:cadLayouts.map(l=>({name:l.name,state:l.state}))}))}catch(e){}
+ return out.length;
+}
 function cadApplyParsedDXF(parsed,name){
  const {entities,layers,blocks:importedBlocks,unitCode,dimStyles:importedDimStyles={}}=parsed;
  if(!entities.length&&!Object.keys(importedBlocks).length)throw Error('No supported 2D entities found. DXF blocks, spline curves and layout entities may require a more complete CAD import engine.');
@@ -8903,7 +8921,9 @@ function cadApplyParsedDXF(parsed,name){
  cadDrawingExt='dxf';cadSetDrawingName(name);
  $('units').value=from;$('canvasUnits').textContent='· '+from;$('gridSpacing').value=state.grid;
  updateAll();zoomExtents();
- const warning=parsed.warnings||[];
+ let importedLayouts=0;try{importedLayouts=cadImportDXFLayouts(parsed.layouts)}catch(e){importedLayouts=0}
+ if(importedLayouts)log('Presentaciones importadas: '+importedLayouts+' lámina(s) con sus ventanas gráficas y escalas');
+ const warning=(parsed.warnings||[]).map(w=>importedLayouts&&/^Espacio papel/.test(w)?w.replace(/\(no se mezclan con el dibujo 1:1\)/,'(marcos y rótulos: CAD2D usa su propia carátula; las láminas y ventanas sí se importaron)'):w);
  log('DXF imported: '+entities.length+' entities · '+state.layers.length+' layers');
  toast('DXF imported: '+entities.length+' supported entities');
  if(warning.length)alert('Importación con advertencias: CAD2D no puede representar íntegramente estos elementos:\n\n· '+warning.join('\n· ')+'\n\nEl archivo original no se modifica: si lo guardás desde CAD2D con otro nombre, conservá el original para no perderlos.');
@@ -12740,7 +12760,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
 <script src="cad-arq-pro.js?v=20261126-ruta1"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
-<script src="cad-dxf-parser.js?v=20261126-nonuni6"></script>
+<script src="cad-dxf-parser.js?v=20261126-layouts7"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
 <script src="cad-comandos-plus.js?v=20261126-comandos1"></script>
