@@ -413,7 +413,7 @@
   el.innerHTML=`<div class="hd"><b>BLACKLINE CAD · ${T('BLOCK BROWSER','EXPLORADOR DE BLOQUES')}</b><button data-a="min" title="${T('Collapse','Plegar')}">▁</button><button data-a="max" title="${T('Maximize','Maximizar')}">▢</button><button data-a="close" title="${T('Close · Esc','Cerrar · Esc')}">×</button></div>
 <div class="tabs">${Object.entries(VIEWS).map(([k,v])=>`<button data-v="${k}">${es()?v.es:v.en}</button>`).join('')}</div>
 <div class="tools"><input type="search" placeholder="${T('Search: toilet, kitchen, car, section, north…','Buscar: inodoro, cocina, auto, corte, norte…')}" value=""><label>${T('Size','Tamaño')} <input type="range" min="84" max="220" step="4" value="${st.size}"></label>${paperControls()}<button type="button" data-a="local-pack" title="Importar ZIP completos, DWG, DXF o paquete JSON local">${T("Import ZIP / DWG / DXF","Importar ZIP / DWG / DXF")}</button></div>
-<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links"><button data-web="all-houses">${T('All','Todas')}</button>${[['Baños','Bathrooms'],['Cocinas','Kitchens'],['Dormitorios','Bedrooms'],['Detalles','Details'],['Cotas','Dimensions'],['Bloques de documentación','Documentation blocks']].map(([es,en])=>`<button data-web="ref-type" data-ref-type="${es}">${T(en,es)}</button>`).join('')}${[30,45,60,70,75,90,100,120,150,180,200,250].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
+<div class="web-links"><button data-web="search">Buscar / Search</button><button data-web="file">Archivo / File</button><button data-web="url">URL</button></div><div class="area-links"><button data-web="all-houses">${T('All','Todas')}</button>${[['Baños','Bathrooms'],['Cocinas','Kitchens'],['Dormitorios','Bedrooms'],['Detalles','Details'],['Cotas','Dimensions'],['Bloques de documentación','Documentation blocks']].map(([es,en])=>`<button data-web="ref-type" data-ref-type="${es}">${T(en,es)}</button>`).join('')}${[30,45,60,70,75,90,100,120,150,180,200,250].map(n=>`<button data-web="area" data-area="${n}">${n} m²</button>`).join('')}${ARQ_TYPOLOGIES.map(([k,es,en])=>`<button data-web="typology" data-typology="${k}">${T(en,es)}</button>`).join('')}</div><div class="main"><div class="cats"></div><div class="grid"></div></div><div class="ft"></div>
 <span class="rz n" data-r="n"></span><span class="rz e" data-r="e"></span><span class="rz s" data-r="s"></span><span class="rz w" data-r="w"></span><span class="rz se" data-r="se"></span>`;
   document.body.append(el);place();
   const q=el.querySelector('input[type=search]');q.value=st.q;
@@ -505,6 +505,31 @@
 
  function openSearch(term){if(generalPlanQuery(term))return openWeb(term);stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=false;webController?.abort();st.view='all';st.cat='';st.q=term;visibleCount=4;searchPage=0;commandGallery=true;selectionEpoch++;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:Math.max(8,(innerWidth-370)/2),y:bar?bar.bottom+8:80,w:370,h:420};open();const q=el?.querySelector('input[type=search]');if(q)q.value=term;el.querySelector('.grid').scrollTop=0}
  
+ // Tipologías del catálogo de referencias (Commons + propias). Orden: lo específico antes que lo genérico.
+ const ARQ_TYPOLOGIES=[
+  ['casa-patio','Casas con patio','Courtyard houses',/\b(?:casas? (?:con|de) patio|casa patio|courtyard houses?|patio houses?|domus)\b/],
+  ['casa-hilera','Casas en hilera','Row houses',/\b(?:casas? en hilera|casas? adosadas?|adosadas|townhouses?|row ?houses?|terraced houses?|duplex)\b/],
+  ['villa','Villas','Villas',/\b(?:villas?|quintas?)\b/],
+  ['vivienda-colectiva','Vivienda colectiva','Apartment buildings',/\b(?:edificios? de (?:viviendas?|departamentos?)|viviendas? colectivas?|multifamiliar(?:es)?|apartment buildings?|bloques? de viviendas?|housing blocks?)\b/],
+  ['oficinas','Edificios de oficinas','Office buildings',/\b(?:edificios? de oficinas?|office buildings?|bancos?|banks?)\b/],
+  ['edificio-publico','Edificios públicos','Civic buildings',/\b(?:edificios? publicos?|ayuntamientos?|municipalidad(?:es)?|tribunal(?:es)?|town halls?|city halls?|civic buildings?)\b/],
+  ['iglesia','Iglesias','Churches',/\b(?:iglesias?|catedral(?:es)?|capillas?|basilicas?|monasterios?|churches?|cathedrals?|chapels?)\b/],
+  ['templo','Templos','Temples',/\b(?:templos?|mezquitas?|sinagogas?|temples?|mosques?|synagogues?)\b/],
+  ['teatro','Teatros','Theatres',/\b(?:teatros?|auditorios?|operas?|cines?|estadios?|theat(?:re|er)s?|auditoriums?|stadiums?)\b/],
+  ['museo','Museos','Museums',/\b(?:museos?|museums?)\b/],
+  ['escuela','Escuelas','Schools',/\b(?:escuelas?|colegios?|universidad(?:es)?|schools?|universit(?:y|ies)|colleges?)\b/],
+  ['hospital','Hospitales','Hospitals',/\b(?:hospital(?:es)?|clinicas?|hospitals?|clinics?)\b/],
+  ['biblioteca','Bibliotecas','Libraries',/\b(?:bibliotecas?|librar(?:y|ies))\b/],
+  ['estacion','Estaciones','Stations',/\b(?:estacion(?:es)?|aeropuertos?|stations?|airports?)\b/],
+  ['palacio','Palacios y castillos','Palaces & castles',/\b(?:palacios?|castillos?|fortalezas?|palaces?|castles?)\b/],
+  ['hotel','Hoteles','Hotels',/\b(?:hotel(?:es)?|hotels?)\b/],
+  ['industrial','Industriales','Industrial',/\b(?:industrial(?:es)?|fabricas?|galpon(?:es)?|depositos?|factor(?:y|ies)|warehouses?)\b/],
+  ['comercial','Mercados y comercios','Markets & shops',/\b(?:mercados?|comercios?|comerciales?|tiendas?|markets?|shops?)\b/],
+  ['termas','Termas','Baths',/\b(?:termas|thermae|public baths?)\b/],
+  ['edificios','Todos los edificios','All buildings',/\b(?:todos los edificios|edificios?|buildings?|obras|otras obras|other works)\b/]
+ ];
+ function arqTypology(raw){const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();if(!q||/\d/.test(q))return null;const hit=ARQ_TYPOLOGIES.find(t=>t[3].test(q));return hit?hit[0]:null;}
+ function typologyMatch(x,typ){return typ==='edificios'?x.category==='building':x.typology===typ;}
  function strictRoomCategory(raw){
   const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   if(/\b(?:banos?|baths?|bathrooms?|restrooms?|washrooms?|toilets?|toilettes?|sanitarios?|vestuarios?|locker rooms?)\b/.test(q))return 'bathroom';
@@ -634,11 +659,11 @@
   const read=async name=>{try{const r=await fetch(new URL(name,base),{cache:'no-cache'});if(!r.ok)return [];const rows=await r.json();return Array.isArray(rows)?rows:[]}catch(e){return []}};
   const [archive,uploads,driveRefs,r2Refs]=await Promise.all([read('index.json'),read('user-house-plans.json'),read('drive-house-references.json'),read('r2-house-plans.json')]);
   const rows=[...new Map(archive.concat(uploads,driveRefs,r2Refs).filter(x=>x&&typeof x.original==='string').map(x=>[x.original,x])).values()];
-  const area=parseArea(raw),category=houseRefCategory(raw),house=/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw);
+  const area=parseArea(raw),typ=arqTypology(raw),category=typ?null:houseRefCategory(raw),house=!typ&&/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw);
   const file=v=>{if(typeof v!=='string'||!/^[\w./-]+$/.test(v)||v.includes('..')||v.startsWith('/'))return null;return new URL(v,base).href;};
-  return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&['house','bathroom','kitchen','bedroom','detail','dimension','documentation'].includes(x.category)&&/^(?:house|bathroom|kitchen|bedroom|detail|dimension|documentation)\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g|webp|dwg|dxf)$/i.test(x.original||''))&&(category?x.category===category:(!house||x.category==='house'))&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
+  return rows.filter(x=>(/^(?:CC0|CC BY(?:-SA)?(?: [\d.]+)?|Public domain)$/i.test(x.license||'')||x.license==='User supplied'&&['house','bathroom','kitchen','bedroom','detail','dimension','documentation'].includes(x.category)&&/^(?:house|bathroom|kitchen|bedroom|detail|dimension|documentation)\/(?:\d+|unverified)\/user-[\w-]+\.(?:png|jpe?g|webp|dwg|dxf)$/i.test(x.original||''))&&(typ?typologyMatch(x,typ):category?x.category===category:(!house||x.category==='house'))&&(!area||Number.isFinite(x.area)&&Math.abs(x.area-area)<=Math.max(5,area*.15))).map(x=>{
    const original=file(x.original),image=file(x.image)||(/\.(?:png|jpe?g|webp|pdf)$/i.test(original||'')?original:null),cad=file(x.cad)||(/\.(?:dxf|dwg)$/i.test(original||'')?original:null);
-   return {title:x.title,architect:x.architect||null,category:x.category,floorPlanVerified:x.floorPlanVerified===true,drawingType:x.drawingType,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
+   return {title:x.title,architect:x.architect||null,category:x.category,typology:x.typology||null,floorPlanVerified:x.floorPlanVerified===true,drawingType:x.drawingType,area:x.area??null,thumb:file(x.thumb)||(/\.(?:png|jpe?g|webp)$/i.test(image||'')?image:null),url:image,cadUrl:cad,source:x.license==='User supplied'?original:safeHttps(x.source),license:x.license==='User supplied'?(x.area==null?T('Reference image','Imagen de referencia'):T('Reference image · Approximate area','Imagen de referencia · Superficie aproximada')):x.license+' · '+(x.author||'')};
   }).filter(x=>x.thumb&&x.source&&approvedArchitecturalDrawing(x));
  }
  // Public-domain plates of historical treatises (Palladio, Vitruvio, Serlio…), served by the
@@ -693,7 +718,7 @@
    const q=normalize(raw).replace(/\b(?:referencias?|references?|web|plantas?|planos?|floor|plans?|cortes?|sections?|arquitectura|architecture|arquitectonic[oa]s?|architectural|dwg|dxf|jpg|png|de|del|the|of)\b/g,' ').trim();
    const terms=q.split(/\s+/).filter(x=>x.length>2);
    const general=!terms.length||/\b(?:casas?|viviendas?|houses?|homes?)\b/.test(q);
-   const refCategory=houseRefCategory(raw);const match=x=>refCategory?x.category===refCategory:general||terms.every(t=>normalize([x.title,x.category].join(' ')).includes(t));
+   const typ=arqTypology(raw),refCategory=houseRefCategory(raw);const match=x=>typ?typologyMatch(x,typ):refCategory?x.category===refCategory:general||terms.every(t=>normalize([x.title,x.category].join(' ')).includes(t));
    webItems=onlyArchitecturalDrawings(own.concat(archive.filter(match)));
    webStatus=webItems.length?'':T('No approved architectural plans or sections found.','No hay plantas o cortes arquitectónicos aprobados para esta búsqueda.');paintWeb();
   }catch(e){if(epoch===webEpoch){webStatus=T('Catalogue unavailable. Retry.','Catálogo no disponible. Volvé a buscar.');paintWeb();}}
@@ -735,6 +760,7 @@
   if(a==='house-references'){if(!houseMode)return openHouses('Casas referencias');const raw='Casas referencias';el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='ref-type'&&window.CAD2D_ARQ_DOCS&&['Detalles','Cotas'].includes(button.dataset.refType)){close();window.CAD2D_ARQ_DOCS.open(button.dataset.refType==='Cotas'?'dim':'detail','');return;}
   if(a==='ref-type'){const kind=button.dataset.refType;if(strictRoomCategory(kind))return openWeb(T(({Baños:'Bathrooms',Cocinas:'Kitchens',Dormitorios:'Bedrooms'})[kind]||kind,kind));const raw='Referencias '+kind;if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw);}
+  if(a==='typology'){const t=ARQ_TYPOLOGIES.find(x=>x[0]===button.dataset.typology);if(!t)return;const raw=t[1];if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='area'){const raw='Casas de '+button.dataset.area+' m²';if(!houseMode)return openHouses(raw);el.querySelector('input[type=search]').value=raw;return searchHouseGallery(raw)}
   if(a==='search')return searchWeb(q);
   if(a==='google'||a==='pinterest'){const query=webQuery(q),url=a==='google'?'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(query):'https://www.pinterest.com/search/pins/?q='+encodeURIComponent(query);window.open(url,'_blank','noopener,noreferrer');return;}
@@ -754,11 +780,11 @@
   if(roomQuery(raw)||strictRoomCategory(raw))return openWeb(raw);
   stopHouseRefresh();webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
   try{
-   const refCategory=houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
-   const [own,archive]=await Promise.all([refsOnly?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
+   const typ=arqTypology(raw),refCategory=typ?'typology':houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
+   const [own,archive]=await Promise.all([refsOnly||typ?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
    if(epoch!==webEpoch||!houseMode)return;
    webItems=own.concat(archive).filter(x=>(!refsOnly||!!refCategory||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
-   {const q=String(raw||'').trim(),mine=await userCadMatches(/\bcasas?\b|\bviviendas?\b|\bhouses?\b/i.test(q)?q:q+' casa').catch(()=>[]);if(epoch!==webEpoch||!houseMode)return;const keep=mine.filter(x=>/casa|vivienda|house|planta|corte/i.test(String(x.category)+' '+x.license));if(keep.length)webItems=keep.concat(webItems.filter(x=>!keep.some(k=>k.cadUrl===x.cadUrl)));}
+   if(!typ){const q=String(raw||'').trim(),mine=await userCadMatches(/\bcasas?\b|\bviviendas?\b|\bhouses?\b/i.test(q)?q:q+' casa').catch(()=>[]);if(epoch!==webEpoch||!houseMode)return;const keep=mine.filter(x=>/casa|vivienda|house|planta|corte/i.test(String(x.category)+' '+x.license));if(keep.length)webItems=keep.concat(webItems.filter(x=>!keep.some(k=>k.cadUrl===x.cadUrl)));}
    webStatus=webItems.length?'':refCategory?T('No files in this category yet.','Todavía no hay archivos en esta categoría.'):T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
    // No generic external photographs are appended.
@@ -778,7 +804,7 @@
  }
  function openWeb(term){stopHouseRefresh();classicMode=false;el?.querySelectorAll('.classic-links').forEach(n=>n.remove());houseMode=false;webMode=true;webItems=[];webStatus='';commandGallery=true;searchPage=0;selectionEpoch++;st.q=term;const bar=document.getElementById('cadArqInstructionBar')?.getBoundingClientRect();compactRect={x:bar?bar.left:40,y:bar?bar.bottom+8:80,w:Math.min(760,innerWidth-16),h:Math.min(690,innerHeight-16)};open();el.querySelector('input[type=search]').value=term;searchWeb(term)}
 
- window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,roomQuery,close,refresh:paint});
+ window.CAD2D_BLOCK_BROWSER=Object.freeze({open,openSearch,openWeb,openHouses,openClassics,openVisual,openRecovered,openOlimpiadas,openImported,roomQuery,typology:arqTypology,close,refresh:paint});
  const EXT=window.CAD2D_EXTENSIONS;
  if(EXT?.commands){
   for(const key of termIndex.keys()){const command=key.toUpperCase();if(!EXT.commands[command])EXT.commands[command]=()=>openSearch(key)}

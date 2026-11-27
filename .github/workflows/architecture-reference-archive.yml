@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - scripts/collect-architecture-references.py
+      - scripts/collect-commons-typologies.py
       - .github/workflows/architecture-reference-archive.yml
 permissions:
   contents: read
@@ -13,7 +14,7 @@ concurrency:
 jobs:
   archive:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 80
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.ARCHITECTURE_R2_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.ARCHITECTURE_R2_SECRET_ACCESS_KEY }}
@@ -51,6 +52,7 @@ jobs:
             cat r2-head-error; exit 1
           fi
           python scripts/collect-architecture-references.py
+          python scripts/collect-commons-typologies.py
       - name: Upload originals and thumbnails directly to R2 then publish catalogue
         shell: bash
         run: |
@@ -58,11 +60,12 @@ jobs:
           endpoint="https://${R2_ACCOUNT}.r2.cloudflarestorage.com"
           dir=assets/architecture-references
           aws --endpoint-url "$endpoint" s3 sync "$dir/house/" "s3://$R2_BUCKET/$dir/house/" --only-show-errors
+          if [[ -d "$dir/building" ]]; then aws --endpoint-url "$endpoint" s3 sync "$dir/building/" "s3://$R2_BUCKET/$dir/building/" --only-show-errors; fi
           python - <<'PY'
           import json,pathlib
           root=pathlib.Path("assets/architecture-references")
           combined={}
-          for name in ("r2-existing.json","index.json","drive-house-references.json","user-house-plans.json"):
+          for name in ("r2-existing.json","index.json","drive-house-references.json","user-house-plans.json","commons-typologies.json"):
               p=root/name
               if p.is_file():
                   for row in json.loads(p.read_text()):

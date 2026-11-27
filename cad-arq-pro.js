@@ -1270,6 +1270,8 @@ function arqHouseGallery(raw){
  if(arqRasterHouseQuery(raw)||arqRasterRoomQuery(raw))return true;
  const q=String(raw).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(/\b(?:dibujar|generar|crear|draw|generate|create)\b/.test(q))return false;
+ // Tipologías del catálogo: iglesias, museos, casas con patio, vivienda colectiva… (sin medidas).
+ if(window.CAD2D_BLOCK_BROWSER?.typology?.(raw))return true;
  // Cortes, vistas y planos de viviendas en CAD; departamentos y monoambientes con superficie o ambientes.
  if(/\b(?:cortes?|secciones?|vistas?|alzados?|fachadas?|sections?|elevations?)\s+(?:de\s+)?(?:casas?|viviendas?|houses?)\b/.test(q)||/\b(?:casas?|viviendas?|houses?)\s+(?:en\s+)?(?:dwg|dxf|cad)\b/.test(q))return true;
  if(/\b(?:departamentos?|deptos?|monoambientes?|apartments?|flats?|studios?)\b/.test(q)&&(/\d+(?:[.,]\d+)?\s*(?:m(?:ts?)?\s*(?:2|²|\^2)|sqm|square meters|metros cuadrados)/.test(q)||/\b\d+\s+ambientes?\b/.test(q)))return true;
