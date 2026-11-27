@@ -4884,7 +4884,8 @@ function build(){
  '<label>Dirección horizontal (°) <input type="number" min="-360" max="360" step="5" data-light-field="azimuth"></label>'+
  '<label>Inclinación (°) <input type="number" min="-90" max="90" step="5" data-light-field="elevation"></label>'+
  '<label>Semiángulo foco (°) <input type="number" min="3" max="90" step="1" data-light-field="angleDeg"></label>'+
- '<label>Longitud tubo (m) <input type="number" min=".1" max="12" step=".1" data-light-field="length"></label>'+
+ '<label>Longitud tubo / panel (m) <input type="number" min=".1" max="12" step=".1" data-light-field="length"></label>'+
+ '<label>Ancho panel (m) <input type="number" min=".1" max="12" step=".1" data-light-field="width"></label>'+
  '<label><input type="checkbox" data-light-field="shadow"> Sombras (puntual / foco)</label>'+
  '</div><button type="button" class="btn" data-light-copy>Duplicar luz</button> <button type="button" class="btn" data-light-remove>Eliminar luz</button>'+
  '<small>Luces locales sin costo. Globo, panel y tubo: aproximaciones visuales; no son simulación fotométrica IES.</small>'+
@@ -8485,11 +8486,21 @@ function cad3dLightNormalize(v){
  x:bounded(v.x,0,-1000000,1000000),y:bounded(v.y,0,-1000000,1000000),z:bounded(v.z,0,-1000000,1000000),
  power:bounded(v.power,12,0,80),color:/^#[0-9a-f]{6}$/i.test(v.color||'')?v.color:'#fff2dd',
  range:bounded(v.range,10,1,100),angleDeg:bounded(v.angleDeg,Number.isFinite(v.angle)?v.angle*180/Math.PI:30,3,90),
- azimuth:bounded(v.azimuth,0,-360,360),elevation:bounded(v.elevation,-75,-90,90),length:bounded(v.length,1.2,.1,12),shadow:!!v.shadow};
+ azimuth:bounded(v.azimuth,0,-360,360),elevation:bounded(v.elevation,-75,-90,90),length:bounded(v.length,1.2,.1,12),width:bounded(v.width,bounded(v.length,1.2,.1,12),.1,12),shadow:!!v.shadow};
 }
 function cad3dLightDirection(v){
  var az=v.azimuth*Math.PI/180,el=v.elevation*Math.PI/180;
  return [Math.cos(el)*Math.cos(az),Math.cos(el)*Math.sin(az),Math.sin(el)];
+}
+function cad3dPanelSampleOffsets(v){
+ var az=v.azimuth*Math.PI/180,el=v.elevation*Math.PI/180;
+ var u=[-Math.sin(el)*Math.cos(az),-Math.sin(el)*Math.sin(az),Math.cos(el)];
+ var w=[-Math.sin(az),Math.cos(az),0],out=[];
+ for(var j=0;j<4;j++){
+  var a=(j%2-.5)*v.length/2,b=(Math.floor(j/2)-.5)*v.width/2;
+  out.push(u.map((k,i)=>k*a+w[i]*b));
+ }
+ return out;
 }
 function cad3dLightDefault(kind,id,b){
  var names={point:'Luz puntual',spot:'Foco',linear:'Luz lineal',ceiling:'Cenital',globe:'Globo',distant:'Direccional',panel:'Panel cenital'};
@@ -8498,7 +8509,7 @@ function cad3dLightDefault(kind,id,b){
  return cad3dLightNormalize({id:id,type:kind,name:names[kind]+' '+id,enabled:true,x:b.x,y:b.y,
  z:overhead?(b.empty?2.7:b.z+b.height/2-.05):Math.max(2.4,b.z),
  power:kind==='distant'?2:kind==='linear'||kind==='panel'?22:kind==='spot'||kind==='ceiling'?14:12,
- color:'#fff2dd',range:10,angleDeg:kind==='ceiling'?45:30,azimuth:0,elevation:overhead?-90:-75,length:1.2,shadow:false});
+ color:'#fff2dd',range:10,angleDeg:kind==='ceiling'?45:30,azimuth:0,elevation:overhead?-90:-75,length:1.2,width:kind==='panel'?.6:1.2,shadow:false});
 }
 function cad3dLightRestore(saved){
  var seen=new Set();cad3dLights=(Array.isArray(saved)?saved:[]).slice(0,48).map(cad3dLightNormalize).filter(v=>v&&!seen.has(v.id)&&seen.add(v.id));
@@ -8523,10 +8534,10 @@ function cad3dLightsUpdateScene(){
   if(v.type==='distant'){
    var sun=new T.DirectionalLight(color,power),dir=cad3dLightDirection(v);sun.position.copy(at);sun.target.position.copy(at).add(new T.Vector3(...dir));sun.castShadow=!!v.shadow;sun.userData.lightId=v.id;scene.add(sun,sun.target);cad3dLightObjects.push(sun);
   }else if(v.type==='spot'||v.type==='ceiling'||v.type==='panel'){
-   var samples=v.type==='panel'?4:1;
+   var offsets=v.type==='panel'?cad3dPanelSampleOffsets(v):[[0,0,0]],samples=offsets.length;
    for(var j=0;j<samples;j++){
    var spot=new T.SpotLight(color,power/samples);
-   spot.position.copy(at);if(samples===4){spot.position.x+=(j%2-.5)*v.length/2;spot.position.y+=(Math.floor(j/2)-.5)*v.length/2;}
+   spot.position.copy(at).add(new T.Vector3(...offsets[j]));
    spot.angle=v.angleDeg*Math.PI/180;
    spot.penumbra=.28;spot.decay=2;spot.distance=Math.max(1,Number(v.range)||12);
    var dir=cad3dLightDirection(v);
@@ -8624,7 +8635,7 @@ function cad3dLightPaletteRender(){
  var light=cad3dLights.find(function(v){return String(v.id)===old;})||cad3dLights[0];
  if(light)select.value=String(light.id);
  panel.querySelectorAll('[data-light-field]').forEach(function(el){
-  el.disabled=!light;
+  el.disabled=!light||(el.dataset.lightField==='width'&&light.type!=='panel');
   if(light)el.type==='checkbox'?el.checked=!!light[el.dataset.lightField]:el.value=String(light[el.dataset.lightField]??'');
  });
  panel.querySelector('[data-light-edit]').hidden=!light;
