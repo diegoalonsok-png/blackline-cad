@@ -1,0 +1,32 @@
+name: CALCOPY public browser verification
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/calcopy-public-browser.yml'
+      - 'research/calcopy-v2/public-browser-check.cjs'
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser test runner
+        run: |
+          npm install --prefix /tmp/calcopy-browser playwright
+          /tmp/calcopy-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Run actual public-site CALCOPY workflow
+        env:
+          NODE_PATH: /tmp/calcopy-browser/node_modules
+        run: node research/calcopy-v2/public-browser-check.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calcopy-public-browser-evidence
+          path: calcopy-public-output/
