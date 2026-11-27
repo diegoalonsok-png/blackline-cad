@@ -286,7 +286,7 @@ function useReferenceCadLayout(){
   if(navLabels[button.dataset.tab])button.textContent=navLabels[button.dataset.tab];
  });
  const brand=doc.querySelector('.brand small');
- if(brand)brand.textContent='DESIGN AND ARCHITECTURAL DRAFTING · 2D';
+ if(brand)brand.remove();
  const left=side.left;
  if(left){
   const layerPanel=left.querySelector('#layers')?.closest('.panel')||doc.querySelector('#layers')?.closest('.panel');
