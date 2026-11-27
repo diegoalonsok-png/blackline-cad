@@ -2593,7 +2593,7 @@ async function cad3dFetchRemoteModel(spec){
  if(data.version!==1||!Array.isArray(p)||!p.length||p.length%9||p.length>1080000||!p.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Geometría 3D inválida');
  return {meshVertices:p,materialColor:/^#[0-9a-f]{6}$/i.test(data.materialColor||'')?data.materialColor:'#b6bdc0'};
 }
-var cad3dBlockView='3d',cad3dBlockCategory='all',cad3dShowProvisional=false;
+var cad3dBlockView='3d',cad3dBlockCategory='all',cad3dShowProvisional=false,cad3dGalleryPage=0;
 // A realism label requires a human review and a documented redistributable source.
 function cad3dGalleryQualityFromManifest(v){
  var q=v.quality,approved=v.review?.approved===true&&/^\d{4}-\d{2}-\d{2}$/.test(v.review.date||'')&&typeof v.review.reviewer==='string'&&v.review.reviewer.trim().length>0;
@@ -2604,6 +2604,13 @@ function cad3dGalleryQualityFromManifest(v){
 function cad3dGalleryQuality(spec){return spec.quality==='realistic'?'Realista · revisado':spec.quality==='semirealistic'?'Semirrealista · revisado':spec.detail?'Detallado · pendiente de revisión':'Provisional · no realista';}
 function cad3dGalleryVisible(spec){return !spec.superseded&&!(spec.legacy&&window.BlacklineEntourage)&&(cad3dShowProvisional||spec.detail||['realistic','semirealistic'].includes(spec.quality));}
 function cad3dBlockKind(spec){return spec.cutout?'2.5d':'3d';}
+// Cap live gallery cards and local thumbnail generation per page, independent of catalogue size.
+function cad3dGalleryPageSlice(ids,page){
+ var size=48,total=ids.length,pages=Math.max(1,Math.ceil(total/size));
+ var index=Math.max(0,Math.min(pages-1,Number.isFinite(page)?Math.floor(page):0));
+ return {ids:ids.slice(index*size,(index+1)*size),index,pages,total};
+}
+function cad3dGalleryRank(spec){return spec.quality==='realistic'?0:spec.quality==='semirealistic'?1:spec.detail?2:3;}
 var cad3dPreviewCache={};
 function cad3dBlockPreview(spec,id){
  // Preview is derived from the actual block definition, not a category icon.
@@ -2658,9 +2665,16 @@ function cad3dBlockCatalogItems(){
  var search=norm(root.querySelector('.cad3dBlockSearch').value).trim();
  var synonyms={sofa:'sofa couch living',silla:'chair seat',mesa:'table',cama:'bed',sillon:'armchair chair',inodoro:'toilet wc',lavatorio:'sink basin',auto:'car vehicle',arbol:'tree plant',heladera:'fridge refrigerator',escritorio:'desk office',banera:'bath bathtub',lampara:'lamp light',televisor:'tv television'};
  ids=ids.filter(function(id){var d=CAD3D_COMPONENTS[id],label=norm(d.name+' '+d.group+' '+id);var words=Object.keys(synonyms).filter(k=>label.includes(k)).map(k=>synonyms[k]).join(' ');return search.split(/\s+/).every(w=>(label+' '+words).includes(w));});
- var holder=root.querySelector('.cad3dBlockResults');
+ ids.sort(function(a,b){return cad3dGalleryRank(CAD3D_COMPONENTS[a])-cad3dGalleryRank(CAD3D_COMPONENTS[b])||CAD3D_COMPONENTS[a].name.localeCompare(CAD3D_COMPONENTS[b].name)||a.localeCompare(b);});
+ var page=cad3dGalleryPageSlice(ids,cad3dGalleryPage);cad3dGalleryPage=page.index;
+ var holder=root.querySelector('.cad3dBlockResults'),pager=root.querySelector('.cad3dGalleryPager');
+ pager.hidden=page.pages<=1;
+ pager.querySelector('[data-gallery-page="prev"]').disabled=page.index===0;
+ pager.querySelector('[data-gallery-page="next"]').disabled=page.index>=page.pages-1;
+ pager.querySelector('[data-gallery-page-label]').textContent=(page.index+1)+' / '+page.pages;
+ root.querySelector('.cad3dBlockCount').textContent=page.total+' components · '+(page.total?(page.index*48+1)+'–'+Math.min(page.total,(page.index+1)*48):'0');
  if(!ids.length){holder.innerHTML='<div class="cad3dBlockEmpty">'+(cad3dBlockView==='photo'?'': 'Sin componentes revisados o detallados para estos filtros. Activá los provisionales si necesitás un bloque básico.')+'</div>';return;}
- holder.innerHTML='<div class="cad3dBlockGrid">'+ids.map(function(id){
+ holder.innerHTML='<div class="cad3dBlockGrid">'+page.ids.map(function(id){
   var spec=CAD3D_COMPONENTS[id];
   return '<button type="button" class="cad3dBlockCard" data-3d-block="'+id+'" title="Insertar '+escapeHtml(spec.name)+'">'+
     '<span class="cad3dBlockPreview">'+cad3dBlockPreview(spec,id)+'</span>'+
@@ -2698,7 +2712,7 @@ function cad3DBlockCatalog(){
  '<input class="cad3dBlockSearch" type="search" placeholder="Search components..." aria-label="Buscar componentes">'+
  '<label class="cad3dBlockMeta"><input type="checkbox" data-gallery-provisional> Mostrar componentes provisionales (esquemáticos / no revisados)</label>'+
  '<div class="cad3dBlockFilters" role="group" aria-label="Categorías"></div>'+
- '<div class="cad3dBlockResults"></div>'+
+ '<div class="cad3dBlockResults"></div><div class="cad3dGalleryPager" hidden><button type="button" class="btn" data-gallery-page="prev" aria-label="Previous page">‹</button> <small data-gallery-page-label aria-live="polite"></small> <button type="button" class="btn" data-gallery-page="next" aria-label="Next page">›</button></div>'+
  '<div class="cad3dBlockEmpty cad3dBlockEmptyNotice" hidden>Los recortes fotográficos son imágenes PNG/WebP con transparencia. Todavía no hay fotografías reales incorporadas en esta biblioteca; los recortes esquemáticos están en la pestaña 2.5D.</div>'+
  '<small class="cad3dBlockCount" aria-live="polite"></small></div></details>';
 }
@@ -5280,13 +5294,15 @@ function build(){
   function end(ev){if(ev.pointerId!==id)return;header.removeEventListener('pointermove',move);header.removeEventListener('pointerup',end);header.removeEventListener('pointercancel',end);}
   header.addEventListener('pointermove',move);header.addEventListener('pointerup',end);header.addEventListener('pointercancel',end);
  });
- root.querySelector('.cad3dBlockSearch').addEventListener('input',cad3dBlockCatalogItems);
- root.querySelector('[data-gallery-provisional]').addEventListener('change',function(){cad3dShowProvisional=this.checked;cad3dRefreshBlockCatalog();});
+ root.querySelector('.cad3dBlockSearch').addEventListener('input',function(){cad3dGalleryPage=0;cad3dBlockCatalogItems();});
+ root.querySelector('[data-gallery-provisional]').addEventListener('change',function(){cad3dShowProvisional=this.checked;cad3dGalleryPage=0;cad3dRefreshBlockCatalog();});
  root.querySelector('.block3DPanel').addEventListener('click',async function(e){
+  var pageButton=e.target.closest('[data-gallery-page]');
+  if(pageButton){if(!pageButton.disabled){cad3dGalleryPage+=pageButton.dataset.galleryPage==='next'?1:-1;cad3dBlockCatalogItems();}return;}
   var tab=e.target.closest('[data-block-kind]');
-  if(tab){cad3dBlockView=tab.dataset.blockKind;cad3dBlockCategory='all';cad3dRefreshBlockCatalog();return;}
+  if(tab){cad3dBlockView=tab.dataset.blockKind;cad3dBlockCategory='all';cad3dGalleryPage=0;cad3dRefreshBlockCatalog();return;}
   var category=e.target.closest('[data-block-category]');
-  if(category){cad3dBlockCategory=category.dataset.blockCategory;cad3dRefreshBlockCatalog();return;}
+  if(category){cad3dBlockCategory=category.dataset.blockCategory;cad3dGalleryPage=0;cad3dRefreshBlockCatalog();return;}
   var button=e.target.closest('[data-3d-block]');if(!button)return;
   var id=button.dataset['3dBlock'];if(!CAD3D_COMPONENTS[id])return;
   var spec=CAD3D_COMPONENTS[id];
