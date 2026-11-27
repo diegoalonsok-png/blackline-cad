@@ -597,7 +597,7 @@
  const MODERN_RE=/\b(?:le ?corbusier|corbu|mies|frank lloyd wright|gropius|aalto|louis kahn|niemeyer|tadao ando|zaha|gehry|koolhaas|siza|barragan|utzon|scarpa|botta|herzog|eisenman|venturi|aldo rossi)\b/i,DRAW_RE=/\b(?:plan|plans|planta|plantas|plano|planos|section|sections|corte|cortes|seccion|elevation|alzado|fachada|drawing|dibujo|sketch|croquis|grundriss|pianta)\b/i;
  let localGalleryPromise=null;
  function localGallery(){
-  if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json?v=20261127-bathroom-catalogue5',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
+  if(!localGalleryPromise)localGalleryPromise=fetch(new URL('assets/arq-catalogue/v1/index.json?v=20261127-bathroom-catalogue6',document.baseURI)).then(r=>{if(!r.ok)throw Error('Catálogo no disponible');return r.json()}).catch(e=>{localGalleryPromise=null;throw e});
   return localGalleryPromise;
  }
  // Bilingual room search. Explicit raster requests keep the reference route.
@@ -635,7 +635,7 @@
   const cat=query.category,terms=query.terms,base=new URL('assets/arq-room-cad/v1/',document.baseURI),nativeBase=new URL('assets/arq-catalogue/v1/',document.baseURI);
   const [newRows,nativeRows]=await Promise.all([roomCADIndex().catch(()=>[]),cat==='living'?Promise.resolve([]):localGallery().catch(()=>[])]);
   const dxf=newRows.filter(x=>x.category===cat&&roomTermsMatch(x,terms)&&/^[a-z0-9-]+$/.test(x.id)&&typeof x.preview==='string'&&x.preview.startsWith('<svg ')).map(x=>{const u=new URL(x.id+'.dxf',base).href;return {title:T(x.en,x.es),category:cat,drawingType:'floor-plan',area:x.area,thumb:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(x.preview),cadUrl:u,source:u,license:T('DXF · editable · concept plan','DXF · editable · anteproyecto'),roomCad:true,local:true};});
-  const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,category:cat,drawingType:'floor-plan',area:x.area,thumb:new URL(x.id+'.svg',nativeBase).href,source:new URL(x.id+'.svg',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
+  const native=nativeRows.filter(x=>x.category===cat&&(!terms.length||roomTermsMatch(x,terms))).map(x=>({title:x.name,category:cat,drawingType:'floor-plan',area:x.area,thumb:new URL(x.id+'.svg?v=20261127-bathroom-catalogue6',nativeBase).href,source:new URL(x.id+'.svg?v=20261127-bathroom-catalogue6',nativeBase).href,license:T('Native CAD · editable','CAD nativo · editable'),local:true,planId:x.id,roomCad:true}));
   const user=await userCadMatches([cat==='bathroom'?'baño':cat==='kitchen'?'cocina':'living',...terms.map(t=>t==='accessible'?'discapacitados':t)].join(' ')).catch(()=>[]);
   return user.concat(dxf,native);
  }
