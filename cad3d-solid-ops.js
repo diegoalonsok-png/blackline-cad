@@ -3,7 +3,9 @@
 'use strict';
 const EPS=1e-7,MAX=120000;
 const sub=(a,b)=>a.map((x,i)=>x-b[i]),dot=(a,b)=>a.reduce((n,x,i)=>n+x*b[i],0),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-function volume(t){let v=0;for(let i=0;i<t.length;i+=9)v+=dot(t.slice(i,i+3),cross(t.slice(i+3,i+6),t.slice(i+6,i+9)))/6;return v}
+// Closed-mesh volume: shift to a nearby vertex before the tetrahedron sum.
+// Compensated summation reduces cancellation on shells and complex solids.
+function volume(t){if(!t.length)return 0;const o=t.slice(0,3);let v=0,c=0;for(let i=0;i<t.length;i+=9){const a=sub(t.slice(i,i+3),o),b=sub(t.slice(i+3,i+6),o),d=sub(t.slice(i+6,i+9),o),term=dot(a,cross(b,d))/6-c,next=v+term;c=(next-v)-term;v=next;}return v}
 function poly(v){let n;for(let i=2;i<v.length;i++){const c=cross(sub(v[i-1],v[0]),sub(v[i],v[0])),l=Math.hypot(...c);if(l>EPS*EPS){n=c.map(x=>x/l);break}}return n?{v,n,w:dot(n,v[0])}:null}
 function flip(p){return {v:p.v.slice().reverse(),n:p.n.map(x=>-x),w:-p.w}}
 function boolean(a,b,op){
@@ -25,14 +27,19 @@ function boolean(a,b,op){
   all(){return this.p.concat(this.f?this.f.all():[],this.b?this.b.all():[])}
  }
  function input(t){if(!Array.isArray(t)||!t.length||t.length%9||t.length>MAX||!t.every(Number.isFinite))throw Error('Malla inválida o demasiado grande');const out=[],reverse=volume(t)<0;for(let i=0;i<t.length;i+=9){let p=poly([t.slice(i,i+3),t.slice(i+3,i+6),t.slice(i+6,i+9)]);if(p)out.push(reverse?flip(p):p)}if(Math.abs(volume(t))<EPS*EPS)throw Error('El objeto no encierra volumen');return out}
- const A=new Node(input(a)),B=new Node(input(b));
+ // Perform the BSP in local coordinates to keep plane offsets numerically stable.
+ const valid=t=>Array.isArray(t)&&t.length>0&&t.length%9===0&&t.length<=MAX&&t.every(Number.isFinite);
+ if(!valid(a)||!valid(b))throw Error('Malla inválida o demasiado grande');
+ const anchor=a.slice(0,3),local=t=>t.map((x,i)=>x-anchor[i%3]);
+ const A=new Node(input(local(a))),B=new Node(input(local(b)));
  if(op==='subtract'){A.invert();A.clipTo(B);B.clipTo(A);B.invert();B.clipTo(A);B.invert();A.build(B.all());A.invert()}
  else if(op==='intersect'){A.invert();B.clipTo(A);B.invert();A.clipTo(B);B.clipTo(A);A.build(B.all());A.invert()}
  else if(op==='union'){A.clipTo(B);B.clipTo(A);B.invert();B.clipTo(A);B.invert();A.build(B.all())}
  else throw Error('Operación desconocida');
  const out=[];for(const p of A.all())for(let i=2;i<p.v.length;i++){const q=poly([p.v[0],p.v[i-1],p.v[i]]);if(q){out.push(...q.v[0],...q.v[1],...q.v[2]);if(out.length>MAX)throw Error('Resultado supera el límite de malla guardable')}}
- if(!out.every(Number.isFinite))throw Error('Resultado inválido');
- return out;
+ const world=out.map((x,i)=>x+anchor[i%3]);
+ if(!world.every(Number.isFinite))throw Error('Resultado inválido');
+ return world;
 }
 function revolve(profile,angle,faces){
  if(profile.length<3||profile.length>128||!Number.isFinite(angle)||angle<=0||angle>360||profile.some(p=>p[0]<-EPS||!p.every(Number.isFinite)))throw Error('Perfil o ángulo inválido');
