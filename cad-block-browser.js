@@ -293,8 +293,44 @@
  ];
  const normalizeTerm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
  const termIndex=new Map(blockTerms.flatMap(([keys,re])=>(keys.includes('|')?keys.split('|'):keys.split(' ')).map(k=>[normalizeTerm(k),re])));
+ // Shared name matching for native, imported, personal and document CAD blocks.
+ const matchNorm=s=>normalizeTerm(s).replace(/[^a-z0-9]+/g,' ').trim();
+ const matchWords=s=>matchNorm(s).split(/\s+/).filter(Boolean);
+ const wordForms=w=>[w,...(w.length>3&&w.endsWith('s')?[w.slice(0,-1)]:[]),...(w.length>4&&w.endsWith('es')?[w.slice(0,-2)]:[])];
+ function editDistance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let next=[i];for(let j=1;j<=b.length;j++)next[j]=Math.min(row[j]+1,next[j-1]+1,row[j-1]+(a[i-1]===b[j-1]?0:1));row=next;}return row[b.length];}
+ const extraAliases=[
+ ['auto autos automovil automoviles coche coches car cars vehicle vehicles vehiculo vehiculos','auto autos automovil automoviles coche coches car cars vehicle vehicles vehiculo vehiculos'],
+ ['bidet bidets bide bides','bidet bidets bide bides'],
+ ['enchufe enchufes tomacorriente tomacorrientes toma socket outlet','enchufe enchufes tomacorriente tomacorrientes toma socket outlet'],
+ ['grifo griferia canilla faucet tap','grifo griferia canilla faucet tap'],
+ ['baranda barandas pasamanos railing handrail','baranda barandas pasamanos railing handrail'],
+ ['sillon sillones sofa sofas couch couches','sillon sillones sofa sofas couch couches'],
+ ['lavatorio lavatorios lavabo lavabos washbasin basin vanitory bacha','lavatorio lavatorios lavabo lavabos washbasin basin vanitory bacha'],
+ ['discapacitado discapacitados accesible accessible wheelchair pmr','discapacitado discapacitados accesible accessible wheelchair pmr'],
+ ['computadora ordenador computer pc','computadora ordenador computer pc'],
+ ['camioneta camionetas pickup suv','camioneta camionetas pickup suv']
+ ].map(([a,b])=>[a.split(' '),b.split(' ')]);
+ const aliasesFor=w=>extraAliases.find(([a])=>a.includes(w))?.[1]||[];
+ function wordMatch(w,words,allowFuzzy=true){
+  const forms=wordForms(w),aliases=aliasesFor(w),rx=termIndex.get(w);
+  if(words.some(t=>forms.some(v=>wordForms(t).includes(v))))return 0;
+  if(words.some(t=>aliases.includes(t))||(rx&&rx.test(words.join(' '))))return 1;
+  if(w.length>=3&&words.some(t=>t.startsWith(w)&&t.length<=w.length+7))return 2;
+  if(allowFuzzy&&w.length>=4&&words.some(t=>t.length>=4&&Math.abs(t.length-w.length)<=(w.length>=7?2:1)&&editDistance(w,t)<=(w.length>=7?2:1)))return 4;
+  return -1;
+ }
+ function nameMatchRank(raw,primary,secondary='',category=''){
+  const q=matchNorm(raw),p=matchNorm(primary),s=matchNorm(secondary),cat=matchNorm(category);
+  if(!q)return 0;if(q===p)return 0;
+  const words=matchWords(q),pw=matchWords(p),sw=matchWords(s),cw=matchWords(cat);let rank=0;
+  for(const w of words){let n=wordMatch(w,pw);if(n<0){n=wordMatch(w,sw);if(n>=0)n+=8;}
+   // A known object must match its name/identifier, never an entire unrelated category.
+   if(n<0&&!termIndex.has(w)&&!aliasesFor(w).length){n=wordMatch(w,cw,false);if(n>=0)n+=18;}
+   if(n<0)return -1;rank+=n;
+  }return rank+1;
+ }
  function blockQuery(raw){
-  const q=normalizeTerm(raw);
+  const q=normalizeTerm(raw).replace(/^\s*(?:(?:buscar|busca|mostrar|insertar|colocar|search|find|show|insert|place)\s+)?(?:bloques?|blocks?)\s+(?:de\s+|of\s+)?/,'').replace(/^\s*(?:buscar|busca|mostrar|insertar|colocar|search|find|show|insert|place)\s+/,'');
   const mode=/\b(?:cortes?|secciones?|seccion|sections?|sectional|cross.section)\b/.test(q)?'Corte':/\b(?:vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|costado|frente|trasera|trasero|atras|detras|back)\b/.test(q)?'Alzado':/\b(?:plantas?|top|plan|arriba|superior)\b/.test(q)?'Planta':null;
   const direction=/\b(?:laterales?|perfil|side|costado)\b/.test(q)?'side':/\b(?:frontal|front|frente)\b/.test(q)?'front':/\b(?:posterior|rear|trasera|trasero|atras|detras|back)\b/.test(q)?'rear':null;
   const text=q.replace(/\b(?:en|de|del|la|el|los|las|un|una|desde|visto|vista|in|of|the|from|cortes?|secciones?|seccion|sections?|sectional|cross.section|vistas?|alzados?|elevaciones?|elevacion|elevations?|front|side|frontal|laterales?|perfil|posterior|rear|costado|frente|trasera|trasero|atras|detras|back|plantas?|top|plan|arriba|superior|view)\b/g,' ').replace(/\s+/g,' ').trim();
@@ -303,17 +339,14 @@
  function blockMatchRank(it,query){
   const {q,mode,direction,text}=query;if(!q)return 0;
   const name=normalizeTerm([it.name,tr(it.name),String(it.id||'').replace(/[_-]/g,' '),String(it.source||'').replace(/[_-]/g,' ')].filter(Boolean).join(' '));
-  const all=normalizeTerm([name,it.cat,tr(it.cat),familyOf(it),...(Array.isArray(it.tags)?it.tags:[])].filter(Boolean).join(' '));
-  const syn=termIndex.get(text);
-  const tokens=text.split(/[\s_-]+/).filter(Boolean);
-  const matched=!text||(syn?syn.test(name):tokens.every(t=>{const alias=termIndex.get(t);return alias?alias.test(name):all.includes(t)}));
-  if(!matched)return -1;
+  const rank=nameMatchRank(text,it.name,[tr(it.name),it.id,it.source,...(Array.isArray(it.tags)?it.tags:[])].filter(Boolean).join(' '),[it.cat,tr(it.cat),familyOf(it)].join(' '));
+  if(rank<0)return -1;
   const actual=modeOf(it);
   if(direction&&!(direction==='side'?/lateral|perfil|side|\blat\b/:direction==='front'?/frontal|front|\bfre\b/:/posterior|rear|trasera/).test(name))return -1;
-  if(!mode||actual===mode)return 0;
+  if(!mode||actual===mode)return rank*3;
   // Furniture shown in a building section may be an elevation rather than a cut through the object.
   // Label these alternatives explicitly, after true section blocks.
-  if(mode==='Corte'&&actual==='Alzado'&&text&&!direction)return 1;
+  if(mode==='Corte'&&actual==='Alzado'&&text&&!direction)return rank*3+1;
   return -1;
  }
  function filtered(pool=items().filter(inView)){
@@ -406,7 +439,7 @@
   });
   searchPage=Math.min(searchPage,Math.max(0,Math.ceil(list.length/4)-1));const shown=commandGallery?list.slice(searchPage*4,searchPage*4+4):list.slice(0,visibleCount),cardSize=commandGallery?100:visual?Math.max(170,st.size):st.size;
   grid.style.gridTemplateColumns=commandGallery?'repeat(2,minmax(0,1fr))':`repeat(auto-fill,minmax(${cardSize}px,1fr))`;
-  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
+  grid.innerHTML=shown.map(it=>`<button class="card${it.id===armedId?' armed':''}" data-id="${it.id}" title="${simpleName(it,names)} · ${T('Click to select, then click on drawing','Clic para seleccionar, luego clic en el plano')}"><span class="preview" data-preview-id="${it.id}" data-preview-height="${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}" style="min-height:${visual?Math.max(145,Math.round(cardSize*.9)):Math.round(st.size*.72)}px"></span>${it.pro?'<span class="pro">PRO</span>':''}${archivedView(it)?'<span class="archive-label" title="Bloque histórico o esquemático; verificar detalle y escala">'+T('HISTORICAL / SCHEMATIC','HISTÓRICO / ESQUEMÁTICO')+'</span>':''}<span class="nm">${simpleName(it,names)}</span>${commandGallery&&st.q?'<span class="mt">'+({Planta:T('Plan','Planta'),Corte:T('Section','Corte'),Alzado:T('Elevation','Alzado')}[modeOf(it)])+(blockMatchRank(it,searchQuery)%3===1?' · '+T('related view','vista relacionada'):'')+'</span>':''}<span class="mt">${cm(it.w)}×${cm(it.d)} cm${it.wMax>it.wMin||it.dMax>it.dMin?' · ↔':''}</span></button>`).join('')||`<p style="color:inherit;padding:20px">${T('No blocks match.','No hay bloques que coincidan.')}</p>`;
   mountPreviews(grid);
   if(commandGallery&&list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q||!el)return;const b=document.createElement('button');b.className='card';b.style.cssText='grid-column:1/-1;justify-content:center;align-items:center;min-height:44px;text-align:center;font-weight:600';b.textContent=T('Your DWG/DXF blocks: ','Tus bloques DWG/DXF: ')+items.length+' →';b.onclick=()=>{openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();};grid.prepend(b);}).catch(()=>{});}
   if(commandGallery&&!list.length&&String(st.q||'').trim().length>2){const q=String(st.q).trim(),ep=++userCadEpoch;userCadMatches(q).then(items=>{if(ep!==userCadEpoch||!items.length||webMode||String(st.q||'').trim()!==q)return;openWeb(q);webController?.abort();webEpoch++;webItems=items;webStatus='';searchPage=0;paintWeb();}).catch(()=>{});}
@@ -643,9 +676,7 @@
   const rows=await userCadIndex();if(!rows.length)return [];
   const q=ucNorm(raw).replace(/\b(?:de|del|para|con|en|un|una|el|la|los|las|y|o|ver|buscar|insertar|bloques?|blocks?|planta|plantas|cad|dwg|dxf|the|a|of|for|with)\b/g,' ').replace(/\s+/g,' ').trim();
   if(!q)return [];
-  const words=q.split(' ').filter(w=>w.length>2);
-  const groups=words.map(w=>{const syn=UCAD_SYN.find(([re])=>re.test(w));return syn?syn[1].split(' '):[w.replace(/(?:es|s)$/,'')]});
-  const scored=rows.map(x=>{const t=ucNorm([x.name,x.category,x.category_title,Array.isArray(x.tags)?x.tags.join(' '):x.tags,x.id].join(' '));const hits=groups.filter(g=>g.some(w=>w&&t.includes(w))).length;return [hits,x]}).filter(([h])=>h>0&&h>=Math.min(groups.length,2)).sort((a,b)=>b[0]-a[0]).slice(0,max);
+  const scored=rows.map(x=>[nameMatchRank(q,x.name,[x.id,x.original_name,x.filename,Array.isArray(x.tags)?x.tags.join(' '):x.tags].filter(Boolean).join(' '),[x.category,x.category_title].join(' ')),x]).filter(([rank])=>rank>=0).sort((a,b)=>a[0]-b[0]||String(a[1].name).localeCompare(String(b[1].name))).slice(0,max);
   const root=new URL('./',document.baseURI);
   return scored.map(([,x])=>({title:x.name||x.id,category:x.category,drawingType:'cad-block',thumb:new URL(x.preview,root).href,cadUrl:new URL(x.dxf,root).href,source:new URL(x.dxf,root).href,license:T('DWG/DXF uploaded · ','DWG/DXF propio · ')+(x.category_title||x.category||''),roomCad:true,local:true}));
  }
