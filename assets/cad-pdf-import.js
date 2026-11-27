@@ -562,14 +562,27 @@ async function traceFile(file,source=null,python=false,brush=false){
    preview.onclick=e=>{const rect=preview.getBoundingClientRect(),scale=Math.min(rect.width/w,rect.height/h);if(scale>0)markAt((e.clientX-rect.left-(rect.width-w*scale)/2)/scale,(e.clientY-rect.top-(rect.height-h*scale)/2)/scale,scale);};
    undo.onclick=()=>{if(python){const f=history.pop();if(f)f();}else placements.pop();redraw();};
    const ai=document.createElement('button');ai.className='btn';ai.textContent=LX('IA · Objetos','AI · Objects');ai.title=LX('Reconocer mobiliario y artefactos con el modelo visual local (experimental)','Recognize furniture and fixtures with the experimental local vision model');
+   const semanticAI=document.createElement('button');semanticAI.className='btn';semanticAI.textContent='IA · Qwen-VL';semanticAI.title=LX('Interpretación semántica avanzada (WebGPU, experimental)','Advanced semantic interpretation (WebGPU, experimental)');
    const aiStatus=document.createElement('p');aiStatus.style.cssText='font-size:12px;color:#9fc3d6';
-   ai.onclick=async()=>{if(!confirm(LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
-    ai.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
+   const recognizeAI=async advanced=>{if(ai.disabled||semanticAI.disabled)return;if(!confirm(advanced?LX('Qwen-VL requiere WebGPU y una descarga inicial de varios GB. El plano se procesa localmente. ¿Continuar?','Qwen-VL requires WebGPU and a multi-GB initial download. The plan is processed locally. Continue?'):LX('Primera ejecución: descarga de un modelo gratuito de visión (varios cientos de MB). El plano se procesa localmente. ¿Continuar?','First run: downloads a free vision model (several hundred MB). The plan is processed locally. Continue?')))return;
+    ai.disabled=true;semanticAI.disabled=true;ok.disabled=true;onlyBlocks.disabled=true;aiStatus.textContent=LX('Cargando modelo local…','Loading local model…');
     try{
      const module=await import(new URL('cad-calco-vision.mjs?v=20261126-wcscale1',BASE.replace(/vendor\/pdfjs\/$/,'' )).href);
-     const found=preDetected||await module.detect(cv,p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');});
+     const progress=p=>{if(d.isConnected)aiStatus.textContent=p.status==='progress'?LX('Descargando ','Downloading ')+(p.file||'modelo')+' '+Math.round(p.progress||0)+'%':LX('Preparando IA local…','Preparing local AI…');};
+     let reading=null,found;
+     if(advanced){const model=await import(new URL('cad-calcopy-semantic.mjs?v=20261126-qwen1',BASE.replace(/vendor\/pdfjs\/$/,'')).href);reading=await model.interpret(cv,progress);found=reading.objects;}
+     else found=preDetected||await module.detect(cv,progress);
      if(!d.isConnected)return;
      let n=0;const sx=real*scaleF/w,sy=source?Math.abs(source.b.y-source.a.y)*C.U[S.unit]/1000/h*scaleF:sx;
+     let addedWalls=0;
+     if(reading&&AS&&G&&python){
+      for(const hintWall of reading.wallHints){
+       const [a,b,X,Y]=hintWall.box,midX=(a+X)/2,midY=(b+Y)/2,A=AS.measureWall(G,midX,midY);
+       if(!A||A.v!==((Y-b)>(X-a))||A.t*Math.sqrt(sx*sy)<.08||A.t*Math.sqrt(sx*sy)>.5||(A.hi-A.lo)*Math.sqrt(sx*sy)<.25)continue;
+       if(walls.some(q=>!q.skip&&q.v===A.v&&Math.abs(q.c-A.c)<Math.max(2,Math.min(q.t,A.t)*.5)&&Math.min(q.hi,A.hi)>Math.max(q.lo,A.lo)))continue;
+       AS.snapEnds(A,walls);syncWall(A);walls.push(A);history.push(()=>{const i=walls.indexOf(A);if(i>=0)walls.splice(i,1);});addedWalls++;
+      }
+     }
      for(const det of found){
       const [x0,y0,x1,y1]=det.box.map((v,i)=>Math.max(0,Math.min(i%2?h:w,v)));if(x1<=x0||y1<=y0)continue;
       const fit=module.bestCatalogMatch(det.label,[x0,y0,x1,y1],candidates,sx,sy);if(!fit)continue;const it=fit.item,id=it.id;
@@ -578,10 +591,11 @@ async function traceFile(file,source=null,python=false,brush=false){
       // Preserve the detected center and choose the best orthogonal axis.
       const pl={x:fit.x,y:fit.y,rotation:fit.rotation,uncertain:fit.uncertain,id:it.id,name:it.name+' (IA)',w:fit.w,d:fit.d,aiBox:[x0,y0,x1,y1]};placements.push(pl);if(python)history.push(()=>{const i=placements.indexOf(pl);if(i>=0)placements.splice(i,1);});n++;
      }
-     redraw();aiStatus.textContent=n+LX(' candidatos añadidos de ',' candidates added out of ')+found.length+LX(' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.',' detections. Check position and rotation; use Undo mark to reject.');
+     redraw();aiStatus.textContent=n+LX(' candidatos añadidos de ',' candidates added out of ')+found.length+LX(' detecciones. Revisá posición y giro; usá Deshacer marca para rechazar.',' detections. Check position and rotation; use Undo mark to reject.')+(reading?' · Qwen-VL: '+addedWalls+' WALL / '+reading.rooms.length+' ROOM': '');
     }catch(e){if(d.isConnected)aiStatus.textContent=LX('IA local no disponible: ','Local AI unavailable: ')+String(e.message||e).slice(0,180)+LX('. Podés seguir con el marcado manual.','. You can continue marking manually.');}
-    finally{ai.disabled=false;redraw();}
+    finally{ai.disabled=false;semanticAI.disabled=false;redraw();}
    };
+   ai.onclick=()=>recognizeAI(false);semanticAI.onclick=()=>recognizeAI(true);
    retry.onclick=async()=>{retry.disabled=true;ok.disabled=true;title.textContent=LX('CALCO: buscando otra interpretación…','CALCO: trying another reading…');await new Promise(resolve=>setTimeout(resolve,30));try{const modes=['macizos','rayados','rayado fino','rayado fino claro','mixto experimental'];mode=modes[(modes.indexOf(mode)+1)%modes.length];makeMask(mode==='rayado fino'?170:mode==='rayado fino claro'?205:205);if(mode==='mixto experimental'){makeMask(205);const solid=traceWallBands(mask,w,h),hatch=traceHatchedWallBands(mask,w,h),fineLight=traceFineWallBands(mask,w,h);makeMask(170);const fine=traceFineWallBands(mask,w,h);walls=combineTraceCandidates([solid,hatch,fineLight,fine]);}else{walls=mode==='macizos'?traceWallBands(mask,w,h):mode==='rayados'?traceHatchedWallBands(mask,w,h):traceFineWallBands(mask,w,h);}if(walls.length>250)walls=[];hatched=mode!=='macizos';C.log('CALCO: '+walls.length+LX(' candidatos · ',' candidates · ')+mode);redraw();}catch(e){title.textContent='CALCO: '+e.message;}finally{retry.disabled=false;}};
    const tool=document.createElement('select'),reading=document.createElement('select'),flip=document.createElement('button');
    if(python){
@@ -593,8 +607,8 @@ async function traceFile(file,source=null,python=false,brush=false){
      // Cycle through the four swing combinations.
      const prev=[o.side,o.hingeAtLo];if(o.hingeAtLo)o.hingeAtLo=false;else{o.hingeAtLo=true;o.side=-o.side;}history.push(()=>{[o.side,o.hingeAtLo]=prev;});redraw();};
     const useDetected=document.createElement('button');useDetected.className='btn';useDetected.textContent=LX('Aceptar batientes detectadas','Accept detected swing doors');useDetected.onclick=()=>{const pxPerM=w/(real*scaleF),added=[];for(const q of doorCandidates.filter(q=>q.kind==='swing-door')){const u=(q.g0+q.g1)/2,op=AS.openingAt(G,walls,q.v?q.c:u,q.v?u:q.c,'door',pxPerM);if(!op||!op.partner||!!op.v!==!!q.v||Math.abs(op.g0-q.g0)>Math.max(3,.06*pxPerM)||Math.abs(op.g1-q.g1)>Math.max(3,.06*pxPerM)||openings.some(o=>!!o.v===!!op.v&&Math.abs(o.c-op.c)<op.t&&Math.min(o.g1,op.g1)>Math.max(o.g0,op.g0)))continue;op.kind='swing-door';op.side=q.side;op.hingeAtLo=q.hingeAtLo;openings.push(op);added.push(op);}if(added.length)history.push(()=>{for(const o of added){const i=openings.indexOf(o);if(i>=0)openings.splice(i,1);}});hint.textContent=added.length+LX(' batientes añadidas; revisá giro y posición.',' swing doors added; review swing and position.');redraw();};useDetected.disabled=!doorCandidates.some(q=>q.kind==='swing-door');
-    controls.append(reading,maskLabel,zoneLabel,tool,picker,rot,rotateBtn,undo,flip,useDetected,ai);
-   }else controls.append(picker,rot,undo,ai);
+    controls.append(reading,maskLabel,zoneLabel,tool,picker,rot,rotateBtn,undo,flip,useDetected,ai,semanticAI);
+   }else controls.append(picker,rot,undo,ai,semanticAI);
    if(!python)controls.append(retry);const hint=document.createElement('p');if(python)hint.style.cssText='min-height:4.6em;margin:6px 0';hint.textContent=python?LX('1) Elegí la lectura que mejor siga los muros. 2) Con «+ Muro» tocá los muros que falten; con «Quitar» tocá los que sobren. 3) Con «+ Puerta» / «+ Ventana» tocá el hueco. 4) Ajustá la escala con dos clics sobre una cota. 5) Marcá muebles y artefactos. Deshacer revierte el último paso.','1) Pick the reading that best follows the walls. 2) With «+ Wall» click missing walls; with «Remove» click extra ones. 3) With «+ Door» / «+ Window» click the gap. 4) Set the scale with two clicks on a dimension. 5) Mark furniture and fixtures. Undo reverts the last step.'):'Sin bloque elegido, hacé clic sobre un tramo para excluirlo o recuperarlo. Para marcar un objeto, elegí un bloque. Revisá los muros y los vanos antes de insertar.';
    if(brush){
     tool.value='wall';tool.hidden=true;zoneView.checked=false;
@@ -614,7 +628,7 @@ async function traceFile(file,source=null,python=false,brush=false){
     bar.style.cssText='display:flex;gap:4px;align-items:center;flex-wrap:nowrap;max-width:calc(100vw - 48px);overflow-x:auto';
     const grip=document.createElement('span');grip.textContent='⠿';grip.style.cssText='cursor:move;padding:0 5px;touch-action:none';bar.prepend(grip);
     for(const [label,action] of [['−',()=>C.zoomShortcut?.('out')],['+',()=>C.zoomShortcut?.('in')],['Fit',()=>C.zoomExtents?.()]]){const b=document.createElement('button');b.className='btn';b.textContent=label;b.onclick=action;bar.append(b);}
-    ok.textContent=LX('Finalizar','Finish');cancel.textContent='×';bar.append(blockInput,rot,undo,rotateBtn,flip,ai,ok,cancel);
+    ok.textContent=LX('Finalizar','Finish');cancel.textContent='×';bar.append(blockInput,rot,undo,rotateBtn,flip,ai,semanticAI,ok,cancel);
     for(const b of bar.querySelectorAll('button'))b.style.cssText='padding:4px 8px;min-height:30px;white-space:nowrap;border-radius:8px';
     const details=document.createElement('details');details.style.cssText='position:absolute;top:100%;right:0;background:#20252b;border-radius:8px;max-width:min(600px,85vw);padding:4px';const summary=document.createElement('summary');summary.textContent='⚙';summary.title=LX('Opciones','Options');details.append(summary,controls,aiStatus,topologyInfo,dimOption,onlyBlocks);bar.append(details);
     const status=document.createElement('span');status.style.cssText='font-size:11px;white-space:nowrap';bar.append(status);
