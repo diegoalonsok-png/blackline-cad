@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-auditorium1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-restaurant1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1046,7 +1046,7 @@ function arqResizeReference(source,axis,value){
  p.brief={...p.brief,kind:'bath_reference',width:W,depth:D,alternatives:1};p.status='approximate';p.warning='Dimensiones ajustadas sin escalar artefactos. Revisar holguras, circulación y normativa.';p.assumptions=[p.warning];return p;
 }
 function arqCanResize(meta){
- return !!meta?.brief&&meta.rooms?.length===1&&meta.brief.kind!=='suite_row'&&!meta.brief.classroomGrid&&!meta.brief.auditoriumGrid&&(meta.brief.alternatives||1)===1&&(meta.brief.kind!=='bath_reference'||meta.sourcePlan?.walls?.length===4);
+ return !!meta?.brief&&meta.rooms?.length===1&&meta.brief.kind!=='suite_row'&&!meta.brief.classroomGrid&&!meta.brief.auditoriumGrid&&!meta.brief.restaurantGrid&&(meta.brief.alternatives||1)===1&&(meta.brief.kind!=='bath_reference'||meta.sourcePlan?.walls?.length===4);
 }
 
 /* Room-level virtual dimensions, screen only, never printed. */
@@ -1093,7 +1093,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectu
 EXT.drawArchitectureCommand=async raw=>{
  if(!arqRoomSetRequest(raw)){
  if(!arqPoolRequest(raw)){
- if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)){
+ if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)&&!arqRestaurantRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
  if(arqHouseGallery(raw)){arqOpenHouseGallery(raw);return;}
  if(arqWebReference(raw)){arqOpenWebReference(raw);return;}
@@ -1331,7 +1331,7 @@ function openArchitectureBar(focus=true){
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none;width:auto;min-width:max-content;padding:0 10px;margin-right:6px';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
-  const updateCatalogue=()=>{if(arqAuditoriumRequest(input.value)||arqClassroomRequest(input.value)||arqSanitaryBatteryRequest(input.value)||arqParkingRequest(input.value)||arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
+  const updateCatalogue=()=>{if(arqRestaurantRequest(input.value)||arqAuditoriumRequest(input.value)||arqClassroomRequest(input.value)||arqSanitaryBatteryRequest(input.value)||arqParkingRequest(input.value)||arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
   catalogue.onclick=()=>{if(arqRoomCAD(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenRoomCAD(input.value);return;}if(arqClassicQuery(input.value)){const b=window.CAD2D_BLOCK_BROWSER;if(b?.openClassics){EXT.cancelArchitectureCommand();b.openClassics(arqClassicExpand(input.value));}return;}if(arqHouseGallery(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenHouseGallery(input.value);return;}if(arqWebReference(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenWebReference(input.value);return;}const cat=arqCatalogueCategory(input.value);const object=!cat&&arqObjectSearch(input.value);if(!cat&&!object)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(object){arqOpenObjectSearch(object);return;}EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
 
   const KEY='cad2d-arqbar-pos';
@@ -1378,6 +1378,10 @@ function arqWallRequest(raw){
 }
 // Decisión de ARQ Assist para un pedido (sin efectos): la usa el envío y sirve para medir aciertos.
 // Repeated room requests are drawing commands, not block-catalogue queries.
+function arqRestaurantRequest(raw){
+ const s=String(raw||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ return /^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:restaurantes?|restoran(?:es)?|restaurants?|comedores gastronomicos?|salones gastronomicos?)\b/.test(s)&&/\d/.test(s)&&!/\b(?:jpg|png|fotos?|references|referencias)\b/.test(s);
+}
 function arqAuditoriumRequest(raw){
  const s=String(raw||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  return /^(?:(?:quiero|necesito|dibujar|dibuja|crear|generar|draw|create|generate)\s+)*(?:auditorios?|teatros?|salas? de cine|cines?|auditoriums?|theaters?|theatres?|cinemas?)\b/.test(s)&&/\d/.test(s)&&!/\b(?:jpg|png|fotos?|references|referencias)\b/.test(s);
@@ -1413,6 +1417,7 @@ function arqRoomSetRequest(raw){
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
  if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw))return {kind:'calco'};
+ if(arqRestaurantRequest(raw))return {kind:'draw'};
  if(arqAuditoriumRequest(raw))return {kind:'draw'};
  if(arqClassroomRequest(raw))return {kind:'draw'};
  if(arqSanitaryBatteryRequest(raw))return {kind:'draw'};
