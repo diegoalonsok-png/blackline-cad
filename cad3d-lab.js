@@ -2763,12 +2763,36 @@ function cad3dImportOBJ(content,fileName){
  });
  cad3dImportTriangles(verts,faces,fileName);
 }
+/* Imported geometry is immutable. Equal-size copies share GPU buffers, but keep
+   independent mesh transforms, materials, selection and document records. */
+var cad3dImportedGeometryCache=new WeakMap();
+function cad3dAcquireImportedGeometry(r){
+ var points=r.meshVertices,key=[r.w,r.d,r.h].join('|');
+ var sizes=cad3dImportedGeometryCache.get(points);
+ if(!sizes){sizes=new Map();cad3dImportedGeometryCache.set(points,sizes);}
+ var entry=sizes.get(key);
+ if(!entry){
+  var positions=new Float32Array(points.length);
+  for(var i=0;i<points.length;i+=3){positions[i]=points[i]*r.w;positions[i+1]=points[i+1]*r.d;positions[i+2]=points[i+2]*r.h;}
+  var g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(positions,3));g.computeVertexNormals();
+  entry={geometry:g,refs:0,sizes:sizes,key:key};sizes.set(key,entry);
+ }
+ entry.refs++;return entry;
+}
+function cad3dReleaseImportedGeometry(entry){
+ if(!entry||entry.refs<=0)return;
+ if(--entry.refs===0){entry.sizes.delete(entry.key);entry.geometry.dispose();}
+}
+function cad3dCloneRecord(r){
+ if(r.type!=='imported3d'||!Array.isArray(r.meshVertices))return JSON.parse(JSON.stringify(r));
+ var data=Object.assign({},r);delete data.meshVertices;
+ var copy=JSON.parse(JSON.stringify(data));copy.meshVertices=r.meshVertices;return copy;
+}
 function cad3dBuildImportedMesh(r,group){
  if(!r.meshVertices||!r.meshVertices.length)return;
- var points=r.meshVertices,positions=new Float32Array(points.length);
- for(var i=0;i<points.length;i+=3){positions[i]=points[i]*r.w;positions[i+1]=points[i+1]*r.d;positions[i+2]=points[i+2]*r.h;}
- var g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(positions,3));g.computeVertexNormals();
- addMesh(g,r.materialColor||0xb6bdc0,r.id,group);
+ var entry=cad3dAcquireImportedGeometry(r);
+ try{var mesh=addMesh(entry.geometry,r.materialColor||0xb6bdc0,r.id,group);mesh.userData.cad3dSharedGeometry=entry;}
+ catch(err){cad3dReleaseImportedGeometry(entry);throw err;}
 }
 
 function buildCAD3DBlock(record,group){
@@ -6130,6 +6154,7 @@ async function open(){
   if(!placing)text('Botón central: paneo · Mayús + central: órbita');
  }catch(e){
   console.warn('Blackline CAD3D: WebGL fallback',e);
+  if(modelRoot)disposeMeshes(modelRoot);
   renderer?.domElement?.remove();renderer?.dispose();renderer=null;modelRoot=null;camera=null;perspectiveCamera=null;orthographicCamera=null;
   if(!fallbackCanvas)beginFallback();
   if(!placing)text('Vista compatible · botón central: paneo · Mayús + central: órbita');
@@ -6797,7 +6822,7 @@ function placePoint(pt){
  if(kind==='move'||kind==='copy'){
   var ids=new Set(selected),dx=pt.x-firstPoint.x,dy=pt.y-firstPoint.y,moved=[];
   records.filter(function(r){return ids.has(r.id)&&editableRecord(r);}).forEach(function(r){
-   var dest=kind==='copy'?JSON.parse(JSON.stringify(r)):r;
+   var dest=kind==='copy'?cad3dCloneRecord(r):r;
    if(kind==='copy'){
     dest.id=serial++;dest.openings?.forEach(function(o){o.id=serial++;});records.push(dest);
    }
@@ -7054,7 +7079,7 @@ function valid3DGripCandidate(r){
  return true;
 }
 function apply3DGripCandidate(original,kind,delta,openingId){
- var r=JSON.parse(JSON.stringify(original));
+ var r=cad3dCloneRecord(original);
  if(kind==='move'){
   if(!delta||!Number.isFinite(delta.x+delta.y))return null;
   r.x=original.x+delta.x;r.y=original.y+delta.y;
@@ -7193,7 +7218,7 @@ function bind3DGripOverlay(layer){
   var def=get3DGripDefinitions(r,selectedOpeningId).find(function(g){return g.kind===btn.dataset.kind;});
   if(!def)return;
   e.preventDefault();e.stopPropagation();btn.focus({preventScroll:true});
-  var original=JSON.parse(JSON.stringify(r));
+  var original=cad3dCloneRecord(r);
   var center=pointOnScreen(grip3DWorldPoint(r,0,0,(r.h||r.radius*2||2)/2),root.querySelector('.view'));
   var centerPage=root.querySelector('.view').getBoundingClientRect();
   drag={id:e.pointerId,r:r,original:original,def:def,openingId:selectedOpeningId,x:e.clientX,y:e.clientY,moved:false,
@@ -8321,7 +8346,8 @@ function buildObject(r){
 }
 function disposeMeshes(group){
  group.traverse(function(o){if(o.isMesh||o.isLine||o.isPoints||o.userData?.cadSketch){
-  if(o.geometry)o.geometry.dispose();
+  if(o.userData?.cad3dSharedGeometry){cad3dReleaseImportedGeometry(o.userData.cad3dSharedGeometry);delete o.userData.cad3dSharedGeometry;}
+  else if(o.geometry)o.geometry.dispose();
   var materials=Array.isArray(o.material)?o.material:[o.material];
   materials.forEach(function(m){if(!m)return;if(m.map&&m.map.isCanvasTexture&&!o.userData?.cadWallTexture)m.map.dispose();m.dispose();});
  }});
@@ -9188,7 +9214,7 @@ function change(e){
 /* CAD3D_EDIT_ENHANCEMENTS_V1: duplicate, locate and recolor imported geometry. */
 function cad3dCloneObject(id){
  var source=records.find(function(r){return r.id===id&&editableRecord(r);});if(!source)return;
- var copy=JSON.parse(JSON.stringify(source));copy.id=serial++;copy.x=(source.x||0)+.65;copy.y=(source.y||0)+.65;
+ var copy=cad3dCloneRecord(source);copy.id=serial++;copy.x=(source.x||0)+.65;copy.y=(source.y||0)+.65;
  // Ensure architectural openings receive unique object-local identifiers.
  if(copy.openings)copy.openings.forEach(function(o){o.id=serial++;});
  records.push(copy);selected=[copy.id];selectedOpeningId=null;
