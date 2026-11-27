@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Online DXF Editor &amp; DWG Conversion | CAD2D3D</title>
-<meta name="description" content="Edit compatible DXF drawings online with CAD2D3D. Convert supported DWG files locally, check units and export your drawings.">
+<title>Online DXF Editor: Open and Edit CAD Drawings | CAD2D3D</title>
+<meta name="description" content="Open, measure and edit compatible DXF drawings in your browser. Try CAD2D3D with a sample DXF file and check model-space dimensions.">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="https://blackline-cad.org/online-dxf-editor">
 <link rel="alternate" hreflang="es" href="https://blackline-cad.org/editor-dxf-online"><link rel="alternate" hreflang="en" href="https://blackline-cad.org/online-dxf-editor">
 <meta property="og:type" content="article"><meta property="og:site_name" content="CAD2D3D by Blackline">
-<meta property="og:title" content="Online DXF Editor &amp; DWG Conversion | CAD2D3D">
-<meta property="og:description" content="Edit compatible DXF drawings online with CAD2D3D. Convert supported DWG files locally, check units and export your drawings.">
+<meta property="og:title" content="Online DXF Editor: Open and Edit CAD Drawings | CAD2D3D">
+<meta property="og:description" content="Open, measure and edit compatible DXF drawings in your browser. Try CAD2D3D with a sample DXF file and check model-space dimensions.">
 <meta property="og:url" content="https://blackline-cad.org/online-dxf-editor">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"How to open DWG and edit DXF drawings online with Blackline CAD","inLanguage":"en","mainEntityOfPage":"https://blackline-cad.org/online-dxf-editor","about":[{"@type":"Thing","name":"DXF file format"},{"@type":"SoftwareApplication","name":"CAD2D3D by Blackline","alternateName":"CAD2D3D","url":"https://blackline-cad.org/","applicationCategory":"DesignApplication","operatingSystem":"Web browser"}],"isAccessibleForFree":true}</script>
 <style>:root{color-scheme:dark}*{box-sizing:border-box}body{background:#0d141a;color:#edf1f4;margin:0;font:16px/1.7 system-ui,-apple-system,"Segoe UI",sans-serif}main{max-width:820px;margin:auto;padding:32px 22px 80px}a{color:#a4d7f2}h1,h2{line-height:1.25}h1{font-size:clamp(29px,5vw,43px)}h2{margin-top:32px}p,li{color:#cbd8e0}nav{display:flex;flex-wrap:wrap;gap:17px;border-bottom:1px solid #344550;padding-bottom:22px;font-size:14px}.cta{display:inline-block;padding:10px 17px;background:#d3b47a;color:#11191e;text-decoration:none;border-radius:4px;font-weight:700}.note{background:#18252e;border-left:3px solid #d3b47a;padding:12px 18px}footer{border-top:1px solid #344550;padding-top:20px;margin-top:44px;font-size:14px}</style>
@@ -20,7 +20,7 @@
 <p><a class="cta" href="/">Launch the online CAD editor</a></p>
 <h2>How to work with a DXF drawing</h2>
 <ol><li>Open Blackline CAD and select a supported DXF file, or use the local DWG to DXF conversion tool for a compatible drawing.</li><li>Check the file's drawing units and measure an existing line of known length before editing.</li><li>Use line, polyline, circle, dimension and layer tools to edit the supported entities.</li><li>Save a project copy; export to DXF and reopen it in another CAD application to check geometry and units.</li></ol>
-<h2>What file compatibility means</h2>
+<h2 id="dxf-prueba">Download a sample DXF and verify 1:1 model scale</h2><p>Use this <a href="/examples/scale-1to1-test.dxf" download>Blackline sample DXF file</a> to test drawing exchange before importing a professional project. It contains two lines measuring 10 m and 4 m, and a circle with a 1 m radius, on two layers, with drawing units declared in meters (DXF R2000).</p><ol><li>Download the sample, launch the editor and open a copy.</li><li>Measure the horizontal line: it should be 10 m. The vertical line should measure 4 m.</li><li>Inspect the CHECK-1TO1 and WALLS layers and check the circle radius.</li><li>Export a new DXF, reopen it and repeat the checks. Resolve any discrepancies before relying on the result for construction documents.</li></ol><p>This exercise checks basic entities and drawing units; it does not certify universal DXF compatibility. For a plotting test, a 10 m model line should measure 100 mm on paper at 1:100.</p><h2>What file compatibility means</h2>
 <p>DXF is an exchange format, but not every DXF uses only basic 2D entities. Blackline CAD supports a limited set of common ASCII DXF geometry. Some imports may omit advanced blocks, xrefs, splines, nonstandard hatches, layouts or proxy objects. Imported drawings with ambiguous units need manual verification.</p>
 <div class="note"><strong>How DWG works:</strong> The remote conversion service is disabled. Try the <a href="/cad-file-converter-online">local browser converter</a> for supported DWG files. Some objects may not transfer; verify geometry, dimensions and units before relying on the result. Preserve your original file.</div>
 <h2>For architecture and education</h2>
