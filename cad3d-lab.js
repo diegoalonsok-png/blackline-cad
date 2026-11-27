@@ -4870,7 +4870,7 @@ function build(){
  '<button type="button" class="btn" data-layer-toggle="locked"></button> <button type="button" class="btn" data-layer-toggle="rename">Renombrar</button> <button type="button" class="btn" data-layer-toggle="assign">Asignar selección</button> <button type="button" class="btn" data-layer-toggle="delete">Eliminar vacía</button> <button type="button" class="btn" data-layer-toggle="freeze">Congelar</button> <button type="button" class="btn" data-layer-toggle="isolate">Aislar</button> <button type="button" class="btn" data-layer-toggle="unisolate">Restaurar</button> <button type="button" class="btn" data-layer-toggle="merge">Fusionar</button> <button type="button" class="btn" data-layer-toggle="selectobjects">Seleccionar objetos</button><input type="search" data-layer-search aria-label="Buscar capas 3D" placeholder="Filtrar capas" style="width:100%;margin:5px 0"><div class="cad3dLayerList" role="group" aria-label="Lista de capas 3D"></div></div></section>'+
  '<section class="panel cad3dLightsPanel" aria-label="Luces paramétricas 3D"><header class="panel-title">ILUMINACIÓN 3D</header>'+
  '<div class="panel-content cad3dLightTools">'+
- '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
+ '<div><select data-light-newtype aria-label="Tipo de luz"><option value="point">Globular / puntual</option><option value="spot">Foco orientable</option><option value="linear">Lineal / tubo LED</option><option value="ceiling">Cenital / downlight</option><option value="globe">Globo difuso / globe</option><option value="distant">Direccional / distant</option><option value="panel">Panel cenital / ceiling panel</option></select> <button type="button" class="btn" data-light-add>＋ Crear luz</button></div>'+
  '<small data-light-count>0 luces</small><select data-light-select aria-label="Seleccionar luz"></select><label><input type="checkbox" data-light-symbols checked> Mostrar símbolos de luz</label>'+
  '<div data-light-edit>'+
  '<label><input type="checkbox" data-light-field="enabled"> Encendida</label>'+
@@ -4883,11 +4883,11 @@ function build(){
  '<label>Z (m) <input type="number" step=".1" data-light-field="z"></label>'+
  '<label>Dirección horizontal (°) <input type="number" min="-360" max="360" step="5" data-light-field="azimuth"></label>'+
  '<label>Inclinación (°) <input type="number" min="-90" max="90" step="5" data-light-field="elevation"></label>'+
- '<label>Apertura foco (rad) <input type="number" min=".05" max="1.57" step=".05" data-light-field="angle"></label>'+
+ '<label>Semiángulo foco (°) <input type="number" min="3" max="90" step="1" data-light-field="angleDeg"></label>'+
  '<label>Longitud tubo (m) <input type="number" min=".1" max="12" step=".1" data-light-field="length"></label>'+
  '<label><input type="checkbox" data-light-field="shadow"> Sombras (puntual / foco)</label>'+
- '</div><button type="button" class="btn" data-light-remove>Eliminar luz</button>'+
- '<small>Luces editables del visor 3D. La luz lineal se aproxima con cinco emisores; no es una luz de área V-Ray.</small>'+
+ '</div><button type="button" class="btn" data-light-copy>Duplicar luz</button> <button type="button" class="btn" data-light-remove>Eliminar luz</button>'+
+ '<small>Luces locales sin costo. Globo, panel y tubo: aproximaciones visuales; no son simulación fotométrica IES.</small>'+
  '</div></section>'+
  '<section class="panel cad3dSectionPanel" aria-label="Planos de sección 3D"><header class="panel-title">SECCIÓN 3D · CORTE MÓVIL</header>'+
  '<div class="panel-content cad3dSectionTools">'+
@@ -8477,26 +8477,63 @@ function cad3dSectionApply(){
 /* Blackline native CAD3D light sources. No V-Ray components or assets are redistributed. */
 var cad3dLights=[],cad3dLightObjects=[],cad3dLightSequence=1;
 var cad3dLightOverlay=null,cad3dLightDrag=null,cad3dLightSymbols=true;
+function cad3dLightNormalize(v){
+ if(!v||!['point','spot','linear','ceiling','globe','distant','panel'].includes(v.type)||![v.x,v.y,v.z].every(Number.isFinite))return null;
+ var bounded=(x,d,a,b)=>Math.max(a,Math.min(b,Number.isFinite(x)?x:d));
+ var id=Number(v.id);if(!Number.isSafeInteger(id)||id<1)return null;
+ return {id:id,type:v.type,name:String(v.name||'Luz').slice(0,60),enabled:v.enabled!==false,
+ x:bounded(v.x,0,-1000000,1000000),y:bounded(v.y,0,-1000000,1000000),z:bounded(v.z,0,-1000000,1000000),
+ power:bounded(v.power,12,0,80),color:/^#[0-9a-f]{6}$/i.test(v.color||'')?v.color:'#fff2dd',
+ range:bounded(v.range,10,1,100),angleDeg:bounded(v.angleDeg,Number.isFinite(v.angle)?v.angle*180/Math.PI:30,3,90),
+ azimuth:bounded(v.azimuth,0,-360,360),elevation:bounded(v.elevation,-75,-90,90),length:bounded(v.length,1.2,.1,12),shadow:!!v.shadow};
+}
+function cad3dLightDirection(v){
+ var az=v.azimuth*Math.PI/180,el=v.elevation*Math.PI/180;
+ return [Math.cos(el)*Math.cos(az),Math.cos(el)*Math.sin(az),Math.sin(el)];
+}
+function cad3dLightDefault(kind,id,b){
+ var names={point:'Luz puntual',spot:'Foco',linear:'Luz lineal',ceiling:'Cenital',globe:'Globo',distant:'Direccional',panel:'Panel cenital'};
+ if(!Object.prototype.hasOwnProperty.call(names,kind))return null;
+ var overhead=['ceiling','panel','linear'].includes(kind);
+ return cad3dLightNormalize({id:id,type:kind,name:names[kind]+' '+id,enabled:true,x:b.x,y:b.y,
+ z:overhead?(b.empty?2.7:b.z+b.height/2-.05):Math.max(2.4,b.z),
+ power:kind==='distant'?2:kind==='linear'||kind==='panel'?22:kind==='spot'||kind==='ceiling'?14:12,
+ color:'#fff2dd',range:10,angleDeg:kind==='ceiling'?45:30,azimuth:0,elevation:overhead?-90:-75,length:1.2,shadow:false});
+}
+function cad3dLightRestore(saved){
+ var seen=new Set();cad3dLights=(Array.isArray(saved)?saved:[]).slice(0,48).map(cad3dLightNormalize).filter(v=>v&&!seen.has(v.id)&&seen.add(v.id));
+ cad3dLightSequence=cad3dLights.reduce((n,v)=>Math.max(n,v.id),0)+1;
+}
+function cad3dLightCreate(kind){
+ if(cad3dLights.length>=48)return text('Límite de 48 luces');
+ var v=cad3dLightDefault(kind,cad3dLightSequence,cad3dBounds(true));if(!v)return;
+ cad3dLightSequence++;cad3dLights.push(v);cad3dLightsSave();cad3dLightsUpdateScene();cad3dLightPaletteRender();
+ var panel=root.querySelector('.cad3dLightsPanel');panel.querySelector('[data-light-select]').value=String(v.id);cad3dLightPaletteRender();panel.scrollIntoView?.({block:'nearest'});
+}
 function cad3dLightsSave(){
  try{localStorage.setItem('blackline-cad3d-light-sources-v1',JSON.stringify(cad3dLights));}catch(_e){}
 }
 function cad3dLightsUpdateScene(){
  if(!scene||!T)return;
- cad3dLightObjects.forEach(function(o){scene.remove(o);if(o.target)scene.remove(o.target);});
+ cad3dLightObjects.forEach(function(o){scene.remove(o);if(o.target)scene.remove(o.target);o.shadow?.dispose?.();o.dispose?.();});
  cad3dLightObjects=[];
  cad3dLights.filter(function(v){return v.enabled!==false;}).forEach(function(v){
   var color=new T.Color(v.color||'#fff2df'),power=Math.max(0,Math.min(80,Number(v.power)||0));
   var at=new T.Vector3(v.x,v.y,v.z);
-  if(v.type==='spot'){
-   var spot=new T.SpotLight(color,power);
-   spot.position.copy(at);
-   spot.angle=Math.max(.05,Math.min(Math.PI/2,Number(v.angle)||.55));
+  if(v.type==='distant'){
+   var sun=new T.DirectionalLight(color,power),dir=cad3dLightDirection(v);sun.position.copy(at);sun.target.position.copy(at).add(new T.Vector3(...dir));sun.castShadow=!!v.shadow;sun.userData.lightId=v.id;scene.add(sun,sun.target);cad3dLightObjects.push(sun);
+  }else if(v.type==='spot'||v.type==='ceiling'||v.type==='panel'){
+   var samples=v.type==='panel'?4:1;
+   for(var j=0;j<samples;j++){
+   var spot=new T.SpotLight(color,power/samples);
+   spot.position.copy(at);if(samples===4){spot.position.x+=(j%2-.5)*v.length/2;spot.position.y+=(Math.floor(j/2)-.5)*v.length/2;}
+   spot.angle=v.angleDeg*Math.PI/180;
    spot.penumbra=.28;spot.decay=2;spot.distance=Math.max(1,Number(v.range)||12);
-   var az=(Number(v.azimuth)||0)*Math.PI/180,el=(Number(v.elevation)||-65)*Math.PI/180;
-   spot.target.position.copy(at).add(new T.Vector3(Math.cos(el)*Math.cos(az),Math.cos(el)*Math.sin(az),Math.sin(el)).multiplyScalar(3));
-   spot.castShadow=!!v.shadow;
+   var dir=cad3dLightDirection(v);
+   spot.target.position.copy(spot.position).add(new T.Vector3(...dir).multiplyScalar(3));
+   spot.castShadow=!!v.shadow&&samples===1;
    if(spot.castShadow){spot.shadow.mapSize.set(512,512);spot.shadow.bias=-.0005;}
-   spot.userData.lightId=v.id;scene.add(spot,spot.target);cad3dLightObjects.push(spot);
+   spot.userData.lightId=v.id;scene.add(spot,spot.target);cad3dLightObjects.push(spot);}
   }else if(v.type==='linear'){
    // Three.js core does not support tube-area lights: short distributed point sources approximate the emitting length.
    var count=5,length=Math.max(.1,Math.min(12,Number(v.length)||1.2)),az2=(Number(v.azimuth)||0)*Math.PI/180;
@@ -8533,7 +8570,7 @@ function cad3dLightGlyphs(){
  cad3dLights.forEach(function(v){
   var origin=new T.Vector3(v.x,v.y,v.z),a=project(origin);
   if(!Number.isFinite(a.x+a.y+a.z)||a.z< -1||a.z>1||a.x<0||a.x>w||a.y<0||a.y>h)return;
-  var active=String(v.id)===id,icon=v.type==='spot'?'◉':v.type==='linear'?'▰':'☀';
+  var active=String(v.id)===id,icon=({spot:'◉',ceiling:'⊙',linear:'▰',panel:'▦',distant:'➜',globe:'●'})[v.type]||'☀';
   items.push({v:v,x:a.x,y:a.y,axis:'free',label:icon,title:v.name+' · Arrastrar libremente',active:active});
   if(!active)return;
   var unit=camera.isOrthographicCamera?(camera.top-camera.bottom)/Math.max(1,h):2*origin.distanceTo(camera.position)*Math.tan(camera.fov*Math.PI/360)/Math.max(1,h);
@@ -8598,20 +8635,15 @@ function cad3dLightSetup(){
  var panel=root.querySelector('.cad3dLightsPanel');if(!panel)return;
  try{
   var saved=JSON.parse(localStorage.getItem('blackline-cad3d-light-sources-v1')||'[]');
-  if(Array.isArray(saved))cad3dLights=saved.filter(function(v){
-   return v&&['point','spot','linear'].includes(v.type)&&[v.x,v.y,v.z].every(Number.isFinite);
-  }).slice(0,48);
-  cad3dLightSequence=cad3dLights.reduce(function(n,v){return Math.max(n,Number(v.id)||0);},0)+1;
+  cad3dLightRestore(saved);
  }catch(_e){}
  function refresh(){cad3dLightsSave();cad3dLightsUpdateScene();cad3dLightPaletteRender();}
- panel.querySelector('[data-light-add]').addEventListener('click',function(){
-  if(cad3dLights.length>=48)return;
-  var kind=panel.querySelector('[data-light-newtype]').value;
-  var b=cad3dBounds(),names={point:'Luz globular',spot:'Foco',linear:'Luz lineal'};
-  var v={id:cad3dLightSequence++,type:kind,name:names[kind]+' '+cad3dLightSequence,
-   enabled:true,x:b.x,y:b.y,z:Math.max(2.4,b.z),power:kind==='linear'?22:kind==='spot'?14:12,
-   color:'#fff2dd',range:kind==='linear'?7:10,angle:.5,azimuth:0,elevation:-75,length:1.2,shadow:false};
-  cad3dLights.push(v);refresh();panel.querySelector('[data-light-select]').value=String(v.id);cad3dLightPaletteRender();
+ panel.querySelector('[data-light-add]').addEventListener('click',function(){cad3dLightCreate(panel.querySelector('[data-light-newtype]').value);});
+ panel.querySelector('[data-light-copy]').addEventListener('click',function(){
+  var v=cad3dLights.find(o=>String(o.id)===panel.querySelector('[data-light-select]').value);
+  if(!v||cad3dLights.length>=48)return;
+  var copy=cad3dLightNormalize(Object.assign({},v,{id:cad3dLightSequence++,name:v.name+' copia',x:v.x+.5}));
+  cad3dLights.push(copy);refresh();panel.querySelector('[data-light-select]').value=String(copy.id);cad3dLightPaletteRender();
  });
  panel.querySelector('[data-light-select]').addEventListener('change',cad3dLightPaletteRender);
  panel.querySelector('[data-light-symbols]').addEventListener('change',function(){cad3dLightSymbols=this.checked;cad3dLightGlyphs();});
@@ -8624,7 +8656,8 @@ function cad3dLightSetup(){
    var id=panel.querySelector('[data-light-select]').value,v=cad3dLights.find(function(o){return String(o.id)===id;});
    if(!v)return;
    var key=this.dataset.lightField;
-   v[key]=this.type==='checkbox'?this.checked:this.type==='number'?Number(this.value):this.value;
+   if(this.type==='number'&&(this.value.trim()===''||!Number.isFinite(Number(this.value))))return;
+   var next=cad3dLightNormalize(Object.assign({},v,{[key]:this.type==='checkbox'?this.checked:this.type==='number'?Number(this.value):this.value}));if(!next)return;Object.assign(v,next);
    // Keep the active input mounted while editing coordinates, power and colors.
    cad3dLightsSave();cad3dLightsUpdateScene();
    if(key==='name'){
@@ -10053,6 +10086,9 @@ function run3DCommand(){
  if(!action(command))text('Comando 3D desconocido: '+raw);
 }
 function action(a,presetId){
+ var lightCommands={pointlight:'point',spotlight:'spot',distantlight:'distant',downlight:'ceiling',luzcenital:'ceiling',luzglobular:'globe',globelight:'globe',panelight:'panel',panellight:'panel',linearlight:'linear'};
+ if(Object.prototype.hasOwnProperty.call(lightCommands,a)){cad3dLightCreate(lightCommands[a]);return true;}
+ if(a==='lightlist'){root.querySelector('.cad3dLightsPanel')?.scrollIntoView({block:'nearest'});root.querySelector('[data-light-select]')?.focus();return true;}
  if(a==='materials'){cad3dShowMaterials();return true;}
  if(a==='select'){cad3dMaterialPaint=false;cad3dMaterialRender();cad3dNavigationTool='select';root.querySelector('.view')?.classList.remove('cad3dPanning');cad3dSyncCompactBars();setPlacement(null);text('Select · elegí un objeto 3D');return true;}
  if(a==='extrude'){cad3dExtrudeSelection();return true;}
@@ -10288,7 +10324,7 @@ async function importCADFile(ev){
  }catch(e){if(request===importSequence)text('Error importando plano: '+(e.message||e));}
 }
 function exportJSON(){
- var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer,materials:cad3dCustomMaterials};
+ var data={format:'BLACKLINE-CAD3D-1',units:'m',records:records,serial:serial,underlay:underlay,layers:layers,currentLayer:currentLayer,materials:cad3dCustomMaterials,lights:cad3dLights};
  download('blackline-cad3d.3djson',JSON.stringify(data,null,2),'application/json');text('Modelo editable .3DJSON exportado');
 }
 async function readJSON(e){
@@ -10409,7 +10445,7 @@ async function readJSON(e){
   if(underlay?.segments.length)fitUnderlay();
   else drawUnderlay();
   var ids=layers.map(function(l){return Number(l.id.split('-')[1])||0;}).concat(records.flatMap(function(r){return [r.id].concat((r.openings||[]).map(function(o){return o.id;}));}));
-  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
+  serial=ids.reduce(function(max,id){return Math.max(max,finite(id,0));},Math.max(1,finite(data.serial,0)))+1;selected=[];cad3dLightRestore(data.lights);cad3dLightsSave();cad3dLightsUpdateScene();cad3dLightPaletteRender();redraw();renderProps();text(records.length+' objetos 3D cargados (sin alterar CAD2D)');
  }catch(err){if(request===importSequence)text('No se pudo abrir .3DJSON: '+String(err.message||err));}
 }
 window.addEventListener('keydown',function(ev){
