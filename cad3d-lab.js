@@ -2902,9 +2902,9 @@ async function cad3dImportOCCT(file,ext){
 function cad3dDecodeIFC(source){
  if(typeof source!=='string'||source.length>18000000||!source.includes("FILE_DESCRIPTION(('Experimental tessellated exchange'),'2;1');")||!source.includes("FILE_SCHEMA(('IFC4'));"))throw Error('IFC import: only Blackline IFC4 tessellation files are supported at present');
  source=source.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
- const start=source.indexOf('\nDATA;\n'),end=source.lastIndexOf('\nENDSEC;');
+ const section=/^DATA\s*;\s*/m.exec(source),start=section?section.index+section[0].length:-1,end=source.lastIndexOf('\nENDSEC;');
  if(start<0||end<=start||!source.trim().endsWith('END-ISO-10303-21;'))throw Error('IFC import: invalid DATA section');
- const records=new Map(),data=source.slice(start+7,end);
+ const records=new Map(),data=source.slice(start,end);
  // STEP entities may span multiple lines or share one line. Split only outside strings.
  let begin=0,quoted=false;
  for(let i=0;i<data.length;i++){
