@@ -9887,9 +9887,28 @@ function cad3dMassProperties(r){
   const p=r.profilePoints;let cross=0,cx=0,cy=0,perimeter=0;
   for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length],v=a[0]*b[1]-b[0]*a[1];cross+=v;cx+=(a[0]+b[0])*v;cy+=(a[1]+b[1])*v;perimeter+=Math.hypot(b[0]-a[0],b[1]-a[1])}
   const area=Math.abs(cross)/2;volume=area*r.extrudedHeight;surface=2*area+perimeter*r.extrudedHeight;center=[cx/(3*cross),cy/(3*cross),r.extrudedHeight/2];
+ }else if(r.type==='slab'&&positive(w,d,h)&&((r.pitch||0)!==0||r.slabPolyHoles?.length)){
+  // The slab mesh is a vertical extrusion of its plan, then sheared in Z.
+  // Exact moments of the stored polygon loops; no triangle sampling needed.
+  if(!Number.isFinite(r.pitch??0)||Math.abs(r.pitch||0)>45||!cad3dSlabHolesValid(r))return unsupported('Losa o perforación inválida');
+  const slope=Math.tan((r.pitch||0)*Math.PI/180);
+  let area=w*d,mx=0,my=0,perimeter=2*(w+d);
+  for(const loop of cad3dSlabHoles(r)){
+   let cross=0,cx=0,cy=0;
+   for(let i=0;i<loop.length;i++){
+    const a=loop[i],b=loop[(i+1)%loop.length],v=a[0]*b[1]-b[0]*a[1];
+    cross+=v;cx+=(a[0]+b[0])*v;cy+=(a[1]+b[1])*v;
+    perimeter+=Math.hypot(b[0]-a[0],b[1]-a[1]);
+   }
+   const cut=Math.abs(cross)/2;if(!(cut>0))return unsupported('Perforación sin área');
+   area-=cut;mx-=cut*cx/(3*cross);my-=cut*cy/(3*cross);
+  }
+  if(!(area>0))return unsupported('Losa sin área neta');
+  const x=mx/area,y=my/area;
+  volume=area*h;surface=2*area*Math.hypot(1,slope)+perimeter*h;center=[x,y,h/2+slope*x];
+  reason='Losa según contorno almacenado y espesor vertical; incluye caras de los huecos. Curvas poligonales aproximadas.';
  }else if((r.type==='wall'||r.type==='slab')&&positive(w,d,h)){
   const wall=r.type==='wall';
-  if(!wall&&((r.pitch||0)!==0||r.slabPolyHoles?.length))return unsupported('Losa inclinada o con cortes poligonales: requiere cálculo de malla');
   if((r.openings||[]).length>150)return unsupported('Demasiados vanos para cálculo nominal');
   let span=wall?h:d,thickness=wall?d:h,base=wall?0:-span/2;
   const cuts=[],clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
@@ -9928,7 +9947,7 @@ function cad3dPropertyDetails(r,p){
  if(r.materialId)add('Material',r.materialId);
  if(r.styleId)add('Estilo',r.styleId);
  if(r.type==='sphere'||r.type==='cylinder'||r.type==='cone')add('Diámetro',fmt(2*r.radius)+' m');
- if(r.type==='wall'||r.type==='slab')add('Vanos',r.openings?.length||0);
+ if(r.type==='wall'||r.type==='slab')add('Vanos',(r.openings?.length||0)+(r.type==='slab'?(r.slabPolyHoles?.length||0):0));
  if(r.type==='profile2d')add('Vértices de perfil',r.profilePoints?.length||0);
  if(r.type==='imported3d')add('Triángulos',Math.floor((r.meshVertices?.length||0)/9));
  if(p.volume!==null)add(p.kind==='nominal'?'Volumen nominal':'Volumen',fmt(p.volume)+' m³');
