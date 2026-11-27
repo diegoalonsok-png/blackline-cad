@@ -1220,10 +1220,18 @@ async function openArqPlanCatalogue(category,query=''){
   }
   return;
  }
- let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;status.remove();
+ let items;try{items=await arqCatalogueIndex()}catch(e){if(dlg.isConnected)status.textContent=e.message+' · Cerrá y volvé a intentar.';return}if(!dlg.isConnected)return;
  const requestedArea=category==='house'?String(query).match(/\d+(?:[.,]\d+)?/):null;
- const filtered=items.filter(x=>x.category===category&&(!requestedArea||Math.abs(x.area-Number(requestedArea[0].replace(',','.')))<.5)).sort((a,b)=>a.area-b.area);
- if(!filtered.length){const note=document.createElement('p');note.textContent='No hay modelos para esta superficie todavía.';grid.append(note);}
+ let filtered=items.filter(x=>x.category===category&&(!requestedArea||Math.abs(x.area-Number(requestedArea[0].replace(',','.')))<.5)).sort((a,b)=>a.area-b.area);
+ const approvedPreviews=new Map();
+ if(['house','bathroom'].includes(category)&&window.CAD2D_SANITARY_PREVIEW){
+  status.textContent='Verificando plantas aprobadas…';let cursor=0;
+  const worker=async()=>{while(dlg.isConnected&&cursor<filtered.length){const item=filtered[cursor++];try{const result=await window.CAD2D_SANITARY_PREVIEW(item.id);if(result&&!result.issues.length&&result.preview)approvedPreviews.set(item.id,result.preview);}catch(e){/* unavailable plans are omitted, not deleted */}}};
+  await Promise.all(Array.from({length:Math.min(8,filtered.length)},worker));if(!dlg.isConnected)return;
+  filtered=filtered.filter(item=>approvedPreviews.has(item.id));
+ }
+ status.remove();
+ if(!filtered.length){const note=document.createElement('p');note.textContent='No hay plantas aprobadas disponibles para esta búsqueda.';grid.append(note);}
  for(const item of filtered){
   const button=document.createElement('button');button.className='btn arq-card';button.style.cssText='display:flex;flex-direction:column;gap:5px;padding:6px;text-align:center;min-width:0';
   const img=document.createElement('img');img.src=new URL(item.id+'.svg?v=20261127-bathroom-catalogue6',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.category==='house'?fmt(item.area)+' m² cubiertos · '+fmt(w)+' × '+fmt(d)+' m':item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard',counter:'Mesada',kingbed:'Cama king',bunk:'Cucheta',crib:'Cuna',desk:'Escritorio',washer:'Lavarropas',dryer:'Secarropas',laundrySink:'Pileta',bookshelf:'Biblioteca',table8:'Mesa para ocho'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
@@ -1232,7 +1240,7 @@ async function openArqPlanCatalogue(category,query=''){
    try{const response=await fetch(new URL(item.id+'.json?v=20261127-kitchen-passage9',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');let plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;{const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
    catch(e){CORE.toast(e.message)}finally{button.disabled=false}};
   grid.append(button);
-  if(['house','bathroom'].includes(item.category)&&window.CAD2D_SANITARY_PREVIEW){button.disabled=true;img.removeAttribute('src');window.CAD2D_SANITARY_PREVIEW(item.id).then(r=>{if(!button.isConnected)return;if(r.issues.length){img.alt=r.issues.join(' · ');button.title=img.alt;return}img.src=r.preview;button.disabled=false}).catch(e=>{button.title=e.message;img.alt=e.message;});}
+  if(approvedPreviews.has(item.id))img.src=approvedPreviews.get(item.id);
  }
  const foot=document.createElement('p');foot.style.cssText='font-size:12px;opacity:.8;margin-bottom:0;flex:none';foot.textContent='Seleccioná una planta para insertarla como muros, aberturas y bloques independientes. / Select a plan to insert editable CAD objects.';dlg.append(foot);
 }
