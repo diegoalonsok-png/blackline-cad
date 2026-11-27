@@ -19,3 +19,16 @@ test('SHELL is dispatched and commits only a valid generated result',()=>{
  assert.match(s,/k\.boxShell\(r\.w,r\.d,r\.h,t\)/);
  assert.match(s,/cad3dCommitSolids\(\[r\.id\],\[cad3dMakeSolid\(mesh,r,/);
 });
+
+test('closed solid volume is invariant to large world-coordinate translation',()=>{
+ const local=k.boxShell(5,4,3,.2),shifted=local.map(x=>x+1e9);
+ assert.ok(Math.abs(k.volume(local)-13.632)<1e-8);
+ assert.ok(Math.abs(k.volume(shifted)-13.632)<1e-5);
+});
+test('boolean subtract remains stable when both closed solids are translated',()=>{
+ const a=k.boxShell(5,4,3,.2),b=k.boxShell(2,2,2,.2).map((x,i)=>x+(i%3===2?-.1:0));
+ const local=k.boolean(a,b,'subtract');
+ const far=k.boolean(a.map(x=>x+1e8),b.map(x=>x+1e8),'subtract');
+ assert.ok(local.length>0&&far.length>0);
+ assert.ok(Math.abs(k.volume(local)-k.volume(far))<1e-5);
+});
