@@ -16,7 +16,10 @@
  const dot=(a,b)=>a.x*b.x+a.y*b.y;
  const unit=v=>{const l=norm(v);return Number.isFinite(l)&&l>EPS?{x:v.x/l,y:v.y/l}:null;};
  const near=(a,b)=>Math.abs(a-b)<=EPS*Math.max(1,Math.abs(a),Math.abs(b));
- const same=(a,b)=>near(a.x,b.x)&&near(a.y,b.y);
+ // Coordinate coincidence needs an absolute tolerance plus floating-point resolution,
+ // not a relative tolerance that grows to centimeters at georeferenced origins.
+ const coordNear=(a,b)=>Math.abs(a-b)<=Math.max(EPS,4*Number.EPSILON*Math.max(Math.abs(a),Math.abs(b)));
+ const same=(a,b)=>coordNear(a.x,b.x)&&coordNear(a.y,b.y);
  const goodLine=e=>e?.type==='line'&&point(e.a)&&point(e.b)&&!!unit(sub(e.b,e.a));
  const goodCircle=e=>e?.type==='circle'&&point(e.c)&&Number.isFinite(e.r)&&e.r>EPS;
  const fail=reason=>({ok:false,reason});
