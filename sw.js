@@ -1,7 +1,7 @@
 /* Blackline CAD · service worker: permite instalar la app y abrirla sin conexión.
  * Estrategia «red primero»: siempre se usa la versión publicada más nueva; la copia guardada
  * solo se usa si no hay conexión. Nunca guarda llamadas a la API, pagos ni analítica. */
-const CACHE='blackline-cad-v9';
+const CACHE='blackline-cad-v10';
 const SCOPE=new URL(self.registration.scope).pathname;
 const CORE=['./','./index.html','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'];
 self.addEventListener('install',ev=>{ev.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}));self.skipWaiting()});
