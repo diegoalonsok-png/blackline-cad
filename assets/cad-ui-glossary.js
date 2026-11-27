@@ -221,7 +221,7 @@ window.CAD2D_UI_GLOSSARY={
  ["Seleccioná un material y hacé clic en una cara del muro. Con Repetir, el JPG se escala según ancho y alto en metros; sin Repetir se ajusta a toda la cara. Cambiá escala y giro para actualizar la última cara pintada.","Select a material and click a wall face. With Repeat, the JPG is scaled by width and height in meters; without Repeat it fits the whole face. Change scale and rotation to update the last painted face."],
  ["CAD2D3D es un software independiente de dibujo técnico 2D y modelado 3D. No está afiliado, patrocinado ni respaldado por otros fabricantes de software. Las marcas de terceros pertenecen a sus respectivos titulares; los formatos de archivo se mencionan sólo para describir la compatibilidad.","CAD2D3D is independent 2D technical drawing and 3D modeling software. It is not affiliated with, sponsored or endorsed by any other software vendor. Third-party trademarks belong to their respective owners; file formats are mentioned only to describe compatibility."],
  ["Importar PDF · PDFIMPORT","Import PDF · PDFIMPORT"],
- ["Cargando 3D…","Loading 3D…"],["El módulo 3D no pudo cargarse. Revisá la conexión y actualizá la página.","The 3D module could not load. Check your connection and reload the page."],
+ ["Cargando 3D…","Loading 3D…"],["Enviar corte a 2D","Send section to 2D"],["El módulo 3D no pudo cargarse. Revisá la conexión y actualizá la página.","The 3D module could not load. Check your connection and reload the page."],
  ["Vincular plano de la nube · REFXNUBE","Link cloud drawing · REFXNUBE"],
  ["Importar TXT","Import TXT"],
  ["Unir muros al dibujar (AUTO-JOIN)","Join walls while drawing (AUTO-JOIN)"],

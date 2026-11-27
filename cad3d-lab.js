@@ -4897,6 +4897,7 @@ function build(){
  '<label>Posición (m) <input type="number" min="-500" max="500" step=".1" value="0" data-section-number></label>'+
  '<button type="button" class="btn" data-section-reverse aria-pressed="false" title="Invertir hacia dónde mira el corte">↔ Invertir dirección</button>'+
  '<button type="button" class="btn" data-section-center>Situar en el modelo</button>'+
+ '<button type="button" class="btn" data-section-to2d title="Genera el corte como dibujo 2D editable (polilíneas, relleno y cotas de nivel) al costado de la planta">Enviar corte a 2D</button>'+
  '<label><input type="checkbox" data-section-visible checked> Mostrar plano y flecha</label>'+
  '</div></section>'+
  '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
@@ -8669,6 +8670,95 @@ function cad3dLightSetup(){
  refresh();
 }
 
+/* Corte 3D → dibujo 2D: interseca cada triángulo de los sólidos visibles con el plano de sección,
+   encadena los segmentos en contornos y los envía al 2D como polilíneas comunes con relleno de corte
+   y cotas de nivel. El 2D recibe líneas editables: no queda vinculado al modelo. */
+function cad3dSectionCut(){
+ var axis=cad3dSection.axis,n=cad3dSectionNormal(),off=Number(cad3dSection.offset)||0;
+ var unit={x:[1,0,0],y:[0,1,0],z:[0,0,1]}[axis],c=(n[0]*unit[0]+n[1]*unit[1]+n[2]*unit[2])*off+1e-7;
+ var up=axis==='z'?[0,1,0]:[0,0,1],right=axis==='z'?[1,0,0]:[n[1]*up[2]-n[2]*up[1],n[2]*up[0]-n[0]*up[2],n[0]*up[1]-n[1]*up[0]];
+ var meshes=[],budget=3000000,used=0;
+ modelRoot.updateMatrixWorld(true);
+ modelRoot.traverseVisible(function(o){if(o.isMesh&&o.geometry&&o.geometry.attributes&&o.geometry.attributes.position)meshes.push(o);});
+ var out=[],m4=new T.Matrix4(),inst=new T.Matrix4(),v=new T.Vector3();
+ meshes.forEach(function(o){
+  var mats=Array.isArray(o.material)?o.material:[o.material];
+  if(mats.every(function(m){return m&&m.transparent&&m.opacity<.05;}))return;
+  var glass=!!(o.userData&&o.userData.cadGlass),pos=o.geometry.attributes.position,idx=o.geometry.index,tri=idx?idx.count/3:pos.count/3;
+  var copies=o.isInstancedMesh?o.count:1,segs=[];
+  for(var k=0;k<copies;k++){
+   if(used>budget)break;
+   if(o.isInstancedMesh){o.getMatrixAt(k,inst);m4.multiplyMatrices(o.matrixWorld,inst);}else m4.copy(o.matrixWorld);
+   var e=m4.elements,W=new Float64Array(pos.count*3);
+   for(var i=0;i<pos.count;i++){var x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);W[i*3]=e[0]*x+e[4]*y+e[8]*z+e[12];W[i*3+1]=e[1]*x+e[5]*y+e[9]*z+e[13];W[i*3+2]=e[2]*x+e[6]*y+e[10]*z+e[14];}
+   for(var t=0;t<tri;t++){
+    used++;var ia=idx?idx.getX(t*3):t*3,ib=idx?idx.getX(t*3+1):t*3+1,ic=idx?idx.getX(t*3+2):t*3+2,ids=[ia,ib,ic],d=[0,0,0],pts=[];
+    for(var q=0;q<3;q++){var j=ids[q]*3;d[q]=n[0]*W[j]+n[1]*W[j+1]+n[2]*W[j+2]-c;}
+    if((d[0]>0&&d[1]>0&&d[2]>0)||(d[0]<0&&d[1]<0&&d[2]<0))continue;
+    for(var q2=0;q2<3;q2++){var r=(q2+1)%3,da=d[q2],db=d[r];if((da<0)!==(db<0)){var tt=da/(da-db),ja=ids[q2]*3,jb=ids[r]*3;
+      var px=W[ja]+(W[jb]-W[ja])*tt,py=W[ja+1]+(W[jb+1]-W[ja+1])*tt,pz=W[ja+2]+(W[jb+2]-W[ja+2])*tt;
+      pts.push([px*right[0]+py*right[1]+pz*right[2],px*up[0]+py*up[1]+pz*up[2]]);}}
+    if(pts.length===2&&Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1])>1e-7)segs.push(pts);
+   }
+  }
+  if(segs.length)out.push({glass:glass,segs:segs});
+ });
+ return {axis:axis,offset:off,parts:out,truncated:used>budget};
+}
+function cad3dChainSegments(segs){
+ var key=function(p){return Math.round(p[0]*1e5)+','+Math.round(p[1]*1e5);},map=new Map(),used=new Uint8Array(segs.length),chains=[];
+ segs.forEach(function(s,i){[0,1].forEach(function(e){var k=key(s[e]);if(!map.has(k))map.set(k,[]);map.get(k).push(i);});});
+ for(var i=0;i<segs.length;i++){
+  if(used[i])continue;used[i]=1;var chain=[segs[i][0],segs[i][1]];
+  for(var dir=0;dir<2;dir++){
+   for(var guard=0;guard<200000;guard++){
+    var end=dir===0?chain[chain.length-1]:chain[0],list=map.get(key(end))||[],next=-1;
+    for(var a=0;a<list.length;a++)if(!used[list[a]]){next=list[a];break;}
+    if(next<0)break;used[next]=1;var s=segs[next],other=key(s[0])===key(end)?s[1]:s[0];
+    if(dir===0)chain.push(other);else chain.unshift(other);
+   }
+  }
+  var closed=chain.length>3&&key(chain[0])===key(chain[chain.length-1]);if(closed)chain.pop();
+  // Quitar vértices alineados (las caras trianguladas parten los lados en tramos).
+  var clean=[];for(var p=0;p<chain.length;p++){
+   var A=chain[(p-1+chain.length)%chain.length],B=chain[p],C=chain[(p+1)%chain.length];
+   if((!closed&&(p===0||p===chain.length-1)))
+    {clean.push(B);continue;}
+   var cr=(B[0]-A[0])*(C[1]-B[1])-(B[1]-A[1])*(C[0]-B[0]),la=Math.hypot(B[0]-A[0],B[1]-A[1]),lb=Math.hypot(C[0]-B[0],C[1]-B[1]);
+   if(Math.abs(cr)>1e-7*Math.max(1e-9,la*lb)&&la>1e-6)clean.push(B);
+  }
+  if(clean.length>=2)chains.push({pts:clean,closed:closed&&clean.length>=3});
+ }
+ return chains;
+}
+function cad3dPolyArea(pts){var a=0;for(var i=0;i<pts.length;i++){var p=pts[i],q=pts[(i+1)%pts.length];a+=p[0]*q[1]-q[0]*p[1];}return a/2;}
+function cad3dPointInPoly(pt,pts){var inside=false;for(var i=0,j=pts.length-1;i<pts.length;j=i++){var a=pts[i],b=pts[j];if(((a[1]>pt[1])!==(b[1]>pt[1]))&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;}
+function cad3dSectionTo2D(){
+ var bridge=window.BlacklineCAD3DBridge;
+ if(!bridge||typeof bridge.addSection!=='function')return text('Puente con el 2D no disponible: recargá la página');
+ if(!T||!modelRoot||!records.length)return text('No hay modelo 3D para cortar');
+ var cut;try{cut=cad3dSectionCut();}catch(e){return text('No se pudo calcular el corte: '+(e.message||e));}
+ var loops=[];
+ cut.parts.forEach(function(part){
+  var chains=cad3dChainSegments(part.segs),closed=chains.filter(function(c){return c.closed;});
+  closed.forEach(function(c){c.area=Math.abs(cad3dPolyArea(c.pts));});
+  closed.sort(function(a,b){return b.area-a.area;});
+  closed.forEach(function(c,i){if(c.parent)return;c.holes=[];for(var j=i+1;j<closed.length;j++){var h=closed[j];if(!h.parent&&cad3dPointInPoly(h.pts[0],c.pts)){h.parent=c;c.holes.push(h.pts);}}});
+  chains.forEach(function(c){loops.push({pts:c.pts,closed:c.closed,kind:part.glass?'glass':'cut',fill:!part.glass&&c.closed&&!c.parent,holes:c.holes||[]});});
+ });
+ if(!loops.length)return text('El plano de sección no corta ningún sólido visible: movelo o usá «Situar en el modelo»');
+ // Niveles: bordes horizontales del corte (pisos, losas, techos).
+ var levelMap=new Map();
+ if(cut.axis!=='z')loops.forEach(function(l){if(l.kind!=='cut'||!l.closed)return;for(var i=0;i<l.pts.length;i++){var a=l.pts[i],b=l.pts[(i+1)%l.pts.length],len=Math.abs(b[0]-a[0]);
+  if(Math.abs(b[1]-a[1])<1e-4&&len>=.05){var z=Math.round(a[1]*100)/100;levelMap.set(z,(levelMap.get(z)||0)+len);}}});
+ var levels=[...levelMap].filter(function(e){return e[1]>=.1;}).map(function(e){return e[0];}).sort(function(a,b){return a-b;});
+ levels=levels.filter(function(z,i){return i===0||z-levels[i-1]>.03;}).slice(0,16);
+ var name=cut.axis==='x'?'CORTE X = ':cut.axis==='y'?'CORTE Y = ':'PLANTA DE CORTE Z = ';
+ var title=name+cut.offset.toFixed(2).replace('.',',')+' m';
+ var res=bridge.addSection({title:title,axis:cut.axis,loops:loops,levels:levels});
+ text((res&&res.count?res.count+' objetos 2D · ':'')+title+' enviado al plano 2D (polilíneas editables, relleno y cotas de nivel)'+(cut.truncated?' · modelo muy grande: corte parcial':''));
+ return res;
+}
 function cad3dSectionSetup(){
  var p=root.querySelector('.cad3dSectionPanel');if(!p)return;
  try{var v=JSON.parse(localStorage.getItem('blackline-cad3d-section-v1')||'null');
@@ -8683,6 +8773,7 @@ function cad3dSectionSetup(){
  p.querySelector('[data-section-number]').addEventListener('change',function(){cad3dSection.offset=Math.max(-500,Math.min(500,Number(this.value)||0));update();});
  p.querySelector('[data-section-reverse]').addEventListener('click',function(){cad3dSection.reverse=!cad3dSection.reverse;update();});
  p.querySelector('[data-section-visible]').addEventListener('change',function(){cad3dSection.showPlane=this.checked;update();});
+ p.querySelector('[data-section-to2d]').addEventListener('click',function(){cad3dSectionTo2D();});
  p.querySelector('[data-section-center]').addEventListener('click',function(){
   var b=cad3dBounds();cad3dSection.offset=cad3dSection.axis==='x'?b.x:cad3dSection.axis==='y'?b.y:b.z;update();
  });
@@ -10079,6 +10170,7 @@ function run3DCommand(){
  if(command==='layiso'||command==='layuniso'){cad3dIsolateLayers(command==='layuniso');return;}
  if(command==='laymrg'){cad3dMergeLayer();return;}if(command==='layselect'){cad3dSelectLayer();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
+ if(['corte2d','seccion2d','section2d','sectionto2d','cortea2d'].includes(command)){cad3dSectionTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
  if(command==='select'||command==='cancel'){setPlacement(null);text('Selección activa');return;}
