@@ -40,6 +40,18 @@ Al crear los precios en Stripe, marcá *Incluir impuestos en el precio* (`tax_be
 
 ## Mercado Pago en pesos (Argentina) y descuento de estudiante (27 nov 2026)
 
+> **27 nov 2026 · Activo en producción.** Aplicación «CAD2D3D» creada en Mercado Pago, con el webhook `https://api.blackline-cad.org/api/mp-webhook` (Planes y suscripciones). Los secretos ya están cargados en `cad2d-billing` y el Worker nuevo está publicado (versión 60e8a7ad).
+> Precios en pesos (finales; decididos el 27/11 con el euro oficial a ≈ $1.770 y un descuento regional de ≈ 25 %):
+>
+> | Plan | Precio | Estudiante (50 %) |
+> | --- | --- | --- |
+> | Pro mensual (`MP_PRICE_PRO_MONTHLY`) | $ 7.990 | $ 3.995 |
+> | Pro anual (`MP_PRICE_PRO_YEARLY`) | $ 69.990 | $ 34.995 |
+> | Estudio mensual (`MP_PRICE_STUDIO_MONTHLY`) | $ 14.990 | $ 7.495 |
+> | Estudio anual (`MP_PRICE_STUDIO_YEARLY`) | $ 129.990 | $ 64.995 |
+>
+> Para cambiarlos: Workers → cad2d-billing → Settings → Variables and Secrets → lápiz de cada `MP_PRICE_*` → Deploy. No hace falta tocar el código.
+
 **Mercado Pago:**
 - Se ofrece solo a quien se conecta desde Argentina, según el país que informa Cloudflare. Fuera de Argentina el cuadro de planes queda igual que antes.
 - Es una **suscripción automática** (*preapproval*): Mercado Pago debita cada mes o cada año, con tarjeta o con dinero en cuenta.
