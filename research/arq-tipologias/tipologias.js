@@ -190,7 +190,7 @@ function furnish(house) {
       let pair = false;
       { // Residential WC + bidet are mandatory regardless of room size.
         const wc = require('./blocks.js').item('san-wc'), bd = require('./blocks.js').item('san-bidet');
-        for (const side of ['W', 'E', 'N', 'S']) {
+        for (const side of ['W']) {
           const L = side === 'W' || side === 'E' ? cd : cw;
           for (const order of [[wc, bd], [bd, wc]]) {
             if (pair) break;
@@ -209,7 +209,7 @@ function furnish(house) {
         need(pair, 'par inodoro + bidé sobre misma pared; revisar distribución si no cabe');
       }
       // No single-WC fallback: the generator rejects this variant through warn.
-      need(F.wall(full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 'san-lav2' : 'san-lav', { w: full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 1.2 : 0.6, use: 0.55 }) || F.wall('san-lav-pie', { use: 0.5 }), 'lavatorio');
+      need(F.wall(full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 'san-lav2' : 'san-lav', { w: full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 1.2 : 0.6, use: 0.55, sides: ['E','N','S'] }) || F.wall('san-lav-pie', { use: 0.5, sides: ['E','N','S'] }), 'lavatorio');
     } else if (r.type === 'lav') {
       need(F.wall('kq-lavarropas', { use: 0.6 }), 'lavarropas'); F.wall('kq-pileta', { use: 0.5 }); F.wall('kq-termo', { use: 0.3 });
     } else if (r.type === 'kitchen' || r.type === 'kitchenette') {
