@@ -10466,6 +10466,9 @@ function action(a,presetId){
  else if(a==='shot')exportViewPNG();
  else if(a==='sketchSvg')exportSketchSVG();
  else if(a==='obj')exportOBJ();
+ else if(['ply','plyout','exportply'].includes(a))exportMeshExchange('ply');
+ else if(['off','offout','exportoff'].includes(a))exportMeshExchange('off');
+ else if(['glb','glbout','exportglb'].includes(a))exportMeshExchange('glb');
  else if(['stl','stlout','exportstl'].includes(a))exportSTL();
  else if(a==='dxf')exportDXF();
  else if(a==='json')exportJSON();
@@ -10490,6 +10493,34 @@ function trianglesWorld(fn){
    fn(points,m.userData.owner);
   }
  });
+}
+// Portable mesh exchange, coordinates in metres. GLB converts Z-up to Y-up.
+function cad3dEncodeMesh(triangles,format){
+ if(!triangles.length||triangles.length>120000)throw Error('Exportación: cantidad de caras no admitida (máx. 120.000)');
+ if(triangles.some(t=>t.length!==3||t.some(p=>p.length!==3||!p.every(Number.isFinite))))throw Error('Coordenadas de exportación inválidas');
+ const n=triangles.length*3;
+ if(format==='ply'||format==='off'){
+  const vertices=triangles.flat().map(p=>p.map(x=>String(+x.toPrecision(12))).join(' '));
+  const faces=triangles.map((_,i)=>'3 '+[3*i,3*i+1,3*i+2].join(' '));
+  const header=format==='ply'?['ply','format ascii 1.0','comment CAD2D3D coordinates in metres','element vertex '+n,'property double x','property double y','property double z','element face '+triangles.length,'property list uchar int vertex_indices','end_header']:['OFF',n+' '+triangles.length+' 0'];
+  return [...header,...vertices,...faces].join('\n')+'\n';
+ }
+ if(format!=='glb')throw Error('Formato de exportación inválido');
+ const positions=new Float32Array(n*3),min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];let i=0;
+ for(const t of triangles)for(const p of t){const v=[p[0],p[2],-p[1]];for(let k=0;k<3;k++){positions[i]=v[k];const f=positions[i++];if(!Number.isFinite(f))throw Error('Coordenada fuera del rango GLB');min[k]=Math.min(min[k],f);max[k]=Math.max(max[k],f);}}
+ const j={asset:{version:'2.0',generator:'CAD2D3D Blackline'},scene:0,scenes:[{nodes:[0]}],nodes:[{mesh:0}],meshes:[{primitives:[{attributes:{POSITION:0},mode:4}]}],buffers:[{byteLength:positions.byteLength}],bufferViews:[{buffer:0,byteOffset:0,byteLength:positions.byteLength,target:34962}],accessors:[{bufferView:0,componentType:5126,count:n,type:'VEC3',min,max}]};
+ const raw=new TextEncoder().encode(JSON.stringify(j)),padded=(raw.length+3)&~3,total=12+8+padded+8+positions.byteLength,buffer=new ArrayBuffer(total),d=new DataView(buffer),u=new Uint8Array(buffer);
+ d.setUint32(0,0x46546c67,true);d.setUint32(4,2,true);d.setUint32(8,total,true);d.setUint32(12,padded,true);d.setUint32(16,0x4e4f534a,true);u.fill(32,20,20+padded);u.set(raw,20);
+ d.setUint32(20+padded,positions.byteLength,true);d.setUint32(24+padded,0x004e4942,true);for(let k=0;k<positions.length;k++)d.setFloat32(28+padded+k*4,positions[k],true);
+ return buffer;
+}
+function exportMeshExchange(format){
+ if(!records.some(visibleRecord)||!T)return text('No hay geometría 3D visible disponible');
+ const triangles=[];try{trianglesWorld(p=>{if(triangles.length>=120000)throw Error('Límite de 120.000 caras');triangles.push(p);});
+ const content=cad3dEncodeMesh(triangles,format);
+ download('CAD2D3D-model.'+format,content,format==='glb'?'model/gltf-binary':'text/plain;charset=utf-8');
+ text(format.toUpperCase()+' · '+triangles.length+' caras · metros · solo geometría');
+ }catch(e){text(e.message||'Exportación interrumpida');}
 }
 function exportOBJ(){
  if(!records.some(visibleRecord))return text('No hay objetos 3D visibles para exportar');
