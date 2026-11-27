@@ -22,3 +22,10 @@ test('openings are dimensioned on their own and never become building levels',()
  assert.match(src,/l\.kind!=='cut'\|\|!l\.closed\|\|l\.opening/);
  assert.match(html,/Aberturas: antepecho y altura de vano/);
 });
+test('beyond-the-cut view with hidden lines removed, one-step section to layout, schedule button',()=>{
+ assert.match(src,/function cad3dSectionBeyond\(\)/);assert.match(src,/new T\.MeshDepthMaterial\(\{depthPacking:T\.RGBADepthPacking/);
+ assert.match(src,/kind:'beyond',fill:false/);assert.match(html,/layer\('A-CORTE-VISTA','#9aa4ab',\.13\)/);
+ assert.match(src,/data-section-tolayout/);assert.match(src,/data-schedule-to2d/);assert.match(src,/toLayout:!!\(opts&&opts\.toLayout\)/);
+ assert.match(html,/function cadSectionToLayout\(bb,title\)/);assert.match(html,/const scales=\[10,20,25,50,75,100,125,200,250,500,1000\]/);
+ assert.ok(!/Experimental \(se puede desactivar\)/.test(src),'stairs no longer labelled experimental');
+});

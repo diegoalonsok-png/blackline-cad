@@ -12961,10 +12961,10 @@ function cadAddSectionFrom3D(p){
  const ox=b?b.maxX+5*k-minH*k:-minH*k,oy=b?b.minY-minV*k:-minV*k,Q=(h,v)=>P(ox+h*k,oy+v*k);
  const layer=(name,color,width)=>{let l=state.layers.find(x=>x.name===name);if(!l){let id='sec-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-');while(state.layers.some(x=>x.id===id))id+='-';l={id,name,visible:true,locked:false,color,width,linetype:'CONTINUOUS'};state.layers.push(l)}return l.id};
  saveHistory();
- const Lcut=layer('A-CORTE','#ffffff',.5),Lfill=layer('A-CORTE-RELLENO','#8a8a8a',.13),Lglass=layer('A-CORTE-VIDRIO','#7fd3ff',.13),Ldim=layer('A-CORTE-COTAS','#5ec8ff',.18);
+ const Lcut=layer('A-CORTE','#ffffff',.5),Lfill=layer('A-CORTE-RELLENO','#8a8a8a',.13),Lglass=layer('A-CORTE-VIDRIO','#7fd3ff',.13),Ldim=layer('A-CORTE-COTAS','#5ec8ff',.18),Lview=loops.some(l=>l.kind==='beyond')?layer('A-CORTE-VISTA','#9aa4ab',.13):null;
  const add=e=>{e.id=state.nextId++;state.entities.push(e);return e};let count=0;
  for(const l of loops){
-  const pts=l.pts.map(q=>Q(q[0],q[1])),lay=l.kind==='glass'?Lglass:Lcut;
+  const pts=l.pts.map(q=>Q(q[0],q[1])),lay=l.kind==='glass'?Lglass:l.kind==='beyond'?Lview:Lcut;
   if(l.fill&&pts.length>=3){add({type:'hatch',pts:pts.map(q=>({...q})),...(l.holes?.length?{holes:l.holes.filter(h=>Array.isArray(h)&&h.length>=3).map(h=>h.map(q=>Q(q[0],q[1])))}:{}),hatchStyle:'solid',color:'#8a8a8a',layer:Lfill});count++}
   if(pts.length===2&&!l.closed)add({type:'line',a:pts[0],b:pts[1],layer:lay});else add({type:'polyline',pts,closed:!!l.closed,layer:lay});count++;
  }
@@ -12990,7 +12990,23 @@ function cadAddSectionFrom3D(p){
  }
  add({type:'text',text:String(p.title||'CORTE').slice(0,80),p:Q(minH,minV-.9),h:.3*k,rotation:0,layer:Ldim});count++;
  updateAll();zoomExtents();log('Corte desde 3D: '+count+' objetos 2D · '+String(p.title||''));toast(String(p.title||'Corte')+' · '+count+' objetos 2D');
- return {count};
+ const created=state.entities.slice(-count),bb=created.length?getBounds(created):null;
+ if(p.toLayout&&bb)cadSectionToLayout(bb,String(p.title||'CORTE'));
+ return {count,bounds:bb};
+}
+/* Corte → lámina nueva con una ventana a escala estándar centrada en el corte, debajo del rótulo libre. */
+function cadSectionToLayout(bb,title){
+ cadAddLayout();
+ const o=layoutPlotOptions(),M=cadFrameMargins(o.frame)||{l:o.margin,r:o.margin,t:o.margin,b:o.margin};
+ const titleOn=$('layoutTitleBlock').checked,TW=Math.max(120,Math.min(190,o.w*.42)),TH=titleOn?TW*.30:0;
+ const x=M.l+6,y=M.t+6,w=o.w-M.l-M.r-12,h=o.h-M.t-M.b-12-(titleOn?TH+4:0);
+ const dx=Math.max(1e-6,bb.maxX-bb.minX),dy=Math.max(1e-6,bb.maxY-bb.minY),mmPer=U[state.unit];
+ const scales=[10,20,25,50,75,100,125,200,250,500,1000];let sc=scales.find(n=>dx*mmPer/n<=w*.94&&dy*mmPer/n<=h*.9)||'fit';
+ cadLayoutViewports=[{x,y,w,h,cx:(bb.minX+bb.maxX)/2,cy:(bb.minY+bb.maxY)/2,scale:sc==='fit'?'fit':String(sc),frame:false,label:sc!=='fit',title:title.slice(0,40),frozenLayers:[]}];
+ cadTitleFields={...cadTitleFields,plano:title.slice(0,80)};
+ cadLayouts[cadLayoutIdx].name=title.replace(/\s*=.*$/,'').slice(0,30)||cadLayouts[cadLayoutIdx].name;
+ cadLayouts[cadLayoutIdx].state=collectLayoutState();cadLayoutsPersist();renderLayoutTabs();renderLayoutWorkspace();
+ toast('Lámina «'+cadLayouts[cadLayoutIdx].name+'» creada con el corte a '+(sc==='fit'?'escala ajustada':'1:'+sc));
 }
 window.BlacklineCAD3DBridge=Object.freeze({
  addSection:p=>cadAddSectionFrom3D(p),
@@ -13046,6 +13062,6 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script defer src="cad3d-solid-ops.js?v=20261126-shell-v1"></script>
 <script defer src="cad3d-entourage.js?v=20261125-entourage-v1"></script>
 <script defer src="cad3d-croquis-studio.js?v=20261125-studio-v1"></script>
-<script defer src="cad3d-lab.js?v=20261127-planilla1"></script>
+<script defer src="cad3d-lab.js?v=20261127-lamina1"></script>
 <script defer src="cad3d-ai-croquis.js?v=20261125-art-retouch-v1"></script>
 </body></html>

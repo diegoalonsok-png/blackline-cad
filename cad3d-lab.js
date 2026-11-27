@@ -2277,7 +2277,7 @@ function clickArchPalette(e){
   try{localStorage.setItem('blackline-cad3d-stairs-beta-v1',cad3dStairsBetaEnabled?'on':'off');}catch(_e){}
   if(!cad3dStairsBetaEnabled&&['stair','railing'].includes(placing))setPlacement(null);
   renderArchPalette();
-  text(cad3dStairsBetaEnabled?'Escaleras y barandas experimentales activadas':'Creación de escaleras y barandas desactivada · los modelos existentes permanecen');
+  text(cad3dStairsBetaEnabled?'Escaleras y barandas paramétricas activadas':'Creación de escaleras y barandas desactivada · los modelos existentes permanecen');
   return;
  }
  if(e.target.closest('[data-arch-close]')){showArchPalette(false);return;}
@@ -4834,7 +4834,7 @@ function build(){
  '<button type="button" class="btn" data-arch-size="large">▣ Grande</button></div>'+
  '<button type="button" class="btn" data-arch-dock aria-pressed="false" title="Acoplar junto a Layers">⇥ Acoplar</button>'+
  '<button type="button" class="btn" data-arch-close aria-label="Cerrar paleta">×</button></header>'+
- '<label class="cad3dStairsBeta"><input type="checkbox" data-stairs-beta checked> Escaleras y barandas paramétricas · Experimental (se puede desactivar)</label>'+
+ '<label class="cad3dStairsBeta"><input type="checkbox" data-stairs-beta checked> Escaleras y barandas paramétricas (se pueden desactivar)</label>'+
  '<div class="archTools" role="group" aria-label="Tipos paramétricos">'+
  Object.keys(archLabels).map(function(kind){
   return '<button type="button" class="btn" data-arch-tool="'+kind+'">'+archLabels[kind]+'</button>';
@@ -4898,6 +4898,8 @@ function build(){
  '<button type="button" class="btn" data-section-reverse aria-pressed="false" title="Invertir hacia dónde mira el corte">↔ Invertir dirección</button>'+
  '<button type="button" class="btn" data-section-center>Situar en el modelo</button>'+
  '<button type="button" class="btn" data-section-to2d title="Genera el corte como dibujo 2D editable (polilíneas, relleno y cotas de nivel) al costado de la planta">Enviar corte a 2D</button>'+
+ '<button type="button" class="btn" data-section-tolayout title="Envía el corte al 2D y arma una lámina nueva con su ventana a escala y el rótulo">Corte a lámina</button>'+
+ '<button type="button" class="btn" data-schedule-to2d title="Planilla de puertas y ventanas del modelo, con alto y antepecho, en el plano 2D">Planilla de aberturas</button>'+
  '<label><input type="checkbox" data-section-visible checked> Mostrar plano y flecha</label>'+
  '</div></section>'+
  '<section class="panel"><header class="panel-title">Selection / Properties</header>'+
@@ -8707,6 +8709,75 @@ function cad3dSectionCut(){
  });
  return {axis:axis,offset:off,parts:out,truncated:used>budget};
 }
+/* Lo que se ve más allá del corte: aristas del modelo del lado conservado, con líneas ocultas eliminadas
+ * comparando contra un mapa de profundidad (cámara ortogonal sobre el plano, mirando hacia el modelo). */
+function cad3dSectionBeyond(){
+ var axis=cad3dSection.axis,n=cad3dSectionNormal(),off=Number(cad3dSection.offset)||0;
+ var unit={x:[1,0,0],y:[0,1,0],z:[0,0,1]}[axis],c=(n[0]*unit[0]+n[1]*unit[1]+n[2]*unit[2])*off;
+ var up=axis==='z'?[0,1,0]:[0,0,1],right=axis==='z'?[1,0,0]:[n[1]*up[2]-n[2]*up[1],n[2]*up[0]-n[0]*up[2],n[0]*up[1]-n[1]*up[0]];
+ var dot=function(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];};
+ modelRoot.updateMatrixWorld(true);
+ var box=new T.Box3().setFromObject(modelRoot);if(box.isEmpty())return [];
+ var minH=Infinity,maxH=-Infinity,minV=Infinity,maxV=-Infinity,maxD=0;
+ [box.min.x,box.max.x].forEach(function(x){[box.min.y,box.max.y].forEach(function(y){[box.min.z,box.max.z].forEach(function(z){
+  var p=[x,y,z],h=dot(p,right),v=dot(p,up),d=dot(p,n)-c;minH=Math.min(minH,h);maxH=Math.max(maxH,h);minV=Math.min(minV,v);maxV=Math.max(maxV,v);maxD=Math.max(maxD,d);});});});
+ if(maxD<=0.01)return [];
+ var pad=.05;minH-=pad;maxH+=pad;minV-=pad;maxV+=pad;
+ var spanH=maxH-minH,spanV=maxV-minV,res=Math.min(2048/Math.max(spanH,spanV),400),W=Math.max(16,Math.ceil(spanH*res)),Hh=Math.max(16,Math.ceil(spanV*res));
+ res=Math.min(W/spanH,Hh/spanV);
+ // Cámara ortogonal: ejes (right, up, -n), sobre el plano, mirando hacia +n.
+ var near=-.001,far=maxD+1;
+ var cam=new T.OrthographicCamera(minH,maxH,maxV,minV,near,far);
+ var m=new T.Matrix4().makeBasis(new T.Vector3(right[0],right[1],right[2]),new T.Vector3(up[0],up[1],up[2]),new T.Vector3(-n[0],-n[1],-n[2]));
+ m.setPosition(n[0]*c,n[1]*c,n[2]*c);cam.matrixAutoUpdate=false;cam.matrix.copy(m);cam.matrixWorld.copy(m);cam.matrixWorldInverse.copy(m).invert();cam.updateProjectionMatrix();
+ var rt=new T.WebGLRenderTarget(W,Hh,{type:T.UnsignedByteType,format:T.RGBAFormat,depthBuffer:true});
+ var plane=new T.Plane(new T.Vector3(n[0],n[1],n[2]),-c);
+ var mat=new T.MeshDepthMaterial({depthPacking:T.RGBADepthPacking,side:T.DoubleSide,clippingPlanes:[plane]});
+ // Sólo los sólidos tapan: se ocultan líneas, puntos, carteles y vidrios durante el mapa de profundidad.
+ var hidden=[];modelRoot.traverse(function(o){if(o.visible&&(o.isLine||o.isLineSegments||o.isPoints||o.isSprite||(o.isMesh&&o.userData&&o.userData.cadGlass)))hidden.push(o);});
+ hidden.forEach(function(o){o.visible=false;});
+ var tmp=new T.Scene(),parent=modelRoot.parent,prevRT=renderer.getRenderTarget(),prevClip=renderer.localClippingEnabled,prevColor=new T.Color(),prevAlpha=renderer.getClearAlpha();renderer.getClearColor(prevColor);
+ var px=new Uint8Array(W*Hh*4);
+ try{
+  tmp.overrideMaterial=mat;tmp.add(modelRoot);renderer.localClippingEnabled=true;renderer.setRenderTarget(rt);renderer.setClearColor(0xffffff,1);renderer.clear();
+  renderer.render(tmp,cam);renderer.readRenderTargetPixels(rt,0,0,W,Hh,px);
+ }finally{
+  renderer.setRenderTarget(prevRT);renderer.setClearColor(prevColor,prevAlpha);renderer.localClippingEnabled=prevClip;
+  if(parent)parent.add(modelRoot);hidden.forEach(function(o){o.visible=true;});rt.dispose();mat.dispose();
+ }
+ // Profundidad (m desde el plano) por píxel; fondo = infinito.
+ var K=255/256,F0=K/16777216,F1=K/65536,F2=K/256,F3=K,depth=new Float32Array(W*Hh);
+ for(var i=0;i<W*Hh;i++){var r=px[i*4],g=px[i*4+1],b=px[i*4+2],al=px[i*4+3];
+  if(r===255&&g===255&&b===255&&al===255){depth[i]=Infinity;continue;}
+  var z=(r*F0+g*F1+b*F2+al*F3)/255;depth[i]=near+z*(far-near);}
+ var tol=Math.max(.015,2/res),out=[],budget=1500000,used=0,ev=new T.Vector3(),m4=new T.Matrix4(),inst=new T.Matrix4();
+ var sampleVis=function(h,v,d){var x=Math.floor((h-minH)*res),y=Math.floor((v-minV)*res);var best=-Infinity;
+  for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){var xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=W||yy>=Hh)continue;var D=depth[yy*W+xx];if(D>best)best=D;}
+  return best>=d-tol;};
+ var edgeCache=new Map();
+ modelRoot.traverseVisible(function(o){
+  if(!o.isMesh||!o.geometry||(o.userData&&o.userData.cadGlass)||used>budget)return;
+  var eg=edgeCache.get(o.geometry);if(!eg){eg=new T.EdgesGeometry(o.geometry,25);edgeCache.set(o.geometry,eg);}
+  var pos=eg.attributes.position,copies=o.isInstancedMesh?o.count:1;
+  for(var k=0;k<copies;k++){
+   if(o.isInstancedMesh){o.getMatrixAt(k,inst);m4.multiplyMatrices(o.matrixWorld,inst);}else m4.copy(o.matrixWorld);
+   for(var j=0;j<pos.count;j+=2){
+    ev.fromBufferAttribute(pos,j).applyMatrix4(m4);var A=[ev.x,ev.y,ev.z];ev.fromBufferAttribute(pos,j+1).applyMatrix4(m4);var B=[ev.x,ev.y,ev.z];
+    var da=dot(A,n)-c,db=dot(B,n)-c;if(da<.01&&db<.01)continue;
+    if(da<0||db<0){var t=da/(da-db),Q=[A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t];if(da<0){A=Q;da=0;}else{B=Q;db=0;}}
+    var ha=dot(A,right),va=dot(A,up),hb=dot(B,right),vb=dot(B,up),Lpx=Math.hypot(hb-ha,vb-va)*res;
+    if(Lpx<.5)continue;var steps=Math.min(4000,Math.max(2,Math.ceil(Lpx)));used+=steps;
+    var run=null;
+    for(var q=0;q<=steps;q++){var tt=q/steps,h=ha+(hb-ha)*tt,v=va+(vb-va)*tt,d=da+(db-da)*tt,vis=sampleVis(h,v,d);
+     if(vis){if(!run)run=[h,v];run.e=[h,v];}
+     else if(run){if(Math.hypot(run.e[0]-run[0],run.e[1]-run[1])>1/res)out.push([[run[0],run[1]],run.e]);run=null;}}
+    if(run&&Math.hypot(run.e[0]-run[0],run.e[1]-run[1])>1/res)out.push([[run[0],run[1]],run.e]);
+   }
+  }
+ });
+ edgeCache.forEach(function(g){g.dispose();});
+ return out;
+}
 function cad3dChainSegments(segs){
  var key=function(p){return Math.round(p[0]*1e5)+','+Math.round(p[1]*1e5);},map=new Map(),used=new Uint8Array(segs.length),chains=[];
  segs.forEach(function(s,i){[0,1].forEach(function(e){var k=key(s[e]);if(!map.has(k))map.set(k,[]);map.get(k).push(i);});});
@@ -8735,7 +8806,7 @@ function cad3dChainSegments(segs){
 }
 function cad3dPolyArea(pts){var a=0;for(var i=0;i<pts.length;i++){var p=pts[i],q=pts[(i+1)%pts.length];a+=p[0]*q[1]-q[0]*p[1];}return a/2;}
 function cad3dPointInPoly(pt,pts){var inside=false;for(var i=0,j=pts.length-1;i<pts.length;j=i++){var a=pts[i],b=pts[j];if(((a[1]>pt[1])!==(b[1]>pt[1]))&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;}
-function cad3dSectionTo2D(){
+function cad3dSectionTo2D(opts){
  var bridge=window.BlacklineCAD3DBridge;
  if(!bridge||typeof bridge.addSection!=='function')return text('Puente con el 2D no disponible: recargá la página');
  if(!T||!modelRoot||!records.length)return text('No hay modelo 3D para cortar');
@@ -8756,6 +8827,9 @@ function cad3dSectionTo2D(){
   .map(function(b){return {h0:b.h0,h1:b.h1,z0:Math.round(b.z0*100)/100,z1:Math.round(b.z1*100)/100};});
 
  if(!loops.length)return text('El plano de sección no corta ningún sólido visible: movelo o usá «Situar en el modelo»');
+ // Vista más allá del corte (líneas finas, sin las ocultas).
+ var beyond=[];try{if(cut.axis!=='z')beyond=cad3dChainSegments(cad3dSectionBeyond());}catch(e){beyond=[];}
+ beyond.forEach(function(ch){loops.push({pts:ch.pts,closed:ch.closed,kind:'beyond',fill:false,holes:[]});});
  // Niveles: bordes horizontales del corte (pisos, losas, techos).
  var levelMap=new Map();
  if(cut.axis!=='z')loops.forEach(function(l){if(l.kind!=='cut'||!l.closed||l.opening)return;for(var i=0;i<l.pts.length;i++){var a=l.pts[i],b=l.pts[(i+1)%l.pts.length],len=Math.abs(b[0]-a[0]);
@@ -8767,7 +8841,7 @@ function cad3dSectionTo2D(){
  var name=cut.axis==='x'?'CORTE X = ':cut.axis==='y'?'CORTE Y = ':'PLANTA DE CORTE Z = ';
  var title=name+cut.offset.toFixed(2).replace('.',',')+' m';
  loops.forEach(function(l){delete l.opening;});
- var res=bridge.addSection({title:title,axis:cut.axis,loops:loops,levels:levels,openings:cut.axis==='z'?[]:openings});
+ var res=bridge.addSection({title:title,axis:cut.axis,loops:loops,levels:levels,openings:cut.axis==='z'?[]:openings,toLayout:!!(opts&&opts.toLayout)});
  text((res&&res.count?res.count+' objetos 2D · ':'')+title+' enviado al plano 2D (polilíneas editables, relleno y cotas de nivel)'+(cut.truncated?' · modelo muy grande: corte parcial':''));
  return res;
 }
@@ -8801,6 +8875,8 @@ function cad3dSectionSetup(){
  p.querySelector('[data-section-reverse]').addEventListener('click',function(){cad3dSection.reverse=!cad3dSection.reverse;update();});
  p.querySelector('[data-section-visible]').addEventListener('change',function(){cad3dSection.showPlane=this.checked;update();});
  p.querySelector('[data-section-to2d]').addEventListener('click',function(){cad3dSectionTo2D();});
+ p.querySelector('[data-section-tolayout]').addEventListener('click',function(){cad3dSectionTo2D({toLayout:true});});
+ p.querySelector('[data-schedule-to2d]').addEventListener('click',function(){cad3dScheduleTo2D();});
  p.querySelector('[data-section-center]').addEventListener('click',function(){
   var b=cad3dBounds();cad3dSection.offset=cad3dSection.axis==='x'?b.x:cad3dSection.axis==='y'?b.y:b.z;update();
  });
@@ -10198,6 +10274,7 @@ function run3DCommand(){
  if(command==='laymrg'){cad3dMergeLayer();return;}if(command==='layselect'){cad3dSelectLayer();return;}
  if(command==='check3d'||command==='verify3d'){verify3DSolids();return;}
  if(['corte2d','seccion2d','section2d','sectionto2d','cortea2d'].includes(command)){cad3dSectionTo2D();return;}
+ if(['cortealamina','cortelamina','sectiontolayout','cortelam'].includes(command)){cad3dSectionTo2D({toLayout:true});return;}
  if(['planillaaberturas','tablaaberturas','doorschedule','windowschedule','openingschedule','planilla'].includes(command)){cad3dScheduleTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
