@@ -2565,7 +2565,7 @@ async function cad3dLoadRemoteCatalogue(){
   data.items.slice(0,10000).forEach(function(v){
    if(!v||!/^cloud-[a-z0-9-]{1,80}$/.test(v.id)||!cad3dSafeLibraryFile(v.model,'json')||!['svg','png','webp','jpg'].some(ext=>cad3dSafeLibraryFile(v.thumb,ext))||![v.w,v.d,v.h].every(n=>Number.isFinite(n)&&n>=.001&&n<=1000))return;
    var quality=cad3dGalleryQualityFromManifest(v);
-   CAD3D_COMPONENTS[v.id]={name:String(v.name||v.id).slice(0,100),group:String(v.group||'Objetos').slice(0,60),w:v.w,d:v.d,h:v.h,parts:[],remote:true,model:v.model,thumb:v.thumb,quality:quality,detail:typeof v.replaces==='string'&&/^detail-[a-z0-9-]+$/.test(v.replaces),reviewSource:v.source, ...(v.kind==='2.5d'?{cutout:'photo',mount:v.mount==='cross'?'cross':'face'}:{})};
+   CAD3D_COMPONENTS[v.id]={name:String(v.name||v.id).slice(0,100),group:String(v.group||'Objetos').slice(0,60),w:v.w,d:v.d,h:v.h,parts:[],remote:true,model:v.model,thumb:v.thumb,quality:quality,detail:typeof v.replaces==='string'&&/^detail-[a-z0-9-]+$/.test(v.replaces),reviewSource:v.source,reviewAuthor:v.author,reviewLicense:v.license, ...(v.kind==='2.5d'?{cutout:'photo',mount:v.mount==='cross'?'cross':'face'}:{})};
    if(/^detail-[a-z0-9-]+$/.test(v.replaces||'')&&CAD3D_COMPONENTS[v.replaces]?.detail)CAD3D_COMPONENTS[v.replaces].superseded=true;
   });
   return true;
@@ -2596,10 +2596,14 @@ async function cad3dFetchRemoteModel(spec){
 var cad3dBlockView='3d',cad3dBlockCategory='all',cad3dShowProvisional=false,cad3dGalleryPage=0;
 // A realism label requires a human review and a documented redistributable source.
 function cad3dGalleryQualityFromManifest(v){
- var q=v.quality,approved=v.review?.approved===true&&/^\d{4}-\d{2}-\d{2}$/.test(v.review.date||'')&&typeof v.review.reviewer==='string'&&v.review.reviewer.trim().length>0;
- var source=typeof v.source==='string'&&(/^https:\/\//i.test(v.source)||v.source==='Blackline original');
+ var q=v.quality,date=v.review?.date||'',parsed=new Date(date);
+ var approved=v.review?.approved===true&&/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===date&&typeof v.review.reviewer==='string'&&v.review.reviewer.trim().length>0;
+ var source=false;
+ if(v.source==='Blackline original')source=v.license==='Blackline original';
+ else if(typeof v.source==='string'){try{var u=new URL(v.source);source=u.protocol==='https:'&&!!u.hostname&&!u.username&&!u.password&&v.license!=='Blackline original';}catch(e){}}
+ var author=typeof v.author==='string'&&v.author.trim().length>0;
  var license=['CC0-1.0','CC-BY-4.0','Blackline original','Public Domain'].includes(v.license);
- return approved&&source&&license&&['realistic','semirealistic'].includes(q)?q:'provisional';
+ return approved&&source&&author&&license&&['realistic','semirealistic'].includes(q)?q:'provisional';
 }
 function cad3dGalleryQuality(spec){return spec.quality==='realistic'?'Realista · revisado':spec.quality==='semirealistic'?'Semirrealista · revisado':spec.detail?'Detallado · pendiente de revisión':'Provisional · no realista';}
 function cad3dGalleryVisible(spec){return !spec.superseded&&!(spec.legacy&&window.BlacklineEntourage)&&(cad3dShowProvisional||spec.detail||['realistic','semirealistic'].includes(spec.quality));}
@@ -2679,7 +2683,7 @@ function cad3dBlockCatalogItems(){
   return '<button type="button" class="cad3dBlockCard" data-3d-block="'+id+'" title="Insertar '+escapeHtml(spec.name)+'">'+
     '<span class="cad3dBlockPreview">'+cad3dBlockPreview(spec,id)+'</span>'+
     '<span class="cad3dBlockName">'+escapeHtml(spec.name)+'</span>'+
-    '<span class="cad3dBlockMeta">'+escapeHtml(spec.group)+' · '+(spec.cutout?'2.5D':'3D')+' · '+[spec.w,spec.d,spec.h].map(n=>Number(n.toFixed(2))).join(' × ')+' m</span><span class="cad3dBlockMeta">'+escapeHtml(cad3dGalleryQuality(spec))+'</span></button>';
+    '<span class="cad3dBlockMeta">'+escapeHtml(spec.group)+' · '+(spec.cutout?'2.5D':'3D')+' · '+[spec.w,spec.d,spec.h].map(n=>Number(n.toFixed(2))).join(' × ')+' m</span><span class="cad3dBlockMeta">'+escapeHtml(cad3dGalleryQuality(spec))+'</span>'+(['realistic','semirealistic'].includes(spec.quality)?'<span class="cad3dBlockMeta">'+escapeHtml(spec.reviewAuthor+' · '+spec.reviewLicense)+'</span>':'')+'</button>';
  }).join('')+'</div>';
 }
 function cad3dRefreshBlockCatalog(){
