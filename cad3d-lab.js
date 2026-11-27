@@ -2930,6 +2930,18 @@ function cad3dDecodeIFC(source){
  function identity(v){const p=ref(v,'IFCLOCALPLACEMENT');if(p.length!==2||p[0]!=='$')throw Error('IFC import: nested placements unsupported');const a=ref(p[1],'IFCAXIS2PLACEMENT3D');if(a.length!==3||a[1]!=='$'||a[2]!=='$'||list(ref(a[0],'IFCCARTESIANPOINT')[0]).map(value).some(x=>x!==0))throw Error('IFC import: nonidentity placement unsupported');}
  const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCFOOTING:'Footing',IFCBUILDINGELEMENTPROXY:'Other'};
  const assigned=new Map();for(const r of records.values()){if(r.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE')continue;const a=split(r.args),st=ref(a[5],'IFCBUILDINGSTOREY');identity(st[5]);const level=st[9]==='$'?null:{name:label(st[2]),elevation:value(st[9])};for(const id of list(a[4])){if(assigned.has(id))throw Error('IFC import: duplicate storey assignment');assigned.set(id,level);}}
+ // Preserve simple named IFC material associations as metadata, not as a render texture.
+ const materials=new Map();
+ for(const r of records.values()){
+  if(r.type!=='IFCRELASSOCIATESMATERIAL')continue;
+  const a=split(r.args),material=records.get((a[5]||'').slice(1));
+  if(!material||material.type!=='IFCMATERIAL')continue; // layered and other associations remain unsupported
+  const name=label(split(material.args)[0]);if(!name)continue;
+  for(const id of list(a[4])){
+   if(materials.has(id)&&materials.get(id)!==name)throw Error('IFC import: conflicting simple materials');
+   materials.set(id,name);
+  }
+ }
  const items=[];let total=0;
  for(const [id,r] of records){
   if(!Object.prototype.hasOwnProperty.call(types,r.type))continue;
@@ -2941,7 +2953,7 @@ function cad3dDecodeIFC(source){
   const vertices=coords.map(v=>{const p=list(v).map(value);if(p.length!==3)throw Error('IFC import: invalid point');return p;});
   const faces=list(m[3]);total+=faces.length;if(total>120000||items.length>=1000)throw Error('IFC import: geometry limit exceeded');
   const triangles=faces.map(v=>{const inds=list(v).map(value);if(inds.length!==3||inds.some(n=>!Number.isInteger(n)||n<1||n>vertices.length))throw Error('IFC import: invalid triangle index');return inds.map(n=>vertices[n-1]);});
-  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,level:assigned.get('#'+id)||null,triangles});
+  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,level:assigned.get('#'+id)||null,...(materials.has('#'+id)?{material:materials.get('#'+id)}:{}),triangles});
  }
  const allMeshes=[...records.values()].filter(r=>r.type==='IFCTRIANGULATEDFACESET').length;
  if(!items.length||allMeshes!==items.length)throw Error('IFC import: unsupported or unassigned geometry');
@@ -2956,7 +2968,7 @@ function cad3dImportIFC(source){
   const size=max.map((v,k)=>Math.max(.001,v-min[k])),origin=[(min[0]+max[0])/2,(min[1]+max[1])/2,min[2]];
   if(size.some(v=>!Number.isFinite(v)||v>1000))throw Error('IFC import: unsupported object dimensions');
   const meshVertices=item.triangles.flatMap(t=>t.flatMap(p=>p.map((v,k)=>(v-origin[k])/size[k])));
-  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,...(item.level?{bimLevel:cad3dBimLevelValue(item.level.name,item.level.elevation)}:{}),x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
+  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,...(item.material?{ifcMaterial:item.material}:{}),...(item.level?{bimLevel:cad3dBimLevelValue(item.level.name,item.level.elevation)}:{}),x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
  });
  cad3dHistoryStart();const added=planned.map(p=>Object.assign(newRecord('imported3d'),p));records.push(...added);selected=added.map(r=>r.id);redraw();renderProps();text('IFC4 · '+added.length+' objects · Blackline tessellation subset; not parametric');
 }
@@ -10957,7 +10969,7 @@ function cad3dEncodeIFC(items,randomBytes){
 function exportIFC(){
  if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
  try{
-  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='box'&&r.bimClass?r.bimClass.toLowerCase():r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,ifcGuid:r.ifcGuid,triangles:[]}]));
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='box'&&r.bimClass?r.bimClass.toLowerCase():r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.ifcMaterial||r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,ifcGuid:r.ifcGuid,triangles:[]}]));
   let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
   const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
   download('CAD2D3D-model.ifc',content,'application/x-step');
@@ -11202,6 +11214,7 @@ async function readJSON(e){
     o.meshVertices=r.meshVertices.slice();o.name=String(r.name||'Imported model').slice(0,120);
     if(['Wall','Slab','Roof','Stair','Railing','Column','Beam','Footing','Other'].includes(r.ifcClass))o.ifcClass=r.ifcClass;
     if(typeof r.ifcGuid==='string'&&/^[0-3][A-Za-z0-9_$]{21}$/.test(r.ifcGuid))o.ifcGuid=r.ifcGuid;
+    if(typeof r.ifcMaterial==='string'&&r.ifcMaterial.trim())o.ifcMaterial=r.ifcMaterial.slice(0,120);
     ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
    }
