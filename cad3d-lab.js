@@ -10063,7 +10063,7 @@ function applyRenderStyle(){
    m.userData.cadOriginalMaterial={
     transparent:!!mat.transparent,opacity:mat.opacity,depthWrite:mat.depthWrite,
     alphaTest:mat.alphaTest||0,roughness:mat.roughness,metalness:mat.metalness,
-    isCutout:!!(mat.map&&mat.map.isCanvasTexture)
+    isCutout:!!(m.userData.cadCutout||(mat.map&&mat.map.isCanvasTexture))
    };
   }
   var original=m.userData.cadOriginalMaterial;
@@ -10076,7 +10076,7 @@ function applyRenderStyle(){
   mat.depthTest=true;
   mat.transparent=glass||renderStyle==='xray'||(original.transparent&&!cutout);
   mat.opacity=renderStyle==='xray'?(cutout?.5:.23):glass?.28:original.opacity;
-  mat.alphaTest=cutout?Math.max(.45,original.alphaTest):original.alphaTest;
+  mat.alphaTest=cutout?(original.alphaTest>0?original.alphaTest:.45):original.alphaTest;
   // Hidden-line mode uses an invisible depth prepass for proper edge occlusion.
   mat.depthWrite=plainLines?renderStyle==='hidden'&&!glass&&!cutout:
    !glass&&renderStyle!=='xray'&&(cutout||original.depthWrite);
