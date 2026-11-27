@@ -229,7 +229,11 @@ function kitchenRun(F, r, house, need) {
   const total = (ps) => ps.reduce((s, q) => s + q[1], 0);
   const sides = ['N', 'W', 'E', 'S'].map((s) => ({ s, L: s === 'S' || s === 'N' ? r.cx1 - r.cx0 : r.cy1 - r.cy0 }));
   let done = false;
-  for (const pref of [r.type === 'kitchenette' ? ['N'] : [], ['N', 'W', 'E', 'S']].flat()) {
+  // In open kitchens, do not fill the shared boundary with a continuous counter.
+  const common = (house.rooms || []).filter(q => q.id !== r.id && r.group && q.group === r.group);
+  const overlap = (a,b,c,d) => Math.min(b,d)-Math.max(a,c)>1e-6;
+  const shared = side => common.some(q => side==='W' ? Math.abs(q.x1-r.x0)<1e-6&&overlap(q.y0,q.y1,r.y0,r.y1) : side==='E' ? Math.abs(q.x0-r.x1)<1e-6&&overlap(q.y0,q.y1,r.y0,r.y1) : side==='N' ? Math.abs(q.y0-r.y1)<1e-6&&overlap(q.x0,q.x1,r.x0,r.x1) : Math.abs(q.y1-r.y0)<1e-6&&overlap(q.x0,q.x1,r.x0,r.x1));
+  for (const pref of [r.type === 'kitchenette' ? ['N'] : [], ['N', 'W', 'E', 'S']].flat().filter(side=>!shared(side))) {
     if (done) break; const sd = sides.find((q) => q.s === pref);
     for (const stretch of [1.3, 1, 0.8, 0]) {
       let ps = stretch ? parts.map((q) => q.slice()) : SHORT.map((q) => q.slice()); if (!stretch) { const extra = sd.L - 0.05 - total(ps); if (extra < 0) continue; ps[2][1] += Math.min(extra, 0.6); } else { ps[3][1] = Math.max(0.6, Math.min(1.6, 0.7 * stretch)); ps[1][1] = Math.max(0.6, 0.6 * stretch);
