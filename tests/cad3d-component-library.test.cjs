@@ -42,13 +42,20 @@ test('R2 gallery downloads geometry only at placement, not selection or opening'
 test('realism status requires explicit review and redistributable license',()=>{
  const start=source.indexOf('function cad3dGalleryQualityFromManifest');
  const end=source.indexOf('function cad3dBlockKind',start);
- const ctx={window:{},cad3dShowProvisional:false};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+ const ctx={URL,window:{},cad3dShowProvisional:false};vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
  const q=ctx.cad3dGalleryQualityFromManifest;
- const valid={quality:'realistic',source:'https://polyhaven.com/a/example',license:'CC0-1.0',review:{approved:true,date:'2026-11-27',reviewer:'Blackline'}};
+ const valid={quality:'realistic',source:'https://polyhaven.com/a/example',license:'CC0-1.0',author:'Example author',review:{approved:true,date:'2026-11-27',reviewer:'Blackline'}};
  assert.equal(q(valid),'realistic');
  assert.equal(q({...valid,review:undefined}),'provisional');
  assert.equal(q({...valid,license:'unknown'}),'provisional');
  assert.equal(q({...valid,source:''}),'provisional');
+ assert.equal(q({...valid,author:''}),'provisional');
+ assert.equal(q({...valid,source:'https://'}),'provisional');
+ assert.equal(q({...valid,source:'https://user:pass@example.org'}),'provisional');
+ assert.equal(q({...valid,review:{...valid.review,date:'2026-02-30'}}),'provisional');
+ assert.equal(q({...valid,source:'Blackline original'}),'provisional');
+ assert.equal(q({...valid,source:'Blackline original',license:'Blackline original'}),'realistic');
+ assert.equal(q({...valid,license:'Blackline original'}),'provisional');
  assert.equal(ctx.cad3dGalleryVisible({}),false);
  assert.equal(ctx.cad3dGalleryVisible({detail:true}),true);
  assert.equal(ctx.cad3dGalleryVisible({quality:'realistic'}),true);
