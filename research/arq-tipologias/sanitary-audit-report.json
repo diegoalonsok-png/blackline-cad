@@ -1,0 +1,1530 @@
+{
+  "total": 247,
+  "accepted": 208,
+  "changed": 194,
+  "review": 39,
+  "errors": 0,
+  "rows": [
+    {
+      "code": "T-M-025a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-025b",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-028a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-028b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-030a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-030b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-030c",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-030d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-032a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-032b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-032c",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-032d",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-032e",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-035a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-035b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-035c",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-035d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-035e",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-038a",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-038b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-038c",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-M-038d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 1
+    },
+    {
+      "code": "T-M-038e",
+      "status": "review",
+      "issues": [
+        "bath: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-1D-042a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-042b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-045a",
+      "status": "corrected",
+      "moved": 1,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-045b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-050a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-050b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-055a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-055b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-055c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-055d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-060a",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-060b",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-060c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-060d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-060e",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-055a",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D-055b",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D-060a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-060b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-065a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-065b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-065c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-065d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-070a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-070b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-070c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-070d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-070e",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-075a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-075b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-075c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-075d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-075e",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-080a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-080b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-080c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-080d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-085a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-085b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-085c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-085d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-090a",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-090b",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-090c",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-090d",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-090e",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D2B-075a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-075b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-080a",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D2B-080b",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D2B-080c",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D2B-080d",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-2D2B-090a",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-090b",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-090c",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-090d",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-100a",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-100b",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-100c",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-100d",
+      "status": "review",
+      "issues": [
+        "s1: bañadera sin inodoro y bidet; rediseñar"
+      ]
+    },
+    {
+      "code": "T-2D2B-100e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-110a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-110b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-110c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-110d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D2B-110e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-100a",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-3D-100b",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-3D-100c",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-3D-100d",
+      "status": "review",
+      "issues": [
+        "b1: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-3D-110a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-110b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-110c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-110d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-120a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-120b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-120c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-120d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-130a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-130b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-130c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-130d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-140a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-140b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-140c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-140d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-140e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-150a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-150b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-150c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-150d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-130a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-130b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-130c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-130d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-150a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-150b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-150c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-150d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-150e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-165a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-165b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-165c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-165d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-165e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-180a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-180b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-180c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-180d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3DE-180e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-4D-150a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 5
+    },
+    {
+      "code": "T-4D-150b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 5
+    },
+    {
+      "code": "T-4D-150c",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 5
+    },
+    {
+      "code": "T-4D-150d",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 5
+    },
+    {
+      "code": "T-4D-165a",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-165b",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-165c",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-165d",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-180a",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-180b",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-180c",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-180d",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-200a",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-200b",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-200c",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-200d",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-200e",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-220a",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-220b",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-220c",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-220d",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-220e",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-250a",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-250b",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-250c",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-250d",
+      "status": "accepted",
+      "moved": 0,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-250e",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-2D-B-080a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-080b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-080c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-080d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-090a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-090b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-090c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-090d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-B-090e",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-3D-B-095a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-095b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-095c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-095d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-095e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-100a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-100b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-100c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-100d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-110a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-110b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-110c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-110d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-110e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-120a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-120b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-120c",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-120d",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-B-120e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-1D-L-060a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-060b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-065a",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-065b",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-065c",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-065d",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-1D-L-065e",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-075a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-075b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-080a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-080b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-080c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-080d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-090a",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-090b",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-090c",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-090d",
+      "status": "corrected",
+      "moved": 2,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-2D-L-090e",
+      "status": "corrected",
+      "moved": 3,
+      "sanitaryCount": 2
+    },
+    {
+      "code": "T-3D-L-100a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-100b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-110a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-110b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-110c",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-110d",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-110e",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-120a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-120b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-120c",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-120d",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-120e",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-130a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-130b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-130c",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-130d",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-L-130e",
+      "status": "corrected",
+      "moved": 6,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D-H-100a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D-H-100b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D-H-110a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-2D-H-110b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-125a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-125b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-135a",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-135b",
+      "status": "corrected",
+      "moved": 5,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-150a",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-3D-H-150b",
+      "status": "corrected",
+      "moved": 4,
+      "sanitaryCount": 4
+    },
+    {
+      "code": "T-4D-H-160a",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-160b",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-160c",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-160d",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-180a",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-180b",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-180c",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-180d",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-200a",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-200b",
+      "status": "review",
+      "issues": [
+        "b2: no cabe el conjunto fuera de la vista frontal y del barrido; redistribuir baño"
+      ]
+    },
+    {
+      "code": "T-4D-H-200c",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-200d",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-220a",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    },
+    {
+      "code": "T-4D-H-220b",
+      "status": "corrected",
+      "moved": 7,
+      "sanitaryCount": 6
+    }
+  ]
+}
