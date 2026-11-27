@@ -187,32 +187,12 @@
 #cadBlockBrowser.web-reference .web-card a{color:#59482d;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cadBlockBrowser.web-reference .web-card button,#cadBlockBrowser.web-reference .web-links button{border:1px solid #b8a17a;background:#fffaf0;color:#51432e;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
 #cadBlockBrowser.web-reference.min .web-links{display:none}
-/* ArqAssist search palette: muted vintage sky blue, independent of the drawing theme. */
-#cadBlockBrowser.visual.web-reference{background:#c8dbe5;border-color:#7894a6;color:#263f4d}
-#cadBlockBrowser.visual.web-reference .hd{background:#a9c4d4;border-color:#829faf}
-#cadBlockBrowser.visual.web-reference .hd b,#cadBlockBrowser.visual.web-reference .hd button{color:#284352}
-#cadBlockBrowser.visual.web-reference .hd button:hover{background:#95b4c7}
-#cadBlockBrowser.visual.web-reference .tools{background:#d5e4ec;border-color:#9db6c5}
-#cadBlockBrowser.visual.web-reference input[type=search]{background:#f5f9fb;color:#263f4d;border-color:#8da9ba}
-#cadBlockBrowser.visual.web-reference .web-links,#cadBlockBrowser.visual.web-reference .area-links{background:#c8dbe5}
-#cadBlockBrowser.visual.web-reference .grid{background:#d5e4ec}
-#cadBlockBrowser.visual.web-reference .web-card{background:#edf4f8;border-color:#9db7c7;color:#263f4d}
-#cadBlockBrowser.visual.web-reference .web-card a{color:#34566b}
-#cadBlockBrowser.visual.web-reference .web-card .plan-preview span{color:#526e7d}
-#cadBlockBrowser.visual.web-reference .web-card button,#cadBlockBrowser.visual.web-reference .web-links button,#cadBlockBrowser.visual.web-reference .area-links button,#cadBlockBrowser.visual.web-reference .ft button{background:#f1f6f9;border-color:#8eaabb;color:#345366}
-#cadBlockBrowser.visual.web-reference .area-links button[aria-pressed=true]{background:#52788f;border-color:#52788f;color:#fff}
-#cadBlockBrowser.visual.web-reference .ft{background:#bdd3e0;border-color:#91adbe;color:#284352}
-#cadBlockBrowser.visual.web-reference .web-card .plan-preview,#cadBlockBrowser.visual.web-reference .web-card img{background:#fff}
-#cadBlockBrowser.visual.web-reference .classic-links{color:#345366!important}
-#cadBlockBrowser.visual.web-reference .classic-links button{background:#edf4f8!important;border-color:#8eaabb!important;color:#345366!important}
-#cadBlockBrowser.visual.arq-block-search{background:#c8dbe5;border-color:#7894a6;color:#263f4d}
-#cadBlockBrowser.visual.arq-block-search .hd{background:#a9c4d4;border-color:#829faf}
-#cadBlockBrowser.visual.arq-block-search .hd b,#cadBlockBrowser.visual.arq-block-search .hd button{color:#284352}
-#cadBlockBrowser.visual.arq-block-search .tools,#cadBlockBrowser.visual.arq-block-search .grid{background:#d5e4ec;border-color:#9db6c5}
-#cadBlockBrowser.visual.arq-block-search input[type=search],#cadBlockBrowser.visual.arq-block-search .card{background:#edf4f8;color:#263f4d;border-color:#9db7c7}
-#cadBlockBrowser.visual.arq-block-search .card .preview{background:#fff}
-#cadBlockBrowser.visual.arq-block-search .card .nm,#cadBlockBrowser.visual.arq-block-search .card .mt{color:#34566b}
-#cadBlockBrowser.visual.arq-block-search .ft,#cadBlockBrowser.visual.arq-block-search .ft button{background:#bdd3e0;border-color:#91adbe;color:#284352}
+/* Keep the entire gallery cream. Only CAD drawing paper is vintage sky blue. */
+#cadBlockBrowser.visual.arq-block-search .card .preview,
+#cadBlockBrowser.visual.web-reference .web-card .plan-preview{background:#b7cfdc;border-color:#9db6c5;color:#293238;isolation:isolate}
+#cadBlockBrowser.visual.arq-block-search .card .preview img,
+#cadBlockBrowser.visual.web-reference .web-card .plan-preview img{background:transparent;mix-blend-mode:multiply;filter:grayscale(1)}
+#cadBlockBrowser.visual.arq-block-search .card .preview svg{background:transparent!important;mix-blend-mode:multiply}
 
 `;document.head.append(css);
 
@@ -442,7 +422,7 @@
   for(const it of pool){const cat=groupOf(it);counts.set(cat,(counts.get(cat)||0)+1)}
   const visual=commandGallery||st.view==='visual'||st.view==='olymp3'||st.view==='imported';
   const paper=PAPERS.find(p=>p.id===(commandGallery?'cream':st.paper))||PAPERS[0];
-  el.style.setProperty('--paper-bg',paper.bg);
+  el.style.setProperty('--paper-bg',commandGallery?'#b7cfdc':paper.bg);
   el.style.setProperty('--paper-ink',paper.ink);
   el.style.setProperty('--static-preview-filter',['blue','black'].includes(paper.id)?'invert(1)':'none');
   el.querySelectorAll('[data-paper]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.paper===paper.id)));
