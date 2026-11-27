@@ -982,8 +982,48 @@ function collectiveCabins(spec){
  p.status='approximate';p.warning='Cabinas individuales preliminares de '+cellW.toFixed(2)+' × '+cellD.toFixed(2)+' m; circulación '+passage.toFixed(2)+' m. Verificar giros, privacidad, accesibilidad, ventilación y normativa.';
  p.assumptions.push(p.warning);return p;
 }
+/* Pedido de vivienda escrito como lo hace un arquitecto: "casa de 75 mts 2 hab + 2 baños + cocina + living".
+   Abreviaturas (hab, dorm, mts, m2), "+" como separador, 2 baños = baño principal + baño de servicio y una
+   superficie total objetivo: las medidas de los ambientes se ajustan en pocas iteraciones hasta acercarse. */
+function houseBrief(raw){
+ let s=normalize(raw).replace(/[+;]/g,',').replace(/\s+/g,' ');
+ if(!/\b(?:casa|vivienda|house|chalet|planta de casa)\b/.test(s))return null;
+ s=s.replace(/\bhabs?\b\.?|\bhabitac\b\.?/g,'habitaciones').replace(/\bdorms?\b\.?/g,'dormitorios').replace(/\bbaños?\b/g,m=>m.replace('ñ','n'))
+  .replace(/\bliving[- ]comedor\b/g,'living').replace(/\bestar\b/g,'living').replace(/\bcocina[- ]comedor\b/g,'cocina');
+ const area=s.match(/\b(\d{2,3}(?:[.,]\d+)?)\s*(?:m2|m²|mts2|mts\.?|metros cuadrados|metros|m)\b(?!\s*(?:x|×|por))/);
+ const target=area?Number(area[1].replace(',','.')):null;
+ const bathsM=s.match(/\b(\d|un|una|dos|tres)\s+banos?\b/);const baths=bathsM?Number(numberWords[bathsM[1]]||bathsM[1]):1;
+ const bedM=s.match(/\b(\d|un|una|dos|tres|cuatro|cinco|seis)\s+(?:habitaciones?|dormitorios?)\b/);const bedrooms=bedM?Number(numberWords[bedM[1]]||bedM[1]):null;
+ if(!target&&baths<2)return null; // sin superficie ni varios baños, el motor normal ya lo entiende
+ if(!bedrooms&&!/\b(?:habitaciones?|dormitorios?)\b/.test(s))return null;
+ return {target:target&&target>=25&&target<=600?target:null,bedrooms:Math.max(1,Math.min(6,bedrooms||2)),baths:Math.max(1,Math.min(2,baths)),
+  variants:/\b(?:versiones|variantes|alternativas)\b/.test(s)?3:1};
+}
+function houseByArea(h){
+ const r1=x=>Math.round(x*20)/20,f=n=>String(n).replace('.',',');
+ // Propuesta base (m): dormitorio 3,0×3,2 · baño 1,7×2,2 · servicio 1,5×1,8 · cocina 2,6×3,0 · living 3,8×4,4
+ let k=1,plan=null,area=0;
+ const brief=k=>{const d=[Math.max(2.6,r1(3*k)),Math.max(2.8,r1(3.2*k))],b=[Math.max(1.5,r1(1.7*Math.sqrt(k))),Math.max(1.8,r1(2.2*Math.sqrt(k)))],
+  c=[Math.max(2.2,r1(2.6*k)),Math.max(2.4,r1(3*k))],l=[Math.max(3,r1(3.8*k)),Math.max(3.2,r1(4.4*k))];
+  return 'casa con '+h.bedrooms+' dormitorios de '+f(d[0])+' x '+f(d[1])+', bano de '+f(b[0])+' x '+f(b[1])+(h.baths>1?', bano de servicio de 1,5 x 1,8':'')+', cocina de '+f(c[0])+' x '+f(c[1])+', living de '+f(l[0])+' x '+f(l[1])+(h.variants>1?', 3 variantes':'')};
+ const measure=p=>{let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const w of p.walls){for(const q of [w.a,w.b]){x0=Math.min(x0,q[0]);x1=Math.max(x1,q[0]);y0=Math.min(y0,q[1]);y1=Math.max(y1,q[1])}}
+  // Superficie cubierta: suma de locales + circulación, aproximada por la envolvente de cada variante.
+  const rooms=(p.rooms||[]).filter(r=>!p.variants?.length||String(r.id||'').startsWith('v0-'));
+  const sum=rooms.reduce((n,r)=>n+(Number(r.area)||((r.w||0)*(r.d||0))),0);return sum>0?sum*1.18:(x1-x0)*(y1-y0)};
+ for(let i=0;i<5;i++){
+  plan=compoundPlan(compoundInstruction(brief(k)));area=measure(plan);
+  if(!h.target||Math.abs(area-h.target)/h.target<.05)break;
+  k=Math.max(.75,Math.min(1.8,k*Math.sqrt(h.target/area)));
+ }
+ plan.assumptions=plan.assumptions||[];
+ if(h.target)plan.assumptions.push('Superficie objetivo '+h.target+' m² · propuesta ≈ '+Math.round(area)+' m² cubiertos (locales + circulación + muros).');
+ if(h.baths>1)plan.assumptions.push('Dos baños: baño principal y baño de servicio.');
+ plan.assumptions.push('Sin límite de terreno: implantación libre, editable con las herramientas de muro.');
+ plan.status='approximate';plan.brief={...plan.brief,request:h};return plan;
+}
 function run(raw){
  if(typeof raw!=='string'||raw.length>4000)throw Error('Instrucción inválida.');
+ {const h=houseBrief(raw);if(h)return houseByArea(h);}
  const pool=poolInstruction(raw);if(pool)return solvePool(pool);
  const parking=parkingInstruction(raw);if(parking)return solveParking(parking);
  const battery=sanitaryBatteryInstruction(raw);if(battery)return collectiveCabins(battery);

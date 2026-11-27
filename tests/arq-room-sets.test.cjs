@@ -33,7 +33,7 @@ test('room set bar routing takes priority without hijacking the gallery',()=>{
  for(const [raw] of cases)assert.equal(match(raw),true,raw);
  for(const raw of ['baños','buscar baños','baños jpg','dormitorio de 3 por 4 con puerta'])assert.equal(match(raw),false,raw);
  assert.match(source,/if\(arqRoomSetRequest\(raw\)\)return \{kind:'draw'\}/);
- assert.match(source,/EXT\.drawArchitectureCommand=async raw=>\{\s*if\(!arqRoomSetRequest\(raw\)\)/);
+ assert.match(source,/EXT\.drawArchitectureCommand=async raw=>\{\s*if\(!arqRoomSetRequest\(raw\)(?:&&!arqHouseDesignRequest\(raw\))?\)/);
 });
 
 

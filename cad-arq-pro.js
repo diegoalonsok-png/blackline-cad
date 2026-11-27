@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261126-restaurant1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261127-casa1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1091,7 +1091,7 @@ EXT.cancelArchitectureCommand=()=>{
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
 EXT.drawArchitectureCommand=async raw=>{
- if(!arqRoomSetRequest(raw)){
+ if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)){
  if(!arqPoolRequest(raw)){
  if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)&&!arqRestaurantRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
@@ -1331,7 +1331,7 @@ function openArchitectureBar(focus=true){
   host.append(bar);
   const input=bar.querySelector('[data-arq-text]'),run=bar.querySelector('[data-arq-run]'),handle=bar.querySelector('.qb-handle');
   const catalogue=document.createElement('button');catalogue.type='button';catalogue.className='btn slim';catalogue.hidden=true;catalogue.style.cssText='white-space:nowrap;font-size:11px;flex:none;width:auto;min-width:max-content;padding:0 10px;margin-right:6px';catalogue.setAttribute('aria-label','Abrir catálogo de plantas');bar.insertBefore(catalogue,run);
-  const updateCatalogue=()=>{if(arqRestaurantRequest(input.value)||arqAuditoriumRequest(input.value)||arqClassroomRequest(input.value)||arqSanitaryBatteryRequest(input.value)||arqParkingRequest(input.value)||arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
+  const updateCatalogue=()=>{if(arqHouseDesignRequest(input.value)||arqRestaurantRequest(input.value)||arqAuditoriumRequest(input.value)||arqClassroomRequest(input.value)||arqSanitaryBatteryRequest(input.value)||arqParkingRequest(input.value)||arqPoolRequest(input.value)||arqRoomSetRequest(input.value)){catalogue.hidden=true;catalogue.style.display='none';resizeText();return;}if(arqRoomCAD(input.value)){catalogue.hidden=false;catalogue.style.display='';let spanish=false;try{spanish=/^es/i.test(localStorage.getItem('cad2d-alias-language')||'')}catch(e){}catalogue.textContent=spanish?'Ver CAD':'View CAD';catalogue.title=spanish?'Plantas CAD editables':'Editable CAD plans';resizeText();return;}if(arqClassicQuery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent=(()=>{try{return localStorage.getItem('cad2d-alias-language')==='es'?'Plantas clásicas':'Classic plans'}catch(e){return 'Classic plans'}})();catalogue.title='Plantas, cortes y vistas / Plans, sections and elevations';resizeText();return;}if(arqHouseGallery(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Viviendas';catalogue.title='Galería de viviendas por superficie';resizeText();return;}if(arqWebReference(input.value)){catalogue.hidden=false;catalogue.style.display='';catalogue.textContent='Ver web';catalogue.title='Referencias arquitectónicas';resizeText();return;}const category=arqCatalogueCategory(input.value);const object=!category&&arqObjectSearch(input.value);catalogue.hidden=!(category||object);catalogue.style.display=category||object?'':'none';if(object){catalogue.textContent='Ver bloques';catalogue.title='Buscar e insertar bloques';}if(category){catalogue.textContent=((category==='stairs'||category==='rails')?LIB.library.filter(x=>x.cat===(category==='rails'?'Pasamanos':'Escaleras')&&!x.hideFromGallery&&x.id!=='esc-rampa').length:(arqCatalogueCounts[category]||0))+' modelos';catalogue.title='Ver plantas y dimensiones';}resizeText();};
   catalogue.onclick=()=>{if(arqRoomCAD(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenRoomCAD(input.value);return;}if(arqClassicQuery(input.value)){const b=window.CAD2D_BLOCK_BROWSER;if(b?.openClassics){EXT.cancelArchitectureCommand();b.openClassics(arqClassicExpand(input.value));}return;}if(arqHouseGallery(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenHouseGallery(input.value);return;}if(arqWebReference(input.value)){if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');arqOpenWebReference(input.value);return;}const cat=arqCatalogueCategory(input.value);const object=!cat&&arqObjectSearch(input.value);if(!cat&&!object)return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');if(object){arqOpenObjectSearch(object);return;}EXT.cancelArchitectureCommand();openArqPlanCatalogue(cat,input.value);};
 
   const KEY='cad2d-arqbar-pos';
@@ -1414,6 +1414,16 @@ function arqRoomSetRequest(raw){
  return new RegExp('\\b'+room+'\\s*(?:(?:en|in|de)\\s+)?(?:'+set+'\\s*(?:(?:de|of)\\s+)?)?(?:[x×*]|:|cantidad\\s*[:=]?)\\s*'+quantity+'(?=\\s|$)').test(s)||
   (new RegExp('\\b'+room+'\\b').test(s)&&new RegExp('\\b'+set+'\\b').test(s)&&new RegExp('\\b'+quantity+'\\b').test(s));
 }
+// Programa de vivienda ("casa de 75 mts 2 hab + 2 baños + cocina + living"): se DIBUJA con el motor propio,
+// no se muestran catálogos. Pedir ejemplos, fotos o referencias sigue yendo a la galería.
+function arqHouseDesignRequest(raw){
+ const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ if(!/\b(?:casa|vivienda|chalet|departamento|depto|house)\b/.test(q))return false;
+ if(/\b(?:ejemplos?|referencias?|fotos?|imagenes?|jpg|png|galeria|catalogo|ver plantas|mostrame|mostrar|buscar|busca|modelos?)\b/.test(q))return false;
+ const bed=/\b(?:\d+|un|una|dos|tres|cuatro|cinco|seis)\s*(?:hab\w*|dorm\w*|cuartos?|ambientes?)\b/.test(q)||/\b(?:habitacion|dormitorio)/.test(q);
+ const program=(/\bban/.test(q)?1:0)+(/\bcocina/.test(q)?1:0)+(/\b(?:living|estar|comedor)\b/.test(q)?1:0);
+ return bed&&program>=2;
+}
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
  if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw))return {kind:'calco'};
@@ -1424,6 +1434,7 @@ function arqRouteOf(raw){
  if(arqParkingRequest(raw))return {kind:'draw'};
  if(arqPoolRequest(raw))return {kind:'draw'};
  if(arqRoomSetRequest(raw))return {kind:'draw'};
+ if(arqHouseDesignRequest(raw))return {kind:'draw'};
  if(arqFurnishRequest(raw))return {kind:'furnish'};
  {const w=arqWallRequest(raw);if(w)return {kind:'wall',length:w};}
  const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs)return {kind:'docs',docs};
