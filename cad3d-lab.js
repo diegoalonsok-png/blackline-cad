@@ -2901,15 +2901,21 @@ async function cad3dImportOCCT(file,ext){
  * Reject unsupported geometry/placements before changing the current drawing. */
 function cad3dDecodeIFC(source){
  if(typeof source!=='string'||source.length>18000000||!source.includes("FILE_DESCRIPTION(('Experimental tessellated exchange'),'2;1');")||!source.includes("FILE_SCHEMA(('IFC4'));"))throw Error('IFC import: only Blackline IFC4 tessellation files are supported at present');
+ source=source.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
  const start=source.indexOf('\nDATA;\n'),end=source.lastIndexOf('\nENDSEC;');
  if(start<0||end<=start||!source.trim().endsWith('END-ISO-10303-21;'))throw Error('IFC import: invalid DATA section');
- const records=new Map();
- for(const line of source.slice(start+7,end).split(/\r?\n/)){
-  if(!line.trim())continue;
-  const m=/^#(\d+)=([A-Z0-9]+)\((.*)\);$/.exec(line.trim());
+ const records=new Map(),data=source.slice(start+7,end);
+ // STEP entities may span multiple lines or share one line. Split only outside strings.
+ let begin=0,quoted=false;
+ for(let i=0;i<data.length;i++){
+  const c=data[i];
+  if(c==="'"){if(quoted&&data[i+1]==="'"){i++;continue;}quoted=!quoted;}
+  if(c!==';'||quoted)continue;
+  const m=/^#(\d+)\s*=\s*([A-Z0-9]+)\s*\(([\s\S]*)\)\s*;$/.exec(data.slice(begin,i+1).trim());
   if(!m||records.has(m[1])||records.size>=30000)throw Error('IFC import: invalid entity');
-  records.set(m[1],{type:m[2],args:m[3]});
+  records.set(m[1],{type:m[2],args:m[3]});begin=i+1;
  }
+ if(quoted||data.slice(begin).trim())throw Error('IFC import: invalid entity');
  function split(s){
   const out=[];let quoted=false,depth=0,start=0;
   for(let i=0;i<s.length;i++){const c=s[i];if(c==="'"){if(quoted&&s[i+1]==="'"){i++;continue;}quoted=!quoted;}else if(!quoted){if(c==='(')depth++;else if(c===')')depth--;else if(c===','&&depth===0){out.push(s.slice(start,i).trim());start=i+1;}if(depth<0)throw Error('IFC import: invalid list');}}
@@ -2920,7 +2926,7 @@ function cad3dDecodeIFC(source){
  function label(v){if(!v?.startsWith("'")||!v.endsWith("'"))return '';return v.slice(1,-1).replace(/''/g,"'").replace(/\\X([24])\\([0-9A-F]+)\\X0\\/g,(_,k,h)=>{const n=Number.parseInt(h,16);return h.length===(k==='2'?4:8)&&n<=0x10ffff?String.fromCodePoint(n):'�';}).slice(0,120);}
  function value(s){if(!/^[+-]?(?:\d+\.?\d*|\.\d+)(?:E[+-]?\d+)?$/i.test(s))throw Error('IFC import: invalid number');const n=Number(s);if(!Number.isFinite(n)||Math.abs(n)>1000000)throw Error('IFC import: coordinate out of range');return n;}
  const units=[...records.values()].filter(r=>r.type==='IFCSIUNIT'&&r.args.includes('.LENGTHUNIT.'));
- if(units.length!==1||units[0].args!=='*,.LENGTHUNIT.,$,.METRE.')throw Error('IFC import: only metres supported');
+ if(units.length!==1||split(units[0].args).join(',')!=='*,.LENGTHUNIT.,$,.METRE.')throw Error('IFC import: only metres supported');
  function identity(v){const p=ref(v,'IFCLOCALPLACEMENT');if(p.length!==2||p[0]!=='$')throw Error('IFC import: nested placements unsupported');const a=ref(p[1],'IFCAXIS2PLACEMENT3D');if(a.length!==3||a[1]!=='$'||a[2]!=='$'||list(ref(a[0],'IFCCARTESIANPOINT')[0]).map(value).some(x=>x!==0))throw Error('IFC import: nonidentity placement unsupported');}
  const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCFOOTING:'Footing',IFCBUILDINGELEMENTPROXY:'Other'};
  const assigned=new Map();for(const r of records.values()){if(r.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE')continue;const a=split(r.args),st=ref(a[5],'IFCBUILDINGSTOREY');identity(st[5]);const level=st[9]==='$'?null:{name:label(st[2]),elevation:value(st[9])};for(const id of list(a[4])){if(assigned.has(id))throw Error('IFC import: duplicate storey assignment');assigned.set(id,level);}}
