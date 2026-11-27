@@ -1,0 +1,68 @@
+name: CALCOPY gallery geometry test
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/calcopy-gallery-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy opencv-python-headless shapely
+      - name: Run real gallery images
+        shell: bash
+        run: |
+          mkdir -p /tmp/calcopy-results
+          python - <<'PY'
+          import sys,json,cv2,numpy as np
+          from pathlib import Path
+          sys.path.insert(0,'research/calco-python-20261125')
+          import browser_bridge
+          from shapely.geometry import LineString
+          from shapely.ops import unary_union
+          root=Path('assets/architecture-references')
+          cases=[
+            ('house/100/house-100-innerscene.png',49.2),
+            ('house/unverified/user-drive-20261125-01.jpg',126.5),
+            ('house/unverified/user-drive-20261125-02.jpg',150.0)
+          ]
+          out=Path('/tmp/calcopy-results')
+          report=[]
+          for path,ppm in cases:
+            im=cv2.imread(str(root/path))
+            if im is None:
+              report.append({'image':path,'error':'missing or unreadable'});continue
+            h,w=im.shape[:2]
+            try:
+              rows=json.loads(browser_bridge.analyze_rgba(cv2.cvtColor(im,cv2.COLOR_BGR2RGBA).tobytes(),w,h,ppm))
+              mask=np.full((h,w),255,np.uint8)
+              overlay=im.copy()
+              for row in rows:
+                p=LineString([row['a'],row['b']]).buffer(row['t']/2,cap_style=2)
+                pts=np.rint(np.asarray(p.exterior.coords)).astype(np.int32)
+                cv2.fillPoly(mask,[pts],0)
+                cv2.polylines(overlay,[pts],True,(0,150,230),2)
+              stem=Path(path).stem
+              cv2.imwrite(str(out/(stem+'-mask.png')),mask)
+              cv2.imwrite(str(out/(stem+'-overlay.png')),overlay)
+              (out/(stem+'.json')).write_text(json.dumps(rows,indent=2))
+              report.append({'image':path,'ppm':ppm,'scale_provisional':True,'candidates':len(rows),'note':'Unreviewed candidates, not accuracy'})
+            except Exception as e:
+              report.append({'image':path,'error':str(e)})
+          print(json.dumps(report,indent=2))
+          (out/'report.json').write_text(json.dumps(report,indent=2))
+          if any('error' in r for r in report):sys.exit(1)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: calcopy-gallery-results
+          path: /tmp/calcopy-results
