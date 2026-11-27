@@ -123,7 +123,7 @@ const mpReady=env=>!!env.MP_ACCESS_TOKEN&&Object.keys(MP_PLANS).some(k=>mpPrice(
 const discountPct=env=>{const n=Number(env.STUDENT_DISCOUNT||50);return n>0&&n<100?n:50};
 async function mp(env,path,method='GET',body){
  const r=await fetch('https://api.mercadopago.com'+path,{method,headers:{authorization:'Bearer '+env.MP_ACCESS_TOKEN,'content-type':'application/json',...(method==='POST'?{'x-idempotency-key':crypto.randomUUID()}:{})},body:body?JSON.stringify(body):undefined});
- const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.message||'Mercado Pago '+r.status);return j;
+ const j=await r.json().catch(()=>({}));if(!r.ok)throw Error([j.message,j.error,(j.cause||[]).map(c=>c.description||c.code).join('; ')].filter(Boolean).join(' · ')||'Mercado Pago '+r.status);return j;
 }
 // Firma de Mercado Pago: x-signature "ts=…,v1=…" sobre "id:<data.id>;request-id:<x-request-id>;ts:<ts>;"
 async function verifyMp(env,req,dataId){
@@ -338,11 +338,19 @@ async function handle(req,env){
     const student=await studentUntil(env,userId)>now();
     if(student)amount=Math.round(amount*(100-discountPct(env)))/100;
     // Si todavía tiene días de prueba, el primer débito se hace al terminar la prueba.
-    const trialEnd=Number(user.trial_ends_at)||0,start=trialEnd>now()+86400?new Date(trialEnd*1000).toISOString():undefined;
+    // Mercado Pago no acepta un primer débito muy lejano: la prueba se respeta hasta un máximo de 1 año.
+    const trialEnd=Math.min(Number(user.trial_ends_at)||0,now()+360*86400),start=trialEnd>now()+86400?new Date(trialEnd*1000).toISOString():undefined;
     const label=(def[0]==='studio'?'CAD2D3D Estudio':'CAD2D3D Pro')+(def[1]===12?' · anual':' · mensual')+(student?' · estudiante':'');
-    const pre=await mp(env,'/preapproval','POST',{reason:label,external_reference:userId+'|'+plan,payer_email:user.email,status:'pending',
-     back_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',
-     auto_recurring:{frequency:def[1],frequency_type:'months',transaction_amount:amount,currency_id:'ARS',...(start?{start_date:start}:{})}});
+    let pre;
+    try{
+     pre=await mp(env,'/preapproval','POST',{reason:label,external_reference:userId+'|'+plan,payer_email:user.email,status:'pending',
+      back_url:env.APP_ORIGIN+(env.APP_PATH||'/')+'?pago=ok',
+      auto_recurring:{frequency:def[1],frequency_type:'months',transaction_amount:amount,currency_id:'ARS',...(start?{start_date:start}:{})}});
+    }catch(err){
+     // El motivo de Mercado Pago (sin datos secretos) se muestra a la persona en lugar de un "error interno".
+     console.error('mp-checkout:',err&&err.message);
+     return cors(env,req,json({error:'Mercado Pago: '+String(err&&err.message||'no disponible').slice(0,200)},502));
+    }
     await mpSync(env,pre);
     return cors(env,req,json({url:pre.init_point}));
    }
