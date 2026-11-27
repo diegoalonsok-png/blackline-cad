@@ -15,4 +15,41 @@ function cadRasterHeader(bytes){
 }
 function cadRasterSizeOK(w,h){return Number.isInteger(w)&&Number.isInteger(h)&&w>0&&h>0&&w<=8192&&h<=8192&&w*h<=12000000;}
 
-self.onmessage=async({data})=>{let im,canvas;try{if(typeof createImageBitmap!=='function'||typeof OffscreenCanvas==='undefined'){self.postMessage({unsupported:true});return}const file=data.file;if(!file||!file.size||file.size>12*1024*1024)throw Error('Imagen rechazada: máximo 12 MB.');const h=cadRasterHeader(new Uint8Array(await file.arrayBuffer()));if(!cadRasterSizeOK(h.w,h.h))throw Error('Imagen rechazada: máximo 12 megapíxeles y 8192 px por lado.');im=await createImageBitmap(new Blob([file],{type:h.type}));if(!cadRasterSizeOK(im.width,im.height))throw Error('Resolución no admitida');const k=Math.min(1,1600/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*k)),height=Math.max(1,Math.round(im.height*k));canvas=new OffscreenCanvas(w,height);const g=canvas.getContext('2d');if(!g)throw Error('Memoria gráfica insuficiente');g.fillStyle='#fff';g.fillRect(0,0,w,height);g.drawImage(im,0,0,w,height);im.close();im=null;const blob=await canvas.convertToBlob({type:'image/jpeg',quality:.88});if(blob.size>1800000)throw Error('Imagen optimizada demasiado pesada');self.postMessage({blob,w,h:height});}catch(err){self.postMessage({error:String(err?.message||err)})}finally{im?.close();if(canvas){canvas.width=0;canvas.height=0}}};
+/* Inspect only the first 64 KiB for common files. JPEG may carry larger APP
+ * metadata before its SOF marker; retry the bounded complete file only then. */
+async function cadRasterPreflight(file){
+ if(!file||!Number.isFinite(file.size)||file.size<=0||file.size>12*1024*1024)throw Error('Image rejected: maximum 12 MB.');
+ const prefix=new Uint8Array(await file.slice(0,Math.min(file.size,65536)).arrayBuffer());
+ let header;
+ try{header=cadRasterHeader(prefix);}catch(error){
+  if(prefix[0]!==255||prefix[1]!==216||file.size<=prefix.length)throw error;
+  header=cadRasterHeader(new Uint8Array(await file.arrayBuffer()));
+ }
+ if(!cadRasterSizeOK(header.w,header.h))throw Error('Image rejected: maximum 12 megapixels and 8192 px per side.');
+ return header;
+}
+function cadRasterPreviewSize(w,h){
+ if(!cadRasterSizeOK(w,h))throw Error('Unsupported image resolution');
+ const k=Math.min(1,1600/Math.max(w,h));
+ return {w:Math.max(1,Math.round(w*k)),h:Math.max(1,Math.round(h*k))};
+}
+self.onmessage=async({data})=>{
+ let im,canvas;
+ try{
+  if(typeof createImageBitmap!=='function'||typeof OffscreenCanvas==='undefined'){self.postMessage({unsupported:true});return;}
+  const file=data?.file,header=await cadRasterPreflight(file);
+  // A typed slice avoids rebuilding the complete image blob. Keep browser
+  // orientation handling, including JPEG EXIF, and size from decoded bounds.
+  im=await createImageBitmap(file.slice(0,file.size,header.type));
+  const {w,h}=cadRasterPreviewSize(im.width,im.height);
+  canvas=new OffscreenCanvas(w,h);
+  const g=canvas.getContext('2d',{alpha:false});
+  if(!g)throw Error('Insufficient graphics memory');
+  g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(im,0,0,w,h);
+  im.close();im=null;
+  const blob=await canvas.convertToBlob({type:'image/jpeg',quality:.88});
+  if(blob.size>1800000)throw Error('Optimized image is too large');
+  self.postMessage({blob,w,h});
+ }catch(err){self.postMessage({error:String(err?.message||err)});}
+ finally{im?.close();if(canvas){canvas.width=0;canvas.height=0;}}
+};
