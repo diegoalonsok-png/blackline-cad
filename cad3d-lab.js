@@ -2765,6 +2765,7 @@ function cad3dDecodeIFC(source){
  if(units.length!==1||units[0].args!=='*,.LENGTHUNIT.,$,.METRE.')throw Error('IFC import: only metres supported');
  function identity(v){const p=ref(v,'IFCLOCALPLACEMENT');if(p.length!==2||p[0]!=='$')throw Error('IFC import: nested placements unsupported');const a=ref(p[1],'IFCAXIS2PLACEMENT3D');if(a.length!==3||a[1]!=='$'||a[2]!=='$'||list(ref(a[0],'IFCCARTESIANPOINT')[0]).map(value).some(x=>x!==0))throw Error('IFC import: nonidentity placement unsupported');}
  const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCBUILDINGELEMENTPROXY:'Other'};
+ const assigned=new Map();for(const r of records.values()){if(r.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE')continue;const a=split(r.args),st=ref(a[5],'IFCBUILDINGSTOREY');identity(st[5]);const level=st[9]==='$'?null:{name:label(st[2]),elevation:value(st[9])};for(const id of list(a[4])){if(assigned.has(id))throw Error('IFC import: duplicate storey assignment');assigned.set(id,level);}}
  const items=[];let total=0;
  for(const [id,r] of records){
   if(!Object.prototype.hasOwnProperty.call(types,r.type))continue;
@@ -2776,7 +2777,7 @@ function cad3dDecodeIFC(source){
   const vertices=coords.map(v=>{const p=list(v).map(value);if(p.length!==3)throw Error('IFC import: invalid point');return p;});
   const faces=list(m[3]);total+=faces.length;if(total>120000||items.length>=1000)throw Error('IFC import: geometry limit exceeded');
   const triangles=faces.map(v=>{const inds=list(v).map(value);if(inds.length!==3||inds.some(n=>!Number.isInteger(n)||n<1||n>vertices.length))throw Error('IFC import: invalid triangle index');return inds.map(n=>vertices[n-1]);});
-  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,triangles});
+  items.push({name:label(a[2]),ifcClass:types[r.type],ifcGuid:label(a[0]),sourceId:id,level:assigned.get('#'+id)||null,triangles});
  }
  const allMeshes=[...records.values()].filter(r=>r.type==='IFCTRIANGULATEDFACESET').length;
  if(!items.length||allMeshes!==items.length)throw Error('IFC import: unsupported or unassigned geometry');
@@ -2791,7 +2792,7 @@ function cad3dImportIFC(source){
   const size=max.map((v,k)=>Math.max(.001,v-min[k])),origin=[(min[0]+max[0])/2,(min[1]+max[1])/2,min[2]];
   if(size.some(v=>!Number.isFinite(v)||v>1000))throw Error('IFC import: unsupported object dimensions');
   const meshVertices=item.triangles.flatMap(t=>t.flatMap(p=>p.map((v,k)=>(v-origin[k])/size[k])));
-  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
+  return {name:item.name||item.ifcClass,ifcClass:item.ifcClass,ifcGuid:item.ifcGuid,...(item.level?{bimLevel:cad3dBimLevelValue(item.level.name,item.level.elevation)}:{}),x:origin[0],y:origin[1],z:origin[2],w:size[0],d:size[1],h:size[2],meshVertices};
  });
  cad3dHistoryStart();const added=planned.map(p=>Object.assign(newRecord('imported3d'),p));records.push(...added);selected=added.map(r=>r.id);redraw();renderProps();text('IFC4 · '+added.length+' objects · Blackline tessellation subset; not parametric');
 }
@@ -8933,17 +8934,32 @@ function cad3dSectionTo2D(opts){
  return res;
 }
 /* Planilla de aberturas del modelo 3D (puertas y ventanas en muros y losas), enviada al 2D con alto y antepecho. */
+function cad3dBimLevelValue(name,elevation){
+ const level=String(name??'').trim();
+ if(!level||level.length>80||/[\u0000-\u001f]/.test(level))throw Error('BIMLEVEL: invalid level name');
+ if(elevation==null||String(elevation).trim()===''||!Number.isFinite(Number(elevation))||Math.abs(Number(elevation))>10000)throw Error('BIMLEVEL: invalid elevation (m)');
+ return {name:level,elevation:Number(elevation)};
+}
+function cad3dAssignBimLevel(){
+ const chosen=records.filter(r=>selected.includes(r.id)&&editableRecord(r));
+ if(!chosen.length)return text('BIMLEVEL: select editable objects');
+ const name=window.prompt('Building level name (e.g. Ground floor, Level 1)',chosen[0].bimLevel?.name||'Ground floor');if(name===null)return;
+ const elevation=window.prompt('Level elevation in metres (metadata; objects will not move)',String(chosen[0].bimLevel?.elevation??chosen[0].z??0));if(elevation===null)return;
+ try{const level=cad3dBimLevelValue(name,elevation);if(records.some(r=>!chosen.includes(r)&&r.bimLevel?.name===level.name&&r.bimLevel.elevation!==level.elevation))throw Error('BIMLEVEL: this name already has a different elevation');
+ cad3dHistoryStart();for(const r of chosen)r.bimLevel={...level};cad3dHistoryCapture();renderProps();text('BIMLEVEL · '+chosen.length+' objects assigned to '+level.name+' · '+level.elevation+' m');
+ }catch(e){text(e.message);}
+}
 function cad3dBimInventory(format='csv'){
  const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
  const n=v=>Number.isFinite(v)?v:null, out=[];
  for(const r of records){
   const layer=layerForRecord(r),cls=r.type==='slab'&&r.slabKind==='roof'?'Roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass:types[r.type]||'Other';
   const id='3D:'+r.id;
-  out.push({id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
-  for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
+  out.push({id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
+  for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
  }
  if(!out.length)return text('BIM3D · No hay elementos en el modelo');
- const keys=['id','host','class','nativeType','name','layer','material','style','x','y','z','width','depth','height','sill','openingCount'];
+ const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount'];
  const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native record dimensions, not measured net quantities; hosted openings have no global placement here. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
  const blob=new Blob([content],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='CAD2D3D-BIM-3D.'+format;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);text('BIM3D · '+out.length+' registros exportados; MASSPROP para volúmenes y superficies');
 }
@@ -10475,6 +10491,7 @@ function run3DCommand(){
  if(['cortealamina','cortelamina','sectiontolayout','cortelam'].includes(command)){cad3dSectionTo2D({toLayout:true});return;}
  if(['bim','bim3d','bimcsv'].includes(command)){cad3dBimInventory('csv');return;}
  if(command==='bimjson'){cad3dBimInventory('json');return;}
+ if(['bimlevel','bimnivel'].includes(command)){cad3dAssignBimLevel();return;}
  if(['planillaaberturas','tablaaberturas','doorschedule','windowschedule','openingschedule','planilla'].includes(command)){cad3dScheduleTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
@@ -10586,8 +10603,11 @@ function cad3dEncodeIFC(items,randomBytes){
  const project=add('IFCPROJECT',guid()+",$,'CAD2D3D',$,$,$,$,("+context+'),'+units);
  const placement=add('IFCLOCALPLACEMENT','$,'+axis);
  const building=add('IFCBUILDING',guid()+",$,'Building',$,$,"+placement+",$,$,.ELEMENT.,$,$,$");
- const storey=add('IFCBUILDINGSTOREY',guid()+",$,'Unassigned level',$,$,"+placement+",$,$,.ELEMENT.,$");
- add('IFCRELAGGREGATES',guid()+',$,$,$,'+project+',('+building+')');add('IFCRELAGGREGATES',guid()+',$,$,$,'+building+',('+storey+')');
+ const storeys=new Map();
+ add('IFCRELAGGREGATES',guid()+',$,$,$,'+project+',('+building+')');
+ function getStorey(level){const name=level?.name||'Unassigned level',elevation=level?.elevation??null;if(elevation!==null&&!Number.isFinite(elevation))throw Error('IFC: invalid level elevation');
+ const key=JSON.stringify([name,elevation]);if(!storeys.has(key)){const id=add('IFCBUILDINGSTOREY',guid()+',$,'+str(name)+',$,$,'+placement+',$,$,.ELEMENT.,'+(elevation===null?'$':num(elevation)));storeys.set(key,{id,products:[]});}return storeys.get(key);}
+
  const classes={wall:'IFCWALL',slab:'IFCSLAB',roof:'IFCROOF',stair:'IFCSTAIR',railing:'IFCRAILING',column:'IFCCOLUMN',beam:'IFCBEAM'},products=[];let count=0;
  for(const item of items){const triangles=item.triangles;if(!triangles?.length)continue;
   count+=triangles.length;if(count>120000)throw Error('IFC: máximo 120.000 caras');
@@ -10599,23 +10619,24 @@ function cad3dEncodeIFC(items,randomBytes){
   const shape=add('IFCPRODUCTDEFINITIONSHAPE','$,$,('+rep+')');
   const cls=Object.prototype.hasOwnProperty.call(classes,item.type)?classes[item.type]:'IFCBUILDINGELEMENTPROXY';
   const product=add(cls,guid()+',$,'+str(item.name||item.type)+',$,$,'+placement+','+shape+','+str(item.id)+',.NOTDEFINED.');
-  products.push(product);
+  products.push(product);getStorey(item.level).products.push(product);
   if(item.material){const material=add('IFCMATERIAL',str(item.material)+',$,$');add('IFCRELASSOCIATESMATERIAL',guid()+',$,$,$,('+product+'),'+material);}
   const props=[['NativeType',item.type],['NativeId',item.id],['Style',item.style],['Layer',item.layer]].filter(p=>p[1]!=null&&String(p[1])!=='').map(p=>add('IFCPROPERTYSINGLEVALUE',str(p[0])+',$,IFCLABEL('+str(p[1])+'),$'));
   if(props.length){const pset=add('IFCPROPERTYSET',guid()+",$,'Blackline_Native',$,("+props.join(',')+')');add('IFCRELDEFINESBYPROPERTIES',guid()+',$,$,$,('+product+'),'+pset);}
  }
  if(!products.length)throw Error('IFC: sin geometría exportable');
- add('IFCRELCONTAINEDINSPATIALSTRUCTURE',guid()+',$,$,$,('+products.join(',')+'),'+storey);
+ add('IFCRELAGGREGATES',guid()+',$,$,$,'+building+',('+[...storeys.values()].map(s=>s.id).join(',')+')');
+ for(const s of storeys.values())add('IFCRELCONTAINEDINSPATIALSTRUCTURE',guid()+',$,$,$,('+s.products.join(',')+'),'+s.id);
  return "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('Experimental tessellated exchange'),'2;1');\nFILE_NAME('CAD2D3D.ifc','"+new Date().toISOString().slice(0,19)+"',('CAD2D3D'),('Blackline'),'Blackline','CAD2D3D','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n"+data.join('\n')+'\nENDSEC;\nEND-ISO-10303-21;\n';
 }
 function exportIFC(){
  if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
  try{
-  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,triangles:[]}]));
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,triangles:[]}]));
   let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
   const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
   download('CAD2D3D-model.ifc',content,'application/x-step');
-  text('IFC4 experimental · '+count+' caras · clases nativas, nivel sin asignar · sin vanos IFC independientes');
+  text('IFC4 experimental · '+count+' caras · native classes and assigned levels · sin vanos IFC independientes');
  }catch(e){text(e.message||'IFC: exportación interrumpida');}
 }
 function exportMeshExchange(format){
@@ -10842,6 +10863,7 @@ async function readJSON(e){
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
     styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
+   if(r.bimLevel){try{o.bimLevel=cad3dBimLevelValue(r.bimLevel.name,r.bimLevel.elevation);}catch(_){}}
    if(r.type==='profile2d'){
     o.profilePoints=Array.isArray(r.profilePoints)?r.profilePoints.slice(0,512).filter(p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<10000)):[];
     o.profileClosed=!!r.profileClosed;
