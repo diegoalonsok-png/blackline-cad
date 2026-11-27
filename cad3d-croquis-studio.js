@@ -772,24 +772,61 @@ function semanticTrain(dataset,prompt,scene,style,settings){
  var key=x=>semanticText(x.prompt)+'|'+x.style+'|'+JSON.stringify(x.scene);
  data.examples=data.examples.filter(x=>key(x)!==key(e));data.examples.push(e);data.examples=data.examples.slice(-300);return data;
 }
-function semanticPredict(prompt,scene,style,dataset){
+function semanticCalibration(c){
+ var base={bandwidth:1.5,strength:1,neighbors:5};if(!c)return base;
+ if(![.5,1,1.5,2.5,4].includes(c.bandwidth)||![0,.25,.5,.75,1,1.25].includes(c.strength)||![3,5,8].includes(c.neighbors))throw Error('Invalid calibration');
+ return {bandwidth:c.bandwidth,strength:c.strength,neighbors:c.neighbors};
+}
+function semanticPredict(prompt,scene,style,dataset,calibration){
+ var cal=semanticCalibration(calibration);
  style=semanticStyle(prompt,style);var base=semanticBaseline(prompt,scene,style),v=semanticFeatures(prompt,scene),matches=[];
  for(var e of semanticValidateDataset(dataset).examples){
   if(e.style!==style)continue;
   var f=semanticFeatures(e.prompt,e.scene),dist=0;for(var i=0;i<v.length;i++)dist+=(v[i]-f[i])**2;
   matches.push({e,dist});
  }
- matches.sort((a,b)=>a.dist-b.dist);matches=matches.slice(0,5);
+ matches.sort((a,b)=>a.dist-b.dist);matches=matches.slice(0,cal.neighbors);
  var exact=matches.find(m=>m.dist<1e-12);
  if(exact)base=Object.assign({},exact.e.settings);
  else if(matches.length){
   var total=0,correction=Object.fromEntries(SEM_KEYS.map(k=>[k,0]));
-  for(var m of matches){if(m.dist>4)continue;var weight=Math.exp(-m.dist/1.5);total+=weight;var orig=semanticBaseline(m.e.prompt,m.e.scene,style);for(var k of SEM_KEYS)correction[k]+=weight*(m.e.settings[k]-orig[k]);}
-  if(total>0)for(var k of SEM_KEYS)base[k]+=correction[k]/Math.max(1,total);
+  for(var m of matches){if(m.dist>4)continue;var weight=Math.exp(-m.dist/cal.bandwidth);total+=weight;var orig=semanticBaseline(m.e.prompt,m.e.scene,style);for(var k of SEM_KEYS)correction[k]+=weight*(m.e.settings[k]-orig[k]);}
+  if(total>0)for(var k of SEM_KEYS)base[k]+=cal.strength*correction[k]/Math.max(1,total);
  }
  return {style,settings:semanticClamp(base),examples:dataset.examples.length,similar:matches.filter(m=>m.dist<=4).length,warp:0};
 }
-var semantic=Object.freeze({version:1,keys:SEM_KEYS,scene:semanticScene,predict:semanticPredict,train:semanticTrain,validate:semanticValidateDataset});
+
+/* Recursive practice: learn ONLY from approved corrections, never from own
+   predictions. Hold out entire prompt groups; calibrate on the remaining groups.
+   The independent holdout is a gate, not a visual quality score. */
+function semanticPractice(data,current,pass){
+ var ds=semanticValidateDataset(data),active=semanticCalibration(current);
+ var groups=new Map();for(var e of ds.examples){var key=semanticText(e.prompt);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);}
+ var keys=[...groups.keys()].sort(),round=Math.max(0,Math.floor(Number(pass)||0));
+ if(keys.length<8)return {calibration:active,accepted:false,reason:'insufficient',groups:keys.length,pass:round};
+ // Keep a stable holdout, never select candidate using its errors.
+ var hold=new Set(keys.filter((_,i)=>i%4===0)),train=keys.filter(k=>!hold.has(k));
+ var tune=new Set(train.filter((_,i)=>i%3===round%3));
+ var fit=ds.examples.filter(e=>!hold.has(semanticText(e.prompt))&&!tune.has(semanticText(e.prompt)));
+ var tuneRows=ds.examples.filter(e=>tune.has(semanticText(e.prompt))),holdRows=ds.examples.filter(e=>hold.has(semanticText(e.prompt)));
+ var trainRows=ds.examples.filter(e=>!hold.has(semanticText(e.prompt)));
+ // Bounds on dataset and candidate grid keep the background job small.
+ function loss(rows,examples,c){
+  var sum=0;for(var e of rows){var p=semanticPredict(e.prompt,e.scene,e.style,{version:1,examples},c).settings;
+   for(var i=0;i<SEM_KEYS.length;i++){var k=SEM_KEYS[i],d=(p[k]-e.settings[k])/(SEM_LIMITS[i][1]-SEM_LIMITS[i][0]);sum+=d*d;}}
+  return sum/(Math.max(1,rows.length)*SEM_KEYS.length);
+ }
+ var best=active,bestLoss=loss(tuneRows,fit,active);
+ var candidates=[active];
+ for(var b of [.5,1,1.5,2.5,4])for(var a of [0,.25,.5,.75,1,1.25])candidates.push({bandwidth:b,strength:a,neighbors:active.neighbors});
+ for(var n of [3,5,8])candidates.push({bandwidth:active.bandwidth,strength:active.strength,neighbors:n});
+ for(var c of candidates){var l=loss(tuneRows,fit,c);if(l+1e-9<bestLoss){best=c;bestLoss=l;}}
+ var before=loss(holdRows,trainRows,active),after=loss(holdRows,trainRows,best);
+ var accepted=after+Math.max(1e-8,before*.005)<before;
+ return {calibration:accepted?best:active,accepted,reason:accepted?'improved':'retained',groups:keys.length,pass:round+1,before,after,holdout:holdRows.length,tune:tuneRows.length};
+}
+
+var semantic=Object.freeze({version:2,keys:SEM_KEYS,scene:semanticScene,predict:semanticPredict,train:semanticTrain,validate:semanticValidateDataset,calibration:semanticCalibration,practice:semanticPractice});
 
 var api={version:'1.0.0',semantic:semantic,STYLES:STYLES,DEFAULTS:DEFAULTS,resolveOptions:resolveOptions,prepare:prepare,
  paint:paint,warp:warp,dirt:dirt,strokePlan:strokePlan,drawStrokes:drawStrokes,finish:finish,render:render,resample:resample};
