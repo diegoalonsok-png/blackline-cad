@@ -11,6 +11,10 @@ test('object snap typed in the middle of a command (FIN, MED, EXT, PAR…)',()=>
 });
 test('previously unknown everyday commands are now answered',()=>{
  for(const n of ['POINT','PO','LAYCUR','TEXTEDIT','BE','XR','DOR','LINETYPE','COL','SN','MS','PS','PAGESETUP','DXFOUT','GRADIENT','DS','LW',
-  'WALLADD','DOORADD','WINDOWADD','OPENINGADD','SPACEADD','STAIRADD','AECSCHEDULEADD','SLABADD','ROOFADD','REGION','WIPEOUT','LIMITS','OPTIONS'])
+  'WALLADD','DOORADD','WINDOWADD','OPENINGADD','SPACEADD','STAIRADD','AECSCHEDULEADD','SLABADD','ROOFADD','REGION','WIPEOUT','COBERTURA','WIPEOUTFRAME','LIMITS','OPTIONS'])
   assert.ok(new RegExp("'"+n+"'").test(plus),n);
+});
+test('wipeout paints the background on screen and white on paper',()=>{
+ assert.match(html,/e\.wipeout\?displayColors\.background/);assert.match(html,/function colorOutput\(e,o\)\{if\(e\.wipeout\)return '#ffffff';/);
+ assert.match(plus,/wipeout:true,onTop:true/);
 });

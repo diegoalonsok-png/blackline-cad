@@ -2366,7 +2366,7 @@ function cadVectorBatch(selectedIds){
  function addFill(e,lay){
   if(e.type!=='hatch'||selectedIds.has(e.id)||(e.hatchStyle&&e.hatchStyle!=='solid')||(e.holes&&e.holes.length)||!(e.pts?.length>2)||e.color2)return false;
   if(count){ctx.stroke();count=0}flushText();
-  const col=cadScreenColor(e.color||lay.color);if(col!==fillColor){ctx.fillStyle=col;fillColor=col}
+  const col=e.wipeout?displayColors.background:cadScreenColor(e.color||lay.color);if(col!==fillColor){ctx.fillStyle=col;fillColor=col}
   ctx.beginPath();tracePath({type:'polyline',pts:e.pts,closed:true});ctx.closePath();ctx.fill('evenodd');textColor='';
   return true;
  }
@@ -3877,7 +3877,7 @@ function drawEntity(e,forceColor,selectedIds){const isSelected=selectedIds?selec
    const g=e.hatchStyle==='gradient-radial'?ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,R):ctx.createLinearGradient(c.x-Math.cos(a)*R,c.y+Math.sin(a)*R,c.x+Math.cos(a)*R,c.y-Math.sin(a)*R);
    g.addColorStop(0,e.color||lay.color);g.addColorStop(1,e.color2||'#ffffff');ctx.fillStyle=g;ctx.fill('evenodd');
   }
-  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=cadScreenColor(e.color||lay.color);ctx.fill('evenodd')}
+  else if(!e.hatchStyle||e.hatchStyle==='solid'||cadIsGradient(e)){ctx.fillStyle=e.wipeout&&!forceColor&&!isSelected?displayColors.background:cadScreenColor(e.color||lay.color);ctx.fill('evenodd');if(e.wipeout&&(isSelected||state.wipeoutFrame)){ctx.strokeStyle=isSelected?displayColors.selection:cadScreenColor(lay.color);ctx.lineWidth=1;ctx.stroke()}}
   else{
    ctx.save();ctx.clip('evenodd');ctx.strokeStyle=cadScreenColor(e.color||lay.color);ctx.lineWidth=Math.max(.7,(e.width??.13)*3);
    // Stroke independent hatch segments in batches, preserving their exact endpoints.
@@ -9500,7 +9500,7 @@ for(const id of ['plotStyle','layoutStyle']){const sel=$(id);if(!sel)continue;
  sel.addEventListener('change',()=>{if(sel.value==='ctb'&&!document.getElementById('cadCtbEditor'))cadEditCtb()});
  const b=document.createElement('button');b.type='button';b.className='btn slim';b.textContent='Tabla CTB…';b.title='Editar qué color y grosor imprime cada color del dibujo';b.style.marginTop='4px';b.onclick=()=>cadEditCtb();sel.insertAdjacentElement('afterend',b);}
 {const X=window.CAD2D_EXTENSIONS=window.CAD2D_EXTENSIONS||{commands:{},context:[],overlays:[],ribbon:{}};X.commands=X.commands||{};for(const k of['CTB','PLOTSTYLE','STYLESMANAGER','ESTILOSIMPRESION','PLUMAS'])X.commands[k]=()=>cadEditCtb();}
-function colorOutput(e,o){if(o.style==='ctb'){const m=cadCtbEntry(e),src=cadSrcColor(e);if(!m)return '#161616';if(m.color==='object')return cadNearWhite(src)?'#161616':src;return m.color}if(o.style==='mono-hatch')return e.type==='hatch'?(e.color||layerFor(e).color):'#161616';return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
+function colorOutput(e,o){if(e.wipeout)return '#ffffff';if(o.style==='ctb'){const m=cadCtbEntry(e),src=cadSrcColor(e);if(!m)return '#161616';if(m.color==='object')return cadNearWhite(src)?'#161616':src;return m.color}if(o.style==='mono-hatch')return e.type==='hatch'?(e.color||layerFor(e).color):'#161616';return o.style==='mono'?'#161616':(e.color||layerFor(e).color)}
 function escXML(s){return String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}
 function makeSVG(o){
  if(o.viewports?.length&&!o.__vp){
@@ -12851,7 +12851,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-dxf-parser.js?v=20261126-layouts7"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
 <script src="cad-dwg-batch.js?v=20261126-vitruvia3"></script>
-<script src="cad-comandos-plus.js?v=20261126-comandos3"></script>
+<script src="cad-comandos-plus.js?v=20261126-comandos4"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261126-usercad4"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
 <script src="cad-local-vector-packs.js?v=20261124-demand-v11"></script>

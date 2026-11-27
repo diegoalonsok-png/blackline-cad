@@ -362,7 +362,17 @@ in3D(['BLDGSECTIONLINEADD','BLDGELEVATIONLINEADD','CORTE','ALZADO'],'El corte o 
 /* Órdenes que CAD2D3D no tiene: en lugar de «desconocida», se indica la alternativa. */
 const alt=(names,msg)=>reg(names,()=>{CORE.toast(msg);CORE.log?.(names[0]+': '+msg)});
 alt(['REGION','REG'],'REGION no existe: las polilíneas cerradas ya funcionan como regiones (área, sombreado, contorno con BOUNDARY).');
-alt(['WIPEOUT','COBERTURA'],'COBERTURA no existe: usá un sombreado sólido del color de fondo y ALFONDO / ALFRENTE.');
+/* ---------- COBERTURA: tapa lo que está debajo (sombreados, líneas) para que un texto o un bloque se lea limpio ---------- */
+reg(['WIPEOUT','COBERTURA','WO'],()=>{
+ const make=pts=>{if(pts.length<3)return CORE.toast('COBERTURA: al menos 3 puntos');CORE.saveHistory();
+  const e=add({type:'hatch',pts:pts.map(p=>P(p.x,p.y)),hatchStyle:'solid',color:'#ffffff',wipeout:true,onTop:true});
+  CORE.updateAll();CORE.toast('Cobertura creada · lo que dibujes después queda encima · ALFRENTE / ALFONDO para reordenar');return e};
+ const poly=sel().filter(e=>e.type==='polyline'&&e.closed&&!e.bulges&&e.pts?.length>2);
+ if(poly.length){CORE.saveHistory();let n=0;const st=S();for(const pl of poly){const i=st.entities.indexOf(pl),e={type:'hatch',pts:pl.pts.map(p=>P(p.x,p.y)),hatchStyle:'solid',color:'#ffffff',wipeout:true,onTop:true,layer:pl.layer,id:CORE.nextId()};st.entities.splice(i,0,e);n++}
+  CORE.updateAll();return CORE.toast(n+' cobertura(s) desde polilíneas cerradas (quedan debajo de la polilínea)')}
+ pick({mode:'multi',label:'COBERTURA · marcá el contorno (Enter cierra) · o seleccioná antes una polilínea cerrada',preview:(pts,m)=>pts.length?[...pts,m,pts[0]]:null,done:make});
+});
+reg(['WIPEOUTFRAME','MARCOCOBERTURA'],()=>{const st=S();st.wipeoutFrame=!st.wipeoutFrame;CORE.schedule();CORE.toast('Marco de coberturas '+(st.wipeoutFrame?'visible':'oculto')+' (no se imprime)')});
 alt(['SKETCH','BOCETO'],'BOCETO no existe: usá SPLINE o POLILÍNEA.');
 alt(['SPLINEDIT'],'Las splines se editan con pinzamientos en sus puntos de ajuste o con PEDIT.');
 alt(['BLEND'],'BLEND no existe: usá EMPALME (FILLET) o SPLINE entre los extremos.');
