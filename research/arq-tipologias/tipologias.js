@@ -190,7 +190,7 @@ function furnish(house) {
       let pair = false;
       if (full && cw * cd > 4.6) {
         const wc = require('./blocks.js').item('san-wc'), bd = require('./blocks.js').item('san-bidet');
-        for (const side of ['W', 'E', 'N', 'S']) {
+        for (const side of ['W']) {
           const L = side === 'W' || side === 'E' ? cd : cw;
           for (const order of [[wc, bd], [bd, wc]]) {
             if (pair) break;
@@ -208,7 +208,7 @@ function furnish(house) {
         }
         need(pair, 'par inodoro + bidé sobre misma pared; revisar distribución si no cabe');
       }
-      if (!pair) need(F.wall('san-wc', { use: 0.5, useSides: 0.15, sides: ['W','E','N','S'], noWindow: true }) || F.wall('san-wc', { use: 0.5, useSides: 0.15 }), 'inodoro');
+      if (!pair) need(F.wall('san-wc', { use: 0.5, useSides: 0.15, sides: ['W'], noWindow: true }), 'inodoro en pared izquierda');
       need(F.wall(full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 'san-lav2' : 'san-lav', { w: full && Math.max(cw, cd) > 2.9 && Math.min(cw, cd) > 1.9 ? 1.2 : 0.6, use: 0.55 }) || F.wall('san-lav-pie', { use: 0.5 }), 'lavatorio');
     } else if (r.type === 'lav') {
       need(F.wall('kq-lavarropas', { use: 0.6 }), 'lavarropas'); F.wall('kq-pileta', { use: 0.5 }); F.wall('kq-termo', { use: 0.3 });
