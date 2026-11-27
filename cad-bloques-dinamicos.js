@@ -122,6 +122,7 @@ function grips(ref,def){
   else if(par.kind==='rotation'){const t=((par.base||0)+valueOf(par,ref))*Math.PI/180;out.push({par,kind:'rotation',w:toWorld(ref,P(par.c.x+par.r*Math.cos(t),par.c.y+par.r*Math.sin(t)))})}
  }
  if(def.dyn.vis?.states?.length>1){const g=def.dyn.vis.grip||P(0,0);out.push({kind:'visibility',w:toWorld(ref,g)})}
+ if(def.dyn.lookup?.rows?.length){const g=def.dyn.lookup.grip||(def.dyn.vis?.states?.length>1?P(0,-.3):P(0,0));out.push({kind:'lookup',w:toWorld(ref,g)})}
  return out;
 }
 const GRIP='#35c8ff';
@@ -136,6 +137,7 @@ EXT.overlays.push(ctx=>{
    const A=pt(0,r),B=pt(2.4,r),C=pt(-2.4,r);ctx.moveTo(A.x,A.y);ctx.lineTo(B.x,B.y);ctx.lineTo(C.x,C.y);ctx.closePath();
   }else if(g.kind==='flip'){ctx.moveTo(s.x-9,s.y);ctx.lineTo(s.x-3,s.y-6);ctx.lineTo(s.x-3,s.y+6);ctx.closePath();ctx.moveTo(s.x+9,s.y);ctx.lineTo(s.x+3,s.y-6);ctx.lineTo(s.x+3,s.y+6);ctx.closePath()}
   else if(g.kind==='rotation'){ctx.arc(s.x,s.y,6,0,Math.PI*2)}
+  else if(g.kind==='lookup'){ctx.rect(s.x-7,s.y-6,14,12);ctx.fill();ctx.stroke();ctx.beginPath();ctx.moveTo(s.x-4,s.y-2);ctx.lineTo(s.x+4,s.y-2);ctx.moveTo(s.x-4,s.y+2);ctx.lineTo(s.x+4,s.y+2);ctx.stroke();continue}
   else{ctx.moveTo(s.x-7,s.y-4);ctx.lineTo(s.x+7,s.y-4);ctx.lineTo(s.x,s.y+6);ctx.closePath()}
   ctx.fill();ctx.stroke();
  }
@@ -157,11 +159,27 @@ function visMenu(ref,def,x,y){
   b.onclick=()=>{CORE.saveHistory();ref.dyn={...(ref.dyn||{}),__vis:st};m.remove();CORE.updateAll();refreshProps(true)};m.append(b)}
  document.body.append(m);setTimeout(()=>document.addEventListener('pointerdown',function off(e){if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',off,true)}},true),0);
 }
+function currentRow(ref,def){
+ const rows=def.dyn.lookup?.rows||[];
+ return rows.find(r=>Object.entries(r.values).every(([k,v])=>{const cur=k==='__vis'?(ref.dyn?.__vis??def.dyn.vis?.states?.[0]):valueOf((def.dyn.params||[]).find(p=>p.id===k)||{},ref);return typeof v==='number'?Math.abs(Number(cur)-v)<1e-6:String(cur)===String(v)}))||null;
+}
+function applyRow(ref,row){CORE.saveHistory();ref.dyn={...(ref.dyn||{}),...row.values};CORE.updateAll();refreshProps(true)}
+function lookupMenu(ref,def,x,y){
+ document.getElementById('cadDynVisMenu')?.remove();
+ const m=document.createElement('div');m.id='cadDynVisMenu';m.setAttribute('role','menu');m.setAttribute('data-no-cad-translate','');
+ m.style.cssText='position:fixed;z-index:9999;left:'+x+'px;top:'+y+'px;background:#13202a;border:1px solid #35c8ff;border-radius:6px;padding:4px;min-width:150px;box-shadow:0 6px 18px #0009';
+ const cur=currentRow(ref,def);
+ for(const row of def.dyn.lookup.rows){const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.setAttribute('aria-checked',String(row===cur));
+  b.textContent=(row===cur?'✓ ':'   ')+row.label;b.style.cssText='display:block;width:100%;text-align:left;background:none;border:0;color:#e8f7ff;padding:5px 8px;cursor:pointer;font:12px system-ui';
+  b.onclick=()=>{m.remove();applyRow(ref,row)};m.append(b)}
+ document.body.append(m);setTimeout(()=>document.addEventListener('pointerdown',function off(e){if(!m.contains(e.target)){m.remove();document.removeEventListener('pointerdown',off,true)}},true),0);
+}
 CORE.canvas.addEventListener('pointerdown',ev=>{
  if(ev.button!==0)return;const g=hitGrip(ev);if(!g)return;
  ev.preventDefault();ev.stopImmediatePropagation();
  if(g.kind==='flip'){CORE.saveHistory();g.ref.dyn={...(g.ref.dyn||{}),[g.par.id]:!valueOf(g.par,g.ref)};CORE.updateAll();refreshProps(true);return}
  if(g.kind==='visibility'){visMenu(g.ref,g.def,ev.clientX+8,ev.clientY+8);return}
+ if(g.kind==='lookup'){lookupMenu(g.ref,g.def,ev.clientX+8,ev.clientY+8);return}
  drag={g,moved:false,before:clone(g.ref.dyn||{})};
 },true);
 CORE.canvas.addEventListener('pointermove',ev=>{
@@ -187,6 +205,7 @@ function refreshProps(force){
  if(!box){box=document.createElement('section');box.id='cadDynParams';box.setAttribute('data-no-cad-translate','');box.style.cssText='margin:9px 0;padding:8px;border:1px solid #35c8ff;border-radius:6px';host.prepend(box)}
  box.hidden=false;
  const {ref,def}=d;let h='<b style="font-size:11px">'+L('PARÁMETROS DEL BLOQUE','BLOCK PARAMETERS')+'</b>';
+ if(def.dyn.lookup?.rows?.length){const cur=currentRow(ref,def);h+='<label style="display:block;margin:6px 0">'+L('Tabla','Lookup')+' <select data-dyn-lookup><option value=""'+(cur?'':' selected')+'>'+L('(personalizado)','(custom)')+'</option>'+def.dyn.lookup.rows.map((r,i)=>'<option value="'+i+'"'+(r===cur?' selected':'')+'>'+esc(r.label)+'</option>').join('')+'</select></label>'}
  if(def.dyn.vis?.states?.length>1){const cur=def.dyn.vis.states.includes(ref.dyn?.__vis)?ref.dyn.__vis:def.dyn.vis.states[0];
   h+='<label style="display:block;margin:6px 0">'+L('Visibilidad','Visibility')+' <select data-dyn="__vis">'+def.dyn.vis.states.map(s=>'<option'+(s===cur?' selected':'')+'>'+esc(s)+'</option>').join('')+'</select></label>'}
  for(const par of def.dyn.params||[]){
@@ -201,6 +220,7 @@ function refreshProps(force){
   if(id==='__vis')v=inp.value;else if(par.kind==='flip')v=inp.checked;else if(par.kind==='linear')v=clampLinear(par,Number(String(inp.value).replace(',','.')));else{v=Number(String(inp.value).replace(',','.'));if(!Number.isFinite(v))return}
   CORE.saveHistory();ref.dyn={...(ref.dyn||{}),[id]:v};CORE.updateAll();refreshProps(true);
  }));
+ box.querySelector('[data-dyn-lookup]')?.addEventListener('change',e=>{const row=def.dyn.lookup.rows[Number(e.target.value)];if(row)applyRow(ref,row)});
  box.querySelector('[data-dyn-reset]').onclick=()=>{CORE.saveHistory();delete ref.dyn;CORE.updateAll();refreshProps(true)};
 }
 EXT.overlays.push(()=>{try{refreshProps(false)}catch(e){}});
@@ -214,7 +234,7 @@ function ensureAuthoring(){
  const j=job();if(!j)return null;
  if(!A||A.name!==j.name){
   const def=S().blocks?.[j.name];const d=clone(def?.dyn||{});
-  A={name:j.name,params:d.params||[],vis:{states:d.vis?.states?.length?d.vis.states:[],hidden:d.vis?.hidden||{},grip:d.vis?.grip||null,current:null}};
+  A={name:j.name,params:d.params||[],lookup:d.lookup?.rows?.length?d.lookup:{rows:[]},vis:{states:d.vis?.states?.length?d.vis.states:[],hidden:d.vis?.hidden||{},grip:d.vis?.grip||null,current:null}};
   A.vis.current=A.vis.states[0]||null;
   for(const e of editorEntities())keyOf(e);
   applyVisInEditor();
@@ -294,7 +314,10 @@ function collectDyn(){
  const live=new Set(editorEntities().map(e=>e.dk).filter(Boolean));
  const params=A.params.map(p=>({...clone(p),keys:(p.keys||[]).filter(k=>live.has(k))})).filter(p=>p.keys.length);
  const vis=A.vis.states.length>1?{states:A.vis.states.slice(),hidden:Object.fromEntries(A.vis.states.map(s=>[s,(A.vis.hidden[s]||[]).filter(k=>live.has(k))])),...(A.vis.grip?{grip:A.vis.grip}:{})}:null;
- return params.length||vis?{params,...(vis?{vis}:{})}:null;
+ const ids=new Set(params.map(p=>p.id));if(vis)ids.add('__vis');
+ const rows=(A.lookup?.rows||[]).filter(r=>String(r.label||'').trim()).map(r=>({label:String(r.label).trim().slice(0,60),values:Object.fromEntries(Object.entries(r.values||{}).filter(([k])=>ids.has(k)))})).filter(r=>Object.keys(r.values).length);
+ const lookup=rows.length?{rows,...(A.lookup.grip?{grip:A.lookup.grip}:{})}:null;
+ return params.length||vis||lookup?{params,...(vis?{vis}:{}),...(lookup?{lookup}:{})}:null;
 }
 /* Llamado por el programa al guardar el bloque: devuelve def.dyn (o null) ya trasladado al nuevo punto base. */
 function onSave(base){
@@ -302,6 +325,7 @@ function onSave(base){
  if(!A)return undefined;
  for(const e of editorEntities()){keyOf(e);delete e.cadHidden}
  let dyn=collectDyn();
+ if(dyn?.lookup?.grip&&base)dyn.lookup.grip=P(dyn.lookup.grip.x-base.x,dyn.lookup.grip.y-base.y);
  if(dyn&&base){const sh=p=>p&&Number.isFinite(p.x)?P(p.x-base.x,p.y-base.y):p;
   for(const p of dyn.params){for(const k of ['a','b','c'])if(p[k])p[k]=sh(p[k]);if(p.frame)p.frame={minX:p.frame.minX-base.x,maxX:p.frame.maxX-base.x,minY:p.frame.minY-base.y,maxY:p.frame.maxY-base.y}}
   if(dyn.vis?.grip)dyn.vis.grip=sh(dyn.vis.grip)}
@@ -315,7 +339,7 @@ function renderPalette(){
  if(!j){pal?.remove();return}
  if(!pal){
   pal=document.createElement('aside');pal.id='cadBlockPalette';pal.setAttribute('aria-label',L('Paleta de autoría de bloques','Block authoring palette'));pal.setAttribute('data-no-cad-translate','');
-  pal.style.cssText='position:absolute;top:64px;left:72px;z-index:46;width:236px;max-height:calc(100% - 90px);overflow:auto;padding:10px;border-radius:10px;background:#1c1810ee;border:1.5px solid #d4a748;color:#f3e3bf;font:12px system-ui;box-shadow:0 10px 26px #0008';
+  pal.style.cssText='position:absolute;top:64px;left:72px;z-index:46;width:286px;max-height:calc(100% - 90px);overflow:auto;padding:10px;border-radius:10px;background:#1c1810ee;border:1.5px solid #d4a748;color:#f3e3bf;font:12px system-ui;box-shadow:0 10px 26px #0008';
   for(const ev of ['pointerdown','wheel'])pal.addEventListener(ev,e=>e.stopPropagation());
   pal.addEventListener('click',e=>{const t=e.target.closest('[data-t]');if(!t)return;const [fn,arg]=t.dataset.t.split(':');
    if(fn==='del'){A.params=A.params.filter(p=>p.id!==arg);renderPalette();CORE.updateAll();return}
@@ -323,8 +347,17 @@ function renderPalette(){
    if(fn==='lim'){const p=A.params.find(x=>x.id===arg);const r=window.prompt('Mínimo, máximo e incremento (0 = sin límite), separados por ;',[p.min||0,p.max||0,p.inc||0].join(' ; '));if(r===null)return;
     const [mn,mx,inc]=r.split(';').map(s=>Number(s.trim().replace(',','.')));if(![mn,mx,inc].every(n=>Number.isFinite(n)&&n>=0))return CORE.toast('Valores inválidos');if(mx>0&&mn>mx)return CORE.toast('El mínimo supera al máximo');Object.assign(p,{min:mn,max:mx,inc});renderPalette();return}
    if(fn==='state'){A.vis.current=arg;applyVisInEditor();renderPalette();return}
+   if(fn==='lkAdd'){const values={};for(const p of A.params)values[p.id]=p.kind==='linear'?+unitOf(p).L.toFixed(4):p.kind==='flip'?false:0;if(A.vis.states.length>1)values.__vis=A.vis.current||A.vis.states[0];A.lookup.rows.push({label:L('Opción ','Option ')+(A.lookup.rows.length+1),values});renderPalette();return}
+   if(fn==='lkDel'){A.lookup.rows.splice(Number(arg),1);renderPalette();return}
+   if(fn==='lkGrip'){PLUS.pick({mode:'points',need:1,label:L('Ubicación del pinzamiento de la tabla','Lookup grip location'),done:([p])=>{A.lookup.grip=p;renderPalette()}});return}
    if(tools[fn])tools[fn](arg);
   });
+  pal.addEventListener('change',e=>{const t=e.target.closest('[data-lk]');if(!t||!A)return;const [i,col]=t.dataset.lk.split(':'),row=A.lookup.rows[Number(i)];if(!row)return;
+   if(col==='label'){row.label=t.value;return}
+   const par=A.params.find(p=>p.id===col);row.values=row.values||{};
+   if(col==='__vis'){if(t.value)row.values.__vis=t.value;else delete row.values.__vis;return}
+   if(par?.kind==='flip'){row.values[col]=t.checked;return}
+   const n=Number(String(t.value).replace(',','.'));if(t.value===''||!Number.isFinite(n))delete row.values[col];else row.values[col]=par?.kind==='linear'?clampLinear(par,n):n;});
   const host=document.querySelector('.cad-block-editing')||CORE.canvas.parentElement;host.append(pal);
  }
  const b=(t,label,title)=>'<button type="button" class="btn slim" data-t="'+t+'" title="'+esc(title||label)+'" style="margin:2px 2px 2px 0">'+label+'</button>';
@@ -342,6 +375,18 @@ function renderPalette(){
  if(A?.vis.states.length){for(const s of A.vis.states)h+='<button type="button" class="btn slim" data-t="state:'+esc(s)+'" style="margin:2px;'+(s===A.vis.current?'border-color:#d4a748;color:#fff':'')+'">'+(s===A.vis.current?'● ':'')+esc(s)+'</button>';
   h+='<div>'+b('visHide',L('Ocultar selección','Hide selection'),L('Oculta en este estado los objetos seleccionados','Hide the selected objects in this state'))+b('visShowAll',L('Mostrar todo','Show all'))+b('visRename',L('Renombrar','Rename'))+b('visDelete',L('Borrar estado','Delete state'))+b('visGrip',L('Ubicar pinzamiento','Place grip'))+'</div>'}
  h+=b('visNew',L('+ Nuevo estado','+ New state'),L('Crear un estado de visibilidad','Create a visibility state'));
+ h+=sec(L('TABLA DE CONSULTA','LOOKUP TABLE'));
+ {const cols=[...(A?.params||[]).map(p=>({id:p.id,name:p.name,kind:p.kind})),...(A?.vis.states.length>1?[{id:'__vis',name:L('Visibilidad','Visibility'),kind:'vis'}]:[])];
+  if(!cols.length)h+='<div style="opacity:.7">'+L('Primero agregá parámetros o estados de visibilidad.','Add parameters or visibility states first.')+'</div>';
+  else{
+   h+='<div style="overflow:auto"><table style="border-collapse:collapse;font-size:11px"><tr><th style="text-align:left;padding:2px">'+L('Opción','Option')+'</th>'+cols.map(c=>'<th style="text-align:left;padding:2px;max-width:70px;overflow:hidden;text-overflow:ellipsis" title="'+esc(c.name)+'">'+esc(c.name)+'</th>').join('')+'<th></th></tr>';
+   (A.lookup.rows||[]).forEach((r,i)=>{
+    h+='<tr><td style="padding:1px"><input data-lk="'+i+':label" value="'+esc(r.label||'')+'" style="width:64px"></td>'+cols.map(c=>{const v=r.values?.[c.id];
+     if(c.kind==='flip')return '<td style="text-align:center"><input type="checkbox" data-lk="'+i+':'+c.id+'"'+(v?' checked':'')+'></td>';
+     if(c.kind==='vis')return '<td><select data-lk="'+i+':'+c.id+'" style="width:76px"><option value=""></option>'+A.vis.states.map(st=>'<option'+(st===v?' selected':'')+'>'+esc(st)+'</option>').join('')+'</select></td>';
+     return '<td><input type="number" step="any" data-lk="'+i+':'+c.id+'" value="'+(v??'')+'" style="width:58px"></td>'}).join('')+'<td>'+b('lkDel:'+i,'✕',L('Quitar fila','Remove row'))+'</td></tr>'});
+   h+='</table></div>'+b('lkAdd',L('+ Fila','+ Row'),L('Agregar una opción con los valores actuales','Add an option'))+b('lkGrip',L('Ubicar pinzamiento','Place grip'));
+  }}
  h+=sec(L('BLOQUE','BLOCK'))+b('test',L('▶ Probar bloque','▶ Test block'),L('Prueba los parámetros sin salir del editor','Try the parameters without leaving the editor'));
  h+='<div style="opacity:.65;margin-top:8px;line-height:1.35">'+L('Dibujá y modificá con las herramientas de siempre. Guardá con «✓» en la barra superior.','Draw and modify with the usual tools. Save with “✓” in the top bar.')+'</div>';
  pal.innerHTML=h;

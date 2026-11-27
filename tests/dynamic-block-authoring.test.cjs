@@ -38,3 +38,9 @@ test('the program wires the editor space: geometry hook, save/close hooks, cache
  assert.match(html,/def\.dynamic2d,def\.dyn,def\.libraryLayer0/);assert.match(html,/cad-bloques-dinamicos\.js\?v=/);
  assert.match(src,/id='cadBlockPalette'/);assert.match(src,/'BLOQUENUEVO','NEWBLOCK'/);assert.match(src,/data-no-cad-translate/);
 });
+test('lookup table: rows set several parameters and the visibility state at once',()=>{
+ assert.match(src,/TABLA DE CONSULTA/);assert.match(src,/function applyRow\(ref,row\)/);assert.match(src,/data-dyn-lookup/);
+ // Una fila de la tabla es sólo un conjunto de valores: aplicada, el bloque cambia como con los pinzamientos.
+ const out=D.apply(def,{dyn:{w:1.4,f:false,__vis:'Sin silla'}});
+ assert.equal(out.length,2);assert.deepEqual(out[0].pts.map(p=>+p.x.toFixed(6)).sort((a,b)=>a-b),[0,0,1.4,1.4]);
+});
