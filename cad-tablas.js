@@ -21,6 +21,11 @@ function layerId(name,color){
  if(!l){let id='tb-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-');while(st.layers.some(x=>x.id===id))id+='-';l={id,name,visible:true,locked:false,color,width:.18,linetype:'CONTINUOUS'};st.layers.push(l)}
  return l.id;
 }
+// Capas de anotación: se usa la del dibujo si ya existe (con nombres habituales en castellano o inglés), si no se crea.
+const TEXT_LAYER=/^(TEXT|TEXTS|TEXTO|TEXTOS|A[-_ ]?TEXT\w*|A[-_ ]?ANNO[-_ ]?TEXT\w*|A[-_ ]?TEXTO\w*|ANNOTATION|ANOTACION(ES)?)$/i;
+const TABLE_LAYER=/^(TABLES?|TABLAS?|PLANILLAS?|A[-_ ]?TABL\w*|A[-_ ]?PLANILL\w*|A[-_ ]?ANNO[-_ ]?TABL\w*|SCHEDULES?)$/i;
+function annotationLayer(re,name,color){const l=S().layers.find(x=>re.test(String(x.name||'').trim()));if(l){if(l.locked)l.locked=false;if(l.visible===false)l.visible=true;return l.id}return layerId(name,color)}
+const textLayer=()=>annotationLayer(TEXT_LAYER,'TEXT','#ffffff'),tableLayer=()=>annotationLayer(TABLE_LAYER,'TABLES','#e6e6e6');
 const fmtNum=v=>Number(v).toFixed(2).replace('.',',');
 
 /* ---------- Tabla genérica: filas de texto → líneas y textos ---------- */
@@ -67,13 +72,13 @@ function pasteText(text,at){
  const clean=String(text).replace(/\r\n?/g,'\n').replace(/\t/g,'    ').replace(/[\u0000-\u0008\u000b-\u001f]/g,'').slice(0,20000).replace(/\n+$/,'');
  if(!clean.trim())return false;
  const h=textH(),lines=clean.split('\n'),width=Math.min(400,Math.max(...lines.map(l=>l.length)))*h*.62;
- const e={type:'text',p:P(at.x,at.y),text:clean,h,layer:S().layerId,fontFamily:'Arial',...(lines.length>1?{mtextWidth:+width.toFixed(6)}:{})};
- commit([e],'PEGAR TEXTO');CORE.toast(L('Texto pegado','Text pasted')+' · '+lines.length+' '+L('renglón(es)','line(s)')+' · '+L('doble clic para editar','double-click to edit'));
+ const e={type:'text',p:P(at.x,at.y),text:clean,h,layer:textLayer(),fontFamily:'Arial',...(lines.length>1?{mtextWidth:+width.toFixed(6)}:{})};
+ commit([e],'PEGAR TEXTO');CORE.toast(L('Texto pegado en la capa ','Text pasted on layer ')+(S().layers.find(l=>l.id===e.layer)?.name||'')+' · '+lines.length+' '+L('renglón(es)','line(s)'));
  return true;
 }
 function pasteTable(rows,at){
- const list=gridTable(at,rows,{});const n=commit(list,'PEGAR TABLA');
- CORE.toast(L('Tabla pegada','Table pasted')+' · '+rows.length+' × '+Math.max(...rows.map(r=>r.length))+' · '+L('quedó seleccionada para moverla','selected so you can move it'));
+ const list=gridTable(at,rows,{layer:tableLayer()});const n=commit(list,'PEGAR TABLA');
+ CORE.toast(L('Tabla pegada en la capa ','Table pasted on layer ')+(S().layers.find(l=>l.id===list[0]?.layer)?.name||'')+' · '+rows.length+' × '+Math.max(...rows.map(r=>r.length))+' · '+L('seleccionada para moverla','selected to move it'));
  return n.length>0;
 }
 let pasteHandled=0,lastBlur=0,lastInternalCopy=0;
@@ -143,8 +148,8 @@ function schedule2D(){
  if(!items.length)return CORE.toast(L('PLANILLA DE ABERTURAS: no encontré puertas ni ventanas (bloques de aberturas) en la planta'+(sel.size?' seleccionada':''),'OPENING SCHEDULE: no doors or windows (opening blocks) found'));
  const {rows,groups}=scheduleRows(items,false);
  const tag=window.confirm(L('Planilla de aberturas: '+items.length+' abertura(s) en '+groups.length+' tipo(s).\n\n¿Rotular también cada abertura en la planta (P1, V1…)?','Opening schedule: '+items.length+' opening(s), '+groups.length+' type(s).\n\nAlso tag each opening on the plan (D1, W1…)?'));
- const lay=layerId('A-PLANILLAS','#e6e6e6'),out=gridTable(placeBeside(),rows,{title:L('PLANILLA DE ABERTURAS','OPENING SCHEDULE'),layer:lay});
- if(tag){const tl=layerId('A-ROTULOS-ABERTURAS','#ffd166'),h=textH()*.8;
+ const lay=tableLayer(),out=gridTable(placeBeside(),rows,{title:L('PLANILLA DE ABERTURAS','OPENING SCHEDULE'),layer:lay});
+ if(tag){const tl=textLayer(),h=textH()*.8;
   for(const g of groups)for(const m of g.members){let c=m.ref.p;try{const b=CORE.getBounds(CORE.blockChildren(m.ref));c=P((b.minX+b.maxX)/2,(b.minY+b.maxY)/2)}catch(e){}
    const r=h*1.15;out.push({type:'circle',c:P(c.x,c.y),r,layer:tl},{type:'text',p:P(c.x-g.code.length*h*.31,c.y-h*.45),text:g.code,h,layer:tl,fontFamily:'Arial'})}}
  commit(out,'PLANILLA DE ABERTURAS');CORE.zoomExtents?.();
@@ -156,7 +161,7 @@ function addSchedule(p){
  const items=raw.filter(i=>i&&(i.t==='P'||i.t==='V')&&Number(i.w)>0).map(i=>({t:i.t,w:Number(i.w),h:Number(i.h)||0,sill:Number(i.sill)||0,desc:String(i.desc||'').slice(0,48)}));
  if(!items.length)return {count:0};
  const {rows}=scheduleRows(items,true),k=1000/CORE.U[S().unit];
- const lay=layerId('A-PLANILLAS','#e6e6e6'),out=gridTable(placeBeside(),rows,{title:String(p.title||L('PLANILLA DE ABERTURAS (MODELO 3D)','OPENING SCHEDULE (3D MODEL)')).slice(0,80),layer:lay,h:.18*k});
+ const lay=tableLayer(),out=gridTable(placeBeside(),rows,{title:String(p.title||L('PLANILLA DE ABERTURAS (MODELO 3D)','OPENING SCHEDULE (3D MODEL)')).slice(0,80),layer:lay,h:.18*k});
  commit(out,'PLANILLA DE ABERTURAS 3D');CORE.zoomExtents?.();CORE.toast(L('Planilla de aberturas del 3D: ','3D opening schedule: ')+items.length+' '+L('abertura(s)','opening(s)'));
  return {count:items.length};
 }

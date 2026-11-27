@@ -27,3 +27,8 @@ test('wiring: Ctrl+V decides between internal objects, text and tables; 3D sends
  assert.match(src,/document\.addEventListener\('paste'/);assert.match(src,/'PLANILLAABERTURAS'/);
  assert.match(lab,/function cad3dScheduleTo2D\(\)/);assert.match(lab,/'planillaaberturas','tablaaberturas','doorschedule'/);
 });
+test('pasted text goes to the text layer and tables to a tables layer (existing ones are reused)',()=>{
+ assert.match(src,/const TEXT_LAYER=\/\^\(TEXT\|TEXTS\|TEXTO\|TEXTOS/);assert.match(src,/const TABLE_LAYER=\/\^\(TABLES\?\|TABLAS\?\|PLANILLAS\?/);
+ assert.match(src,/layer:textLayer\(\)/);assert.match(src,/gridTable\(at,rows,\{layer:tableLayer\(\)\}\)/);
+ assert.equal((src.match(/const lay=tableLayer\(\)/g)||[]).length,2,'2D and 3D schedules on the tables layer');
+});
