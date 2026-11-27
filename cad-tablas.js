@@ -13,7 +13,7 @@
 'use strict';
 const CORE=window.CAD2D_CORE,EXT=window.CAD2D_EXTENSIONS;if(!CORE||!EXT)return;
 const P=(x,y)=>({x,y}),S=()=>CORE.state,$=id=>document.getElementById(id);
-const L=(es,en)=>document.documentElement.lang==='en'?en:es;
+const L=(es,en)=>document.documentElement.lang==='es'?es:en;
 const MARK='⁣CAD2D3D-OBJETOS⁣';
 const textH=()=>{const v=Number(String($('textHeight')?.value||'').replace(',','.'));return v>0&&v<1e6?v:.25*1000/CORE.U[S().unit]};
 function layerId(name,color){

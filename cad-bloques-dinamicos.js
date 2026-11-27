@@ -18,7 +18,7 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const job=()=>CORE.blockEdit?.()||null;
 const uid=p=>p+Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-3);
-const L=(es,en)=>document.documentElement.lang==='en'?en:es;
+const L=(es,en)=>document.documentElement.lang==='es'?es:en;
 const fmt=v=>String(+Number(v).toFixed(4)).replace('.',',');
 
 /* ---------------- Geometría ---------------- */

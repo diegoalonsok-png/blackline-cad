@@ -10,7 +10,7 @@ test('CAD commands and interface default to English until user explicitly change
  assert.match(html,/<option value="en" selected>EN<\/option>/);
  assert.match(html,/let cad2dAliasLanguage='en'/);
  assert.match(html,/localStorage\.getItem\('cad2d-alias-language'\)==='es'\?'es':'en'/);
- assert.match(html,/BlacklineUILanguage\?\.setLanguage\(cad2dAliasLanguage\)/);
+ assert.match(html,/BlacklineUILanguage\?\.setLanguage\(ui\)/);
  assert.match(html,/assets\/cad-ui-language\.js/);
 });
 test('Desktop-CAD-style right click uses Enter, editing context, and one-time OSNAP',()=>{

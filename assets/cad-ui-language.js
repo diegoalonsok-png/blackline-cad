@@ -65,12 +65,23 @@
   return text.replace(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/g,w=>{if(w.length<3&&w===w.toUpperCase())return w;const t=WORDS[w.toLowerCase()];if(!t)return w;return w[0]===w[0].toUpperCase()&&w[0]!==w[0].toLowerCase()?(w===w.toUpperCase()&&w.length>1?t.toUpperCase():t[0].toUpperCase()+t.slice(1)):t});
  }
  let current='en';
+ const PT=root.CAD2D_UI_PT||null;
  function translate(value,language=current){
   const input=String(value||'');
+  if(language==='pt'){
+   // Portugués: todo pasa por su forma en inglés (el español ya tiene par inglés) y de ahí a pt-BR.
+   if(!PT)return translate(input,'en');
+   const sp=input.match(/^(\s*)([\s\S]*?)(\s*)$/);if(!sp||!sp[2])return input;
+   if(PT.reverse(sp[2]))return input;
+   const en=translate(sp[2],'en');const out=PT.translate(en);
+   return sp[1]+(out||en)+sp[3];
+  }
   const table=language==='es'?toEs:toEn;
   const space=input.match(/^(\s*)([\s\S]*?)(\s*)$/);
   if(!space)return input;
-  const [,a,core,b]=space;
+  let [,a,core,b]=space;
+  // Volviendo del portugués: primero a inglés.
+  if(PT&&PT.reverse(core)){core=PT.reverse(core);if(language==='en')return a+core+b}
   if(table.has(core))return a+table.get(core)+b;
   // Compound menu rows preserve shortcut notation and counts.
   const match=/^(.+?)(\s·\s.+)$/.exec(core);
@@ -105,15 +116,16 @@
   }
  }
  function setLanguage(value){
-  current=value==='es'?'es':'en';
+  current=value==='es'?'es':value==='pt'?'pt':'en';
   document.documentElement.lang=current;
   const selector=document.getElementById('cadAliasLanguage');
   if(selector)selector.value=current;
+  document.documentElement.lang=current==='pt'?'pt-BR':current;
   walk(document.body);
  }
  function init(){
   let value='en';
-  try{value=localStorage.getItem('cad2d-alias-language')==='es'?'es':'en'}catch(_){}
+  try{value=localStorage.getItem('cad2d-ui-language')==='pt'?'pt':localStorage.getItem('cad2d-alias-language')==='es'?'es':'en'}catch(_){}
   setLanguage(value);
   if(typeof MutationObserver==='function'){
    // Both directions (EN<->ES). Added subtrees are batched and walked once; a node that keeps

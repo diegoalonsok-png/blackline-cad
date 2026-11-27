@@ -48,5 +48,5 @@ test('idioma de alias: colisiones intencionales B D LI AR',()=>{
 test('selector de idioma visible y persistente',()=>{
  assert.match(html,/id="cadAliasLanguage"/);
  assert.match(main,/localStorage\.setItem\('cad2d-alias-language'/);
- assert.match(main,/cad2dAliasLanguage=cad2dLanguageSelect\.value==='en'\?'en':'es'/);
+ assert.match(main,/cad2dAliasLanguage=ui==='es'\?'es':'en'/);
 });
