@@ -39,12 +39,27 @@ function front(fp, side, depth, extraSides = 0) {
   return [x0 - depth, y0 - e, x0, y1 + e];
 }
 class Fitter {
-  constructor(room, house) { this.room = room; this.zones = zonesFor(room, house); this.solid = []; this.clear = []; this.blocks = []; this.windows = house.windows.filter((w) => w.room === room.id); }
+  constructor(room, house) { this.room = room; this.houseDoors=house.doors; this.zones = zonesFor(room, house); this.solid = []; this.clear = []; this.blocks = []; this.windows = house.windows.filter((w) => w.room === room.id); }
   free(fp, use) {
     if (!inside(fp, this.room)) return false;
     if (this.zones.some((z) => ov(fp, z)) || this.solid.some((s) => ov(fp, s)) || this.clear.some((s) => ov(fp, s))) return false;
     if (use) { const u = clip(use, this.room); if ((u[2] - u[0]) * (u[3] - u[1]) < (use[2] - use[0]) * (use[3] - use[1]) * 0.8) return false; if (this.solid.some((s) => ov(u, s, 0.02)) || this.zones.some((z) => ov(u, z, 0.3))) return false; }
     return true;
+  }
+  // Block the wall containing the access and its straight-ahead sight corridor.
+  privateFixture(fp, side) {
+    const r=this.room;
+    let found=false;
+    for(const d of this.houseDoors){
+      const h=d.h, lo=h?r.x0:r.y0, hi=h?r.x1:r.y1;
+      const wallSide=h?(Math.abs(d.c-r.y0)<1e-6?'S':Math.abs(d.c-r.y1)<1e-6?'N':null):(Math.abs(d.c-r.x0)<1e-6?'W':Math.abs(d.c-r.x1)<1e-6?'E':null);
+      if(!wallSide||d.b<=lo||d.a>=hi)continue;
+      found=true;
+      if(side===wallSide)return false;
+      const sight=h?[d.a-.10,r.cy0,d.b+.10,r.cy1]:[r.cx0,d.a-.10,r.cx1,d.b+.10];
+      if(ov(fp,sight))return false;
+    }
+    return found;
   }
   underWindow(fp, side) {
     const r = this.room, c = { S: r.y0, N: r.y1, W: r.x0, E: r.x1 }[side];
@@ -63,6 +78,7 @@ class Fitter {
         const use = opts.use ? front(fp, side, opts.use, opts.useSides || 0) : null;
         if (!this.free(fp, use)) continue;
         if (opts.noWindow && this.underWindow(fp, side)) continue;
+        if (opts.privacy && !this.privateFixture(fp, side)) continue;
         const s = (opts.score ? opts.score(fp, side, t, L - w) : 0) - (opts.center ? Math.abs(t - (L - w) / 2) * 0.3 : 0);
         if (!best || s > best.s + 1e-9) best = { s, fp, side, use, w, d };
       }
