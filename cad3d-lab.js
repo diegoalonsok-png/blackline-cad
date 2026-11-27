@@ -2764,7 +2764,7 @@ function cad3dDecodeIFC(source){
  const units=[...records.values()].filter(r=>r.type==='IFCSIUNIT'&&r.args.includes('.LENGTHUNIT.'));
  if(units.length!==1||units[0].args!=='*,.LENGTHUNIT.,$,.METRE.')throw Error('IFC import: only metres supported');
  function identity(v){const p=ref(v,'IFCLOCALPLACEMENT');if(p.length!==2||p[0]!=='$')throw Error('IFC import: nested placements unsupported');const a=ref(p[1],'IFCAXIS2PLACEMENT3D');if(a.length!==3||a[1]!=='$'||a[2]!=='$'||list(ref(a[0],'IFCCARTESIANPOINT')[0]).map(value).some(x=>x!==0))throw Error('IFC import: nonidentity placement unsupported');}
- const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCBUILDINGELEMENTPROXY:'Other'};
+ const types={IFCWALL:'Wall',IFCSLAB:'Slab',IFCROOF:'Roof',IFCSTAIR:'Stair',IFCRAILING:'Railing',IFCCOLUMN:'Column',IFCBEAM:'Beam',IFCFOOTING:'Footing',IFCBUILDINGELEMENTPROXY:'Other'};
  const assigned=new Map();for(const r of records.values()){if(r.type!=='IFCRELCONTAINEDINSPATIALSTRUCTURE')continue;const a=split(r.args),st=ref(a[5],'IFCBUILDINGSTOREY');identity(st[5]);const level=st[9]==='$'?null:{name:label(st[2]),elevation:value(st[9])};for(const id of list(a[4])){if(assigned.has(id))throw Error('IFC import: duplicate storey assignment');assigned.set(id,level);}}
  const items=[];let total=0;
  for(const [id,r] of records){
@@ -8949,18 +8949,86 @@ function cad3dAssignBimLevel(){
  cad3dHistoryStart();for(const r of chosen)r.bimLevel={...level};cad3dHistoryCapture();renderProps();text('BIMLEVEL · '+chosen.length+' objects assigned to '+level.name+' · '+level.elevation+' m');
  }catch(e){text(e.message);}
 }
+/* BIM wall assembly metadata, based on the existing nominal mass calculator.
+ * Layer thicknesses must equal the wall thickness. No automatic geometric splitting. */
+/* Structural BIM tools use the existing editable BOX geometry, not a duplicate solid engine. */
+function cad3dBimStructureSpec(kind,values){
+ const defaults={Column:[.3,.3,3],Beam:[4,.25,.45],Footing:[1.2,1.2,.4]};
+ if(!Object.prototype.hasOwnProperty.call(defaults,kind)||!Array.isArray(values)||values.length!==6||values.some(v=>typeof v!=='number'||!Number.isFinite(v)))throw Error('BIM structure: invalid parameters');
+ const [w,d,h,x,y,z]=values;
+ if([w,d,h].some(v=>v<.01||v>1000)||[x,y,z].some(v=>Math.abs(v)>10000))throw Error('BIM structure: dimensions or position out of range');
+ return {type:'box',bimClass:kind,name:kind,w,d,h,x,y,z};
+}
+function cad3dCreateBimStructure(kind){
+ const defaults={Column:[.3,.3,3],Beam:[4,.25,.45],Footing:[1.2,1.2,.4]};
+ if(!Object.prototype.hasOwnProperty.call(defaults,kind))return;
+ if(records.length>=1000)return text('BIM structure: model limit reached');
+ if(!editableRecord({layerId:currentLayer}))return text('BIM structure: current layer is not editable');
+ const input=window.prompt(kind+' — length X, width Y, height Z, center X, center Y, base Z (metres; separate with semicolons)',[...defaults[kind],0,0,0].join('; '));
+ if(input===null)return;
+ try{
+  const values=input.split(';').map(v=>v.trim()===''?NaN:Number(v.trim().replace(',','.')));
+  const spec=cad3dBimStructureSpec(kind,values);
+  cad3dHistoryStart();const r=Object.assign(newRecord('box'),spec);records.push(r);selected=[r.id];selectedOpeningId=null;redraw();renderProps();cad3dHistoryCapture();text('BIM · '+kind+' created · edit dimensions in Properties');
+ }catch(e){text(e.message);}
+}
+function cad3dBimWallLayers(input,thickness){
+ if(!Number.isFinite(thickness)||thickness<=0||thickness>1000||!Array.isArray(input)||!input.length||input.length>16)throw Error('BIMWALL: invalid wall assembly');
+ const layers=input.map(l=>{
+  const material=String(l?.material??'').trim(),t=l?.thickness;
+  if(!material||material.length>80||/[\u0000-\u001f]/.test(material)||typeof t!=='number'||!Number.isFinite(t)||t<.001||t>thickness)throw Error('BIMWALL: invalid material or layer thickness');
+  return {material,thickness:t};
+ });
+ if(Math.abs(layers.reduce((sum,l)=>sum+l.thickness,0)-thickness)>1e-6)throw Error('BIMWALL: layers must total wall thickness');
+ return layers;
+}
+function cad3dBimWallQuantities(r){
+ if(r.type!=='wall')return null;
+ const gross=r.w*r.h;
+ if(!Number.isFinite(gross)||gross<=0||!Number.isFinite(r.d)||r.d<=0)return {status:'invalid wall dimensions',grossArea:null,netArea:null,netVolume:null,layers:[]};
+ const mass=cad3dMassProperties(r);
+ if(!Number.isFinite(mass.volume))return {status:'invalid opening or geometry',grossArea:gross,netArea:null,netVolume:null,layers:[]};
+ const net=mass.volume/r.d;let layers=[];
+ if(r.bimWallLayers){try{layers=cad3dBimWallLayers(r.bimWallLayers,r.d).map(l=>({...l,netVolume:net*l.thickness}));}catch(_){return {status:'layer thickness mismatch',grossArea:gross,netArea:net,netVolume:mass.volume,layers:[]};}}
+ return {status:layers.length?'nominal assembly':'nominal wall',grossArea:gross,netArea:net,netVolume:mass.volume,layers};
+}
+function cad3dEditBimWall(){
+ const chosen=records.filter(r=>selected.includes(r.id)&&editableRecord(r)&&r.type==='wall');
+ if(!chosen.length)return text('BIMWALL: select editable walls');
+ if(chosen.some(r=>Math.abs(r.d-chosen[0].d)>1e-6))return text('BIMWALL: selected walls must share the same thickness');
+ const initial=chosen[0].bimWallLayers||[{material:'Masonry',thickness:chosen[0].d}];
+ const answer=window.prompt('Wall assembly, outside to inside. Material:thickness in metres; separate layers with semicolons. Empty clears assembly. Wall thickness: '+chosen[0].d+' m',initial.map(l=>l.material+':'+l.thickness).join('; '));
+ if(answer===null)return;
+ try{
+  const parsed=answer.trim()?answer.split(';').map(x=>{const i=x.lastIndexOf(':');if(i<1||!x.slice(i+1).trim())throw Error('BIMWALL: use Material:thickness');return {material:x.slice(0,i),thickness:Number(x.slice(i+1))};}):null;
+  const layers=parsed?cad3dBimWallLayers(parsed,chosen[0].d):null;
+  cad3dHistoryStart();for(const r of chosen){if(layers)r.bimWallLayers=layers.map(l=>({...l}));else delete r.bimWallLayers;}
+  cad3dHistoryCapture();renderProps();text('BIMWALL · '+chosen.length+' walls · '+(layers?layers.length+' material layers':'assembly cleared')+' · geometry unchanged');
+ }catch(e){text(e.message);}
+}
+function cad3dBimQTO(){
+ const walls=records.filter(r=>r.type==='wall'&&visibleRecord(r));
+ if(!walls.length)return text('BIMQTO: no visible walls');
+ const rows=[['Wall ID','Level','Status','Material','Thickness (m)','Gross wall area (m2)','Net wall area (m2)','Net volume (m3)','Layer volume (m3)']];
+ for(const r of walls){const q=cad3dBimWallQuantities(r),base=[r.id,r.bimLevel?.name||'',q.status];
+  rows.push([...base,'',r.d,q.grossArea,q.netArea,q.netVolume,'']);
+  for(const l of q.layers)rows.push([...base,l.material,l.thickness,'','','',l.netVolume]);
+ }
+ download('CAD2D3D-wall-quantities.csv',cad3dReportCSV(rows),'text/csv;charset=utf-8');
+ text('BIMQTO · '+walls.length+' walls · nominal quantities, openings deducted; no junction adjustments');
+}
 function cad3dBimInventory(format='csv'){
  const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
  const n=v=>Number.isFinite(v)?v:null, out=[];
  for(const r of records){
-  const layer=layerForRecord(r),cls=r.type==='slab'&&r.slabKind==='roof'?'Roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass:types[r.type]||'Other';
-  const id='3D:'+r.id;
-  out.push({id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
+  const layer=layerForRecord(r),cls=r.type==='box'&&r.bimClass?r.bimClass:r.type==='slab'&&r.slabKind==='roof'?'Roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass:types[r.type]||'Other';
+  const id='3D:'+r.id, q=cad3dBimWallQuantities(r), structural=r.type==='box'&&r.bimClass?cad3dMassProperties(r):null;
+  out.push({grossArea:q?.grossArea??null,netArea:q?.netArea??null,netVolume:q?.netVolume??structural?.volume??null,quantityStatus:q?.status||(structural?.volume!=null?'rectangular solid':''),wallLayers:q?.layers||[],id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
   for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
  }
  if(!out.length)return text('BIM3D · No hay elementos en el modelo');
- const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount'];
- const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native record dimensions, not measured net quantities; hosted openings have no global placement here. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
+ const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount','grossArea','netArea','netVolume','quantityStatus'];
+ const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native dimensions; walls have nominal net quantities excluding openings but not junctions. Hosted openings have no global placement here. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
  const blob=new Blob([content],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='CAD2D3D-BIM-3D.'+format;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);text('BIM3D · '+out.length+' registros exportados; MASSPROP para volúmenes y superficies');
 }
 
@@ -9055,13 +9123,16 @@ function styleOptions(kind,id){
 function renderProps(){
  if(!root)return;var p=root.querySelector('.props');
  if(typeof render3DGrips==='function')render3DGrips();
- if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p>';return;}
+ if(!selected.length){p.innerHTML='<p>Seleccioná un objeto para editar sus medidas en metros.</p><div class="detail">BIM Structure <button type="button" class="btn" data-bim-create="Column">Column</button> <button type="button" class="btn" data-bim-create="Beam">Beam</button> <button type="button" class="btn" data-bim-create="Footing">Footing</button></div>';return;}
  if(selected.length!==1){var pair=records.filter(r=>selected.includes(r.id));p.innerHTML='<p>'+selected.length+' objetos seleccionados.</p>'+(pair.length===2&&pair.some(r=>r.type==='slab')&&pair.some(r=>r.type==='profile2d')?'<button class="btn" data-slab-poly-cut>Perforar losa con polilínea</button>':'<p>SUBTRACT: losa primero, sólido cortante después. UNION / INTERSECT: dos BOX sin rotación.</p>');return;}
  var r=records.find(function(v){return v.id===selected[0];});if(!r){p.innerHTML='';return;}
  var focus=(r.openings||[]).find(function(o){return o.id===selectedOpeningId;});
  var html=focus?'<strong>'+escapeHtml(focus.kind.toUpperCase()+' #'+focus.id)+'</strong><button type="button" class="btn" data-back-wall="1">← Wall properties</button>':
  '<strong>'+escapeHtml(r.type.toUpperCase()+' #'+r.id)+'</strong>'+
   '<label>Layer <select data-object-layer>'+layerOptions(r.layerId||'0')+'</select></label>';
+ if(!focus&&r.bimClass)html+='<div class="detail">BIM class: '+escapeHtml(r.bimClass)+'</div>';
+ if(!focus)html+='<div class="detail">BIM level: '+escapeHtml(r.bimLevel?.name||'Unassigned')+' <button type="button" class="btn" data-bim-level>Assign level</button></div>';
+ if(r.type==='wall'&&!focus){const q=cad3dBimWallQuantities(r);html+='<div class="detail">BIM wall · '+escapeHtml(q.status)+(Number.isFinite(q.netArea)?' · '+q.netArea.toFixed(2)+' m² net':'')+' <button type="button" class="btn" data-bim-wall>Wall assembly</button> <button type="button" class="btn" data-bim-qto>Quantities CSV</button></div>';}
  if(r.type==='slab'&&!focus)html+=cad3dSlabCutHTML(r);
  var host=['wall','slab','stair','railing'].includes(r.type);
  if(host&&!focus)html+='<label>Style <select data-object-style>'+styleOptions(r.type,r.styleId)+'</select></label>';
@@ -9350,6 +9421,10 @@ function clickProps(e){
  }
  var chosen=e.target.closest('[data-select-opening-id]');
  if(chosen){selectedOpeningId=Number(chosen.dataset.selectOpeningId);renderProps();highlight();return;}
+ var bimCreate=e.target.closest('[data-bim-create]');if(bimCreate){cad3dCreateBimStructure(bimCreate.dataset.bimCreate);return;}
+ if(e.target.closest('[data-bim-level]')){cad3dAssignBimLevel();return;}
+ if(e.target.closest('[data-bim-wall]')){cad3dEditBimWall();return;}
+ if(e.target.closest('[data-bim-qto]')){cad3dBimQTO();return;}
  if(e.target.closest('[data-back-wall]')){selectedOpeningId=null;renderProps();highlight();return;}
  var o=e.target.closest('[data-remove-opening]');if(o){
   var host=records.find(function(r){return selected.includes(r.id)&&(r.type==='wall'||r.type==='slab');});if(!host)return;
@@ -10492,6 +10567,11 @@ function run3DCommand(){
  if(['bim','bim3d','bimcsv'].includes(command)){cad3dBimInventory('csv');return;}
  if(command==='bimjson'){cad3dBimInventory('json');return;}
  if(['bimlevel','bimnivel'].includes(command)){cad3dAssignBimLevel();return;}
+ if(['bimwall','bimwalllayers'].includes(command)){cad3dEditBimWall();return;}
+ if(command==='bimcolumn'){cad3dCreateBimStructure('Column');return;}
+ if(command==='bimbeam'){cad3dCreateBimStructure('Beam');return;}
+ if(['bimfooting','bimfoundation'].includes(command)){cad3dCreateBimStructure('Footing');return;}
+ if(['bimqto','bimquantities'].includes(command)){cad3dBimQTO();return;}
  if(['planillaaberturas','tablaaberturas','doorschedule','windowschedule','openingschedule','planilla'].includes(command)){cad3dScheduleTo2D();return;}
  if(viewPresets.some(function(v){return v[0]===command;})){setViewPreset(command);return;}
  if(command==='layer'||command==='capas'){root.querySelector('.layerPanel select').focus();return;}
@@ -10608,7 +10688,7 @@ function cad3dEncodeIFC(items,randomBytes){
  function getStorey(level){const name=level?.name||'Unassigned level',elevation=level?.elevation??null;if(elevation!==null&&!Number.isFinite(elevation))throw Error('IFC: invalid level elevation');
  const key=JSON.stringify([name,elevation]);if(!storeys.has(key)){const id=add('IFCBUILDINGSTOREY',guid()+',$,'+str(name)+',$,$,'+placement+',$,$,.ELEMENT.,'+(elevation===null?'$':num(elevation)));storeys.set(key,{id,products:[]});}return storeys.get(key);}
 
- const classes={wall:'IFCWALL',slab:'IFCSLAB',roof:'IFCROOF',stair:'IFCSTAIR',railing:'IFCRAILING',column:'IFCCOLUMN',beam:'IFCBEAM'},products=[];let count=0;
+ const classes={wall:'IFCWALL',slab:'IFCSLAB',roof:'IFCROOF',stair:'IFCSTAIR',railing:'IFCRAILING',column:'IFCCOLUMN',beam:'IFCBEAM',footing:'IFCFOOTING'},products=[];let count=0;
  for(const item of items){const triangles=item.triangles;if(!triangles?.length)continue;
   count+=triangles.length;if(count>120000)throw Error('IFC: máximo 120.000 caras');
   const points=[],faces=[];
@@ -10632,7 +10712,7 @@ function cad3dEncodeIFC(items,randomBytes){
 function exportIFC(){
  if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
  try{
-  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,triangles:[]}]));
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='box'&&r.bimClass?r.bimClass.toLowerCase():r.type==='slab'&&r.slabKind==='roof'?'roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass.toLowerCase():r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,level:r.bimLevel,triangles:[]}]));
   let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
   const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
   download('CAD2D3D-model.ifc',content,'application/x-step');
@@ -10863,7 +10943,9 @@ async function readJSON(e){
     w:clamp(finite(r.w,2),.01,1000),d:clamp(finite(r.d,2),.01,1000),h:clamp(finite(r.h,2),.01,1000),
     styleId:String(r.styleId||'').slice(0,60),pitch:clamp(finite(r.pitch,0),-45,45),slabKind:r.slabKind==='roof'?'roof':'floor',
     radius:clamp(finite(r.radius,1),.01,1000),openings:[]};
+   if(r.type==='box'&&['Column','Beam','Footing'].includes(r.bimClass)){o.bimClass=r.bimClass;o.name=r.bimClass;}
    if(r.bimLevel){try{o.bimLevel=cad3dBimLevelValue(r.bimLevel.name,r.bimLevel.elevation);}catch(_){}}
+   if(r.type==='wall'&&r.bimWallLayers){try{o.bimWallLayers=cad3dBimWallLayers(r.bimWallLayers,o.d);}catch(_){}}
    if(r.type==='profile2d'){
     o.profilePoints=Array.isArray(r.profilePoints)?r.profilePoints.slice(0,512).filter(p=>Array.isArray(p)&&p.length===2&&p.every(v=>Number.isFinite(v)&&Math.abs(v)<10000)):[];
     o.profileClosed=!!r.profileClosed;
@@ -10873,7 +10955,7 @@ async function readJSON(e){
    if(r.type==='imported3d'){
     if(!Array.isArray(r.meshVertices)||!r.meshVertices.length||r.meshVertices.length>1080000||r.meshVertices.length%9||!r.meshVertices.every(v=>Number.isFinite(v)&&Math.abs(v)<=1.00001))throw Error('Malla 3D guardada inválida');
     o.meshVertices=r.meshVertices.slice();o.name=String(r.name||'Imported model').slice(0,120);
-    if(['Wall','Slab','Roof','Stair','Railing','Column','Beam','Other'].includes(r.ifcClass))o.ifcClass=r.ifcClass;
+    if(['Wall','Slab','Roof','Stair','Railing','Column','Beam','Footing','Other'].includes(r.ifcClass))o.ifcClass=r.ifcClass;
     if(typeof r.ifcGuid==='string'&&/^[0-3][A-Za-z0-9_$]{21}$/.test(r.ifcGuid))o.ifcGuid=r.ifcGuid;
     ['w','d','h'].forEach(k=>{o[k]=clamp(finite(r[k],2),.001,1000);});
     if(/^#[0-9a-f]{6}$/i.test(r.materialColor||''))o.materialColor=r.materialColor;
