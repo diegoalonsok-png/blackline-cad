@@ -720,6 +720,23 @@ function calibrateImageReference(){
  C.toast(LX('Marcá el primer extremo de una cota · Esc cancela.','Pick first dimension endpoint · Esc cancels.'));
 }
 for(const k of ['IMAGECALIBRATE','CALIBRARIMAGEN','CALIBRARPLANTA'])EXT.commands[k]=calibrateImageReference;
+// Exact total image width is useful when a scanned sheet has known overall dimensions.
+function imageWidthCommand(){
+ const S=C.state,images=S.entities.filter(e=>e.type==='image'&&S.selected.includes(e.id));
+ if(wcScaleBusy||S.tool!=='select'||S.stage?.length||images.length!==1)return C.toast(LX('Seleccioná una imagen.','Select one image.'));
+ const image=images[0],layer=S.layers.find(l=>l.id===image.layer);
+ if(layer?.locked||layer?.visible===false||layer?.frozen)return C.toast(LX('La capa no es editable.','Image layer is not editable.'));
+ imageCalibrationCancel?.();
+ const current=Math.abs(image.b.x-image.a.x)*C.U[S.unit]/1000;
+ const raw=prompt(LX('Ancho real total de la imagen, incluidos márgenes (m):','Actual total image width, including margins (m):'),String(Number(current.toFixed(6))));
+ if(raw===null||!raw.trim())return;
+ const W=Number(raw.replace(',','.')),next=toiletImageResize(image,W,C.U[S.unit]);
+ if(!next)return C.toast(LX('Ancho inválido.','Invalid width.'));
+ C.saveHistory();image.b=C.P(next.b.x,next.b.y);image.calcoScale={method:'known-dimension',approximate:false,widthM:W};C.updateAll();C.log('IMAGEWIDTH · '+W+' m');
+ C.toast(LX('Ancho de imagen ajustado.','Image width set.'));
+}
+for(const k of ['IMAGEWIDTH','ANCHOIMAGEN'])EXT.commands[k]=imageWidthCommand;
+
 
 async function wcScaleImage(image){
  const S=C.state;
