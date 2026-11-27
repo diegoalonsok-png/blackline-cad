@@ -4,6 +4,12 @@
 
 - **CAD 2D y 3D online (ES):** https://blackline-cad.org/cad-2d-3d-online
 - **Online 2D & 3D CAD (EN):** https://blackline-cad.org/online-2d-3d-cad
+- **Português:** https://blackline-cad.org/cad-2d-3d-online-br
+- **Français:** https://blackline-cad.org/cao-2d-3d-en-ligne
+- **Deutsch:** https://blackline-cad.org/cad-2d-3d-online-de
+- **Italiano:** https://blackline-cad.org/cad-2d-3d-online-it
+- **ArqAssist / editable CAD block search:** https://blackline-cad.org/online-cad-blocks#arqassist
+- **Teaching worksheet:** https://blackline-cad.org/cad-2d-education#ficha-docente
 - **Editor DXF online (ES):** https://blackline-cad.org/editor-dxf-online
 - **Online DXF editor (EN):** https://blackline-cad.org/online-dxf-editor
 - **Render arquitectónico (ES):** https://blackline-cad.org/render-arquitectonico-online
