@@ -10469,6 +10469,7 @@ function action(a,presetId){
  else if(['ply','plyout','exportply'].includes(a))exportMeshExchange('ply');
  else if(['off','offout','exportoff'].includes(a))exportMeshExchange('off');
  else if(['glb','glbout','exportglb'].includes(a))exportMeshExchange('glb');
+ else if(['ifcout','ifcexport','exportifc'].includes(a))exportIFC();
  else if(['stl','stlout','exportstl'].includes(a))exportSTL();
  else if(a==='dxf')exportDXF();
  else if(a==='json')exportJSON();
@@ -10490,7 +10491,7 @@ function trianglesWorld(fn){
   for(var i=0;i+2<n;i+=3){
    var points=[];
    for(var j=0;j<3;j++){var at=index?index.getX(i+j):i+j;p.fromBufferAttribute(attr,at).applyMatrix4(m.matrixWorld);points.push([p.x,p.y,p.z]);}
-   fn(points,m.userData.owner);
+   fn(points,m.userData.owner,m);
   }
  });
 }
@@ -10513,6 +10514,52 @@ function cad3dEncodeMesh(triangles,format){
  d.setUint32(0,0x46546c67,true);d.setUint32(4,2,true);d.setUint32(8,total,true);d.setUint32(12,padded,true);d.setUint32(16,0x4e4f534a,true);u.fill(32,20,20+padded);u.set(raw,20);
  d.setUint32(20+padded,positions.byteLength,true);d.setUint32(24+padded,0x004e4942,true);for(let k=0;k<positions.length;k++)d.setFloat32(28+padded+k*4,positions[k],true);
  return buffer;
+}
+/* Experimental IFC4 tessellated exchange, not certified or parametric. */
+function cad3dEncodeIFC(items,randomBytes){
+ const alphabet='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_$';
+ function guid(){const b=randomBytes();if(b.length!==16)throw Error('IFC GUID');let x=0n;for(const v of b)x=(x<<8n)|BigInt(v);let g='';for(let i=0;i<22;i++){g=alphabet[Number(x&63n)]+g;x>>=6n;}return "'"+g+"'";}
+ function str(v){let s="'";for(const c of String(v??'').slice(0,200)){const n=c.codePointAt(0);if(c==="'")s+="''";else if(n>=32&&n<=126&&c!=='\\')s+=c;else if(n<=65535)s+='\\X2\\'+n.toString(16).padStart(4,'0').toUpperCase()+'\\X0\\';else s+='\\X4\\'+n.toString(16).padStart(8,'0').toUpperCase()+'\\X0\\';}return s+"'";}
+ function num(v){if(!Number.isFinite(v))throw Error('IFC: coordenada inválida');let n=Number(v.toPrecision(12)).toString().toUpperCase();return n.includes('.')?n:n.includes('E')?n.replace('E','.E'):n+'.';}
+ if(!items.length||items.length>1000)throw Error('IFC: sin objetos o más de 1.000 objetos');
+ const data=[],add=(type,args)=>{data.push('#'+(data.length+1)+'='+type+'('+args+');');return '#'+data.length;};
+ const origin=add('IFCCARTESIANPOINT','(0.,0.,0.)'),axis=add('IFCAXIS2PLACEMENT3D',origin+',$,$'),context=add('IFCGEOMETRICREPRESENTATIONCONTEXT',"$,'Model',3,0.000001,"+axis+',$');
+ const body=add('IFCGEOMETRICREPRESENTATIONSUBCONTEXT',"'Body','Model',*,*,*,*,"+context+',$,.MODEL_VIEW.,$');
+ const units=add('IFCUNITASSIGNMENT','('+['LENGTHUNIT, METRE','AREAUNIT, SQUARE_METRE','VOLUMEUNIT, CUBIC_METRE'].map(p=>{const [a,b]=p.split(', ');return add('IFCSIUNIT','*,.'+a+'.,$,.'+b+'.');}).join(',')+')');
+ const project=add('IFCPROJECT',guid()+",$,'CAD2D3D',$,$,$,$,("+context+'),'+units);
+ const placement=add('IFCLOCALPLACEMENT','$,'+axis);
+ const building=add('IFCBUILDING',guid()+",$,'Building',$,$,"+placement+",$,$,.ELEMENT.,$,$,$");
+ const storey=add('IFCBUILDINGSTOREY',guid()+",$,'Unassigned level',$,$,"+placement+",$,$,.ELEMENT.,$");
+ add('IFCRELAGGREGATES',guid()+',$,$,$,'+project+',('+building+')');add('IFCRELAGGREGATES',guid()+',$,$,$,'+building+',('+storey+')');
+ const classes={wall:'IFCWALL',slab:'IFCSLAB',roof:'IFCROOF',stair:'IFCSTAIR',railing:'IFCRAILING',column:'IFCCOLUMN',beam:'IFCBEAM'},products=[];let count=0;
+ for(const item of items){const triangles=item.triangles;if(!triangles?.length)continue;
+  count+=triangles.length;if(count>120000)throw Error('IFC: máximo 120.000 caras');
+  const points=[],faces=[];
+  for(const t of triangles){if(t.length!==3||t.some(p=>p.length!==3||!p.every(Number.isFinite)))throw Error('IFC: cara inválida');const base=points.length+1;for(const p of t)points.push('('+p.map(num).join(',')+')');faces.push('('+[base,base+1,base+2].join(',')+')');}
+  const list=add('IFCCARTESIANPOINTLIST3D','('+points.join(',')+')');
+  const mesh=add('IFCTRIANGULATEDFACESET',list+',$,$,('+faces.join(',')+'),$');
+  const rep=add('IFCSHAPEREPRESENTATION',body+",'Body','Tessellation',("+mesh+')');
+  const shape=add('IFCPRODUCTDEFINITIONSHAPE','$,$,('+rep+')');
+  const cls=Object.prototype.hasOwnProperty.call(classes,item.type)?classes[item.type]:'IFCBUILDINGELEMENTPROXY';
+  const product=add(cls,guid()+',$,'+str(item.name||item.type)+',$,$,'+placement+','+shape+','+str(item.id)+',.NOTDEFINED.');
+  products.push(product);
+  if(item.material){const material=add('IFCMATERIAL',str(item.material)+',$,$');add('IFCRELASSOCIATESMATERIAL',guid()+',$,$,$,('+product+'),'+material);}
+  const props=[['NativeType',item.type],['NativeId',item.id],['Style',item.style],['Layer',item.layer]].filter(p=>p[1]!=null&&String(p[1])!=='').map(p=>add('IFCPROPERTYSINGLEVALUE',str(p[0])+',$,IFCLABEL('+str(p[1])+'),$'));
+  if(props.length){const pset=add('IFCPROPERTYSET',guid()+",$,'Blackline_Native',$,("+props.join(',')+')');add('IFCRELDEFINESBYPROPERTIES',guid()+',$,$,$,('+product+'),'+pset);}
+ }
+ if(!products.length)throw Error('IFC: sin geometría exportable');
+ add('IFCRELCONTAINEDINSPATIALSTRUCTURE',guid()+',$,$,$,('+products.join(',')+'),'+storey);
+ return "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('Experimental tessellated exchange'),'2;1');\nFILE_NAME('CAD2D3D.ifc','"+new Date().toISOString().slice(0,19)+"',('CAD2D3D'),('Blackline'),'Blackline','CAD2D3D','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n"+data.join('\n')+'\nENDSEC;\nEND-ISO-10303-21;\n';
+}
+function exportIFC(){
+ if(!T||!records.some(visibleRecord))return text('IFC: no hay geometría 3D visible');
+ try{
+  const items=new Map(records.filter(visibleRecord).map(r=>[r.id,{id:r.id,name:r.name||r.type,type:r.type==='slab'&&r.slabKind==='roof'?'roof':r.type,material:r.materialId,style:r.styleId,layer:layerForRecord(r)?.name,triangles:[]}]));
+  let count=0;trianglesWorld((p,id,mesh)=>{if(mesh?.userData?.cadCutout||mesh?.userData?.cadProfileFace)return;const item=items.get(id);if(!item)return;if(++count>120000)throw Error('IFC: máximo 120.000 caras');item.triangles.push(p);});
+  const content=cad3dEncodeIFC([...items.values()],()=>crypto.getRandomValues(new Uint8Array(16)));
+  download('CAD2D3D-model.ifc',content,'application/x-step');
+  text('IFC4 experimental · '+count+' caras · clases nativas, nivel sin asignar · sin vanos IFC independientes');
+ }catch(e){text(e.message||'IFC: exportación interrumpida');}
 }
 function exportMeshExchange(format){
  if(!records.some(visibleRecord)||!T)return text('No hay geometría 3D visible disponible');
