@@ -32,3 +32,10 @@ test('drawing units include km, yards and miles; imperial and map scales; ANSI/A
  for(const v of ['48','96','120','240','63360','24000'])assert.ok(html.includes('<option value="'+v+'">'),v);
  for(const k of ['ANSIB','ANSIC','ANSID','ANSIE','ARCHA','ARCHB','ARCHC'])assert.ok(html.includes('<option value="'+k+'">'),k);
 });
+test('standard sheet frame (DIN/ISO 5457 or IRAM 4504) on layouts, drawn in screen, SVG, PDF and layout DXF',()=>{
+ assert.match(html,/function cadFrameMargins\(frame\)\{return frame==='iram'\?\{l:25,r:10,t:10,b:10\}:frame==='iso'\?\{l:20,r:10,t:10,b:10\}:null\}/);
+ assert.match(html,/rects=\[\{x:fx,y:fy,w:fw,h:fh,width:\.7\}\]/,'0.7 mm frame');
+ assert.match(html,/<select id="layoutFrame"><option value="iso" selected>DIN \/ ISO 5457/);
+ assert.match(html,/\$\{o\.__vp&&!o\.__noEntities\?'':cadSvgFrame\(o\)\}/);assert.match(html,/const F=cadSheetFrameParts\(o\);if\(F\)\{contents\.push/);
+ assert.match(html,/cadApplySheetFrame\(o,\$\('layoutFrame'\)\?\.value\|\|'iso'/);assert.match(html,/title:'none',frame:null,__fx:0\}\)/);
+});
