@@ -1363,7 +1363,7 @@ function arqCheckSanitary(plan,library){
   const opposite={S:'N',N:'S',W:'E',E:'W'};
   const orders=bd.length?[[wc[0],bd[0]],[bd[0],wc[0]]]:[[wc[0]]];let best=null;
   function search(strict=true){
-  for(const side of ['W']){
+  for(const side of ['W','E']){
    if(doorSides.has(side))continue;
    const lo=horizontal(side)?x:y,hi=horizontal(side)?R[2]:R[3];
    for(const order of orders)for(const gap of (w*h<3.6?[.10,.20,.25]:[.25,.20]))for(let at=lo+.05;at<=hi;at+=.025){
@@ -1374,7 +1374,7 @@ function arqCheckSanitary(plan,library){
     if(!ok)continue;
     for(const b of basin){const old=box(b),obstacles=[...fixed,...layout.flatMap(q=>[q.fp,q.front])];if(((b.rotation||0)%360+360)%360!==({W:270,E:90,S:0,N:180}[side])&&inside(old,R)&&!obstacles.some(z=>overlaps(old,z))&&!doors.some(o=>sweep(old,o))){layout.push({b,fp:old,front:old,point:b.point,rotation:b.rotation,keep:true});continue}
      let pick=null;
-     for(const bs of ['E','N','S']){if(bs===side)continue;const l=horizontal(bs)?x:y,u=horizontal(bs)?R[2]:R[3];for(let pos=l+.05;pos<=u;pos+=.05){const c=candidate(b,bs,pos);if(!c||conflict(c,obstacles)||doors.some(o=>sweep(c.fp,o)))continue;const d=Math.hypot(c.point[0]-b.point[0],c.point[1]-b.point[1]);if(!pick||d<pick.d)pick={...c,d}}}
+     for(const bs of ['E','N','S','W']){if(bs===side)continue;const l=horizontal(bs)?x:y,u=horizontal(bs)?R[2]:R[3];for(let pos=l+.05;pos<=u;pos+=.05){const c=candidate(b,bs,pos);if(!c||conflict(c,obstacles)||doors.some(o=>sweep(c.fp,o)))continue;const d=Math.hypot(c.point[0]-b.point[0],c.point[1]-b.point[1]);if(!pick||d<pick.d)pick={...c,d}}}
      if(!pick){ok=false;break}score+=2+pick.d;layout.push(pick);
     }
     if(ok&&(!best||score<best.score))best={layout,score};
@@ -1392,7 +1392,7 @@ function arqCheckSanitary(plan,library){
   // but may never face the entrance or touch the actual door sweep.
   if(!best){fixed=[...other,...wet.map(box)];search(false);}
   if(!best&&wet.length===1){const b=wet[0];for(const side of ['N','S','E','W']){if(doorSides.has(side))continue;const lo=horizontal(side)?x:y,hi=horizontal(side)?R[2]:R[3];for(let t=lo;t<=hi;t+=.05){const c=candidate(b,side,t,.45,true);if(!c||doors.some(o=>sweep(c.fp,o)||sweep(c.front,o))||conflict(c,other))continue;fixed=[...other,c.fp,c.front];search(false);if(best){best.layout.push(c);break;}}if(best)break;}}
-  if(!best){issues.push(room.id+': no cabe inodoro + bidé en pared izquierda con lavatorio separado; redistribuir baño');continue}
+  if(!best){issues.push(room.id+': no cabe inodoro + bidé juntos en pared lateral con lavatorio separado; redistribuir baño');continue}
   for(const b of bd)if(!clone.blocks.includes(b)){clone.blocks.push(b);moved.push('added:san-bidet');if(Array.isArray(clone.brief?.fixtures)&&!clone.brief.fixtures.includes('bidet'))clone.brief.fixtures.push('bidet');}
   for(const q of best.layout){if(q.keep)continue;const changed=q.b.rotation!==q.rotation||q.b.point.some((v,i)=>Math.abs(v-q.point[i])>eps);q.b.point=q.point;q.b.rotation=q.rotation;if(q.b.footprint)q.b.footprint=q.fp;if(q.b.box)q.b.box=q.fp;if(q.b.envelope)q.b.envelope=[q.fp[0],q.fp[1],q.fp[2]-q.fp[0],q.fp[3]-q.fp[1]];if(changed)moved.push(q.b.catalogId)}
  }
