@@ -524,7 +524,9 @@ async function traceFile(file,source=null,python=false,brush=false){
    const dimOption=document.createElement('label'),dimCheck=document.createElement('input');dimCheck.type='checkbox';dimCheck.checked=false;dimCheck.onchange=()=>{dimensionOverall=dimCheck.checked;};dimOption.append(dimCheck,document.createTextNode(LX(' Acotar al final (medidas generales)',' Dimension at end (overall measurements)')));
    const picker=document.createElement('select'),rot=document.createElement('select'),undo=document.createElement('button'),retry=document.createElement('button');retry.className='btn';retry.textContent=LX('Probar otro detector','Try another detector');
    const catalog=window.CAD2D_ARQ_LIBRARY?.library||[];
-   const candidates=catalog.filter(i=>!i.hideFromGallery&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-|mob-|kq-|esc-|ext-|veh-|ofi-|per-)/.test(i.id)&&Number.isFinite(i.w)&&i.w>0&&Number.isFinite(i.d)&&i.d>0);
+   // Los bloques ocultos solo por la depuración visual de galerías (galleryCuration) siguen
+   // disponibles aquí: CALCOPY necesita sus definiciones nativas (inodoro, cama, heladera…).
+   const candidates=catalog.filter(i=>(!i.hideFromGallery||i.galleryCuration)&&!i.pro&&!i.paidOnly&&!i.dxfPlan&&/^(?:san-|dor-|mob-|kq-|esc-|ext-|veh-|ofi-|per-)/.test(i.id)&&Number.isFinite(i.w)&&i.w>0&&Number.isFinite(i.d)&&i.d>0);
    picker.add(new Option(LX('Elegir bloque…','Choose block…'),''));for(const i of candidates)picker.add(new Option(i.name,i.id));
    for(const angle of [0,90,180,270])rot.add(new Option(angle+'°',String(angle)));
    undo.textContent=LX('Deshacer marca','Undo mark');undo.className='btn';
