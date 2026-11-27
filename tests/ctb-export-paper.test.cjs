@@ -26,3 +26,9 @@ test('active layout exports to DXF in paper millimetres, clipped like the printo
  assert.match(html,/state\.unit='mm';\n try\{return \{name,count:ents\.length/);
  assert.match(html,/option\('Lámina activa → \.DXF','Hoja tal como se imprime, en mm de papel'/);assert.match(html,/\['EXPORTLAYOUT','EXPORTARLAMINA','LAMINADXF'\]/);
 });
+test('drawing units include km, yards and miles; imperial and map scales; ANSI/ARCH sheets',()=>{
+ assert.match(html,/U=\{mm:1,cm:10,m:1000,km:1e6,in:25\.4,ft:304\.8,yd:914\.4,mi:1609344\}/);
+ assert.match(html,/\{mm:4,cm:5,m:6,km:7,in:1,ft:2,yd:10,mi:3\}/);assert.ok(!/\{1:'in',2:'ft',4:'mm',5:'cm',6:'m'\}/.test(html),'every DXF unit map knows mi/km/yd');
+ for(const v of ['48','96','120','240','63360','24000'])assert.ok(html.includes('<option value="'+v+'">'),v);
+ for(const k of ['ANSIB','ANSIC','ANSID','ANSIE','ARCHA','ARCHB','ARCHC'])assert.ok(html.includes('<option value="'+k+'">'),k);
+});
