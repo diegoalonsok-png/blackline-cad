@@ -383,10 +383,11 @@ reg(['LAYWALK','RECORRERCAPAS'],()=>{
  const st=S();if(!st.layers.length)return CORE.toast('Sin capas');
  if(document.getElementById('cadLayerWalkDialog'))return;
  const dlg=document.createElement('dialog');dlg.id='cadLayerWalkDialog';dlg.style.cssText='width:min(420px,90vw);max-height:80vh;background:#f8f2e4;color:#26343d;border:1px solid #ad9e83;padding:12px;border-radius:8px';
- dlg.innerHTML='<form method="dialog"><b>LAYWALK · Recorrer capas</b><p>Seleccioná una o más capas para una vista temporal. Al cerrar se restaura la visibilidad original.</p><select multiple size="12" style="width:100%"></select><p><button>Cerrar y restaurar</button></p></form>';
- const original=st.layers.map(l=>[l,l.visible]),select=dlg.querySelector('select');for(const l of st.layers){const o=new Option(l.name,l.id);o.selected=!!l.visible;select.append(o)}
- select.addEventListener('change',()=>{const ids=new Set(Array.from(select.selectedOptions,o=>o.value));for(const [l] of original)l.visible=ids.has(String(l.id));CORE.schedule();});
- dlg.addEventListener('close',()=>{for(const [l,visible] of original)l.visible=visible;CORE.schedule();dlg.remove();},{once:true});
+ dlg.innerHTML='<form method="dialog"><b>LAYWALK · Recorrer capas</b><p>Explorá las capas y sus cantidades. Aplicar conserva la selección de capas visibles; Cancelar no cambia el dibujo.</p><select multiple size="12" style="width:100%"></select><p data-count></p><p><button value="apply">Aplicar visibilidad</button> <button value="cancel">Cancelar</button></p></form>';
+ const original=st.layers,select=dlg.querySelector('select'),counts=new Map();for(const e of st.entities)counts.set(String(e.layer),(counts.get(String(e.layer))||0)+1);
+ for(const l of original){const o=new Option(l.name+' · '+(counts.get(String(l.id))||0)+' objetos',String(l.id));o.selected=!!l.visible;select.append(o)}
+ const chosen=()=>new Set(Array.from(select.selectedOptions,o=>o.value));const refresh=()=>{const ids=chosen();dlg.querySelector('[data-count]').textContent=ids.size+' capas · '+Array.from(ids).reduce((n,id)=>n+(counts.get(id)||0),0)+' objetos';};select.addEventListener('change',refresh);refresh();
+ dlg.addEventListener('close',()=>{if(dlg.returnValue==='apply'&&S().layers===original){const ids=chosen();if(original.some(l=>!!l.visible!==ids.has(String(l.id)))){CORE.saveHistory();for(const l of original)l.visible=ids.has(String(l.id));CORE.updateAll();}}dlg.remove();},{once:true});
  document.body.append(dlg);dlg.showModal();
 });
 alt(['LIMITS'],'No hace falta definir límites: el dibujo es ilimitado y las láminas definen el papel.');
