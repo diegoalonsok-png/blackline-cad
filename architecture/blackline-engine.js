@@ -269,9 +269,12 @@ function solve(spec){
    wall(front,[a,t/2],[b,t/2]);wall(back,[a,d+1.5*t],[b,d+1.5*t]);if(side){opening(side==='left'?'side0':'side1','swing-door',t/2+(side==='left'?d-doorX-door/2:doorX+door/2),door);}else opening(front,'swing-door',t/2+doorX+door/2,door);
    room('room'+i,base,x,t,d,front,back,i);blocks(lay,x,t,base);
    if(suite||cd){
-    const offset=step/2-door/2-win/2-.2;
-    if(win&&offset-win/2<=t/2)throw Error('No hay espacio en fachada para la puerta y ventana solicitadas.');
-    opening(front,'framed-window',offset,win);opening(back,'swing-door',compactSuite?t/2+bathW/2:step/2,bathDoor);
+    // Select the largest free facade interval after the actual (possibly off-center) entry door.
+    const margin=.05,lo=t/2+margin,hi=step-t/2-margin,doorStart=t/2+doorX,doorEnd=doorStart+door;
+    const gaps=door?[[lo,doorStart-margin],[doorEnd+margin,hi]]:[[lo,hi]];
+    const free=gaps.filter(([a,b])=>b-a>=win-1e-8).sort((a,b)=>(b[1]-b[0])-(a[1]-a[0]))[0];
+    if(win&&!free)throw Error('No hay espacio en fachada para la puerta y ventana solicitadas.');
+    if(win)opening(front,'framed-window',(free[0]+free[1])/2,win);opening(back,'swing-door',compactSuite?t/2+bathW/2:step/2,bathDoor);
     let prev=back,from='room'+i;
     if(cd){const closetBack='closetback'+i;wall(closetBack,[a,d+shift+1.5*t],[b,d+shift+1.5*t]);room('closet'+i,'closet',x,d+2*t,cd,back,closetBack,i);blocks(clay,x,d+2*t,'closet');out.connections.push({from:p+from,to:p+'closet'+i,via:p+back,private:true});prev=closetBack;from='closet'+i;if(suite)opening(prev,'swing-door',step/2,bathDoor);}
     if(suite){const end=compactSuite?a+bathW+t:b;if(compactSuite)wall('bathside'+i,[end,d+1.5*t],[end,fullD+1.5*t]);wall(rear,[a,fullD+1.5*t],[end,fullD+1.5*t]);opening(rear,'framed-window',compactSuite?(bathW+t)/2:step/2,Math.min(.8,bathW-.3));room('bath'+i,'bathroom',x,d+shift+2*t,bd,prev,rear,i,bathW);blocks(blay,x,d+shift+2*t,'bathroom');out.connections.push({from:p+from,to:p+'bath'+i,via:p+prev,private:true});}
