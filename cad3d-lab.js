@@ -10761,6 +10761,9 @@ function cad3dInterferenceShape(r){
  if(r.type==='sphere'&&positive(r.radius)){
   const R=r.radius;return {id:r.id,kind:'sphere',x,y,z:z+R,R,minX:x-R,maxX:x+R,minY:y-R,maxY:y+R,minZ:z,maxZ:z+2*R};
  }
+ if(r.type==='cylinder'&&positive(r.radius,r.h)){
+  const R=r.radius;return {id:r.id,kind:'cylinder',x,y,z:z+r.h/2,R,hz:r.h/2,minX:x-R,maxX:x+R,minY:y-R,maxY:y+R,minZ:z,maxZ:z+r.h};
+ }
  if(!(r.type==='box'||r.type==='slab'&&!r.pitch&&!r.openings?.length&&!r.slabPolyHoles?.length)||!positive(r.w,r.d,r.h))return null;
  const a=rot*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),u=[c,sn],v=[-sn,c],hx=r.w/2,hy=r.d/2;
  const dx=Math.abs(c)*hx+Math.abs(sn)*hy,dy=Math.abs(sn)*hx+Math.abs(c)*hy;
@@ -10770,6 +10773,16 @@ function cad3dInterferencePair(a,b,eps=1e-8){
  if(Math.min(a.maxX,b.maxX)-Math.max(a.minX,b.minX)<=eps||Math.min(a.maxY,b.maxY)-Math.max(a.minY,b.minY)<=eps||Math.min(a.maxZ,b.maxZ)-Math.max(a.minZ,b.minZ)<=eps)return false;
  const dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z;
  if(a.kind==='sphere'&&b.kind==='sphere')return Math.hypot(dx,dy,dz)<a.R+b.R-eps;
+ if(a.kind==='cylinder'&&b.kind==='cylinder')return Math.hypot(dx,dy)<a.R+b.R-eps;
+ if(a.kind==='cylinder'||b.kind==='cylinder'){
+  const cyl=a.kind==='cylinder'?a:b,other=cyl===a?b:a,X=cyl.x-other.x,Y=cyl.y-other.y;
+  if(other.kind==='sphere'){
+   const radial=Math.max(0,Math.hypot(X,Y)-cyl.R),vertical=Math.max(0,Math.abs(cyl.z-other.z)-cyl.hz);
+   return Math.hypot(radial,vertical)<other.R-eps;
+  }
+  const qx=Math.max(0,Math.abs(X*other.u[0]+Y*other.u[1])-other.hx),qy=Math.max(0,Math.abs(X*other.v[0]+Y*other.v[1])-other.hy);
+  return Math.hypot(qx,qy)<cyl.R-eps;
+ }
  if(a.kind==='box'&&b.kind==='box'){
   const dot=(p,q)=>p[0]*q[0]+p[1]*q[1];
   for(const axis of [a.u,a.v,b.u,b.v]){
@@ -10804,13 +10817,13 @@ function cad3dInterferenceReport(){
  if(root.querySelector('[data-interfere-report]'))return;
  const d=document.createElement('dialog');d.setAttribute('data-interfere-report','');
  d.style.cssText='width:min(590px,92vw);max-height:80vh;overflow:auto;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:6px;padding:14px';
- d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">INTERFERE · Interferencias 3D</strong><button type="button" class="btn" data-close>×</button></div><p>Comprueba prismas, esferas y losas horizontales sin huecos. El contacto sin penetración no se considera interferencia.</p><label>Alcance <select data-scope><option value="all">Modelo visible</option><option value="selection">Entre objetos seleccionados</option><option value="against">Selección contra modelo visible</option></select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" class="btn" data-scan>Analizar</button><button type="button" class="btn" data-select disabled>Seleccionar interferencias listadas</button><button type="button" class="btn" data-export disabled>TXT</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">INTERFERE · Interferencias 3D</strong><button type="button" class="btn" data-close>×</button></div><p>Comprueba prismas, esferas, cilindros verticales y losas horizontales sin huecos según sus geometrías analíticas nominales. El contacto sin penetración no se considera interferencia.</p><label>Alcance <select data-scope><option value="all">Modelo visible</option><option value="selection">Entre objetos seleccionados</option><option value="against">Selección contra modelo visible</option></select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" class="btn" data-scan>Analizar</button><button type="button" class="btn" data-select disabled>Seleccionar interferencias listadas</button><button type="button" class="btn" data-export disabled>TXT</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
  let result=null,report='';
  const output=d.querySelector('pre'),select=d.querySelector('[data-select]'),exp=d.querySelector('[data-export]'),scope=d.querySelector('[data-scope]');
  d.querySelector('[data-scan]').onclick=()=>{
   if(scope.value!=='all'&&!selected.length){output.textContent='Seleccioná objetos antes de usar este alcance.';return}
   result=cad3dInterferenceScan(records.filter(visibleRecord),selected,scope.value);
-  report=['Interferencias confirmadas: '+result.found,'Objetos compatibles: '+result.supported,'Pares examinados en barrido X: '+result.tested,'Objetos visibles no evaluados: '+result.unsupported.length,result.truncated?'ANÁLISIS PARCIAL: alcanzado el límite de pares.':'Barrido de objetos compatibles completado.',result.found>result.pairs.length?'Detalle limitado a '+result.pairs.length+' pares.':'','PARES:',...result.pairs.map(p=>'#'+p[0]+' ↔ #'+p[1]),'','NO EVALUADOS:',...result.unsupported.slice(0,150).map(x=>'#'+x.id+' · '+x.type),result.unsupported.length>150?'Listado de no evaluados limitado a 150.':'','No se verificaron muros, escaleras, cilindros, conos, mallas o sólidos booleanos. La ausencia de resultados no certifica un modelo libre de interferencias.'].filter(Boolean).join('\n');
+  report=['Interferencias confirmadas: '+result.found,'Objetos compatibles: '+result.supported,'Pares examinados en barrido X: '+result.tested,'Objetos visibles no evaluados: '+result.unsupported.length,result.truncated?'ANÁLISIS PARCIAL: alcanzado el límite de pares.':'Barrido de objetos compatibles completado.',result.found>result.pairs.length?'Detalle limitado a '+result.pairs.length+' pares.':'','PARES:',...result.pairs.map(p=>'#'+p[0]+' ↔ #'+p[1]),'','NO EVALUADOS:',...result.unsupported.slice(0,150).map(x=>'#'+x.id+' · '+x.type),result.unsupported.length>150?'Listado de no evaluados limitado a 150.':'','No se verificaron muros, escaleras, conos, mallas o sólidos booleanos. La ausencia de resultados no certifica un modelo libre de interferencias.'].filter(Boolean).join('\n');
   output.textContent=report;select.disabled=!result.pairs.length;exp.disabled=false;
  };
  scope.onchange=()=>{result=null;report='';output.textContent='';select.disabled=true;exp.disabled=true};
