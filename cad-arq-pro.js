@@ -1478,8 +1478,17 @@ async function arqFetchPreviewPlan(url,timeout=12000){
 const arqSanitaryPreviewCache=new Map();
 window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=arqFetchPreviewPlan(new URL(id+'.json?v=20261127-house-framed1',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
+// An explicit individual block request is not a furnishing/layout command.
+function arqSingleBlockRequest(raw){
+ const q=arqCleanRequest(raw).replace(/^(?:bloques?|blocks?)\s+(?:(?:de|of)\s+)?/,'');
+ if(!q||q.length>160)return null;
+ if(/\+|;|\b(?:y|and|con|with|para|en el|en la|dentro|habitacion|dormitorio|bedroom|living|comedor|bathroom|bano)\b/.test(q))return null;
+ if(!/^(?:inodoros?|wc|toilets?|retretes?|bidets?|bides?|lavatorios?|lavabos?|bachas?|sinks?|basins?|duchas?|showers?|banaderas?|baneras?|bathtubs?|puertas?|doors?|ventanas?|windows?|camas?|beds?|mesas?|tables?|sillas?|chairs?|sofas?|sillones?|couches?|heladeras?|fridges?|refrigerators?|arbol(?:es)?|trees?|autos?|cars?|bicicletas?|bicycles?|hornos?|ovens?|anafes?|cooktops?|microondas|microwaves?|lavarropas?|washers?)\b/.test(q))return null;
+ // Dimensions and qualifiers are retained for the gallery, not interpreted as room dimensions.
+ return arqObjectSearch(q)||q;
+}
 function arqObjectSearch(raw){
- const q=arqCleanRequest(String(raw).replace(/^\s*(?:bloques? de)\s+/i,''));
+ const q=arqCleanRequest(raw).replace(/^(?:bloques?|blocks?)\s+(?:(?:de|of)\s+)?/,'');
  const groups=[['anafe',/^(?:anafes?|cooktops?|hobs?|placa de coccion)$/],['horno',/^(?:hornos?|ovens?)$/],['cocina a gas',/^(?:cocina a gas|gas stove|stove|estufa)$/],['microondas',/^(?:microondas|microwaves?)$/],['inodoro',/^(?:inodoros?|wc|toilets?|retretes?)$/],['arbol',/^(?:arbol(?:es)?|trees?)$/],['auto',/^(?:autos?|automovil(?:es)?|coches?|cars?|vehiculos?)$/],['bidet',/^(?:bidets?|bides?)$/],['lavatorio',/^(?:lavatorios?|lavabos?|bachas?|sinks?|basins?)$/],['ducha',/^(?:duchas?|showers?)$/],['banera',/^(?:baneras?|banaderas?|bathtubs?)$/],['puerta',/^(?:puertas?|doors?)$/],['ventana',/^(?:ventanas?|windows?)$/],['cama',/^(?:camas?|beds?)$/],['mesa',/^(?:mesas?|tables?)$/],['silla',/^(?:sillas?|chairs?)$/],['sofa',/^(?:sofas?|sillones?|couches?)$/],['heladera',/^(?:heladeras?|frigorificos?|refrigeradores?|refrigerators?|fridges?)$/],['persona',/^(?:personas?|people|person)$/],['palmera',/^(?:palmeras?|palm trees?)$/],['camion',/^(?:camion(?:es)?|trucks?)$/],['bicicleta',/^(?:bicicletas?|bicycles?)$/],['moto',/^(?:motos?|motocicletas?|motorcycles?)$/]];
  for(const [term,re] of groups)if(re.test(q))return term;
  // Explicit object searches accept every catalogue name, including model numbers.
@@ -1541,6 +1550,7 @@ function openArchitectureBar(focus=true){
   const submit=async()=>{
    const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
+   try{
    const route=arqRouteOf(raw);
    if(route.kind==='calco'){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
    if(route.kind==='furnish'){EXT.cancelArchitectureCommand();arqFurnish(raw);return;}
@@ -1552,7 +1562,8 @@ function openArchitectureBar(focus=true){
    if(route.kind==='web'){arqOpenWebReference(raw);return;}
    if(route.kind==='catalogue'){EXT.cancelArchitectureCommand();openArqPlanCatalogue(route.category,raw);return;}
    if(route.kind==='object'){arqOpenObjectSearch(route.object);return;}
-   run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
+   run.disabled=true;await EXT.drawArchitectureCommand(raw);
+   }catch(e){CORE.toast('ARQASSIST · '+(e?.message||e));statusHint('ARQASSIST · '+(e?.message||e));CORE.log('ARQASSIST: '+(e?.message||e));}finally{run.disabled=false}
   };
   input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
   for(const type of ['pointerdown','pointerup','mousedown','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
@@ -1627,6 +1638,7 @@ function arqRouteOf(raw){
  if(arqPoolRequest(raw))return {kind:'draw'};
  if(arqRoomSetRequest(raw))return {kind:'draw'};
  if(arqHouseDesignRequest(raw))return {kind:'draw'};
+ const single=arqSingleBlockRequest(raw);if(single)return {kind:'object',object:single};
  if(arqFurnishRequest(raw))return {kind:'furnish'};
  {const w=arqWallRequest(raw);if(w)return {kind:'wall',length:w};}
  const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs)return {kind:'docs',docs};
