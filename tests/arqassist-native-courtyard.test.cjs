@@ -32,7 +32,7 @@ test('Courtyard typology searches retrieve matching native editable CAD plans in
  const s=fs.readFileSync('cad-block-browser.js','utf8');
  const typ=new Function(s.slice(s.indexOf('const ARQ_TYPOLOGIES='),s.indexOf('function typologyMatch('))+';return arqTypology;')();
  const tips=JSON.parse(fs.readFileSync('assets/arq-tipologias/v1/index.json'));
- const previews=new Function('arqTypology','generalPlanQuery','parseArea','localGallery','document','fetch','T',s.slice(s.indexOf('function localHouseTypologyMatch('),s.indexOf('// Interleave distinct architectural schemes'))+';return localHousePreviews;')(typ,()=>false,()=>null,async()=>catalogue,{baseURI:'https://blackline-cad.org/'},async()=>({ok:true,json:async()=>tips}),(en,es)=>es);
+ const previews=new Function('arqTypology','generalPlanQuery','parseArea','localGallery','document','arqBrowserJSON','T',s.slice(s.indexOf('function localHouseTypologyMatch('),s.indexOf('// Interleave distinct architectural schemes'))+';return localHousePreviews;')(typ,()=>false,()=>null,async()=>catalogue,{baseURI:'https://blackline-cad.org/'},async()=>tips,(en,es)=>es);
  for(const q of ['casas con patio','courtyard houses','domus']){
   const r=await previews(q);
   assert(r.some(x=>x.planId==='plan-901'));
@@ -59,4 +59,21 @@ test('Architectural preview downloads abort stalled responses and clear their ti
  });
  await assert.rejects(stalled('test',10),/aborted body/);
  assert.equal(signal.aborted,true);assert.equal(cleared,3);
+});
+
+test('ARQASSIST progressively exposes only approved houses with correct underlying indices',()=>{
+ const s=fs.readFileSync('cad-block-browser.js','utf8');
+ const rows=[{planId:'a'},{planId:'b'},{planId:'c'},{cadUrl:'house.dxf'}];
+ const results=new Map([['b',{issues:[],preview:'svg'}],['c',{issues:['bad'],preview:null}]]);
+ const ready=new Function('window','needsSanitaryPreview','sanitaryGalleryResult',s.slice(s.indexOf('function approvedVisiblePlans('),s.indexOf('function paintWeb('))+';return approvedVisiblePlans;')({CAD2D_SANITARY_PREVIEW:()=>{}},x=>!!x.planId,x=>results.get(x.planId));
+ assert.deepEqual(ready(rows).map(x=>x.index),[1,3]);
+ results.set('a',{issues:[],preview:'svg'});
+ assert.deepEqual(ready(rows).map(x=>x.index),[0,1,3]);
+});
+test('ARQASSIST catalogue JSON bounds stalled response bodies',async()=>{
+ const s=fs.readFileSync('cad-block-browser.js','utf8');
+ const make=new Function('fetch','AbortController','setTimeout','clearTimeout',s.slice(s.indexOf('async function arqBrowserJSON('),s.indexOf('let localGalleryPromise='))+';return arqBrowserJSON;');
+ assert.deepEqual(await make(async()=>({ok:true,json:async()=>[1]}),AbortController,setTimeout,clearTimeout)('x'),[1]);
+ const stalled=make(async(u,o)=>({ok:true,json:()=>new Promise((resolve,reject)=>o.signal.addEventListener('abort',()=>reject(Error('timeout')),{once:true}))}),AbortController,setTimeout,clearTimeout);
+ await assert.rejects(stalled('x',{},10),/timeout/);
 });
