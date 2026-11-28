@@ -447,8 +447,19 @@ function variantSize(item,a){
  const fits=a.w>=item.wMin-e&&a.w<=item.wMax+e&&a.d>=item.dMin-e&&a.d<=item.dMax+e&&(!item.lockAspect||Math.abs(a.w*item.d-a.d*item.w)<e);
  return fits?{w:a.w,d:a.d,changed:false}:{w:item.w,d:item.d,changed:Math.abs(a.w-item.w)>e||Math.abs(a.d-item.d)>e};
 }
+// Group the existing catalogue by real object and projection, not just authored family ID.
+function replacementKey(item){
+ if(!item)return '';
+ const n=String(item.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),cat=String(item.cat||'');
+ const projection=item.dynamicOpening?.projection||(/corte|seccion|section/.test(n)?'section':/vista frontal|alzado|elevation|front view/.test(n)||cat==='Alzados'?'front':/vista lateral|side view/.test(n)?'side':/vista posterior|rear view/.test(n)?'rear':/vista|view|Cortes y vistas|en vista/i.test(n+' '+cat)?'view':'plan');
+ if(item.dynamicOpening)return 'opening:'+item.dynamicOpening.kind+':'+projection+':'+(projection==='plan'?(item.dynamicAxis||'w'):'');
+ if(!/^(?:Sanitarios|Mobiliario|Dormitorio|Oficina|Mobiliario en vista|Cortes y vistas)$/i.test(cat))return 'family:'+cat+':'+item.family+':'+projection;
+ const kind=/^(?:inodoro|wc\b|toilet|retrete)/.test(n)?'toilet':/^(?:bidet|bide\b)/.test(n)?'bidet':/^(?:sofa|sillon|butaca|couch|armchair)/.test(n)?'sofa':/^(?:silla\b(?! de ruedas)|chair\b)/.test(n)?'chair':null;
+ return kind?'object:'+kind+':'+projection:'family:'+cat+':'+item.family+':'+projection;
+}
 function replacementItems(item){
- return familyOf(item).filter(v=>v.cat===item.cat&&!v.dxfPlan&&!v.hideFromGallery);
+ const key=replacementKey(item);
+ return LIB.library.filter(v=>!v.hideFromGallery&&!v.dxfPlan&&!/^views26-/.test(v.id)&&replacementKey(v)===key);
 }
 function swapVariant(ref,id){
  const a=arqOf(ref),item=byId(id),source=a&&byId(a.id);
@@ -456,6 +467,8 @@ function swapVariant(ref,id){
  if(!allowed(item)){plan()?.upsell('Bloque Pro: '+item.name);return false}
  if(dkNeeds(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)return swapVariant(ref,id);return false}).catch(e=>CORE.toast(e.message))}
  const size=variantSize(item,a);
+ // Never change the span of a hosted opening through the model picker.
+ if(source.dynamicOpening?.projection==='plan'&&(size.changed||source.dynamicAxis!==item.dynamicAxis))return false;
  CORE.saveHistory();ref.blockName=ensureDefinition(item,size.w,size.d);delete ref.dynamic;
  CORE.updateAll();CORE.queueLocalBackup?.();CORE.schedule?.();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name+' · Ctrl+Z');return true;
 }
@@ -469,6 +482,7 @@ function variantMenu(ref,x,y){
  const close=document.createElement('button');close.type='button';close.className='btn';close.textContent='×';close.setAttribute('aria-label',variantLang('Cerrar','Close'));close.onclick=()=>closeVariantMenu();menu.append(close);
  const grid=document.createElement('div');grid.className='arq-variant-grid';menu.append(grid);
  for(const v of replacementItems(item)){
+  if(item.dynamicOpening?.projection==='plan'&&variantSize(v,a).changed)continue;
   const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('aria-pressed',String(v.id===item.id));
   const size=variantSize(v,a),label=document.createElement('span');label.textContent=v.name+' · '+cm(size.w)+'×'+cm(size.d)+' cm'+(v.pro?' · PRO':'')+(size.changed?variantLang(' · nueva medida',' · new size'):'');
   try{b.innerHTML=thumb(v,64)}catch(e){}b.append(label);
