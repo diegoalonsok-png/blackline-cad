@@ -137,3 +137,21 @@ test('INTERFERE tests actual masonry around rectangular wall voids with bounded 
  assert.equal(api.scan([w,{id:3,type:'cylinder',x:0,y:0,z:0,radius:.2,h:1}]).found,0);
  assert.equal(api.scan([w,{...w,id:3,rot:90}]).found,1);
 });
+
+test('INTERFERE recognizes horizontal slab material around rectangular floor openings',()=>{
+ const api=new Function(section('function cad3dInterferenceShape(','function cad3dInterferenceReport(')+';return {scan:cad3dInterferenceScan};')();
+ const slab={id:1,type:'slab',x:0,y:0,z:3,w:6,d:4,h:.2,rot:0,openings:[{offset:1,offsetY:0,w:2,d:1}]},b={id:2,type:'box',x:1,y:0,z:2,w:.5,d:.5,h:2};
+ const scan=(a,b,limit=200000)=>api.scan([a,b],[],'all',limit);
+ assert.equal(scan(slab,b).found,0);assert.equal(scan(slab,b).supported,2);
+ assert.equal(scan(slab,{...b,y:.4}).found,1);
+ assert.equal(scan(slab,{...b,y:.25}).found,0);
+ assert.equal(scan(slab,{...b,y:1,z:2,h:1}).found,0);
+ assert.equal(scan({...slab,rot:90},{...b,x:0,y:1}).found,0);
+ assert.equal(scan({...slab,rot:90},{...b,x:.4,y:1}).found,1);
+ assert.equal(scan(slab,{id:3,type:'cylinder',x:1,y:0,z:2,radius:.2,h:2}).found,0);
+ assert.equal(scan({...slab,openings:[{offset:4,offsetY:0,w:2,d:1}]},b).unsupported.length,1);
+ assert.equal(scan({...slab,slabPolyHoles:[[[0,0],[1,0],[0,1]]]},b).unsupported.length,1);
+ assert.equal(scan({...slab,pitch:15},b).unsupported.length,1);
+ assert.equal(scan(slab,b,1).truncated,true);
+ assert.equal(scan(slab,{...slab,id:3}).found,1);
+});
