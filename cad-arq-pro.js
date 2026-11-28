@@ -1169,9 +1169,10 @@ EXT.drawArchitectureCommand=async raw=>{
   startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{
    if(epoch!==arqCommandEpoch)return;
    try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD / entities drawn')}
-   catch(e){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}
+   catch(e){CORE.toast(e.message);statusHint('ARQASSIST · '+e.message);CORE.log('ARQASSIST: '+e.message)}
   },'arq-command');
- }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}}
+  if(Array.isArray(plan.walls)&&Array.isArray(plan.openings)&&Array.isArray(plan.blocks)){pick.planPreview=plan;CORE.schedule();}
+ }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);statusHint('ARQASSIST · '+e.message);CORE.log('ARQASSIST: '+e.message)}}
 };
 
 
