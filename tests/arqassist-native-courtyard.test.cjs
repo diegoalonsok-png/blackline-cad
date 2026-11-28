@@ -8,7 +8,7 @@ const sanitary=new Function(code.slice(code.indexOf('function arqCheckSanitary('
 test('Native U and courtyard homes have connected furnished rooms and sanitary pairs',()=>{
  for(const [id,bedrooms,baths] of [['plan-901',3,1],['plan-902',4,2]]){
   const p=JSON.parse(fs.readFileSync(root+id+'.json'));
-  assert(catalogue.some(x=>x.id===id&&x.format==='cad'&&x.typology));
+  assert(!catalogue.some(x=>x.id===id),'withdrawn plan must stay out of the catalogue');
   assert.equal(p.units,'m');assert.equal(p.rooms.filter(r=>r.kind==='bedroom').length,bedrooms);assert.equal(p.rooms.filter(r=>r.kind==='bathroom').length,baths);
   assert.equal(p.blocks.filter(b=>b.role==='bed').length,bedrooms);
   assert.equal(p.blocks.filter(b=>b.role==='toilet').length,baths);assert.equal(p.blocks.filter(b=>b.role==='bidet').length,baths);
@@ -35,8 +35,8 @@ test('Courtyard typology searches retrieve matching native editable CAD plans in
  const previews=new Function('arqTypology','generalPlanQuery','parseArea','localGallery','document','fetch','T',s.slice(s.indexOf('function localHouseTypologyMatch('),s.indexOf('// Interleave distinct architectural schemes'))+';return localHousePreviews;')(typ,()=>false,()=>null,async()=>catalogue,{baseURI:'https://blackline-cad.org/'},async()=>({ok:true,json:async()=>tips}),(en,es)=>es);
  for(const q of ['casas con patio','courtyard houses','domus']){
   const r=await previews(q);
-  assert(r.some(x=>x.planId==='plan-901'));
-  assert(r.some(x=>x.planId==='plan-902'));
+  assert(!r.some(x=>x.planId==='plan-901'));
+  assert(!r.some(x=>x.planId==='plan-902'));
   assert(!r.some(x=>x.planId==='plan-904'));
   assert(r.some(x=>x.tipo&&/patio/i.test(x.houseScheme)));
   assert(r.every(x=>!x.tipo||/patio/i.test(x.houseScheme)));
