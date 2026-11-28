@@ -9277,6 +9277,14 @@ function cad3dBimQTO(){
  download('CAD2D3D-wall-quantities.csv',cad3dReportCSV(rows),'text/csv;charset=utf-8');
  text('BIMQTO · '+walls.length+' walls · nominal quantities, openings deducted; no junction adjustments');
 }
+// Hosted wall opening reference: horizontal midpoint on the wall axis, at sill elevation.
+function cad3dBimOpeningPosition(r,o){
+ if(r.type!=='wall'||![r.x,r.y,r.z,r.rot??0,r.w,r.h,o.offset,o.w,o.h,o.sill].every(Number.isFinite)||
+    r.w<=0||r.h<=0||o.w<=0||o.h<=0||o.sill<0||Math.abs(o.offset)+o.w/2>r.w/2+1e-6||o.sill+o.h>r.h+1e-6)return {x:null,y:null,z:null};
+ const a=(r.rot??0)*Math.PI/180;
+ const x=r.x+Math.cos(a)*o.offset,y=r.y+Math.sin(a)*o.offset,z=r.z+o.sill;
+ return [x,y,z].every(Number.isFinite)?{x,y,z}:{x:null,y:null,z:null};
+}
 function cad3dBimInventory(format='csv'){
  const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
  const n=v=>Number.isFinite(v)?v:null, out=[];
@@ -9284,11 +9292,11 @@ function cad3dBimInventory(format='csv'){
   const layer=layerForRecord(r),cls=r.type==='box'&&r.bimClass?r.bimClass:r.type==='slab'&&r.slabKind==='roof'?'Roof':r.type==='imported3d'&&r.ifcClass?r.ifcClass:types[r.type]||'Other';
   const id='3D:'+r.id, q=cad3dBimWallQuantities(r), structural=r.type==='box'&&r.bimClass?cad3dMassProperties(r):null;
   out.push({grossArea:q?.grossArea??null,netArea:q?.netArea??null,netVolume:q?.netVolume??structural?.volume??null,quantityStatus:q?.status||(structural?.volume!=null?'rectangular solid':''),wallLayers:q?.layers||[],id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
-  for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:String(o.styleId||''),x:null,y:null,z:null,width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
+  for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:String(o.styleId||''),...cad3dBimOpeningPosition(r,o),width:n(o.w),depth:null,height:n(o.h)||n(o.d),sill:n(o.sill),openingCount:0});}
  }
  if(!out.length)return text('BIM3D · No hay elementos en el modelo');
  const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount','grossArea','netArea','netVolume','quantityStatus'];
- const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native dimensions; walls have nominal net quantities excluding openings but not junctions. Hosted openings have no global placement here. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
+ const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native dimensions; walls have nominal net quantities excluding openings but not junctions. Hosted wall openings use wall-axis midpoint at sill elevation; slab opening positions are unreported. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
  const blob=new Blob([content],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='CAD2D3D-BIM-3D.'+format;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);text('BIM3D · '+out.length+' registros exportados; MASSPROP para volúmenes y superficies');
 }
 
