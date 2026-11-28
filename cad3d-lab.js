@@ -10754,7 +10754,7 @@ function cad3dMassReport(){
 }
 /* INTERFERE: read-only collision detection for supported analytic primitives.
    Other types are explicitly excluded; never treat a bounding box as proof. */
-function cad3dInterferenceShape(r){
+function cad3dInterferenceShape(r,wallJoin=null){
  const valid=(...v)=>v.every(Number.isFinite),positive=(...v)=>valid(...v)&&v.every(x=>x>0);
  const x=r.x??0,y=r.y??0,z=r.z??0,rot=r.rot??0;
  if(!valid(x,y,z,rot))return null;
@@ -10764,7 +10764,9 @@ function cad3dInterferenceShape(r){
  if(r.type==='cylinder'&&positive(r.radius,r.h)){
   const R=r.radius;return {id:r.id,kind:'cylinder',x,y,z:z+r.h/2,R,hz:r.h/2,minX:x-R,maxX:x+R,minY:y-R,maxY:y+R,minZ:z,maxZ:z+r.h};
  }
- if(!(r.type==='box'||r.type==='slab'&&!r.pitch&&!r.openings?.length&&!r.slabPolyHoles?.length)||!positive(r.w,r.d,r.h))return null;
+ // Only walls whose actual miter/trim resolver confirms an unchanged rectangular solid.
+ const solidWall=r.type==='wall'&&wallJoin&&wallJoin.start===null&&wallJoin.end===null&&!r.openings?.length;
+ if(!(r.type==='box'||solidWall||r.type==='slab'&&!r.pitch&&!r.openings?.length&&!r.slabPolyHoles?.length)||!positive(r.w,r.d,r.h))return null;
  const a=rot*Math.PI/180,c=Math.cos(a),sn=Math.sin(a),u=[c,sn],v=[-sn,c],hx=r.w/2,hy=r.d/2;
  const dx=Math.abs(c)*hx+Math.abs(sn)*hy,dy=Math.abs(sn)*hx+Math.abs(c)*hy;
  return {id:r.id,kind:'box',x,y,z:z+r.h/2,u,v,hx,hy,hz:r.h/2,minX:x-dx,maxX:x+dx,minY:y-dy,maxY:y+dy,minZ:z,maxZ:z+r.h};
@@ -10795,9 +10797,9 @@ function cad3dInterferencePair(a,b,eps=1e-8){
  const qx=Math.max(0,Math.abs(X*box.u[0]+Y*box.u[1])-box.hx),qy=Math.max(0,Math.abs(X*box.v[0]+Y*box.v[1])-box.hy),qz=Math.max(0,Math.abs(Z)-box.hz);
  return Math.hypot(qx,qy,qz)<sphere.R-eps;
 }
-function cad3dInterferenceScan(input,selectedIds,scope,limit=200000){
+function cad3dInterferenceScan(input,selectedIds,scope,limit=200000,resolveWallJoin=null){
  const shapes=[],unsupported=[],ids=new Set(selectedIds);
- for(const r of input){const s=cad3dInterferenceShape(r);if(s)shapes.push(s);else unsupported.push({id:r.id,type:r.type})}
+ for(const r of input){const join=r.type==='wall'&&resolveWallJoin?resolveWallJoin(r):null;const s=cad3dInterferenceShape(r,join);if(s)shapes.push(s);else unsupported.push({id:r.id,type:r.type})}
  shapes.sort((a,b)=>a.minX-b.minX);
  const pairs=[];let tested=0,found=0,truncated=false;
  outer:for(let i=0;i<shapes.length;i++){
@@ -10817,13 +10819,13 @@ function cad3dInterferenceReport(){
  if(root.querySelector('[data-interfere-report]'))return;
  const d=document.createElement('dialog');d.setAttribute('data-interfere-report','');
  d.style.cssText='width:min(590px,92vw);max-height:80vh;overflow:auto;background:#1d2933;color:#eaf5fc;border:1px solid #536879;border-radius:6px;padding:14px';
- d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">INTERFERE · Interferencias 3D</strong><button type="button" class="btn" data-close>×</button></div><p>Comprueba prismas, esferas, cilindros verticales y losas horizontales sin huecos según sus geometrías analíticas nominales. El contacto sin penetración no se considera interferencia.</p><label>Alcance <select data-scope><option value="all">Modelo visible</option><option value="selection">Entre objetos seleccionados</option><option value="against">Selección contra modelo visible</option></select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" class="btn" data-scan>Analizar</button><button type="button" class="btn" data-select disabled>Seleccionar interferencias listadas</button><button type="button" class="btn" data-export disabled>TXT</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
+ d.innerHTML='<div style="display:flex;align-items:center;gap:8px"><strong style="flex:1">INTERFERE · Interferencias 3D</strong><button type="button" class="btn" data-close>×</button></div><p>Comprueba prismas, esferas, cilindros verticales, losas horizontales sin huecos y muros macizos sin ajustes de encuentros según sus geometrías analíticas nominales. El contacto sin penetración no se considera interferencia.</p><label>Alcance <select data-scope><option value="all">Modelo visible</option><option value="selection">Entre objetos seleccionados</option><option value="against">Selección contra modelo visible</option></select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0"><button type="button" class="btn" data-scan>Analizar</button><button type="button" class="btn" data-select disabled>Seleccionar interferencias listadas</button><button type="button" class="btn" data-export disabled>TXT</button></div><pre style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>';
  let result=null,report='';
  const output=d.querySelector('pre'),select=d.querySelector('[data-select]'),exp=d.querySelector('[data-export]'),scope=d.querySelector('[data-scope]');
  d.querySelector('[data-scan]').onclick=()=>{
   if(scope.value!=='all'&&!selected.length){output.textContent='Seleccioná objetos antes de usar este alcance.';return}
-  result=cad3dInterferenceScan(records.filter(visibleRecord),selected,scope.value);
-  report=['Interferencias confirmadas: '+result.found,'Objetos compatibles: '+result.supported,'Pares examinados en barrido X: '+result.tested,'Objetos visibles no evaluados: '+result.unsupported.length,result.truncated?'ANÁLISIS PARCIAL: alcanzado el límite de pares.':'Barrido de objetos compatibles completado.',result.found>result.pairs.length?'Detalle limitado a '+result.pairs.length+' pares.':'','PARES:',...result.pairs.map(p=>'#'+p[0]+' ↔ #'+p[1]),'','NO EVALUADOS:',...result.unsupported.slice(0,150).map(x=>'#'+x.id+' · '+x.type),result.unsupported.length>150?'Listado de no evaluados limitado a 150.':'','No se verificaron muros, escaleras, conos, mallas o sólidos booleanos. La ausencia de resultados no certifica un modelo libre de interferencias.'].filter(Boolean).join('\n');
+  result=cad3dInterferenceScan(records.filter(visibleRecord),selected,scope.value,200000,wallJoinOffsets);
+  report=['Interferencias confirmadas: '+result.found,'Objetos compatibles: '+result.supported,'Pares examinados en barrido X: '+result.tested,'Objetos visibles no evaluados: '+result.unsupported.length,result.truncated?'ANÁLISIS PARCIAL: alcanzado el límite de pares.':'Barrido de objetos compatibles completado.',result.found>result.pairs.length?'Detalle limitado a '+result.pairs.length+' pares.':'','PARES:',...result.pairs.map(p=>'#'+p[0]+' ↔ #'+p[1]),'','NO EVALUADOS:',...result.unsupported.slice(0,150).map(x=>'#'+x.id+' · '+x.type),result.unsupported.length>150?'Listado de no evaluados limitado a 150.':'','No se verificaron muros con aberturas o ajustes de encuentros, escaleras, conos, mallas o sólidos booleanos. Las penetraciones pueden ser uniones constructivas intencionales. La ausencia de resultados no certifica un modelo libre de interferencias.'].filter(Boolean).join('\n');
   output.textContent=report;select.disabled=!result.pairs.length;exp.disabled=false;
  };
  scope.onchange=()=>{result=null;report='';output.textContent='';select.disabled=true;exp.disabled=true};
