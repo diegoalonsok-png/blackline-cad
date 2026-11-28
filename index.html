@@ -1810,6 +1810,37 @@ function cadJoinGeneratedArqFaces(pairs){
  return true;
 }
 
+// Split orthogonal hosts at actual junctions, including through-wall T/X nodes.
+// Opening segments retain their dedicated pair; a junction inside a void is invalid.
+function cadArqHostBoundaries(w,walls,openings,L){
+ const eps=1e-7,dx=w.b[0]-w.a[0],dy=w.b[1]-w.a[1],horizontal=Math.abs(dy)<eps,vertical=Math.abs(dx)<eps;
+ const cuts=[0,...openings.slice(0,-1).map((o,i)=>(o.offset+o.width/2+openings[i+1].offset-openings[i+1].width/2)/2),L];
+ if(!horizontal&&!vertical)return cuts;
+ const axis=horizontal?0:1,other=1-axis;
+ for(const q of walls){
+  if(q===w||!Array.isArray(q.a)||!Array.isArray(q.b)||Math.abs(q.a[axis]-q.b[axis])>eps)continue;
+  const c=q.a[axis],line=w.a[other];
+  if(line<Math.min(q.a[other],q.b[other])-eps||line>Math.max(q.a[other],q.b[other])+eps)continue;
+  const t=(c-w.a[axis])*Math.sign(w.b[axis]-w.a[axis]);
+  if(t<=eps||t>=L-eps)continue;
+  if(openings.some(o=>Math.abs(o.offset-t)<o.width/2+q.thickness/2-eps))throw Error('Opening intersects wall junction: '+w.id);
+  cuts.push(t);
+ }
+ return cuts.sort((a,b)=>a-b).filter((v,i,a)=>!i||v-a[i-1]>eps);
+}
+function cadArqOpeningDefinition(o,k,defaults,name){
+ // Reuse the free native gallery definition when it has the same physical span.
+ const existing=Object.values(state.blocks).find(d=>d.libraryLayer0&&/^CAD2D Abertura v2 · /.test(d.name||'')&&d.parametric?.kind===o.kind&&!d.parametric.defaults?.vano&&Math.abs(Number(d.parametric.defaults?.width)-o.width*k)<1e-7);
+ if(existing)return existing.name;
+ const key=name+' · Layer 0';
+ if(!state.blocks[key]){
+  const def=cadPrepareDynamicBlock({name:key,entities:[],libraryLayer0:true,parametric:{kind:o.kind,defaults:{...defaults}}});
+  def.entities=blockInstanceGeometry(def,{scale:1,params:defaults});
+  if(!def.entities.length)throw Error('Invalid dynamic opening geometry');
+  state.blocks[key]=def;
+ }
+ return key;
+}
 function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
  if(plan?.schema!=='blackline.architecture.v1'||plan.units!=='m'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks)||plan.walls.length>500||plan.openings.length>300||plan.blocks.length>500)throw Error('Invalid architecture plan');
  if(plan.openings.length&&(!autoOpeningEnabled||!window.BlacklineAutoOpening))throw Error('Enable automatic wall openings.');
@@ -1829,14 +1860,15 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
    for(let i=0;i<openings.length;i++){const o=openings[i];if(!['swing-door','double-door','framed-window'].includes(o.kind)||!Number.isFinite(o.offset)||!(o.width>=.3&&o.width<=5)||o.offset-o.width/2<=w.thickness/2||o.offset+o.width/2>=L-w.thickness/2||i&&openings[i-1].offset+openings[i-1].width/2>=o.offset-o.width/2)throw Error('Invalid or overlapping opening: '+w.id)}
    const at=t=>P(A.x+(B.x-A.x)*t/L,A.y+(B.y-A.y)*t/L);
    // Each opening owns a separate host segment; later moving it cannot destroy another opening.
-   const boundaries=[0,...openings.slice(0,-1).map((o,i)=>(o.offset+o.width/2+openings[i+1].offset-openings[i+1].width/2)/2),L];
+   const boundaries=cadArqHostBoundaries(w,plan.walls,openings,L);
    const segments=[];
    for(let j=0;j<boundaries.length-1;j++){
     const a=at(boundaries[j]),b=at(boundaries[j+1]),faces=cadWallFaces(a,b,w.thickness*k,'center'),group='wall-'+state.nextId;
     const pair=faces.map((face,i)=>({id:state.nextId++,type:'line',...face,layer:wallLayer,color:'#ffffff',width:.35,wall2d:{group,face:i,thickness:w.thickness*k,justify:'center',guideA:clone(a),guideB:clone(b)},arqBatch:batch,arqWall:w.id}));
     state.entities.push(...pair);segments.push(pair);
    }
-   hosts.set(w.id,{w,A,B,L,at,openings,segments});
+   const openingPairs=openings.map(o=>{const j=boundaries.findIndex((v,i)=>i<boundaries.length-1&&o.offset-o.width/2>v-1e-7&&o.offset+o.width/2<boundaries[i+1]+1e-7);if(j<0)throw Error('Opening crosses host segment: '+w.id);return segments[j]});
+   hosts.set(w.id,{w,A,B,L,at,openings,segments,openingPairs});
   }
   // Native junction solver on generated walls only, before cutting openings.
   const arqPairs=[...hosts.values()].flatMap(host=>host.segments);
@@ -1844,16 +1876,16 @@ function cadApplyArchitecturePlan(plan,origin,resolveBlock,replaceBatch=null){
   for(const o of plan.openings)if(!hosts.has(o.host))throw Error('Unknown opening host');
   for(const host of hosts.values())for(let i=0;i<host.openings.length;i++){
    const o=host.openings[i],w=host.w,center=host.at(o.offset),reviewed=plan.traceReviewed===true;
-   const reverse=reviewed&&Boolean(o.orientation?.reverseHostDirection);
+   const reverse=Boolean(o.orientation?.reverseHostDirection);
    const start=host.at(o.offset+(reverse?1:-1)*o.width/2);
-   const depth=reviewed?Math.min(.15,w.thickness,o.frameDepth??(o.kind==='framed-window'?.12:.15)):w.thickness;
-   const frame=reviewed?(o.frameWidth??.035):.035;
+   const depth=Math.min(.15,w.thickness,o.frameDepth??(o.kind==='framed-window'?.12:.15));
+   const frame=o.frameWidth??.035;
    if(!(depth>0&&depth<=.5&&frame>0&&frame<o.width*.2))throw Error('Invalid opening frame');
    const name='ARQ · '+o.kind+' · '+Math.round(o.width*1000)+' · '+Math.round(w.thickness*1000)+' · '+state.unit+(reviewed?' · CALCO '+Math.round(depth*1000)+'-'+Math.round(frame*1000):'');
    const openingLayer=layer(o.kind==='framed-window'?'WINDOWS':'DOORS');
    const defaults={width:o.width*k,frameWidth:frame*k,frameDepth:depth*k,mirror:Boolean(o.orientation?.mirror)};
-   if(!state.blocks[name])state.blocks[name]={name,entities:[{type:'line',a:P(0,0),b:P(o.width*k,0),layer:'0'}],parametric:{kind:o.kind,defaults}};
-   const definition=state.blocks[name],ref={id:state.nextId++,type:'blockRef',blockName:name,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI+(reverse?180:0),layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.segments[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
+   const blockName=cadArqOpeningDefinition(o,k,defaults,name);
+   const definition=state.blocks[blockName],ref={id:state.nextId++,type:'blockRef',blockName,p:start,scale:1,rotation:Math.atan2(host.B.y-host.A.y,host.B.x-host.A.x)*180/Math.PI+(reverse?180:0),layer:openingLayer,params:{...defaults},wallThickness:w.thickness*k,autoOpeningPairIds:host.openingPairs[i].map(e=>e.id),arqBatch:batch,arqWall:w.id};
    state.entities.push(ref);
    if(autoCutWallForOpening(ref,definition)!==2)throw Error('Could not cut both wall faces: '+w.id);
   }
@@ -3222,7 +3254,7 @@ function blockChildren(ref,keepAttDefs=false){
  if(!definition||!Array.isArray(definition.entities))return [];
  const origin=ref.p||P(0,0),scale=Number(ref.scale)||1,angle=Number(ref.rotation)||0;
  const sxy=Number.isFinite(Number(ref.scaleX))&&Number.isFinite(Number(ref.scaleY))?{x:scale*Number(ref.scaleX),y:scale*Number(ref.scaleY)}:null;
- return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle,sxy).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
+ return blockInsertionEntities({...definition,entities:cadMirrorGenericBlockGeometry(cadOpeningMirrorGeometry(blockInstanceGeometry(definition,ref),ref),ref)},origin,scale,angle,sxy).map(e=>({...e,...(ref.color&&!e.color?{color:ref.color}:{}),layer:definition.libraryLayer0&&!ref.arqBatch?'0':(ref.xref||definition.preserveLayers)&&e.layer?e.layer:ref.layer,...(definition.libraryLayer0?{color:'#ffffff'}:{}),width:e.type==='hatch'?(e.width??.05):(ref.lineweight??e.width)})).flatMap(e=>{
   // Atributos: cada ATTDEF del bloque muestra el valor de esta referencia (o el valor por defecto).
   if(!e.attdef||keepAttDefs)return [e];
   if(e.attdef.invisible)return [];
