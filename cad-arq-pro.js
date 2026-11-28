@@ -1013,7 +1013,50 @@ function arqFurnish(raw){
  }
  startPick(2,T('ARQASSIST · click two opposite INNER corners of the room','ARQASSIST · clic en dos esquinas INTERIORES opuestas del ambiente'),([a,b])=>{try{run(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.max(a.x,b.x),Math.max(a.y,b.y))}catch(e){CORE.toast(e.message);CORE.log?.(e.message)}},'line');
 }
+/* Strict topology for reviewed orthogonal house plans. Validate centerlines
+   before native wall-face joins and hosted parametric opening insertion. */
+function arqAuditHouseTopology(plan){
+ const eps=1e-6,issues=[],walls=new Map(),nodes=new Map(),axes=[];
+ const near=(a,b)=>Math.abs(a-b)<=eps,point=p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite);
+ const key=p=>p.map(n=>Math.round(n/eps)).join(',');
+ for(const w of plan.walls){
+  if(!w||!w.id||walls.has(w.id)||!point(w.a)||!point(w.b)||!Number.isFinite(w.thickness)||w.thickness<=eps){issues.push('Invalid or duplicate wall ID');continue;}
+  const h=near(w.a[1],w.b[1]),v=near(w.a[0],w.b[0]);
+  if(h===v){issues.push('Invalid orthogonal wall: '+w.id);continue;}
+  const i=h?0:1,j=1-i,lo=Math.min(w.a[i],w.b[i]),hi=Math.max(w.a[i],w.b[i]),axis={w,h,lo,hi,c:w.a[j],length:hi-lo};
+  axes.push(axis);walls.set(w.id,axis);
+  for(const p of [w.a,w.b]){const k=key(p);nodes.set(k,(nodes.get(k)||0)+1);}
+ }
+ for(const a of axes)for(const p of [a.w.a,a.w.b])if(nodes.get(key(p))===1)issues.push('Unjoined wall endpoint: '+a.w.id);
+ for(let i=0;i<axes.length;i++)for(const b of axes.slice(i+1)){
+  const a=axes[i],label=a.w.id+' / '+b.w.id;
+  if(a.h===b.h){
+   if(Math.min(a.hi,b.hi)-Math.max(a.lo,b.lo)>eps&&Math.abs(a.c-b.c)<(a.w.thickness+b.w.thickness)/2-eps)issues.push('Overlapping parallel walls: '+label);
+  }else{
+   const h=a.h?a:b,v=a.h?b:a,x=v.c,y=h.c;
+   if(x>=h.lo-eps&&x<=h.hi+eps&&y>=v.lo-eps&&y<=v.hi+eps&&(!(near(x,h.lo)||near(x,h.hi))||!(near(y,v.lo)||near(y,v.hi))))issues.push('Unsplit wall junction: '+label);
+  }
+ }
+ const hosted=new Map();
+ for(const o of plan.openings){
+  const a=walls.get(o.host);
+  if(!a||!['swing-door','double-door','framed-window'].includes(o.kind)||!Number.isFinite(o.offset)||!Number.isFinite(o.width)||o.width<=eps){issues.push('Invalid hosted opening: '+o.host);continue;}
+  const start=o.offset-o.width/2,end=o.offset+o.width/2,margin=a.w.thickness/2;
+  if(start<margin-eps||end>a.length-margin+eps)issues.push('Opening too close to junction: '+o.host);
+  const list=hosted.get(o.host)||[];
+  if(list.some(q=>Math.min(end,q[1])-Math.max(start,q[0])>eps))issues.push('Overlapping openings: '+o.host);
+  list.push([start,end]);hosted.set(o.host,list);
+ }
+ return [...new Set(issues)];
+}
+function arqRequireHouseTopology(plan){
+ if(plan?.strictHouseTopology!==true)return;
+ const issues=arqAuditHouseTopology(plan);
+ if(issues.length)throw Error('ARQASSIST: '+issues.join(' · '));
+}
+
 function applyArchitecture(plan,origin,replaceBatch=null){
+ arqRequireHouseTopology(plan);
  if(plan?.schema==='blackline.architecture.detail.v1'){if(replaceBatch)throw Error('No se puede reemplazar un ambiente por un detalle.');return applyArchitectureDetail(plan,origin);}
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
  // Validate individual library objects before touching the drawing.
@@ -1092,7 +1135,8 @@ CORE.canvas.addEventListener('pointerdown',async e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const raw=window.prompt((h.axis==='width'?'Ancho / Width':'Largo / Depth')+' (m)',h.value.toFixed(2));if(raw===null)return;
  const value=Number(raw.replace(',','.'));if(!(value>=(h.axis==='width'&&h.meta.rooms[0].kind==='bathroom'?.9:1.2)&&value<=20))return CORE.toast('Medida inválida / Invalid dimension');
- try{const spec={...h.meta.brief,[h.axis]:value};let plan;if(spec.kind==='bath_reference'||spec.templateLayout||spec.compactTransverse){plan=arqResizeReference(h.meta.sourcePlan,h.axis,value);}else{plan=await solveArchitecture('',spec);}if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Aplicar cambio?'))return;applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
+ try{const spec={...h.meta.brief,[h.axis]:value};let plan;if(spec.kind==='bath_reference'||spec.templateLayout||spec.compactTransverse){plan=arqResizeReference(h.meta.sourcePlan,h.axis,value);}else{plan=await solveArchitecture('',spec);}arqRequireHouseTopology(plan);
+ if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Aplicar cambio?'))return;applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
 },true);
 
 let arqCommandEpoch=0;
@@ -1169,8 +1213,12 @@ function arqPlanThumbnail(plan){
   const ops=plan.openings.filter(o=>o.host===w.id).sort((a,b)=>a.offset-b.offset);let at=0;
   const line=(a,b)=>{if(b>a)body+='<line x1="'+pt(a)[0]+'" y1="'+pt(a)[1]+'" x2="'+pt(b)[0]+'" y2="'+pt(b)[1]+'" stroke="#53575a" stroke-width="'+w.thickness+'" stroke-linecap="butt"/>'};
   for(const o of ops){const a=o.offset-o.width/2,b=o.offset+o.width/2;line(at,a);const [x,y]=pt(a),angle=-Math.atan2(uy,ux)*180/Math.PI;
-   if(o.kind==='swing-door'){const flip=o.orientation?.mirror?' translate('+o.width+' 0) scale(-1 1)':'',rev=o.orientation?.reverseHostDirection?' translate('+o.width+' 0) rotate(180)':'';body+='<g transform="translate('+x+' '+y+') rotate('+angle+')'+rev+flip+'" stroke="#74716b" stroke-width=".012" fill="none"><path d="M0 0 V-'+o.width+' M0 -'+o.width+' A'+o.width+' '+o.width+' 0 0 1 '+o.width+' 0"/></g>';}
-   else body+='<g transform="translate('+x+' '+y+') rotate('+angle+')" stroke="#69949b" stroke-width=".018"><path d="M0 -.025 H'+o.width+' M0 .025 H'+o.width+'"/></g>';at=b;}
+   const fw=Math.min(.05,o.width*.12),fd=w.thickness,span=o.width-2*fw,flip=o.orientation?.mirror?' translate('+o.width+' 0) scale(-1 1)':'',rev=o.orientation?.reverseHostDirection?' translate('+o.width+' 0) rotate(180)':'';
+   body+='<g transform="translate('+x+' '+y+') rotate('+angle+')'+rev+flip+'" stroke="'+(o.kind==='framed-window'?'#69949b':'#74716b')+'" stroke-width=".012" fill="none"><rect x="0" y="'+(-fd/2)+'" width="'+fw+'" height="'+fd+'"/><rect x="'+(o.width-fw)+'" y="'+(-fd/2)+'" width="'+fw+'" height="'+fd+'"/>';
+   if(o.kind==='swing-door')body+='<path d="M'+fw+' 0 V-'+span+' M'+fw+' -'+span+' A'+span+' '+span+' 0 0 1 '+(o.width-fw)+' 0"/>';
+   else if(o.kind==='double-door'){const half=span/2;body+='<path d="M'+fw+' 0 V-'+half+' M'+fw+' -'+half+' A'+half+' '+half+' 0 0 1 '+(o.width/2)+' 0 M'+(o.width-fw)+' 0 V-'+half+' M'+(o.width-fw)+' -'+half+' A'+half+' '+half+' 0 0 0 '+(o.width/2)+' 0"/>';}
+   else for(const yy of [-fd/2,fd/2,-fw*.28,fw*.28])body+='<path d="M'+fw+' '+yy+' H'+(o.width-fw)+'"/>';
+   body+='</g>';at=b;}
   line(at,L);
   // Corner fill only at actual junctions; native insertion has its own wall joiner.
   for(const [x,y] of [w.a,w.b])body+='<rect x="'+(x-w.thickness/2)+'" y="'+(-y-w.thickness/2)+'" width="'+w.thickness+'" height="'+w.thickness+'" fill="#53575a"/>';
@@ -1237,7 +1285,7 @@ async function openArqPlanCatalogue(category,query=''){
   const img=document.createElement('img');img.src=new URL(item.id+'.svg?v=20261127-bathroom-catalogue6',arqCatalogueBase).href;img.loading='lazy';img.decoding='async';img.alt=item.name;img.style.cssText='width:100%;height:142px;object-fit:contain;background:#f4efe3;border-radius:4px';button.append(img);const name=document.createElement('span');name.textContent=item.name;const size=document.createElement('span');const [w,d]=item.dimensions;size.textContent=item.category==='house'?fmt(item.area)+' m² cubiertos · '+fmt(w)+' × '+fmt(d)+' m':item.roomCount===1?fmt(w)+' × '+fmt(d)+' m · '+fmt(item.area)+' m²':fmt(item.area)+' m² útiles aprox. · Varios ambientes';size.style.opacity='.8';button.append(name,size);const roles={toilet:'Inodoro',toiletCompact:'Inodoro compacto',bidet:'Bidet',basin:'Lavatorio',basin45:'Lavatorio compacto',doubleBasin:'Doble lavatorio',doubleShower:'Doble ducha',shower:'Ducha',shower75:'Ducha compacta',bathtub:'Bañadera',bathtub150:'Bañadera 1,50',fridge:'Heladera',sink:'Bacha',range:'Cocina',island:'Isla',bed:'Cama',singlebed:'Cama individual',doublebed:'Cama doble',wardrobe:'Placard',counter:'Mesada',kingbed:'Cama king',bunk:'Cucheta',crib:'Cuna',desk:'Escritorio',washer:'Lavarropas',dryer:'Secarropas',laundrySink:'Pileta',bookshelf:'Biblioteca',table8:'Mesa para ocho'};const equipment=document.createElement('small');equipment.style.cssText='font-size:10px;opacity:.85;white-space:normal';equipment.textContent=item.roles.map(role=>roles[role]||role).join(' · ');button.append(equipment);
   if(item.preliminary){const note=document.createElement('small');note.textContent='Preliminar / Preliminary';note.style.color='#dfc28b';button.append(note);}
   button.onclick=async()=>{if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');const epoch=++arqCommandEpoch;button.disabled=true;
-   try{const response=await fetch(new URL(item.id+'.json?v=20261127-kitchen-passage9',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');let plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;{const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
+   try{const response=await fetch(new URL(item.id+'.json?v=20261127-house-framed1',arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');let plan=await response.json();if(epoch!==arqCommandEpoch||!dlg.isConnected)return;{const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Insertar la propuesta editable?'))return;if(S().tool!=='select'||S().stage.length)return CORE.toast('Terminá el comando CAD actual.');dlg.close();startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{if(epoch!==arqCommandEpoch)return;try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD')}catch(e){CORE.toast(e.message);CORE.log(e.message)}},'arq-command');pick.planPreview=plan;CORE.schedule();}
    catch(e){CORE.toast(e.message)}finally{button.disabled=false}};
   grid.append(button);
   if(approvedPreviews.has(item.id))img.src=approvedPreviews.get(item.id);
@@ -1405,7 +1453,7 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
  if(!typology&&!/^plan-\d+$/.test(id))throw Error('Identificador de planta inválido');
  if(S().tool!=='select'||S().stage.length)throw Error('Terminá el comando CAD actual.');
  const epoch=++arqCommandEpoch;
- const response=await fetch(new URL(id+'.json?v=20261127-kitchen-passage9',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
+ const response=await fetch(new URL(id+'.json?v=20261127-house-framed1',typology?arqTypologyBase:arqCatalogueBase));if(!response.ok)throw Error('No se pudo descargar la planta.');
  let plan=await response.json();if(epoch!==arqCommandEpoch||!isCurrent())return false;
  if(plan.schema!=='blackline.architecture.v1'||!Array.isArray(plan.walls)||!Array.isArray(plan.openings)||!Array.isArray(plan.blocks))throw Error('Planta inválida.');
  {const checked=arqCheckSanitary(plan,LIB.library);if(checked.issues.length)throw Error('Planta pendiente de revisión sanitaria: '+checked.issues.join(' · '));plan=checked.plan;}
@@ -1416,7 +1464,7 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
 window.CAD2D_INSERT_CATALOGUE_PLAN=insertCataloguePlanById;
 // Preview and insertion use the same validated native geometry, not stale raster files.
 const arqSanitaryPreviewCache=new Map();
-window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=fetch(new URL(id+'.json?v=20261127-kitchen-passage9',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Planta no disponible');return r.json()}).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
+window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=fetch(new URL(id+'.json?v=20261127-house-framed1',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Planta no disponible');return r.json()}).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
 function arqObjectSearch(raw){
  const q=arqCleanRequest(String(raw).replace(/^\s*(?:bloques? de)\s+/i,''));
