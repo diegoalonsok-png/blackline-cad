@@ -539,6 +539,19 @@ function compactBathTemplate(spec){
 /* Multiple-room preliminary plans. Native centerlines, one wall per boundary. */
 function compoundInstruction(text){
  const s=normalize(text).replace(/\bentreda\b/g,'entrada');
+ // Dimensioned connected pairs. Strict syntax avoids silently dropping extra requests.
+ const linked=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|crea|hacer|hace|generar|genera|draw|create)\s+)*(?:un(?:a)?\s+)?(cocina|kitchen|living|salon)\s+(.+?)\s*(?:\+|\bcon\b|\by\b)\s*(?:un(?:a)?\s+)?(lavadero|laundry|comedor|dining(?: room)?)\b(.*)$/);
+ if(linked){
+  const first=/^(?:cocina|kitchen)$/.test(linked[1])?'kitchen':'living',second=/^(?:lavadero|laundry)$/.test(linked[3])?'laundry':'dining';
+  if((first==='kitchen'&&second==='laundry')||(first==='living'&&second==='dining')){
+   const simple=/^(?:de\s+)?\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?\s*(?:x|×|por|by)\s*\d+(?:[.,]\d+)?\s*(?:m|cm|mm)?$/;
+   if(simple.test(linked[2].trim())&&(!linked[4].trim()||simple.test(linked[4].trim()))){
+    const a=dimensions(linked[2]),b=dimensions(linked[4])||DEFAULT[second].slice(0,2);
+    if(!a||![...a,...b].every(x=>Number.isFinite(x)&&x>=1.8&&x<=15))throw Error('Medidas de ambientes comunicados: entre 1,80 y 15 m.');
+    return {kind:'compound_linked_pair',variants:1,first,second,firstSize:a,secondSize:b};
+   }
+  }
+ }
  const isHouse=/\b(?:casa|vivienda|house)\b/.test(s);
  const hallMatch=s.match(/\b(?:pasillo|corredor)\s*(?:comun\s*)?(?:de\s*)?(\d+(?:[.,]\d+)?)\s*(cm|mm|mts?|metros?)?\b/);
  const hallRooms=s.match(/\b(\d+|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:habitaciones|dormitorios)\b/);
@@ -595,7 +608,7 @@ function compoundPlan(spec){
  if(spec.kind==='compound_house'){
   if(spec.assumedBedrooms)notes.add('Cantidad no indicada: se proponen dos dormitorios.');
   notes.add('Circulación común de 1,20 m; medidas de ambientes no indicadas adoptadas como propuesta.');
- }else if(spec.kind==='compound_hall')notes.add('Pasillo común de '+passage+' m de ancho libre.');else if(spec.kind==='compound_bedrooms')notes.add('Habitaciones contiguas en fila, acceso independiente desde el exterior; muro de 0,15 m y aberturas iniciales.');else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
+ }else if(spec.kind==='compound_linked_pair')notes.add('Ambientes comunicados mediante puerta interior; medidas no indicadas adoptadas como propuesta.');else if(spec.kind==='compound_hall')notes.add('Pasillo común de '+passage+' m de ancho libre.');else if(spec.kind==='compound_bedrooms')notes.add('Habitaciones contiguas en fila, acceso independiente desde el exterior; muro de 0,15 m y aberturas iniciales.');else notes.add('Baño y cocina como ambientes independientes; medidas no indicadas adoptadas como propuesta.');
  let dx=0;
  for(let v=0;v<spec.variants;v++){
   const prefix='v'+v+'-',rects=[],requests=[],raw=[],roomSpecs=[];
@@ -617,6 +630,15 @@ function compoundPlan(spec){
    rects.push({x:0,y:0,X:total,Y:cy});
    out.rooms.push({id:prefix+'hall',kind:'circulation',clearBounds:[dx+t/2,t/2,total-t,passage]});
    requests.push({kind:'swing-door',a:[0,cy],b:[0,0],center:[0,cy/2],width:.9,entry:true});
+  }else if(spec.kind==='compound_linked_pair'){
+   const [w,d]=spec.firstSize,[w2,d2]=spec.secondSize;
+   const first=makeRoom('first',spec.first,0,0,w,d,'S',spec.first==='living'?['sofa']:DEFAULT[spec.first][2]);
+   const second=makeRoom('second',spec.second,0,d+t,w2,d2,'S',DEFAULT[spec.second][2]);
+   const center=Math.min(w,w2)/2;
+   roomSpecs[0].exitX=center;roomSpecs[0].sideWindow=true;
+   roomSpecs[1].entryX=center;
+   out.connections.push({from:first.id,to:second.id,private:false});
+   total=Math.max(w,w2)+t;
   }else if(spec.kind==='compound_pair'){
    const items=[fixture('bath','bathroom',spec.bathSize),fixture('kitchen','kitchen',spec.kitchenSize)];if(v%2)items.reverse();
    for(const item of items){makeRoom(item.id,item.kind,total,0,...item.size,'S',item.items);total+=item.size[0]+t+1.5;}
@@ -637,20 +659,21 @@ function compoundPlan(spec){
    out.rooms.push({id:prefix+'hall',kind:'circulation',clearBounds:[dx+t/2,t/2,total-t,passage]});
    requests.push({kind:'swing-door',a:[0,cy],b:[0,0],center:[0,cy/2],width:.9,entry:true});
   }
-  for(const {room,x,y,X,Y,w,d,side,fixtures} of roomSpecs){
-   const reverse=side==='N',zone=R((w-door)/2,0,door,door);
-   let layout=null;for(const items of [fixtures,fixtures.filter(k=>k!=='bidet'),fixtures.slice(0,1),[]]){
-    try{layout=arrange(w,d,items,[zone],v);if(items.length!==fixtures.length)notes.add(room.kind+': equipamiento reducido; revisar '+fixtures.filter(k=>!items.includes(k)).join(', '));break}catch(e){}
+  for(const {room,x,y,X,Y,w,d,side,fixtures,entryX,exitX,sideWindow} of roomSpecs){
+   const reverse=side==='N',entry=entryX??w/2,zone=R(entry-door/2,0,door,door),zones=[zone,...(exitX==null?[]:[R(exitX-door/2,d-door,door,door)])];
+   let layout=null;for(const items of spec.kind==='compound_linked_pair'?[fixtures]:[fixtures,fixtures.filter(k=>k!=='bidet'),fixtures.slice(0,1),[]]){
+    try{layout=arrange(w,d,items,zones,v);if(items.length!==fixtures.length)notes.add(room.kind+': equipamiento reducido; revisar '+fixtures.filter(k=>!items.includes(k)).join(', '));break}catch(e){}
    }
    if(!layout)throw Error('No se pudo preparar el ambiente.');
    const pt=(a,b)=>reverse?[dx+X-t/2-a,Y-t/2-b]:[dx+x+t/2+a,y+t/2+b];
    for(const o of layout){const [id,bw,bd]=C[o.key],r=o.r,[ox,oy]=({0:[0,0],90:[r.w,0],180:[r.w,r.d],270:[0,r.d]})[o.rot];
     const p=pt(r.x+ox,r.y+oy),env=reverse?pt(r.x+r.w,r.y+r.d):pt(r.x,r.y);
-    out.blocks.push({catalogId:id,role:o.key,point:p,rotation:(o.rot+(reverse?180:0))%360,scale:1,layer:room.kind==='bathroom'?'FIXTURES':room.kind==='kitchen'?'KITCHEN':'FURNITURE',envelope:[...env,r.w,r.d],nominalSize:[bw,bd]});
+    out.blocks.push({catalogId:id,role:o.key,point:p,rotation:(o.rot+(reverse?180:0))%360,scale:1,layer:room.kind==='bathroom'?'FIXTURES':room.kind==='kitchen'?'KITCHEN':room.kind==='laundry'?'EQUIPMENT':'FURNITURE',envelope:[...env,r.w,r.d],nominalSize:[bw,bd]});
    }
    const cy=reverse?Y:y,wy=reverse?y:Y;
-   requests.push({kind:'swing-door',a:reverse?[X,cy]:[x,cy],b:reverse?[x,cy]:[X,cy],center:[(x+X)/2,cy],width:door});
-   requests.push({kind:'framed-window',a:[x,wy],b:[X,wy],center:[(x+X)/2,wy],width:Math.min(room.kind==='bathroom'?.8:1.5,w-.35)});
+   requests.push({kind:'swing-door',a:reverse?[X,cy]:[x,cy],b:reverse?[x,cy]:[X,cy],center:[reverse?X-t/2-entry:x+t/2+entry,cy],width:door,...(entryX==null?{}:{connection:room.id})});
+   if(sideWindow)requests.push({kind:'framed-window',a:[x,y],b:[x,Y],center:[x,(y+Y)/2],width:Math.min(1.5,d-.35)});
+   else requests.push({kind:'framed-window',a:[x,wy],b:[X,wy],center:[(x+X)/2,wy],width:Math.min(room.kind==='bathroom'?.8:1.5,w-.35)});
   }
   for(const {x,y,X,Y} of rects)raw.push([[x,y],[X,y]],[[x,Y],[X,Y]],[[x,y],[x,Y]],[[X,y],[X,Y]]);
   // Split shared boundaries at every vertex; do not duplicate a wall.
@@ -673,7 +696,7 @@ function compoundPlan(spec){
    if(req&&(req.b[0]-req.a[0])*(b[0]-a[0])+(req.b[1]-req.a[1])*(b[1]-a[1])<0)[a,b]=[b,a];
    const id=prefix+'wall'+idx++;
    out.walls.push({id,a:[a[0]+dx,a[1]],b:[b[0]+dx,b[1]],thickness:t,layer:'WALLS',join:'native'});
-   if(req){const L=Math.hypot(b[0]-a[0],b[1]-a[1]);out.openings.push({host:id,kind:req.kind,width:req.width,offset:((req.center[0]-a[0])*(b[0]-a[0])+(req.center[1]-a[1])*(b[1]-a[1]))/L,layer:'OPENINGS'});}
+   if(req){const L=Math.hypot(b[0]-a[0],b[1]-a[1]);out.openings.push({host:id,kind:req.kind,width:req.width,offset:((req.center[0]-a[0])*(b[0]-a[0])+(req.center[1]-a[1])*(b[1]-a[1]))/L,layer:'OPENINGS'});if(req.connection){const c=out.connections.find(c=>c.to===req.connection);if(c)c.via=id;}}
   }
   out.variants.push({id:'v'+v,number:v+1});
   dx+=total+2;
