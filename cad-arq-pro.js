@@ -1148,13 +1148,15 @@ EXT.cancelArchitectureCommand=()=>{
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
 EXT.drawArchitectureCommand=async raw=>{
- if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)&&!arqLinkedRoomRequest(raw)){
+ if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)){
+ if(!arqLinkedRoomRequest(raw)){
  if(!arqPoolRequest(raw)){
  if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)&&!arqRestaurantRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
  if(arqHouseGallery(raw)){arqOpenHouseGallery(raw);return;}
  if(arqWebReference(raw)){arqOpenWebReference(raw);return;}
  const object=!arqCatalogueCategory(raw)&&arqObjectSearch(raw);if(object){arqOpenObjectSearch(object);return;}
+ }
  }
  }
  }
