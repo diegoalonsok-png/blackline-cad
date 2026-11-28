@@ -106,3 +106,18 @@ test('INTERFERE detects nominal vertical cylinders against cylinders, boxes and 
  const result=api.scan([c,b,{...s,x:10}],[],'all');
  assert.equal(result.found,1);assert.equal(result.supported,3);
 });
+
+test('INTERFERE includes only rectangular solid walls verified by the actual join resolver',()=>{
+ const api=new Function('let records=[];'+section('function wallJoinOffsets(','function applyWallMiter(')+section('function cad3dInterferenceShape(','function cad3dInterferenceReport(')+';return {shape:cad3dInterferenceShape,scan:(all,ids=[],scope="all")=>{records=all;return cad3dInterferenceScan(all,ids,scope,200000,wallJoinOffsets)}};')();
+ const w={id:1,type:'wall',x:0,y:0,z:0,w:5,d:.2,h:3,rot:0},b={id:2,type:'box',bimClass:'Column',x:0,y:0,z:0,w:.3,d:.3,h:3};
+ assert.equal(api.scan([w,b]).found,1);
+ assert.equal(api.scan([w,{...b,y:.25}]).found,0);
+ assert.equal(api.scan([{...w,rot:90},{...b,y:1}]).found,1);
+ assert.equal(api.scan([w,{...b,z:3}]).found,0);
+ assert.equal(api.scan([{...w,openings:[{offset:0,w:1,h:2,sill:0}]},b]).unsupported.length,1);
+ const l={...w,id:3,x:2.5,y:2.5,rot:90},t={...w,id:4,x:0,y:2.5,rot:90};
+ assert.equal(api.scan([w,l,b]).unsupported.length,2);
+ assert.ok(api.scan([w,t,b]).unsupported.some(x=>x.id===4));
+ assert.equal(api.shape(w),null);
+ assert.equal(api.scan([w,b],[1,2],'selection').found,1);
+});
