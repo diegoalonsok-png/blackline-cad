@@ -1484,10 +1484,12 @@ function arqObjectSearch(raw){
  // Explicit object searches accept every catalogue name, including model numbers.
  const explicit=/^(?:buscar|insertar|importar|colocar|bloques? de|search|insert|import|place)\s+/i.test(raw.trim());
  if(!q||q.length>160)return null;
+ // Dimensioned room instructions must reach the solver, including insert/place verbs.
+ if(/\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|banos?|bathrooms?|cocinas?|kitchens?)\b/.test(q)&&/\d\s*(?:[x×*]|por|by)\s*\d/.test(q))return null;
  if(explicit)return q;
  // Keep room generation and dimensioned architectural instructions separate.
  if(arqCatalogueCategory(raw)||/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(q))return null;
- if(/\d\s*(?:[x×*]|por|by)\s*\d|\b(?:dibujar|generar|crear|disenar|draw|generate|create|design)\b/.test(q))return null;
+ if(/\d\s*(?:[x×*]|por|by)\s*\d|\b(?:dibuj\w*|gener\w*|crea\w*|disen\w*|draw|generate|create|design)\b/.test(q))return null;
  if(/\b(?:habitacion(?:es)?|dormitorios?|bedrooms?|banos?|bathrooms?|cocinas?|kitchens?)\b/.test(q)&&/\d|\b(?:con|with|suite|vestidor|fila|tandem)\b/.test(q))return null;
  return q;
 }
@@ -1540,6 +1542,7 @@ function openArchitectureBar(focus=true){
   const submit=async()=>{
    const raw=input.value.trim().replace(/\s+/g,' ');if(!raw){input.focus();return}
    if(S().tool!=='select'||S().stage.length){CORE.toast('Terminá el comando CAD actual o presioná Esc / Finish current CAD command first');return}
+   try{
    const route=arqRouteOf(raw);
    if(route.kind==='calco'){EXT.cancelArchitectureCommand();if(window.CAD2D_CALCO)await window.CAD2D_CALCO();else CORE.toast('CALCO no disponible; actualizá la página.');return;}
    if(route.kind==='furnish'){EXT.cancelArchitectureCommand();arqFurnish(raw);return;}
@@ -1551,7 +1554,8 @@ function openArchitectureBar(focus=true){
    if(route.kind==='web'){arqOpenWebReference(raw);return;}
    if(route.kind==='catalogue'){EXT.cancelArchitectureCommand();openArqPlanCatalogue(route.category,raw);return;}
    if(route.kind==='object'){arqOpenObjectSearch(route.object);return;}
-   run.disabled=true;try{await EXT.drawArchitectureCommand(raw)}finally{run.disabled=false}
+   run.disabled=true;await EXT.drawArchitectureCommand(raw);
+   }catch(e){CORE.toast('ARQASSIST · '+(e?.message||e));CORE.log('ARQASSIST: '+(e?.message||e));}finally{run.disabled=false}
   };
   input.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();submit()}else if(e.key==='Escape'){EXT.cancelArchitectureCommand();input.blur()}});
   for(const type of ['pointerdown','pointerup','mousedown','click','wheel','contextmenu','keyup','keypress'])bar.addEventListener(type,e=>e.stopPropagation());
