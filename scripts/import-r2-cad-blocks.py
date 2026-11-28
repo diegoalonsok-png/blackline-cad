@@ -2,6 +2,7 @@
 import io, json, os, re, hashlib, zipfile, tempfile, time, unicodedata, urllib.request
 from pathlib import PurePosixPath
 import boto3, ezdxf
+from botocore.exceptions import ClientError
 from ezdxf.addons.drawing import Frontend, RenderContext
 from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
 from ezdxf.addons.drawing.config import Configuration, BackgroundPolicy, ColorPolicy
@@ -14,12 +15,15 @@ s3=boto3.client("s3",endpoint_url="https://"+os.environ["R2_ACCOUNT"]+".r2.cloud
 prefix="assets/user-cad/v1/"
 def put(key,data,mime):
     s3.put_object(Bucket=bucket,Key=prefix+key,Body=data,ContentType=mime)
-for i in range(30):
-    try:
-        if urllib.request.urlopen("http://127.0.0.1:8080/health",timeout=3).read()==b"ready": break
-    except OSError: pass
-    time.sleep(2)
-else: raise RuntimeError("Converter unavailable")
+    if s3.head_object(Bucket=bucket,Key=prefix+key)["ContentLength"]!=len(data):
+        raise RuntimeError("R2 verification failed: "+key)
+def await_converter():
+    for i in range(30):
+        try:
+            if urllib.request.urlopen("http://127.0.0.1:8080/health",timeout=3).read()==b"ready": return
+        except OSError: pass
+        time.sleep(2)
+    raise RuntimeError("Converter unavailable")
 def import_package(data,label):
     global z,names
     z=zipfile.ZipFile(io.BytesIO(data))
@@ -58,6 +62,7 @@ def import_package(data,label):
         try:
             if is_dxf: dxf=raw
             else:
+                await_converter()
                 req=urllib.request.Request("http://127.0.0.1:8080/convert",data=raw,method="POST")
                 with urllib.request.urlopen(req,timeout=75) as res: dxf=res.read()
             with tempfile.NamedTemporaryFile(suffix=".dxf") as f:
@@ -83,10 +88,14 @@ def import_package(data,label):
     # Merge with the catalogue already published: a new package adds or replaces items by id, never wipes earlier uploads.
     try:
         previous=json.loads(s3.get_object(Bucket=bucket,Key=prefix+"catalog.json")["Body"].read()).get("items",[])
-    except Exception:
+    except ClientError as e:
+        if e.response["Error"]["Code"] not in ("404","NoSuchKey","NotFound"): raise
         previous=[]
-    new_ids={i["id"] for i in items}
-    merged=[i for i in previous if i.get("id") not in new_ids]+items
+    ready_items=[i for i in items if i.get("status")=="ready"]
+    if os.environ.get("REQUIRE_ALL_READY")=="1" and len(ready_items)!=len(rows):
+        raise RuntimeError("Not all requested CAD files passed; catalogue left unchanged")
+    new_ids={i["id"] for i in ready_items}
+    merged=[i for i in previous if i.get("id") not in new_ids]+ready_items
     put("catalog.json",json.dumps({"version":1,"items":merged},ensure_ascii=False).encode(),"application/json")
     print("Catalogue items:",len(merged))
     ready=sum(1 for i in items if i.get("status")=="ready")
