@@ -64,3 +64,19 @@ test('BIM slab inventory deducts rectangular and polygon openings and locates ro
  assert.deepEqual(api.p(slab,{...slab.openings[0],offset:10}),{x:null,y:null,z:null});
  assert.ok(section('function cad3dBimInventory(','function cad3dScheduleTo2D(').includes('cad3dBimWallQuantities(r)||cad3dBimSlabQuantities(r)'));
 });
+
+test('BIM polygon cuts have individual projected quantities and true transformed centroids',()=>{
+ const cut=new Function(section('function cad3dPolyCross(','function cad3dSlabCutEditPlan(')+section('function cad3dBimPolygonCut(','function cad3dBimInventory(')+';return cad3dBimPolygonCut;')();
+ const r={id:12,type:'slab',x:10,y:20,z:3,rot:90,w:10,d:10,h:.2,pitch:30},p=[[0,0],[4,0],[0,2]];
+ const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,String(a)+' != '+b);
+ const q=cut(r,p,0);
+ assert.equal(q.id,'3D:12:polygon-cut:0');near(q.cutArea,4);near(q.cutVolume,.8);
+ near(q.x,10-2/3);near(q.y,20+4/3);near(q.z,3+Math.tan(Math.PI/6)*4/3);
+ assert.equal(q.width,4);assert.equal(q.depth,2);assert.equal(q.netVolume,null);
+ const rev=cut(r,p.slice().reverse(),0);near(q.x,rev.x);near(q.y,rev.y);near(q.cutArea,rev.cutArea);
+ for(const invalid of [[],[[0,0],[2,2],[0,2],[2,0]],[[0,0],[6,0],[0,2]]]){
+  const v=cut(r,invalid,1);assert.equal(v.x,null);assert.equal(v.cutArea,undefined);
+ }
+ const inventory=section('function cad3dBimInventory(','function cad3dScheduleTo2D(');
+ assert.ok(inventory.includes('cad3dBimPolygonCut(r,p,i)'));assert.ok(inventory.includes("'cutArea','cutVolume'"));
+});
