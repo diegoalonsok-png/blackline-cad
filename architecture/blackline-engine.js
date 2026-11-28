@@ -540,7 +540,7 @@ function compactBathTemplate(spec){
 function compoundInstruction(text){
  const s=normalize(text).replace(/\bentreda\b/g,'entrada');
  // Dimensioned connected pairs. Strict syntax avoids silently dropping extra requests.
- const linked=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|crea|hacer|hace|generar|genera|draw|create)\s+)*(?:un(?:a)?\s+)?(cocina|kitchen|living|salon)\s+(.+?)\s*(?:\+|\bcon\b|\by\b)\s*(?:un(?:a)?\s+)?(lavadero|laundry|comedor|dining(?: room)?)\b(.*)$/);
+ const linked=s.match(/^(?:(?:quiero|necesito|dibujar|dibuja|crear|crea|hacer|hace|armar|arma|generar|genera|draw|create)\s+)*(?:un(?:a)?\s+)?(cocina|kitchen|living|salon)\s+(.+?)\s*(?:\+|\bcon\b|\by\b)\s*(?:un(?:a)?\s+)?(lavadero|laundry|comedor|dining(?: room)?)\b(.*)$/);
  if(linked){
   const first=/^(?:cocina|kitchen)$/.test(linked[1])?'kitchen':'living',second=/^(?:lavadero|laundry)$/.test(linked[3])?'laundry':'dining';
   if((first==='kitchen'&&second==='laundry')||(first==='living'&&second==='dining')){
@@ -701,6 +701,7 @@ function compoundPlan(spec){
   out.variants.push({id:'v'+v,number:v+1});
   dx+=total+2;
  }
+ if(spec.kind==='compound_linked_pair')out.strictHouseTopology=true;
  out.warning='APROXIMACIÓN: '+[...notes].join(' ');
  out.assumptions=[...notes];return out;
 }
