@@ -1830,8 +1830,8 @@ function cadArqHostBoundaries(w,walls,openings,L){
 }
 function cadArqOpeningDefinition(o,k,defaults,name){
  // Reuse the free native gallery definition when it has the same physical span.
- const existing=Object.values(state.blocks).find(d=>d.libraryLayer0&&/^CAD2D Abertura v2 · /.test(d.name||'')&&d.parametric?.kind===o.kind&&!d.parametric.defaults?.vano&&Math.abs(Number(d.parametric.defaults?.width)-o.width*k)<1e-7);
- if(existing)return existing.name;
+ const gallery=window.CAD2D_ENSURE_ARQ_OPENING?.(o.kind,o.width,Boolean(defaults.mirror));
+ if(gallery)return gallery;
  const key=name+' · Layer 0';
  if(!state.blocks[key]){
   const def=cadPrepareDynamicBlock({name:key,entities:[],libraryLayer0:true,parametric:{kind:o.kind,defaults:{...defaults}}});
@@ -11619,7 +11619,12 @@ function initPermanentBlockGallery(){
   return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="var(--cad-gallery-ink, #243746)" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
  }
  window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);return x?install(x)!==false:false};
- function install(x){
+ // ARQASSIST can obtain the same free gallery block definition without arming insertion or taking another history snapshot.
+ window.CAD2D_ENSURE_ARQ_OPENING=(kind,width,mirror=false)=>{
+  const x=entries.find(e=>e.free&&e.kind===kind&&!e.vano&&!e.mullion&&Math.abs(e.w-width)<1e-8&&(kind!=='swing-door'||Boolean(e.reverse)===mirror));
+  return x?install(x,true):null;
+ };
+ function install(x,definitionOnly=false){
   if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
   // Library folder names are for browsing only, never drawing layers.
@@ -11629,11 +11634,11 @@ function initPermanentBlockGallery(){
   const key=state.blocks[legacyKey]&&!state.blocks[legacyKey].libraryLayer0?legacyKey+' · Layer 0':legacyKey;
   const already=Boolean(state.blocks[key]);
   let layer=state.layers.find(l=>l.id==='0'||l.name==='0');
-  if(!layer||!already)saveHistory();
+  if(!definitionOnly&&(!layer||!already))saveHistory();
   if(!layer){
    layer={id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.13};
    state.layers.unshift(layer);
-   renderLayers();
+   if(!definitionOnly)renderLayers();
   }
   const entities=x.draw.map(d=>{
    const v=d.slice(1).map(n=>n*factor),type=d[0];
@@ -11653,8 +11658,9 @@ function initPermanentBlockGallery(){
    }}:null;
    state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),libraryLayer0:true,...(param?{parametric:param}:{}),...(x.pro?{pro:true}:{})});
    if(x.wholeRoom){state.blocks[key].dynamic2d=blDynEligible(state.blocks[key]);state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
-   renderBlockLibrary();queueLocalBackup()
+   if(!definitionOnly){renderBlockLibrary();queueLocalBackup()}
   }
+  if(definitionOnly)return key;
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
   setTool('insertBlock');state.galleryRepeatedInsert=true;
   $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar · Esc para terminar';
