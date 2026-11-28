@@ -11102,12 +11102,19 @@ function exportDXF(){
 
 /* Independent 2D underlay: reference geometry only, never part of the 3D solid model. */
 function segmentsFromEntities(list,multiplier){
+ if(!Number.isFinite(multiplier)||multiplier<=0)throw Error('Invalid CAD reference scale / Escala de referencia inválida');
  var segments=[];
- var add=function(a,b){if(segments.length<30000)segments.push([a[0]*multiplier,a[1]*multiplier,b[0]*multiplier,b[1]*multiplier]);};
+ var add=function(a,b){
+  var coords=[a[0]*multiplier,a[1]*multiplier,b[0]*multiplier,b[1]*multiplier];
+  if(!coords.every(Number.isFinite))throw Error('Invalid CAD reference coordinates / Coordenadas inválidas');
+  if(segments.length>=30000)throw Error('CAD reference exceeds 30,000 segments; simplify or isolate layers / La referencia supera 30.000 segmentos; simplificá o aislá capas');
+  segments.push(coords);
+ };
  var line=function(a,b){if(a&&b&&Number.isFinite(a.x)&&Number.isFinite(a.y)&&Number.isFinite(b.x)&&Number.isFinite(b.y))add([a.x,a.y],[b.x,b.y]);};
  var arc=function(cx,cy,rx,ry,start,end,rotation){
-  if(!Number.isFinite(cx)||!Number.isFinite(cy)||!(rx>0)||!(ry>0))return;
-  var span=end-start,count=Math.max(12,Math.ceil(Math.abs(span)*20)),prev=null;
+  if(![cx,cy,rx,ry,start,end,rotation??0].every(Number.isFinite)||!(rx>0)||!(ry>0))return;
+  var span=end-start;if(!Number.isFinite(span)||Math.abs(span)>2*Math.PI+1e-8)return;
+  var count=Math.max(12,Math.ceil(Math.abs(span)*20)),prev=null;
   for(var i=0;i<=count;i++){
    var t=start+span*i/count,px=rx*Math.cos(t),py=ry*Math.sin(t),c=Math.cos(rotation||0),sn=Math.sin(rotation||0);
    var p={x:cx+px*c-py*sn,y:cy+px*sn+py*c};
@@ -11153,7 +11160,7 @@ function dxfToUnderlay(raw,filename){
   if(!factor)throw Error('Unidad inválida. Usá mm, cm, m, in o ft.');
  }
  var hidden=new Set(plan.layers.filter(function(l){return !l.visible||l.frozen;}).map(function(l){return l.id;}));
- var segments=segmentsFromEntities(plan.entities.filter(function(e){return !hidden.has(e.layer);}),factor);
+ var segments=segmentsFromEntities(plan.entities.filter(function(e){return e&&!e.cadHidden&&!hidden.has(e.layer);}),factor);
  if(!segments.length)throw Error('El plano no contiene geometría 2D visible compatible con el visor');
  return {name:filename,segments:segments};
 }
@@ -11195,7 +11202,8 @@ function useOpenCAD2D(){
  if(!bridge||typeof bridge.snapshot!=='function')return text('Puente con CAD2D no disponible: recargá la página');
  try{
   var data=bridge.snapshot();
-  var factor={mm:.001,cm:.01,m:1,in:.0254,ft:.3048}[data.unit]||1;
+  var factor={mm:.001,cm:.01,m:1,in:.0254,ft:.3048}[data.unit];
+  if(!Number.isFinite(factor)||factor<=0)throw Error('Unknown CAD2D units / Unidades CAD2D desconocidas');
   var visible=new Set((data.layers||[]).filter(function(l){return l.visible!==false&&!l.frozen;}).map(function(l){return l.id;}));
   var entities=(data.entities||[]).filter(function(e){return visible.has(e.layer)&&!e.cadHidden;});
   var segments=segmentsFromEntities(entities,factor);
