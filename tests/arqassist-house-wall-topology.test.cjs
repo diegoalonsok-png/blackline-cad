@@ -24,3 +24,18 @@ test('reject duplicate walls, overlapping openings, disconnected ends and unspli
  q=copy(p);q.walls.push({id:'cross',a:[6,0],b:[6,6],thickness:.15});assert(audit(q).some(x=>x.includes('Unsplit wall junction')));
  q=copy(p);q.openings[0].offset=.01;assert(audit(q).some(x=>x.includes('Opening too close')));
 });
+
+test('hosted openings clear thicker perpendicular walls at both ends and in reversed host direction',()=>{
+ const p={walls:[
+ {id:'bottom',a:[0,0],b:[4,0],thickness:.15},
+ {id:'right',a:[4,0],b:[4,4],thickness:.5},
+ {id:'top',a:[4,4],b:[0,4],thickness:.15},
+ {id:'left',a:[0,4],b:[0,0],thickness:.5}
+ ],openings:[{host:'bottom',kind:'swing-door',offset:.55,width:.8}]};
+ const o=p.openings[0],bad=()=>audit(p).some(x=>x.includes('Opening too close'));
+ assert(bad());o.offset=.65;assert.deepEqual(audit(p),[]);
+ o.offset=3.45;assert(bad());o.offset=3.35;assert.deepEqual(audit(p),[]);
+ [p.walls[0].a,p.walls[0].b]=[p.walls[0].b,p.walls[0].a];
+ o.offset=.55;assert(bad());o.offset=3.45;assert(bad());
+ o.offset=2;o.kind='framed-window';assert.deepEqual(audit(p),[]);
+});

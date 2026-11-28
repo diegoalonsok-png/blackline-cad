@@ -1041,8 +1041,10 @@ function arqAuditHouseTopology(plan){
  for(const o of plan.openings){
   const a=walls.get(o.host);
   if(!a||!['swing-door','double-door','framed-window'].includes(o.kind)||!Number.isFinite(o.offset)||!Number.isFinite(o.width)||o.width<=eps){issues.push('Invalid hosted opening: '+o.host);continue;}
-  const start=o.offset-o.width/2,end=o.offset+o.width/2,margin=a.w.thickness/2;
-  if(start<margin-eps||end>a.length-margin+eps)issues.push('Opening too close to junction: '+o.host);
+  const start=o.offset-o.width/2,end=o.offset+o.width/2;
+  // At L/T/X junctions the perpendicular wall face may be thicker than the host.
+  const clearance=p=>axes.reduce((m,b)=>b.h!==a.h&&[b.w.a,b.w.b].some(q=>near(p[0],q[0])&&near(p[1],q[1]))?Math.max(m,b.w.thickness/2):m,a.w.thickness/2);
+  if(start<clearance(a.w.a)-eps||end>a.length-clearance(a.w.b)+eps)issues.push('Opening too close to junction: '+o.host);
   const list=hosted.get(o.host)||[];
   if(list.some(q=>Math.min(end,q[1])-Math.max(start,q[0])>eps))issues.push('Overlapping openings: '+o.host);
   list.push([start,end]);hosted.set(o.host,list);
