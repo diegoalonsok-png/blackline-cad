@@ -1013,7 +1013,50 @@ function arqFurnish(raw){
  }
  startPick(2,T('ARQASSIST · click two opposite INNER corners of the room','ARQASSIST · clic en dos esquinas INTERIORES opuestas del ambiente'),([a,b])=>{try{run(Math.min(a.x,b.x),Math.min(a.y,b.y),Math.max(a.x,b.x),Math.max(a.y,b.y))}catch(e){CORE.toast(e.message);CORE.log?.(e.message)}},'line');
 }
+/* Strict topology for reviewed orthogonal house plans. Validate centerlines
+   before native wall-face joins and hosted parametric opening insertion. */
+function arqAuditHouseTopology(plan){
+ const eps=1e-6,issues=[],walls=new Map(),nodes=new Map(),axes=[];
+ const near=(a,b)=>Math.abs(a-b)<=eps,point=p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite);
+ const key=p=>p.map(n=>Math.round(n/eps)).join(',');
+ for(const w of plan.walls){
+  if(!w||!w.id||walls.has(w.id)||!point(w.a)||!point(w.b)||!Number.isFinite(w.thickness)||w.thickness<=eps){issues.push('Invalid or duplicate wall ID');continue;}
+  const h=near(w.a[1],w.b[1]),v=near(w.a[0],w.b[0]);
+  if(h===v){issues.push('Invalid orthogonal wall: '+w.id);continue;}
+  const i=h?0:1,j=1-i,lo=Math.min(w.a[i],w.b[i]),hi=Math.max(w.a[i],w.b[i]),axis={w,h,lo,hi,c:w.a[j],length:hi-lo};
+  axes.push(axis);walls.set(w.id,axis);
+  for(const p of [w.a,w.b]){const k=key(p);nodes.set(k,(nodes.get(k)||0)+1);}
+ }
+ for(const a of axes)for(const p of [a.w.a,a.w.b])if(nodes.get(key(p))===1)issues.push('Unjoined wall endpoint: '+a.w.id);
+ for(let i=0;i<axes.length;i++)for(const b of axes.slice(i+1)){
+  const a=axes[i],label=a.w.id+' / '+b.w.id;
+  if(a.h===b.h){
+   if(Math.min(a.hi,b.hi)-Math.max(a.lo,b.lo)>eps&&Math.abs(a.c-b.c)<(a.w.thickness+b.w.thickness)/2-eps)issues.push('Overlapping parallel walls: '+label);
+  }else{
+   const h=a.h?a:b,v=a.h?b:a,x=v.c,y=h.c;
+   if(x>=h.lo-eps&&x<=h.hi+eps&&y>=v.lo-eps&&y<=v.hi+eps&&(!(near(x,h.lo)||near(x,h.hi))||!(near(y,v.lo)||near(y,v.hi))))issues.push('Unsplit wall junction: '+label);
+  }
+ }
+ const hosted=new Map();
+ for(const o of plan.openings){
+  const a=walls.get(o.host);
+  if(!a||!['swing-door','double-door','framed-window'].includes(o.kind)||!Number.isFinite(o.offset)||!Number.isFinite(o.width)||o.width<=eps){issues.push('Invalid hosted opening: '+o.host);continue;}
+  const start=o.offset-o.width/2,end=o.offset+o.width/2,margin=a.w.thickness/2;
+  if(start<margin-eps||end>a.length-margin+eps)issues.push('Opening too close to junction: '+o.host);
+  const list=hosted.get(o.host)||[];
+  if(list.some(q=>Math.min(end,q[1])-Math.max(start,q[0])>eps))issues.push('Overlapping openings: '+o.host);
+  list.push([start,end]);hosted.set(o.host,list);
+ }
+ return [...new Set(issues)];
+}
+function arqRequireHouseTopology(plan){
+ if(plan?.strictHouseTopology!==true)return;
+ const issues=arqAuditHouseTopology(plan);
+ if(issues.length)throw Error('ARQASSIST: '+issues.join(' · '));
+}
+
 function applyArchitecture(plan,origin,replaceBatch=null){
+ arqRequireHouseTopology(plan);
  if(plan?.schema==='blackline.architecture.detail.v1'){if(replaceBatch)throw Error('No se puede reemplazar un ambiente por un detalle.');return applyArchitectureDetail(plan,origin);}
  if(typeof CORE.wall.applyPlan!=='function')throw Error('Reload CAD2D3D to update the architecture engine.');
  // Validate individual library objects before touching the drawing.
@@ -1092,7 +1135,8 @@ CORE.canvas.addEventListener('pointerdown',async e=>{
  e.preventDefault();e.stopImmediatePropagation();
  const raw=window.prompt((h.axis==='width'?'Ancho / Width':'Largo / Depth')+' (m)',h.value.toFixed(2));if(raw===null)return;
  const value=Number(raw.replace(',','.'));if(!(value>=(h.axis==='width'&&h.meta.rooms[0].kind==='bathroom'?.9:1.2)&&value<=20))return CORE.toast('Medida inválida / Invalid dimension');
- try{const spec={...h.meta.brief,[h.axis]:value};let plan;if(spec.kind==='bath_reference'||spec.templateLayout||spec.compactTransverse){plan=arqResizeReference(h.meta.sourcePlan,h.axis,value);}else{plan=await solveArchitecture('',spec);}if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Aplicar cambio?'))return;applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
+ try{const spec={...h.meta.brief,[h.axis]:value};let plan;if(spec.kind==='bath_reference'||spec.templateLayout||spec.compactTransverse){plan=arqResizeReference(h.meta.sourcePlan,h.axis,value);}else{plan=await solveArchitecture('',spec);}arqRequireHouseTopology(plan);
+ if(plan.warning&&!window.confirm(plan.warning+'\n\n¿Aplicar cambio?'))return;applyArchitecture(plan,h.meta.origin,h.batch);CORE.toast('Ambiente recalculado · Ctrl+Z deshace')}catch(err){CORE.toast(err.message)}
 },true);
 
 let arqCommandEpoch=0;
