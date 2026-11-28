@@ -199,7 +199,7 @@ css.textContent=`
 #arqModal .arq-grid{flex:1;overflow:auto;padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-content:start}
 #arqModal .arq-card .arq-name{font-size:11px}
 #arqVariantMenu{position:fixed;z-index:9100;background:#141c24;border:1px solid #4d6676;border-radius:8px;padding:6px;max-height:60vh;overflow:auto;display:grid;gap:3px;min-width:230px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
-#arqVariantMenu button{text-align:left;font-size:11px}
+#arqVariantMenu button{text-align:left;font-size:11px} #arqVariantMenu{width:min(370px,90vw)}#arqVariantMenu .arq-variant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#arqVariantMenu .arq-variant-grid button{display:flex;flex-direction:column;white-space:normal;min-width:0}#arqVariantMenu .arq-variant-grid button[aria-pressed=true]{outline:1px solid #91bfd5}
 #arqVariantMenu .arq-vt{font-size:10px;color:#9cb1bc;padding:2px 4px}
 #arqDialog{position:fixed;inset:0;z-index:9200;background:rgba(5,9,13,.6);display:flex;align-items:center;justify-content:center}
 #arqDialog .arq-dlg{background:#141c24;border:1px solid #4d6676;border-radius:10px;padding:14px;min-width:300px;max-width:560px;color:#e5eef7;font-size:12px}
@@ -441,29 +441,109 @@ function resizeRef(ref,W,D){
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);
  CORE.toast(item.name+' → '+cm(w)+' × '+cm(d)+' cm · Ctrl+Z deshace');
 }
+// Same-family replacement uses real catalogue geometry, never stretched sanitary fixtures.
+function variantSize(item,a){
+ const e=1e-7;
+ const fits=a.w>=item.wMin-e&&a.w<=item.wMax+e&&a.d>=item.dMin-e&&a.d<=item.dMax+e&&(!item.lockAspect||Math.abs(a.w*item.d-a.d*item.w)<e);
+ return fits?{w:a.w,d:a.d,changed:false}:{w:item.w,d:item.d,changed:Math.abs(a.w-item.w)>e||Math.abs(a.d-item.d)>e};
+}
+// Group the existing catalogue by real object and projection, not just authored family ID.
+function replacementKey(item){
+ if(!item)return '';
+ const n=String(item.name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),cat=String(item.cat||'');
+ const projection=item.dynamicOpening?.projection||(/corte|seccion|section/.test(n)?'section':/vista frontal|alzado|elevation|front view/.test(n)||cat==='Alzados'?'front':/vista lateral|side view/.test(n)?'side':/vista posterior|rear view/.test(n)?'rear':/vista|view|Cortes y vistas|en vista/i.test(n+' '+cat)?'view':'plan');
+ if(item.dynamicOpening)return 'opening:'+item.dynamicOpening.kind+':'+projection+':'+(projection==='plan'?(item.dynamicAxis||'w'):'');
+ if(!/^(?:Sanitarios|Mobiliario|Dormitorio|Oficina|Mobiliario en vista|Cortes y vistas)$/i.test(cat))return 'family:'+cat+':'+item.family+':'+projection;
+ const kind=/^(?:inodoro|wc\b|toilet|retrete)/.test(n)?'toilet':/^(?:bidet|bide\b)/.test(n)?'bidet':/^(?:sofa|sillon|butaca|couch|armchair)/.test(n)?'sofa':/^(?:silla\b(?! de ruedas)|chair\b)/.test(n)?'chair':null;
+ return kind?'object:'+kind+':'+projection:'family:'+cat+':'+item.family+':'+projection;
+}
+function replacementItems(item){
+ const key=replacementKey(item);
+ return LIB.library.filter(v=>!v.hideFromGallery&&!v.dxfPlan&&!/^views26-/.test(v.id)&&replacementKey(v)===key);
+}
 function swapVariant(ref,id){
- const a=arqOf(ref),item=byId(id);if(!a||!item)return;
- if(dkNeeds(item)&&allowed(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)swapVariant(ref,id)}).catch(e=>CORE.toast(e.message))}
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d);delete ref.dynamic;
- CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
+ const a=arqOf(ref),item=byId(id),source=a&&byId(a.id);
+ if(!source||!item||!S().entities.includes(ref)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false||!replacementItems(source).includes(item))return false;
+ if(!allowed(item)){plan()?.upsell('Bloque Pro: '+item.name);return false}
+ if(dkNeeds(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)return swapVariant(ref,id);return false}).catch(e=>CORE.toast(e.message))}
+ const size=variantSize(item,a);
+ // Never change the span of a hosted opening through the model picker.
+ if(source.dynamicOpening?.projection==='plan'&&(size.changed||source.dynamicAxis!==item.dynamicAxis))return false;
+ CORE.saveHistory();ref.blockName=ensureDefinition(item,size.w,size.d);delete ref.dynamic;
+ CORE.updateAll();CORE.queueLocalBackup?.();CORE.schedule?.();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name+' · Ctrl+Z');return true;
 }
+// One floating replacement palette for native openings and architectural library blocks.
+const replacePalette=(()=>{
+ const host=document.createElement('aside');host.id='cadReplacePalette';host.hidden=true;host.setAttribute('role','region');host.setAttribute('aria-label','Replace block / Cambiar bloque');
+ const head=document.createElement('div');head.className='replace-head';
+ const heading=document.createElement('strong'),close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close / Cerrar');head.append(heading,close);
+ const search=document.createElement('input');search.type='search';search.placeholder='Buscar modelo / Find model';search.setAttribute('aria-label',search.placeholder);
+ const body=document.createElement('div');body.className='replace-body';host.append(head,search,body);document.body.append(host);
+ const css=document.createElement('style');css.textContent=`
+ #cadReplacePalette[hidden]{display:none!important}#cadReplacePalette{position:fixed;z-index:9200;right:18px;top:145px;width:min(350px,calc(100vw - 24px));max-height:min(62vh,520px);display:flex;flex-direction:column;background:#f3e8d3;color:#293238;border:1px solid #baa17c;border-radius:12px;box-shadow:0 10px 30px #0005;overflow:hidden;font:12px system-ui,sans-serif;box-sizing:border-box}
+ #cadReplacePalette .replace-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:#ddcba8;cursor:move;touch-action:none;user-select:none;border-bottom:1px solid #baa17c}
+ #cadReplacePalette .replace-head button{border:0;background:transparent;color:#293238;font-size:20px;cursor:pointer}#cadReplacePalette input{margin:8px 9px;padding:7px 9px;border-radius:7px;border:1px solid #c7b28c;background:#fffaf0;color:#293238;min-width:0}#cadReplacePalette .replace-body{overflow:auto;min-height:0;padding:3px 9px 9px}
+ #cadReplacePalette #arqVariantMenu,#cadReplacePalette #cadOpeningSwap{position:static!important;transform:none!important;box-sizing:border-box;min-width:0!important;width:100%!important;max-width:none!important;max-height:none!important;box-shadow:none;border:0;background:transparent;color:#293238;padding:0;overflow:visible}
+ #cadReplacePalette #arqVariantMenu>.btn,#cadReplacePalette #cadOpeningSwap>[data-close]{display:none!important}#cadReplacePalette #arqVariantMenu .arq-vt,#cadReplacePalette #cadOpeningSwap .meta{color:#65543e}
+ #cadReplacePalette .options,#cadReplacePalette .arq-variant-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+ #cadReplacePalette .options button,#cadReplacePalette .arq-variant-grid button{display:flex!important;box-sizing:border-box;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:5px;min-width:0;white-space:normal!important;text-align:center!important;border:1px solid #cbb796!important;background:#fffaf0!important;color:#293238!important;border-radius:8px;padding:6px!important}
+ #cadReplacePalette .options button:hover,#cadReplacePalette .arq-variant-grid button:hover,#cadReplacePalette button.cur,#cadReplacePalette button[aria-pressed=true]{border-color:#815b28!important;outline:1px solid #815b28}
+ #cadReplacePalette .options svg,#cadReplacePalette .arq-variant-grid svg,#cadReplacePalette .arq-variant-grid img{background:#b7cfdc!important;color:#293238!important;width:100%!important;height:72px!important;border-radius:4px;object-fit:contain;display:block}
+ #cadReplacePalette .options button[hidden],#cadReplacePalette .arq-variant-grid button[hidden]{display:none!important}
+ `;document.head.append(css);
+ let owner='',dismiss=null,drag=null;
+ const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ function filter(){const q=norm(search.value).trim();for(const b of body.querySelectorAll('.options button,.arq-variant-grid button'))b.hidden=!!q&&!norm(b.textContent).includes(q)}
+ search.addEventListener('input',filter);close.onclick=()=>{const fn=dismiss;if(fn)fn();else hide(owner)};
+ for(const ev of ['pointerdown','mousedown','click','wheel','contextmenu','keydown','keyup'])host.addEventListener(ev,e=>e.stopPropagation());
+ head.addEventListener('pointerdown',e=>{if(e.button!==0||e.target===close)return;const r=host.getBoundingClientRect();drag={x:e.clientX-r.left,y:e.clientY-r.top};head.setPointerCapture?.(e.pointerId)});
+ head.addEventListener('pointermove',e=>{if(!drag)return;host.style.right='auto';host.style.left=Math.max(4,Math.min(innerWidth-host.offsetWidth-4,e.clientX-drag.x))+'px';host.style.top=Math.max(4,Math.min(innerHeight-host.offsetHeight-4,e.clientY-drag.y))+'px'});
+ for(const ev of ['pointerup','pointercancel','lostpointercapture'])head.addEventListener(ev,()=>{drag=null});
+ function hide(key){if(owner!==key)return;host.hidden=true;body.replaceChildren();owner='';dismiss=null;search.value=''}
+ function show(key,node,onClose){if(owner!==key){search.value='';body.replaceChildren(node);owner=key;}else if(node.parentNode!==body)body.replaceChildren(node);dismiss=onClose;heading.textContent=variantLang('CAMBIAR BLOQUE','REPLACE BLOCK');host.hidden=false;filter()}
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!host.hidden){const fn=dismiss;if(fn)fn();else hide(owner)}},true);
+ return Object.freeze({show,hide,contains:node=>host.contains(node)});
+})();
+window.CAD2D_REPLACE_PALETTE=replacePalette;
+let variantDismissed='',variantActive='';
+const variantLang=(es,en)=>document.documentElement.lang==='es'?es:en;
 function variantMenu(ref,x,y){
- closeVariantMenu();
- const a=arqOf(ref),item=byId(a.id),menu=document.createElement('div');menu.id='arqVariantMenu';menu.setAttribute('role','menu');
- menu.innerHTML='<div class="arq-vt">VARIANTES · '+esc(item.family.toUpperCase())+' · se conserva '+cm(a.w)+'×'+cm(a.d)+' cm si entra en rango</div>';
- for(const v of familyOf(item)){
-  const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('role','menuitem');
-  b.textContent=(v.id===item.id?'● ':'')+v.name+(v.pro?'  · PRO':'');b.onclick=()=>{closeVariantMenu();swapVariant(ref,v.id)};menu.append(b);
+ closeVariantMenu(false);
+ const a=arqOf(ref),item=a&&byId(a.id);if(!item||CORE.layerFor(ref).locked)return;
+ const menu=document.createElement('div');menu.id='arqVariantMenu';menu.setAttribute('role','dialog');menu.setAttribute('aria-label',variantLang('Cambiar bloque','Replace block'));variantActive=ref.id;
+ const title=document.createElement('div');title.className='arq-vt';title.textContent=variantLang('Cambiar bloque · ','Replace block · ')+item.name+' · '+cm(a.w)+'×'+cm(a.d)+' cm';menu.append(title);
+ const close=document.createElement('button');close.type='button';close.className='btn';close.textContent='×';close.setAttribute('aria-label',variantLang('Cerrar','Close'));close.onclick=()=>closeVariantMenu();menu.append(close);
+ const grid=document.createElement('div');grid.className='arq-variant-grid';menu.append(grid);
+ for(const v of replacementItems(item)){
+  if(item.dynamicOpening?.projection==='plan'&&variantSize(v,a).changed)continue;
+  const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('aria-pressed',String(v.id===item.id));
+  const size=variantSize(v,a),label=document.createElement('span');label.textContent=v.name+' · '+cm(size.w)+'×'+cm(size.d)+' cm'+(v.pro?' · PRO':'')+(size.changed?variantLang(' · nueva medida',' · new size'):'');
+  try{b.innerHTML=thumb(v,64)}catch(e){}b.append(label);
+  b.onclick=()=>{if(size.changed&&!window.confirm(variantLang('El nuevo bloque tiene otras medidas reales. ¿Reemplazar y revisar el espacio libre?','The new block has different real dimensions. Replace and review clearance?')))return;try{const result=swapVariant(ref,v.id);if(result&&typeof result.then==='function')result.then(ok=>{if(ok)closeVariantMenu()});else if(result)closeVariantMenu()}catch(e){CORE.toast(e.message)}};grid.append(b);
  }
- const more=document.createElement('button');more.type='button';more.className='btn';more.textContent='Abrir galería completa…';more.onclick=()=>{closeVariantMenu();openModal(item.cat)};menu.append(more);
- document.body.append(menu);
- menu.style.left=Math.min(x,innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(y,innerHeight-menu.offsetHeight-8)+'px';
- setTimeout(()=>document.addEventListener('pointerdown',outsideMenu,true),0);
+ const note=document.createElement('div');note.className='arq-vt';note.textContent=variantLang('Conserva punto de inserción, giro y capa. Revisá el espacio libre si cambia el tamaño.','Preserves insertion point, rotation and layer. Review clearance if the size changes.');menu.append(note);
+ for(const ev of ['pointerdown','mousedown','click','wheel','contextmenu'])menu.addEventListener(ev,e=>e.stopPropagation());
+ replacePalette.show('arq',menu,()=>closeVariantMenu());
+ setTimeout(()=>{if(menu.isConnected)document.addEventListener('pointerdown',outsideMenu,true)},0);
 }
-function outsideMenu(e){const m=$('arqVariantMenu');if(m&&!m.contains(e.target))closeVariantMenu()}
-function closeVariantMenu(){$('arqVariantMenu')?.remove();document.removeEventListener('pointerdown',outsideMenu,true)}
-
+function outsideMenu(e){const m=$('arqVariantMenu');if(m&&!replacePalette.contains(e.target))closeVariantMenu()}
+function closeVariantMenu(dismiss=true){if(dismiss&&variantActive)variantDismissed=variantActive;replacePalette.hide('arq');$('arqVariantMenu')?.remove();variantActive='';document.removeEventListener('pointerdown',outsideMenu,true)}
+// Automatically display variants on selecting one native library block; keep
+// dedicated opening editor independent, and never reopen a dismissed selection.
+EXT.overlays.push(()=>{
+ const ref=S().tool==='select'&&S().selected.length===1&&!gripDrag&&!pick.active?selectedArqRef():null;
+ const a=ref&&arqOf(ref),item=a&&byId(a.id);
+ const eligible=ref&&item&&!S().blocks[ref.blockName]?.parametric&&!CORE.layerFor(ref).locked&&CORE.layerFor(ref).visible!==false&&replacementItems(item).length>1;
+ if(!eligible){if(variantActive)closeVariantMenu(false);if(!ref||ref.id!==variantDismissed)variantDismissed='';return}
+ if(variantActive===ref.id||variantDismissed===ref.id)return;
+ variantMenu(ref,Math.max(8,innerWidth-400),155);
+});
+EXT.commands=EXT.commands||{};
+for(const key of ['CAMBIARBLOQUE','REEMPLAZARBLOQUE','SWAPBLOCK','REPLACEBLOCK'])EXT.commands[key]=()=>{
+ const ref=selectedArqRef();if(ref&&arqOf(ref)&&!CORE.layerFor(ref).locked&&!S().blocks[ref.blockName]?.parametric){variantDismissed='';variantMenu(ref,0,0);return}
+ if(window.CAD2D_OPENINGS?.selected?.().length){window.CAD2D_OPENINGS.open?.();return}
+ CORE.toast(variantLang('Seleccioná un bloque de la galería.','Select a gallery block.'));
+};
 function onPointerDown(ev){
  if(ev.button!==0)return;
  const raw=P(ev.offsetX,ev.offsetY);
@@ -802,7 +882,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261128-suite-opening1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261128-linked-room2');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1149,12 +1229,14 @@ EXT.cancelArchitectureCommand=()=>{
 document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
 EXT.drawArchitectureCommand=async raw=>{
  if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)){
+ if(!arqLinkedRoomRequest(raw)){
  if(!arqPoolRequest(raw)){
  if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)&&!arqRestaurantRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
  if(arqHouseGallery(raw)){arqOpenHouseGallery(raw);return;}
  if(arqWebReference(raw)){arqOpenWebReference(raw);return;}
  const object=!arqCatalogueCategory(raw)&&arqObjectSearch(raw);if(object){arqOpenObjectSearch(object);return;}
+ }
  }
  }
  }
@@ -1616,6 +1698,10 @@ function arqHouseDesignRequest(raw){
  const program=(/\bban/.test(q)?1:0)+(/\bcocina/.test(q)?1:0)+(/\b(?:living|estar|comedor)\b/.test(q)?1:0);
  return bed&&program>=2;
 }
+function arqLinkedRoomRequest(raw){
+ const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ return /\d\s*(?:mm|cm|m)?\s*(?:x|×|por|by)\s*\d/.test(q)&&(/\b(?:cocina|kitchen)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:lavadero|laundry)\b/.test(q)||/\b(?:living|salon)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:comedor|dining)\b/.test(q))&&!/\b(?:buscar|busca|mostrar|mostrame|search|find|show|fotos?|referencias?)\b/.test(q);
+}
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
  if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw))return {kind:'calco'};
@@ -1627,6 +1713,7 @@ function arqRouteOf(raw){
  if(arqPoolRequest(raw))return {kind:'draw'};
  if(arqRoomSetRequest(raw))return {kind:'draw'};
  if(arqHouseDesignRequest(raw))return {kind:'draw'};
+ if(arqLinkedRoomRequest(raw))return {kind:'draw'};
  if(arqFurnishRequest(raw))return {kind:'furnish'};
  {const w=arqWallRequest(raw);if(w)return {kind:'wall',length:w};}
  const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs)return {kind:'docs',docs};

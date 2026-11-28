@@ -11587,7 +11587,9 @@ function initPermanentBlockGallery(){
   return '<svg viewBox="'+(x0-pad)+' '+(-y1-pad)+' '+(width+2*pad)+' '+(height+2*pad)+'" role="img" aria-label="'+escapeHTML(x.id)+'" style="height:104px;width:100%;background:#111923;border-radius:8px"><g transform="scale(1 -1)" fill="none" stroke="var(--cad-gallery-ink, #243746)" stroke-width="'+stroke+'" stroke-linecap="round" stroke-linejoin="round">'+shape+'</g></svg>';
  }
  window.CAD2D_INSERT_LIBRARY_BLOCK=id=>{const x=entries.find(e=>e.id===id);return x?install(x)!==false:false};
- function install(x){
+ // Shared catalogue bridge: use the same definitions and previews for replacements.
+ window.CAD2D_OPENING_CATALOGUE=Object.freeze({list:()=>entries.filter(e=>e.kind&&(!e.pro||canUseLibraryPro())).map(e=>({id:e.id,kind:e.kind,w:e.w,reverse:!!e.reverse,mullion:!!e.mullion,vano:!!e.vano})),preview:id=>{const e=entries.find(e=>e.id===id&&e.kind);return e?svgFor(e):''},ensure:id=>{const e=entries.find(e=>e.id===id&&e.kind);return e?install(e,true):false}});
+ function install(x,definitionOnly=false){
   if(x.pro&&!canUseLibraryPro()){window.CAD2D_PLAN?.upsell('Bloque PRO: '+x.id);return false}
   const factor=U.m/U[state.unit];
   // Library folder names are for browsing only, never drawing layers.
@@ -11597,7 +11599,7 @@ function initPermanentBlockGallery(){
   const key=state.blocks[legacyKey]&&!state.blocks[legacyKey].libraryLayer0?legacyKey+' · Layer 0':legacyKey;
   const already=Boolean(state.blocks[key]);
   let layer=state.layers.find(l=>l.id==='0'||l.name==='0');
-  if(!layer||!already)saveHistory();
+  if(!definitionOnly&&(!layer||!already))saveHistory();
   if(!layer){
    layer={id:'0',name:'0',color:'#ffffff',visible:true,locked:false,width:.13};
    state.layers.unshift(layer);
@@ -11621,8 +11623,9 @@ function initPermanentBlockGallery(){
    }}:null;
    state.blocks[key]=cadPrepareDynamicBlock({name:key,entities:normalizeBlockEntities(entities),libraryLayer0:true,...(param?{parametric:param}:{}),...(x.pro?{pro:true}:{})});
    if(x.wholeRoom){state.blocks[key].dynamic2d=blDynEligible(state.blocks[key]);state.blocks[key].dynamicActions=true;state.blocks[key].compositeRoom=true}
-   renderBlockLibrary();queueLocalBackup()
+   if(!definitionOnly){renderBlockLibrary();queueLocalBackup()}
   }
+  if(definitionOnly)return key;
   select.value=key;$('blockScale').value='1';$('blockRotation').value='0';
   setTool('insertBlock');state.galleryRepeatedInsert=true;
   $('blHelp').textContent='Elegido: '+x.id+' · clic en el plano para insertar · Esc para terminar';
@@ -13268,7 +13271,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="assets/cad2d-quality-curation-20261123.js?v=20261123-curated1"></script>
 <script src="assets/cad2d-cc0-curated-web-20261123.js?v=20261123-v1"></script>
 <script src="assets/cad-arq-docs.js?v=20261126-1"></script>
-<script src="cad-arq-pro.js?v=20261128-suite-opening1"></script>
+<script src="cad-arq-pro.js?v=20261128-replace-palette1"></script>
 <script src="cad-dxf-proxy-2d.js?v=20261123-aec-v1"></script>
 <script src="cad-dxf-parser.js?v=20261126-layouts7"></script>
 <script src="cad-model-compare.js?v=20261124-compare-v1"></script>
@@ -13277,7 +13280,7 @@ window.BlacklineCAD3DBridge=Object.freeze({
 <script src="cad-bloques-dinamicos.js?v=20261127-bloques3"></script>
 <script src="cad-tablas.js?v=20261127-tablas3"></script>
 <script src="cad-bim.js?v=20261127-bim1"></script>
-<script src="cad-aberturas.js?v=20261127-aberturas2"></script>
+<script src="cad-aberturas.js?v=20261128-replace-palette1"></script>
 <script src="assets/cad-calco-ia.js?v=20261127-calcoia1"></script>
 <script src="cad-touch.js?v=20261120-1850"></script><script src="cad-quickbar.js?v=20261124-arq-toggle-v3"></script><script src="cad-cmd-resize.js?v=20261120-1850"></script><script src="cad-buy-guide.js?v=20261126-precios"></script>
 <script src="cad-arq-tools.js?v=20261120-2010"></script><script src="cad-block-browser.js?v=20261127-shared-paper21"></script><script src="cad2d-olimpiadas3-loader.js?v=20261124-demand-v11"></script>
