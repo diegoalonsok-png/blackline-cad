@@ -11,7 +11,7 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const findChrome=()=>['google-chrome','google-chrome-stable','chromium','chromium-browser']
  .map(bin=>spawnSync('which',[bin],{encoding:'utf8'})).find(r=>r.status===0)?.stdout.trim();
 
-test('browser: desktop-CAD-style PL, LINE distance 5, WALL options and wall distance 5', {timeout:45000},async t=>{
+test('browser: desktop-CAD-style PL, LINE distance 5, WALL options and wall distance 5', {timeout:90000},async t=>{
  const chrome=findChrome();
  if(!chrome){t.skip('Chrome not installed on the test runner');return;}
  const root=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'cad2d-browser-'));
@@ -129,6 +129,21 @@ test('browser: desktop-CAD-style PL, LINE distance 5, WALL options and wall dist
   await type('5');await key('Enter');
   const wall=await evaluate("(()=>{const e=window.CAD2D_CORE.state.entities.filter(e=>e.wall2d).at(-1);return e?Math.hypot(e.wall2d.guideB.x-e.wall2d.guideA.x,e.wall2d.guideB.y-e.wall2d.guideA.y):null})()");
   assert.ok(wall!==null&&Math.abs(wall-5)<1e-5,'WALL 5 + Enter creates 5 meters, got '+wall);
+
+  await key('Escape');
+  for(let i=0;i<100&&!await evaluate("Boolean(window.CAD2D_BLOCK_BROWSER && window.CAD2D_ARQ_ROUTE && window.CAD2D_EXTENSIONS?.commands?.ARQASSIST)");i++)await sleep(100);
+  assert.equal(await evaluate("Boolean(window.CAD2D_BLOCK_BROWSER && window.CAD2D_ARQ_ROUTE)"),true,'ARQASSIST and block browser initialized');
+  for(const [q,kind] of [['inodoro','object'],['house','house'],['casa','house'],['dibuja un baño','draw'],['insertar una cocina de 3 x 4','draw']]){
+   assert.equal(await evaluate('window.CAD2D_ARQ_ROUTE('+JSON.stringify(q)+').kind'),kind,q+' route');
+  }
+  for(const q of ['inodoro','house','casa']){
+   await evaluate("window.CAD2D_EXTENSIONS.commands.ARQASSIST();");
+   await evaluate("(()=>{const el=document.querySelector('#cadArqInstructionBar [data-arq-text]');el.value="+JSON.stringify(q)+";el.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#cadArqInstructionBar [data-arq-run]').click();})()");
+   const selector=q==='inodoro'?'#cadBlockBrowser .grid button[data-id]':'#cadBlockBrowser .grid .web-card [data-web=cad]';
+   let count=0;for(let i=0;i<140;i++){count=await evaluate('document.querySelectorAll('+JSON.stringify(selector)+').length');if(count)break;await sleep(100);}
+   assert.ok(count>0,q+' should show editable catalogue items; '+await evaluate("document.querySelector('#cadBlockBrowser .grid')?.innerText?.slice(0,300)||'no gallery'"));
+   await evaluate("window.CAD2D_BLOCK_BROWSER.close()");
+  }
  }finally{
   ws?.close();browser.kill('SIGKILL');await new Promise(resolve=>server.close(resolve));
   try{fs.rmSync(temp,{recursive:true,force:true,maxRetries:10,retryDelay:100})}catch(error){console.warn('Chrome test cleanup: '+error.message)}
