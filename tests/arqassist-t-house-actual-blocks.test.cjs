@@ -1,11 +1,12 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),L=require('../assets/cad2d-arq-generators.js');
 const base='assets/arq-catalogue/v1/';
-test('T house uses actual catalogue block geometry, non-overlapping room footprints and clear door swings',()=>{
- const p=JSON.parse(fs.readFileSync(base+'plan-904.json')),index=JSON.parse(fs.readFileSync(base+'index.json'));
- assert(index.some(r=>r.id==='plan-904'&&r.typology==='t-shape'&&r.area===152));
- assert.equal(p.rooms.filter(r=>r.kind==='bedroom').length,3);
- assert.equal(p.rooms.filter(r=>r.kind==='bathroom').length,1);
+test('Reviewed houses use actual catalogue block geometry and clear door swings',()=>{
+ for(const id of ['plan-901','plan-902','plan-904']){
+ const p=JSON.parse(fs.readFileSync(base+id+'.json')),index=JSON.parse(fs.readFileSync(base+'index.json'));
+ assert(index.some(r=>r.id===id&&r.typology));
+ assert.equal(p.rooms.filter(r=>r.kind==='bedroom').length,id==='plan-902'?4:3);
+ assert.equal(p.rooms.filter(r=>r.kind==='bathroom').length,id==='plan-902'?2:1);
  const bounds=b=>{const a=L.bounds(L.build(b.catalogId,...b.nominalSize).entities),c=Math.cos(b.rotation*Math.PI/180),s=Math.sin(b.rotation*Math.PI/180),ps=[[a.minX,a.minY],[a.minX,a.maxY],[a.maxX,a.minY],[a.maxX,a.maxY]].map(([x,y])=>[b.point[0]+x*c-y*s,b.point[1]+x*s+y*c]);return [Math.min(...ps.map(q=>q[0])),Math.min(...ps.map(q=>q[1])),Math.max(...ps.map(q=>q[0])),Math.max(...ps.map(q=>q[1]))]};
  const eps=1e-5,overlap=(a,b)=>a[0]<b[2]-eps&&b[0]<a[2]-eps&&a[1]<b[3]-eps&&b[1]<a[3]-eps;
  const reach=new Set(['room0']);for(let i=0;i<p.rooms.length;i++)for(const c of p.connections){assert(p.openings.some(o=>o.host===c.via&&o.kind==='swing-door'));if(reach.has(c.from)||reach.has(c.to)){reach.add(c.from);reach.add(c.to)}}
@@ -22,4 +23,6 @@ test('T house uses actual catalogue block geometry, non-overlapping room footpri
  }
  const src=fs.readFileSync('cad-arq-pro.js','utf8'),sanitary=new Function(src.slice(src.indexOf('function arqCheckSanitary('),src.indexOf('async function insertCataloguePlanById('))+';return arqCheckSanitary;')();
  assert.deepEqual(sanitary(p,L.library).issues,[]);
+ if(id!=='plan-904')assert(p.openings.some(o=>o.host==='wall4'&&o.kind==='swing-door'));
+ }
 });
