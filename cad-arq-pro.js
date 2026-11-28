@@ -1465,8 +1465,17 @@ async function insertCataloguePlanById(id,isCurrent=()=>true){
 }
 window.CAD2D_INSERT_CATALOGUE_PLAN=insertCataloguePlanById;
 // Preview and insertion use the same validated native geometry, not stale raster files.
+// Bound both the network request and response body; a stalled plan must not block the gallery.
+async function arqFetchPreviewPlan(url,timeout=12000){
+ const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeout);
+ try{
+  const r=await fetch(url,{signal:ctrl.signal});
+  if(!r.ok)throw Error('Planta no disponible');
+  return await r.json();
+ }finally{clearTimeout(timer);}
+}
 const arqSanitaryPreviewCache=new Map();
-window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=fetch(new URL(id+'.json?v=20261127-house-framed1',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(r=>{if(!r.ok)throw Error('Planta no disponible');return r.json()}).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
+window.CAD2D_SANITARY_PREVIEW=async id=>{if(!/^(?:plan-\d+|T-[A-Z0-9-]{1,8}-\d{3}[a-z])$/.test(id))throw Error('Identificador inválido');if(!arqSanitaryPreviewCache.has(id)){const p=arqFetchPreviewPlan(new URL(id+'.json?v=20261127-house-framed1',id.startsWith('T-')?arqTypologyBase:arqCatalogueBase)).then(plan=>{const result=arqCheckSanitary(plan,LIB.library);return {issues:result.issues,moved:result.moved.length,preview:result.issues.length?null:'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(arqPlanThumbnail(result.plan))}}).catch(e=>{arqSanitaryPreviewCache.delete(id);throw e});arqSanitaryPreviewCache.set(id,p);}return arqSanitaryPreviewCache.get(id);};
 function arqOpenWebReference(raw){const b=window.CAD2D_BLOCK_BROWSER;if(!b?.openWeb)return CORE.toast('Visor web no disponible');EXT.cancelArchitectureCommand();b.openWeb(raw);}
 function arqObjectSearch(raw){
  const q=arqCleanRequest(String(raw).replace(/^\s*(?:bloques? de)\s+/i,''));
