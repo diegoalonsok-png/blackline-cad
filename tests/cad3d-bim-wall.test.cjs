@@ -49,3 +49,18 @@ test('hosted BIM wall openings export axis position and sill elevation after wal
  for(const [r,o] of [[wall,{...opening,offset:3}],[wall,{...opening,sill:3}],[{...wall,type:'slab'},opening],[{...wall,x:NaN},opening]])assert.deepEqual(position(r,o),{x:null,y:null,z:null});
  assert.ok(section('function cad3dBimInventory(','function cad3dScheduleTo2D(').includes('...cad3dBimOpeningPosition(r,o)'));
 });
+
+test('BIM slab inventory deducts rectangular and polygon openings and locates rotated pitched slabs',()=>{
+ const api=new Function(section('function cad3dPolyCross(','// Bounds are in slab-local metres')+section('function cad3dMassProperties(','function cad3dPropertyDetails(')+section('function cad3dBimSlabQuantities(','function cad3dBimInventory(')+';return {q:cad3dBimSlabQuantities,p:cad3dBimOpeningPosition};')();
+ const slab={type:'slab',x:10,y:20,z:3,rot:90,w:6,d:4,h:.2,openings:[{offset:1,offsetY:.5,w:1,d:2}]};
+ const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-9,String(a)+' != '+b);
+ for(const pitch of [0,30,-30]){
+  const r={...slab,pitch},q=api.q(r),p=api.p(r,r.openings[0]);
+  near(q.grossArea,24);near(q.netArea,22);near(q.netVolume,4.4);
+  near(p.x,9.5);near(p.y,21);near(p.z,3+Math.tan(pitch*Math.PI/180));
+ }
+ near(api.q({...slab,openings:[],slabPolyHoles:[[[-1,-1],[1,-1],[1,1],[-1,1]]]}).netArea,20);
+ assert.equal(api.q({...slab,h:0}).netVolume,null);
+ assert.deepEqual(api.p(slab,{...slab.openings[0],offset:10}),{x:null,y:null,z:null});
+ assert.ok(section('function cad3dBimInventory(','function cad3dScheduleTo2D(').includes('cad3dBimWallQuantities(r)||cad3dBimSlabQuantities(r)'));
+});
