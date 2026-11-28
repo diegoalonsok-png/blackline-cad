@@ -454,7 +454,7 @@ function replacementKey(item){
  const projection=item.dynamicOpening?.projection||(/corte|seccion|section/.test(n)?'section':/vista frontal|alzado|elevation|front view/.test(n)||cat==='Alzados'?'front':/vista lateral|side view/.test(n)?'side':/vista posterior|rear view/.test(n)?'rear':/vista|view|Cortes y vistas|en vista/i.test(n+' '+cat)?'view':'plan');
  if(item.dynamicOpening)return 'opening:'+item.dynamicOpening.kind+':'+projection+':'+(projection==='plan'?(item.dynamicAxis||'w'):'');
  if(!/^(?:Sanitarios|Mobiliario|Dormitorio|Oficina|Mobiliario en vista|Cortes y vistas)$/i.test(cat))return 'family:'+cat+':'+item.family+':'+projection;
- const kind=/^(?:inodoro|wc\b|toilet|retrete)/.test(n)?'toilet':/^(?:bidet|bide\b)/.test(n)?'bidet':/^(?:sofa|sillon|butaca|couch|armchair)/.test(n)?'sofa':/^(?:silla\b(?! de ruedas)|chair\b)/.test(n)?'chair':null;
+ const kind=/^(?:cama\b|bed\b|cucheta\b|litera\b|bunk bed\b|cuna\b|crib\b)/.test(n)?'bed':/^(?:inodoro|wc\b|toilet|retrete)/.test(n)?'toilet':/^(?:bidet|bide\b)/.test(n)?'bidet':/^(?:sofa|sillon|butaca|couch|armchair)/.test(n)?'sofa':/^(?:silla\b(?! de ruedas)|chair\b)/.test(n)?'chair':null;
  return kind?'object:'+kind+':'+projection:'family:'+cat+':'+item.family+':'+projection;
 }
 function replacementItems(item){
@@ -488,7 +488,8 @@ const replacePalette=(()=>{
  #cadReplacePalette .options,#cadReplacePalette .arq-variant-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
  #cadReplacePalette .options button,#cadReplacePalette .arq-variant-grid button{display:flex!important;box-sizing:border-box;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:5px;min-width:0;white-space:normal!important;text-align:center!important;border:1px solid #cbb796!important;background:#fffaf0!important;color:#293238!important;border-radius:8px;padding:6px!important}
  #cadReplacePalette .options button:hover,#cadReplacePalette .arq-variant-grid button:hover,#cadReplacePalette button.cur,#cadReplacePalette button[aria-pressed=true]{border-color:#815b28!important;outline:1px solid #815b28}
- #cadReplacePalette .options svg,#cadReplacePalette .arq-variant-grid svg,#cadReplacePalette .arq-variant-grid img{background:#b7cfdc!important;color:#293238!important;width:100%!important;height:72px!important;border-radius:4px;object-fit:contain;display:block}
+ #cadReplacePalette .options svg,#cadReplacePalette .arq-variant-grid svg,#cadReplacePalette .arq-variant-grid img{background:#b7cfdc!important;color:#293238!important;width:100%!important;height:96px!important;border-radius:4px;object-fit:contain;display:block}
+ #cadReplacePalette .arq-variant-preview{display:flex;flex-direction:column;justify-content:center;min-height:96px;min-width:0;gap:3px;background:#b7cfdc;color:#293238;border-radius:4px;font-size:10px;overflow:hidden}#cadReplacePalette .arq-variant-preview small{font-size:10px;color:#293238}
  #cadReplacePalette .options button[hidden],#cadReplacePalette .arq-variant-grid button[hidden]{display:none!important}
  `;document.head.append(css);
  let owner='',dismiss=null,drag=null;
@@ -507,6 +508,12 @@ const replacePalette=(()=>{
 window.CAD2D_REPLACE_PALETTE=replacePalette;
 let variantDismissed='',variantActive='';
 const variantLang=(es,en)=>document.documentElement.lang==='es'?es:en;
+function variantPreview(item,size){
+ // Use the geometry at the exact replacement dimensions, not the default size.
+ // Remote definitions remain on demand: show their existing lightweight thumbnail.
+ if(dkNeeds(item))return {html:thumb(item,96),nominal:true};
+ return {html:svgFor(item,size.w,size.d,{height:96}),nominal:false};
+}
 function variantMenu(ref,x,y){
  closeVariantMenu(false);
  const a=arqOf(ref),item=a&&byId(a.id);if(!item||CORE.layerFor(ref).locked)return;
@@ -518,7 +525,10 @@ function variantMenu(ref,x,y){
   if(item.dynamicOpening?.projection==='plan'&&variantSize(v,a).changed)continue;
   const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('aria-pressed',String(v.id===item.id));
   const size=variantSize(v,a),label=document.createElement('span');label.textContent=v.name+' · '+cm(size.w)+'×'+cm(size.d)+' cm'+(v.pro?' · PRO':'')+(size.changed?variantLang(' · nueva medida',' · new size'):'');
-  try{b.innerHTML=thumb(v,64)}catch(e){}b.append(label);
+  const preview=document.createElement('span');preview.className='arq-variant-preview';
+  const unavailable=()=>{preview.replaceChildren();preview.textContent=variantLang('Vista previa no disponible','Preview unavailable');};
+  try{const p=variantPreview(v,size);preview.innerHTML=p.html;const img=preview.querySelector('img');if(img)img.addEventListener('error',unavailable,{once:true});if(p.nominal&&(size.w!==v.w||size.d!==v.d)){const hint=document.createElement('small');hint.textContent=variantLang('Miniatura nominal','Nominal thumbnail');preview.append(hint)}}catch(e){unavailable()}
+  b.append(preview,label);
   b.onclick=()=>{if(size.changed&&!window.confirm(variantLang('El nuevo bloque tiene otras medidas reales. ¿Reemplazar y revisar el espacio libre?','The new block has different real dimensions. Replace and review clearance?')))return;try{const result=swapVariant(ref,v.id);if(result&&typeof result.then==='function')result.then(ok=>{if(ok)closeVariantMenu()});else if(result)closeVariantMenu()}catch(e){CORE.toast(e.message)}};grid.append(b);
  }
  const note=document.createElement('div');note.className='arq-vt';note.textContent=variantLang('Conserva punto de inserción, giro y capa. Revisá el espacio libre si cambia el tamaño.','Preserves insertion point, rotation and layer. Review clearance if the size changes.');menu.append(note);
