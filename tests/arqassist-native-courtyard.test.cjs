@@ -44,3 +44,19 @@ test('Courtyard typology searches retrieve matching native editable CAD plans in
  assert.deepEqual(await previews('museos'),[]);
  assert((await previews('casas')).some(x=>x.planId==='plan-904'));
 });
+
+test('Architectural preview downloads abort stalled responses and clear their timers',async()=>{
+ const src=fs.readFileSync('cad-arq-pro.js','utf8');
+ const create=new Function('fetch','AbortController','setTimeout','clearTimeout',src.slice(src.indexOf('async function arqFetchPreviewPlan('),src.indexOf('const arqSanitaryPreviewCache='))+';return arqFetchPreviewPlan;');
+ let cleared=0;
+ const make=(fetch,setTimer=setTimeout)=>create(fetch,AbortController,setTimer,id=>{cleared++;clearTimeout(id)});
+ assert.deepEqual(await make(async()=>({ok:true,json:async()=>({id:'plan-901'})}))('test'),{id:'plan-901'});
+ await assert.rejects(make(async()=>({ok:false}))('test'),/Planta no disponible/);
+ let signal;
+ const stalled=make(async(url,opts)=>{
+  signal=opts.signal;
+  return {ok:true,json:()=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('aborted body')),{once:true}))};
+ });
+ await assert.rejects(stalled('test',10),/aborted body/);
+ assert.equal(signal.aborted,true);assert.equal(cleared,3);
+});
