@@ -80,3 +80,17 @@ test('BIM polygon cuts have individual projected quantities and true transformed
  const inventory=section('function cad3dBimInventory(','function cad3dScheduleTo2D(');
  assert.ok(inventory.includes('cad3dBimPolygonCut(r,p,i)'));assert.ok(inventory.includes("'cutArea','cutVolume'"));
 });
+
+test('CAD2D reference transfer preserves metric scale and rejects silent truncation',()=>{
+ const api=new Function(section('function segmentsFromEntities(','function cad3dStyleUnderlay(')+';return {segmentsFromEntities,dxfToUnderlay};')();
+ const line={type:'line',a:{x:0,y:0},b:{x:5000,y:0}};
+ assert.deepEqual(api.segmentsFromEntities([line],.001),[[0,0,5,0]]);
+ assert.equal(api.segmentsFromEntities(Array(30000).fill(line),.001).length,30000);
+ assert.throws(()=>api.segmentsFromEntities(Array(30001).fill(line),1),/30,000 segments/);
+ assert.throws(()=>api.segmentsFromEntities([line],NaN),/Invalid CAD reference scale/);
+ assert.throws(()=>api.segmentsFromEntities([{...line,b:{x:Number.MAX_VALUE,y:0}}],2),/Invalid CAD reference coordinates/);
+ assert.ok(api.segmentsFromEntities([{type:'circle',c:{x:0,y:0},r:1}],1).length>100);
+ assert.deepEqual(api.segmentsFromEntities([{type:'circle',c:{x:0,y:0},r:Infinity}],1),[]);
+ assert.ok(section('function useOpenCAD2D(','async function importCADFile(').includes('Unknown CAD2D units'));
+ assert.ok(section('function dxfToUnderlay(','function cad3dStyleUnderlay(').includes('!e.cadHidden'));
+});
