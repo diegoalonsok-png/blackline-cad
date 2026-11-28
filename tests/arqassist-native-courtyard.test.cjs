@@ -28,3 +28,19 @@ test('House gallery interleaves schemes before repeated graphic variants',()=>{
  const a=[{planId:'a1',houseScheme:'bar',houseVariantKey:'a'},{planId:'a2',houseScheme:'bar',houseVariantKey:'a'},{planId:'b',houseScheme:'bar'},{planId:'u',houseScheme:'U'},{planId:'o',houseScheme:'courtyard'}];
  assert.deepEqual(sort(a).map(x=>x.planId),['a1','u','o','b','a2']);
 });
+test('Courtyard typology searches retrieve matching native editable CAD plans in Spanish and English',async()=>{
+ const s=fs.readFileSync('cad-block-browser.js','utf8');
+ const typ=new Function(s.slice(s.indexOf('const ARQ_TYPOLOGIES='),s.indexOf('function typologyMatch('))+';return arqTypology;')();
+ const tips=JSON.parse(fs.readFileSync('assets/arq-tipologias/v1/index.json'));
+ const previews=new Function('arqTypology','generalPlanQuery','parseArea','localGallery','document','fetch','T',s.slice(s.indexOf('function localHouseTypologyMatch('),s.indexOf('// Interleave distinct architectural schemes'))+';return localHousePreviews;')(typ,()=>false,()=>null,async()=>catalogue,{baseURI:'https://blackline-cad.org/'},async()=>({ok:true,json:async()=>tips}),(en,es)=>es);
+ for(const q of ['casas con patio','courtyard houses','domus']){
+  const r=await previews(q);
+  assert(r.some(x=>x.planId==='plan-901'));
+  assert(r.some(x=>x.planId==='plan-902'));
+  assert(!r.some(x=>x.planId==='plan-904'));
+  assert(r.some(x=>x.tipo&&/patio/i.test(x.houseScheme)));
+  assert(r.every(x=>!x.tipo||/patio/i.test(x.houseScheme)));
+ }
+ assert.deepEqual(await previews('museos'),[]);
+ assert((await previews('casas')).some(x=>x.planId==='plan-904'));
+});
