@@ -724,12 +724,19 @@
   return user.concat(dxf,native);
  }
  function generalPlanQuery(raw){const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();return /^(?:(?:plantas?|planos?|(?:floor )?plans?)(?:\s+(?:de\s+)?(?:arquitectura|architectural|architecture|arquitectonic[oa]s?|cad|dwg|dxf))?|architectural (?:floor )?plans?)$/.test(q);}
+ function localHouseTypologyMatch(x,typ){
+  if(!typ)return true;
+  if(typ!=='casa-patio')return false;
+  const q=String([x.typology,x.schemeName,x.name].filter(Boolean).join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  return /\b(?:courtyard|u-shape|patio|domus)\b/.test(q);
+ }
  async function localHousePreviews(raw){
-  if(!generalPlanQuery(raw)&&!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
+  const typ=arqTypology(raw);
+  if(!typ&&!generalPlanQuery(raw)&&!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
   const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
   const tb=new URL('assets/arq-tipologias/v1/',document.baseURI);let tip=[];
-  try{const r=await fetch(new URL('index.json?v=20261127-tipologias1',tb));if(r.ok){const ix=await r.json();if(Array.isArray(ix))tip=ix.filter(x=>/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(x.code)&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.08))).map(x=>({title:x.name+' · '+x.schemeName,area:x.area,houseScheme:x.schemeName,houseVariantKey:x.code.slice(0,-1),thumb:new URL(x.code+'.webp',tb).href,url:new URL(x.code+'.jpg',tb).href,source:new URL(x.code+'.jpg',tb).href,license:T('CAD2D3D typology · editable CAD','Tipología CAD2D3D · CAD editable'),local:true,planId:x.code,tipo:x.code,dxfGz:new URL(x.code+'.dxf.gz',tb).href,dwg:new URL(x.code+'.dwg',tb).href,dims:x.dims}));}}catch(e){}
-  return tip.concat(rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,houseScheme:x.typology||'legacy-native',thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id})));
+  try{const r=await fetch(new URL('index.json?v=20261127-tipologias1',tb));if(r.ok){const ix=await r.json();if(Array.isArray(ix))tip=ix.filter(x=>/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(x.code)&&localHouseTypologyMatch(x,typ)&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.08))).map(x=>({title:x.name+' · '+x.schemeName,area:x.area,houseScheme:x.schemeName,houseVariantKey:x.code.slice(0,-1),thumb:new URL(x.code+'.webp',tb).href,url:new URL(x.code+'.jpg',tb).href,source:new URL(x.code+'.jpg',tb).href,license:T('CAD2D3D typology · editable CAD','Tipología CAD2D3D · CAD editable'),local:true,planId:x.code,tipo:x.code,dxfGz:new URL(x.code+'.dxf.gz',tb).href,dwg:new URL(x.code+'.dwg',tb).href,dims:x.dims}));}}catch(e){}
+  return tip.concat(rows.filter(x=>x.category==='house'&&localHouseTypologyMatch(x,typ)&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,houseScheme:x.typology||'legacy-native',thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id})));
  }
  // Interleave distinct architectural schemes before repeating a family.
  function diversifyHousePlans(items){
@@ -921,12 +928,12 @@
   if(roomQuery(raw)||strictRoomCategory(raw))return openWeb(raw);
   stopHouseRefresh();webController?.abort();const epoch=++webEpoch;webArea=parseArea(raw);st.q=raw;searchPage=0;webItems=[];webStatus=T('Loading house library…','Cargando biblioteca de viviendas…');paintWeb();
   try{
-   const typ=arqTypology(raw),refCategory=typ?'typology':houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||!!refCategory)&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
-   const [own,archive]=await Promise.all([refsOnly||typ?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
+   const typ=arqTypology(raw),refCategory=typ?'typology':houseRefCategory(raw),refsOnly=(/referencias|references/i.test(raw)||(!typ&&!!refCategory))&&!webArea;const query=webArea?'Casas de '+webArea+' m²':refCategory?raw:refsOnly?'Casas referencias':'Casas';houseQuery=query;
+   const [own,archive]=await Promise.all([refsOnly?Promise.resolve([]):localHousePreviews(query).catch(()=>[]),archivedReferences(query).catch(()=>[])]);
    if(epoch!==webEpoch||!houseMode)return;
    webItems=own.concat(archive).filter(x=>(!refsOnly||!!refCategory||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
    if(!typ){const q=String(raw||'').trim(),mine=await userCadMatches(/\bcasas?\b|\bviviendas?\b|\bhouses?\b/i.test(q)?q:q+' casa').catch(()=>[]);if(epoch!==webEpoch||!houseMode)return;const keep=mine.filter(x=>/casa|vivienda|house|planta|corte/i.test(String(x.category)+' '+x.license));if(keep.length)webItems=keep.concat(webItems.filter(x=>!keep.some(k=>k.cadUrl===x.cadUrl)));}
-   if(!refsOnly&&!typ)webItems=diversifyHousePlans(webItems);
+   if(!refsOnly&&(!typ||typ==='casa-patio'))webItems=diversifyHousePlans(webItems);
    webStatus=webItems.length?'':refCategory?T('No files in this category yet.','Todavía no hay archivos en esta categoría.'):T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
    // No generic external photographs are appended.
