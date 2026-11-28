@@ -38,3 +38,14 @@ test('IFC4 exchange preserves structural element classes',()=>{
  assert.match(ifc,/=IFCFOOTING\(/);
  assert.deepEqual(x.cad3dDecodeIFC(ifc).map(r=>r.ifcClass),['Column','Beam','Footing']);
 });
+
+test('hosted BIM wall openings export axis position and sill elevation after wall transformations',()=>{
+ const position=new Function(section('function cad3dBimOpeningPosition(','function cad3dBimInventory(')+';return cad3dBimOpeningPosition;')();
+ const wall={type:'wall',x:10,y:20,z:3,rot:0,w:6,h:3},opening={offset:1,w:1,h:1,sill:1};
+ for(const [rot,x,y] of [[0,11,20],[90,10,21],[180,9,20],[-90,10,19]]){
+  const p=position({...wall,rot},opening);assert.ok(Math.abs(p.x-x)<1e-9&&Math.abs(p.y-y)<1e-9);assert.equal(p.z,4);
+ }
+ assert.deepEqual(position({...wall,x:15,y:25,z:6},opening),{x:16,y:25,z:7});
+ for(const [r,o] of [[wall,{...opening,offset:3}],[wall,{...opening,sill:3}],[{...wall,type:'slab'},opening],[{...wall,x:NaN},opening]])assert.deepEqual(position(r,o),{x:null,y:null,z:null});
+ assert.ok(section('function cad3dBimInventory(','function cad3dScheduleTo2D(').includes('...cad3dBimOpeningPosition(r,o)'));
+});
