@@ -219,7 +219,7 @@
  }
  function galleryItems(){
   const base=LIB.library,remote=window.CAD2D_OLYMPIADAS3?.catalog||[];
-  if(!remote.length)return base;
+  if(!Array.isArray(remote)||!remote.length)return base;
   const ids=new Set(base.map(it=>it.id)),sources=new Set(base.map(it=>String(it.source||'').toLowerCase()).filter(Boolean));
   return base.concat(remote.filter(it=>!ids.has(it.id)&&!sources.has(String(it.source||'').toLowerCase())));
  }
@@ -413,7 +413,7 @@
  const extraMatches=new Map();
  function loadPersonalBlocks(){
   if(personalBlocks!==null||personalLoad||!CORE.personalBlocks)return;
-  personalLoad=CORE.personalBlocks.read().then(rows=>{personalBlocks=Array.isArray(rows)?rows:[];}).catch(()=>{personalBlocks=[];}).finally(()=>{personalLoad=null;if(commandGallery&&!webMode)paint();});
+  personalLoad=Promise.resolve().then(()=>CORE.personalBlocks.read()).then(rows=>{personalBlocks=Array.isArray(rows)?rows:[];}).catch(()=>{personalBlocks=[];}).finally(()=>{personalLoad=null;if(commandGallery&&!webMode)paint();});
  }
  document.addEventListener('cad-personal-blocks-changed',()=>{personalBlocks=null;if(commandGallery&&!webMode){loadPersonalBlocks();paint();}});
  function extraSearch(query){
@@ -448,7 +448,7 @@
   el.querySelector('.cats').innerHTML=`<button data-c="" class="${st.cat?'':'on'}"><span>${T('All categories','Todas las categorías')}</span><small>${count('')}</small></button>`+
    cats.map(c=>`<button data-c="${c}" class="${st.cat===c?'on':''}"><span>${tr(c)}</span><small>${count(c)}</small></button>`).join('');
   const list=filtered(pool),grid=el.querySelector('.grid');
-  const searchQuery=blockQuery(st.q);if(commandGallery&&searchQuery.q){loadPersonalBlocks();list.push(...extraSearch(searchQuery));}else extraMatches.clear();
+  const searchQuery=blockQuery(st.q);if(commandGallery&&searchQuery.q){try{loadPersonalBlocks();list.push(...extraSearch(searchQuery));}catch(e){console.warn('[ARQASSIST] optional blocks unavailable',e);}}else extraMatches.clear();
   if(visual)list.sort((a,b)=>{
    const rank=x=>/^(?:dk-arbol|dk-dos-arboles|dk-arbusto-arbol)/.test(x.id)?0:familyOf(x)==='Exterior'?1:2;
    return (a.extra?a.extraRank:blockMatchRank(a,searchQuery))-(b.extra?b.extraRank:blockMatchRank(b,searchQuery))||Number(archivedView(a))-Number(archivedView(b))||Number(!!a.extra)-Number(!!b.extra)||rank(a)-rank(b)||a.name.localeCompare(b.name,es()?'es':'en');
