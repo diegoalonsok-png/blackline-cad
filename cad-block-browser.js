@@ -728,8 +728,24 @@
   if(!generalPlanQuery(raw)&&!/\b(?:casa|casas|vivienda|viviendas|house|houses|home|homes)\b/i.test(raw))return [];
   const a=parseArea(raw),rows=await localGallery(),base=new URL('assets/arq-catalogue/v1/',document.baseURI);
   const tb=new URL('assets/arq-tipologias/v1/',document.baseURI);let tip=[];
-  try{const r=await fetch(new URL('index.json?v=20261127-tipologias1',tb));if(r.ok){const ix=await r.json();if(Array.isArray(ix))tip=ix.filter(x=>/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(x.code)&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.08))).map(x=>({title:x.name+' · '+x.schemeName,area:x.area,thumb:new URL(x.code+'.webp',tb).href,url:new URL(x.code+'.jpg',tb).href,source:new URL(x.code+'.jpg',tb).href,license:T('CAD2D3D typology · editable CAD','Tipología CAD2D3D · CAD editable'),local:true,planId:x.code,tipo:x.code,dxfGz:new URL(x.code+'.dxf.gz',tb).href,dwg:new URL(x.code+'.dwg',tb).href,dims:x.dims}));}}catch(e){}
-  return tip.concat(rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id})));
+  try{const r=await fetch(new URL('index.json?v=20261127-tipologias1',tb));if(r.ok){const ix=await r.json();if(Array.isArray(ix))tip=ix.filter(x=>/^T-[A-Z0-9-]{1,8}-\d{3}[a-z]$/.test(x.code)&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.08))).map(x=>({title:x.name+' · '+x.schemeName,area:x.area,houseScheme:x.schemeName,houseVariantKey:x.code.slice(0,-1),thumb:new URL(x.code+'.webp',tb).href,url:new URL(x.code+'.jpg',tb).href,source:new URL(x.code+'.jpg',tb).href,license:T('CAD2D3D typology · editable CAD','Tipología CAD2D3D · CAD editable'),local:true,planId:x.code,tipo:x.code,dxfGz:new URL(x.code+'.dxf.gz',tb).href,dwg:new URL(x.code+'.dwg',tb).href,dims:x.dims}));}}catch(e){}
+  return tip.concat(rows.filter(x=>x.category==='house'&&(!a||Math.abs(x.area-a)<=Math.max(5,a*.15))).map(x=>({title:x.name,area:x.area,houseScheme:x.typology||'legacy-native',thumb:new URL(x.id+'.svg',base).href,url:new URL(x.id+'.svg',base).href,source:new URL(x.id+'.svg',base).href,license:T('Own preliminary plan','Planta propia preliminar'),local:true,planId:x.id})));
+ }
+ // Interleave distinct architectural schemes before repeating a family.
+ function diversifyHousePlans(items){
+  const groups=new Map(),other=[],seen=new Set();
+  for(const x of items){if(!x.houseScheme){other.push(x);continue;}
+   // Variant suffixes denote the same indexed base scheme; keep distinct cards
+   // available on later pages rather than presenting two graphic styles first.
+   const key=x.houseVariantKey||x.planId;
+   const duplicate=key&&seen.has(key);
+   if(key)seen.add(key);
+   const family=x.houseScheme+(duplicate?' / alternate finish':'');
+   if(!groups.has(family))groups.set(family,[]);groups.get(family).push(x);
+  }
+  const primary=[...groups].filter(([k])=>!k.endsWith(' / alternate finish')).map(([,g])=>g),alternate=[...groups].filter(([k])=>k.endsWith(' / alternate finish')).map(([,g])=>g);
+  const out=[];for(let i=0;primary.some(g=>i<g.length);i++)for(const g of primary)if(g[i])out.push(g[i]);
+  return out.concat(...alternate,other);
  }
  function isScaleFloorPlan(item){return !!item&&!item.classic&&(item.floorPlanVerified===true||item.drawingType==='floor-plan'||item.category==='house'||item.category==='bathroom'||item.planId&&Number.isFinite(item.area))&&!/\b(?:section|elevation|corte|vista|fachada)\b/i.test(String(item.drawingType||''));}
  const rejectedRasterUrls=new Set();
@@ -910,6 +926,7 @@
    if(epoch!==webEpoch||!houseMode)return;
    webItems=own.concat(archive).filter(x=>(!refsOnly||!!refCategory||(!x.planId&&!x.cadUrl))&&(!webArea||Number.isFinite(x.area)&&Math.abs(x.area-webArea)<.5)).sort((a,b)=>refsOnly?(a.area??-1)-(b.area??-1):(a.area??Infinity)-(b.area??Infinity));
    if(!typ){const q=String(raw||'').trim(),mine=await userCadMatches(/\bcasas?\b|\bviviendas?\b|\bhouses?\b/i.test(q)?q:q+' casa').catch(()=>[]);if(epoch!==webEpoch||!houseMode)return;const keep=mine.filter(x=>/casa|vivienda|house|planta|corte/i.test(String(x.category)+' '+x.license));if(keep.length)webItems=keep.concat(webItems.filter(x=>!keep.some(k=>k.cadUrl===x.cadUrl)));}
+   if(!refsOnly&&!typ)webItems=diversifyHousePlans(webItems);
    webStatus=webItems.length?'':refCategory?T('No files in this category yet.','Todavía no hay archivos en esta categoría.'):T('No plans for this area yet.','Todavía no hay plantas para esta superficie.');
    paintWeb();
    // No generic external photographs are appended.
