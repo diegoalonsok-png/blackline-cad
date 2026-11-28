@@ -30,3 +30,21 @@ test('reject nonfinite conversion factor and flag missing slab thickness',()=>{
  const rows=bim.inventory(s,1000);assert.equal(rows[0].footprintM2,20);assert.equal(rows[0].grossVolumeM3,null);
  assert.deepEqual(bim.audit(rows)[0].issues,['missing-slab-thickness']);
 });
+
+test('BIM refuses contradictory wall metadata and degenerate guide quantities',()=>{
+ const s=state();
+ for(const e of s.entities.slice(0,2))e.bim={class:'Wall',heightM:2.7,level:'PB',material:'Brick'};
+ assert.equal(bim.inventory(s,1)[0].quality,'gross-guide');
+ s.entities[1].bim.heightM=3;
+ let r=bim.inventory(s,1)[0];
+ assert.equal(r.quality,'conflicting-wall-metadata');assert.equal(r.grossAreaM2,null);assert.equal(r.grossVolumeM3,null);
+ assert(bim.audit([r])[0].issues.includes('conflicting-wall-metadata'));
+ s.entities[1].bim.heightM=2.7;s.entities[1].bim.level='PA';
+ assert.equal(bim.inventory(s,1)[0].grossVolumeM3,null);
+ delete s.entities[1].bim;
+ assert.equal(bim.inventory(s,1)[0].quality,'gross-guide');
+ for(const e of s.entities.slice(0,2))e.wall2d.guideB={x:0,y:0};
+ r=bim.inventory(s,1)[0];
+ assert.equal(r.quality,'invalid-wall-guide');assert.equal(r.lengthM,null);assert.equal(r.grossVolumeM3,null);
+ assert(bim.audit([r])[0].issues.includes('invalid-wall-guide'));
+});
