@@ -29,13 +29,17 @@ function typeOf(e){
  if(kind==='swing-door')return p.mirror?'door-r':'door-l';
  return p.vano?'vano':p.mullion?'mullion':'window';
 }
-function definitionFor(type){
- const name='ABERTURA · '+type.kind+' · '+type.id;
- if(!S().blocks[name]){
-  const defaults={width:.9*k(),frameWidth:.05*k(),frameDepth:(type.kind==='framed-window'?.12:.30)*k(),mirror:false,...type.set};
-  S().blocks[name]={name,entities:[{type:'line',a:{x:0,y:0},b:{x:defaults.width,y:0},layer:'0'}],parametric:{kind:type.kind,defaults}};
- }
- return name;
+// Use the actual permanent gallery model; no parallel ABERTURA definitions.
+function galleryModel(type,refs){
+ const models=window.CAD2D_OPENING_CATALOGUE?.list?.()||[];
+ const first=refs[0],p=first?{...defOf(first).parametric.defaults,...first.params}:{width:.9*k()};
+ const target=p.width*(Number(first?.scale)||1)/k();
+ const matches=models.filter(m=>m.kind===type.kind&&(type.kind==='swing-door'?m.reverse===!!type.set.mirror:type.kind==='framed-window'?m.vano===!!type.set.vano&&m.mullion===!!type.set.mullion:true));
+ return matches.sort((a,b)=>Math.abs(a.w-target)-Math.abs(b.w-target)||a.w-b.w)[0]||null;
+}
+function definitionFor(type,refs){
+ const model=galleryModel(type,refs);if(!model)return null;
+ return window.CAD2D_OPENING_CATALOGUE.ensure(model.id)||null;
 }
 // Reemplaza el tipo conservando lugar, rotación, ancho, espesor de muro y lado de apertura.
 function swap(typeId,refs=selectedOpenings()){
@@ -44,14 +48,15 @@ function swap(typeId,refs=selectedOpenings()){
  if(!refs.length){CORE.toast(L('Seleccioná una o más puertas o ventanas.','Select one or more doors or windows.'));return 0}
  if(!choices(refs).includes(type)){CORE.toast(L('Elegí una abertura de la misma familia.','Choose an opening of the same family.'));return 0;}
  const narrow=type.kind==='double-door'&&refs.some(r=>({...defOf(r).parametric.defaults,...r.params}).width<1.0*k());
+ if(!galleryModel(type,refs)){CORE.toast(L('Modelo de galería no disponible.','Gallery model unavailable.'));return 0}
  CORE.saveHistory();
- const name=definitionFor(type);let n=0;
+ const name=definitionFor(type,refs);if(!name||!S().blocks[name]?.parametric)return 0;let n=0;
  for(const ref of refs){
   const def=defOf(ref),old={...def.parametric.defaults,...(ref.params||{})};
-  const params={...old,...type.set};
+  const params={...S().blocks[name].parametric.defaults,...old,...type.set};
   // Profundidad del marco: ventana 12 cm, puerta 30 cm; nunca más que el muro.
   const wall=Number(ref.wallThickness)||old.frameDepth;
-  params.frameDepth=Math.min(wall||Infinity,(type.kind==='framed-window'?.12:.30)*k());
+  params.frameDepth=Math.min(wall||Infinity,Number(old.frameDepth)||.12*k(),type.kind==='framed-window'?.15*k():Infinity);
   if(type.kind!=='framed-window'){delete params.mullion;delete params.vano}
   if(type.kind!=='swing-door')params.mirror=type.kind==='framed-window'?false:Boolean(old.mirror);
   ref.blockName=name;ref.params=params;n++;
@@ -66,7 +71,7 @@ function flipSide(){const refs=selectedOpenings();if(!refs.length)return;CORE.sa
 const bar=(()=>{
  const el=document.createElement('div');el.id='cadOpeningSwap';el.hidden=true;el.setAttribute('role','dialog');el.setAttribute('aria-label',L('Cambiar abertura','Replace opening'));
  const css=document.createElement('style');css.textContent=`#cadOpeningSwap[hidden]{display:none!important}#cadOpeningSwap{position:fixed;left:50%;top:142px;transform:translateX(-50%);z-index:8500;display:flex;gap:4px;align-items:center;flex-wrap:wrap;width:min(420px,92vw);max-width:92vw;background:#16222b;color:#e6eef3;border:1px solid #d3b47a;border-radius:12px;padding:6px 8px;box-shadow:0 8px 24px rgba(0,0,0,.4);font:12px system-ui,sans-serif}
-#cadOpeningSwap b{flex-basis:100%;margin:4px;white-space:normal}#cadOpeningSwap .options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}#cadOpeningSwap .options button{flex-direction:column;white-space:normal;text-align:center;justify-content:center;min-height:74px}#cadOpeningSwap svg{width:54px;height:44px}#cadOpeningSwap .meta{flex-basis:100%;opacity:.8;margin:4px}#cadOpeningSwap [data-close]{position:absolute;right:8px;top:5px}#cadOpeningSwap button{all:unset;cursor:pointer;padding:5px 8px;border:1px solid #3a4b57;border-radius:8px;display:flex;gap:5px;align-items:center;white-space:nowrap}
+#cadOpeningSwap b{flex-basis:100%;margin:4px;white-space:normal}#cadOpeningSwap .options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;width:100%}#cadOpeningSwap .options button{flex-direction:column!important;white-space:normal!important;text-align:center;justify-content:center;min-height:74px}#cadOpeningSwap svg{width:54px;height:44px}#cadOpeningSwap .meta{flex-basis:100%;opacity:.8;margin:4px}#cadOpeningSwap [data-close]{position:absolute;right:8px;top:5px}#cadOpeningSwap button{all:unset;cursor:pointer;padding:5px 8px;border:1px solid #3a4b57;border-radius:8px;display:flex;gap:5px;align-items:center;white-space:nowrap}
 #cadOpeningSwap button:hover{border-color:#9adff3;background:#1d2c36}#cadOpeningSwap button.cur{border-color:#d3b47a;background:#2a2518}#cadOpeningSwap .i{font-size:15px;line-height:1}
 .bl-light #cadOpeningSwap{background:#fff;color:#1e2a33}.bl-light #cadOpeningSwap button{border-color:#cfd8de}`;
  document.head.append(css);
@@ -77,9 +82,9 @@ const bar=(()=>{
   return '<svg viewBox="0 0 48 44" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round">'+shapes[t.id]+'</svg>';
  }
  function paint(refs){
-  const cur=new Set(refs.map(typeOf)),types=choices(refs);
+  const cur=new Set(refs.map(typeOf)),types=choices(refs).filter(t=>galleryModel(t,refs));
   const w=refs.length===1?Number({...defOf(refs[0]).parametric.defaults,...refs[0].params}.width)/k():null;
-  el.innerHTML='<b>'+(refs.length===1?(family(refs[0])==='window'?L('Cambiar ventana','Replace window'):L('Cambiar puerta','Replace door')):refs.length+L(' aberturas seleccionadas',' selected openings'))+'</b><button type="button" data-close aria-label="'+L('Cerrar','Close')+'">×</button><span class="meta">'+(Number.isFinite(w)?L('Ancho: ','Width: ')+w.toFixed(2)+' m · ':'')+L('Conserva posición y hueco','Preserves position and wall opening')+'</span><div class="options">'+types.map(t=>'<button type="button" data-swap="'+t.id+'" class="'+(cur.size===1&&cur.has(t.id)?'cur':'')+'">'+preview(t)+L(t.es,t.en)+'</button>').join('')+'</div>'+
+  el.innerHTML='<b>'+(refs.length===1?(family(refs[0])==='window'?L('Cambiar ventana','Replace window'):L('Cambiar puerta','Replace door')):refs.length+L(' aberturas seleccionadas',' selected openings'))+'</b><button type="button" data-close aria-label="'+L('Cerrar','Close')+'">×</button><span class="meta">'+(Number.isFinite(w)?L('Ancho: ','Width: ')+w.toFixed(2)+' m · ':'')+L('Conserva posición y hueco','Preserves position and wall opening')+'</span><div class="options">'+types.map(t=>'<button type="button" data-swap="'+t.id+'" class="'+(cur.size===1&&cur.has(t.id)?'cur':'')+'">'+(window.CAD2D_OPENING_CATALOGUE?.preview?.(galleryModel(t,refs).id)||preview(t))+L(t.es,t.en)+'</button>').join('')+'</div>'+
   (!types.length?'<span class="meta">'+L('Seleccioná solo puertas o solo ventanas.','Select only doors or only windows.')+'</span>':'')+
   (refs.every(r=>family(r)==='door')?'<button type="button" data-flip>⇅ '+L('Invertir apertura','Flip opening')+'</button>':'');
  }
@@ -103,7 +108,7 @@ EXT.overlays=EXT.overlays||[];EXT.overlays.push(()=>{try{bar.refresh()}catch(e){
 EXT.context=EXT.context||[];
 EXT.context.push(({item,active})=>{
  if(active)return [];const refs=selectedOpenings();if(!refs.length)return [];
- return choices(refs).map(t=>item('⇄ '+L('Cambiar por ','Change to ')+L(t.es,t.en),()=>swap(t.id,refs)));
+ return choices(refs).filter(t=>galleryModel(t,refs)).map(t=>item('⇄ '+L('Cambiar por ','Change to ')+L(t.es,t.en),()=>swap(t.id,refs)));
 });
 EXT.commands=EXT.commands||{};
 const cmd=()=>{const refs=selectedOpenings();if(!refs.length)return CORE.toast(L('Seleccioná puertas o ventanas y repetí el comando (o usá la barra que aparece al seleccionarlas).','Select doors or windows and repeat the command (or use the bar that appears when they are selected).'));bar.refresh(true)};
