@@ -472,6 +472,39 @@ function swapVariant(ref,id){
  CORE.saveHistory();ref.blockName=ensureDefinition(item,size.w,size.d);delete ref.dynamic;
  CORE.updateAll();CORE.queueLocalBackup?.();CORE.schedule?.();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name+' · Ctrl+Z');return true;
 }
+// One floating replacement palette for native openings and architectural library blocks.
+const replacePalette=(()=>{
+ const host=document.createElement('aside');host.id='cadReplacePalette';host.hidden=true;host.setAttribute('role','region');host.setAttribute('aria-label','Replace block / Cambiar bloque');
+ const head=document.createElement('div');head.className='replace-head';
+ const heading=document.createElement('strong'),close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Close / Cerrar');head.append(heading,close);
+ const search=document.createElement('input');search.type='search';search.placeholder='Buscar modelo / Find model';search.setAttribute('aria-label',search.placeholder);
+ const body=document.createElement('div');body.className='replace-body';host.append(head,search,body);document.body.append(host);
+ const css=document.createElement('style');css.textContent=`
+ #cadReplacePalette[hidden]{display:none!important}#cadReplacePalette{position:fixed;z-index:9200;right:18px;top:145px;width:min(350px,calc(100vw - 24px));max-height:min(62vh,520px);display:flex;flex-direction:column;background:#f3e8d3;color:#293238;border:1px solid #baa17c;border-radius:12px;box-shadow:0 10px 30px #0005;overflow:hidden;font:12px system-ui,sans-serif;box-sizing:border-box}
+ #cadReplacePalette .replace-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:#ddcba8;cursor:move;touch-action:none;user-select:none;border-bottom:1px solid #baa17c}
+ #cadReplacePalette .replace-head button{border:0;background:transparent;color:#293238;font-size:20px;cursor:pointer}#cadReplacePalette input{margin:8px 9px;padding:7px 9px;border-radius:7px;border:1px solid #c7b28c;background:#fffaf0;color:#293238;min-width:0}#cadReplacePalette .replace-body{overflow:auto;min-height:0;padding:3px 9px 9px}
+ #cadReplacePalette #arqVariantMenu,#cadReplacePalette #cadOpeningSwap{position:static!important;transform:none!important;box-sizing:border-box;min-width:0!important;width:100%!important;max-width:none!important;max-height:none!important;box-shadow:none;border:0;background:transparent;color:#293238;padding:0;overflow:visible}
+ #cadReplacePalette #arqVariantMenu>.btn,#cadReplacePalette #cadOpeningSwap>[data-close]{display:none!important}#cadReplacePalette #arqVariantMenu .arq-vt,#cadReplacePalette #cadOpeningSwap .meta{color:#65543e}
+ #cadReplacePalette .options,#cadReplacePalette .arq-variant-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important}
+ #cadReplacePalette .options button,#cadReplacePalette .arq-variant-grid button{display:flex!important;box-sizing:border-box;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:5px;min-width:0;white-space:normal!important;text-align:center!important;border:1px solid #cbb796!important;background:#fffaf0!important;color:#293238!important;border-radius:8px;padding:6px!important}
+ #cadReplacePalette .options button:hover,#cadReplacePalette .arq-variant-grid button:hover,#cadReplacePalette button.cur,#cadReplacePalette button[aria-pressed=true]{border-color:#815b28!important;outline:1px solid #815b28}
+ #cadReplacePalette .options svg,#cadReplacePalette .arq-variant-grid svg,#cadReplacePalette .arq-variant-grid img{background:#b7cfdc!important;color:#293238!important;width:100%!important;height:72px!important;border-radius:4px;object-fit:contain;display:block}
+ #cadReplacePalette .options button[hidden],#cadReplacePalette .arq-variant-grid button[hidden]{display:none!important}
+ `;document.head.append(css);
+ let owner='',dismiss=null,drag=null;
+ const norm=v=>String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ function filter(){const q=norm(search.value).trim();for(const b of body.querySelectorAll('.options button,.arq-variant-grid button'))b.hidden=!!q&&!norm(b.textContent).includes(q)}
+ search.addEventListener('input',filter);close.onclick=()=>{const fn=dismiss;if(fn)fn();else hide(owner)};
+ for(const ev of ['pointerdown','mousedown','click','wheel','contextmenu','keydown','keyup'])host.addEventListener(ev,e=>e.stopPropagation());
+ head.addEventListener('pointerdown',e=>{if(e.button!==0||e.target===close)return;const r=host.getBoundingClientRect();drag={x:e.clientX-r.left,y:e.clientY-r.top};head.setPointerCapture?.(e.pointerId)});
+ head.addEventListener('pointermove',e=>{if(!drag)return;host.style.right='auto';host.style.left=Math.max(4,Math.min(innerWidth-host.offsetWidth-4,e.clientX-drag.x))+'px';host.style.top=Math.max(4,Math.min(innerHeight-host.offsetHeight-4,e.clientY-drag.y))+'px'});
+ for(const ev of ['pointerup','pointercancel','lostpointercapture'])head.addEventListener(ev,()=>{drag=null});
+ function hide(key){if(owner!==key)return;host.hidden=true;body.replaceChildren();owner='';dismiss=null;search.value=''}
+ function show(key,node,onClose){if(owner!==key){search.value='';body.replaceChildren(node);owner=key;}else if(node.parentNode!==body)body.replaceChildren(node);dismiss=onClose;heading.textContent=variantLang('CAMBIAR BLOQUE','REPLACE BLOCK');host.hidden=false;filter()}
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!host.hidden){const fn=dismiss;if(fn)fn();else hide(owner)}},true);
+ return Object.freeze({show,hide,contains:node=>host.contains(node)});
+})();
+window.CAD2D_REPLACE_PALETTE=replacePalette;
 let variantDismissed='',variantActive='';
 const variantLang=(es,en)=>document.documentElement.lang==='es'?es:en;
 function variantMenu(ref,x,y){
@@ -490,12 +523,11 @@ function variantMenu(ref,x,y){
  }
  const note=document.createElement('div');note.className='arq-vt';note.textContent=variantLang('Conserva punto de inserción, giro y capa. Revisá el espacio libre si cambia el tamaño.','Preserves insertion point, rotation and layer. Review clearance if the size changes.');menu.append(note);
  for(const ev of ['pointerdown','mousedown','click','wheel','contextmenu'])menu.addEventListener(ev,e=>e.stopPropagation());
- document.body.append(menu);
- menu.style.left=Math.max(4,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';menu.style.top=Math.max(4,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
+ replacePalette.show('arq',menu,()=>closeVariantMenu());
  setTimeout(()=>{if(menu.isConnected)document.addEventListener('pointerdown',outsideMenu,true)},0);
 }
-function outsideMenu(e){const m=$('arqVariantMenu');if(m&&!m.contains(e.target))closeVariantMenu()}
-function closeVariantMenu(dismiss=true){if(dismiss&&variantActive)variantDismissed=variantActive;$('arqVariantMenu')?.remove();variantActive='';document.removeEventListener('pointerdown',outsideMenu,true)}
+function outsideMenu(e){const m=$('arqVariantMenu');if(m&&!replacePalette.contains(e.target))closeVariantMenu()}
+function closeVariantMenu(dismiss=true){if(dismiss&&variantActive)variantDismissed=variantActive;replacePalette.hide('arq');$('arqVariantMenu')?.remove();variantActive='';document.removeEventListener('pointerdown',outsideMenu,true)}
 // Automatically display variants on selecting one native library block; keep
 // dedicated opening editor independent, and never reopen a dismissed selection.
 EXT.overlays.push(()=>{
@@ -506,6 +538,12 @@ EXT.overlays.push(()=>{
  if(variantActive===ref.id||variantDismissed===ref.id)return;
  variantMenu(ref,Math.max(8,innerWidth-400),155);
 });
+EXT.commands=EXT.commands||{};
+for(const key of ['CAMBIARBLOQUE','REEMPLAZARBLOQUE','SWAPBLOCK','REPLACEBLOCK'])EXT.commands[key]=()=>{
+ const ref=selectedArqRef();if(ref&&arqOf(ref)&&!CORE.layerFor(ref).locked&&!S().blocks[ref.blockName]?.parametric){variantDismissed='';variantMenu(ref,0,0);return}
+ if(window.CAD2D_OPENINGS?.selected?.().length){window.CAD2D_OPENINGS.open?.();return}
+ CORE.toast(variantLang('Seleccioná un bloque de la galería.','Select a gallery block.'));
+};
 function onPointerDown(ev){
  if(ev.button!==0)return;
  const raw=P(ev.offsetX,ev.offsetY);
