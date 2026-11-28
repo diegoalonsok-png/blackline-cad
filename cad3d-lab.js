@@ -9304,6 +9304,22 @@ function cad3dBimOpeningPosition(r,o){
  const x=r.x+Math.cos(a)*o.offset,y=r.y+Math.sin(a)*o.offset,z=r.z+o.sill;
  return [x,y,z].every(Number.isFinite)?{x,y,z}:{x:null,y:null,z:null};
 }
+// Polygon cuts use their true plan centroid, not the bounding-box midpoint.
+function cad3dBimPolygonCut(r,p,index){
+ const id='3D:'+r.id+':polygon-cut:'+index;
+ const empty={id,x:null,y:null,z:null,width:null,depth:null,height:null,grossArea:null,netArea:null,netVolume:null,quantityStatus:'invalid polygon cut'};
+ if(r.type!=='slab'||![r.x,r.y,r.z,r.rot??0,r.pitch??0,r.w,r.d,r.h].every(Number.isFinite)||
+    r.w<=0||r.d<=0||r.h<=0||Math.abs(r.pitch??0)>45||!cad3dPolyValid(p,r))return empty;
+ let cross=0,mx=0,my=0;
+ for(let i=0;i<p.length;i++){
+  const a=p[i],b=p[(i+1)%p.length],v=a[0]*b[1]-b[0]*a[1];cross+=v;mx+=(a[0]+b[0])*v;my+=(a[1]+b[1])*v;
+ }
+ const area=Math.abs(cross)/2,u=mx/(3*cross),v=my/(3*cross),a=(r.rot??0)*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+ const x=r.x+c*u-s*v,y=r.y+s*u+c*v,z=r.z+Math.tan((r.pitch??0)*Math.PI/180)*u;
+ const bounds=cad3dSlabCutBounds(p);
+ if(!bounds||![area,x,y,z].every(Number.isFinite))return empty;
+ return {...empty,x,y,z,width:bounds.w,depth:bounds.d,height:r.h,cutArea:area,cutVolume:area*r.h,quantityStatus:'polygon cut; local bounds; centroid on underside'};
+}
 function cad3dBimInventory(format='csv'){
  const types={wall:'Wall',slab:'Slab',stair:'Stair',railing:'Railing',column:'Column',beam:'Beam',roof:'Roof',door:'Door',window:'Window',furniture:'Furniture'};
  const n=v=>Number.isFinite(v)?v:null, out=[];
@@ -9312,10 +9328,14 @@ function cad3dBimInventory(format='csv'){
   const id='3D:'+r.id, q=cad3dBimWallQuantities(r)||cad3dBimSlabQuantities(r), structural=r.type==='box'&&r.bimClass?cad3dMassProperties(r):null;
   out.push({grossArea:q?.grossArea??null,netArea:q?.netArea??null,netVolume:q?.netVolume??structural?.volume??null,quantityStatus:q?.status||(structural?.volume!=null?'rectangular solid':''),wallLayers:q?.layers||[],id,host:'',class:cls,nativeType:r.type,name:String(r.name||r.type),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:String(r.materialId||''),style:String(r.styleId||''),x:n(r.x),y:n(r.y),z:n(r.z),width:n(r.w),depth:n(r.d),height:n(r.h),sill:null,openingCount:(r.openings||[]).length+(r.slabPolyHoles||[]).length});
   for(const o of r.openings||[]){out.push({id:id+':opening:'+o.id,host:id,class:o.kind==='door'?'Door':o.kind==='window'?'Window':'Opening',nativeType:o.kind||'opening',name:String(o.kind||'opening'),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:String(o.styleId||''),...cad3dBimOpeningPosition(r,o),width:n(o.w),depth:r.type==='slab'?n(o.d):null,height:r.type==='slab'?n(r.h):n(o.h),sill:n(o.sill),openingCount:0});}
+  if(r.type==='slab')for(const [i,p] of (r.slabPolyHoles||[]).entries()){
+   const cut=cad3dBimPolygonCut(r,p,i);
+   out.push({host:id,class:'Opening',nativeType:'polygon-cut',name:'Polygon cut '+(i+1),layer:layer?.name||'',level:r.bimLevel?.name||'',levelElevation:n(r.bimLevel?.elevation),material:'',style:'',sill:null,openingCount:0,...cut});
+  }
  }
  if(!out.length)return text('BIM3D · No hay elementos en el modelo');
- const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount','grossArea','netArea','netVolume','quantityStatus'];
- const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native dimensions; walls have nominal net quantities excluding openings but not junctions. Hosted wall openings use wall-axis midpoint at sill elevation; rectangular slab openings use plan center on the underside. Slab areas are plan-projected; thickness is vertical. Polygon cuts contribute to quantities but are not individually listed. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
+ const keys=['id','host','class','nativeType','name','layer','level','levelElevation','material','style','x','y','z','width','depth','height','sill','openingCount','grossArea','netArea','netVolume','quantityStatus','cutArea','cutVolume'];
+ const content=format==='json'?JSON.stringify({schema:'blackline-bim-inventory-v1',unit:'m',source:'3D',note:'Native dimensions; walls have nominal net quantities excluding openings but not junctions. Hosted wall openings use wall-axis midpoint at sill elevation; rectangular slab openings use plan center on the underside. Slab areas are plan-projected; thickness is vertical. Polygon cuts are individually listed with plan-centroid coordinates, local bounding dimensions and removed area/volume in separate cut fields; IDs are positional within each host and not persistent across reordering. Not IFC.',elements:out},null,2):cad3dReportCSV([keys,...out.map(row=>keys.map(k=>row[k]??''))]);
  const blob=new Blob([content],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='CAD2D3D-BIM-3D.'+format;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);text('BIM3D · '+out.length+' registros exportados; MASSPROP para volúmenes y superficies');
 }
 
