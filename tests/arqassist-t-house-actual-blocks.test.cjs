@@ -4,7 +4,7 @@ const base='assets/arq-catalogue/v1/';
 test('Reviewed houses use actual catalogue block geometry and clear door swings',()=>{
  for(const id of ['plan-901','plan-902','plan-904']){
  const p=JSON.parse(fs.readFileSync(base+id+'.json')),index=JSON.parse(fs.readFileSync(base+'index.json'));
- assert(index.some(r=>r.id===id&&r.typology));
+ assert.equal(index.some(r=>r.id===id&&r.typology),id==='plan-904','retired houses remain compatible but are not listed');
  assert.equal(p.rooms.filter(r=>r.kind==='bedroom').length,id==='plan-902'?4:3);
  assert.equal(p.rooms.filter(r=>r.kind==='bathroom').length,id==='plan-902'?2:1);
  const bounds=b=>{const a=L.bounds(L.build(b.catalogId,...b.nominalSize).entities),c=Math.cos(b.rotation*Math.PI/180),s=Math.sin(b.rotation*Math.PI/180),ps=[[a.minX,a.minY],[a.minX,a.maxY],[a.maxX,a.minY],[a.maxX,a.maxY]].map(([x,y])=>[b.point[0]+x*c-y*s,b.point[1]+x*s+y*c]);return [Math.min(...ps.map(q=>q[0])),Math.min(...ps.map(q=>q[1])),Math.max(...ps.map(q=>q[0])),Math.max(...ps.map(q=>q[1]))]};
@@ -25,4 +25,10 @@ test('Reviewed houses use actual catalogue block geometry and clear door swings'
  assert.deepEqual(sanitary(p,L.library).issues,[]);
  if(id!=='plan-904')assert(p.openings.some(o=>o.host==='wall4'&&o.kind==='swing-door'));
  }
+});
+test('Rejected patio house and same-layout U variant remain absent from gallery',()=>{
+ const rows=JSON.parse(fs.readFileSync(base+'index.json'));
+ for(const id of ['plan-901','plan-902'])assert(!rows.some(r=>r.id===id));
+ assert(rows.some(r=>r.id==='plan-904'));
+ assert(fs.readFileSync('cad-block-browser.js','utf8').includes("rows.filter(row=>!['plan-901','plan-902'].includes(row.id))"));
 });
