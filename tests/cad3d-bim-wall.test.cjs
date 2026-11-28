@@ -114,10 +114,26 @@ test('INTERFERE includes only rectangular solid walls verified by the actual joi
  assert.equal(api.scan([w,{...b,y:.25}]).found,0);
  assert.equal(api.scan([{...w,rot:90},{...b,y:1}]).found,1);
  assert.equal(api.scan([w,{...b,z:3}]).found,0);
- assert.equal(api.scan([{...w,openings:[{offset:0,w:1,h:2,sill:0}]},b]).unsupported.length,1);
+ assert.equal(api.scan([{...w,openings:[{offset:0,w:1,h:2,sill:0}]},b]).found,1);
  const l={...w,id:3,x:2.5,y:2.5,rot:90},t={...w,id:4,x:0,y:2.5,rot:90};
  assert.equal(api.scan([w,l,b]).unsupported.length,2);
  assert.ok(api.scan([w,t,b]).unsupported.some(x=>x.id===4));
  assert.equal(api.shape(w),null);
  assert.equal(api.scan([w,b],[1,2],'selection').found,1);
+});
+
+test('INTERFERE tests actual masonry around rectangular wall voids with bounded compound work',()=>{
+ const api=new Function('let records=[];'+section('function wallJoinOffsets(','function applyWallMiter(')+section('function cad3dInterferenceShape(','function cad3dInterferenceReport(')+';return {scan:(all,limit=200000)=>{records=all;return cad3dInterferenceScan(all,[],"all",limit,wallJoinOffsets)}};')();
+ const w={id:1,type:'wall',x:0,y:0,z:0,w:5,d:.2,h:3,rot:0,openings:[{offset:0,w:1,h:2,sill:0}]},b={id:2,type:'box',x:0,y:0,z:0,w:.5,d:.5,h:1};
+ assert.equal(api.scan([w,b]).found,0);assert.equal(api.scan([w,b]).supported,2);
+ assert.equal(api.scan([w,{...b,z:2}]).found,1);
+ assert.equal(api.scan([w,{...b,x:.6}]).found,1);
+ assert.equal(api.scan([w,{...b,x:.25}]).found,0);
+ assert.equal(api.scan([{...w,rot:90},b]).found,0);
+ assert.equal(api.scan([{...w,openings:[{offset:0,w:1,h:1,sill:1}]},b]).found,1);
+ assert.equal(api.scan([{...w,openings:[...w.openings,{offset:.5,w:1,h:2,sill:0}]},{...b,x:.6}]).found,0);
+ assert.equal(api.scan([{...w,openings:[{offset:0,w:100,h:2,sill:0}]},b]).unsupported.length,1);
+ assert.equal(api.scan([w,b],1).truncated,true);
+ assert.equal(api.scan([w,{id:3,type:'cylinder',x:0,y:0,z:0,radius:.2,h:1}]).found,0);
+ assert.equal(api.scan([w,{...w,id:3,rot:90}]).found,1);
 });
