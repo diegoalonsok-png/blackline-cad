@@ -199,7 +199,7 @@ css.textContent=`
 #arqModal .arq-grid{flex:1;overflow:auto;padding:0 14px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-content:start}
 #arqModal .arq-card .arq-name{font-size:11px}
 #arqVariantMenu{position:fixed;z-index:9100;background:#141c24;border:1px solid #4d6676;border-radius:8px;padding:6px;max-height:60vh;overflow:auto;display:grid;gap:3px;min-width:230px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
-#arqVariantMenu button{text-align:left;font-size:11px}
+#arqVariantMenu button{text-align:left;font-size:11px} #arqVariantMenu{width:min(370px,90vw)}#arqVariantMenu .arq-variant-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}#arqVariantMenu .arq-variant-grid button{display:flex;flex-direction:column;white-space:normal;min-width:0}#arqVariantMenu .arq-variant-grid button[aria-pressed=true]{outline:1px solid #91bfd5}
 #arqVariantMenu .arq-vt{font-size:10px;color:#9cb1bc;padding:2px 4px}
 #arqDialog{position:fixed;inset:0;z-index:9200;background:rgba(5,9,13,.6);display:flex;align-items:center;justify-content:center}
 #arqDialog .arq-dlg{background:#141c24;border:1px solid #4d6676;border-radius:10px;padding:14px;min-width:300px;max-width:560px;color:#e5eef7;font-size:12px}
@@ -441,29 +441,57 @@ function resizeRef(ref,W,D){
  CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);
  CORE.toast(item.name+' → '+cm(w)+' × '+cm(d)+' cm · Ctrl+Z deshace');
 }
-function swapVariant(ref,id){
- const a=arqOf(ref),item=byId(id);if(!a||!item)return;
- if(dkNeeds(item)&&allowed(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)swapVariant(ref,id)}).catch(e=>CORE.toast(e.message))}
- if(!allowed(item))return plan().upsell('Bloque Pro: '+item.name);
- CORE.saveHistory();ref.blockName=ensureDefinition(item,a.w,a.d);delete ref.dynamic;
- CORE.updateAll();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name);
+// Same-family replacement uses real catalogue geometry, never stretched sanitary fixtures.
+function variantSize(item,a){
+ const e=1e-7;
+ const fits=a.w>=item.wMin-e&&a.w<=item.wMax+e&&a.d>=item.dMin-e&&a.d<=item.dMax+e&&(!item.lockAspect||Math.abs(a.w*item.d-a.d*item.w)<e);
+ return fits?{w:a.w,d:a.d,changed:false}:{w:item.w,d:item.d,changed:Math.abs(a.w-item.w)>e||Math.abs(a.d-item.d)>e};
 }
+function replacementItems(item){
+ return familyOf(item).filter(v=>v.cat===item.cat&&!v.dxfPlan&&!v.hideFromGallery);
+}
+function swapVariant(ref,id){
+ const a=arqOf(ref),item=byId(id),source=a&&byId(a.id);
+ if(!source||!item||!S().entities.includes(ref)||CORE.layerFor(ref).locked||CORE.layerFor(ref).visible===false||!replacementItems(source).includes(item))return false;
+ if(!allowed(item)){plan()?.upsell('Bloque Pro: '+item.name);return false}
+ if(dkNeeds(item)){const old=ref.blockName;return dkPrepare(item).then(()=>{if(S().entities.includes(ref)&&ref.blockName===old&&!CORE.layerFor(ref).locked)return swapVariant(ref,id);return false}).catch(e=>CORE.toast(e.message))}
+ const size=variantSize(item,a);
+ CORE.saveHistory();ref.blockName=ensureDefinition(item,size.w,size.d);delete ref.dynamic;
+ CORE.updateAll();CORE.queueLocalBackup?.();CORE.schedule?.();syncSizeRow(item,S().blocks[ref.blockName].arq);CORE.toast('Variante: '+item.name+' · Ctrl+Z');return true;
+}
+let variantDismissed='',variantActive='';
+const variantLang=(es,en)=>document.documentElement.lang==='es'?es:en;
 function variantMenu(ref,x,y){
- closeVariantMenu();
- const a=arqOf(ref),item=byId(a.id),menu=document.createElement('div');menu.id='arqVariantMenu';menu.setAttribute('role','menu');
- menu.innerHTML='<div class="arq-vt">VARIANTES · '+esc(item.family.toUpperCase())+' · se conserva '+cm(a.w)+'×'+cm(a.d)+' cm si entra en rango</div>';
- for(const v of familyOf(item)){
-  const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('role','menuitem');
-  b.textContent=(v.id===item.id?'● ':'')+v.name+(v.pro?'  · PRO':'');b.onclick=()=>{closeVariantMenu();swapVariant(ref,v.id)};menu.append(b);
+ closeVariantMenu(false);
+ const a=arqOf(ref),item=a&&byId(a.id);if(!item||CORE.layerFor(ref).locked)return;
+ const menu=document.createElement('div');menu.id='arqVariantMenu';menu.setAttribute('role','dialog');menu.setAttribute('aria-label',variantLang('Cambiar bloque','Replace block'));variantActive=ref.id;
+ const title=document.createElement('div');title.className='arq-vt';title.textContent=variantLang('Cambiar bloque · ','Replace block · ')+item.name+' · '+cm(a.w)+'×'+cm(a.d)+' cm';menu.append(title);
+ const close=document.createElement('button');close.type='button';close.className='btn';close.textContent='×';close.setAttribute('aria-label',variantLang('Cerrar','Close'));close.onclick=()=>closeVariantMenu();menu.append(close);
+ const grid=document.createElement('div');grid.className='arq-variant-grid';menu.append(grid);
+ for(const v of replacementItems(item)){
+  const b=document.createElement('button');b.type='button';b.className='btn';b.setAttribute('aria-pressed',String(v.id===item.id));
+  const size=variantSize(v,a),label=document.createElement('span');label.textContent=v.name+' · '+cm(size.w)+'×'+cm(size.d)+' cm'+(v.pro?' · PRO':'')+(size.changed?variantLang(' · nueva medida',' · new size'):'');
+  try{b.innerHTML=thumb(v,64)}catch(e){}b.append(label);
+  b.onclick=()=>{if(size.changed&&!window.confirm(variantLang('El nuevo bloque tiene otras medidas reales. ¿Reemplazar y revisar el espacio libre?','The new block has different real dimensions. Replace and review clearance?')))return;try{const result=swapVariant(ref,v.id);if(result&&typeof result.then==='function')result.then(ok=>{if(ok)closeVariantMenu()});else if(result)closeVariantMenu()}catch(e){CORE.toast(e.message)}};grid.append(b);
  }
- const more=document.createElement('button');more.type='button';more.className='btn';more.textContent='Abrir galería completa…';more.onclick=()=>{closeVariantMenu();openModal(item.cat)};menu.append(more);
+ const note=document.createElement('div');note.className='arq-vt';note.textContent=variantLang('Conserva punto de inserción, giro y capa. Revisá el espacio libre si cambia el tamaño.','Preserves insertion point, rotation and layer. Review clearance if the size changes.');menu.append(note);
+ for(const ev of ['pointerdown','mousedown','click','wheel','contextmenu'])menu.addEventListener(ev,e=>e.stopPropagation());
  document.body.append(menu);
- menu.style.left=Math.min(x,innerWidth-menu.offsetWidth-8)+'px';menu.style.top=Math.min(y,innerHeight-menu.offsetHeight-8)+'px';
- setTimeout(()=>document.addEventListener('pointerdown',outsideMenu,true),0);
+ menu.style.left=Math.max(4,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';menu.style.top=Math.max(4,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
+ setTimeout(()=>{if(menu.isConnected)document.addEventListener('pointerdown',outsideMenu,true)},0);
 }
 function outsideMenu(e){const m=$('arqVariantMenu');if(m&&!m.contains(e.target))closeVariantMenu()}
-function closeVariantMenu(){$('arqVariantMenu')?.remove();document.removeEventListener('pointerdown',outsideMenu,true)}
-
+function closeVariantMenu(dismiss=true){if(dismiss&&variantActive)variantDismissed=variantActive;$('arqVariantMenu')?.remove();variantActive='';document.removeEventListener('pointerdown',outsideMenu,true)}
+// Automatically display variants on selecting one native library block; keep
+// dedicated opening editor independent, and never reopen a dismissed selection.
+EXT.overlays.push(()=>{
+ const ref=S().tool==='select'&&S().selected.length===1&&!gripDrag&&!pick.active?selectedArqRef():null;
+ const a=ref&&arqOf(ref),item=a&&byId(a.id);
+ const eligible=ref&&item&&!S().blocks[ref.blockName]?.parametric&&!CORE.layerFor(ref).locked&&CORE.layerFor(ref).visible!==false&&replacementItems(item).length>1;
+ if(!eligible){if(variantActive)closeVariantMenu(false);if(!ref||ref.id!==variantDismissed)variantDismissed='';return}
+ if(variantActive===ref.id||variantDismissed===ref.id)return;
+ variantMenu(ref,Math.max(8,innerWidth-400),155);
+});
 function onPointerDown(ev){
  if(ev.button!==0)return;
  const raw=P(ev.offsetX,ev.offsetY);
