@@ -94,3 +94,15 @@ test('CAD2D reference transfer preserves metric scale and rejects silent truncat
  assert.ok(section('function useOpenCAD2D(','async function importCADFile(').includes('Unknown CAD2D units'));
  assert.ok(section('function dxfToUnderlay(','function cad3dStyleUnderlay(').includes('!e.cadHidden'));
 });
+
+test('INTERFERE detects nominal vertical cylinders against cylinders, boxes and spheres',()=>{
+ const api=new Function(section('function cad3dInterferenceShape(','function cad3dInterferenceReport(')+';return {shape:cad3dInterferenceShape,pair:cad3dInterferencePair,scan:cad3dInterferenceScan};')();
+ const c={id:1,type:'cylinder',x:0,y:0,z:0,radius:1,h:2},b={id:2,type:'box',x:1.4,y:0,z:0,w:1,d:1,h:2},s={id:3,type:'sphere',x:0,y:0,z:1.5,radius:.5};
+ const hit=(a,b)=>api.pair(api.shape(a),api.shape(b));
+ for(const [a,o,v] of [[c,{...c,x:1.9},true],[c,{...c,x:2},false],[c,{...c,z:2},false],[c,b,true],[c,{...b,x:1.5},false],[c,{...b,x:1.4,y:1.4},false],[c,s,true],[c,{...s,z:2},false],[c,{...s,x:1.4,z:1.7},true],[c,{...s,x:1.4,z:1.9},false],[c,{...b,rot:45},true]]){
+  assert.equal(hit(a,o),v);assert.equal(hit(o,a),v);
+ }
+ assert.equal(api.shape({...c,radius:0}),null);
+ const result=api.scan([c,b,{...s,x:10}],[],'all');
+ assert.equal(result.found,1);assert.equal(result.supported,3);
+});
