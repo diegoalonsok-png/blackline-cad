@@ -66,7 +66,7 @@ function distance(a,b){let row=Array.from({length:b.length+1},(_,i)=>i);for(let 
 function concept(t){if(lex.has(t))return lex.get(t);if(t.length<5)return null;let best=2,keys=new Set();for(const [word,key] of lex){if(Math.abs(word.length-t.length)>1)continue;const d=distance(word,t);if(d<best){best=d;keys=new Set([key])}else if(d===best)keys.add(key)}return best===1&&keys.size===1?[...keys][0]:null}
 const num=s=>Number(String(s).replace(',','.'));
 const unitScale=u=>/^(cm|centimet)/.test(u||'')?.01:/^(mm|milimet)/.test(u||'')?.001:/^(ft|feet|foot|pies|pie)$/.test(u||'')?.3048:1;
-const N='(\\d+(?:[.,]\\d+)?)',U='(mm|cm|mts?|metros?|meters?|metres?|ft|feet|foot|pies|pie|centimetros?|milimetros?)?';
+const N='(\\d+(?:[.,]\\d+)?)',U='(mm|cm|metros?|meters?|metres?|mts?|m|ft|feet|foot|pies|pie|centimetros?|milimetros?)?';
 function measure(s){const m=s.match(new RegExp('^\\s*'+N+'\\s*'+U+'\\b','i'));return m?num(m[1])*unitScale(m[2]):null}
 function dimensions(s){const m=s.match(new RegExp(N+'\\s*'+U+'\\s*(?:x|×|por|by|par|mal|per)\\s*'+N+'\\s*'+U,'i'));return m?[num(m[1])*unitScale(m[2]||m[4]),num(m[3])*unitScale(m[4]||m[2])]:null}
 // Count-after-name shorthand is distinct from the two dimensions.
