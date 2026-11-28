@@ -1620,7 +1620,7 @@ function arqHouseDesignRequest(raw){
 }
 function arqLinkedRoomRequest(raw){
  const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
- return /\d\s*(?:x|×|por|by)\s*\d/.test(q)&&(/\b(?:cocina|kitchen)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:lavadero|laundry)\b/.test(q)||/\b(?:living|salon)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:comedor|dining)\b/.test(q))&&!/\b(?:buscar|busca|mostrar|mostrame|search|find|show|fotos?|referencias?)\b/.test(q);
+ return /\d\s*(?:mm|cm|m)?\s*(?:x|×|por|by)\s*\d/.test(q)&&(/\b(?:cocina|kitchen)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:lavadero|laundry)\b/.test(q)||/\b(?:living|salon)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:comedor|dining)\b/.test(q))&&!/\b(?:buscar|busca|mostrar|mostrame|search|find|show|fotos?|referencias?)\b/.test(q);
 }
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
