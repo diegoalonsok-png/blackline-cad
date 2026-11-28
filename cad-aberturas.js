@@ -76,6 +76,9 @@ const bar=(()=>{
 .bl-light #cadOpeningSwap{background:#fff;color:#1e2a33}.bl-light #cadOpeningSwap button{border-color:#cfd8de}`;
  document.head.append(css);
  let sig='',dismissed='';
+ const shared=window.CAD2D_REPLACE_PALETTE;
+ function hide(){el.hidden=true;shared?.hide('opening')}
+ function dismiss(){dismissed=selectionKey(selectedOpenings());hide()}
  const selectionKey=refs=>refs.map(r=>r.id).sort().join('|');
  function preview(t){
   const shapes={'door-l':'<path d="M9 35V5 M9 5 A30 30 0 0 1 39 35"/>','door-r':'<path d="M39 35V5 M39 5 A30 30 0 0 0 9 35"/>',double:'<path d="M9 35V19 M39 35V19 M9 19 A16 16 0 0 1 25 35 M39 19 A14 14 0 0 0 25 33"/>',window:'<rect x="5" y="15" width="38" height="14"/><path d="M8 19H40 M8 25H40"/>',mullion:'<rect x="5" y="15" width="38" height="14"/><path d="M8 19H40 M8 25H40 M24 15V29"/>',vano:'<path d="M5 12V32 M43 12V32 M5 12H10 M5 32H10 M38 12H43 M38 32H43"/>'};
@@ -89,16 +92,16 @@ const bar=(()=>{
   (refs.every(r=>family(r)==='door')?'<button type="button" data-flip>⇅ '+L('Invertir apertura','Flip opening')+'</button>':'');
  }
  for(const ev of ['pointerdown','mousedown','wheel','contextmenu'])el.addEventListener(ev,e=>e.stopPropagation());
- el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();if(b.hasAttribute('data-close')){dismissed=selectionKey(selectedOpenings());el.hidden=true;}else if(b.dataset.swap)swap(b.dataset.swap);else if(b.hasAttribute('data-flip'))flipSide();});
+ el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;e.stopPropagation();if(b.hasAttribute('data-close')){dismiss();}else if(b.dataset.swap)swap(b.dataset.swap);else if(b.hasAttribute('data-flip'))flipSide();});
  const api={refresh(force=false){
   const refs=S().tool==='select'?selectedOpenings():[],key=selectionKey(refs);
-  if(!refs.length){el.hidden=true;sig='';dismissed='';return}
+  if(!refs.length){hide();sig='';dismissed='';return}
   if(force||dismissed!==key)dismissed='';
-  if(dismissed===key){el.hidden=true;return}
+  if(dismissed===key){hide();return}
   const s=refs.map(r=>r.id+':'+r.blockName+':'+JSON.stringify(r.params||{})).join('|')+document.documentElement.lang;
-  if(s!==sig){sig=s;paint(refs)}if(el.hidden)el.hidden=false;
+  if(s!==sig||el.hidden){sig=s;paint(refs);el.hidden=false;shared?.show('opening',el,dismiss)}
  }};
- const mount=()=>{document.body.append(el)};if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
+ const mount=()=>{if(!shared)document.body.append(el)};if(document.body)mount();else addEventListener('DOMContentLoaded',mount);
  return api;
 })();
 // La selección cambia con cada clic: la barra se sincroniza al dibujar cada cuadro (sin costo si no cambió).
@@ -113,5 +116,5 @@ EXT.context.push(({item,active})=>{
 EXT.commands=EXT.commands||{};
 const cmd=()=>{const refs=selectedOpenings();if(!refs.length)return CORE.toast(L('Seleccioná puertas o ventanas y repetí el comando (o usá la barra que aparece al seleccionarlas).','Select doors or windows and repeat the command (or use the bar that appears when they are selected).'));bar.refresh(true)};
 for(const c of ['CAMBIARABERTURA','CAMBIARABERTURAS','REEMPLAZARABERTURA','CAMBIARPUERTA','CAMBIARVENTANA','SWAPOPENING','REPLACEOPENING'])EXT.commands[c]=cmd;
-window.CAD2D_OPENINGS=Object.freeze({swap,types:TYPES.map(t=>t.id),selected:selectedOpenings});
+window.CAD2D_OPENINGS=Object.freeze({swap,open:()=>bar.refresh(true),types:TYPES.map(t=>t.id),selected:selectedOpenings});
 })();
