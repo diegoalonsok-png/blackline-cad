@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261128-suite-opening1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261128-linked-room1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1148,7 +1148,7 @@ EXT.cancelArchitectureCommand=()=>{
 };
 document.addEventListener('keydown',e=>{if(e.key==='Escape')EXT.cancelArchitectureCommand()},true);
 EXT.drawArchitectureCommand=async raw=>{
- if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)){
+ if(!arqRoomSetRequest(raw)&&!arqHouseDesignRequest(raw)&&!arqLinkedRoomRequest(raw)){
  if(!arqPoolRequest(raw)){
  if(!arqParkingRequest(raw)&&!arqSanitaryBatteryRequest(raw)&&!arqClassroomRequest(raw)&&!arqAuditoriumRequest(raw)&&!arqRestaurantRequest(raw)){
  if(arqRoomCAD(raw)){arqOpenRoomCAD(raw);return;}
@@ -1616,6 +1616,10 @@ function arqHouseDesignRequest(raw){
  const program=(/\bban/.test(q)?1:0)+(/\bcocina/.test(q)?1:0)+(/\b(?:living|estar|comedor)\b/.test(q)?1:0);
  return bed&&program>=2;
 }
+function arqLinkedRoomRequest(raw){
+ const q=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ return /\d\s*(?:x|×|por|by)\s*\d/.test(q)&&(/\b(?:cocina|kitchen)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:lavadero|laundry)\b/.test(q)||/\b(?:living|salon)\b.*(?:\+|\bcon\b|\by\b|\bwith\b|\band\b).*\b(?:comedor|dining)\b/.test(q))&&!/\b(?:buscar|busca|mostrar|mostrame|search|find|show|fotos?|referencias?)\b/.test(q);
+}
 function arqRouteOf(raw){
  raw=String(raw||'').trim().replace(/\s+/g,' ');
  if(/^(?:calco|calcar|calcar planta|traceplan|trace plan)$/i.test(raw))return {kind:'calco'};
@@ -1627,6 +1631,7 @@ function arqRouteOf(raw){
  if(arqPoolRequest(raw))return {kind:'draw'};
  if(arqRoomSetRequest(raw))return {kind:'draw'};
  if(arqHouseDesignRequest(raw))return {kind:'draw'};
+ if(arqLinkedRoomRequest(raw))return {kind:'draw'};
  if(arqFurnishRequest(raw))return {kind:'furnish'};
  {const w=arqWallRequest(raw);if(w)return {kind:'wall',length:w};}
  const docs=window.CAD2D_ARQ_DOCS?.match(raw);if(docs)return {kind:'docs',docs};
