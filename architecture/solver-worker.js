@@ -17,7 +17,7 @@ self.onmessage=async({data})=>{
  const id=data?.id;
  try{
   if(!data.semantic){
-   if(!self.BlacklineArchitectureAI)importScripts('blackline-engine.js?v=20261127-casa1');
+   if(!self.BlacklineArchitectureAI)importScripts('blackline-engine.js?v=20261128-suite-opening1');
    const plan=data.brief?self.BlacklineArchitectureAI.solve(data.brief):self.BlacklineArchitectureAI.run(data.text);
    self.postMessage({id,plan});return;
   }

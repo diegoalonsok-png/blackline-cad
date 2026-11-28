@@ -802,7 +802,7 @@ function solveGeometry(text,brief=null,semantic=false){
  if(arqPending)return Promise.reject(Error('Architecture engine is busy.'));
  if(!brief&&!text.trim())return Promise.reject(Error('Enter an architectural instruction.'));
  clearTimeout(arqIdle);
- if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261127-casa1');
+ if(!arqWorker)arqWorker=new Worker('architecture/solver-worker.js?v=20261128-suite-opening1');
  const worker=arqWorker,id=++arqSeq;
  return new Promise((resolve,reject)=>{
   const done=(err,value,terminate=false)=>{clearTimeout(timeout);arqPending=null;worker.onmessage=worker.onerror=null;
@@ -1169,9 +1169,10 @@ EXT.drawArchitectureCommand=async raw=>{
   startPick(1,'ARQASSIST · clic en origen / click origin',([p])=>{
    if(epoch!==arqCommandEpoch)return;
    try{const n=applyArchitecture(plan,p);CORE.toast('ARQASSIST · '+n+' entidades CAD / entities drawn')}
-   catch(e){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}
+   catch(e){CORE.toast(e.message);statusHint('ARQASSIST · '+e.message);CORE.log('ARQASSIST: '+e.message)}
   },'arq-command');
- }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);CORE.log('ARQASSIST: '+e.message)}}
+  if(Array.isArray(plan.walls)&&Array.isArray(plan.openings)&&Array.isArray(plan.blocks)){pick.planPreview=plan;CORE.schedule();}
+ }catch(e){if(epoch===arqCommandEpoch){CORE.toast(e.message);statusHint('ARQASSIST · '+e.message);CORE.log('ARQASSIST: '+e.message)}}
 };
 
 
