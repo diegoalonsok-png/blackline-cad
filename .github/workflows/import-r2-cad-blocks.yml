@@ -1,5 +1,9 @@
 name: Import CAD blocks from R2 staging
 on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/r2-cad-import-request.json
   workflow_dispatch:
     inputs:
       package_ref:
@@ -29,9 +33,22 @@ jobs:
           python-version: '3.12'
       - run: pip install boto3 ezdxf matplotlib Pillow
       - name: Build pinned DWG converter
+        if: github.event_name == 'workflow_dispatch'
         run: |
           docker build -t blackline-import-dwg dwg-converter
           docker run --rm -d --name blackline-import-dwg -p 127.0.0.1:8080:8080 blackline-import-dwg
+      - name: Fetch verified queued DXF package
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          read -r REF SHA FILE HASH < <(python -c 'import json,re; x=json.load(open("scripts/r2-cad-import-request.json")); assert re.fullmatch(r"import/[a-z0-9-]+",x["ref"]); assert re.fullmatch(r"[a-f0-9]{40}",x["commit"]); assert re.fullmatch(r"[A-Za-z0-9_-]+\.zip",x["file"]); assert re.fullmatch(r"[a-f0-9]{64}",x["sha256"]); assert x["dxf_only"] is True; print(x["ref"],x["commit"],x["file"],x["sha256"])')
+          git fetch --depth 1 origin "refs/heads/$REF:refs/remotes/origin/package"
+          test "$(git rev-parse origin/package)" = "$SHA"
+          mkdir -p "$RUNNER_TEMP/packages"
+          git show "origin/package:$FILE" > "$RUNNER_TEMP/packages/$FILE"
+          echo "$HASH  $RUNNER_TEMP/packages/$FILE" | sha256sum -c -
+          echo "PACKAGE_FILE=$RUNNER_TEMP/packages/$FILE" >> "$GITHUB_ENV"
+          echo "REQUIRE_ALL_READY=1" >> "$GITHUB_ENV"
       - name: Fetch package from a temporary import branch
         if: ${{ inputs.package_ref != '' }}
         env:
